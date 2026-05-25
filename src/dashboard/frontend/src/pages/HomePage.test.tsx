@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FeatureRegistryEntry } from '@panctl/contracts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@panctl/contracts';
+import { INITIAL_READ_MODEL_STATE } from '@panctl/contracts';
 
 import { HomePage } from './HomePage';
+import { useDashboardStore } from '../lib/store';
 
 function makeEntry(overrides: Partial<FeatureRegistryEntry> = {}): FeatureRegistryEntry {
   return {
@@ -21,7 +23,55 @@ function makeEntry(overrides: Partial<FeatureRegistryEntry> = {}): FeatureRegist
   };
 }
 
-function renderHomePage() {
+const memoryStatus: MemoryStatus = {
+  name: 'PAN-1204 status',
+  headline: 'Home workspace cards are in progress',
+  summary: 'The Home page is rendering workspace status rollups from memory.',
+  goal: null,
+  phase: 'building',
+  accomplished: [],
+  decided: [],
+  open: [],
+  nextSteps: ['Verify Home'],
+  confidence: 0.75,
+  workingSet: [],
+  tags: [],
+};
+
+function makeObservation(overrides: Partial<MemoryObservation> = {}): MemoryObservation {
+  return {
+    id: 'obs-1',
+    timestamp: '2026-05-25T00:10:00.000Z',
+    projectId: 'panopticon-cli',
+    workspaceId: 'feature-pan-1204',
+    issueId: 'PAN-1204',
+    runId: 'run-1',
+    sessionId: 'session-1',
+    agentRole: 'work',
+    agentHarness: 'claude-code',
+    gitBranch: 'feature/pan-1204',
+    sourceTranscriptOffset: 1,
+    actionStatus: 'Rendering workspace card',
+    narrative: 'Narrative',
+    summary: 'Summary',
+    files: [],
+    tags: [],
+    tokens: { prompt: 1, completion: 1, total: 2 },
+    model: 'stub-model',
+    ...overrides,
+  };
+}
+
+function resetDashboardStore() {
+  useDashboardStore.setState({
+    ...INITIAL_READ_MODEL_STATE,
+    drawer: { issueId: null, tab: 'overview' },
+    bootstrapComplete: false,
+    snapshotTimestamp: null,
+  });
+}
+
+function renderHomePage(props: Parameters<typeof HomePage>[0] = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -31,10 +81,14 @@ function renderHomePage() {
 
   return render(
     <QueryClientProvider client={client}>
-      <HomePage />
+      <HomePage {...props} />
     </QueryClientProvider>,
   );
 }
+
+beforeEach(() => {
+  resetDashboardStore();
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -42,6 +96,42 @@ afterEach(() => {
 });
 
 describe('HomePage', () => {
+  it('renders workspace status cards from read-model memory state', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    const onOpenWorkspaceHome = vi.fn();
+    useDashboardStore.setState({
+      issuesRaw: [{ identifier: 'PAN-1204', title: 'Build Home', description: 'Render Home workspace list' }],
+      statusByIssueId: { 'PAN-1204': memoryStatus },
+      observationsByIssueId: { 'PAN-1204': [makeObservation({ tags: ['commit'] })] },
+      reviewStatusByIssueId: { 'PAN-1204': { issueId: 'PAN-1204', prUrl: 'https://example.com/pr/1' } },
+    });
+
+    renderHomePage({ onOpenWorkspaceHome, now: new Date('2026-05-25T00:20:00.000Z') });
+
+    const card = await screen.findByRole('button', { name: /open pan-1204 workspace overview/i });
+    expect(within(card).getByText('Home workspace cards are in progress')).toBeInTheDocument();
+    expect(within(card).getByText('Building')).toBeInTheDocument();
+    expect(within(card).getByText('Rendering workspace card')).toBeInTheDocument();
+    expect(within(card).getByText('+0')).toBeInTheDocument();
+    expect(within(card).getByText('-0')).toBeInTheDocument();
+    expect(within(card).getAllByText('1')).toHaveLength(2);
+
+    fireEvent.click(card);
+    expect(onOpenWorkspaceHome).toHaveBeenCalledWith('PAN-1204');
+  });
+
+  it('shows a workspace empty state when memory state is absent', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    useDashboardStore.setState({
+      agentsById: { 'agent-stopped': { id: 'agent-stopped', issueId: 'PAN-999', status: 'stopped' } },
+    });
+
+    renderHomePage();
+
+    expect(await screen.findByText('No workspace status is available yet.')).toBeInTheDocument();
+    expect(screen.getByText(/Workspace cards will appear after memory status/)).toBeInTheDocument();
+  });
+
   it('renders Knowledge Registry rows from the dashboard API', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [makeEntry()] })));
 

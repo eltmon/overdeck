@@ -132,7 +132,14 @@ vi.mock('./components/CommandDeck', () => ({
 vi.mock('./components/Pipeline/PipelineView', () => ({
   PipelineView: () => <div data-testid="pipeline-view" />,
 }));
-vi.mock('./pages/HomePage', () => ({ HomePage: () => <div data-testid="home-page" /> }));
+vi.mock('./pages/HomePage', () => ({
+  HomePage: ({ onOpenWorkspaceHome }: { onOpenWorkspaceHome?: (issueId: string) => void }) => (
+    <div>
+      <div data-testid="home-page" />
+      <button onClick={() => onOpenWorkspaceHome?.('PAN-123')}>Open Home workspace</button>
+    </div>
+  ),
+}));
 vi.mock('./components/drawer/IssueDrawer', () => ({
   IssueDrawer: () => null,
 }));
@@ -316,6 +323,16 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/');
     renderApp();
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
+  });
+
+  it('opens a Home workspace card through the existing board drawer route', async () => {
+    window.history.replaceState(null, '', '/');
+    renderApp();
+
+    fireEvent.click(screen.getByText('Open Home workspace'));
+
+    expect(mockOpenIssue).toHaveBeenCalledWith('PAN-123');
+    await waitFor(() => expect(screen.getByText('Open issue')).toBeInTheDocument());
   });
 
   it('renders PipelineView at /pipeline', () => {

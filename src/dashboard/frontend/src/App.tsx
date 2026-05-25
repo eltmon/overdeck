@@ -747,6 +747,11 @@ export default function App() {
     openIssue(issueId);
   }, [openIssue, setActiveTab]);
 
+  const handleOpenWorkspaceHome = useCallback((issueId: string) => {
+    setActiveTab('kanban');
+    openIssue(issueId);
+  }, [openIssue, setActiveTab]);
+
   return (
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
@@ -888,7 +893,7 @@ export default function App() {
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
           {activeTab === 'home' && (
-            <HomePage />
+            <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
           )}
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">

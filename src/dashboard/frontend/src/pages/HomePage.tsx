@@ -1,8 +1,32 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { FeatureRegistryEntry } from '@panctl/contracts';
+import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@panctl/contracts';
+import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
+import { useDashboardStore } from '../lib/store';
+import type { Issue } from '../types';
 
 interface FeatureRegistryResponse {
   entries: FeatureRegistryEntry[];
+}
+
+interface HomePageProps {
+  onOpenWorkspaceHome?: (issueId: string) => void;
+  now?: Date;
+}
+
+interface HomeWorkspaceSources {
+  issuesRaw: unknown[];
+  statusByIssueId?: Record<string, MemoryStatus>;
+  observationsByIssueId?: Record<string, MemoryObservation[]>;
+  agentsById?: Record<string, AgentSnapshot>;
+  reviewStatusByIssueId?: Record<string, ReviewStatusSnapshot>;
+}
+
+interface HomeWorkspaceCard {
+  issue: Pick<Issue, 'identifier' | 'title' | 'description'>;
+  status?: MemoryStatus;
+  observations: MemoryObservation[];
+  stats: WorkspaceStatusStats;
 }
 
 async function fetchFeatureRegistry(): Promise<FeatureRegistryEntry[]> {
@@ -12,13 +36,25 @@ async function fetchFeatureRegistry(): Promise<FeatureRegistryEntry[]> {
   return Array.isArray(data.entries) ? data.entries : [];
 }
 
-export function HomePage() {
+export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
   const registryQuery = useQuery({
     queryKey: ['feature-registry'],
     queryFn: fetchFeatureRegistry,
     staleTime: 30_000,
     retry: false,
   });
+  const issuesRaw = useDashboardStore((state) => state.issuesRaw);
+  const statusByIssueId = useDashboardStore((state) => state.statusByIssueId);
+  const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
+  const agentsById = useDashboardStore((state) => state.agentsById);
+  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const workspaceCards = useMemo(() => buildHomeWorkspaceCards({
+    issuesRaw,
+    statusByIssueId,
+    observationsByIssueId,
+    agentsById,
+    reviewStatusByIssueId,
+  }), [agentsById, issuesRaw, observationsByIssueId, reviewStatusByIssueId, statusByIssueId]);
 
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
@@ -30,6 +66,36 @@ export function HomePage() {
             A live landing page for current workspace context, cross-workspace ownership, and memory-first guidance.
           </p>
         </header>
+
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="workspace-status-title">
+          <div>
+            <h2 id="workspace-status-title" className="text-lg font-semibold text-foreground">Workspaces</h2>
+            <p className="text-sm text-muted-foreground">Live workspace status rollups from memory observations.</p>
+          </div>
+
+          <div className="mt-4">
+            {workspaceCards.length > 0 ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {workspaceCards.map((workspace) => (
+                  <WorkspaceStatusCard
+                    key={workspace.issue.identifier}
+                    issue={workspace.issue}
+                    status={workspace.status}
+                    observations={workspace.observations}
+                    stats={workspace.stats}
+                    onOpenWorkspaceHome={() => onOpenWorkspaceHome?.(workspace.issue.identifier)}
+                    now={now}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">No workspace status is available yet.</p>
+                <p className="mt-1">Workspace cards will appear after memory status or observations are recorded for an issue.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="knowledge-registry-title">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -64,6 +130,77 @@ export function HomePage() {
       </div>
     </div>
   );
+}
+
+function buildHomeWorkspaceCards({
+  issuesRaw,
+  statusByIssueId = {},
+  observationsByIssueId = {},
+  agentsById = {},
+  reviewStatusByIssueId = {},
+}: HomeWorkspaceSources): HomeWorkspaceCard[] {
+  const issueById = new Map<string, Pick<Issue, 'identifier' | 'title' | 'description'>>();
+  for (const rawIssue of issuesRaw) {
+    const issue = readIssue(rawIssue);
+    if (issue) issueById.set(issue.identifier, issue);
+  }
+
+  const issueIds = new Set<string>();
+  for (const issueId of Object.keys(statusByIssueId)) issueIds.add(issueId);
+  for (const [issueId, observations] of Object.entries(observationsByIssueId)) {
+    if (observations.length > 0) issueIds.add(issueId);
+  }
+  for (const agent of Object.values(agentsById)) {
+    if (agent.issueId && isActiveWorkspaceAgent(agent)) issueIds.add(agent.issueId);
+  }
+
+  return [...issueIds].sort().map((issueId) => {
+    const status = statusByIssueId[issueId];
+    const observations = observationsByIssueId[issueId] ?? [];
+    return {
+      issue: issueById.get(issueId) ?? {
+        identifier: issueId,
+        title: status?.headline || issueId,
+        description: status?.summary,
+      },
+      status,
+      observations,
+      stats: buildWorkspaceStats(observations, reviewStatusByIssueId[issueId]),
+    };
+  });
+}
+
+function isActiveWorkspaceAgent(agent: AgentSnapshot): boolean {
+  return agent.hasLiveTmuxSession === true || ['healthy', 'running', 'starting', 'stuck', 'warning'].includes(agent.status);
+}
+
+function buildWorkspaceStats(
+  observations: readonly MemoryObservation[],
+  reviewStatus: ReviewStatusSnapshot | undefined,
+): WorkspaceStatusStats {
+  return {
+    additions: 0,
+    deletions: 0,
+    commits: observations.filter(hasCommitTag).length,
+    prs: reviewStatus?.prUrl ? 1 : 0,
+  };
+}
+
+function hasCommitTag(observation: MemoryObservation): boolean {
+  return observation.tags.some((tag) => ['commit', 'commits', 'git.commit'].includes(tag.toLowerCase()));
+}
+
+function readIssue(value: unknown): Pick<Issue, 'identifier' | 'title' | 'description'> | null {
+  if (!isRecord(value) || typeof value.identifier !== 'string' || typeof value.title !== 'string') return null;
+  return {
+    identifier: value.identifier,
+    title: value.title,
+    description: typeof value.description === 'string' ? value.description : undefined,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function FeatureRegistryTable({ entries }: { entries: FeatureRegistryEntry[] }) {
