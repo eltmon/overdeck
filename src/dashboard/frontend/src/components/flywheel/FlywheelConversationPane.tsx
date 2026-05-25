@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, FileText, Loader2, Maximize2, Pause, Play, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, Maximize2, Pause, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
