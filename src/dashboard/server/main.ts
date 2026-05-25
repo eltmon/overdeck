@@ -12,6 +12,7 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
@@ -357,6 +358,8 @@ console.log('[panopticon] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[panopticon] ConversationLifecycleService started');
 
+startSubstrateBugPoller();
+
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {
   void cleanupOrphanedConversationAttachments();
@@ -423,6 +426,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
+  stopSubstrateBugPoller();
   stopTtsSummarizer();
   stopTtsPlayback();
   stopTranscriptPoller();
