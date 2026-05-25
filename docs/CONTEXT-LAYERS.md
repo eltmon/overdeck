@@ -125,6 +125,10 @@ silently rot while the maintained rules accumulated elsewhere (#1359).
 3. offers to register each project found under `~/Projects/`;
 4. prints where the old location is preserved.
 
+If a non-interactive migration skips registration, register projects with
+`pan projects add <path>`. The singular `pan project ...` form remains available
+as a compatibility alias, but new docs and prompts prefer `pan projects ...`.
+
 It never overwrites an existing target (safe to re-run) and never deletes the
 source. After verifying the migration, delete the old location and set
 `sync.devroot` to `null` to silence the warning.
