@@ -468,7 +468,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                       { label: 'Runtime', value: runtime },
                       { label: 'Last heard', value: lastHeard },
                     ]}
-                    streamLines={output.slice(-8)}
+                    streamLines={output.slice(-16)}
                     verbBadge={verbBadgeForAgent(agent, now)}
                     stuck={stuck}
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
