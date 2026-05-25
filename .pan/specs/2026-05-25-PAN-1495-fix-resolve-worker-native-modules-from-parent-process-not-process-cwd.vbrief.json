@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
-    "updated": "2026-05-25T09:24:05.221Z"
+    "updated": "2026-05-25T09:26:51.307Z"
   },
   "plan": {
     "id": "pan-1495",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
     "author": "agent:claude-opus-4-7",
-    "sequence": 10,
+    "sequence": 17,
     "created": "2026-05-25T08:25:00.000Z",
-    "updated": "2026-05-25T09:24:05.221Z",
+    "updated": "2026-05-25T09:26:51.307Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
@@ -233,57 +233,57 @@
         "phase": "review",
         "issueId": "PAN-1495",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-25T09:21:54.906Z",
+        "updatedAt": "2026-05-25T09:26:51.307Z",
         "work": {
-          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-05-25T09:21:54.906Z",
-          "notes": "Verification FAILED at typecheck (5443ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
+          "notes": "Verification FAILED at lint (48967ms):\n\n38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:resolver (34%)\n  - rolldown-plugin-dts:generate (33%)\n  - tsdown:deps (29%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nskill CLI lint failed:\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-pause/SKILL.md: pan pause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-plan/SKILL.md: pan plan exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-projects/SKILL.md: pan projects exists in top-level help but --help failed\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-25T09:21:54.906Z",
-              "notes": "Verification FAILED at typecheck (5443ms):\n\n\n> @panctl/cli@0.11.1 typecheck\n> tsc --noEmit\n\nsrc/cli/commands/done.ts(510,7): error TS2322: Type '\"work-agent\"' is not assignable to type '\"dashboard\" | Role | \"cloister\"'.\nsrc/lib/config-yaml.ts(1533,5): error TS2741: Property 'lifecycle' is missing in type '{ enabled: boolean; voice: string; volume: number; rate: number; maxChars: number; dropInfoWhenFull: boolean; daemonPort: number; daemonHost: string; daemonAutoStart: boolean; voiceMap: { [x: string]: string; }; mutedSources: string[]; utteranceTemplates: { ...; }; mutedIssues: string[]; }' but required in type 'NormalizedTtsDaemonConfig'.\n"
+              "at": "2026-05-25T09:26:51.307Z",
+              "notes": "Verification FAILED at lint (48967ms):\n\n38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:resolver (34%)\n  - rolldown-plugin-dts:generate (33%)\n  - tsdown:deps (29%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nskill CLI lint failed:\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-pause/SKILL.md: pan pause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-plan/SKILL.md: pan plan exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1495/sync-sources/skills/pan-projects/SKILL.md: pan projects exists in top-level help but --help failed\n"
             }
           ]
         },
         "review": {
           "status": "failed",
-          "updatedAt": "2026-05-25T09:21:54.906Z",
-          "notes": "Verification failed at typecheck",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
+          "notes": "Verification failed at lint",
           "history": [
             {
               "status": "failed",
-              "at": "2026-05-25T09:21:54.906Z",
-              "notes": "Verification failed at typecheck"
+              "at": "2026-05-25T09:26:51.307Z",
+              "notes": "Verification failed at lint"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:21:54.906Z"
+              "at": "2026-05-25T09:26:51.307Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-25T09:21:54.906Z",
+          "updatedAt": "2026-05-25T09:26:51.307Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-25T09:21:54.906Z"
+              "at": "2026-05-25T09:26:51.307Z"
             }
           ],
           "readyForMerge": false,
