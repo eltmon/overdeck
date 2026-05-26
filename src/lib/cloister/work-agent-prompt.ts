@@ -65,6 +65,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       ISSUE_ID: ctx.issueId,
       ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
       WORKSPACE_PATH: ctx.workspacePath,
+      BRANCH_NAME: `feature/${ctx.issueId.toLowerCase()}`,
       LOCAL: ctx.env === 'LOCAL',
       REMOTE: ctx.env === 'REMOTE',
       PROJECT_ROOT: ctx.projectRoot || '',
