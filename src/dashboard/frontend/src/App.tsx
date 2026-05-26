@@ -45,7 +45,7 @@ import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { PanOpenInPicker } from './components/PanOpenInPicker';
-import { useProjectCwdForIssue } from './hooks/useProjectCwdForIssue';
+import { useTopBarCwd } from './hooks/useProjectCwdForIssue';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -387,7 +387,7 @@ export default function App() {
 
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const drawerOpen = drawerIssueId !== null;
-  const topBarCwd = useProjectCwdForIssue(drawerIssueId);
+  const topBarCwd = useTopBarCwd(drawerIssueId, selectedConvId);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
