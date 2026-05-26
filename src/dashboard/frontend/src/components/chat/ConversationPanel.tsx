@@ -530,7 +530,7 @@ export function ConversationPanel({
               <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
             </span>
           )}
-          <PanOpenInPicker openInCwd={conversation.cwd} />
+          <PanOpenInPicker openInCwd={conversation.cwd} compact />
           {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
             <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}

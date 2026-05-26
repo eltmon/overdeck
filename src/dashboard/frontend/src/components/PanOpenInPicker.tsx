@@ -14,13 +14,19 @@ interface PanOpenInPickerProps {
    * exists, else `$HOME`).
    */
   openInCwd: string | null;
+  /**
+   * Icon-only rendering for tight contexts (e.g. ConversationPanel header
+   * where the picker sits next to other icon-only action buttons). The
+   * editor label is hidden; the icon button keeps its tooltip and dropdown.
+   */
+  compact?: boolean;
 }
 
 const EDITOR_LABELS: Record<EditorId, string> = Object.fromEntries(
   EDITORS.map((e) => [e.id, e.label]),
 ) as Record<EditorId, string>;
 
-export function PanOpenInPicker({ openInCwd }: PanOpenInPickerProps) {
+export function PanOpenInPicker({ openInCwd, compact = false }: PanOpenInPickerProps) {
   const [availableEditors, setAvailableEditors] = useState<EditorId[]>([]);
   const [defaultCwd, setDefaultCwd] = useState<string | null>(null);
   const [preferred, setPreferred] = useState<EditorId | null>(getPreferredEditor);
@@ -99,11 +105,12 @@ export function PanOpenInPicker({ openInCwd }: PanOpenInPickerProps) {
       <button
         onClick={() => handleOpen(primaryEditor)}
         disabled={disabled}
-        className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+        className={`flex items-center gap-1 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-1' : 'px-1.5'}`}
         title={`Open ${tooltipCwd} in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
+        aria-label={`Open in ${EDITOR_LABELS[primaryEditor]}`}
       >
         <PrimaryIcon className="w-2.5 h-2.5" />
-        {EDITOR_LABELS[primaryEditor]}
+        {!compact && EDITOR_LABELS[primaryEditor]}
       </button>
       {availableEditors.length > 1 && (
         <button
