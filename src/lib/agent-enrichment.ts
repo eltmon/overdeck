@@ -38,12 +38,38 @@ export interface QuestionOption { label: string; description: string }
 export interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean }
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
 
+/**
+ * PAN-1520 — every "agent is blocked waiting on operator" surface we detect.
+ * Used to drive the unified pending-input indicator and notifications.
+ */
+export type PendingInputKind =
+  | 'askUserQuestion'
+  | 'permissionRequest'
+  | 'exitPlanMode'
+  | 'enterPlanMode'
+  | 'sessionResume'
+
+export interface PendingAskUserQuestionSnapshot {
+  toolUseId: string
+  askedAt: string
+  questions: Array<{
+    question: string
+    header?: string
+    multiSelect?: boolean
+    options: Array<{ label: string; description?: string }>
+  }>
+}
+
 export interface AgentEnrichment {
   role: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | undefined
   hasPendingQuestion: boolean
   pendingQuestionCount: number
   pendingQuestionPrompt?: string
   pendingQuestionReason?: string
+  // PAN-1520 — unified pending-input surfaces.
+  pendingInputCount: number
+  pendingInputKinds: PendingInputKind[]
+  pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
   resolution: string
   resolutionCount: number
 }
@@ -155,38 +181,111 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
   } catch {
     return ''
   }
-}async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
-  if (!existsSync(jsonlPath)) return []
+}/**
+ * PAN-1520 — the hook (`sync-sources/hooks/ask-user-question-hook`) returns a
+ * deny verdict with this reason string. When we see a tool_result whose content
+ * matches this, treat it as a "still pending" — the operator has NOT actually
+ * answered; the upstream tool was denied to force a plain-text restate.
+ */
+const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
+
+function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
+  if (item.is_error !== true) return false
+  const content = item.content
+  if (typeof content === 'string') return content.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+  if (Array.isArray(content)) {
+    return content.some((part: unknown) => {
+      if (typeof part === 'string') return part.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+      if (part && typeof part === 'object' && 'text' in part) {
+        const text = (part as { text?: unknown }).text
+        return typeof text === 'string' && text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
+      }
+      return false
+    })
+  }
+  return false
+}
+
+async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
+  const detection = await scanPendingInputsPromise(jsonlPath)
+  return detection.askUserQuestions
+}
+
+interface PendingInputsScan {
+  readonly askUserQuestions: PendingQuestion[]
+  /** Outstanding EnterPlanMode tool_use ids without a matching ExitPlanMode (plan being drafted). */
+  readonly enterPlanModeOpen: boolean
+  /** Outstanding ExitPlanMode tool_use without a matching tool_result (operator approval pending). */
+  readonly exitPlanModePending: boolean
+}
+
+async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
+  if (!existsSync(jsonlPath)) {
+    return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
+  }
   try {
-    // Only read the last 512KB — pending questions are always recent.
+    // Only read the last 512KB — pending inputs are always recent.
     const content = await readFileTail(jsonlPath, 512_000)
     const lines = content.split('\n').filter(line => line.trim())
-    const toolCalls = new Map<string, PendingQuestion>()
-    const answeredIds = new Set<string>()
+    const askToolCalls = new Map<string, PendingQuestion>()
+    const askAnswered = new Set<string>()
+    const exitPlanModeIds = new Set<string>()
+    const exitPlanModeAnswered = new Set<string>()
+    const enterPlanModeIds = new Set<string>()
+    const exitPlanModeFiredAfterEnter = new Set<string>() // tracks any ExitPlanMode (signals plan-mode session ended)
+
     for (const line of lines) {
       try {
         const entry = JSON.parse(line)
         const messageContent = entry.message?.content
         if (!Array.isArray(messageContent)) continue
         for (const item of messageContent) {
-          if (item.type === 'tool_use' && item.name === 'AskUserQuestion') {
-            toolCalls.set(item.id, {
-              toolId: item.id,
-              timestamp: entry.timestamp || new Date().toISOString(),
-              questions: item.input?.questions || [],
-            })
+          if (item.type === 'tool_use') {
+            if (item.name === 'AskUserQuestion' && typeof item.id === 'string') {
+              askToolCalls.set(item.id, {
+                toolId: item.id,
+                timestamp: entry.timestamp || new Date().toISOString(),
+                questions: item.input?.questions || [],
+              })
+            } else if (item.name === 'ExitPlanMode' && typeof item.id === 'string') {
+              exitPlanModeIds.add(item.id)
+              exitPlanModeFiredAfterEnter.add(item.id)
+            } else if (item.name === 'EnterPlanMode' && typeof item.id === 'string') {
+              enterPlanModeIds.add(item.id)
+            }
           }
-          if (item.type === 'tool_result' && item.tool_use_id) {
-            answeredIds.add(item.tool_use_id)
+          if (item.type === 'tool_result' && typeof item.tool_use_id === 'string') {
+            // Hook deny does NOT count as an answer — the operator still needs
+            // to restate-and-respond. Skip these so AUQ stays pending.
+            if (askToolCalls.has(item.tool_use_id)) {
+              if (isAskUserQuestionHookDenyToolResult(item)) {
+                // intentionally do NOT mark as answered — hook deny keeps it pending
+              } else {
+                askAnswered.add(item.tool_use_id)
+              }
+            }
+            if (exitPlanModeIds.has(item.tool_use_id)) {
+              exitPlanModeAnswered.add(item.tool_use_id)
+            }
           }
         }
-      } catch {}
+      } catch { /* malformed JSONL line — skip */ }
     }
-    return Array.from(toolCalls.entries())
-      .filter(([id]) => !answeredIds.has(id))
+
+    const askUserQuestions = Array.from(askToolCalls.entries())
+      .filter(([id]) => !askAnswered.has(id))
       .map(([, question]) => question)
+
+    const exitPlanModePending = Array.from(exitPlanModeIds).some(id => !exitPlanModeAnswered.has(id))
+
+    // EnterPlanMode is "open" only if no ExitPlanMode has fired since the last
+    // EnterPlanMode. Approximation: if there are EnterPlanMode ids AND no
+    // ExitPlanMode has fired, we're still in plan mode.
+    const enterPlanModeOpen = enterPlanModeIds.size > 0 && exitPlanModeFiredAfterEnter.size === 0
+
+    return { askUserQuestions, enterPlanModeOpen, exitPlanModePending }
   } catch {
-    return []
+    return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
 }async function getAgentPendingQuestionsPromise(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
@@ -229,11 +328,19 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // Get runtime state for resolution + explicit waiting signals.
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId))
 
-  // Get pending questions, filtered by agent start time.
+  // Get pending questions + other blocking surfaces, filtered by agent start time.
   // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).
   let pendingQuestions: PendingQuestion[] = []
+  let enterPlanModeOpen = false
+  let exitPlanModePending = false
   if (!skipJsonlScan) {
-    pendingQuestions = [...await Effect.runPromise(getAgentPendingQuestions(agentId))]
+    const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
+    if (jsonlPath) {
+      const scan = await scanPendingInputsPromise(jsonlPath)
+      pendingQuestions = [...scan.askUserQuestions]
+      enterPlanModeOpen = scan.enterPlanModeOpen
+      exitPlanModePending = scan.exitPlanModePending
+    }
     if (pendingQuestions.length > 0 && startedAt) {
       const agentStartTime = new Date(startedAt).getTime()
       pendingQuestions = pendingQuestions.filter(q => {
@@ -278,12 +385,40 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection
   const hasPendingQuestion = !hasActiveSpecialist && detection !== null
 
+  // PAN-1520 — fold every blocking surface into a uniform set.
+  // PermissionRequest is tracked server-side in channelPermissionRequestsById and
+  // is contributed at the read-model layer (server merges it in). The enrichment
+  // here owns the JSONL-derived kinds plus pane/runtime fallbacks.
+  const pendingInputKinds: PendingInputKind[] = []
+  let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined
+  if (!hasActiveSpecialist) {
+    if (pendingQuestions.length > 0) {
+      pendingInputKinds.push('askUserQuestion')
+      const first = pendingQuestions[0]
+      pendingAskUserQuestion = {
+        toolUseId: first.toolId,
+        askedAt: first.timestamp,
+        questions: first.questions.map(q => ({
+          question: q.question,
+          header: q.header,
+          multiSelect: q.multiSelect,
+          options: q.options.map(o => ({ label: o.label, description: o.description })),
+        })),
+      }
+    }
+    if (exitPlanModePending) pendingInputKinds.push('exitPlanMode')
+    if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
+  }
+
   return {
     role,
     hasPendingQuestion,
     pendingQuestionCount: pendingQuestions.length,
     pendingQuestionPrompt: detection?.prompt,
     pendingQuestionReason: detection?.reason,
+    pendingInputCount: pendingInputKinds.length,
+    pendingInputKinds,
+    pendingAskUserQuestion,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
   }

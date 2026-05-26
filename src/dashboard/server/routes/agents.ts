@@ -81,6 +81,7 @@ import {
   resumeAgent,
   restartAgent,
   messageAgent,
+  deliverAgentMessage,
   stopAgentSync,
   stopAgent,
   listRunningAgentsSync,
@@ -747,6 +748,9 @@ const getAgentsRoute = HttpRouter.add(
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
               pendingQuestionReason: enrichment.pendingQuestionReason,
+              pendingInputCount: enrichment.pendingInputCount,
+              pendingInputKinds: enrichment.pendingInputKinds,
+              pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
               resolution: runtimeState?.resolution || enrichment.resolution || 'working',
               resolutionCount: runtimeState?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
@@ -1246,7 +1250,17 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/agents/:id/answer-question ─────────────────────────────
+// ─── Route: POST /api/agents/:id/answer-question (PAN-1520) ──────────────────
+//
+// Operator answer for an AskUserQuestion the agent is blocked on. The Phase 1
+// hook (sync-sources/hooks/ask-user-question-hook) denies the upstream tool
+// call to prevent silent corruption (upstream returns option #1 under
+// --dangerously-skip-permissions), so by the time this endpoint is hit the
+// agent has restated the question as plain text and is waiting on a normal
+// user message. We compose that user message from the chosen option labels
+// and deliver it through the standard message pipeline.
+//
+// Body: { answers: string[] }  — one chosen-option label per question.
 
 const postAgentAnswerQuestionRoute = HttpRouter.add(
   'POST',
@@ -1254,44 +1268,35 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+    if (!id.trim()) {
+      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
+    }
+    const body = (yield* readJsonBody) as Record<string, unknown>;
 
-    const { answers } = body as any;
-    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+    const answers = body['answers'];
+    if (!Array.isArray(answers) || answers.length === 0) {
       return jsonResponse({ error: 'answers array required' }, { status: 400 });
+    }
+    if (!answers.every((a): a is string => typeof a === 'string' && a.length > 0)) {
+      return jsonResponse({ error: 'every answer must be a non-empty string' }, { status: 400 });
     }
 
     const pendingQuestions = yield* getAgentPendingQuestions(id);
     if (pendingQuestions.length === 0) {
-      return jsonResponse({ error: 'No pending questions found' }, { status: 400 });
+      return jsonResponse({ error: 'No pending questions found for this agent' }, { status: 404 });
     }
 
     const questionSet = pendingQuestions[0];
     const questions = questionSet.questions;
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
+    const lines: string[] = [];
     for (let i = 0; i < answers.length && i < questions.length; i++) {
-      const answer = answers[i];
-      const question = questions[i];
-      const optionIndex = question.options.findIndex(
-        (opt: { label: string }) => opt.label === answer
-      );
-
-      if (optionIndex === -1) {
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, '4'])));
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, answer])));
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
-      } else {
-        const keyNumber = optionIndex + 1;
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, String(keyNumber)])));
-      }
-
-      yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'Tab'])));
-      yield* Effect.promise(() => delay(100));
+      const q = questions[i].question ?? `Question ${i + 1}`;
+      lines.push(`Q: ${q}\nA: ${answers[i]}`);
     }
+    const message = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
 
-    yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
-    return jsonResponse({ success: true });
+    yield* Effect.promise(() => deliverAgentMessage(id, message, 'ask-user-question-answer'));
+    return jsonResponse({ success: true, agentId: id, delivered: answers.length });
   })),
 );
 

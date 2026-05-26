@@ -378,6 +378,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             pendingQuestionCount: event.payload.pendingQuestionCount,
             pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
             pendingQuestionReason: event.payload.pendingQuestionReason,
+            pendingInputCount: event.payload.pendingInputCount,
+            pendingInputKinds: event.payload.pendingInputKinds,
+            pendingAskUserQuestion: event.payload.pendingAskUserQuestion,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },
@@ -462,6 +465,20 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               base[field] = value
             }
           }
+        }
+        // PAN-1520 (fixes #339) — clear stale pending-input fields whenever the
+        // agent transitions out of an actively-running state. The enrichment
+        // poller stops emitting events for non-running agents, so without this
+        // a paused or stopped agent would keep showing INPUT/AskUserQuestion
+        // forever from the operator's perspective.
+        if (event.payload.status !== 'running' && event.payload.status !== 'starting') {
+          delete base['hasPendingQuestion']
+          delete base['pendingQuestionCount']
+          delete base['pendingQuestionPrompt']
+          delete base['pendingQuestionReason']
+          delete base['pendingInputCount']
+          delete base['pendingInputKinds']
+          delete base['pendingAskUserQuestion']
         }
         return base as AgentSnapshot
       })()

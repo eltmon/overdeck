@@ -8,6 +8,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
+import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
@@ -49,7 +50,7 @@ import { useTopBarCwd } from './hooks/useProjectCwdForIssue';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgents, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -546,7 +547,17 @@ export default function App() {
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
+  const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
   const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
+    useState<Set<string>>(new Set());
+  // PAN-1520 — track AskUserQuestions the operator has already answered so the
+  // dialog hides immediately, before the next enrichment poll clears the field.
+  const [optimisticallyAnsweredAskUserQuestionIds, setOptimisticallyAnsweredAskUserQuestionIds] =
+    useState<Set<string>>(new Set());
+  // PAN-1520 — agent IDs the operator has dismissed without answering. Stays
+  // dismissed for the lifetime of this snapshot — we wait for the agent to
+  // restate or for a fresh `pendingAskUserQuestion.toolUseId` before re-showing.
+  const [dismissedAskUserQuestionAgentIds, setDismissedAskUserQuestionAgentIds] =
     useState<Set<string>>(new Set());
 
   // Issues from Zustand store (event-sourced via snapshot — no polling)
@@ -557,6 +568,21 @@ export default function App() {
   const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
+
+  // PAN-1520 — surface the oldest unresolved AskUserQuestion. Filter out:
+  //   - questions the operator just optimistically answered (by toolUseId)
+  //   - questions for agents the operator dismissed without answering
+  const visibleAskUserQuestionAgents = agentsWithAskUserQuestion.filter((a) => {
+    const toolUseId = a.pendingAskUserQuestion?.toolUseId
+    if (!toolUseId) return false
+    if (optimisticallyAnsweredAskUserQuestionIds.has(toolUseId)) return false
+    if (dismissedAskUserQuestionAgentIds.has(a.id)) return false
+    return true
+  });
+  const currentAskUserQuestionAgent = visibleAskUserQuestionAgents[0] ?? null;
+  // Cast the snapshot pendingAskUserQuestion shape forward to the dialog's
+  // expected agent. AgentSnapshot already carries the field by name.
+  const currentAskUserQuestionIssueId = currentAskUserQuestionAgent?.issueId;
 
   useEffect(() => {
     setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
@@ -591,6 +617,63 @@ export default function App() {
   // Track which planning agents have already fired an INPUT toast to avoid spam
   const notifiedPlanningInputRef = useRef<Set<string>>(new Set());
 
+  // PAN-1520 — desktop-notification permission grant on first interaction.
+  // Browsers require user gesture for `Notification.requestPermission()` in
+  // many configurations; we attempt once and silently degrade to toast-only.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      // Don't auto-prompt — wait for the first user gesture. We piggyback on
+      // the existing pointerdown handler so this never fires on hostile pages.
+      const ask = (): void => {
+        Notification.requestPermission().catch(() => { /* ignore */ });
+        window.removeEventListener('pointerdown', ask);
+      };
+      window.addEventListener('pointerdown', ask, { once: true });
+      return (): void => { window.removeEventListener('pointerdown', ask); };
+    }
+    return undefined;
+  }, []);
+
+  // PAN-1520 — fire a desktop notification (+ in-app toast) when an agent
+  // transitions into a "needs operator input" state. We track unique
+  // (agentId, toolUseId) tuples in a ref so a single AUQ only fires once.
+  const notifiedPendingInputRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const a of agentsWithAskUserQuestion) {
+      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
+      if (!toolUseId) continue;
+      const key = `${a.id}::${toolUseId}`;
+      if (notifiedPendingInputRef.current.has(key)) continue;
+      notifiedPendingInputRef.current.add(key);
+
+      const title = `Agent ${a.id} is waiting on you`;
+      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
+      // In-app toast — always works.
+      toast.info(title, { description: body, duration: 12000 });
+      // Desktop notification — best-effort; silently no-ops without permission.
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const n = new Notification(title, { body, tag: key });
+          n.onclick = (): void => {
+            window.focus();
+            n.close();
+          };
+        } catch { /* ignore — some browsers throw under restricted contexts */ }
+      }
+    }
+    // Garbage-collect notification keys for AUQs that have cleared.
+    const liveKeys = new Set(
+      agentsWithAskUserQuestion
+        .map((a) => `${a.id}::${a.pendingAskUserQuestion?.toolUseId ?? ''}`)
+        .filter((k) => !k.endsWith('::')),
+    );
+    for (const k of notifiedPendingInputRef.current) {
+      if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
+    }
+  }, [agentsWithAskUserQuestion]);
+
   // Toast notification when a planning agent needs user input
   useEffect(() => {
     const planningAgentsNeedingInput = agents.filter(
@@ -616,6 +699,96 @@ export default function App() {
       }
     }
   }, [agents]);
+
+  // PAN-1520 — answer an AskUserQuestion via plain user message routed
+  // through deliverAgentMessage on the server.
+  const askUserQuestionAnswerMutation = useMutation({
+    mutationFn: async ({ agentId, answers }: { agentId: string; answers: string[] }) => {
+      const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/answer-question`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      });
+      if (!res.ok) {
+        let message = `Failed to deliver answer (${res.status})`;
+        try {
+          const body = await res.json() as { error?: string };
+          if (body?.error) message = body.error;
+        } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onMutate: (variables) => {
+      const toolUseId = currentAskUserQuestionAgent?.pendingAskUserQuestion?.toolUseId;
+      if (toolUseId) {
+        setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
+          const next = new Set(prev);
+          next.add(toolUseId);
+          return next;
+        });
+      }
+      return { agentId: variables.agentId, toolUseId };
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(`Answer delivered to ${variables.agentId}`);
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.toolUseId) {
+        setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
+          if (!prev.has(context.toolUseId!)) return prev;
+          const next = new Set(prev);
+          next.delete(context.toolUseId!);
+          return next;
+        });
+      }
+      toast.error(`Failed to deliver answer: ${error.message}`);
+    },
+  });
+
+  const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
+    if (!currentAskUserQuestionAgent) return;
+    askUserQuestionAnswerMutation.mutate({
+      agentId: currentAskUserQuestionAgent.id,
+      answers,
+    });
+  }, [askUserQuestionAnswerMutation, currentAskUserQuestionAgent]);
+
+  const handleDismissAskUserQuestion = useCallback(() => {
+    if (!currentAskUserQuestionAgent) return;
+    setDismissedAskUserQuestionAgentIds((prev) => {
+      const next = new Set(prev);
+      next.add(currentAskUserQuestionAgent.id);
+      return next;
+    });
+  }, [currentAskUserQuestionAgent]);
+
+  // PAN-1520 — purge optimistic state for AUQs that have actually cleared
+  // server-side, and re-allow dismissed agents whose tool-use id has changed.
+  useEffect(() => {
+    const liveToolUseIds = new Set(
+      agentsWithAskUserQuestion
+        .map((a) => a.pendingAskUserQuestion?.toolUseId)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+    setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (liveToolUseIds.has(id)) { next.add(id); } else { changed = true; }
+      }
+      return changed ? next : prev;
+    });
+    const liveAgentIds = new Set(agentsWithAskUserQuestion.map((a) => a.id));
+    setDismissedAskUserQuestionAgentIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (liveAgentIds.has(id)) { next.add(id); } else { changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [agentsWithAskUserQuestion]);
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({
@@ -1062,6 +1235,16 @@ export default function App() {
         isSubmitting={channelPermissionResponseMutation.isPending}
         onAllow={handleAllowChannelPermission}
         onDeny={handleDenyChannelPermission}
+      />
+
+      {/* PAN-1520 — AskUserQuestion interactive dialog */}
+      <AskUserQuestionDialog
+        agent={(currentAskUserQuestionAgent ?? null) as unknown as import('@panctl/contracts').AgentSnapshot | null}
+        issueId={currentAskUserQuestionIssueId}
+        isOpen={!!currentAskUserQuestionAgent && !currentChannelPermissionRequest}
+        isSubmitting={askUserQuestionAnswerMutation.isPending}
+        onSubmit={handleSubmitAskUserQuestion}
+        onDismiss={handleDismissAskUserQuestion}
       />
 
       {/* Confirmation Dialog */}
