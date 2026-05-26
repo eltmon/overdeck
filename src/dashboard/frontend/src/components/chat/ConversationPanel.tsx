@@ -10,7 +10,7 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import { ContextUsageIndicator } from './ContextUsageIndicator';
+import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -461,8 +461,6 @@ export function ConversationPanel({
     ? 'var(--success)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
-  const headerContextUsage = messagesData?.contextUsage ?? conversation.contextUsage ?? null;
-
   return (
     <div className={styles.conversationTerminal}>
       {/* Header bar — hidden in embedded mode (ZoneB already shows session info), so its context indicator is omitted there. */}
@@ -536,7 +534,6 @@ export function ConversationPanel({
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
             </span>
           )}
-          <ContextUsageIndicator contextUsage={headerContextUsage} />
           <span className={styles.conversationTerminalStatus}>
             <Circle
               size={7}
@@ -921,6 +918,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
+  // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
+  // t3code's placement). The snapshot adapter normalizes the server's
+  // `ContextUsage` shape into t3code's `ContextWindowSnapshot` so future
+  // upstream changes port cleanly.
+  const contextWindowUsage = toContextWindowSnapshot(
+    data?.contextUsage ?? conversation.contextUsage ?? null,
+  );
 
   // Drop optimistic messages once the server has returned at least as many messages
   // as we had before plus the optimistic ones (the real message has arrived).
@@ -1127,7 +1131,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} agentId={agentId} />
+        <ComposerFooter
+          conversation={conversation}
+          onSend={handleMessageSent}
+          onSendFailed={handleSendFailed}
+          agentId={agentId}
+          contextWindowUsage={contextWindowUsage}
+        />
       )}
     </div>
   );

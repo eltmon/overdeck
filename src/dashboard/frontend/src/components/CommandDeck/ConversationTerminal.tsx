@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle, Folder, GitFork } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
-import { ContextUsageIndicator } from '../chat/ContextUsageIndicator';
+import { ContextWindowMeter } from '../chat/ContextWindowMeter';
+import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from './ConversationList';
 import styles from './styles/command-deck.module.css';
 
@@ -78,7 +79,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
             {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
           </span>
         )}
-        <ContextUsageIndicator contextUsage={conversation.contextUsage ?? null} />
+        <ContextWindowMeter usage={toContextWindowSnapshot(conversation.contextUsage ?? null)} />
         <span className={styles.conversationTerminalStatus}>
           <Circle
             size={7}

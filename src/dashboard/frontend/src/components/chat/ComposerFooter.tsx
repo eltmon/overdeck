@@ -22,6 +22,8 @@ import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel }
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
+import { ContextWindowMeter } from './ContextWindowMeter';
+import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -146,11 +148,23 @@ interface ComposerFooterProps {
   onSendFailed?: (text: string) => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
+  /**
+   * Current context-window snapshot for this conversation. Rendered as a
+   * `<ContextWindowMeter>` in the toolbar right-cluster, mirroring t3code's
+   * placement (right side, just before the send button).
+   */
+  contextWindowUsage?: ContextWindowSnapshot | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
+export function ComposerFooter({
+  conversation,
+  onSend,
+  onSendFailed,
+  agentId,
+  contextWindowUsage = null,
+}: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   // Existing conversations are bound to the harness they were spawned with.
   // Falling back to a global localStorage default here caused the picker to
@@ -614,6 +628,8 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           >
             {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
+
+          <ContextWindowMeter usage={contextWindowUsage} />
 
           <button
             className={styles.sendButton}
