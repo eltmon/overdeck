@@ -3,7 +3,7 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -519,6 +519,18 @@ export function ConversationPanel({
               </>
             )}
           </span>
+          {conversation.branch && (
+            <span
+              className={styles.terminalBranchBar}
+              title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
+            >
+              {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+              <span className={styles.terminalBranchBarMode}>
+                {conversation.isWorktree ? 'Worktree' : 'Local'}
+              </span>
+              <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+            </span>
+          )}
           {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
             <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}

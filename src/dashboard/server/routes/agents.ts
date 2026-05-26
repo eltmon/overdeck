@@ -118,6 +118,7 @@ import { operatorInterventionEvent } from '../../../lib/operator-interventions.j
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import { getClosedIssueIdsForReadSource, ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
+import { resolveAgentGitInfo } from '../services/git-info.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -1542,6 +1543,45 @@ const getAgentRuntimeRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'not found' }, { status: 404 });
     }
     return jsonResponse({ success: true, snapshot });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/git-info ─────────────────────────────────────
+//
+// Branch + worktree status for the agent's workspace (PAN-1523). Used by
+// AgentOutputPanel to render the Local/Worktree/Drifted chip in the panel
+// header. Work agents don't have a conversation row to enrich, so the panel
+// queries this dedicated endpoint instead.
+
+const getAgentGitInfoRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/git-info',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
+    }
+
+    const agentState = yield* getAgentState(id);
+    if (!agentState?.workspace || !agentState.issueId) {
+      return jsonResponse({
+        actualBranch: null,
+        branchDrifted: false,
+        workspaceMissing: true,
+        expectedBranch: null,
+      });
+    }
+
+    const expectedBranch = `feature/${agentState.issueId.toLowerCase()}`;
+    const info = yield* Effect.promise(() =>
+      resolveAgentGitInfo(agentState.workspace as string, expectedBranch),
+    );
+    return jsonResponse({
+      ...info,
+      expectedBranch,
+      workspacePath: agentState.workspace,
+    });
   })),
 );
 
@@ -3741,6 +3781,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postInternalAgentPermissionRequestRoute,
   postAgentPermissionResponseRoute,
   getAgentRuntimeRoute,
+  getAgentGitInfoRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -234,6 +234,18 @@ export function ConversationRow({
       ) : (
         <span className={isNested ? styles.projectConvLabel : styles.conversationName}>
           {conv.title ?? conv.name}
+        </span>
+      )}
+
+      {/* Branch / worktree chip (PAN-1523) */}
+      {conv.branch && (
+        <span
+          className={styles.conversationBranchChip}
+          title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+          aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+        >
+          {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+          <span className={styles.conversationBranchChipText}>{conv.branch}</span>
         </span>
       )}
 

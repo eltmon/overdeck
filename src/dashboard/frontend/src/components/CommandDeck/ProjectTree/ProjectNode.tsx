@@ -23,6 +23,12 @@ export interface ProjectFeatureResourceDetails {
   hasVbrief: boolean;
   hasBeads: boolean;
   dockerContainerCount: number;
+  /** PAN-1523: actual HEAD of the agent's workspace, or null when workspace is missing. */
+  actualBranch?: string | null;
+  /** PAN-1523: true when workspace HEAD differs from expected feature/<id> branch. */
+  branchDrifted?: boolean;
+  /** PAN-1523: true when workspace path is configured but missing on disk. */
+  workspaceMissing?: boolean;
 }
 
 export interface ProjectFeatureResourceIdentifiers {

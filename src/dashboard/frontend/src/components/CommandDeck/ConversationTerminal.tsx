@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Circle } from 'lucide-react';
+import { Circle, Folder, GitFork } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import { ContextUsageIndicator } from '../chat/ContextUsageIndicator';
 import type { Conversation } from './ConversationList';
@@ -61,6 +61,18 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
             {conversation.name}
           </span>
         </span>
+        {conversation.branch && (
+          <span
+            className={styles.terminalBranchBar}
+            title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
+          >
+            {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+            <span className={styles.terminalBranchBarMode}>
+              {conversation.isWorktree ? 'Worktree' : 'Local'}
+            </span>
+            <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+          </span>
+        )}
         {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
           <span className={styles.featureCost}>
             {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}

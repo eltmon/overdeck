@@ -4333,6 +4333,71 @@
   cursor: help;
 }
 
+/* ─── Branch / worktree chips (PAN-1523) ─────────────────────────────────── */
+
+.conversationBranchChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  /* Sits inline with the title row, never wraps. */
+  max-width: 160px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+}
+
+.conversationBranchChipText {
+  /* Long branch names ellipsis inside the chip rather than pushing it wider. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminalBranchBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  flex-shrink: 0;
+  /* Ellipsis-friendly when the header is cramped. */
+  max-width: 320px;
+  min-width: 0;
+}
+
+.terminalBranchBarText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminalBranchBarMode {
+  /* The "Local" / "Worktree" label sits between the icon and the branch name. */
+  color: var(--foreground);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.terminalBranchBarDrift {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+}
+
+.terminalBranchBarMissing {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 15%, transparent);
+}
+
 /* ─── Fork progress view (conversation detail) ──────────────────────────── */
 
 .forkProgressView {

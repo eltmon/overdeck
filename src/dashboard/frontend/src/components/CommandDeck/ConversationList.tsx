@@ -62,6 +62,10 @@ export interface Conversation {
   forkFallbackReason?: string | null;
   /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
   clearedToConvId?: number | null;
+  /** PAN-1523: current git branch at cwd, null when cwd is not a git repo. */
+  branch?: string | null;
+  /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
+  isWorktree?: boolean;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

@@ -110,6 +110,7 @@ import {
   summarizeConversationActivity,
   type ParseState,
 } from '../services/conversation-service.js';
+import { resolveConversationGitInfo } from '../services/git-info.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
@@ -1494,7 +1495,18 @@ const getConversationsRoute = HttpRouter.add(
             }
 
             const compacting = convSf ? isCompacting(convSf) : false;
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage: null };
+            const gitInfo = await resolveConversationGitInfo(conv.cwd);
+            return {
+              ...conv,
+              sessionAlive,
+              isWorking,
+              currentTool,
+              isFavorited: favoritedNames.has(conv.name),
+              compacting,
+              contextUsage: null,
+              branch: gitInfo.branch,
+              isWorktree: gitInfo.isWorktree,
+            };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
         ));
@@ -1559,7 +1571,14 @@ const getConversationRoute = HttpRouter.add(
             contextUsage = null;
           }
         }
-        return jsonResponse({ ...conv, sessionAlive, contextUsage });
+        const gitInfo = await resolveConversationGitInfo(conv.cwd);
+        return jsonResponse({
+          ...conv,
+          sessionAlive,
+          contextUsage,
+          branch: gitInfo.branch,
+          isWorktree: gitInfo.isWorktree,
+        });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] get conversation failed:', msg);
