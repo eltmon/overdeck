@@ -98,6 +98,7 @@ import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -1494,6 +1495,40 @@ const getConversationsRoute = HttpRouter.add(
               }
             }
 
+            // PAN-1520 — scan the conv JSONL for any pending blocking surface
+            // (AskUserQuestion, ExitPlanMode, EnterPlanMode) so the dashboard
+            // can fire the unified indicator/notification/modal for conv
+            // sessions, not just work agents.
+            let pendingInputCount = 0;
+            let pendingInputKinds: PendingInputKind[] = [];
+            let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
+            if (sessionAlive && convSf && existsSync(convSf)) {
+              try {
+                const scan = await scanPendingInputsPromise(convSf);
+                const kinds: PendingInputKind[] = [];
+                if (scan.askUserQuestions.length > 0) {
+                  kinds.push('askUserQuestion');
+                  const first = scan.askUserQuestions[0];
+                  pendingAskUserQuestion = {
+                    toolUseId: first.toolId,
+                    askedAt: first.timestamp,
+                    questions: first.questions.map(q => ({
+                      question: q.question,
+                      header: q.header,
+                      multiSelect: q.multiSelect,
+                      options: q.options.map(o => ({ label: o.label, description: o.description })),
+                    })),
+                  };
+                }
+                if (scan.exitPlanModePending) kinds.push('exitPlanMode');
+                if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
+                pendingInputKinds = kinds;
+                pendingInputCount = kinds.length;
+              } catch {
+                // JSONL scan failure — leave as zero/empty; non-fatal
+              }
+            }
+
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
             return {
@@ -1506,6 +1541,9 @@ const getConversationsRoute = HttpRouter.add(
               contextUsage: null,
               branch: gitInfo.branch,
               isWorktree: gitInfo.isWorktree,
+              pendingInputCount,
+              pendingInputKinds,
+              pendingAskUserQuestion,
             };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
@@ -1572,12 +1610,43 @@ const getConversationRoute = HttpRouter.add(
           }
         }
         const gitInfo = await resolveConversationGitInfo(conv.cwd);
+        // PAN-1520 — pending-input surfaces for this conv.
+        let pendingInputCount = 0;
+        let pendingInputKinds: PendingInputKind[] = [];
+        let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
+        if (sessionAlive && convSf && existsSync(convSf)) {
+          try {
+            const scan = await scanPendingInputsPromise(convSf);
+            const kinds: PendingInputKind[] = [];
+            if (scan.askUserQuestions.length > 0) {
+              kinds.push('askUserQuestion');
+              const first = scan.askUserQuestions[0];
+              pendingAskUserQuestion = {
+                toolUseId: first.toolId,
+                askedAt: first.timestamp,
+                questions: first.questions.map(q => ({
+                  question: q.question,
+                  header: q.header,
+                  multiSelect: q.multiSelect,
+                  options: q.options.map(o => ({ label: o.label, description: o.description })),
+                })),
+              };
+            }
+            if (scan.exitPlanModePending) kinds.push('exitPlanMode');
+            if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
+            pendingInputKinds = kinds;
+            pendingInputCount = kinds.length;
+          } catch { /* non-fatal */ }
+        }
         return jsonResponse({
           ...conv,
           sessionAlive,
           contextUsage,
           branch: gitInfo.branch,
           isWorktree: gitInfo.isWorktree,
+          pendingInputCount,
+          pendingInputKinds,
+          pendingAskUserQuestion,
         });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

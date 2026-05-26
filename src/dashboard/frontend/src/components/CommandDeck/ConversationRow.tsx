@@ -198,6 +198,17 @@ export function ConversationRow({
             aria-label={`Waiting for permission in ${conv.name}`}
           />
         </span>
+      ) : (conv.pendingInputCount ?? 0) > 0 ? (
+        // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Show the
+        // same triangle-alert affordance as the permission case so operators
+        // can spot the row from a distance.
+        <span title={`Waiting on your input (${(conv.pendingInputKinds ?? []).join(', ') || 'question'})`} style={{ display: 'contents' }}>
+          <TriangleAlert
+            size={spinnerSize}
+            className={styles.conversationPermissionAlert}
+            aria-label={`Conversation ${conv.name} is awaiting input`}
+          />
+        </span>
       ) : conv.isWorking ? (
         <WorkingSpinner
           size={spinnerSize}

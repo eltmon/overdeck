@@ -1,0 +1,87 @@
+#!/bin/bash
+# ~/.panopticon/bin/ask-user-question-hook  (PAN-1520)
+#
+# PreToolUse hook on AskUserQuestion — denies the tool call to prevent the
+# upstream Claude Code silent-corruption bug (anthropics/claude-code#10229,
+# #10400) where AskUserQuestion's choice menu does not render under
+# --dangerously-skip-permissions and the harness returns option #1's literal
+# label as the tool_result, fabricating an operator answer that never happened.
+#
+# Until the dashboard surfaces AskUserQuestion options interactively (the rest
+# of PAN-1520), the only safe failure mode is "block until the agent re-asks
+# in plain prose". This hook converts silent corruption -> visible block by
+# returning a deny verdict with the full question text + option labels as
+# additionalContext, so the agent restates the choice to the operator as
+# regular text and waits for a normal response.
+#
+# Never breaks Claude Code: on any error the hook exits 0 silently (which
+# lets the original AskUserQuestion call through — preserving the prior
+# behaviour rather than introducing a new hang).
+
+set +e
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+if ! command -v jq >/dev/null 2>&1; then
+  # Without jq we cannot safely parse the question payload. Allow the call.
+  exit 0
+fi
+
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "AskUserQuestion" ]; then
+  exit 0
+fi
+
+# Emit an awareness event to the dashboard via the standard hook lib so the
+# operator can see the question was asked, even though the tool call is denied.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || true
+if declare -f pan_resolve_agent_id >/dev/null && pan_resolve_agent_id; then
+  TS=$(date -Iseconds)
+  EVENT_BODY=$(echo "$INPUT" | jq --arg ts "$TS" '{
+    kind: "ask_user_question_blocked",
+    timestamp: $ts,
+    questions: (.tool_input.questions // [])
+  }' 2>/dev/null)
+  if [ -n "$EVENT_BODY" ] && declare -f pan_emit_event >/dev/null; then
+    pan_emit_event "$AGENT_ID" "$EVENT_BODY" 2>/dev/null || true
+  fi
+fi
+
+REASON='AskUserQuestion is blocked in Panopticon environments to prevent silent corruption. Upstream Claude Code does not render the choice menu under --dangerously-skip-permissions and returns option #1 as the operator answer (PAN-1520). Restate your question and the option labels in plain text to the operator and wait for their reply.'
+
+CONTEXT=$(echo "$INPUT" | jq -r '
+  def fmt_option:
+    "  - " + (.label // "(no label)")
+    + (if .description then ": " + .description else "" end);
+  def fmt_question:
+    "Question: " + (.question // "(no question text)")
+    + (if .header then "\nHeader: " + .header else "" end)
+    + "\nOptions:\n" + ((.options // []) | map(fmt_option) | join("\n"));
+  (.tool_input.questions // [])
+  | map(fmt_question)
+  | join("\n\n")
+' 2>/dev/null)
+
+if [ -z "$CONTEXT" ]; then
+  CONTEXT="(failed to parse questions payload — restate your question to the operator as plain text)"
+fi
+
+INSTRUCTION="Restate the following to the operator as a plain-text message, listing the options as a numbered list, and wait for their normal response. Do not call AskUserQuestion again."
+
+jq -n \
+  --arg reason "$REASON" \
+  --arg context "${INSTRUCTION}
+
+${CONTEXT}" \
+  '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason,
+      additionalContext: $context
+    }
+  }'
+
+exit 0

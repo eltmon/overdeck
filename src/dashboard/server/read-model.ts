@@ -694,6 +694,10 @@ export const ReadModelServiceLive = Layer.effect(
             pendingQuestionCount: enrichment?.pendingQuestionCount,
             pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
             pendingQuestionReason: enrichment?.pendingQuestionReason,
+            // PAN-1520 — unified pending-input surfaces
+            pendingInputCount: enrichment?.pendingInputCount,
+            pendingInputKinds: enrichment?.pendingInputKinds,
+            pendingAskUserQuestion: enrichment?.pendingAskUserQuestion,
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
             resolutionCount: enrichment?.resolutionCount,
           };

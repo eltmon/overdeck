@@ -66,6 +66,19 @@ export interface Conversation {
   branch?: string | null;
   /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
   isWorktree?: boolean;
+  /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
+  pendingInputCount?: number;
+  pendingInputKinds?: ReadonlyArray<string>;
+  pendingAskUserQuestion?: {
+    toolUseId: string;
+    askedAt: string;
+    questions: ReadonlyArray<{
+      question: string;
+      header?: string;
+      multiSelect?: boolean;
+      options: ReadonlyArray<{ label: string; description?: string }>;
+    }>;
+  };
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
