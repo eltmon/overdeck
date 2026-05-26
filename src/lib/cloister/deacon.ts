@@ -5095,7 +5095,12 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
       await Effect.runPromise(saveAgentState(state));
-      if (state.stoppedByUser !== true) {
+      // PAN-1530: only record failure markers for agents the auto-resume gate
+      // will actually retry. Planning agents are one-shot by design — writing
+      // lastFailureReason / lastFailureNextRetryAt for them pollutes state.json
+      // with a retry that will never fire and confuses the dashboard.
+      const isResumableRole = !dir.startsWith('planning-');
+      if (state.stoppedByUser !== true && isResumableRole) {
         const failedState = await Effect.runPromise(recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
         if (failedState) {
           notifyAgentStatusChanged(failedState, oldStatus, false);
