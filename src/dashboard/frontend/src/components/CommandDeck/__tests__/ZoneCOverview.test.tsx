@@ -90,8 +90,8 @@ vi.mock('../../../hooks/useCostStream', () => ({
 }));
 
 vi.mock('../../PanOpenInPicker', () => ({
-  PanOpenInPicker: ({ cwd }: { cwd: string }) => (
-    <button type="button" data-testid="pan-open-in-picker" data-cwd={cwd}>Open Picker</button>
+  PanOpenInPicker: ({ openInCwd }: { openInCwd: string | null }) => (
+    <button type="button" data-testid="pan-open-in-picker" data-cwd={openInCwd ?? ''}>Open Picker</button>
   ),
 }));
 

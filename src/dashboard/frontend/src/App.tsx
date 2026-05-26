@@ -44,6 +44,8 @@ import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
+import { PanOpenInPicker } from './components/PanOpenInPicker';
+import { useProjectCwdForIssue } from './hooks/useProjectCwdForIssue';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -383,7 +385,9 @@ export default function App() {
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
-  const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+  const drawerOpen = drawerIssueId !== null;
+  const topBarCwd = useProjectCwdForIssue(drawerIssueId);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
@@ -889,6 +893,7 @@ export default function App() {
 
         <div className="relative border-b border-border bg-background px-3 py-1 shrink-0">
           <div className="flex items-center justify-end gap-2">
+            <PanOpenInPicker openInCwd={topBarCwd} />
             <button
               type="button"
               aria-label="Toggle activity feed"

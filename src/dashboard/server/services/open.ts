@@ -4,6 +4,7 @@ import { exec } from 'node:child_process';
 import { Effect, Layer, Context } from 'effect';
 import { EDITORS, type EditorId, type OpenInEditorInput } from '@panctl/contracts';
 import { PanRpcError } from '@panctl/contracts';
+import { getDefaultCwd } from '../../../lib/default-cwd.js';
 
 const execAsync = promisify(exec);
 
@@ -82,6 +83,7 @@ async function resolveAvailableEditors(): Promise<EditorId[]> {
 export interface PanOpenShape {
   readonly openInEditor: (input: OpenInEditorInput) => Effect.Effect<void, PanRpcError>;
   readonly getAvailableEditors: () => Effect.Effect<EditorId[], PanRpcError>;
+  readonly getDefaultCwd: () => Effect.Effect<string, PanRpcError>;
 }
 
 // ─── Service tag ─────────────────────────────────────────────────────────────
@@ -116,6 +118,8 @@ export const PanOpenLive = Layer.effect(
         }),
 
       getAvailableEditors: () => Effect.succeed(cachedEditors),
+
+      getDefaultCwd: () => Effect.sync(getDefaultCwd),
     });
   }),
 );

@@ -8,7 +8,7 @@ import type { Agent, Issue } from '../../types';
 import { IssueActionMenu } from './IssueActionMenu';
 
 vi.mock('../PanOpenInPicker', () => ({
-  PanOpenInPicker: ({ cwd }: { cwd: string }) => <div data-testid="pan-open-picker">Open {cwd}</div>,
+  PanOpenInPicker: ({ openInCwd }: { openInCwd: string | null }) => <div data-testid="pan-open-picker">Open {openInCwd ?? ''}</div>,
 }));
 
 function issue(overrides: Partial<Issue> = {}): Issue {

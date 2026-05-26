@@ -937,7 +937,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   <Pause size={12} /> Stop
                 </button>
               )}
-              {workspace.data?.path && <PanOpenInPicker cwd={workspace.data.path} />}
+              {workspace.data?.path && <PanOpenInPicker openInCwd={workspace.data.path} />}
               {workspace.data?.canContainerize && !workspace.data?.hasAgent && (
                 <button
                   type="button"

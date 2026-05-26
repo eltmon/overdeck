@@ -34,7 +34,7 @@ export function IssueOpenInDialog({ cwd, onClose }: IssueOpenInDialogProps) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <PanOpenInPicker cwd={cwd} />
+        <PanOpenInPicker openInCwd={cwd} />
       </div>
     </div>
   );

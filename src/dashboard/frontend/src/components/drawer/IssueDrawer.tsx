@@ -107,7 +107,7 @@ function DrawerWorkspaceSection({ issueId }: { issueId: string }) {
           {workspace.path}
         </div>
         <div className="shrink-0">
-          <PanOpenInPicker cwd={workspace.path} />
+          <PanOpenInPicker openInCwd={workspace.path} />
         </div>
       </div>
     </section>

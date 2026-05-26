@@ -396,7 +396,14 @@ export const ShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
 
 /** 19. Get available (installed) editors (PAN-966) */
 export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
-  success: Schema.Struct({ editors: Schema.Array(EditorIdSchema) }),
+  success: Schema.Struct({
+    editors: Schema.Array(EditorIdSchema),
+    /**
+     * Default cwd to open when no project/workspace is selected — the
+     * "devroot" fallback. `~/Projects` if it exists, else `$HOME`.
+     */
+    defaultCwd: Schema.String,
+  }),
   error: PanRpcError,
 })
 
