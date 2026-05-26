@@ -16,25 +16,46 @@
  */
 import { useState } from 'react'
 import { Loader2, MessageCircleQuestion } from 'lucide-react'
-import type { AgentSnapshot } from '@panctl/contracts'
+
+/**
+ * PAN-1520 — minimal shape the dialog consumes. Works for either an
+ * AgentSnapshot or a Conversation row; both surfaces carry the same
+ * `pendingAskUserQuestion` field.
+ */
+export interface AskUserQuestionSubject {
+  id: string
+  /** Optional — agent.issueId or conv.issueId. Displayed in the header. */
+  issueId?: string | null
+  /** Display label — 'Agent' or 'Conversation'. Falls back to 'Subject'. */
+  kindLabel?: string
+  pendingAskUserQuestion?: {
+    toolUseId: string
+    askedAt: string
+    questions: ReadonlyArray<{
+      question: string
+      header?: string
+      multiSelect?: boolean
+      options: ReadonlyArray<{ label: string; description?: string }>
+    }>
+  } | null
+}
 
 interface AskUserQuestionDialogProps {
-  agent: AgentSnapshot | null
+  subject: AskUserQuestionSubject | null
   isOpen: boolean
-  issueId?: string
   isSubmitting?: boolean
   onSubmit: (answers: string[]) => void
   onDismiss: () => void
 }
 
 export function AskUserQuestionDialog({
-  agent,
+  subject,
   isOpen,
-  issueId,
   isSubmitting = false,
   onSubmit,
   onDismiss,
 }: AskUserQuestionDialogProps) {
+  const agent = subject
   const pending = agent?.pendingAskUserQuestion
   const questions = pending?.questions ?? []
   // One selected label per question, initialized empty so we can validate.
@@ -62,7 +83,7 @@ export function AskUserQuestionDialog({
             <MessageCircleQuestion className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Agent Question</h2>
+            <h2 className="text-lg font-semibold text-foreground">{agent.kindLabel ?? 'Agent'} Question</h2>
             <p className="text-sm text-muted-foreground">
               {agent.id} is waiting for an operator answer.
             </p>
@@ -72,12 +93,12 @@ export function AskUserQuestionDialog({
         <div className="space-y-4 px-5 py-4 max-h-[60vh] overflow-y-auto">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agent</p>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{agent.kindLabel ?? 'Subject'}</p>
               <p className="font-mono text-sm text-foreground">{agent.id}</p>
             </div>
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
-              <p className="font-mono text-sm text-foreground">{issueId ?? agent.issueId ?? 'Unknown'}</p>
+              <p className="font-mono text-sm text-foreground">{agent.issueId ?? 'Unknown'}</p>
             </div>
           </div>
 

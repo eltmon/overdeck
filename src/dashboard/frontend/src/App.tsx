@@ -8,7 +8,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
-import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
+import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
@@ -569,20 +569,57 @@ export default function App() {
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
 
-  // PAN-1520 — surface the oldest unresolved AskUserQuestion. Filter out:
-  //   - questions the operator just optimistically answered (by toolUseId)
-  //   - questions for agents the operator dismissed without answering
-  const visibleAskUserQuestionAgents = agentsWithAskUserQuestion.filter((a) => {
-    const toolUseId = a.pendingAskUserQuestion?.toolUseId
-    if (!toolUseId) return false
-    if (optimisticallyAnsweredAskUserQuestionIds.has(toolUseId)) return false
-    if (dismissedAskUserQuestionAgentIds.has(a.id)) return false
-    return true
+  // PAN-1520 — poll conversations for pending AskUserQuestion. Cheaper than a
+  // dedicated WS event for now; the list endpoint already returns the field.
+  type ConvAskUserQuestionRow = {
+    name: string;
+    title?: string | null;
+    issueId?: string | null;
+    pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
+  };
+  const { data: convAskUserQuestionRows = [] } = useQuery({
+    queryKey: ['conv-ask-user-question'],
+    queryFn: async (): Promise<ConvAskUserQuestionRow[]> => {
+      const res = await fetch('/api/conversations?limit=1000');
+      if (!res.ok) return [];
+      const rows: ConvAskUserQuestionRow[] = await res.json();
+      return rows.filter((r) => r.pendingAskUserQuestion != null);
+    },
+    refetchInterval: 4000,
+    refetchIntervalInBackground: true,
   });
-  const currentAskUserQuestionAgent = visibleAskUserQuestionAgents[0] ?? null;
-  // Cast the snapshot pendingAskUserQuestion shape forward to the dialog's
-  // expected agent. AgentSnapshot already carries the field by name.
-  const currentAskUserQuestionIssueId = currentAskUserQuestionAgent?.issueId;
+
+  // PAN-1520 — surface the oldest unresolved AskUserQuestion from either an
+  // agent or a conversation. Filter out:
+  //   - questions the operator just optimistically answered (by toolUseId)
+  //   - subjects the operator dismissed without answering
+  const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
+    ...agentsWithAskUserQuestion.map((a) => ({
+      kind: 'agent' as const,
+      id: a.id,
+      issueId: a.issueId ?? null,
+      kindLabel: 'Agent',
+      pendingAskUserQuestion: a.pendingAskUserQuestion,
+      askedAt: a.pendingAskUserQuestion?.askedAt ?? '',
+    })),
+    ...convAskUserQuestionRows.map((c) => ({
+      kind: 'conv' as const,
+      id: c.name,
+      issueId: c.issueId ?? null,
+      kindLabel: c.title ? `Conversation (${c.title})` : 'Conversation',
+      pendingAskUserQuestion: c.pendingAskUserQuestion,
+      askedAt: c.pendingAskUserQuestion?.askedAt ?? '',
+    })),
+  ];
+  askUserQuestionSubjects.sort((a, b) => (a.askedAt === b.askedAt ? a.id.localeCompare(b.id) : a.askedAt.localeCompare(b.askedAt)));
+  const visibleAskUserQuestionSubjects = askUserQuestionSubjects.filter((s) => {
+    const toolUseId = s.pendingAskUserQuestion?.toolUseId;
+    if (!toolUseId) return false;
+    if (optimisticallyAnsweredAskUserQuestionIds.has(toolUseId)) return false;
+    if (dismissedAskUserQuestionAgentIds.has(s.id)) return false;
+    return true;
+  });
+  const currentAskUserQuestionSubject = visibleAskUserQuestionSubjects[0] ?? null;
 
   useEffect(() => {
     setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
@@ -636,43 +673,53 @@ export default function App() {
     return undefined;
   }, []);
 
-  // PAN-1520 — fire a desktop notification (+ in-app toast) when an agent
-  // transitions into a "needs operator input" state. We track unique
-  // (agentId, toolUseId) tuples in a ref so a single AUQ only fires once.
+  // PAN-1520 — fire a desktop notification (+ in-app toast) when a subject
+  // (agent OR conversation) transitions into a "needs operator input" state.
+  // We track unique (subjectId, toolUseId) tuples in a ref so a single AUQ
+  // only fires once.
   const notifiedPendingInputRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    for (const a of agentsWithAskUserQuestion) {
-      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
-      if (!toolUseId) continue;
-      const key = `${a.id}::${toolUseId}`;
-      if (notifiedPendingInputRef.current.has(key)) continue;
+    const announce = (id: string, title: string, body: string): void => {
+      const key = id;
+      if (notifiedPendingInputRef.current.has(key)) return;
       notifiedPendingInputRef.current.add(key);
-
-      const title = `Agent ${a.id} is waiting on you`;
-      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      // In-app toast — always works.
       toast.info(title, { description: body, duration: 12000 });
-      // Desktop notification — best-effort; silently no-ops without permission.
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
           const n = new Notification(title, { body, tag: key });
-          n.onclick = (): void => {
-            window.focus();
-            n.close();
-          };
-        } catch { /* ignore — some browsers throw under restricted contexts */ }
+          n.onclick = (): void => { window.focus(); n.close(); };
+        } catch { /* ignore */ }
       }
+    };
+
+    for (const a of agentsWithAskUserQuestion) {
+      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
+      if (!toolUseId) continue;
+      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
+      announce(`agent::${a.id}::${toolUseId}`, `Agent ${a.id} is waiting on you`, body);
     }
+    for (const c of convAskUserQuestionRows) {
+      const toolUseId = c.pendingAskUserQuestion?.toolUseId;
+      if (!toolUseId) continue;
+      const body = c.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
+      const label = c.title ?? c.name;
+      announce(`conv::${c.name}::${toolUseId}`, `Conversation "${label}" is waiting on you`, body);
+    }
+
     // Garbage-collect notification keys for AUQs that have cleared.
-    const liveKeys = new Set(
-      agentsWithAskUserQuestion
-        .map((a) => `${a.id}::${a.pendingAskUserQuestion?.toolUseId ?? ''}`)
-        .filter((k) => !k.endsWith('::')),
-    );
+    const liveKeys = new Set<string>();
+    for (const a of agentsWithAskUserQuestion) {
+      const id = a.pendingAskUserQuestion?.toolUseId;
+      if (id) liveKeys.add(`agent::${a.id}::${id}`);
+    }
+    for (const c of convAskUserQuestionRows) {
+      const id = c.pendingAskUserQuestion?.toolUseId;
+      if (id) liveKeys.add(`conv::${c.name}::${id}`);
+    }
     for (const k of notifiedPendingInputRef.current) {
       if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
     }
-  }, [agentsWithAskUserQuestion]);
+  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
 
   // Toast notification when a planning agent needs user input
   useEffect(() => {
@@ -700,27 +747,54 @@ export default function App() {
     }
   }, [agents]);
 
-  // PAN-1520 — answer an AskUserQuestion via plain user message routed
-  // through deliverAgentMessage on the server.
+  // PAN-1520 — answer an AskUserQuestion. Routes to the right endpoint based
+  // on subject kind: agents go through /api/agents/:id/answer-question
+  // (formats a "Q/A" message and delivers via deliverAgentMessage); conv
+  // sessions use the regular POST /api/conversations/:name/message channel.
   const askUserQuestionAnswerMutation = useMutation({
-    mutationFn: async ({ agentId, answers }: { agentId: string; answers: string[] }) => {
-      const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/answer-question`, {
+    mutationFn: async ({ kind, id, answers, questions }: {
+      kind: 'agent' | 'conv';
+      id: string;
+      answers: string[];
+      questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
+        ? T extends { questions: infer Q } ? Q : never : never;
+    }) => {
+      if (kind === 'agent') {
+        const res = await fetch(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers }),
+        });
+        if (!res.ok) {
+          let message = `Failed to deliver answer (${res.status})`;
+          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+          throw new Error(message);
+        }
+        return res.json();
+      }
+      // conv: compose the Q/A message ourselves and post via the regular
+      // message channel — that's the path conversation input already uses.
+      const lines: string[] = [];
+      const qArr = (questions ?? []) as ReadonlyArray<{ question: string }>;
+      for (let i = 0; i < answers.length && i < qArr.length; i++) {
+        const q = qArr[i]?.question ?? `Question ${i + 1}`;
+        lines.push(`Q: ${q}\nA: ${answers[i]}`);
+      }
+      const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
+      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ message: composed }),
       });
       if (!res.ok) {
         let message = `Failed to deliver answer (${res.status})`;
-        try {
-          const body = await res.json() as { error?: string };
-          if (body?.error) message = body.error;
-        } catch { /* ignore */ }
+        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
         throw new Error(message);
       }
       return res.json();
     },
     onMutate: (variables) => {
-      const toolUseId = currentAskUserQuestionAgent?.pendingAskUserQuestion?.toolUseId;
+      const toolUseId = currentAskUserQuestionSubject?.pendingAskUserQuestion?.toolUseId;
       if (toolUseId) {
         setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
           const next = new Set(prev);
@@ -728,10 +802,10 @@ export default function App() {
           return next;
         });
       }
-      return { agentId: variables.agentId, toolUseId };
+      return { subjectId: variables.id, toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Answer delivered to ${variables.agentId}`);
+      toast.success(`Answer delivered to ${variables.id}`);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) {
@@ -747,30 +821,36 @@ export default function App() {
   });
 
   const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
-    if (!currentAskUserQuestionAgent) return;
+    if (!currentAskUserQuestionSubject) return;
+    const subject = currentAskUserQuestionSubject;
     askUserQuestionAnswerMutation.mutate({
-      agentId: currentAskUserQuestionAgent.id,
+      kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
+      id: subject.id,
       answers,
+      questions: subject.pendingAskUserQuestion?.questions as never,
     });
-  }, [askUserQuestionAnswerMutation, currentAskUserQuestionAgent]);
+  }, [askUserQuestionAnswerMutation, currentAskUserQuestionSubject]);
 
   const handleDismissAskUserQuestion = useCallback(() => {
-    if (!currentAskUserQuestionAgent) return;
+    if (!currentAskUserQuestionSubject) return;
     setDismissedAskUserQuestionAgentIds((prev) => {
       const next = new Set(prev);
-      next.add(currentAskUserQuestionAgent.id);
+      next.add(currentAskUserQuestionSubject.id);
       return next;
     });
-  }, [currentAskUserQuestionAgent]);
+  }, [currentAskUserQuestionSubject]);
 
   // PAN-1520 — purge optimistic state for AUQs that have actually cleared
-  // server-side, and re-allow dismissed agents whose tool-use id has changed.
+  // server-side, and re-allow dismissed subjects whose tool-use id has
+  // changed. Cleans up across both agent and conv sources.
   useEffect(() => {
-    const liveToolUseIds = new Set(
-      agentsWithAskUserQuestion
-        .map((a) => a.pendingAskUserQuestion?.toolUseId)
-        .filter((id): id is string => typeof id === 'string'),
-    );
+    const liveAgentToolUseIds = agentsWithAskUserQuestion
+      .map((a) => a.pendingAskUserQuestion?.toolUseId)
+      .filter((id): id is string => typeof id === 'string');
+    const liveConvToolUseIds = convAskUserQuestionRows
+      .map((c) => c.pendingAskUserQuestion?.toolUseId)
+      .filter((id): id is string => typeof id === 'string');
+    const liveToolUseIds = new Set<string>([...liveAgentToolUseIds, ...liveConvToolUseIds]);
     setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
       let changed = false;
       const next = new Set<string>();
@@ -779,16 +859,19 @@ export default function App() {
       }
       return changed ? next : prev;
     });
-    const liveAgentIds = new Set(agentsWithAskUserQuestion.map((a) => a.id));
+    const liveSubjectIds = new Set<string>([
+      ...agentsWithAskUserQuestion.map((a) => a.id),
+      ...convAskUserQuestionRows.map((c) => c.name),
+    ]);
     setDismissedAskUserQuestionAgentIds((prev) => {
       let changed = false;
       const next = new Set<string>();
       for (const id of prev) {
-        if (liveAgentIds.has(id)) { next.add(id); } else { changed = true; }
+        if (liveSubjectIds.has(id)) { next.add(id); } else { changed = true; }
       }
       return changed ? next : prev;
     });
-  }, [agentsWithAskUserQuestion]);
+  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({
@@ -1237,11 +1320,11 @@ export default function App() {
         onDeny={handleDenyChannelPermission}
       />
 
-      {/* PAN-1520 — AskUserQuestion interactive dialog */}
+      {/* PAN-1520 — AskUserQuestion interactive dialog (covers both work
+          agents and conversation sessions — same modal, same code path). */}
       <AskUserQuestionDialog
-        agent={(currentAskUserQuestionAgent ?? null) as unknown as import('@panctl/contracts').AgentSnapshot | null}
-        issueId={currentAskUserQuestionIssueId}
-        isOpen={!!currentAskUserQuestionAgent && !currentChannelPermissionRequest}
+        subject={currentAskUserQuestionSubject}
+        isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
         isSubmitting={askUserQuestionAnswerMutation.isPending}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}

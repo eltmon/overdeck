@@ -211,7 +211,7 @@ async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQue
   return detection.askUserQuestions
 }
 
-interface PendingInputsScan {
+export interface PendingInputsScan {
   readonly askUserQuestions: PendingQuestion[]
   /** Outstanding EnterPlanMode tool_use ids without a matching ExitPlanMode (plan being drafted). */
   readonly enterPlanModeOpen: boolean
@@ -219,7 +219,7 @@ interface PendingInputsScan {
   readonly exitPlanModePending: boolean
 }
 
-async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
+export async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
   if (!existsSync(jsonlPath)) {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
   }
