@@ -1892,7 +1892,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-hidden pb-4">
-            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
+            {STATUS_ORDER.map((status) => {
             const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
             const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
             const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
