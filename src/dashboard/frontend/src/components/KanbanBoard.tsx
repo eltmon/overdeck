@@ -1524,6 +1524,23 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [issues, registeredProjects]);
 
+  const issueCreationSupportedByVisibleProject = useMemo(() => {
+    const isSupported = (project: RegisteredProject) => Boolean(project.githubRepo || project.linearTeam || project.linearProject);
+    const projectMatchesSelection = (project: RegisteredProject, selectedId: string) => {
+      const displayName = project.linearProject || project.githubRepo || project.name;
+      return selectedId === project.key || selectedId === `registered:${project.key}` || selectedId === project.name || selectedId === displayName;
+    };
+
+    if (selectedProjects.size === 0) {
+      return registeredProjects.length === 0 || registeredProjects.some(isSupported);
+    }
+
+    return Array.from(selectedProjects).some((selectedId) => {
+      const registeredProject = registeredProjects.find((project) => projectMatchesSelection(project, selectedId));
+      return registeredProject ? isSupported(registeredProject) : true;
+    });
+  }, [registeredProjects, selectedProjects]);
+
   // Filter issues by selected projects
   const filteredIssuesBase = useMemo(() => {
     if (!issues) return [];
@@ -1932,7 +1949,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
                   />
-                  {(status === 'backlog' || status === 'todo') && (
+                  {(status === 'backlog' || status === 'todo') && issueCreationSupportedByVisibleProject && (
                     <button
                       type="button"
                       data-testid={`new-issue-button-${status}`}
