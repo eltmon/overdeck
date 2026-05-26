@@ -19,6 +19,7 @@ import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import { PanOpenInPicker } from '../PanOpenInPicker';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -529,6 +530,7 @@ export function ConversationPanel({
               <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
             </span>
           )}
+          <PanOpenInPicker openInCwd={conversation.cwd} />
           {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
             <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
