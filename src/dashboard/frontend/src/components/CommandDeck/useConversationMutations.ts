@@ -32,6 +32,7 @@ async function unfavoriteConversation(name: string): Promise<void> {
 }
 
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
+type ForkModeOption = ApiForkMode | 'fast-summary';
 
 async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
@@ -63,9 +64,10 @@ export interface ConversationMutations {
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
-  openForkModal: (conv: Conversation) => void;
+  openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => void;
   forkTarget: Conversation | null;
+  forkTargetMode: ForkModeOption | undefined;
   closeForkModal: () => void;
   isForkPending: boolean;
 }
@@ -76,6 +78,7 @@ export function useConversationMutations(
 ): ConversationMutations {
   const queryClient = useQueryClient();
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
+  const [forkTargetMode, setForkTargetMode] = useState<ForkModeOption | undefined>(undefined);
   const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
@@ -167,9 +170,10 @@ export function useConversationMutations(
     },
   });
 
-  const openForkModal = useCallback((conv: Conversation) => {
+  const openForkModal = useCallback((conv: Conversation, options?: { mode?: ForkModeOption }) => {
     if (!summaryForkMutation.isPending) {
       setForkTarget(conv);
+      setForkTargetMode(options?.mode);
     }
   }, [summaryForkMutation.isPending]);
 
@@ -187,6 +191,7 @@ export function useConversationMutations(
       title,
     });
     setForkTarget(null);
+    setForkTargetMode(undefined);
   }, [summaryForkMutation]);
 
   // retitleVersion is referenced so isRetitlePending re-evaluates after pending changes.
@@ -208,7 +213,8 @@ export function useConversationMutations(
     openForkModal,
     submitFork,
     forkTarget,
-    closeForkModal: () => setForkTarget(null),
+    forkTargetMode,
+    closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); },
     isForkPending: summaryForkMutation.isPending,
   };
 }

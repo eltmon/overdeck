@@ -117,6 +117,7 @@ function ForkHelpModal({ onClose }: { onClose: () => void }) {
 
 interface ForkModalProps {
   conversation: Conversation;
+  initialMode?: ForkModeOption;
   onConfirm: (
     conv: Conversation,
     launchModel: string,
@@ -133,7 +134,7 @@ interface ForkModalProps {
   isPending: boolean;
 }
 
-export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkModalProps) {
+export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPending }: ForkModalProps) {
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
@@ -144,7 +145,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
-  const [forkMode, setForkMode] = useState<ForkModeOption>('summary');
+  const [forkMode, setForkMode] = useState<ForkModeOption>(initialMode ?? 'summary');
   useEffect(() => {
     if (forkMode === 'plain' && launchHarness !== 'claude-code') {
       setLaunchHarness('claude-code');
@@ -155,7 +156,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [showHelp, setShowHelp] = useState(false);
 
   const convTitle = conversation.title ?? conversation.name;
-  const [forkTitle, setForkTitle] = useState(`Summary Fork: ${convTitle}`);
+  const [forkTitle, setForkTitle] = useState(`${forkTitlePrefix(initialMode ?? 'summary')}: ${convTitle}`);
 
   useEffect(() => {
     setSummaryModel(compactionModel);

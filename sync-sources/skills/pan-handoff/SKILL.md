@@ -19,17 +19,20 @@ Create a new conversation seeded by a handoff document written by the live sourc
 ## Quick command
 
 ```bash
-pan handoff <conv>
+pan handoff <conv> [focus text...]
 ```
+
+The trailing text after the conversation reference becomes the focus — no flag required.
 
 ## Usage
 
 ```bash
 pan handoff 42
-pan handoff source-conv --focus "continue the API wiring"
+pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
 pan handoff source-conv --harness pi
 pan handoff source-conv --cwd /path/to/project
+pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into checkout
 ```
 
 ## When to use
@@ -42,7 +45,7 @@ Use a normal summary fork when the source conversation is ended or when a quick 
 
 ## Focus
 
-Use `--focus <text>` to tell the source agent what the successor should concentrate on. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
+The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
 
 ## Fallback behavior
 

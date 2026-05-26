@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2 } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -363,6 +363,19 @@ export function ConversationRow({
             aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
           >
             <GitBranchPlus size={iconSize} />
+          </span>
+        )}
+        {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && conv.sessionAlive && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationSummaryForkBtn}
+            onClick={e => { e.stopPropagation(); mutations.openForkModal(conv, { mode: 'handoff' }); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.openForkModal(conv, { mode: 'handoff' }); } }}
+            title="Hand off to a new conversation"
+            aria-label={`Hand off ${conv.title ?? conv.name} to a new conversation`}
+          >
+            <Share2 size={iconSize} />
           </span>
         )}
         {!confirmArchive && (

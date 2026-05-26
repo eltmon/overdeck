@@ -421,9 +421,8 @@ program
   .action(forkCommand);
 
 program
-  .command('handoff <conv>')
-  .description('Agent-authored conversation handoff that spawns a new conversation')
-  .option('--focus <text>', 'Guidance for what the source agent should focus on in the handoff')
+  .command('handoff <conv> [focus...]')
+  .description('Agent-authored conversation handoff that spawns a new conversation; trailing text becomes the focus')
   .option('--model <model>', 'Model for the handoff-forked session')
   .option('--harness <harness>', 'Harness for the handoff-forked session: claude-code or pi')
   .option('--cwd <path>', 'Working directory for the handoff-forked session')

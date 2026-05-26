@@ -7,7 +7,6 @@ import { sessionFilePath } from '../../lib/paths.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 interface HandoffOptions {
-  focus?: string;
   model?: string;
   harness?: string;
   cwd?: string;
@@ -30,6 +29,7 @@ function validateHarness(harness: string | undefined): RuntimeName | undefined {
 
 export async function handoffCommand(
   convRef: string,
+  focusArgs: string[],
   options: HandoffOptions,
 ): Promise<void> {
   const conv = resolveConversation(convRef);
@@ -44,10 +44,11 @@ export async function handoffCommand(
     process.exit(1);
   }
 
+  const focus = focusArgs.join(' ').trim() || undefined;
   const harness = validateHarness(options.harness);
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
-  if (options.focus?.trim()) {
-    console.log(chalk.gray(`  Focus: ${options.focus.trim()}`));
+  if (focus) {
+    console.log(chalk.gray(`  Focus: ${focus}`));
   }
 
   const result = await Effect.runPromise(createSummaryFork(conv, {
@@ -55,7 +56,7 @@ export async function handoffCommand(
     cwd: options.cwd,
     harness,
     forkMode: 'handoff',
-    focus: options.focus,
+    focus,
   }));
   const newConv = result.conversation;
 

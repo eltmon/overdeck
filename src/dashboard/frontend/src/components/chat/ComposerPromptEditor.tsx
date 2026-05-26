@@ -192,8 +192,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   // ─── Conversation ────────────────────────────────────────────────────────────
   { id: 'pan-fork', label: 'pan fork', description: 'Summary fork a conversation', insert: 'pan fork ', category: 'Conversation' },
   { id: 'pan-fork-plain', label: 'pan fork --plain', description: 'Plain fork — copy raw history, skip summary', insert: 'pan fork  --plain', category: 'Conversation' },
-  { id: 'pan-handoff', label: 'pan handoff', description: 'Agent-authored handoff that spawns a new conversation', insert: 'pan handoff ', category: 'Conversation' },
-  { id: 'pan-handoff-focus', label: 'pan handoff --focus', description: 'Guidance for what the source agent should focus on', insert: 'pan handoff  --focus ""', category: 'Conversation' },
+  { id: 'pan-handoff', label: 'pan handoff', description: 'Agent-authored handoff that spawns a new conversation (trailing text becomes focus)', insert: 'pan handoff ', category: 'Conversation' },
   { id: 'pan-handoff-model', label: 'pan handoff --model', description: 'Model for the new conversation', insert: 'pan handoff  --model ', category: 'Conversation' },
   { id: 'pan-handoff-harness', label: 'pan handoff --harness', description: 'Harness for the new conversation (claude-code|pi)', insert: 'pan handoff  --harness ', category: 'Conversation' },
   { id: 'pan-handoff-cwd', label: 'pan handoff --cwd', description: 'Working directory for the new conversation', insert: 'pan handoff  --cwd ', category: 'Conversation' },

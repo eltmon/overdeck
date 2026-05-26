@@ -414,6 +414,25 @@ export function ComposerFooter({
       });
     }
 
+    // Intercept bare `pan handoff` (no other args) and open the fork modal
+    // pre-set to handoff mode for the current conversation. Matches:
+    //   pan handoff
+    //   /pan-handoff
+    //   /pan handoff
+    // (case-insensitive, surrounding whitespace allowed). Anything with extra
+    // args (e.g. `pan handoff conv-123`) falls through to normal send so the
+    // agent can run the CLI command directly.
+    if (/^\/?pan[\s-]handoff\s*$/i.test(messageText)) {
+      window.dispatchEvent(new CustomEvent('panopticon:open-fork-modal', {
+        detail: { conversation, mode: 'handoff' },
+      }));
+      editor.update(() => {
+        $getRoot().clear();
+      });
+      setText('');
+      return;
+    }
+
     const submitConversationName = conversation.name;
 
     // Re-read pending images before any async work — if uploads are still in
