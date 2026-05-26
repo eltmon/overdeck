@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1450: Audit — 6+ recent fixes shipped without the regression tests their AC promised. Add the 7 missing tests, complete PAN-1173's transparently-deferred bonus AC across 9 CLI commands, add a substrate check in the requirements-reviewer role prompt so this pattern fails CI in the future, and audit state.json role population for specialist agents.",
-    "updated": "2026-05-26T00:12:22.433Z"
+    "updated": "2026-05-26T00:20:34.757Z"
   },
   "plan": {
     "id": "pan-1450",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d7283d2f-4862-4ffe-9a4d-adb6ceb75ec2",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 16,
     "created": "2026-05-25T16:30:00.000Z",
-    "updated": "2026-05-26T00:12:22.433Z",
+    "updated": "2026-05-26T00:20:34.757Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1450",
@@ -107,7 +107,7 @@
       {
         "id": "test-1326-kill-stack-teardown",
         "title": "PAN-1326: Add regression test for `pan kill` workspace Docker stack teardown",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -123,41 +123,46 @@
           {
             "id": "test-1326-kill-stack-teardown.ac1",
             "title": "New test asserts that killing a ship-specialist agent invokes stopWorkspaceDocker against the workspace resolved from state.issueId (not state.workspace).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1326-kill-stack-teardown.ac2",
             "title": "New regression test asserts that killing a work agent (the PAN-1316 case) also invokes stopWorkspaceDocker.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1326-kill-stack-teardown.ac3",
             "title": "Tests run under the existing `npm test` invocation without changing pool config or maxForks.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1326-kill-stack-teardown.ac4",
             "title": "`grep -rn 'PAN-1326' src/ --include='*.test.ts'` returns at least one hit after the change (the test file references the issue in a comment or describe label).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1256-starting-grace-window",
         "title": "PAN-1256: Add regression test for recoverOrphanedAgents starting-status grace window",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -173,49 +178,55 @@
           {
             "id": "test-1256-starting-grace-window.ac1",
             "title": "Test (a): status='starting' + startedAt within 120s grace window → agent state is NOT mutated to 'stopped'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1256-starting-grace-window.ac2",
             "title": "Test (b): status='starting' + startedAt past 120s grace → agent IS marked stopped.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1256-starting-grace-window.ac3",
             "title": "Test (c): status='running' + no tmux session → marked stopped immediately, regardless of startedAt (regression guard against grace creeping into running status).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1256-starting-grace-window.ac4",
             "title": "Tests use vi.useFakeTimers/vi.setSystemTime — zero real wall-clock waits. afterEach restores real timers.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1256-starting-grace-window.ac5",
             "title": "If a pure helper was extracted, the helper's home is src/lib/cloister/ (not src/lib/) and the deacon.ts call site delegates to it (no behavioral change in production).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1257-classify-agent-kind",
         "title": "PAN-1257: Export and test classifyAgentKind for every role value",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -231,41 +242,46 @@
           {
             "id": "test-1257-classify-agent-kind.ac1",
             "title": "classifyAgentKind is exported from src/dashboard/server/services/system-health-service.ts.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1257-classify-agent-kind.ac2",
             "title": "New test file covers each role value: 'work', 'review', 'review-correctness', 'review-security', 'test', 'ship', undefined, null — at minimum one assertion per role.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1257-classify-agent-kind.ac3",
             "title": "Legacy-prefix cases ('planning-*' → 'planning'; 'specialist-*' → 'specialist') are also covered.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1257-classify-agent-kind.ac4",
             "title": "Test for `role: null` asserts what the function actually does today (do not paper over with a behavior change in this bead).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1175-resolve-parent-feature-branch",
         "title": "PAN-1175: Add regression test for resolveParentFeatureBranch host-context resolution",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -281,33 +297,37 @@
           {
             "id": "test-1175-resolve-parent-feature-branch.ac1",
             "title": "resolveParentFeatureBranch is reachable from the test (either exported or covered indirectly via createSlotWorktree with mocked git).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1175-resolve-parent-feature-branch.ac2",
             "title": "Test covers: legacy 'feature/<issue>' lookup, numeric 'feature/<num>' fallback, and the throw-with-helpful-message path.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1175-resolve-parent-feature-branch.ac3",
             "title": "No test does `git branch --show-current` (or otherwise depends on the project path's checked-out branch) — proving the host-context fix.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1173-resolve-bare-numeric-id",
         "title": "PAN-1173: Add unit tests for resolveBareNumericIdSync",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -323,57 +343,64 @@
           {
             "id": "test-1173-resolve-bare-numeric-id.ac1",
             "title": "Test (a) zero-match returns null.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1173-resolve-bare-numeric-id.ac2",
             "title": "Test (b) multiple-match returns null (ambiguous case).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1173-resolve-bare-numeric-id.ac3",
             "title": "Test (c) single-match returns the fully-prefixed ID from state.json.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1173-resolve-bare-numeric-id.ac4",
             "title": "Test (d) already-prefixed input delegates to resolveIssueIdSync without touching the filesystem.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1173-resolve-bare-numeric-id.ac5",
             "title": "Test (e) missing AGENTS_DIR returns null without throwing.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1173-resolve-bare-numeric-id.ac6",
             "title": "Tests use a per-test tmp dir (mkdtempSync) and clean up in afterEach; no test mutates the real ~/.panopticon/agents/.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1168-nous-models-probe",
         "title": "PAN-1168: Add regression test for Nous /v1/models probe path",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -389,49 +416,55 @@
           {
             "id": "test-1168-nous-models-probe.ac1",
             "title": "Test (a): Nous probe issues GET against /v1/models, not POST against /v1/messages.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1168-nous-models-probe.ac2",
             "title": "Test (b): Nous probe classifies a 401 response as auth failure (or matches the existing classifyError semantics).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1168-nous-models-probe.ac3",
             "title": "Test (c): Non-Nous providers still use POST /v1/messages — regression guard against accidentally extending /v1/models to all providers.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1168-nous-models-probe.ac4",
             "title": "Test file uses vi.useFakeTimers in beforeEach and vi.useRealTimers in afterEach (per fake-timers-for-retry-tests rule).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1168-nous-models-probe.ac5",
             "title": "ensureOpenAICompatibleProxyRunning is mocked — tests do NOT start the real proxy sidecar.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "test-1111-real-corruption-integration",
         "title": "PAN-1111: Add REAL DB-corruption integration test (replace mock theater)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -447,65 +480,73 @@
           {
             "id": "test-1111-real-corruption-integration.ac1",
             "title": "New file tests/integration/beads-real-corruption.test.ts exists and is picked up by the existing vitest include glob.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac2",
             "title": "Test gates on `commandExistsSync('bd')` (or equivalent) via test.skipIf — no flake when bd is absent.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac3",
             "title": "Test uses the REAL bd binary (no execAsync mock) and a REAL temp .beads/ directory, then corrupts a real manifest file before exercising createBeadsFromVBrief.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac4",
             "title": "Success path asserts result.success === true and result.created.length === plan.items.length.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac5",
             "title": "5-cycle bake: same workspace + same plan, run create/ping/list five times; assert bd doctor --fix is invoked AT MOST ONCE across the five cycles (recovery is sticky, not per-cycle).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac6",
             "title": "Existing mocked test at src/lib/vbrief/__tests__/create-beads.test.ts:219 is NOT removed — both tests coexist with non-overlapping concerns.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "test-1111-real-corruption-integration.ac7",
             "title": "Temp directory is cleaned up in afterAll/afterEach so the test leaves no residue under tests/integration/.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "cli-1173-bare-numeric-rollout",
         "title": "PAN-1173 follow-through: Apply resolveBareNumericIdSync to 9 remaining CLI commands",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -521,105 +562,118 @@
           {
             "id": "cli-1173-bare-numeric-rollout.ac1",
             "title": "src/cli/commands/kill.ts: bare numeric input resolves via resolveBareNumericIdSync before stopAgentSync runs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac2",
             "title": "src/cli/commands/pause.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac3",
             "title": "src/cli/commands/unpause.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac4",
             "title": "src/cli/commands/untroubled.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac5",
             "title": "src/cli/commands/reopen.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac6",
             "title": "src/cli/commands/close.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac7",
             "title": "src/cli/commands/inspect.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac8",
             "title": "src/cli/commands/open.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac9",
             "title": "src/cli/commands/review-restart.ts: bare numeric input resolves via resolveBareNumericIdSync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac10",
             "title": "Each affected command guards the null-return from resolveBareNumericIdSync and emits the same 'Could not resolve issue ID' error message used by show.ts (consistency).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac11",
             "title": "New test file confirms bare-numeric acceptance for all nine commands (one test per command, minimum).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "cli-1173-bare-numeric-rollout.ac12",
             "title": "Fully-prefixed input (PAN-1234, agent-pan-1234, F29698) still works identically to today across all nine commands — additive change, no regression.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "substrate-reviewer-promised-tests",
         "title": "Substrate: Encode 'promised test not delivered → in_pr_scope blocker' rule in roles/review-requirements.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -635,49 +689,55 @@
           {
             "id": "substrate-reviewer-promised-tests.ac1",
             "title": "roles/review-requirements.md contains a new explicit rule: AC text mentioning 'test'/'regression test'/'unit test' + zero new/modified *.test.ts files in PR diff → in_pr_scope Missing, severity `!`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "substrate-reviewer-promised-tests.ac2",
             "title": "The new rule documents that it overrides 'when in doubt prefer whole_feature_scope' for the test-promise case.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "substrate-reviewer-promised-tests.ac3",
             "title": "A worked example cites PAN-1326 (or PAN-1450) so the rule has a concrete anchor.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "substrate-reviewer-promised-tests.ac4",
             "title": "No close-out-time check is added (src/lib/close-out.ts is unchanged in this bead).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "substrate-reviewer-promised-tests.ac5",
             "title": "If sync-sources/agents/pan-review-agent.md mirrors the role prompt (verify first), it is updated in the same commit to keep the two in sync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       },
       {
         "id": "audit-1257-role-population",
         "title": "PAN-1257 audit: Confirm state.json role field is populated for specialist agents",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T16:30:00.000Z",
         "metadata": {
@@ -693,92 +753,99 @@
           {
             "id": "audit-1257-role-population.ac1",
             "title": "Audit enumerates every code path that initially writes a state.json for a specialist agent (review-correctness, review-security, ship, test, review.*).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "audit-1257-role-population.ac2",
             "title": "Audit note written to .pan/audit-1257.md (workspace-local) listing each writer and whether it populates role correctly.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "audit-1257-role-population.ac3",
             "title": "If gaps found: a separate issue is filed (with a link captured in the audit note). If no gaps: audit note explicitly states 'no gaps found, all specialist spawn paths populate role'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           },
           {
             "id": "audit-1257-role-population.ac4",
             "title": "No silent patches: this bead does NOT modify any state.json writer or saveAgentState call.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-26T00:20:13.823Z"
           }
-        ]
+        ],
+        "updated": "2026-05-26T00:20:13.823Z"
       }
     ],
     "edges": [],
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1450-audit-6-recent-fixes-shipped-without-the-regression-tests-their-ac-promised.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1450",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-26T00:12:18.776Z",
+        "updatedAt": "2026-05-26T00:20:34.424Z",
         "work": {
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "status": "passed",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-05-26T00:12:18.776Z"
+              "status": "passed",
+              "at": "2026-05-26T00:20:34.424Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "status": "reviewing",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "notes": "Verification failed at vbrief-ac",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-26T00:12:18.776Z"
+              "status": "reviewing",
+              "at": "2026-05-26T00:20:34.424Z",
+              "notes": "Verification failed at vbrief-ac"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-26T00:12:18.776Z"
+              "at": "2026-05-26T00:20:34.424Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-26T00:12:18.776Z",
+          "updatedAt": "2026-05-26T00:20:34.424Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-26T00:12:18.776Z"
+              "at": "2026-05-26T00:20:34.424Z"
             }
           ],
           "readyForMerge": false,
@@ -787,5 +854,6 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "proposed",
+  "updated": "2026-05-26T00:20:13.823Z"
 }
