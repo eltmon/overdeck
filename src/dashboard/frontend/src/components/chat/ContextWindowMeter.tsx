@@ -1,21 +1,24 @@
 /**
- * ContextWindowMeter — compact "how full is the context window" indicator,
+ * ContextWindowMeter — compact circular ring showing context-window usage,
  * placed next to the send button in the composer toolbar.
  *
- * Named, prop-shaped, and helper-aligned with t3code's
- * apps/web/src/components/chat/ContextWindowMeter.tsx so future visual or
- * data-shape updates can be ported with minimal rename churn. Differences:
+ * Ported visually from t3code's apps/web/src/components/chat/ContextWindowMeter.tsx
+ * so future updates port cleanly. Differences from upstream:
  *
- *   - Server data shape is Panopticon's (`activeBytes` + tokens), wrapped
- *     into a t3code-shaped ContextWindowSnapshot by `toContextWindowSnapshot`.
- *   - Visual is Panopticon's existing compact bar+percent (auto-collapses
- *     to a colored dot in cramped headers via container queries); t3code's
- *     circular ring requires the Popover/PopoverPopup primitives we don't
- *     have here. The data plumbing is identical; the renderer is ours.
+ *   - Data: t3code threads `ContextWindowSnapshot` from an activity stream
+ *     event; we adapt our server-side `ContextUsage` payload via
+ *     `toContextWindowSnapshot()` in lib/contextWindow.ts. Field names match.
+ *   - Hover detail: t3code wraps the trigger in `<Popover>`/`<PopoverPopup>`
+ *     to show a multi-line detail block. We don't have shared popover
+ *     primitives yet — using native `title` (single-line tooltip) for now.
+ *     When a Popover primitive lands, swap the wrapper without touching the
+ *     SVG / data path.
+ *   - Tone coloring: we tint the progress stroke green/yellow/red based on
+ *     usage (<50 / 50–80 / >80). Upstream uses a single muted color. Keep
+ *     this divergence; it's a deliberate extension.
  *
- * When upstream t3code adds a field (e.g. `compactsAutomatically`,
- * `totalProcessedTokens`), add it to `ContextWindowSnapshot` in
- * `lib/contextWindow.ts` and surface it in the tooltip/title here.
+ * Geometry mirrors upstream exactly: 24×24 svg, viewBox 0 0 24 24, radius
+ * 9.75, two stroke-3 circles, -rotate-90 to start the arc at 12 o'clock.
  */
 
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
@@ -36,8 +39,14 @@ function getUsageTone(usedPercentage: number): UsageTone {
 
 function formatPercentage(value: number | null): string | null {
   if (value === null || !Number.isFinite(value)) return null;
+  if (value < 10) {
+    return `${value.toFixed(1).replace(/\.0$/, '')}%`;
+  }
   return `${Math.round(value)}%`;
 }
+
+const RADIUS = 9.75;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export function ContextWindowMeter({ usage }: ContextWindowMeterProps) {
   if (!usage) return null;
@@ -45,63 +54,77 @@ export function ContextWindowMeter({ usage }: ContextWindowMeterProps) {
   const normalizedPercentage =
     usage.usedPercentage !== null ? Math.max(0, Math.min(100, usage.usedPercentage)) : 0;
   const tone = getUsageTone(normalizedPercentage);
-  const formattedTokens = formatContextWindowTokens(usage.usedTokens);
-  const formattedWindow = formatContextWindowTokens(usage.maxTokens);
+  const dashOffset = CIRCUMFERENCE - (normalizedPercentage / 100) * CIRCUMFERENCE;
   const formattedPercent = formatPercentage(usage.usedPercentage);
 
-  const title =
-    usage.maxTokens !== null && formattedPercent
-      ? `${usage.usedTokens.toLocaleString()} active tokens (${formattedPercent}) of ${usage.maxTokens.toLocaleString()} context used`
-      : `${usage.usedTokens.toLocaleString()} active tokens`;
+  // Single-line title until a Popover primitive exists. Keep the same content
+  // t3code surfaces in its popover so the swap is mechanical later.
+  const titleLines: string[] = [];
+  if (usage.maxTokens !== null && formattedPercent) {
+    titleLines.push(
+      `${formattedPercent} · ${formatContextWindowTokens(usage.usedTokens)}/${formatContextWindowTokens(usage.maxTokens)} context used`,
+    );
+  } else {
+    titleLines.push(`${formatContextWindowTokens(usage.usedTokens)} tokens used so far`);
+  }
+  const title = titleLines.join(' · ');
 
-  const toneClass = styles[`tone_${tone}`];
+  // Inner label: percentage when we know the window, raw token count
+  // otherwise. Same fallback chain t3code uses.
+  const innerLabel =
+    usage.usedPercentage !== null
+      ? `${Math.round(usage.usedPercentage)}`
+      : formatContextWindowTokens(usage.usedTokens);
+
+  const ariaLabel =
+    usage.maxTokens !== null && formattedPercent
+      ? `Context window ${formattedPercent} used`
+      : `Context window ${formatContextWindowTokens(usage.usedTokens)} tokens used`;
 
   return (
-    <div
-      className={`${styles.root} ${toneClass}`}
+    <button
+      type="button"
+      className={`${styles.root} ${styles[`tone_${tone}`]}`}
       title={title}
-      aria-label={title}
+      aria-label={ariaLabel}
       data-testid="context-window-meter"
       data-tone={tone}
     >
-      <span className={styles.sizeText} data-testid="context-window-meter-size">
-        {formattedTokens}
-      </span>
-      {formattedPercent && (
-        <span className={styles.percentText} data-testid="context-window-meter-percent">
-          {formattedPercent}
+      <span className={styles.ring}>
+        <svg
+          viewBox="0 0 24 24"
+          className={styles.ringSvg}
+          aria-hidden="true"
+          data-testid="context-window-meter-ring"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r={RADIUS}
+            fill="none"
+            className={styles.ringTrack}
+            strokeWidth="3"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r={RADIUS}
+            fill="none"
+            className={styles.ringProgress}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            data-testid="context-window-meter-progress"
+          />
+        </svg>
+        <span className={styles.ringInner} data-testid="context-window-meter-label">
+          {innerLabel}
         </span>
-      )}
-      <span
-        className={styles.barTrack}
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(normalizedPercentage)}
-        aria-label="Context window usage"
-        data-testid="context-window-meter-bar"
-      >
-        <span
-          className={styles.barFill}
-          style={{ width: `${normalizedPercentage}%` }}
-          data-testid="context-window-meter-fill"
-        />
       </span>
-      <span
-        className={styles.dot}
-        aria-hidden="true"
-        data-testid="context-window-meter-dot"
-      />
-      {usage.maxTokens !== null && (
-        <span className={styles.windowText} data-testid="context-window-meter-window">
-          / {formattedWindow}
-        </span>
-      )}
-    </div>
+    </button>
   );
 }
 
-// Backwards-compatible re-export of the format helper. Anything that
-// imported `formatCompactCount` from the old file can keep working until
-// the call site is updated.
+// Backwards-compatible re-export of the format helper.
 export { formatContextWindowTokens as formatCompactCount };

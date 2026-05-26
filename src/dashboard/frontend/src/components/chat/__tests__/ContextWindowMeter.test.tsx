@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ContextWindowMeter } from '../ContextWindowMeter';
@@ -24,23 +22,9 @@ function snapshot(usedPercentage: number, usedTokens = 33_041): ContextWindowSna
   };
 }
 
-function renderInContainer(width: number, usage: ContextWindowSnapshot | null = snapshot(22)) {
-  return render(
-    <div style={{ containerType: 'inline-size', width }}>
-      <ContextWindowMeter usage={usage} />
-    </div>,
-  );
-}
-
-const meterCss = readFileSync(
-  resolve(process.cwd(), 'src/components/chat/ContextWindowMeter.module.css'),
-  'utf8',
-);
-
-describe('ContextWindowMeter', () => {
+describe('ContextWindowMeter (ring visual, mirrors t3code geometry)', () => {
   it('renders nothing when usage is null', () => {
-    const { container } = renderInContainer(1000, null);
-
+    const { container } = render(<ContextWindowMeter usage={null} />);
     expect(container.querySelector('[data-testid="context-window-meter"]')).toBeNull();
   });
 
@@ -52,54 +36,105 @@ describe('ContextWindowMeter', () => {
     [80, 'medium'],
     [99, 'high'],
   ] as const)('uses the %s%% threshold tone', (usedPercentage, tone) => {
-    renderInContainer(1000, snapshot(usedPercentage));
-
+    render(<ContextWindowMeter usage={snapshot(usedPercentage)} />);
     expect(screen.getByTestId('context-window-meter')).toHaveAttribute('data-tone', tone);
   });
 
-  it('renders the wide variant slots for containers above 900px', () => {
-    renderInContainer(1000, snapshot(22));
+  it('renders an SVG ring with a track + progress circle', () => {
+    render(<ContextWindowMeter usage={snapshot(22)} />);
 
-    // Tokens are formatted with t3code's algorithm — 33041 → '33k'.
-    expect(screen.getByTestId('context-window-meter-size')).toHaveTextContent('33k');
-    expect(screen.getByTestId('context-window-meter-percent')).toHaveTextContent('22%');
-    expect(screen.getByTestId('context-window-meter-bar')).toBeInTheDocument();
+    const ring = screen.getByTestId('context-window-meter-ring');
+    expect(ring.tagName.toLowerCase()).toBe('svg');
+    expect(ring).toHaveAttribute('viewBox', '0 0 24 24');
+
+    // Track + progress = 2 circles, both r=9.75.
+    const circles = ring.querySelectorAll('circle');
+    expect(circles).toHaveLength(2);
+    circles.forEach((c) => expect(c.getAttribute('r')).toBe('9.75'));
   });
 
-  it('defines the medium variant as size plus bar without percent or window text', () => {
-    renderInContainer(720, snapshot(22));
+  it('sets strokeDashoffset proportional to usedPercentage', () => {
+    // circumference = 2π * 9.75 ≈ 61.26
+    // At 25% used, offset = circumference - 0.25 * circumference = 0.75 * 61.26 ≈ 45.94
+    render(<ContextWindowMeter usage={snapshot(25)} />);
+    const progress = screen.getByTestId('context-window-meter-progress');
 
-    expect(screen.getByTestId('context-window-meter-size')).toHaveTextContent('33k');
-    expect(screen.getByTestId('context-window-meter-bar')).toBeInTheDocument();
-    expect(meterCss).toMatch(
-      /@container \(max-width: 900px\)[\s\S]*\.percentText,\s*\.windowText\s*\{[\s\S]*display: none;/,
+    const expectedCircumference = 2 * Math.PI * 9.75;
+    const expectedOffset = expectedCircumference - 0.25 * expectedCircumference;
+
+    expect(Number(progress.getAttribute('stroke-dasharray'))).toBeCloseTo(expectedCircumference, 5);
+    expect(Number(progress.getAttribute('stroke-dashoffset'))).toBeCloseTo(expectedOffset, 5);
+  });
+
+  it('clamps usedPercentage > 100 to a fully-drawn ring (offset = 0)', () => {
+    render(
+      <ContextWindowMeter
+        usage={{
+          usedTokens: 500_000,
+          maxTokens: 200_000,
+          usedPercentage: 250,
+          remainingTokens: 0,
+          remainingPercentage: 0,
+        }}
+      />,
     );
+    const progress = screen.getByTestId('context-window-meter-progress');
+    expect(Number(progress.getAttribute('stroke-dashoffset'))).toBeCloseTo(0, 5);
   });
 
-  it('defines the small variant as the dot only with the full value in the title', () => {
-    renderInContainer(420, snapshot(22));
+  it('shows rounded percent in the inner label', () => {
+    render(<ContextWindowMeter usage={snapshot(22.4)} />);
+    expect(screen.getByTestId('context-window-meter-label')).toHaveTextContent('22');
+  });
 
-    expect(screen.getByTestId('context-window-meter-dot')).toBeInTheDocument();
+  it('falls back to formatted token count when maxTokens is unknown', () => {
+    render(
+      <ContextWindowMeter
+        usage={{
+          usedTokens: 12_500,
+          maxTokens: null,
+          usedPercentage: null,
+          remainingTokens: null,
+          remainingPercentage: null,
+        }}
+      />,
+    );
+    // 12500 → "13k" via formatContextWindowTokens (rounded).
+    expect(screen.getByTestId('context-window-meter-label')).toHaveTextContent('13k');
+  });
+
+  it('exposes a tooltip with percent + tokens when maxTokens known', () => {
+    render(<ContextWindowMeter usage={snapshot(22)} />);
     expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
       'title',
-      '33,041 active tokens (22%) of 200,000 context used',
-    );
-    expect(meterCss).toMatch(
-      /@container \(max-width: 599px\)[\s\S]*\.sizeText,[\s\S]*\.barTrack\s*\{[\s\S]*display: none;/,
-    );
-    expect(meterCss).toMatch(
-      /@container \(max-width: 599px\)[\s\S]*\.dot\s*\{[\s\S]*display: inline-block;/,
+      '22% · 33k/200k context used',
     );
   });
 
-  it('sets progressbar accessibility values', () => {
-    renderInContainer(1000, snapshot(22.4));
+  it('exposes a usage-only tooltip when maxTokens unknown', () => {
+    render(
+      <ContextWindowMeter
+        usage={{
+          usedTokens: 1_500,
+          maxTokens: null,
+          usedPercentage: null,
+          remainingTokens: null,
+          remainingPercentage: null,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
+      'title',
+      '1.5k tokens used so far',
+    );
+  });
 
-    const bar = screen.getByRole('progressbar', { name: 'Context window usage' });
-    expect(bar).toHaveAttribute('aria-valuemin', '0');
-    expect(bar).toHaveAttribute('aria-valuemax', '100');
-    expect(bar).toHaveAttribute('aria-valuenow', '22');
-    expect(screen.getByTestId('context-window-meter-fill')).toHaveStyle({ width: '22.4%' });
+  it('sets an aria-label describing the usage', () => {
+    render(<ContextWindowMeter usage={snapshot(22)} />);
+    expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
+      'aria-label',
+      'Context window 22% used',
+    );
   });
 });
 

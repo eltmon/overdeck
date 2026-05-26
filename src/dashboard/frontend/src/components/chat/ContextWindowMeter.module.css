@@ -1,80 +1,91 @@
+/*
+ * ContextWindowMeter — circular ring, 24×24. Geometry mirrors t3code's
+ * apps/web/src/components/chat/ContextWindowMeter.tsx so the markup and
+ * stroke math stay in sync across the two codebases.
+ *
+ * Tones (low/medium/high) tint the progress stroke based on usage. This
+ * is a deliberate extension over upstream's single muted color.
+ */
+
 .root {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: help;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.sizeText,
-.percentText,
-.windowText {
-  line-height: 1;
+  transition: opacity 0.15s ease;
   flex-shrink: 0;
 }
 
-.percentText,
-.windowText {
-  color: color-mix(in srgb, var(--muted-foreground) 75%, transparent);
+.root:hover {
+  opacity: 0.85;
 }
 
-.barTrack {
-  width: 72px;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--muted-foreground) 18%, transparent);
-  flex-shrink: 0;
+.ring {
+  position: relative;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
 }
 
-.barFill {
-  display: block;
+.ringSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  border-radius: inherit;
+  transform: rotate(-90deg);
 }
 
-.dot {
-  display: none;
-  width: 8px;
-  height: 8px;
+.ringTrack {
+  stroke: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+}
+
+.ringProgress {
+  transition: stroke-dashoffset 0.5s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringProgress {
+    transition: none;
+  }
+}
+
+.ringInner {
+  position: relative;
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  flex-shrink: 0;
+  background: var(--background);
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  /* Use the SF Mono stack so digits inside the tiny ring stay aligned. */
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-.tone_low .barFill,
-.tone_low .dot {
-  background: var(--success);
+.tone_low .ringProgress {
+  stroke: var(--success);
 }
 
-.tone_medium .barFill,
-.tone_medium .dot {
-  background: var(--warning);
+.tone_medium .ringProgress {
+  stroke: var(--warning);
 }
 
-.tone_high .barFill,
-.tone_high .dot {
-  background: var(--destructive);
+.tone_high .ringProgress {
+  stroke: var(--destructive);
 }
 
-@container (max-width: 900px) {
-  .percentText,
-  .windowText {
-    display: none;
-  }
-}
-
-@container (max-width: 599px) {
-  .sizeText,
-  .percentText,
-  .windowText,
-  .barTrack {
-    display: none;
-  }
-
-  .dot {
-    display: inline-block;
-  }
+.tone_high .ringInner {
+  color: var(--destructive);
 }
