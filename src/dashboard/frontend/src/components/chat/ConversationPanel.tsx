@@ -493,7 +493,9 @@ export function ConversationPanel({
               />
             ) : (
               <>
-                {conversation.title ?? conversation.name}
+                <span className={styles.conversationTerminalTitleText}>
+                  {conversation.title ?? conversation.name}
+                </span>
                 <button
                   className={styles.conversationTitleEditBtn}
                   onClick={startEditingTitle}

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -288,6 +288,20 @@ export function ConversationRow({
           aria-label={`Rename ${conv.name}`}
         >
           <Pencil size={iconSize} />
+        </span>
+        <span
+          role="button"
+          tabIndex={0}
+          className={styles.conversationEditBtn}
+          onClick={e => { e.stopPropagation(); mutations.retitle(conv.name); }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.retitle(conv.name); } }}
+          title="Regenerate title from the whole conversation"
+          aria-label={`Regenerate title for ${conv.title ?? conv.name}`}
+          aria-disabled={mutations.isRetitlePending(conv.name)}
+        >
+          {mutations.isRetitlePending(conv.name)
+            ? <Loader2 size={iconSize} className={styles.conversationWorkingSpinner} />
+            : <Sparkles size={iconSize} />}
         </span>
         {conv.handoffDocPath && (
           <span

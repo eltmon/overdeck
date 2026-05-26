@@ -2474,13 +2474,26 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--foreground);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  /* Keep the title + edit/regenerate icons visible even when the cost bar,
+     status, session-id, and tab group consume most of the header. */
+  min-width: 200px;
+  /* Overflow + ellipsis live on the inner text span, not here — otherwise the
+     pencil/sparkle buttons get laid out past this container's right edge and
+     vanish behind overflow:hidden. */
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.conversationTerminalTitleText {
+  /* Inner span that holds just the title text. Shrinks to fit, ellipsises
+     when long, but does NOT clip its sibling buttons. */
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes spin {
@@ -2583,7 +2596,10 @@
   border-radius: 4px;
   display: flex;
   align-items: center;
-  opacity: 0.4;
+  /* 0.4 was too faint against the dark header — icons were effectively
+     invisible until hover. 0.75 is clearly visible at rest, hover still
+     lifts to 1.0 for affordance. */
+  opacity: 0.75;
   transition: opacity 0.15s, color 0.15s, background 0.15s;
   flex-shrink: 0;
 }

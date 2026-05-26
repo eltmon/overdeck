@@ -3489,7 +3489,6 @@ export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
         if (stash.kind !== 'unknown') continue;
         const message = `Non-canonical stash in ${issueId} (${workspacePath}): ${stash.ref} ${stash.message} — audit recommended`;
         console.warn(`[deacon] ${message}`);
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message });
         actions.push(message);
       }
     } catch (error) {

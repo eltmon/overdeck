@@ -57,7 +57,9 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
       {/* Header bar */}
       <div className={`${styles.conversationTerminalHeader} ${styles.conversationHeaderContainer}`}>
         <span className={styles.conversationTerminalTitle}>
-          {conversation.name}
+          <span className={styles.conversationTerminalTitleText}>
+            {conversation.name}
+          </span>
         </span>
         {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
           <span className={styles.featureCost}>
