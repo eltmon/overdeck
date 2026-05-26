@@ -30,7 +30,8 @@ afterEach(() => {
 
 interface JsonlLine {
   timestamp?: string
-  message?: { content?: unknown[] }
+  type?: string
+  message?: { role?: string; content?: unknown }
 }
 
 function writeJsonlSession(filename: string, lines: JsonlLine[]): string {
@@ -125,6 +126,69 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     ])
     const result = await Effect.runPromise(getPendingQuestions(path))
     expect(result.map((r) => r.toolId)).toEqual(['t2'])
+  })
+
+  it('RESOLVES a hook-denied AUQ once a plain user-text turn follows', async () => {
+    // This is the user-reported regression: the operator answers via the
+    // dashboard modal (or by typing in the terminal) and the answer arrives
+    // as a normal user-text turn, NOT a tool_result. Without recognising it
+    // as the resolution, reloading the page resurrects an already-answered
+    // question.
+    const denyReason = 'AskUserQuestion blocked (PAN-1520). Restate to operator.'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
+      { timestamp: '2026-05-26T01:00:05Z', type: 'assistant', message: { content: [{ type: 'text', text: 'Please choose A or B.' }] } },
+      { timestamp: '2026-05-26T01:00:10Z', type: 'user', message: { role: 'user', content: 'A' } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(0)
+  })
+
+  it('RESOLVES a hook-denied AUQ when the operator types prose (not a literal option label)', async () => {
+    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['Yes', 'No'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
+      { timestamp: '2026-05-26T01:00:10Z', type: 'user', message: { role: 'user', content: "Actually let's revisit this — what about option C?" } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(0)
+  })
+
+  it('RESOLVES a hook-denied AUQ when the user message is an array with a text block', async () => {
+    // Some Claude Code conv message turns serialize their content as an array
+    // of blocks (e.g. text + image). As long as ANY block is non-tool_result
+    // it counts as operator text.
+    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
+      {
+        timestamp: '2026-05-26T01:00:10Z',
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: 'Going with A.' }] },
+      },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(0)
+  })
+
+  it('KEEPS a hook-denied AUQ pending while ONLY tool_result wrapper turns follow', async () => {
+    // Intermediate user turns that are nothing but tool_result wrappers do
+    // NOT count as operator answers — only a real user-text turn does.
+    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
+      // The agent runs some other tool, gets a result back. None of this is
+      // operator input — the AUQ is still waiting.
+      { timestamp: '2026-05-26T01:00:05Z', type: 'assistant', message: { content: [{ type: 'tool_use', id: 'bash_x', name: 'Bash', input: { command: 'ls' } }] } },
+      { timestamp: '2026-05-26T01:00:06Z', type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'bash_x', content: 'README.md' }] } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(1)
+    expect(result[0].toolId).toBe('t1')
   })
 })
 

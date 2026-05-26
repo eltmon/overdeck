@@ -219,6 +219,32 @@ export interface PendingInputsScan {
   readonly exitPlanModePending: boolean
 }
 
+/**
+ * PAN-1520 — does this user-message entry carry operator text (i.e. an answer)
+ * rather than just being a wrapper for a tool_result? When the hook denies an
+ * AskUserQuestion the agent restates the question as plain text; the operator's
+ * next user message — whether typed in the terminal, sent from the conversation
+ * composer, or delivered by the answer-question route — is the actual answer.
+ * The presence of that user-text turn after the deny is what resolves the AUQ.
+ */
+function isUserTextEntry(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false
+  const e = entry as { type?: unknown; message?: { content?: unknown } }
+  if (e.type !== 'user') return false
+  const content = e.message?.content
+  if (typeof content === 'string') return content.trim().length > 0
+  if (Array.isArray(content)) {
+    return content.some((item: unknown) => {
+      if (!item || typeof item !== 'object') return false
+      const t = (item as { type?: unknown }).type
+      // Anything that's not a tool_result counts as operator text (text blocks,
+      // image blocks pasted by the operator, etc.).
+      return t !== 'tool_result'
+    })
+  }
+  return false
+}
+
 export async function scanPendingInputsPromise(jsonlPath: string): Promise<PendingInputsScan> {
   if (!existsSync(jsonlPath)) {
     return { askUserQuestions: [], enterPlanModeOpen: false, exitPlanModePending: false }
@@ -229,6 +255,9 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     const lines = content.split('\n').filter(line => line.trim())
     const askToolCalls = new Map<string, PendingQuestion>()
     const askAnswered = new Set<string>()
+    // PAN-1520 — AUQs the hook denied but the operator hasn't yet answered as
+    // plain text. The next user-text turn resolves all of them.
+    const askDeniedAwaitingUser = new Set<string>()
     const exitPlanModeIds = new Set<string>()
     const exitPlanModeAnswered = new Set<string>()
     const enterPlanModeIds = new Set<string>()
@@ -237,6 +266,16 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     for (const line of lines) {
       try {
         const entry = JSON.parse(line)
+
+        // PAN-1520 — a user-text turn resolves any AUQs still in the "denied
+        // but awaiting operator response" state. Without this check, an AUQ
+        // that was hook-denied and then answered via the dashboard modal (or
+        // by the operator typing in the terminal) would appear pending forever.
+        if (isUserTextEntry(entry)) {
+          for (const id of askDeniedAwaitingUser) askAnswered.add(id)
+          askDeniedAwaitingUser.clear()
+        }
+
         const messageContent = entry.message?.content
         if (!Array.isArray(messageContent)) continue
         for (const item of messageContent) {
@@ -255,13 +294,14 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
             }
           }
           if (item.type === 'tool_result' && typeof item.tool_use_id === 'string') {
-            // Hook deny does NOT count as an answer — the operator still needs
-            // to restate-and-respond. Skip these so AUQ stays pending.
             if (askToolCalls.has(item.tool_use_id)) {
               if (isAskUserQuestionHookDenyToolResult(item)) {
-                // intentionally do NOT mark as answered — hook deny keeps it pending
+                // Hook deny — mark as "waiting on operator text" so the very
+                // next user-text turn clears it.
+                askDeniedAwaitingUser.add(item.tool_use_id)
               } else {
                 askAnswered.add(item.tool_use_id)
+                askDeniedAwaitingUser.delete(item.tool_use_id)
               }
             }
             if (exitPlanModeIds.has(item.tool_use_id)) {
