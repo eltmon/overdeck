@@ -107,11 +107,6 @@ temp/
 .playwright-mcp/
 .playwright-mcp/
 
-# Graphify output — derived from source on every run. Tracking causes thousands
-# of lines of diff churn on every PR (5500+ lines in PAN-1059's #1089). The
-# graph is regenerable via `graphify update .` so there's no value in commits.
-graphify-out/
-
 # Panopticon runtime artifacts (ephemeral, not tracked)
 .pan/events/
 .pan/convoy/
@@ -157,4 +152,3 @@ multica/
 .cache/
 .tldr/
 .claude/mcp.json
-graphify-out/cost.json

@@ -34,7 +34,6 @@ Claude Code gives user-level skills precedence over project-level skills when na
 | `/exe-backup` | User | exe.dev Backup |
 | `/feature-work` | Project | Standard workflow for implementing new features with testing |
 | `/github-cli` | Project | GitHub CLI (gh) reference for issues, PRs, and API calls |
-| `/graphify` | User | any input (code, docs, papers, images, videos) to knowledge graph. Use when user asks any question about a codebase, documents, or project content - especially if graphify-out/ exists, treat the question as a /graphify query. |
 | `/gsap` | User | GSAP animation reference for HyperFrames. Covers gsap.to(), from(), fromTo(), easing, stagger, defaults, timelines (gsap.timeline(), position parameter, labels, nesting, playback), and performance (transforms, will-change, quickTo). Use when writing GSAP animations in HyperFrames compositions. |
 | `/hume-evi` | Project | Hume EVI Voice Management |
 | `/hyperframes` | User | Create video compositions, animations, title cards, overlays, captions, voiceovers, audio-reactive visuals, and scene transitions in HyperFrames HTML. |
