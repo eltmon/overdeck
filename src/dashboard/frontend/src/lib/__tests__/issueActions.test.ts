@@ -17,7 +17,6 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'donePlanning',
   'startAgent',
   'startSkipPlanning',
-  'swarm',
   'tell',
   'doneWork',
   'requestReview',

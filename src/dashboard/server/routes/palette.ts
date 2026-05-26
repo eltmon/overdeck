@@ -63,7 +63,6 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan sync-main <id>', description: 'Merge latest main into the feature branch for an active workspace', group: 'Agents', keywords: ['rebase', 'merge', 'main'] },
   { name: 'pan done <id>', description: 'Mark work complete and signal the review pipeline', group: 'Agents', keywords: ['complete', 'finish'] },
   { name: 'pan wipe <id>', description: 'Destructive reset to Todo (removes workspace, branches, beads, status)', group: 'Agents', keywords: ['destroy', 'reset', 'danger'] },
-  { name: 'pan swarm <id>', description: 'Spawn a parallel convoy of work agents on the same issue', group: 'Agents', keywords: ['convoy', 'parallel'] },
 
   // Review pipeline
   { name: 'pan review pending', description: 'List PRs awaiting review action', group: 'Review' },
