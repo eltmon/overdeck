@@ -78,11 +78,6 @@ The final `feature/<id>` → `main` PR is always a human merge.
 
 - **No slot-PR auto-merge.** `--auto-advance` only advances after slot PRs are
   *merged*; nothing merges them. Merge them yourself with `gh pr merge`.
-- **`graphify-out/` conflicts.** Every slot regenerates the tracked graph
-  artifacts, so parallel slots collide there. Resolve with a detached worktree,
-  taking either side (it is regenerable):
-  `git worktree add --detach /tmp/m origin/feature/<id>`, merge each slot
-  branch with `-X theirs`, then `git push origin HEAD:feature/<id>`.
 - **Zombie slots.** Finished slots idle without terminating and consume the
   agent cap, shrinking later batches. Retire them with `pan pause <id>-<N>`
   (the deacon honors a pause; `pan kill` gets auto-resumed).

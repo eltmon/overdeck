@@ -554,17 +554,6 @@ When creating a Linear or GitHub issue from a PRD, **always reference the PRD at
 
 The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
 
-## graphify
-
-This project has a knowledge graph at graphify-out/ with community structure and cross-file relationships.
-
-Rules:
-- At task start, read graphify-out/GRAPH_SUMMARY.md (~700 tokens) for orientation — do NOT read the full GRAPH_REPORT.md (35K tokens) unless you need the complete community listing.
-- For cross-module questions, use the CLI instead of reading files: `graphify query "<question>"`, `graphify path "<A>" "<B>"`, `graphify explain "<concept>"` — these traverse EXTRACTED + INFERRED edges and return only relevant nodes.
-- Only read source files once you know exactly which ones to read (from graphify output or the summary).
-
-The graph is refreshed automatically by the merge agent after every merge to main; agents do not need to run `graphify update` manually.
-
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
