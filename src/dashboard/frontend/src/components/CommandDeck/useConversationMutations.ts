@@ -34,7 +34,7 @@ async function unfavoriteConversation(name: string): Promise<void> {
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; cwd?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -49,6 +49,10 @@ async function summaryForkConversation(opts: { conv: Conversation; model: string
       localSummaryOnly: opts.localSummaryOnly,
       includeThinkingInSummary: opts.includeThinkingInSummary,
       title: opts.title,
+      // PAN-1533: when forking into a worktree, the cwd parameter (already
+      // honored by the summary-fork endpoint) routes the new Claude session
+      // to that path.
+      cwd: opts.cwd,
     }),
   });
   const data = await res.json().catch(() => null);
@@ -64,10 +68,12 @@ export interface ConversationMutations {
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
-  openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption }) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => void;
+  openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; targetCwd?: string; targetCwdLabel?: string }) => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string, targetCwd?: string) => void;
   forkTarget: Conversation | null;
   forkTargetMode: ForkModeOption | undefined;
+  forkTargetCwd: string | undefined;
+  forkTargetCwdLabel: string | undefined;
   closeForkModal: () => void;
   isForkPending: boolean;
 }
@@ -79,6 +85,10 @@ export function useConversationMutations(
   const queryClient = useQueryClient();
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
   const [forkTargetMode, setForkTargetMode] = useState<ForkModeOption | undefined>(undefined);
+  // PAN-1533: pre-selected cwd for the fork (e.g. a conv worktree picked
+  // from the branch chip's WorktreePickerMenu).
+  const [forkTargetCwd, setForkTargetCwd] = useState<string | undefined>(undefined);
+  const [forkTargetCwdLabel, setForkTargetCwdLabel] = useState<string | undefined>(undefined);
   const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
@@ -170,14 +180,16 @@ export function useConversationMutations(
     },
   });
 
-  const openForkModal = useCallback((conv: Conversation, options?: { mode?: ForkModeOption }) => {
+  const openForkModal = useCallback((conv: Conversation, options?: { mode?: ForkModeOption; targetCwd?: string; targetCwdLabel?: string }) => {
     if (!summaryForkMutation.isPending) {
       setForkTarget(conv);
       setForkTargetMode(options?.mode);
+      setForkTargetCwd(options?.targetCwd);
+      setForkTargetCwdLabel(options?.targetCwdLabel);
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string, targetCwd?: string) => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
@@ -189,9 +201,12 @@ export function useConversationMutations(
       localSummaryOnly,
       includeThinkingInSummary,
       title,
+      cwd: targetCwd,
     });
     setForkTarget(null);
     setForkTargetMode(undefined);
+    setForkTargetCwd(undefined);
+    setForkTargetCwdLabel(undefined);
   }, [summaryForkMutation]);
 
   // retitleVersion is referenced so isRetitlePending re-evaluates after pending changes.
@@ -214,7 +229,14 @@ export function useConversationMutations(
     submitFork,
     forkTarget,
     forkTargetMode,
-    closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); },
+    forkTargetCwd,
+    forkTargetCwdLabel,
+    closeForkModal: () => {
+      setForkTarget(null);
+      setForkTargetMode(undefined);
+      setForkTargetCwd(undefined);
+      setForkTargetCwdLabel(undefined);
+    },
     isForkPending: summaryForkMutation.isPending,
   };
 }

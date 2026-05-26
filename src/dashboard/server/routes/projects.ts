@@ -4,6 +4,8 @@ import { jsonResponse } from "../http-helpers.js";
  *
  * Implements:
  *   GET /api/projects/:projectKey/session-tree
+ *   GET /api/projects/:projectKey/worktrees             — PAN-1533
+ *   POST /api/projects/:projectKey/worktrees            — PAN-1533
  */
 
 import { access, readFile, readdir, stat } from 'node:fs/promises';
@@ -31,6 +33,11 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
+import {
+  listProjectWorktrees,
+  createConvWorktree,
+  WorktreeValidationError,
+} from '../services/conv-worktrees.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -541,11 +548,112 @@ const getAllSessionTreesRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/projects/:projectKey/worktrees ────────────────────────
+//
+// PAN-1533: list worktrees of a project (primary + agent + conv).
+// Used by the WorktreePickerMenu on the conversation branch chip.
+
+const getProjectWorktreesRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/worktrees',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['projectKey'] ?? '';
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const projects = listProjectsSync();
+        const project = projects.find(
+          (p) => p.key === projectKey || (p.config as { name?: string }).name === projectKey,
+        );
+        if (!project) return null;
+        const worktrees = await listProjectWorktrees(project.config.path);
+        return { projectKey: project.key, projectPath: project.config.path, worktrees };
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    if (result === null) {
+      return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    }
+    return jsonResponse(result);
+  })),
+);
+
+// ─── Route: POST /api/projects/:projectKey/worktrees ───────────────────────
+//
+// PAN-1533: create a conv worktree at <projectRoot>/worktrees/conv-<slug>.
+// Body: { slug: string, branch: string, base?: string }.
+// Rejects malformed input with 400. Surfaces git failures as 500 with stderr.
+
+const postProjectWorktreesRoute = HttpRouter.add(
+  'POST',
+  '/api/projects/:projectKey/worktrees',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const projectKey = params['projectKey'] ?? '';
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const bodyText = yield* request.text;
+    let body: Record<string, unknown>;
+    try {
+      body = bodyText ? (JSON.parse(bodyText) as Record<string, unknown>) : {};
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const slug = typeof body['slug'] === 'string' ? body['slug'].trim() : '';
+    const branch = typeof body['branch'] === 'string' ? body['branch'].trim() : '';
+    const base = typeof body['base'] === 'string' && body['base'].trim() ? body['base'].trim() : undefined;
+
+    if (!slug) {
+      return jsonResponse({ error: 'slug is required' }, { status: 400 });
+    }
+    if (!branch) {
+      return jsonResponse({ error: 'branch is required' }, { status: 400 });
+    }
+
+    const result = yield* Effect.tryPromise({
+      try: async () => {
+        const projects = listProjectsSync();
+        const project = projects.find(
+          (p) => p.key === projectKey || (p.config as { name?: string }).name === projectKey,
+        );
+        if (!project) return { kind: 'not-found' as const };
+
+        try {
+          const created = await createConvWorktree({
+            projectRoot: project.config.path,
+            slug,
+            branch,
+            base,
+          });
+          return { kind: 'ok' as const, created };
+        } catch (err) {
+          if (err instanceof WorktreeValidationError) {
+            return { kind: 'validation' as const, message: err.message };
+          }
+          throw err;
+        }
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    if (result.kind === 'not-found') {
+      return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    }
+    if (result.kind === 'validation') {
+      return jsonResponse({ error: result.message }, { status: 400 });
+    }
+    return jsonResponse(result.created, { status: 201 });
+  })),
+);
+
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
+  getProjectWorktreesRoute,
+  postProjectWorktreesRoute,
 );
 
 export default projectsRouteLayer;

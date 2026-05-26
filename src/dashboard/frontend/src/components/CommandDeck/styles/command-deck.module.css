@@ -4694,6 +4694,26 @@
   border-color: var(--primary);
 }
 
+/* ─── Fork target cwd confirmation (PAN-1533) ────────────────────────────── */
+
+.forkTargetCwd {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.forkTargetCwd code {
+  font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted-foreground) 18%, transparent);
+}
+
 /* ─── Fork footer ────────────────────────────────────────────────────────── */
 
 .forkFooter {

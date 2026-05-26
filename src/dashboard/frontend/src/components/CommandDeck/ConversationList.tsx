@@ -316,9 +316,11 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         <ForkModal
           conversation={mutations.forkTarget}
           isPending={mutations.isForkPending}
+          targetCwd={mutations.forkTargetCwd}
+          targetCwdLabel={mutations.forkTargetCwdLabel}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
-            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, targetCwd) => {
+            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, targetCwd);
           }}
         />
       )}

@@ -11,6 +11,8 @@ import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
+import { useProjectKeyForCwd } from '../../hooks/useProjectKeyForCwd';
+import { WorktreePickerMenu } from '../CommandDeck/WorktreePickerMenu';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -58,6 +60,14 @@ interface ConversationPanelProps {
   embedded?: boolean;
   /** Agent ID for fetching turn diffs. Omit to skip diff display. */
   agentId?: string;
+  /**
+   * PAN-1533: when set, the header branch chip becomes interactive — click
+   * opens the WorktreePickerMenu, and selecting a worktree calls this
+   * callback with the picked path + label. The caller (which owns the
+   * fork modal) is expected to open `openForkModal` with `targetCwd` set.
+   * When omitted, the chip stays read-only.
+   */
+  onPickWorktree?: (path: string, label: string) => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -98,10 +108,21 @@ export function ConversationPanel({
   roundMetadata,
   embedded = false,
   agentId,
+  onPickWorktree,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  // PAN-1533: interactive branch chip → opens WorktreePickerMenu.
+  const [worktreePickerOpen, setWorktreePickerOpen] = useState(false);
+  const conversationProjectKey = useProjectKeyForCwd(conversation.cwd);
+  const isAgentLikeConversation = /^(agent|planning|specialist|review)-/.test(conversation.name);
+  const canPickWorktree =
+    !embedded &&
+    !!onPickWorktree &&
+    !!conversationProjectKey &&
+    !!conversation.branch &&
+    !isAgentLikeConversation;
   const confirm = useConfirm();
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   // See ComposerFooter for rationale — never seed an existing conversation's
@@ -518,15 +539,52 @@ export function ConversationPanel({
             )}
           </span>
           {conversation.branch && (
-            <span
-              className={styles.terminalBranchBar}
-              title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
-            >
-              {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
-              <span className={styles.terminalBranchBarMode}>
-                {conversation.isWorktree ? 'Worktree' : 'Local'}
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <span
+                role={canPickWorktree ? 'button' : undefined}
+                tabIndex={canPickWorktree ? 0 : undefined}
+                className={styles.terminalBranchBar}
+                title={
+                  canPickWorktree
+                    ? `${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd} — click to fork into another worktree`
+                    : `${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`
+                }
+                aria-haspopup={canPickWorktree ? 'dialog' : undefined}
+                aria-expanded={canPickWorktree ? worktreePickerOpen : undefined}
+                onClick={(e) => {
+                  if (!canPickWorktree) return;
+                  e.stopPropagation();
+                  setWorktreePickerOpen((open) => !open);
+                }}
+                onKeyDown={(e) => {
+                  if (!canPickWorktree) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    setWorktreePickerOpen((open) => !open);
+                  }
+                }}
+                style={canPickWorktree ? { cursor: 'pointer' } : undefined}
+                data-testid="conversation-panel-branch-chip"
+              >
+                {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+                <span className={styles.terminalBranchBarMode}>
+                  {conversation.isWorktree ? 'Worktree' : 'Local'}
+                </span>
+                <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
               </span>
-              <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+              {worktreePickerOpen && conversationProjectKey && onPickWorktree && (
+                <WorktreePickerMenu
+                  projectKey={conversationProjectKey}
+                  currentCwd={conversation.cwd}
+                  newWorktreeSlug={conversation.name}
+                  anchor="top-right"
+                  onClose={() => setWorktreePickerOpen(false)}
+                  onSelect={(path, label) => {
+                    setWorktreePickerOpen(false);
+                    onPickWorktree(path, label);
+                  }}
+                />
+              )}
             </span>
           )}
           {conversation.totalCost !== undefined && conversation.totalCost > 0 && (

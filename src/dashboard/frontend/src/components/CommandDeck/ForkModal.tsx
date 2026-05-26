@@ -118,6 +118,19 @@ function ForkHelpModal({ onClose }: { onClose: () => void }) {
 interface ForkModalProps {
   conversation: Conversation;
   initialMode?: ForkModeOption;
+  /**
+   * PAN-1533: when set, the fork's Claude session will be spawned with
+   * cwd set to this absolute path (typically a conv worktree). Shown
+   * as a confirmation line above the launch button so the user can
+   * see where the fork will run.
+   */
+  targetCwd?: string;
+  /**
+   * PAN-1533: pretty label for `targetCwd` shown in the confirmation
+   * line (e.g. `feature/draft-experiment` rather than the absolute path).
+   * Falls back to the path itself when omitted.
+   */
+  targetCwdLabel?: string;
   onConfirm: (
     conv: Conversation,
     launchModel: string,
@@ -129,12 +142,13 @@ interface ForkModalProps {
     launchHarness?: Harness,
     summaryHarness?: Harness,
     focus?: string,
+    targetCwd?: string,
   ) => void;
   onClose: () => void;
   isPending: boolean;
 }
 
-export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPending }: ForkModalProps) {
+export function ForkModal({ conversation, initialMode, targetCwd, targetCwdLabel, onConfirm, onClose, isPending }: ForkModalProps) {
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
@@ -409,6 +423,12 @@ export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPen
           </div>
         </div>
 
+        {targetCwd && (
+          <div className={styles.forkTargetCwd} data-testid="fork-modal-target-cwd">
+            Forking into <code>{targetCwdLabel ?? targetCwd}</code>
+          </div>
+        )}
+
         <div className={styles.forkFooter}>
           <button className={styles.forkCancelBtn} onClick={onClose}>
             Cancel
@@ -428,6 +448,7 @@ export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPen
               launchHarness,
               summaryHarness,
               handoffFocusValue,
+              targetCwd,
             )}
           >
             <GitBranchPlus size={13} />

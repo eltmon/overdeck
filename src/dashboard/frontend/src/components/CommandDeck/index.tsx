@@ -243,6 +243,7 @@ function ProjectRightPaneTabs({
   onOpenIssue,
   onSelectConversation,
   onActiveIssueIdChange,
+  onPickWorktreeForFork,
 }: {
   projectName: string;
   features: ProjectFeature[];
@@ -267,6 +268,8 @@ function ProjectRightPaneTabs({
   onOpenIssue: (issueId: string) => void;
   onSelectConversation: (name: string | null) => void;
   onActiveIssueIdChange?: (issueId: string | null) => void;
+  /** PAN-1533: forward the branch chip's worktree pick into the parent's fork modal. */
+  onPickWorktreeForFork?: (conv: Conversation, path: string, label: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ProjectRightTab>(() => readProjectTab(projectName));
   const [activeIssueId, setActiveIssueId] = useState<string | null>(() => features[0]?.issueId ?? null);
@@ -469,6 +472,11 @@ function ProjectRightPaneTabs({
                         onViewModeChange={onConversationViewModeChange}
                         agentId={conversationAgentId}
                         onArchived={onArchivedConversation}
+                        onPickWorktree={
+                          onPickWorktreeForFork
+                            ? (path, label) => onPickWorktreeForFork(conv, path, label)
+                            : undefined
+                        }
                       />
                     </div>
                   </div>
@@ -1495,9 +1503,11 @@ export function CommandDeck({
               conversation={projectConvMutations.forkTarget}
               initialMode={projectConvMutations.forkTargetMode}
               isPending={projectConvMutations.isForkPending}
+              targetCwd={projectConvMutations.forkTargetCwd}
+              targetCwdLabel={projectConvMutations.forkTargetCwdLabel}
               onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
+              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, targetCwd) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, targetCwd);
               }}
             />
           )}
@@ -1547,6 +1557,13 @@ export function CommandDeck({
               onActiveIssueIdChange={(issueId) => {
                 if (issueId) handleSelectFeature(issueId);
               }}
+              onPickWorktreeForFork={(conv, path, label) => {
+                projectConvMutations.openForkModal(conv, {
+                  mode: 'summary',
+                  targetCwd: path,
+                  targetCwdLabel: label,
+                });
+              }}
             />
           ) : unscopedConversation ? (
             <div className="flex h-full min-h-0 flex-col">
@@ -1559,6 +1576,13 @@ export function CommandDeck({
                 onArchived={() => {
                   setSelectedConversation(null);
                   queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                }}
+                onPickWorktree={(path, label) => {
+                  projectConvMutations.openForkModal(unscopedConversation, {
+                    mode: 'summary',
+                    targetCwd: path,
+                    targetCwdLabel: label,
+                  });
                 }}
               />
             </div>

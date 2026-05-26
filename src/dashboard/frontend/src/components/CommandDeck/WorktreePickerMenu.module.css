@@ -1,0 +1,263 @@
+/*
+ * WorktreePickerMenu (PAN-1533)
+ *
+ * Anchored popover used by the conversation branch chip. Visual feel
+ * follows the dashboard's existing popover patterns (see
+ * ContextWindowMeter.module.css). The picker is intentionally narrow —
+ * the host conversation pane is often tight and we don't want the menu
+ * to feel like a takeover dialog.
+ */
+
+.popover {
+  position: absolute;
+  z-index: 60;
+  min-width: 280px;
+  max-width: 360px;
+  padding: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  font-size: 11px;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: default;
+  text-align: left;
+}
+
+.anchor_top-right {
+  top: calc(100% + 6px);
+  right: 0;
+}
+
+.anchor_bottom-right {
+  bottom: calc(100% + 6px);
+  right: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.headerLabel {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.backBtn:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 15%, transparent);
+  color: var(--foreground);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.entry {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--foreground);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry:hover:not(.entryDisabled) {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.entryDisabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.entryBranch {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryReason {
+  font-size: 9.5px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.footer {
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.createBtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.createBtn:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.empty,
+.error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  color: var(--muted-foreground);
+}
+
+.error {
+  color: var(--destructive);
+}
+
+.spin {
+  animation: worktree-spin 1s linear infinite;
+}
+
+@keyframes worktree-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Create form ─────────────────────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.fieldLabel {
+  font-size: 9.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+
+.input {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.helpText {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+.helpText code {
+  font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 9.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+}
+
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.cancelBtn,
+.submitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.cancelBtn:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 14%, transparent);
+}
+
+.submitBtn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: transparent;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

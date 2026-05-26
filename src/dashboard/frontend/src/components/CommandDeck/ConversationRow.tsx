@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
+import { useProjectKeyForCwd } from '../../hooks/useProjectKeyForCwd';
+import { WorktreePickerMenu } from './WorktreePickerMenu';
 import { useDashboardStore } from '../../lib/store';
 import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2 } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
@@ -68,6 +70,12 @@ export function ConversationRow({
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  // PAN-1533: branch chip is interactive — opens the WorktreePickerMenu
+  // for non-agent conversations.
+  const [worktreePickerOpen, setWorktreePickerOpen] = useState(false);
+  const projectKey = useProjectKeyForCwd(conv.cwd);
+  const isAgentLikeConversation = /^(agent|planning|specialist|review)-/.test(conv.name);
+  const canPickWorktree = !isAgentLikeConversation && !!projectKey && !!conv.branch;
   const [draftTitle, setDraftTitle] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
   const draftTitleRef = useRef('');
@@ -248,15 +256,56 @@ export function ConversationRow({
         </span>
       )}
 
-      {/* Branch / worktree chip (PAN-1523) */}
+      {/* Branch / worktree chip (PAN-1523, interactive in PAN-1533) */}
       {conv.branch && (
-        <span
-          className={styles.conversationBranchChip}
-          title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
-          aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
-        >
-          {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
-          <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
+          <span
+            role={canPickWorktree ? 'button' : undefined}
+            tabIndex={canPickWorktree ? 0 : undefined}
+            className={styles.conversationBranchChip}
+            title={
+              canPickWorktree
+                ? `${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd} — click to fork into another worktree`
+                : `${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`
+            }
+            aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+            aria-haspopup={canPickWorktree ? 'dialog' : undefined}
+            aria-expanded={canPickWorktree ? worktreePickerOpen : undefined}
+            onClick={(e) => {
+              if (!canPickWorktree) return;
+              e.stopPropagation();
+              setWorktreePickerOpen((open) => !open);
+            }}
+            onKeyDown={(e) => {
+              if (!canPickWorktree) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                setWorktreePickerOpen((open) => !open);
+              }
+            }}
+            style={canPickWorktree ? { cursor: 'pointer' } : undefined}
+            data-testid="conversation-row-branch-chip"
+          >
+            {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+            <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+          </span>
+          {worktreePickerOpen && projectKey && (
+            <WorktreePickerMenu
+              projectKey={projectKey}
+              currentCwd={conv.cwd}
+              newWorktreeSlug={conv.name}
+              anchor="top-right"
+              onClose={() => setWorktreePickerOpen(false)}
+              onSelect={(path, label) => {
+                setWorktreePickerOpen(false);
+                mutations.openForkModal(conv, {
+                  mode: 'summary',
+                  targetCwd: path,
+                  targetCwdLabel: label,
+                });
+              }}
+            />
+          )}
         </span>
       )}
 
