@@ -3222,6 +3222,96 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
   }
 }
 
+/**
+ * Find and kill any running `launcher.sh` process for the given agent.
+ *
+ * PAN-1527: `tmux kill-session` only signals tmux-managed children. Planning
+ * agents (and any agent whose launcher escapes its tmux session) leave
+ * orphan launcher.sh processes alive — state.json says stopped, but bash is
+ * still burning CPU and tokens hours later. This locates them by command
+ * line and walks SIGTERM → grace → SIGKILL.
+ *
+ * Sync version: callable from CLI (`pan kill`) and from the existing
+ * `stopAgentSync`. Uses execSync only via `pgrep`, which is fast and
+ * non-blocking in practice. Acceptable per CLAUDE.md because this path is
+ * sync-by-nature already and is only called from CLI contexts and existing
+ * sync internals.
+ */
+function killLauncherProcessSync(agentId: string): void {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    pidsOut = execSync(
+      `pgrep -f ${JSON.stringify(launcherPath)}`,
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches — nothing to kill
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  // ~500ms grace period for orderly shutdown. Sync spawn of `sleep` is
+  // acceptable in CLI context; this function is never reached from the
+  // dashboard server (which uses the async `stopAgent` Effect below).
+  try {
+    execSync('sleep 0.5', { stdio: 'ignore' });
+  } catch { /* ignore */ }
+
+  const survivors: number[] = [];
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      survivors.push(pid);
+    } catch {
+      /* already dead */
+    }
+  }
+  for (const pid of survivors) {
+    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+  }
+}
+
+async function killLauncherProcessAsync(agentId: string): Promise<void> {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    const { stdout } = await execAsync(`pgrep -f ${JSON.stringify(launcherPath)}`);
+    pidsOut = stdout.trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  await new Promise<void>(resolve => setTimeout(resolve, 500));
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+    } catch {
+      /* already dead */
+    }
+  }
+}
+
 export function stopAgentSync(agentId: string): void {
   const normalizedId = normalizeAgentId(agentId);
 
@@ -3240,6 +3330,11 @@ export function stopAgentSync(agentId: string): void {
 
     killSessionSync(normalizedId);
   }
+
+  // PAN-1527: kill orphan launcher.sh processes that escape tmux (planning
+  // agents, dashboard-spawned launchers, anything that survived tmux
+  // kill-session). Runs even when no tmux session existed in the first place.
+  killLauncherProcessSync(normalizedId);
 
   const state = getAgentStateSync(normalizedId);
   if (state) {
@@ -3284,6 +3379,14 @@ export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxEr
 
       yield* killSession(normalizedId);
     }
+
+    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after
+    // killSession so tmux gets the first chance to take everything down
+    // cleanly; falls through and kills any survivor by command-line match.
+    yield* Effect.tryPromise({
+      try: () => killLauncherProcessAsync(normalizedId),
+      catch: (cause): never => { throw cause; },
+    }).pipe(Effect.catch(() => Effect.void));
 
     const state = yield* getAgentState(normalizedId);
     if (state) {
