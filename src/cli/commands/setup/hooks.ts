@@ -422,6 +422,9 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
   addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
+  // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
+  // (option #1 fabricated as answer under --dangerously-skip-permissions).
+  addHookIfMissing('PreToolUse', 'ask-user-question-hook', 'AskUserQuestion');
   addHookIfMissing('PostToolUse', 'heartbeat-hook');
   addHookIfMissing('PostToolUse', 'permission-event-hook');
   addHookIfMissing('Stop', 'stop-hook');
