@@ -107,9 +107,9 @@ export function PanOpenInPicker({ openInCwd, compact = false }: PanOpenInPickerP
         disabled={disabled}
         className={`flex items-center gap-1 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-1' : 'px-1.5'}`}
         title={`Open ${tooltipCwd} in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
-        aria-label={`Open in ${EDITOR_LABELS[primaryEditor]}`}
+        aria-label={compact ? `Open in ${EDITOR_LABELS[primaryEditor]}` : undefined}
       >
-        <PrimaryIcon className="w-2.5 h-2.5" />
+        <PrimaryIcon className={compact ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'} />
         {!compact && EDITOR_LABELS[primaryEditor]}
       </button>
       {availableEditors.length > 1 && (
