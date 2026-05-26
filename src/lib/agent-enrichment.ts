@@ -408,6 +408,11 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     }
     if (exitPlanModePending) pendingInputKinds.push('exitPlanMode')
     if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
+    // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
+    // into the unified pending-input set so the indicator fires.
+    if (detection?.reason === 'session_resume' && !pendingInputKinds.includes('sessionResume')) {
+      pendingInputKinds.push('sessionResume')
+    }
   }
 
   return {

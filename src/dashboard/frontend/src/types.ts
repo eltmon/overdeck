@@ -124,6 +124,21 @@ export interface Agent {
   pendingQuestionCount?: number;
   pendingQuestionPrompt?: string;
   pendingQuestionReason?: string;
+  // PAN-1520 — unified pending-input surfaces. `pendingInputKinds` lists every
+  // active blocking surface (askUserQuestion, permissionRequest, exitPlanMode,
+  // enterPlanMode, sessionResume). `pendingInputCount` is the count.
+  pendingInputCount?: number;
+  pendingInputKinds?: ReadonlyArray<string>;
+  pendingAskUserQuestion?: {
+    toolUseId: string;
+    askedAt: string;
+    questions: ReadonlyArray<{
+      question: string;
+      header?: string;
+      multiSelect?: boolean;
+      options: ReadonlyArray<{ label: string; description?: string }>;
+    }>;
+  };
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)
