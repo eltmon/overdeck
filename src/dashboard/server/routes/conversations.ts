@@ -728,11 +728,16 @@ export async function handleConversationMessage(
     }
     // Unmanaged @paths in prose are allowed to pass through
   }
+  const managedAttachmentPaths = managedChecks
+    .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
+    .map((c) => c.attachmentPath);
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  const deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
 
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
-      message,
+      deliveredMessage,
       'conversation-message',
       resolveConversationDeliveryMethod(conv),
     );
@@ -788,6 +793,50 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+}
+
+/** Rewrite an outgoing conversation message so harnesses without Claude Code's
+ *  `@`-mention pre-submit parser still surface image attachments to the model.
+ *
+ *  Claude Code's TUI parses `@/abs/path` tokens at submit time and inlines the
+ *  file as vision input — the model sees the image, not the path. Pi (and
+ *  similar harnesses) lack that parser; the model sees `@/abs/path` as literal
+ *  text and may or may not decide to call its Read tool. Replace the
+ *  composer-injected `@path` prefix with an explicit instruction so any
+ *  harness with a Read tool will see and process the attachment. PAN-1535. */
+export function transformMessageForHarness(
+  message: string,
+  harness: RuntimeName,
+  managedPaths: string[],
+): string {
+  if (harness === 'claude-code') return message;
+  if (managedPaths.length === 0) return message;
+
+  // Strip each managed `@<path>` token (exact literal match, escaped for
+  // regex metacharacters) so we don't accidentally strip unmanaged prose
+  // mentions of similar-looking paths.
+  let body = message;
+  for (const p of managedPaths) {
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    body = body.replace(new RegExp(`(?<!\\S)@${escaped}`, 'g'), '');
+  }
+  // Collapse the multiple blank lines left behind by stripping, and trim.
+  const rest = body
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .reduce<string[]>((acc, line) => {
+      if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') return acc;
+      acc.push(line);
+      return acc;
+    }, [])
+    .join('\n')
+    .trim();
+
+  const bullets = managedPaths.map((p) => `- ${p}`).join('\n');
+  if (!rest) {
+    return `Please use your Read tool on the file(s) below and describe what you see.\n\nFiles:\n${bullets}`;
+  }
+  return `Please use your Read tool on the file(s) below before responding, then answer the message that follows based on what you see.\n\nFiles:\n${bullets}\n\nMessage:\n${rest}`;
 }
 
 function resolvePtySupervisorScriptPath(): string {
