@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1450: Audit — 6+ recent fixes shipped without the regression tests their AC promised. Add the 7 missing tests, complete PAN-1173's transparently-deferred bonus AC across 9 CLI commands, add a substrate check in the requirements-reviewer role prompt so this pattern fails CI in the future, and audit state.json role population for specialist agents.",
-    "updated": "2026-05-26T00:20:34.757Z"
+    "updated": "2026-05-26T00:30:04.062Z"
   },
   "plan": {
     "id": "pan-1450",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d7283d2f-4862-4ffe-9a4d-adb6ceb75ec2",
     "author": "agent:claude-opus-4-7",
-    "sequence": 16,
+    "sequence": 20,
     "created": "2026-05-25T16:30:00.000Z",
-    "updated": "2026-05-26T00:20:34.757Z",
+    "updated": "2026-05-26T00:30:04.062Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1450",
@@ -797,55 +797,55 @@
         "phase": "review",
         "issueId": "PAN-1450",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-26T00:20:34.424Z",
+        "updatedAt": "2026-05-26T00:30:04.053Z",
         "work": {
-          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-26T00:20:34.424Z"
+              "at": "2026-05-26T00:30:04.053Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-26T00:20:34.424Z",
-          "notes": "Verification failed at vbrief-ac",
+          "status": "blocked",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
+          "notes": "Requirements reviewer failed before writing report",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-26T00:20:34.424Z",
-              "notes": "Verification failed at vbrief-ac"
+              "status": "blocked",
+              "at": "2026-05-26T00:30:04.053Z",
+              "notes": "Requirements reviewer failed before writing report"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-26T00:20:34.424Z"
+              "at": "2026-05-26T00:30:04.053Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-26T00:20:34.424Z",
+          "updatedAt": "2026-05-26T00:30:04.053Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-26T00:20:34.424Z"
+              "at": "2026-05-26T00:30:04.053Z"
             }
           ],
           "readyForMerge": false,

@@ -54,7 +54,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     console.error(chalk.dim(
       'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
     ));
-    return;
+    process.exit(1);
   }
   const issueLower = issueId.toLowerCase();
 

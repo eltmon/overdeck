@@ -331,7 +331,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     issueIdMocks.resolveBareNumericIdSync.mockReturnValue(null);
     const { killCommand } = await import('../kill.js');
 
-    await killCommand('9999', {});
+    await expect(killCommand('9999', {})).rejects.toThrow('process.exit:1');
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve issue ID "9999"'));
     expect(agentMocks.stopAgentSync).not.toHaveBeenCalled();
