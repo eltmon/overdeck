@@ -370,16 +370,86 @@ export function ComposerFooter({
       event.preventDefault();
       return;
     }
-    if (!event.clipboardData) return;
-    const items = Array.from(event.clipboardData.items);
-    const imageFiles = items
-      .filter((item) => item.type.startsWith('image/'))
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null);
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return;
 
-    if (imageFiles.length === 0) return;
-    event.preventDefault();
-    enqueueImages(imageFiles);
+    // Harvest images from every surface the browser might use:
+    //  - clipboardData.files: canonical "list of files in this paste"
+    //  - clipboardData.items: kind:'file' items (per-platform; Wayland Chromium often
+    //    skips this for screenshot-tool pastes but populates .files)
+    // We dedupe by (name,size,lastModified) so the same image isn't enqueued twice
+    // when it shows up in both surfaces.
+    const collected: File[] = [];
+    const seen = new Set<string>();
+    const addIfImage = (file: File | null) => {
+      if (!file || !file.type.startsWith('image/')) return;
+      const key = `${file.name}|${file.size}|${file.lastModified}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      collected.push(file);
+    };
+    for (const file of Array.from(clipboardData.files)) addIfImage(file);
+    for (const item of Array.from(clipboardData.items)) {
+      if (item.kind === 'file') addIfImage(item.getAsFile());
+    }
+
+    if (collected.length > 0) {
+      event.preventDefault();
+      enqueueImages(collected);
+      return;
+    }
+
+    // Nothing in the synchronous DataTransfer surfaces. Decide whether to
+    // intervene further or let the paste fall through to Lexical.
+    const types = Array.from(clipboardData.types ?? []);
+    const hasImageType = types.some((t) => t.startsWith('image/'));
+    const hasFilesType = types.includes('Files'); // Chrome legacy marker for file pastes
+    const hasUriList = types.includes('text/uri-list');
+
+    // Case A: clipboard claims to carry image bytes but DataTransfer was empty.
+    // This is the Wayland Chromium screenshot-paste bug (PAN-539 regression on
+    // 2026-05-25). Recovery requires the async Clipboard API, which will
+    // trigger a permission prompt on first use — acceptable here because the
+    // alternative is silent failure.
+    if (hasImageType || hasFilesType) {
+      event.preventDefault();
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.read) {
+        void (async () => {
+          try {
+            const items = await navigator.clipboard.read();
+            const recovered: File[] = [];
+            for (const item of items) {
+              for (const type of item.types) {
+                if (!type.startsWith('image/')) continue;
+                const blob = await item.getType(type);
+                const ext = type.split('/')[1]?.split('+')[0] || 'png';
+                recovered.push(new File([blob], `paste-${Date.now()}.${ext}`, { type }));
+              }
+            }
+            if (recovered.length > 0) {
+              enqueueImages(recovered);
+            } else {
+              toast.error('Couldn\'t read the pasted image. Try saving it to a file and dragging it onto the composer.');
+            }
+          } catch {
+            toast.error('Clipboard read denied. Grant clipboard permission, or drag the image onto the composer instead.');
+          }
+        })();
+      } else {
+        toast.error('Couldn\'t read the pasted image. Try dragging the file onto the composer instead.');
+      }
+      return;
+    }
+
+    // Case B: file pasted from a file manager (text/uri-list). Browsers can't
+    // read file:// URIs from web origins, so async-clipboard won't help here.
+    // Tell the user to drag instead.
+    if (hasUriList) {
+      event.preventDefault();
+      toast.error('Paste-from-file-manager isn\'t supported. Drag the file onto the composer instead.');
+    }
+
+    // Otherwise this is a regular text paste — pass through unchanged.
   }, [enqueueImages, sending]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -391,7 +461,10 @@ export function ComposerFooter({
   }, [enqueueImages, sending, conversation.sessionAlive]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith('image/'))) {
+    const items = Array.from(event.dataTransfer.items);
+    // Accept any file-kind drag (files don't expose their MIME type during dragover —
+    // type is empty until drop on most browsers). Also accept anything declared as an image.
+    if (items.some((item) => item.kind === 'file' || item.type.startsWith('image/'))) {
       event.preventDefault();
     }
   }, []);
