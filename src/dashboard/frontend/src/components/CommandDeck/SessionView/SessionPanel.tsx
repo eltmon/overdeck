@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -10,6 +12,23 @@ import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import styles from '../styles/command-deck.module.css';
+
+// PAN-1523: branch/worktree chip in the SessionPanel header. Mirrors the
+// chip in DrawerAgentSession, but anchored to a SessionNode instead of
+// an Agent — same /api/agents/:id/git-info endpoint feeds both.
+interface AgentGitInfo {
+  actualBranch: string | null;
+  branchDrifted: boolean;
+  workspaceMissing: boolean;
+  expectedBranch: string | null;
+  workspacePath?: string | null;
+}
+
+async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/git-info`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 interface SessionPanelProps {
   session: SessionNodeType;
@@ -80,6 +99,70 @@ async function updateAgentDeliveryMethod(agentId: string, deliveryMethod: 'auto'
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
   }
+}
+
+/**
+ * Branch / worktree status chip shown next to the Conversation / Terminal /
+ * Findings toggle in the SessionPanel header. Same data path as
+ * DrawerAgentSession's chip — sources from /api/agents/:id/git-info, where
+ * `:id` is the SessionNode's sessionId (work-agent and specialist tmux
+ * sessions both expose state under that key).
+ *
+ * Renders nothing when the endpoint returns null (non-agent sessions or a
+ * fetch failure); failing closed is the right call because there's no
+ * branch to show for a JSONL-only session that isn't bound to a workspace.
+ */
+function SessionPanelBranchChip({ sessionId }: { sessionId: string }) {
+  const { data: gitInfo } = useQuery({
+    queryKey: ['agent-git-info', sessionId],
+    queryFn: () => fetchAgentGitInfo(sessionId),
+    enabled: !!sessionId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
+  if (!gitInfo) return null;
+
+  const showChip = Boolean(gitInfo.actualBranch || gitInfo.workspaceMissing);
+  if (!showChip) return null;
+
+  const drifted = gitInfo.branchDrifted;
+  const missing = gitInfo.workspaceMissing;
+
+  return (
+    <span
+      className={`${styles.terminalBranchBar} ${
+        missing
+          ? styles.terminalBranchBarMissing
+          : drifted
+            ? styles.terminalBranchBarDrift
+            : ''
+      }`}
+      title={
+        missing
+          ? `Workspace missing on disk: ${gitInfo.workspacePath ?? '(unknown path)'}`
+          : drifted
+            ? `Expected ${gitInfo.expectedBranch ?? '(none)'}, on ${gitInfo.actualBranch ?? '(none)'}`
+            : `${gitInfo.workspacePath ?? ''}`
+      }
+      data-testid="session-panel-branch-chip"
+    >
+      {missing ? (
+        <>
+          <AlertCircle size={12} />
+          <span className={styles.terminalBranchBarMode}>Worktree missing</span>
+        </>
+      ) : (
+        <>
+          {drifted ? <TriangleAlert size={12} /> : <GitFork size={12} />}
+          <span className={styles.terminalBranchBarMode}>
+            {drifted ? 'Drifted' : 'Worktree'}
+          </span>
+          <span className={styles.terminalBranchBarText}>{gitInfo.actualBranch}</span>
+        </>
+      )}
+    </span>
+  );
 }
 
 function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' }) {
@@ -199,6 +282,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     <div className={styles.sessionPanel}>
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
+        <SessionPanelBranchChip sessionId={session.sessionId} />
         <div className={styles.sessionPanelToggle}>
           {(hasJsonl || !isReviewSession) && (
             <button
