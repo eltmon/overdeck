@@ -3123,14 +3123,39 @@
   font-size: 14px;
   line-height: 1.6;
   color: var(--foreground);
+  min-width: 0;
+  overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
 }
 
-.chatMarkdown p { margin: 0 0 8px; }
-.chatMarkdown p:last-child { margin-bottom: 0; }
-.chatMarkdown ul, .chatMarkdown ol { margin: 8px 0; padding-left: 24px; }
-.chatMarkdown li { margin: 2px 0; }
+/* The chat row owns outer spacing — keep markdown's first/last blocks flush. */
+.chatMarkdown > :first-child { margin-top: 0; }
+.chatMarkdown > :last-child { margin-bottom: 0; }
+
+.chatMarkdown p,
+.chatMarkdown ul,
+.chatMarkdown ol,
+.chatMarkdown blockquote,
+.chatMarkdown pre,
+.chatMarkdown table { margin: 8px 0; }
+
+/* Restore list markers stripped by Tailwind preflight. Every nesting level
+ * is explicit so list rendering does not depend on inherited defaults. */
+.chatMarkdown ul {
+  padding-left: 24px;
+  list-style-type: disc;
+}
+.chatMarkdown ol {
+  padding-left: 24px;
+  list-style-type: decimal;
+}
+.chatMarkdown ul ul { list-style-type: circle; }
+.chatMarkdown ul ul ul { list-style-type: square; }
+.chatMarkdown ol ol { list-style-type: lower-alpha; }
+.chatMarkdown ol ol ol { list-style-type: lower-roman; }
+.chatMarkdown li + li { margin-top: 4px; }
+
 .chatMarkdown h1, .chatMarkdown h2, .chatMarkdown h3 {
   font-weight: 600;
   margin: 12px 0 8px;
@@ -3139,17 +3164,17 @@
 .chatMarkdown h1 { font-size: 20px; }
 .chatMarkdown h2 { font-size: 16px; }
 .chatMarkdown h3 { font-size: 14px; }
+
 .chatMarkdown blockquote {
   border-left: 3px solid var(--input);
-  margin: 8px 0;
   padding-left: 12px;
   color: var(--muted-foreground);
 }
+
 .chatMarkdown table {
   border-collapse: collapse;
   width: 100%;
   font-size: 12px;
-  margin: 8px 0;
 }
 .chatMarkdown th, .chatMarkdown td {
   border: 1px solid var(--border);
@@ -3157,6 +3182,7 @@
   text-align: left;
 }
 .chatMarkdown th { background: var(--accent); font-weight: 600; }
+
 .chatMarkdown code:not(pre code) {
   font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
@@ -3175,26 +3201,35 @@
   border: 1px solid var(--border);
 }
 
-.codeBlock:hover .copyButton { opacity: 1; }
+/* Reveal on hover OR keyboard focus so the copy affordance is keyboard-reachable. */
+.codeBlock:hover .copyButton,
+.codeBlock:focus-within .copyButton {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .copyButton {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 1;
-  background: var(--card);
+  background: color-mix(in srgb, var(--background) 82%, transparent);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 3px 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s;
+  pointer-events: none;
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
   display: flex;
   align-items: center;
   color: var(--muted-foreground);
 }
 
-.copyButton:hover { color: var(--foreground); }
+.copyButton:hover {
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--border) 70%, var(--foreground));
+}
 
 .shikiOutput {
   overflow-x: auto;
