@@ -614,6 +614,22 @@ export function ComposerFooter({
             harness={harness}
             onHarnessChange={handleHarnessChange}
           />
+          {/*
+            Model drift indicator. The picker holds the model that the
+            *next* message will be sent with; if the running session's last
+            assistant turn used a different model (e.g. the user ran /model
+            inside Claude Code, or Cloister auto-routed), surface it here so
+            the picker doesn't silently lie about what's actually running.
+          */}
+          {contextWindowUsage?.lastModel && contextWindowUsage.lastModel !== model && (
+            <span
+              className={styles.composerToolbarModelDrift}
+              title={`Last assistant turn ran as ${contextWindowUsage.lastModel}; the picker value applies to the next message you send.`}
+              data-testid="composer-model-drift"
+            >
+              running: {contextWindowUsage.lastModel}
+            </span>
+          )}
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 

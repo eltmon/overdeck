@@ -3416,6 +3416,30 @@
   flex: 1;
 }
 
+/*
+ * Model drift hint (PAN-1523). Surfaces when the picker disagrees with
+ * the running session's last assistant model — e.g. the user ran /model
+ * inside Claude Code. Style is a subdued warning chip; clicking the
+ * picker is the explicit way to resync.
+ */
+.composerToolbarModelDrift {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+  flex-shrink: 0;
+  cursor: help;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Pipe divider between toolbar items (matches t3code style) */
 .composerToolbarDivider {
   width: 1px;

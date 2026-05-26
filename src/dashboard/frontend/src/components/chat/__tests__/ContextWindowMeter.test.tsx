@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextWindowMeter } from '../ContextWindowMeter';
 import {
   formatContextWindowTokens,
@@ -107,7 +107,7 @@ describe('ContextWindowMeter (ring visual, mirrors t3code geometry)', () => {
     render(<ContextWindowMeter usage={snapshot(22)} />);
     expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
       'title',
-      '22% · 33k/200k context used',
+      '22% · 33k/200k context used · click for details',
     );
   });
 
@@ -125,15 +125,72 @@ describe('ContextWindowMeter (ring visual, mirrors t3code geometry)', () => {
     );
     expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
       'title',
-      '1.5k tokens used so far',
+      '1.5k tokens used so far · click for details',
     );
+  });
+
+  it('opens a popover on click and closes on a second click', () => {
+    render(<ContextWindowMeter usage={snapshot(22)} />);
+    const trigger = screen.getByTestId('context-window-meter');
+
+    expect(screen.queryByTestId('context-window-meter-popover')).toBeNull();
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('context-window-meter-popover')).toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.queryByTestId('context-window-meter-popover')).toBeNull();
+  });
+
+  it('renders the breakdown (input / cache-read / cache-create / remaining) in the popover', () => {
+    render(
+      <ContextWindowMeter
+        usage={{
+          ...snapshot(22),
+          lastInputTokens: 4_200,
+          lastCacheReadTokens: 26_000,
+          lastCacheCreationTokens: 2_841,
+          maxObservedInputTokens: 33_041,
+          lastModel: 'claude-opus-4-7',
+          lastTurnAt: '2026-05-26T14:30:00Z',
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('context-window-meter'));
+
+    const popover = screen.getByTestId('context-window-meter-popover');
+    expect(popover).toHaveTextContent('Input');
+    expect(popover).toHaveTextContent('4.2k');
+    expect(popover).toHaveTextContent('Cache read');
+    expect(popover).toHaveTextContent('26k');
+    expect(popover).toHaveTextContent('Cache create');
+    expect(popover).toHaveTextContent('2.8k');
+    expect(popover).toHaveTextContent('claude-opus-4-7');
+  });
+
+  it('shows the 1M-mode badge when maxTokens > 200k', () => {
+    render(
+      <ContextWindowMeter
+        usage={{
+          usedTokens: 340_000,
+          maxTokens: 1_000_000,
+          usedPercentage: 34,
+          remainingTokens: 660_000,
+          remainingPercentage: 66,
+          maxObservedInputTokens: 340_000,
+          lastInputTokens: 340_000,
+          lastCacheReadTokens: 0,
+          lastCacheCreationTokens: 0,
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('context-window-meter'));
+    expect(screen.getByTestId('context-window-meter-popover')).toHaveTextContent('1M mode');
   });
 
   it('sets an aria-label describing the usage', () => {
     render(<ContextWindowMeter usage={snapshot(22)} />);
     expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
       'aria-label',
-      'Context window 22% used',
+      'Context window 22% used — click to expand',
     );
   });
 });
@@ -189,7 +246,35 @@ describe('toContextWindowSnapshot (server→t3code adapter)', () => {
       remainingTokens: 166_959,
       remainingPercentage: 77.6,
       activeBytes: 132_164,
+      lastInputTokens: undefined,
+      lastCacheReadTokens: undefined,
+      lastCacheCreationTokens: undefined,
+      maxObservedInputTokens: undefined,
+      lastModel: undefined,
+      lastTurnAt: undefined,
     });
+  });
+
+  it('passes the per-turn breakdown fields through to the snapshot', () => {
+    const usage: ContextUsage = {
+      activeBytes: 132_164,
+      estimatedTokens: 33_041,
+      contextWindow: 200_000,
+      percentUsed: 22.4,
+      lastInputTokens: 4_200,
+      lastCacheReadTokens: 26_000,
+      lastCacheCreationTokens: 2_841,
+      maxObservedInputTokens: 33_041,
+      lastModel: 'claude-opus-4-7',
+      lastTurnAt: '2026-05-26T14:30:00Z',
+    };
+    const out = toContextWindowSnapshot(usage)!;
+    expect(out.lastInputTokens).toBe(4_200);
+    expect(out.lastCacheReadTokens).toBe(26_000);
+    expect(out.lastCacheCreationTokens).toBe(2_841);
+    expect(out.maxObservedInputTokens).toBe(33_041);
+    expect(out.lastModel).toBe('claude-opus-4-7');
+    expect(out.lastTurnAt).toBe('2026-05-26T14:30:00Z');
   });
 
   it('clamps usedPercentage to [0, 100]', () => {

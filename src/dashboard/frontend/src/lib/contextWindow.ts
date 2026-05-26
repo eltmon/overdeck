@@ -37,6 +37,19 @@ export interface ContextWindowSnapshot {
    * doesn't expose this); useful for debugging the heuristic. Optional.
    */
   readonly activeBytes?: number;
+  // ─── Panopticon-specific breakdown surfaced in the click popover ───────
+  /** input_tokens from the most recent assistant turn's `usage`. */
+  readonly lastInputTokens?: number;
+  /** cache_read_input_tokens from the most recent assistant turn. */
+  readonly lastCacheReadTokens?: number;
+  /** cache_creation_input_tokens from the most recent assistant turn. */
+  readonly lastCacheCreationTokens?: number;
+  /** Highest (input + caches) ever seen in this window — drives 1M auto-detection. */
+  readonly maxObservedInputTokens?: number;
+  /** Model the most recent assistant turn actually ran under. */
+  readonly lastModel?: string | null;
+  /** ISO timestamp of the most recent assistant turn. */
+  readonly lastTurnAt?: string | null;
 }
 
 /**
@@ -65,6 +78,12 @@ export function toContextWindowSnapshot(
     remainingTokens,
     remainingPercentage,
     activeBytes: usage.activeBytes,
+    lastInputTokens: usage.lastInputTokens,
+    lastCacheReadTokens: usage.lastCacheReadTokens,
+    lastCacheCreationTokens: usage.lastCacheCreationTokens,
+    maxObservedInputTokens: usage.maxObservedInputTokens,
+    lastModel: usage.lastModel,
+    lastTurnAt: usage.lastTurnAt,
   };
 }
 
