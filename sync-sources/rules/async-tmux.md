@@ -6,9 +6,12 @@ paths:
   - "src/lib/cloister/**"
   - "src/lib/runtimes/**"
 ---
+### Async tmux delivery — `sendKeysAsync` and `load-buffer` + `paste-buffer`
+
 Use `sendKeysAsync()` from `src/lib/tmux.ts` — never `sendKeys()` (sync).
 
 For tmux message delivery, use the `load-buffer` + `paste-buffer` pattern:
+
 1. Write text to temp file
 2. `tmux load-buffer <file>`
 3. `tmux paste-buffer -t <session>`

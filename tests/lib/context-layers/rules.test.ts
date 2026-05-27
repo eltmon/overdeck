@@ -42,13 +42,13 @@ describe('readBundledRules', () => {
 describe('renderBundledRules', () => {
   it('omits dev-scoped rules when includeDev is false', () => {
     const out = renderBundledRules('claude-code', false);
-    expect(out).toContain('Work Agents Run Through');
-    expect(out).not.toContain('Single Deacon Invariant');
+    expect(out).toContain('Work agents run through');
+    expect(out).not.toContain('Single Deacon invariant');
   });
 
   it('includes dev-scoped rules when includeDev is true', () => {
     const out = renderBundledRules('claude-code', true);
-    expect(out).toContain('Single Deacon Invariant');
+    expect(out).toContain('Single Deacon invariant');
   });
 
   it('produces a single Panopticon Engineering Rules section', () => {
