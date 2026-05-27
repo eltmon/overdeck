@@ -487,15 +487,16 @@ export function ComposerFooter({
       });
     }
 
-    // Intercept bare `pan handoff` (no other args) and open the fork modal
+    // Intercept slash-prefixed handoff invocations and open the fork modal
     // pre-set to handoff mode for the current conversation. Matches:
-    //   pan handoff
+    //   /handoff
     //   /pan-handoff
     //   /pan handoff
-    // (case-insensitive, surrounding whitespace allowed). Anything with extra
-    // args (e.g. `pan handoff conv-123`) falls through to normal send so the
-    // agent can run the CLI command directly.
-    if (/^\/?pan[\s-]handoff\s*$/i.test(messageText)) {
+    // The leading slash is required — it's the convention that distinguishes
+    // dashboard UI actions from messages bound for the agent. Unprefixed
+    // `pan handoff …` (with or without args) falls through to the agent which
+    // runs the CLI directly in its Bash tool.
+    if (/^\/(pan[\s-])?handoff\s*$/i.test(messageText)) {
       window.dispatchEvent(new CustomEvent('panopticon:open-fork-modal', {
         detail: { conversation, mode: 'handoff' },
       }));

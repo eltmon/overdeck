@@ -365,7 +365,7 @@ export function ConversationRow({
             <GitBranchPlus size={iconSize} />
           </span>
         )}
-        {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && conv.sessionAlive && (
+        {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && (
           <span
             role="button"
             tabIndex={0}
