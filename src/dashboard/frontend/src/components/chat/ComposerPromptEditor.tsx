@@ -190,7 +190,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-admin-migrate-config', label: 'pan admin migrate-config', description: 'Migrate settings.json to config.yaml', insert: 'pan admin migrate-config', category: 'Admin' },
 
   // ─── Conversation (dashboard UI actions — intercepted, do NOT pass to agent) ─
-  { id: 'handoff', label: '/handoff', description: 'Open the handoff dialog for this conversation', insert: '/handoff', category: 'Conversation' },
+  { id: 'handoff', label: '/handoff', description: 'Open the handoff dialog for this conversation (trailing text becomes focus)', insert: '/handoff ', category: 'Conversation' },
   // ─── Conversation (agent-bound — pass to agent which runs the CLI) ──────────
   { id: 'pan-fork', label: 'pan fork', description: 'Summary fork a conversation', insert: 'pan fork ', category: 'Conversation' },
   { id: 'pan-fork-plain', label: 'pan fork --plain', description: 'Plain fork — copy raw history, skip summary', insert: 'pan fork  --plain', category: 'Conversation' },

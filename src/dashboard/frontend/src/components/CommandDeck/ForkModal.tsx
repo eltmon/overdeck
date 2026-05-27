@@ -118,6 +118,7 @@ function ForkHelpModal({ onClose }: { onClose: () => void }) {
 interface ForkModalProps {
   conversation: Conversation;
   initialMode?: ForkModeOption;
+  initialFocus?: string;
   onConfirm: (
     conv: Conversation,
     launchModel: string,
@@ -134,7 +135,7 @@ interface ForkModalProps {
   isPending: boolean;
 }
 
-export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPending }: ForkModalProps) {
+export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, onClose, isPending }: ForkModalProps) {
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
@@ -152,7 +153,7 @@ export function ForkModal({ conversation, initialMode, onConfirm, onClose, isPen
     }
   }, [forkMode, launchHarness]);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
-  const [handoffFocus, setHandoffFocus] = useState('');
+  const [handoffFocus, setHandoffFocus] = useState(initialFocus ?? '');
   const [showHelp, setShowHelp] = useState(false);
 
   const convTitle = conversation.title ?? conversation.name;

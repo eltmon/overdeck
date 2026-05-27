@@ -64,10 +64,11 @@ export interface ConversationMutations {
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
-  openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption }) => void;
+  openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => void;
   forkTarget: Conversation | null;
   forkTargetMode: ForkModeOption | undefined;
+  forkTargetFocus: string | undefined;
   closeForkModal: () => void;
   isForkPending: boolean;
 }
@@ -79,6 +80,7 @@ export function useConversationMutations(
   const queryClient = useQueryClient();
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
   const [forkTargetMode, setForkTargetMode] = useState<ForkModeOption | undefined>(undefined);
+  const [forkTargetFocus, setForkTargetFocus] = useState<string | undefined>(undefined);
   const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
@@ -170,10 +172,11 @@ export function useConversationMutations(
     },
   });
 
-  const openForkModal = useCallback((conv: Conversation, options?: { mode?: ForkModeOption }) => {
+  const openForkModal = useCallback((conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => {
     if (!summaryForkMutation.isPending) {
       setForkTarget(conv);
       setForkTargetMode(options?.mode);
+      setForkTargetFocus(options?.focus);
     }
   }, [summaryForkMutation.isPending]);
 
@@ -192,6 +195,7 @@ export function useConversationMutations(
     });
     setForkTarget(null);
     setForkTargetMode(undefined);
+    setForkTargetFocus(undefined);
   }, [summaryForkMutation]);
 
   // retitleVersion is referenced so isRetitlePending re-evaluates after pending changes.
@@ -214,7 +218,8 @@ export function useConversationMutations(
     submitFork,
     forkTarget,
     forkTargetMode,
-    closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); },
+    forkTargetFocus,
+    closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending: summaryForkMutation.isPending,
   };
 }

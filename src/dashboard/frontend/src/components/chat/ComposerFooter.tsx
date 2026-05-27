@@ -490,15 +490,21 @@ export function ComposerFooter({
     // Intercept slash-prefixed handoff invocations and open the fork modal
     // pre-set to handoff mode for the current conversation. Matches:
     //   /handoff
+    //   /handoff <focus text…>
     //   /pan-handoff
+    //   /pan-handoff <focus text…>
     //   /pan handoff
+    //   /pan handoff <focus text…>
     // The leading slash is required — it's the convention that distinguishes
     // dashboard UI actions from messages bound for the agent. Unprefixed
-    // `pan handoff …` (with or without args) falls through to the agent which
-    // runs the CLI directly in its Bash tool.
-    if (/^\/(pan[\s-])?handoff\s*$/i.test(messageText)) {
+    // `pan handoff …` falls through to the agent which runs the CLI directly
+    // in its Bash tool. Any trailing text after the verb becomes the focus
+    // and pre-fills the dialog's Focus textarea.
+    const handoffMatch = messageText.match(/^\/(?:pan[\s-])?handoff(?:\s+(.+))?$/i);
+    if (handoffMatch) {
+      const focus = handoffMatch[1]?.trim() || undefined;
       window.dispatchEvent(new CustomEvent('panopticon:open-fork-modal', {
-        detail: { conversation, mode: 'handoff' },
+        detail: { conversation, mode: 'handoff', focus },
       }));
       editor.update(() => {
         $getRoot().clear();
