@@ -64,9 +64,12 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 5. When UAT is required, start or connect to the running app using the project instructions and drive the browser with Playwright MCP tools.
 6. Walk the golden path and named edge cases from the acceptance criteria.
 7. Capture screenshots, console messages, network failures, and the exact unmet acceptance criterion for any UAT failure.
-8. Emit exactly one final sentinel:
+8. Emit exactly one final test sentinel:
    - `TESTS PASSED` when the configured test suite passes and required UAT passes or is not required.
    - `TESTS FAILED` when any test-suite command fails, the app cannot start, Playwright cannot verify required behavior, or an acceptance criterion remains unproven.
+9. For Pi sessions, end your final response with exactly one structured Panopticon sentinel line:
+   - `PANOPTICON_SPECIALIST_RESULT: test-agent passed`
+   - `PANOPTICON_SPECIALIST_RESULT: test-agent failed`
 
 ## TLDR: prefer code summaries over full reads
 

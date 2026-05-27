@@ -123,7 +123,7 @@ Pi work agents use `turn_end` to approximate Claude Code's `Stop` hook completio
 3. Ask the dashboard classifier endpoint for a final verdict when the transcript is ambiguous.
 4. Emit `agent.resolution_changed` with `done`, `needs_input`, or `stuck` as appropriate.
 
-Specialist Pi agents use the same `turn_end` surface to detect review, test, merge/ship, inspect, and UAT completion markers, then call `/api/specialists/:name/auto-complete` with `passed` or `failed`.
+Specialist Pi agents use the same `turn_end` surface to detect review, test, merge/ship, inspect, and UAT completion. Auto-completion requires a final structured sentinel line, `PANOPTICON_SPECIALIST_RESULT: <specialist-name> <passed|failed>`, and explicit structured failure artifacts take precedence over pass sentinels.
 
 ## Harness-Aware Installation
 

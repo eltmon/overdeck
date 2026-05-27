@@ -2,39 +2,15 @@ export type SpecialistCompletionStatus = 'passed' | 'failed'
 
 export type SpecialistCompletionName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent'
 
-interface SpecialistPatternSet {
-  name: SpecialistCompletionName
-  pass: RegExp[]
-  fail: RegExp[]
-}
+const RESULT_SENTINEL = /^PANOPTICON_SPECIALIST_RESULT:\s*(review-agent|test-agent|merge-agent|inspect-agent|uat-agent)\s+(passed|failed)\s*$/i
 
-const SPECIALIST_PATTERNS: SpecialistPatternSet[] = [
-  {
-    name: 'review-agent',
-    pass: [/review (passed|complete)/i, /\bLGTM\b/i, /no issues found/i, /code review complete/i, /✓.*passed/i, /CODE APPROVED/i],
-    fail: [/review (failed|blocked)/i, /issues found/i, /needs changes/i, /\bblocked\b/i, /CHANGES REQUESTED/i],
-  },
-  {
-    name: 'test-agent',
-    pass: [/(all )?tests? passed/i, /test suite passed/i, /\b0 failed\b/i, /✓.*passed/i, /Tests PASSED/],
-    fail: [/tests? failed/i, /test failures/i, /[1-9][0-9]* failed/i, /✗.*failed/i, /Tests FAILED/],
-  },
-  {
-    name: 'merge-agent',
-    pass: [/merge (complete|successful)/i, /pushed to/i, /merged to main/i, /merged successfully/i],
-    fail: [/merge conflict/i, /cannot merge/i, /merge failed/i],
-  },
-  {
-    name: 'inspect-agent',
-    pass: [/INSPECTION PASSED/i],
-    fail: [/INSPECTION BLOCKED/i],
-  },
-  {
-    name: 'uat-agent',
-    pass: [/UAT PASSED/i, /acceptance criteria passed/i],
-    fail: [/UAT FAILED/i, /acceptance criteria failed/i],
-  },
-]
+const STRUCTURED_FAILURE_PATTERNS: Partial<Record<SpecialistCompletionName, RegExp[]>> = {
+  'review-agent': [/^##\s*Verdict:\s*(CHANGES REQUESTED|FAILED)\s*$/im],
+  'test-agent': [/^TESTS FAILED\s*$/im],
+  'merge-agent': [/^MERGE FAILED\s*$/im],
+  'inspect-agent': [/^INSPECTION BLOCKED\s*$/im],
+  'uat-agent': [/^UAT FAILED\s*$/im],
+}
 
 export function normalizeSpecialistCompletionName(roleOrName: string | undefined): SpecialistCompletionName | null {
   switch ((roleOrName ?? '').trim()) {
@@ -66,23 +42,36 @@ export function matchSpecialistCompletion(
   const name = normalizeSpecialistCompletionName(roleOrName)
   if (!name || !output.trim()) return null
 
-  const patterns = SPECIALIST_PATTERNS.find((entry) => entry.name === name)
-  if (!patterns) return null
-
-  const status = patterns.pass.some((pattern) => pattern.test(output))
-    ? 'passed'
-    : patterns.fail.some((pattern) => pattern.test(output))
-      ? 'failed'
-      : null
-  if (!status) return null
-
-  const summary = output
+  const lines = output
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
+  const tail = lines.slice(-20)
+  const statuses: SpecialistCompletionStatus[] = []
+
+  for (const line of tail) {
+    const match = line.match(RESULT_SENTINEL)
+    if (!match) continue
+    if (normalizeSpecialistCompletionName(match[1]) !== name) continue
+    statuses.push(match[2]!.toLowerCase() as SpecialistCompletionStatus)
+  }
+
+  if (STRUCTURED_FAILURE_PATTERNS[name]?.some((pattern) => pattern.test(output))) {
+    statuses.push('failed')
+  }
+
+  if (statuses.includes('failed')) {
+    return { name, status: 'failed', summary: summarizeSpecialistOutput(lines) }
+  }
+  if (statuses.includes('passed')) {
+    return { name, status: 'passed', summary: summarizeSpecialistOutput(lines) }
+  }
+  return null
+}
+
+function summarizeSpecialistOutput(lines: string[]): string {
+  return lines
     .slice(-5)
     .join(' ')
     .slice(0, 1000)
-
-  return { name, status, summary }
 }

@@ -353,17 +353,36 @@ describe('handleTurnEnd', () => {
 
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, issueId: 'PAN-636' },
-      { output: 'CODE APPROVED — YOUR WORK IS COMPLETE' },
+      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
     expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
   })
 
+  it('does not auto-complete specialist output from loose pass phrases', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: 'Quoted reviewer text said LGTM and CODE APPROVED, but no final sentinel exists.' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+  })
+
+  it('gives structured failure evidence precedence over specialist pass sentinels', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: '## Verdict: CHANGES REQUESTED\n\nPANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'failed' })
+  })
+
   it('posts specialist auto-complete when a specialist marker appears', async () => {
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
-      { output: 'CODE APPROVED — YOUR WORK IS COMPLETE' },
+      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
