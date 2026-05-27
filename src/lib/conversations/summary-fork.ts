@@ -192,10 +192,11 @@ const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
 // transcripts is fine.
 const HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD = 100_000;
 
-function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string): string {
+function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string, outputPath: string): string {
   const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
   return template
     .split('{{focus}}').join(safeFocus)
+    .split('{{outputPath}}').join(outputPath)
     .split('{{transcript}}').join(transcript);
 }
 
@@ -258,26 +259,53 @@ export async function authorHandoffExternal(
     inputLabel = 'raw-transcript';
   }
 
-  const prompt = renderExternalHandoffPrompt(template, focus, promptInput);
-  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | inputType=${inputLabel} | promptChars=${prompt.length}`);
+  const prompt = renderExternalHandoffPrompt(template, focus, promptInput, paths.docPath);
+  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | inputType=${inputLabel} | promptChars=${prompt.length} | outputPath=${paths.docPath}`);
 
-  const docText = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
+  // The prompt tells the model to use its Write tool to author the document
+  // directly at paths.docPath. We capture stdout only as a diagnostic log —
+  // the source of truth for the doc is the file on disk. Writing via tool
+  // avoids stdout preamble leaks like "Here is the handoff document:" that
+  // contaminated earlier attempts.
+  const stdout = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
+  console.log(`[claude-invoke] purpose=handoff-author-external acknowledgement | model=${effectiveModel} | stdoutChars=${stdout.length} | stdoutPreview=${JSON.stringify(stdout.slice(0, 120))}`);
+
+  let docText: string;
+  try {
+    docText = await readFile(paths.docPath, 'utf-8');
+  } catch (err) {
+    // The model didn't use Write — it almost certainly produced the doc on
+    // stdout instead. Persist whatever we got for diagnosis, then surface
+    // the failure as a validation error so the pipeline falls back to a
+    // summary fork rather than spinning forever.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, stdout, 'utf-8').catch((wErr) => {
+      console.warn(`[handoff-author-external] failed to persist stdout to ${rejectedPath}: ${wErr?.message ?? wErr}`);
+    });
+    console.warn(`[handoff-author-external] model did not call Write — stdout (${stdout.length} chars) saved to ${rejectedPath}: ${(err as { message?: string })?.message ?? err}`);
+    throw new HandoffValidationError(paths.docPath, 'authoring session did not call its Write tool to create the handoff doc');
+  }
+
   const validation = validateHandoffDoc(docText);
   if (!validation.ok) {
-    // Persist the rejected output for diagnosis. Without this the LLM's actual
-    // response is lost and "why did validation fail" is impossible to answer
-    // after the fact — see PAN-1518 follow-up: silent fallback is the worst
-    // failure mode for handoff.
+    // The file exists but its content failed the contract check. Persist
+    // the rejected file for diagnosis and surface the reason.
     const rejectedPath = `${paths.docPath}.rejected.md`;
     await writeFile(rejectedPath, docText, 'utf-8').catch((err) => {
-      console.warn(`[handoff-author-external] failed to persist rejected output to ${rejectedPath}: ${err?.message ?? err}`);
+      console.warn(`[handoff-author-external] failed to persist rejected doc to ${rejectedPath}: ${err?.message ?? err}`);
     });
-    console.warn(`[handoff-author-external] validation rejected output (${validation.reason}); raw output saved to ${rejectedPath}`);
+    console.warn(`[handoff-author-external] validation rejected file content (${validation.reason}); copy saved to ${rejectedPath}`);
     throw new HandoffValidationError(paths.docPath, validation.reason);
   }
 
+  // Sanitize as a safety net in case the model wrapped the file in fences
+  // despite the prompt telling it not to. Overwrite the file with the
+  // cleaned text so downstream consumers see the same thing the validator
+  // approved.
   const sanitized = sanitizeHandoffDoc(docText);
-  await writeFile(paths.docPath, sanitized, 'utf-8');
+  if (sanitized !== docText) {
+    await writeFile(paths.docPath, sanitized, 'utf-8');
+  }
   await writeFile(paths.sentinelPath, '', 'utf-8');
 
   return { docPath: paths.docPath, docText: sanitized };
