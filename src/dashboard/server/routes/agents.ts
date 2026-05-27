@@ -109,7 +109,6 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.j
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
-import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { recordFeatureRegistryLifecycle } from '../../../lib/registry/feature-registry-population.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -2988,45 +2987,43 @@ const postAgentsRoute = HttpRouter.add(
       console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`);
     }).pipe(Effect.catch(() => Effect.void));
 
-    let preSpawnStashRef: string | null = null;
-    let preSpawnStashMessage: string | null = null;
-    let preSpawnBaselineHead: string | null = null;
-    try {
-      const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-      }));
-      if (statusOut.trim()) {
-        const { stdout: headOut } = yield* Effect.promise(() => execAsync('git rev-parse HEAD', {
+    // PAN-1531: dirty-worktree refusal replaces silent pre-spawn stashing.
+    // If the workspace has uncommitted changes the route returns 409 with the
+    // diff so the dashboard can present the user three explicit choices:
+    // Commit / Discard (typed confirmation required) / Stash as salvageable.
+    // Clients that have already resolved the dirtiness MUST pass
+    // `acknowledgeDirtyWorkspace: true` to bypass this gate (typically after
+    // the user clicked one of the three modal buttons).
+    const acknowledgeDirtyWorkspace = (body as any).acknowledgeDirtyWorkspace === true;
+    if (!acknowledgeDirtyWorkspace) {
+      try {
+        const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
           cwd: workspacePath,
           encoding: 'utf-8',
         }));
-        preSpawnBaselineHead = headOut.trim() || null;
-        preSpawnStashMessage = buildStashMessage('pre-spawn', issueId, new Date());
-        preSpawnStashRef = yield* Effect.promise(() => createNamedStash(workspacePath, preSpawnStashMessage!, true));
-        if (preSpawnStashRef) {
-          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_created', {
+        if (statusOut.trim()) {
+          const { stdout: diffOut } = yield* Effect.promise(() => execAsync('git diff HEAD --stat', {
+            cwd: workspacePath,
+            encoding: 'utf-8',
+          }).catch(() => ({ stdout: '' })));
+          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_refused_dirty_workspace', {
             issueId,
             workspacePath,
-            stashRef: preSpawnStashRef,
-            stashMessage: preSpawnStashMessage,
-            baselineHead: preSpawnBaselineHead,
+            porcelain: statusOut.trim(),
           }));
-        } else {
-          preSpawnBaselineHead = null;
+          return jsonResponse({
+            error: `Workspace ${workspacePath} has uncommitted changes. Choose an action and retry start with acknowledgeDirtyWorkspace=true.`,
+            code: 'WORKSPACE_DIRTY',
+            workspacePath,
+            porcelain: statusOut.trim(),
+            diffStat: diffOut.trim(),
+            actions: ['commit', 'discard', 'stash-salvage'],
+          }, { status: 409 });
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[start-agent] Failed to check workspace status for ${issueId}: ${message}`);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      preSpawnStashRef = null;
-      preSpawnStashMessage = null;
-      preSpawnBaselineHead = null;
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_failed', {
-        issueId,
-        workspacePath,
-        error: message,
-      }));
-      console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
     }
 
     // PAN-1048 review feedback 003: the route only resolves harness when the
@@ -3216,9 +3213,6 @@ const postAgentsRoute = HttpRouter.add(
             role,
             hostOverride: allowHost || undefined,
             message: 'Waiting for containers to start...',
-            ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-            ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-            ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
           updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
@@ -3290,9 +3284,6 @@ const postAgentsRoute = HttpRouter.add(
                       role,
                       message: `Container startup timed out before work agent spawn. Run pan workspace rebuild ${issueId} to reset the stack.`,
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
-                      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-                      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-                      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                     }, null, 2));
                     return;
                   }
@@ -3350,9 +3341,6 @@ const postAgentsRoute = HttpRouter.add(
                     role,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
-                    ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-                    ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-                    ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                   }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
@@ -3461,9 +3449,6 @@ const postAgentsRoute = HttpRouter.add(
       role,
       hostOverride: allowHost || undefined,
       message: 'Work agent spawn requested',
-      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
     updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {

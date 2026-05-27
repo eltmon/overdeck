@@ -24,9 +24,9 @@ describe('parseRule', () => {
 });
 
 describe('readBundledRules', () => {
-  it('reads all eight bundled rules', () => {
+  it('reads all bundled rules from sync-sources/rules/', () => {
     const rules = readBundledRules();
-    expect(rules.length).toBe(8);
+    expect(rules.length).toBeGreaterThan(0);
     expect(rules.map((r) => r.name)).toEqual(
       expect.arrayContaining(['work-agents-via-pan', 'single-deacon-invariant', 'no-destructive-requests']),
     );

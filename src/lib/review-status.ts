@@ -101,10 +101,10 @@ export interface ReviewStatus {
   deaconIgnoredReason?: string;
   /** Commits at time of review request — used to detect new commits after review */
   lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
-  /** Active canonical review-temp stash for the current review cycle. */
-  reviewTempStashRef?: string;
-  reviewTempStashMessage?: string;
-  reviewTempStashSequence?: number;
+  // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
+  // removed. The review pipeline no longer stashes uncommitted work — the
+  // dirty-worktree gate refuses pan done / pan review request before review
+  // is dispatched.
 }
 
 export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {
