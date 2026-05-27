@@ -98,10 +98,6 @@
     "postinstall": "node scripts/postinstall.mjs || true",
     "prepare": "husky"
   },
-  "optionalDependencies": {
-    "moonshine-linux-x64": "workspace:*",
-    "qwen-tts-linux-x64": "workspace:*"
-  },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
     "@anthropic-ai/sdk": "^0.96.0",
