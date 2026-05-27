@@ -94,5 +94,6 @@ stitch-setup
 unarchive-conversation
 web-design-guidelines
 work-complete
+workspace-add-repo
 workspace-status
 write-spec

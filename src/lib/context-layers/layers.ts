@@ -79,21 +79,35 @@ export function workspaceContextFile(workspacePath: string): string {
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */
-export const GLOBAL_STARTER = `# Global Context
+export const GLOBAL_STARTER = `# Per-Machine Context (this machine only)
 
-This file is the single canonical source for context that applies to every
-coding-agent session on this machine. \`pan sync\` renders it into each
-harness's home (e.g. ~/.claude/CLAUDE.md) — edit it here, not there.
+This file is **per-machine** — it lives at \`~/.panopticon/context/global.md\`
+on the disk in front of you. Nothing syncs it to your other machines.
 
-Harness-specific guidance goes in a templating block:
+For content you want on **every** machine — engineering rules, coding
+standards, behavioral guidelines — add it to \`sync-sources/rules/<name>.md\`
+in the panopticon-cli repo with \`scope: universal\` (or \`scope: dev\` for
+Panopticon-developer-only rules). It will ship with every \`pan install\` /
+\`pan sync\`.
 
+This file should be empty unless you have **genuinely machine-specific**
+quirks to record (e.g. "this laptop's GPU is an RTX 3090", "/data is
+mounted at /mnt/foo here"). Most machines should leave it untouched.
+
+## Harness-specific blocks
+
+If you do add content, you can target a single harness with Mustache-style
+blocks:
+
+\`\`\`markdown
 {{#harness:claude}}
-Guidance only Claude Code sees.
+Guidance only Claude Code sees on this machine.
 {{/harness:claude}}
 
 {{#harness:pi}}
-Guidance only Pi sees.
+Guidance only Pi sees on this machine.
 {{/harness:pi}}
+\`\`\`
 
 Anything outside a block applies to every harness.
 `;

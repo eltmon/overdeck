@@ -626,7 +626,11 @@ program
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
 
-    // Auto-sync skills, hooks, and MCP config on every startup
+    // Auto-sync on every startup: skills, agents, hooks, MCP config,
+    // and rendered context layers (~/.claude/CLAUDE.md + per-project
+    // CLAUDE.md files). Ensures bundled engineering rules and any
+    // edits to global.md / project.md reach every Claude Code session
+    // without the user remembering to run `pan sync` first.
     {
       const origWrite = process.stdout.write;
       const origErrWrite = process.stderr.write;
@@ -637,7 +641,7 @@ program
         await syncCommand({});
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
-        console.log(chalk.dim('  Auto-synced skills, hooks, and MCP config'));
+        console.log(chalk.dim('  Auto-synced skills, agents, rules, hooks, MCP config, and CLAUDE.md context layers'));
       } catch {
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;

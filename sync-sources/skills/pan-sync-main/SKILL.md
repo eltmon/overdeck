@@ -29,7 +29,7 @@ curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 
 ## What It Does
 
-1. Checks for uncommitted changes (blocks if any — must commit or stash first)
+1. Checks for uncommitted changes (blocks if any — must commit or `pan workspace discard --confirm` first; agents never `git stash`)
 2. Cleans up any stale git locks
 3. Runs `git fetch origin main`
 4. Runs `git merge origin/main`
@@ -43,7 +43,7 @@ curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 |--------|---------|
 | Already up to date | Main has no new commits since last sync |
 | Success (N commits) | Clean merge or agent-resolved conflicts |
-| Uncommitted changes | Commit or stash workspace changes first |
+| Uncommitted changes | Commit or discard workspace changes first |
 | Conflict (unresolvable) | Agent could not resolve — merge aborted, workspace unchanged |
 
 ## Design Decisions
@@ -71,7 +71,7 @@ pan sync-main PAN-123
 # ✓ PAN-123 is already up to date with main
 
 # Output on uncommitted changes (blocks):
-# ✗ Sync failed: Workspace has uncommitted changes. Commit or stash them before syncing with main.
+# ✗ Sync failed: Workspace has uncommitted changes. Commit or discard them before syncing with main.
 ```
 
 ## Dashboard
