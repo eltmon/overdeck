@@ -63,6 +63,7 @@ The model the **new forked conversation** will run on. Completely independent of
 
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
+type HandoffAuthor = 'source' | 'external';
 
 function forkTitlePrefix(mode: ForkModeOption): string {
   if (mode === 'plain') return 'Plain Fork';
@@ -130,6 +131,9 @@ interface ForkModalProps {
     launchHarness?: Harness,
     summaryHarness?: Harness,
     focus?: string,
+    handoffAuthor?: HandoffAuthor,
+    handoffAuthorModel?: string,
+    handoffAuthorHarness?: Harness,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -154,6 +158,11 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   }, [forkMode, launchHarness]);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [handoffFocus, setHandoffFocus] = useState(initialFocus ?? '');
+  const [handoffAuthor, setHandoffAuthor] = useState<HandoffAuthor>('external');
+  // For external handoff authoring we reuse the summaryModel/summaryHarness
+  // pickers (they're the same concept — pick a model that reads the transcript
+  // and emits text). The server treats them as handoffAuthorModel/handoffAuthorHarness
+  // when forkMode === 'handoff' and handoffAuthor === 'external'.
   const [showHelp, setShowHelp] = useState(false);
 
   const convTitle = conversation.title ?? conversation.name;
@@ -179,7 +188,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const isHandoffFork = forkMode === 'handoff';
   const modelChanged = launchModel !== (conversation.model || defaultModel);
   const showModelSwitchWarning = isPlainFork && modelChanged;
-  const handoffUnavailable = isHandoffFork && !conversation.sessionAlive;
+  // Only source-authored handoff requires a live source — external authoring
+  // reads the transcript from disk and works on ended conversations.
+  const handoffUnavailable = isHandoffFork && handoffAuthor === 'source' && !conversation.sessionAlive;
   const confirmDisabled = isPending || handoffUnavailable;
   const handoffFocusValue = handoffFocus.trim() || undefined;
 
@@ -310,10 +321,36 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               </div>
             )}
 
+            {isHandoffFork && (
+              <fieldset className={styles.forkModeGroup}>
+                <legend>Authored by</legend>
+                <label className={styles.forkCheckboxRow}>
+                  <input
+                    type="radio"
+                    name="handoff-author"
+                    value="external"
+                    checked={handoffAuthor === 'external'}
+                    onChange={() => setHandoffAuthor('external')}
+                  />
+                  <span>External session (clean — pick the authoring model below)</span>
+                </label>
+                <label className={styles.forkCheckboxRow}>
+                  <input
+                    type="radio"
+                    name="handoff-author"
+                    value="source"
+                    checked={handoffAuthor === 'source'}
+                    onChange={() => setHandoffAuthor('source')}
+                  />
+                  <span>Source agent (uses source's model — pollutes the source conversation)</span>
+                </label>
+              </fieldset>
+            )}
+
             {handoffUnavailable && (
               <div className={styles.forkWarning}>
-                Handoff mode requires a running source conversation. Ended conversations
-                can still use Full summary, Fast summary, or Plain fork.
+                Source-authored handoff requires a running source conversation. Switch
+                to External session, or use Full summary / Fast summary / Plain fork.
               </div>
             )}
 
@@ -331,9 +368,30 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                   placeholder="What should the next conversation focus on?"
                 />
                 <span className={pickerStyles.fieldHint}>
-                  Sent to the source agent as guidance for the handoff document.
+                  {handoffAuthor === 'external'
+                    ? 'Steers what the authoring session emphasizes in the handoff document.'
+                    : 'Sent to the source agent as guidance for the handoff document.'}
                 </span>
               </div>
+            )}
+
+            {isHandoffFork && handoffAuthor === 'external' && (
+              <>
+                <ModelHarnessPicker
+                  model={summaryModel}
+                  harness={summaryHarness}
+                  onModelChange={setSummaryModel}
+                  onHarnessChange={setSummaryHarness}
+                  groups={groups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Authoring model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  The model and harness that read the source transcript and emit the
+                  handoff document. Cheaper models work fine; use a larger model for
+                  nuanced or long conversations.
+                </span>
+              </>
             )}
 
             {forkMode === 'summary' && (
@@ -372,9 +430,10 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               </span>
             )}
 
-            {isHandoffFork && (
+            {isHandoffFork && handoffAuthor === 'source' && (
               <span className={pickerStyles.fieldHint}>
-                Handoff mode asks the source agent to write the seed document; no summary model is used.
+                Source-authored handoff asks the live source agent to write the seed
+                document, using whatever model the source is currently running.
               </span>
             )}
 
@@ -429,6 +488,9 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
               launchHarness,
               summaryHarness,
               handoffFocusValue,
+              isHandoffFork ? handoffAuthor : undefined,
+              isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
+              isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
             )}
           >
             <GitBranchPlus size={13} />

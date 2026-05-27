@@ -10,6 +10,9 @@ interface HandoffOptions {
   model?: string;
   harness?: string;
   cwd?: string;
+  author?: string;
+  authorModel?: string;
+  authorHarness?: string;
 }
 
 function resolveConversation(convRef: string) {
@@ -46,7 +49,14 @@ export async function handoffCommand(
 
   const focus = focusArgs.join(' ').trim() || undefined;
   const harness = validateHarness(options.harness);
+  const authorHarness = validateHarness(options.authorHarness);
+  const author = options.author === 'source' ? 'source' : 'external';
+  if (options.author !== undefined && options.author !== 'source' && options.author !== 'external') {
+    console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
+    process.exit(1);
+  }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
+  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=${authorHarness ?? 'claude-code'})` : ' (in-source agent)'}`));
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
@@ -57,6 +67,9 @@ export async function handoffCommand(
     harness,
     forkMode: 'handoff',
     focus,
+    handoffAuthor: author,
+    handoffAuthorModel: options.authorModel,
+    handoffAuthorHarness: authorHarness,
   }));
   const newConv = result.conversation;
 

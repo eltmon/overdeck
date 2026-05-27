@@ -22,7 +22,7 @@
  * wires the options through and handles tmux spawn + summary injection.
  */
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
@@ -36,13 +36,14 @@ import {
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
-import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import { generateSmartSummary, parseEntries, runModelSummary, serializeConversation } from './smart-compaction.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
+export type HandoffAuthor = 'source' | 'external';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -55,6 +56,22 @@ export interface SummaryForkOptions {
   handoffPollIntervalMs?: number;
   /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
   includeThinkingInSummary?: boolean;
+  /**
+   * Who authors the handoff document when forkMode === 'handoff'.
+   *
+   * - 'source' (legacy): deliver the handoff prompt to the live source agent
+   *   via deliverAgentMessage and wait for it to write the doc + .done sentinel.
+   *   Requires the source conversation to be alive. Pollutes the source's
+   *   context. Uses whatever model/harness the source is running on.
+   * - 'external' (default): spawn a separate authoring session with the chosen
+   *   model/harness that reads the source JSONL transcript and emits the doc.
+   *   Does not touch the source conversation. Works on ended sources.
+   */
+  handoffAuthor?: HandoffAuthor;
+  /** Model for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
+  handoffAuthorModel?: string;
+  /** Harness for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
+  handoffAuthorHarness?: RuntimeName;
 }
 
 export interface SummaryForkResult {
@@ -147,6 +164,60 @@ async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollInt
       await delay(Math.min(pollIntervalMs, remainingMs));
     }
   }
+}
+
+const DEFAULT_HANDOFF_AUTHOR_MODEL = 'claude-sonnet-4-6';
+const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
+
+function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string): string {
+  const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
+  return template
+    .split('{{focus}}').join(safeFocus)
+    .split('{{transcript}}').join(transcript);
+}
+
+/**
+ * Author a handoff document from an external authoring session.
+ *
+ * Reads the source JSONL transcript and asks a fresh, isolated model session
+ * (with the chosen model + harness) to write the handoff Markdown. The source
+ * conversation is never contacted — its context is not polluted.
+ *
+ * Returns the same { docPath, docText } shape as requestHandoffFromAgent so
+ * callers can substitute one for the other.
+ */
+export async function authorHandoffExternal(
+  sourceConv: Conversation,
+  sourceSessionFile: string,
+  focus: string | undefined,
+  model: string | undefined,
+  harness: RuntimeName | undefined,
+  options: { now?: Date } = {},
+): Promise<RequestHandoffResult> {
+  await ensureHandoffsDir();
+  const timestamp = (options.now ?? new Date()).toISOString();
+  const paths = createHandoffPaths(sourceConv.name, timestamp);
+  const template = await readFile(join(packageRoot, 'roles', 'handoff-external.md'), 'utf-8');
+  const entries = await parseEntries(sourceSessionFile);
+  // Skip thinking blocks — they're large and the structured output we want
+  // doesn't need internal reasoning, only the user/assistant exchange.
+  const transcript = serializeConversation(entries, /* includeThinking */ false);
+  const prompt = renderExternalHandoffPrompt(template, focus, transcript);
+
+  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+  const effectiveHarness: RuntimeName = harness ?? 'claude-code';
+  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length}`);
+
+  const docText = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
+  const validation = validateHandoffDoc(docText);
+  if (!validation.ok) {
+    throw new HandoffValidationError(paths.docPath, validation.reason);
+  }
+
+  await writeFile(paths.docPath, docText, 'utf-8');
+  await writeFile(paths.sentinelPath, '', 'utf-8');
+
+  return { docPath: paths.docPath, docText };
 }
 
 export async function requestHandoffFromAgent(
@@ -449,22 +520,22 @@ function sanitizeEntryForPlainFork(entry: any): any {
     summary = '';
     usedSummaryModel = null;
   } else if (forkMode === 'handoff') {
-    const preconditionFallback = await handoffPreconditionFallbackReason(conv);
-    if (preconditionFallback) {
-      forkFallbackReason = preconditionFallback;
-      effectiveForkMode = 'summary';
-      logHandoffFallback(conv, preconditionFallback);
-      const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-      summary = result.summary;
-      usedSummaryModel = result.summaryModel;
-    } else {
+    const handoffAuthor: HandoffAuthor = options.handoffAuthor ?? 'external';
+    if (handoffAuthor === 'external') {
+      // External authoring: read the source JSONL and have a fresh authoring
+      // session write the handoff doc. Source conversation is never touched.
+      // Works on ended source conversations and lets the user pick the
+      // authoring model/harness independently of the source.
       try {
-        const handoff = await requestHandoffFromAgent(conv, options.focus, {
-          timeoutMs: options.handoffTimeoutMs,
-          pollIntervalMs: options.handoffPollIntervalMs,
-        });
+        const handoff = await authorHandoffExternal(
+          conv,
+          sourceSessionFile,
+          options.focus,
+          options.handoffAuthorModel,
+          options.handoffAuthorHarness,
+        );
         summary = handoff.docText;
-        usedSummaryModel = null;
+        usedSummaryModel = options.handoffAuthorModel ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
         handoffDocPath = handoff.docPath;
       } catch (error) {
         forkFallbackReason = handoffFailureReason(error);
@@ -473,6 +544,37 @@ function sanitizeEntryForPlainFork(entry: any): any {
         const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
         summary = result.summary;
         usedSummaryModel = result.summaryModel;
+      }
+    } else {
+      // Source authoring (legacy): deliver the handoff prompt to the live
+      // source agent and wait for it to write the doc + .done sentinel.
+      // Requires the source conversation to be alive and pollutes its
+      // context with the handoff turn pair.
+      const preconditionFallback = await handoffPreconditionFallbackReason(conv);
+      if (preconditionFallback) {
+        forkFallbackReason = preconditionFallback;
+        effectiveForkMode = 'summary';
+        logHandoffFallback(conv, preconditionFallback);
+        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+        summary = result.summary;
+        usedSummaryModel = result.summaryModel;
+      } else {
+        try {
+          const handoff = await requestHandoffFromAgent(conv, options.focus, {
+            timeoutMs: options.handoffTimeoutMs,
+            pollIntervalMs: options.handoffPollIntervalMs,
+          });
+          summary = handoff.docText;
+          usedSummaryModel = null;
+          handoffDocPath = handoff.docPath;
+        } catch (error) {
+          forkFallbackReason = handoffFailureReason(error);
+          effectiveForkMode = 'summary';
+          logHandoffFallback(conv, forkFallbackReason);
+          const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+          summary = result.summary;
+          usedSummaryModel = result.summaryModel;
+        }
       }
     }
   } else {

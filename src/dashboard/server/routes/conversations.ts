@@ -128,10 +128,12 @@ import {
   reserveSummaryForkSession,
   copySessionFromCompactBoundary,
   requestHandoffFromAgent,
+  authorHandoffExternal,
   handoffPreconditionFallbackReason,
   handoffFailureReason,
   logHandoffFallback,
   type SummaryForkMode,
+  type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
 import {
   CONVERSATION_TITLE_MODEL,
@@ -2835,6 +2837,9 @@ async function runForkPipeline(
   includeThinkingInSummary?: boolean,
   summaryHarness?: RuntimeName,
   handoffFocus?: string,
+  handoffAuthor: HandoffAuthor = 'external',
+  handoffAuthorModel?: string,
+  handoffAuthorHarness?: RuntimeName,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -2893,15 +2898,17 @@ async function runForkPipeline(
   };
 
   if (forkMode === 'handoff') {
-    const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
-    if (preconditionFallback) {
-      forkFallbackReason = preconditionFallback;
-      effectiveForkMode = 'summary';
-      logHandoffFallback(parentConv, preconditionFallback);
-      summary = await buildSummary();
-    } else {
+    if (handoffAuthor === 'external') {
+      // External authoring: separate session reads the source JSONL and
+      // writes the doc; source conversation is never touched.
       try {
-        const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+        const handoff = await authorHandoffExternal(
+          parentConv,
+          parentSessionFile,
+          handoffFocus,
+          handoffAuthorModel,
+          handoffAuthorHarness,
+        );
         summary = handoff.docText;
         handoffDocPath = handoff.docPath;
       } catch (error) {
@@ -2909,6 +2916,26 @@ async function runForkPipeline(
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, forkFallbackReason);
         summary = await buildSummary();
+      }
+    } else {
+      // Source authoring (legacy): deliver the prompt to the live source agent.
+      const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
+      if (preconditionFallback) {
+        forkFallbackReason = preconditionFallback;
+        effectiveForkMode = 'summary';
+        logHandoffFallback(parentConv, preconditionFallback);
+        summary = await buildSummary();
+      } else {
+        try {
+          const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+          summary = handoff.docText;
+          handoffDocPath = handoff.docPath;
+        } catch (error) {
+          forkFallbackReason = handoffFailureReason(error);
+          effectiveForkMode = 'summary';
+          logHandoffFallback(parentConv, forkFallbackReason);
+          summary = await buildSummary();
+        }
       }
     }
   } else {
@@ -2999,6 +3026,20 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: focusResult.error }, { status: 400 });
         }
         const handoffFocus = focusResult.focus;
+        const requestedHandoffAuthor = body['handoffAuthor'];
+        let handoffAuthor: HandoffAuthor = 'external';
+        if (requestedHandoffAuthor !== undefined) {
+          if (requestedHandoffAuthor !== 'source' && requestedHandoffAuthor !== 'external') {
+            return jsonResponse({ error: 'Invalid handoffAuthor (expected "source" or "external")' }, { status: 400 });
+          }
+          handoffAuthor = requestedHandoffAuthor;
+        }
+        const handoffAuthorModel = typeof body['handoffAuthorModel'] === 'string'
+          ? body['handoffAuthorModel'].trim()
+          : undefined;
+        if (handoffAuthorModel && !SAFE_MODEL_PATTERN.test(handoffAuthorModel)) {
+          return jsonResponse({ error: 'Invalid handoffAuthorModel' }, { status: 400 });
+        }
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
@@ -3031,6 +3072,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
+        const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
+          ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
+          : undefined;
         if (forkMode === 'plain' && launchHarness === 'pi') {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
           // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
@@ -3066,7 +3110,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });

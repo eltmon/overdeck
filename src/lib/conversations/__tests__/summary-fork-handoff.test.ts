@@ -12,6 +12,7 @@ import { sessionFilePath } from '../../paths.js';
 import { createHandoffPaths } from '../handoff-paths.js';
 import {
   HandoffStallError,
+  authorHandoffExternal,
   createSummaryFork,
   requestHandoffFromAgent,
   validateHandoffDoc,
@@ -21,6 +22,22 @@ import { deliverAgentMessage } from '../../agents.js';
 vi.mock('../../agents.js', () => ({
   deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
 }));
+
+// Mock the smart-compaction module so external-authoring tests don't actually
+// spawn an LLM. Default impl is overridden per-test via vi.mocked(...).
+vi.mock('../smart-compaction.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../smart-compaction.js')>();
+  return {
+    ...actual,
+    runModelSummary: vi.fn((prompt: string) => {
+      // Default: return whatever the test set as the mock impl. If unset, throw.
+      void prompt;
+      throw new Error('runModelSummary mock not configured for this test');
+    }),
+  };
+});
+import { runModelSummary as mockedRunModelSummary } from '../smart-compaction.js';
+import { Effect as EffectMod } from 'effect';
 
 const originalPanopticonHome = process.env.PANOPTICON_HOME;
 const originalHome = process.env.HOME;
@@ -224,7 +241,7 @@ describe('handoff fork handshake', () => {
       await writeFile(`${outputPath}.done`, '', 'utf-8');
     });
 
-    const result = await Effect.runPromise(createSummaryFork(source, { forkMode: 'handoff' }));
+    const result = await Effect.runPromise(createSummaryFork(source, { forkMode: 'handoff', handoffAuthor: 'source' }));
 
     expect(result.summary).toBe(docText);
     expect(result.summaryModel).toBeNull();
@@ -247,6 +264,7 @@ describe('handoff fork handshake', () => {
 
     const result = await Effect.runPromise(createSummaryFork(source, {
       forkMode: 'handoff',
+      handoffAuthor: 'source',
       localSummaryOnly: true,
     }));
 
@@ -266,6 +284,7 @@ describe('handoff fork handshake', () => {
 
     const resultPromise = Effect.runPromise(createSummaryFork(source, {
       forkMode: 'handoff',
+      handoffAuthor: 'source',
       localSummaryOnly: true,
       handoffTimeoutMs: 0,
       handoffPollIntervalMs: 1,
@@ -301,6 +320,7 @@ describe('handoff fork handshake', () => {
 
     const result = await Effect.runPromise(createSummaryFork(source, {
       forkMode: 'handoff',
+      handoffAuthor: 'source',
       localSummaryOnly: true,
       handoffTimeoutMs: 0,
       handoffPollIntervalMs: 1,
@@ -327,6 +347,7 @@ describe('handoff fork handshake', () => {
 
     const result = await Effect.runPromise(createSummaryFork(source, {
       forkMode: 'handoff',
+      handoffAuthor: 'source',
       localSummaryOnly: true,
     }));
 
@@ -349,6 +370,56 @@ describe('handoff fork handshake', () => {
     });
 
     await expect(result).rejects.toBeInstanceOf(HandoffStallError);
+    rmSync(home, { recursive: true, force: true });
+  });
+});
+
+describe('authorHandoffExternal', () => {
+  it('writes the doc + sentinel from the authoring session output and never touches the source agent', async () => {
+    const home = join(tmpdir(), `pan-handoff-external-ok-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const cwd = source.cwd;
+    const sessionId = source.claudeSessionId!;
+    const sourceFile = sessionFilePath(cwd, sessionId);
+    const docText = validDoc();
+
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(docText));
+
+    const result = await authorHandoffExternal(
+      source,
+      sourceFile,
+      'just continue PAN-1351',
+      'claude-haiku-4-5',
+      'claude-code',
+    );
+
+    expect(result.docText).toBe(docText);
+    expect(result.docPath).toContain('/handoffs/');
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
+    expect(mockedRunModelSummary).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(mockedRunModelSummary).mock.calls[0];
+    expect(callArgs?.[1]).toBe('claude-haiku-4-5');
+    expect(callArgs?.[3]).toBe('claude-code');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('falls back to summary fork when external authoring returns invalid output', async () => {
+    const home = join(tmpdir(), `pan-handoff-external-invalid-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const invalid = invalidLongDoc();
+
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(invalid));
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'claude-haiku-4-5',
+      localSummaryOnly: true,
+    }));
+
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('handoff-validation');
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
     rmSync(home, { recursive: true, force: true });
   });
 });

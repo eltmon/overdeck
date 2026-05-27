@@ -33,8 +33,9 @@ async function unfavoriteConversation(name: string): Promise<void> {
 
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
+type HandoffAuthor = 'source' | 'external';
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; summaryHarness?: 'claude-code' | 'pi'; forkMode?: ApiForkMode; focus?: string; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string; handoffAuthor?: HandoffAuthor; handoffAuthorModel?: string; handoffAuthorHarness?: 'claude-code' | 'pi' }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -49,6 +50,9 @@ async function summaryForkConversation(opts: { conv: Conversation; model: string
       localSummaryOnly: opts.localSummaryOnly,
       includeThinkingInSummary: opts.includeThinkingInSummary,
       title: opts.title,
+      handoffAuthor: opts.handoffAuthor,
+      handoffAuthorModel: opts.handoffAuthorModel,
+      handoffAuthorHarness: opts.handoffAuthorHarness,
     }),
   });
   const data = await res.json().catch(() => null);
@@ -65,7 +69,7 @@ export interface ConversationMutations {
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'pi') => void;
   forkTarget: Conversation | null;
   forkTargetMode: ForkModeOption | undefined;
   forkTargetFocus: string | undefined;
@@ -180,7 +184,7 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string) => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi', summaryHarness?: 'claude-code' | 'pi', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'pi') => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
@@ -192,6 +196,9 @@ export function useConversationMutations(
       localSummaryOnly,
       includeThinkingInSummary,
       title,
+      handoffAuthor,
+      handoffAuthorModel,
+      handoffAuthorHarness,
     });
     setForkTarget(null);
     setForkTargetMode(undefined);

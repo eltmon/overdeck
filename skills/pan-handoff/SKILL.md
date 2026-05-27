@@ -33,6 +33,8 @@ pan handoff source-conv --model claude-sonnet-4-6
 pan handoff source-conv --harness pi
 pan handoff source-conv --cwd /path/to/project
 pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into checkout
+pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
+pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
 ```
 
 ## When to use
@@ -41,11 +43,17 @@ pan handoff source-conv --model claude-opus-4-7 wire the Stripe webhook into che
 - The current agent knows dead ends, hazards, or file relationships that a passive summary may miss.
 - You want a deliberate context transfer before switching models, harnesses, or tasks.
 
-Use a normal summary fork when the source conversation is ended or when a quick passive summary is enough. Use a plain fork only when staying within Claude Code-compatible raw history.
+Use a normal summary fork when a quick passive summary is enough. Use a plain fork only when staying within Claude Code-compatible raw history.
 
 ## Focus
 
 The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
+
+## Authoring modes
+
+`--author external` (default) spawns a separate authoring session that reads the source JSONL transcript and writes the handoff document. The source conversation is never contacted — its context stays clean, and the source can be ended. Use `--author-model` and `--author-harness` to choose the authoring model and harness independently of the source and of the new conversation. Cheaper models work well for routine handoffs; reach for a larger model when the conversation has nuance the document needs to preserve.
+
+`--author source` asks the live source agent to write the handoff document in-conversation. This adds the prompt and the doc to the source's transcript (polluting its context) and uses whatever model the source is currently running. It can still be the right choice when the source agent has live state — open files, recent commands, in-flight reasoning — that a transcript reader would miss.
 
 ## Fallback behavior
 

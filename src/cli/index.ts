@@ -422,10 +422,13 @@ program
 
 program
   .command('handoff <conv> [focus...]')
-  .description('Agent-authored conversation handoff that spawns a new conversation; trailing text becomes the focus')
-  .option('--model <model>', 'Model for the handoff-forked session')
-  .option('--harness <harness>', 'Harness for the handoff-forked session: claude-code or pi')
-  .option('--cwd <path>', 'Working directory for the handoff-forked session')
+  .description('Conversation handoff that spawns a new conversation; trailing text becomes the focus')
+  .option('--model <model>', 'Model for the handoff-forked (new) conversation')
+  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
+  .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
+  .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
+  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code or pi (only when --author=external)')
   .action(handoffCommand);
 
 program

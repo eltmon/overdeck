@@ -53,7 +53,7 @@ interface CutPointResult {
 // Entry parsing
 // ============================================================================
 
-async function parseEntries(jsonlPath: string): Promise<any[]> {
+export async function parseEntries(jsonlPath: string): Promise<any[]> {
   const content = await readFile(jsonlPath, 'utf-8');
   const entries: any[] = [];
   for (const line of content.split('\n')) {
@@ -421,7 +421,7 @@ function serializeEntry(entry: any, includeThinking: boolean = true): string | u
   return undefined;
 }
 
-function serializeConversation(entries: any[], includeThinking: boolean = true): string {
+export function serializeConversation(entries: any[], includeThinking: boolean = true): string {
   const parts: string[] = [];
   for (const entry of entries) {
     const serialized = serializeEntry(entry, includeThinking);
