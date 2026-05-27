@@ -148,6 +148,7 @@ describe('ComposerFooter image attachments', () => {
       clipboardData: {
         items: [
           {
+            kind: 'file',
             type: 'image/png',
             getAsFile: () => file,
           },
@@ -246,7 +247,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -303,7 +304,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -360,7 +361,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -418,7 +419,7 @@ describe('ComposerFooter image attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -451,6 +452,83 @@ describe('ComposerFooter image attachments', () => {
     });
   });
 
+  it('only enqueues one image when Chromium surfaces it in both .files and .items', async () => {
+    // Regression for the "Ctrl+V pastes two copies" bug: Chromium often
+    // populates BOTH clipboardData.files AND clipboardData.items (kind:'file')
+    // for a single image paste. The two File objects can have differing
+    // `lastModified` values (microsecond-apart synth), so name|size|lastModified
+    // dedup is unreliable. The handler must prefer .files and ignore .items
+    // when .files already has entries.
+    const fetchMock = vi.mocked(fetch);
+    let uploadCalls = 0;
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        uploadCalls += 1;
+        return new Response(JSON.stringify({ path: `/tmp/panopticon-paste-${uploadCalls}.png` }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    // Two File objects with same content/name but a different lastModified —
+    // the previous dedup key would treat these as distinct images.
+    const fileA = new File(['png-bytes'], 'image.png', { type: 'image/png', lastModified: 1_700_000_000_000 });
+    const fileB = new File(['png-bytes'], 'image.png', { type: 'image/png', lastModified: 1_700_000_000_001 });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        files: [fileA],
+        items: [
+          { kind: 'file', type: 'image/png', getAsFile: () => fileB },
+        ],
+        types: ['Files', 'image/png'],
+      },
+    });
+
+    await waitFor(() => {
+      expect(uploadCalls).toBe(1);
+    });
+    // Exactly one image card should be visible.
+    expect(screen.getAllByText('image.png')).toHaveLength(1);
+  });
+
+  it('falls back to .items when .files is empty (Wayland screenshot-tool paste)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ path: '/tmp/panopticon-paste-wayland.png' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['png-bytes'], 'wayland.png', { type: 'image/png' });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        files: [],
+        items: [
+          { kind: 'file', type: 'image/png', getAsFile: () => file },
+        ],
+        types: ['image/png'],
+      },
+    });
+
+    expect(await screen.findByText('wayland.png')).toBeInTheDocument();
+  });
+
   it('blocks send when any pending image upload has failed', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
@@ -481,7 +559,7 @@ describe('ComposerFooter image attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 

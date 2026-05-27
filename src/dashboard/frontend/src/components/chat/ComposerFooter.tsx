@@ -373,24 +373,27 @@ export function ComposerFooter({
     const clipboardData = event.clipboardData;
     if (!clipboardData) return;
 
-    // Harvest images from every surface the browser might use:
-    //  - clipboardData.files: canonical "list of files in this paste"
-    //  - clipboardData.items: kind:'file' items (per-platform; Wayland Chromium often
-    //    skips this for screenshot-tool pastes but populates .files)
-    // We dedupe by (name,size,lastModified) so the same image isn't enqueued twice
-    // when it shows up in both surfaces.
+    // Harvest images from the canonical surface first:
+    //  - clipboardData.files: the FileList of files in this paste
+    //  - clipboardData.items (kind:'file'): per-item access; only consulted when
+    //    .files is empty (some Wayland Chromium screenshot-tool pastes).
+    // We do NOT iterate both surfaces and dedupe — Chromium synthesizes
+    // distinct File objects for each surface with their own `lastModified`
+    // ticks, so a key built from (name,size,lastModified) can't reliably
+    // recognize them as the same image and the user ends up with two copies
+    // of the same screenshot intermittently.
     const collected: File[] = [];
-    const seen = new Set<string>();
     const addIfImage = (file: File | null) => {
       if (!file || !file.type.startsWith('image/')) return;
-      const key = `${file.name}|${file.size}|${file.lastModified}`;
-      if (seen.has(key)) return;
-      seen.add(key);
       collected.push(file);
     };
-    for (const file of Array.from(clipboardData.files)) addIfImage(file);
-    for (const item of Array.from(clipboardData.items)) {
-      if (item.kind === 'file') addIfImage(item.getAsFile());
+    const filesFromFiles = clipboardData.files ? Array.from(clipboardData.files) : [];
+    if (filesFromFiles.length > 0) {
+      for (const file of filesFromFiles) addIfImage(file);
+    } else if (clipboardData.items) {
+      for (const item of Array.from(clipboardData.items)) {
+        if (item.kind === 'file') addIfImage(item.getAsFile());
+      }
     }
 
     if (collected.length > 0) {
