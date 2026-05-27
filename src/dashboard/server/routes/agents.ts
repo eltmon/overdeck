@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
-import { validateOrigin } from './origin-validation.js';
+import { getHeaderFromMap, validateOrigin } from './origin-validation.js';
 import {
   buildPermissionActivityDetails,
   buildPermissionWaitingMessage,
@@ -9,7 +9,7 @@ import {
   permissionResolutionVerb,
   processPermissionResponse,
 } from './agent-permissions.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 /**
@@ -158,6 +158,8 @@ function emitStartAgentPhase(
   });
 }
 
+const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token';
+
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
   const providedBuffer = Buffer.from(provided, 'utf8');
@@ -166,6 +168,36 @@ function constantTimeTokenEqual(provided: string | undefined, expected: string):
     return false;
   }
   return timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+async function readInternalTokenForRequest(): Promise<string | null> {
+  const fromEnv = process.env.PANOPTICON_INTERNAL_TOKEN;
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  try {
+    const token = (await readFile(join(getPanopticonHome(), 'internal-token'), 'utf8')).trim();
+    return token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function validateAgentRuntimeEventAuth(
+  request: HttpServerRequest.HttpServerRequest,
+) {
+  const expected = await readInternalTokenForRequest();
+  if (!expected) {
+    return {
+      ok: false as const,
+      response: jsonResponse({ success: false, error: 'internal token not configured' }, { status: 503 }),
+    };
+  }
+
+  const provided = getHeaderFromMap(request.headers as Record<string, string | string[] | undefined>, INTERNAL_TOKEN_HEADER);
+  if (constantTimeTokenEqual(provided, expected)) return { ok: true as const };
+  return {
+    ok: false as const,
+    response: jsonResponse({ success: false, error: 'forbidden' }, { status: 403 }),
+  };
 }
 
 async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
@@ -1355,6 +1387,10 @@ const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/heartbeat',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!id.trim()) {
@@ -1372,6 +1408,10 @@ const postAgentWorkCompleteRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/work-complete',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!id.trim()) return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
@@ -1385,6 +1425,10 @@ const postAgentStuckRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/stuck',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!id.trim()) return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
@@ -1394,16 +1438,20 @@ const postAgentStuckRoute = HttpRouter.add(
   })),
 );
 
+function hasNegatedCompletionOutput(output: string): boolean {
+  return /\b(not|never|no|cannot|can't|blocked|waiting|needs input|not yet|isn't|aren't)\b.{0,48}\b(implementation complete|all beads closed|ready for review|work complete)\b/i.test(output);
+}
+
 const postAgentClassifyCompletionRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/classify-completion',
   httpHandler(Effect.gen(function* () {
     const body = (yield* readJsonBody) as Record<string, unknown>;
     const output = typeof body['output'] === 'string' ? body['output'] : '';
-    const verdict = /Implementation complete|all beads closed|ready for review|work complete/i.test(output)
-      ? 'FORGOT_COMPLETION'
-      : /blocked|needs input|waiting for/i.test(output)
-        ? 'STOPPED_FOR_INPUT'
+    const verdict = /blocked|needs input|waiting for|not ready for review/i.test(output) || hasNegatedCompletionOutput(output)
+      ? 'STOPPED_FOR_INPUT'
+      : /Implementation complete|all beads closed|ready for review|work complete/i.test(output)
+        ? 'FORGOT_COMPLETION'
         : 'UNCLEAR';
     return jsonResponse({ success: true, verdict });
   })),

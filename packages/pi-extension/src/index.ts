@@ -5,7 +5,7 @@
  * to emit Panopticon lifecycle signals via filesystem markers and HTTP POSTs.
  */
 
-import { appendFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
@@ -93,10 +93,27 @@ async function writeJson(path: string, body: unknown): Promise<void> {
 }
 
 const POST_TIMEOUT_MS = 1_000
+const MAX_PENDING_EVENTS = 200
+const MAX_PENDING_EVENT_BYTES = 256_000
+const MAX_PENDING_DRAIN_EVENTS = 25
+const MAX_TURN_OUTPUT_BYTES = 64_000
+const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token'
 const HEARTBEAT_PATH = (agentId: string) => `/api/agents/${agentId}/heartbeat`
 
 function getDashboardUrl(): string {
-  return process.env['PANOPTICON_DASHBOARD_URL'] ?? 'http://localhost:3010'
+  return process.env['PANOPTICON_DASHBOARD_URL'] ?? 'http://localhost:3011'
+}
+
+async function readInternalToken(env: HookEnv): Promise<string | null> {
+  const fromEnv = process.env['PANOPTICON_INTERNAL_TOKEN']
+  if (fromEnv?.trim()) return fromEnv.trim()
+  const panopticonHome = env.home ? join(env.home, '.panopticon') : (process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon'))
+  try {
+    const token = (await readFile(join(panopticonHome, 'internal-token'), 'utf8')).trim()
+    return token.length > 0 ? token : null
+  } catch {
+    return null
+  }
 }
 
 async function postEvent(env: HookEnv, body: Record<string, unknown>): Promise<void> {
@@ -108,7 +125,7 @@ async function postDashboard(env: HookEnv, path: string, body: Record<string, un
   const paths = panopticonPathsFor(env.agentId, env.home)
   await drainPendingEvents(env, paths.pendingEventsPath)
 
-  const ok = await postWithTimeout(url, body)
+  const ok = await postWithTimeout(env, url, body)
   if (ok) return
 
   if (ok === false) {
@@ -117,13 +134,16 @@ async function postDashboard(env: HookEnv, path: string, body: Record<string, un
   }
 }
 
-async function postWithTimeout(url: string, body: Record<string, unknown>): Promise<boolean | null> {
+async function postWithTimeout(env: HookEnv, url: string, body: Record<string, unknown>): Promise<boolean | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS)
   try {
+    const token = await readInternalToken(env)
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers[INTERNAL_TOKEN_HEADER] = token
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -137,13 +157,16 @@ async function postWithTimeout(url: string, body: Record<string, unknown>): Prom
   }
 }
 
-async function postJsonWithTimeout(url: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+async function postJsonWithTimeout(env: HookEnv, url: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS)
   try {
+    const token = await readInternalToken(env)
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers[INTERNAL_TOKEN_HEADER] = token
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -156,23 +179,51 @@ async function postJsonWithTimeout(url: string, body: Record<string, unknown>): 
   }
 }
 
-async function drainPendingEvents(env: HookEnv, pendingPath: string): Promise<void> {
+async function readPendingEventLines(pendingPath: string): Promise<string[]> {
   let raw: string
   try {
-    raw = await readFile(pendingPath, 'utf8')
+    const info = await stat(pendingPath)
+    if (info.size <= MAX_PENDING_EVENT_BYTES) {
+      raw = await readFile(pendingPath, 'utf8')
+    } else {
+      const bytesToRead = Math.min(info.size, MAX_PENDING_EVENT_BYTES)
+      const file = await open(pendingPath, 'r')
+      try {
+        const buffer = Buffer.alloc(bytesToRead)
+        await file.read(buffer, 0, bytesToRead, info.size - bytesToRead)
+        raw = buffer.toString('utf8')
+        const firstNewline = raw.indexOf('\n')
+        if (firstNewline >= 0) raw = raw.slice(firstNewline + 1)
+      } finally {
+        await file.close()
+      }
+    }
   } catch {
-    return
-  }
-  if (!raw.trim()) {
-    await unlink(pendingPath).catch(() => {})
-    return
+    return []
   }
 
+  return raw
+    .split('\n')
+    .filter((line) => line.trim())
+    .slice(-MAX_PENDING_EVENTS)
+}
+
+async function writePendingEventLines(pendingPath: string, lines: string[], env: HookEnv): Promise<void> {
+  if (lines.length === 0) return
+  const paths = panopticonPathsFor(env.agentId, env.home)
+  await mkdir(paths.agentDir, { recursive: true })
+  await writeFile(pendingPath, lines.slice(-MAX_PENDING_EVENTS).map((line) => `${line}\n`).join(''), 'utf8').catch(() => {})
+}
+
+async function drainPendingEvents(env: HookEnv, pendingPath: string): Promise<void> {
+  const lines = await readPendingEventLines(pendingPath)
   await unlink(pendingPath).catch(() => {})
-  const lines = raw.split('\n').filter((l) => l.trim())
-  const remaining: string[] = []
+  if (lines.length === 0) return
 
-  for (let i = 0; i < lines.length; i++) {
+  const remaining: string[] = []
+  const limit = Math.min(lines.length, MAX_PENDING_DRAIN_EVENTS)
+
+  for (let i = 0; i < limit; i++) {
     const line = lines[i]!
     let parsed: Record<string, unknown>
     try {
@@ -188,17 +239,17 @@ async function drainPendingEvents(env: HookEnv, pendingPath: string): Promise<vo
       ? parsed['body'] as Record<string, unknown>
       : parsed
 
-    const ok = await postWithTimeout(`${getDashboardUrl()}${path}`, body)
+    const ok = await postWithTimeout(env, `${getDashboardUrl()}${path}`, body)
     if (ok || ok === null) continue
     remaining.push(line, ...lines.slice(i + 1))
     break
   }
 
-  if (remaining.length > 0) {
-    const paths = panopticonPathsFor(env.agentId, env.home)
-    await mkdir(paths.agentDir, { recursive: true })
-    await writeFile(pendingPath, remaining.map((l) => `${l}\n`).join(''), 'utf8').catch(() => {})
+  if (remaining.length === 0 && limit < lines.length) {
+    remaining.push(...lines.slice(limit))
   }
+
+  await writePendingEventLines(pendingPath, remaining, env)
 }
 
 export interface HookEnv {
@@ -359,13 +410,13 @@ async function evidenceClean(env: HookEnv): Promise<boolean> {
 }
 
 async function readTurnOutput(env: HookEnv, event: TurnEndEvent): Promise<string> {
-  if (event.output?.trim()) return event.output
-  if (event.transcript?.trim()) return event.transcript
+  if (event.output?.trim()) return event.output.slice(-MAX_TURN_OUTPUT_BYTES)
+  if (event.transcript?.trim()) return event.transcript.slice(-MAX_TURN_OUTPUT_BYTES)
   const path = event.sessionLogPath ?? env.sessionLogPath ?? process.env['PANOPTICON_PI_SESSION_LOG']
   if (!path) return ''
   try {
     const contents = await readFile(path, 'utf8')
-    return contents.slice(-64_000)
+    return contents.slice(-MAX_TURN_OUTPUT_BYTES)
   } catch {
     return ''
   }
@@ -379,7 +430,7 @@ async function postWorkComplete(env: HookEnv, reason: string, summary: string): 
 
 async function classifyCompletion(env: HookEnv, output: string): Promise<string | null> {
   const issueId = await issueIdFor(env)
-  const result = await postJsonWithTimeout(`${getDashboardUrl()}/api/agents/${env.agentId}/classify-completion`, { issueId, output })
+  const result = await postJsonWithTimeout(env, `${getDashboardUrl()}/api/agents/${env.agentId}/classify-completion`, { issueId, output })
   return typeof result?.['verdict'] === 'string' ? result['verdict'] as string : null
 }
 
@@ -387,6 +438,31 @@ async function markStuck(env: HookEnv, reason: string): Promise<void> {
   const issueId = await issueIdFor(env)
   await postDashboard(env, `/api/agents/${env.agentId}/stuck`, { issueId, reason })
   await postEvent(env, { kind: 'resolution_set', resolution: 'stuck', resolutionCount: 1 })
+}
+
+const COMPLETION_PHRASES = [
+  'Implementation complete',
+  'all beads closed',
+  'ready for review',
+  'work complete',
+]
+
+function hasStructuredCompletionMarker(output: string): boolean {
+  if (/\bPANOPTICON_WORK_COMPLETE\b/i.test(output)) return true
+
+  for (const phrase of COMPLETION_PHRASES) {
+    const pattern = new RegExp(phrase.replace(/ /g, '\\s+'), 'ig')
+    for (const match of output.matchAll(pattern)) {
+      const index = match.index ?? 0
+      const prefix = output.slice(Math.max(0, index - 48), index).toLowerCase()
+      if (/\b(not|never|no|cannot|can't|blocked|waiting|needs input|not yet|isn't|aren't)\b/.test(prefix)) {
+        continue
+      }
+      return true
+    }
+  }
+
+  return false
 }
 
 async function updateProgress(env: HookEnv, kind: 'tool' | 'turn', timestamp: string, extra: Record<string, unknown> = {}): Promise<number> {
@@ -409,7 +485,7 @@ export async function handleWorkAgentTurnEnd(env: HookEnv, event: TurnEndEvent):
     return
   }
 
-  if (/PANOPTICON_WORK_COMPLETE|Implementation complete|all beads closed|ready for review/i.test(output)) {
+  if (hasStructuredCompletionMarker(output)) {
     await postWorkComplete(env, 'structured-reply', output.slice(-1000))
     return
   }

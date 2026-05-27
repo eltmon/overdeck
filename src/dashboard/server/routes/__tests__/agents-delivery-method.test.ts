@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { validateAgentDeliveryMethodOrigin, validateAgentMessageOrigin } from '../agents.js';
+import { validateAgentDeliveryMethodOrigin, validateAgentMessageOrigin, validateAgentRuntimeEventAuth } from '../agents.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 describe('agent mutation origin validation', () => {
@@ -8,6 +8,7 @@ describe('agent mutation origin validation', () => {
     delete process.env.NODE_ENV;
     process.env.PORT = '3011';
     delete process.env.DASHBOARD_URL;
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
     _resetTrustedOriginsForTests();
   });
 
@@ -44,5 +45,27 @@ describe('agent mutation origin validation', () => {
     } as any);
 
     expect(result.ok).toBe(false);
+  });
+
+  it('rejects agent runtime event POSTs without the internal token', async () => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+
+    const result = await validateAgentRuntimeEventAuth({
+      method: 'POST',
+      headers: {},
+    } as any);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('allows agent runtime event POSTs with the internal token', async () => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+
+    const result = await validateAgentRuntimeEventAuth({
+      method: 'POST',
+      headers: { 'x-panopticon-internal-token': 'test-token' },
+    } as any);
+
+    expect(result.ok).toBe(true);
   });
 });

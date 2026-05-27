@@ -26,7 +26,7 @@ const fixedTime = '2026-05-07T05:00:00.000Z'
 const now = () => fixedTime
 
 // Track fetch calls and control responses per test.
-let fetchCalls: { url: string; body: unknown }[] = []
+let fetchCalls: { url: string; body: unknown; headers: Record<string, string> }[] = []
 let fetchResponse: { status: number } = { status: 200 }
 
 beforeEach(() => {
@@ -37,7 +37,7 @@ beforeEach(() => {
     vi.fn(async (_url: string, init?: RequestInit) => {
       const url = _url
       const body = init?.body ? JSON.parse(init.body as string) : undefined
-      fetchCalls.push({ url, body })
+      fetchCalls.push({ url, body, headers: init?.headers as Record<string, string> })
       return { status: fetchResponse.status } as Response
     }),
   )
@@ -94,7 +94,7 @@ describe('handleSessionStart', () => {
       { reason: 'new', sessionId: 'sess-abc' },
     )
     expect(fetchCalls.length).toBe(2)
-    expect(fetchCalls[0]!.url).toBe('http://localhost:3010/api/agents/agent-pan-636/heartbeat')
+    expect(fetchCalls[0]!.url).toBe('http://localhost:3011/api/agents/agent-pan-636/heartbeat')
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'model_set',
       model: 'pi',
@@ -106,6 +106,18 @@ describe('handleSessionStart', () => {
       activity: 'idle',
       timestamp: fixedTime,
     })
+  })
+
+  it('attaches the internal token when one is available', async () => {
+    mkdirSync(join(h.home, '.panopticon'), { recursive: true })
+    writeFileSync(join(h.home, '.panopticon', 'internal-token'), 'test-token\n')
+
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+
+    expect(fetchCalls[0]!.headers['x-panopticon-internal-token']).toBe('test-token')
   })
 
   it('buffers to pending-events.jsonl when dashboard returns 503', async () => {
@@ -120,6 +132,23 @@ describe('handleSessionStart', () => {
     expect(lines.length).toBe(2)
     expect(JSON.parse(lines[0]!).kind).toBe('model_set')
     expect(JSON.parse(lines[1]!).kind).toBe('activity')
+  })
+
+  it('caps pending event replay to a bounded tail when dashboard remains unavailable', async () => {
+    fetchResponse = { status: 503 }
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    mkdirSync(join(h.home, '.panopticon', 'agents', 'agent-pan-636'), { recursive: true })
+    const lines = Array.from({ length: 350 }, (_, index) => JSON.stringify({ kind: 'activity', activity: 'idle', sequence: index }))
+    writeFileSync(paths.pendingEventsPath, `${lines.join('\n')}\n`)
+
+    await handleToolExecutionEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
+      { toolName: 'Bash', isError: false },
+    )
+
+    const remaining = readFileSync(paths.pendingEventsPath, 'utf8').trim().split('\n')
+    expect(remaining.length).toBeLessThanOrEqual(202)
+    expect(JSON.parse(remaining[0]!).sequence).toBeGreaterThanOrEqual(150)
   })
 
   it('flushes pending events on the next successful POST', async () => {
@@ -289,8 +318,18 @@ describe('handleTurnEnd', () => {
       {},
     )
 
-    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3010/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
     expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
+  })
+
+  it('does not auto-complete work on negated ready-for-review output', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636' },
+      { output: 'Blocked on failing tests; not ready for review.' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(false)
   })
 
   it('posts specialist auto-complete when a specialist marker appears', async () => {
@@ -299,7 +338,7 @@ describe('handleTurnEnd', () => {
       { output: 'CODE APPROVED — YOUR WORK IS COMPLETE' },
     )
 
-    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3010/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
     expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
   })
 })
