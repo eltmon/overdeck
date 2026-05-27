@@ -2459,7 +2459,9 @@
 .conversationTerminalHeader {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+  row-gap: 6px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -2468,6 +2470,21 @@
 
 .conversationHeaderContainer {
   container-type: inline-size;
+}
+
+/* Progressively hide the lowest-priority chrome before the header wraps to a
+   second row. The session ID is a technical identifier (already 50% opacity);
+   the branch mode label ("Local"/"Worktree") is redundant with the icon. */
+@container (max-width: 640px) {
+  .conversationHeaderContainer .conversationSessionId {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .conversationHeaderContainer .terminalBranchBarMode {
+    display: none;
+  }
 }
 
 .conversationTerminalTitle {
