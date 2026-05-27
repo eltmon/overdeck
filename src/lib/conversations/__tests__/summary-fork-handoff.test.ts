@@ -411,7 +411,30 @@ describe('prependFallbackFocus', () => {
 });
 
 describe('authorHandoffExternal', () => {
-  it('writes the doc + sentinel from the authoring session output and never touches the source agent', async () => {
+  // The new design: the authoring session uses its Write tool to create the
+  // doc file directly. The model's stdout is just an acknowledgement string.
+  // Tests mock runModelSummary to (a) extract the output path from the prompt
+  // injection, (b) write the test doc to that path as the Write tool would,
+  // (c) return a "done" acknowledgement on stdout.
+  function mockAuthoringSessionThatWrites(docText: string) {
+    vi.mocked(mockedRunModelSummary).mockImplementation((prompt: string) => {
+      const pathMatch = prompt.match(/`([^`]+\/handoffs\/[^`]+\.md)`/);
+      if (pathMatch?.[1]) {
+        const outputPath = pathMatch[1];
+        const { writeFileSync, mkdirSync } = require('node:fs');
+        const { dirname } = require('node:path');
+        mkdirSync(dirname(outputPath), { recursive: true });
+        writeFileSync(outputPath, docText, 'utf-8');
+      }
+      return EffectMod.succeed('done');
+    });
+  }
+
+  function mockAuthoringSessionThatRefusesToWrite(stdoutText: string) {
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(stdoutText));
+  }
+
+  it('writes the doc + sentinel from the authoring session and never touches the source agent', async () => {
     const home = join(tmpdir(), `pan-handoff-external-ok-${Date.now()}`);
     const source = await createSourceConversation(home);
     const cwd = source.cwd;
@@ -419,7 +442,7 @@ describe('authorHandoffExternal', () => {
     const sourceFile = sessionFilePath(cwd, sessionId);
     const docText = validDoc();
 
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(docText));
+    mockAuthoringSessionThatWrites(docText);
 
     const result = await authorHandoffExternal(
       source,
@@ -439,12 +462,12 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('falls back to summary fork when external authoring returns invalid output', async () => {
+  it('falls back to summary fork when the file content fails validation', async () => {
     const home = join(tmpdir(), `pan-handoff-external-invalid-${Date.now()}`);
     const source = await createSourceConversation(home);
     const invalid = invalidLongDoc();
 
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(invalid));
+    mockAuthoringSessionThatWrites(invalid);
 
     const result = await Effect.runPromise(createSummaryFork(source, {
       forkMode: 'handoff',
@@ -459,22 +482,40 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('persists rejected output to .rejected.md when validation fails', async () => {
+  it('falls back to summary fork when the authoring session never calls Write', async () => {
+    // Pretend the model emitted text to stdout instead of using the Write tool.
+    // The new flow must surface this as a validation error, not a successful
+    // handoff seeded with whatever the model emitted on stdout.
+    const home = join(tmpdir(), `pan-handoff-external-stdout-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    mockAuthoringSessionThatRefusesToWrite('Sure, here is the handoff document:\n\n# Handoff\n\n## Suggested skills\n- /foo');
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'claude-haiku-4-5',
+      localSummaryOnly: true,
+    }));
+
+    expect(result.forkMode).toBe('summary');
+    expect(result.forkFallbackReason).toBe('handoff-validation');
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('persists the file content to .rejected.md when validation fails', async () => {
     const home = join(tmpdir(), `pan-handoff-rejected-${Date.now()}`);
     const source = await createSourceConversation(home);
     const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
     const bad = invalidLongDoc();
 
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(bad));
+    mockAuthoringSessionThatWrites(bad);
 
     await expect(
       authorHandoffExternal(source, sourceFile, 'PAN-1351 status', 'claude-haiku-4-5', 'claude-code'),
     ).rejects.toThrow(/Invalid handoff document/);
 
-    // The original doc path must NOT exist (validator threw before writing it)
-    // but the .rejected.md companion must, with the raw model output.
     const paths = createHandoffPaths(source.name, new Date().toISOString());
-    // We can't reconstruct the exact timestamp, but we can scan the dir.
     const { readdir, readFile } = await import('node:fs/promises');
     const handoffDir = dirname(paths.docPath);
     const entries = await readdir(handoffDir);
@@ -485,22 +526,20 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('strips a markdown code fence wrapping before writing the doc', async () => {
+  it('strips a markdown code fence wrapping if the authored file has one', async () => {
     const home = join(tmpdir(), `pan-handoff-fence-${Date.now()}`);
     const source = await createSourceConversation(home);
     const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
     const inner = validDoc();
     const fenced = `\`\`\`markdown\n${inner}\n\`\`\``;
 
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(fenced));
+    mockAuthoringSessionThatWrites(fenced);
 
     const result = await authorHandoffExternal(source, sourceFile, undefined, 'claude-haiku-4-5', 'claude-code');
     expect(result.docText).toBe(inner);
-    // The on-disk doc must also be the sanitized inner, not the fenced raw.
     const { readFile } = await import('node:fs/promises');
     const persisted = await readFile(result.docPath, 'utf-8');
     expect(persisted).toBe(inner);
-    // Sentinel must exist.
     await expect(access(`${result.docPath}.done`)).resolves.toBeUndefined();
     rmSync(home, { recursive: true, force: true });
   });
