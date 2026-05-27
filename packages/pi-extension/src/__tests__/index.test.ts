@@ -357,7 +357,7 @@ describe('handleTurnEnd', () => {
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
-    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ agentId: 'agent-pan-636-review', issueId: 'PAN-636', role: 'review', sessionId: null, status: 'passed' })
   })
 
   it('does not auto-complete specialist output from loose pass phrases', async () => {
@@ -379,14 +379,18 @@ describe('handleTurnEnd', () => {
     expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'failed' })
   })
 
-  it('posts specialist auto-complete when a specialist marker appears', async () => {
+  it('posts specialist auto-complete with trusted runtime metadata when a specialist marker appears', async () => {
+    const paths = panopticonPathsFor('agent-pan-636-review', h.home)
+    mkdirSync(paths.agentDir, { recursive: true })
+    writeFileSync(paths.sessionIdPath, 'pi-session-123\n')
+
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
       { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
-    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ agentId: 'agent-pan-636-review', issueId: 'PAN-636', role: 'review', sessionId: 'pi-session-123', status: 'passed' })
   })
 })
 

@@ -302,6 +302,16 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
   return typeof state['workspace'] === 'string' && state['workspace'].trim() ? state['workspace'] : null
 }
 
+async function sessionIdFor(env: HookEnv): Promise<string | null> {
+  const { paths } = envFor(env)
+  try {
+    const sessionId = (await readFile(paths.sessionIdPath, 'utf8')).trim()
+    return sessionId.length > 0 ? sessionId : null
+  } catch {
+    return null
+  }
+}
+
 function roleFor(env: HookEnv): string {
   return env.role ?? process.env['PANOPTICON_AGENT_ROLE'] ?? process.env['PANOPTICON_SESSION_TYPE'] ?? ''
 }
@@ -515,7 +525,10 @@ export async function handleSpecialistTurnEnd(env: HookEnv, event: TurnEndEvent)
   const issueId = await issueIdFor(env)
   if (!issueId) return
   await postDashboard(env, `/api/specialists/${match.name}/auto-complete`, {
+    agentId: env.agentId,
     issueId,
+    role,
+    sessionId: await sessionIdFor(env),
     status: match.status,
     notes: match.summary,
   })

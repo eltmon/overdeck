@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { validateAgentDeliveryMethodOrigin, validateAgentMessageOrigin, validateAgentRuntimeEventAuth } from '../agents.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
+import { validateSpecialistAutoCompleteMetadata } from '../specialists.js';
 
 describe('agent mutation origin validation', () => {
   beforeEach(() => {
@@ -67,5 +68,61 @@ describe('agent mutation origin validation', () => {
     } as any);
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('specialist auto-complete metadata validation', () => {
+  const reviewAgentState = {
+    id: 'agent-pan-1134-review',
+    issueId: 'PAN-1134',
+    workspace: '/tmp/workspace',
+    role: 'review',
+    model: 'pi',
+    status: 'running',
+    startedAt: '2026-05-27T00:00:00.000Z',
+  } as const;
+
+  it('rejects transcript-only completion without trusted agent metadata', () => {
+    const result = validateSpecialistAutoCompleteMetadata(
+      'review-agent',
+      { issueId: 'PAN-1134', status: 'passed' },
+      null,
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, status: 400, error: 'agentId and role required' });
+  });
+
+  it('rejects mismatched specialist role metadata', () => {
+    const result = validateSpecialistAutoCompleteMetadata(
+      'review-agent',
+      { agentId: 'agent-pan-1134-test', issueId: 'PAN-1134', role: 'test', status: 'passed' },
+      { ...reviewAgentState, id: 'agent-pan-1134-test', role: 'test' } as any,
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, status: 403, error: 'role does not match specialist' });
+  });
+
+  it('rejects stale session metadata for an active specialist run', () => {
+    const result = validateSpecialistAutoCompleteMetadata(
+      'review-agent',
+      { agentId: 'agent-pan-1134-review', issueId: 'PAN-1134', role: 'review', sessionId: 'old-session', status: 'passed' },
+      reviewAgentState as any,
+      { state: 'active', lastActivity: '2026-05-27T00:01:00.000Z', claudeSessionId: 'current-session' },
+    );
+
+    expect(result).toEqual({ ok: false, status: 403, error: 'session does not match active run' });
+  });
+
+  it('allows matching authenticated runtime metadata', () => {
+    const result = validateSpecialistAutoCompleteMetadata(
+      'review-agent',
+      { agentId: 'agent-pan-1134-review', issueId: 'PAN-1134', role: 'review', sessionId: 'current-session', status: 'passed' },
+      reviewAgentState as any,
+      { state: 'active', lastActivity: '2026-05-27T00:01:00.000Z', claudeSessionId: 'current-session' },
+    );
+
+    expect(result).toEqual({ ok: true });
   });
 });
