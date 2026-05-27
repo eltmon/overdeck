@@ -159,6 +159,18 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [handoffFocus, setHandoffFocus] = useState(initialFocus ?? '');
   const [handoffAuthor, setHandoffAuthor] = useState<HandoffAuthor>('external');
+  // Source-authored handoff requires the harness to support delivering a
+  // prompt to the live agent and watching for a sentinel file. Today only
+  // Claude Code does that — Pi (and other future harnesses without
+  // hook-equivalent signaling) can only do external authoring. Keep this in
+  // sync with ConversationTranscriptAdapter.supportsSourceAuthoredHandoff
+  // on the server.
+  const sourceSupportsSourceAuthoring = (conversation.harness ?? 'claude-code') === 'claude-code';
+  useEffect(() => {
+    if (!sourceSupportsSourceAuthoring && handoffAuthor === 'source') {
+      setHandoffAuthor('external');
+    }
+  }, [sourceSupportsSourceAuthoring, handoffAuthor]);
   // For external handoff authoring we reuse the summaryModel/summaryHarness
   // pickers (they're the same concept — pick a model that reads the transcript
   // and emits text). The server treats them as handoffAuthorModel/handoffAuthorHarness
@@ -341,8 +353,16 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                     value="source"
                     checked={handoffAuthor === 'source'}
                     onChange={() => setHandoffAuthor('source')}
+                    disabled={!sourceSupportsSourceAuthoring}
                   />
-                  <span>Source agent (uses source's model — pollutes the source conversation)</span>
+                  <span>
+                    Source agent (uses source's model — pollutes the source conversation)
+                    {!sourceSupportsSourceAuthoring && (
+                      <span style={{ marginLeft: 6, fontStyle: 'italic', color: 'var(--muted-foreground)' }}>
+                        — not supported for {conversation.harness} sources
+                      </span>
+                    )}
+                  </span>
                 </label>
               </fieldset>
             )}

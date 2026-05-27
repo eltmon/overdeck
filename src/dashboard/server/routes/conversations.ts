@@ -136,6 +136,7 @@ import {
   type SummaryForkMode,
   type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
+import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   CONVERSATION_TITLE_MODEL,
   serializeConversationTranscript,
@@ -2993,11 +2994,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        if (conv.harness === 'pi') {
-          return jsonResponse({ error: 'Forking Pi conversations is not supported until Pi session transcript export is available.' }, { status: 400 });
-        }
-
-        const sourceSessionFile = await resolveForkSourceSessionFile(conv);
+        const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
+        const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
         if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
           return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
@@ -3040,6 +3038,25 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           : undefined;
         if (handoffAuthorModel && !SAFE_MODEL_PATTERN.test(handoffAuthorModel)) {
           return jsonResponse({ error: 'Invalid handoffAuthorModel' }, { status: 400 });
+        }
+
+        // Capability gates — the source harness must support the requested
+        // fork mode. Plain forks copy raw Claude JSONL and spawn with
+        // --resume, so only Claude Code sources work. Source-authored handoff
+        // requires the source agent to write a sentinel file in response to a
+        // delivered prompt; harnesses without that signaling path (e.g. Pi,
+        // see PAN-1134) cannot author handoff docs in-session. Other modes
+        // (summary, external-authored handoff) work for any harness whose
+        // transcript adapter knows how to read the session file.
+        if (forkMode === 'plain' && !sourceAdapter.supportsPlainForkAsSource) {
+          return jsonResponse({
+            error: `Plain forks are not supported for ${sourceAdapter.name} sources — only Claude Code can be the source of a plain fork. Use a summary or handoff fork instead.`,
+          }, { status: 400 });
+        }
+        if (forkMode === 'handoff' && handoffAuthor === 'source' && !sourceAdapter.supportsSourceAuthoredHandoff) {
+          return jsonResponse({
+            error: `Source-authored handoffs are not supported for ${sourceAdapter.name} sources because the harness has no signaling channel for the .done sentinel. Use external authoring (handoffAuthor: "external") instead.`,
+          }, { status: 400 });
         }
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;

@@ -36,7 +36,8 @@ import {
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
-import { generateSmartSummary, parseEntries, runModelSummary, serializeConversation } from './smart-compaction.js';
+import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import { getTranscriptAdapter } from './transcript-adapter.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
@@ -222,10 +223,12 @@ export async function authorHandoffExternal(
   const timestamp = (options.now ?? new Date()).toISOString();
   const paths = createHandoffPaths(sourceConv.name, timestamp);
   const template = await readFile(join(packageRoot, 'roles', 'handoff-external.md'), 'utf-8');
-  const entries = await parseEntries(sourceSessionFile);
+  // The source's harness decides how the transcript is read/serialized; the
+  // authoring harness (model + harness picked by the user) is independent.
+  const sourceAdapter = getTranscriptAdapter(sourceConv.harness ?? undefined);
   // Skip thinking blocks — they're large and the structured output we want
   // doesn't need internal reasoning, only the user/assistant exchange.
-  const transcript = serializeConversation(entries, /* includeThinking */ false);
+  const transcript = await sourceAdapter.serializeTranscript(sourceSessionFile, { includeThinking: false });
 
   const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
   const effectiveHarness: RuntimeName = harness ?? 'claude-code';
@@ -239,7 +242,15 @@ export async function authorHandoffExternal(
   // works as well as the raw transcript, just with less fine detail.
   let promptInput: string;
   let inputLabel: 'raw-transcript' | 'compact-summary';
-  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD) {
+  // Precompaction uses generateSmartSummary, which parses the JSONL via the
+  // Claude Code shape (entry.type === 'user'/'assistant'). Other harnesses
+  // (Pi, etc.) have different JSONL shapes, so for non-claude-code sources we
+  // hand the already-serialized transcript through verbatim. Pi sessions tend
+  // to be much shorter than long-running Claude Code sessions, so this works
+  // in practice today; harness-aware chunked compaction is tracked as a
+  // follow-up for when we need it.
+  const canPrecompact = (sourceConv.harness ?? 'claude-code') === 'claude-code';
+  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD && canPrecompact) {
     console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length} | precompacting=true`);
     const { config } = loadConfigSync();
     const richMode = config.conversations.richCompaction;
