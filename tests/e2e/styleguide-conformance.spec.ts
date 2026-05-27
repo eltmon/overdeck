@@ -249,7 +249,7 @@ beforeAll(async () => {
         return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
       },
     }],
-    server: { host: '127.0.0.1', port: 0 },
+    server: { host: '127.0.0.1', port: 0, watch: null },
     logLevel: 'error',
   });
   await vite.listen();
