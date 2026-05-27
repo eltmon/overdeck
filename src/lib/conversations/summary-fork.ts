@@ -126,13 +126,28 @@ export class HandoffValidationError extends Error {
   }
 }
 
-export function validateHandoffDoc(text: string): HandoffDocValidation {
+/**
+ * Strip a wrapping ``` fenced code block from the doc body if the LLM
+ * helpfully wrapped its Markdown output in a fence. Returns the inner
+ * content if a fence was detected, otherwise returns the trimmed input.
+ */
+export function sanitizeHandoffDoc(text: string): string {
   const trimmed = text.trim();
-  if (trimmed.length < 200) {
+  const fenceMatch = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/);
+  return fenceMatch?.[1]?.trim() ?? trimmed;
+}
+
+export function validateHandoffDoc(text: string): HandoffDocValidation {
+  const sanitized = sanitizeHandoffDoc(text);
+  if (sanitized.length < 200) {
     return { ok: false, reason: 'handoff document must be at least 200 characters' };
   }
-  if (!/^##\s+Suggested skills\s*$/imu.test(trimmed)) {
-    return { ok: false, reason: 'handoff document must contain a ## Suggested skills section' };
+  // Accept any heading depth (H1-H6), case-insensitive, with an optional
+  // trailing colon. Real-world LLM outputs vary on heading conventions; the
+  // failure mode of a too-strict validator is silent fallback to summary fork
+  // with no surface to the user, which is the worst outcome.
+  if (!/^#{1,6}\s+suggested skills\s*:?\s*$/imu.test(sanitized)) {
+    return { ok: false, reason: 'handoff document must contain a Suggested skills heading' };
   }
   return { ok: true };
 }
@@ -211,13 +226,23 @@ export async function authorHandoffExternal(
   const docText = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
   const validation = validateHandoffDoc(docText);
   if (!validation.ok) {
+    // Persist the rejected output for diagnosis. Without this the LLM's actual
+    // response is lost and "why did validation fail" is impossible to answer
+    // after the fact — see PAN-1518 follow-up: silent fallback is the worst
+    // failure mode for handoff.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, docText, 'utf-8').catch((err) => {
+      console.warn(`[handoff-author-external] failed to persist rejected output to ${rejectedPath}: ${err?.message ?? err}`);
+    });
+    console.warn(`[handoff-author-external] validation rejected output (${validation.reason}); raw output saved to ${rejectedPath}`);
     throw new HandoffValidationError(paths.docPath, validation.reason);
   }
 
-  await writeFile(paths.docPath, docText, 'utf-8');
+  const sanitized = sanitizeHandoffDoc(docText);
+  await writeFile(paths.docPath, sanitized, 'utf-8');
   await writeFile(paths.sentinelPath, '', 'utf-8');
 
-  return { docPath: paths.docPath, docText };
+  return { docPath: paths.docPath, docText: sanitized };
 }
 
 export async function requestHandoffFromAgent(
@@ -240,10 +265,18 @@ export async function requestHandoffFromAgent(
   );
   const validation = validateHandoffDoc(docText);
   if (!validation.ok) {
+    // The source agent already wrote the file to docPath. Move it aside to
+    // .rejected.md so the next handoff attempt doesn't reuse a stale invalid
+    // doc and so the operator can inspect what the agent wrote.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, docText, 'utf-8').catch((err) => {
+      console.warn(`[handoff-source] failed to persist rejected output to ${rejectedPath}: ${err?.message ?? err}`);
+    });
+    console.warn(`[handoff-source] validation rejected source-authored doc (${validation.reason}); raw output saved to ${rejectedPath}`);
     throw new HandoffValidationError(paths.docPath, validation.reason);
   }
 
-  return { docPath: paths.docPath, docText };
+  return { docPath: paths.docPath, docText: sanitizeHandoffDoc(docText) };
 }
 
 function workspaceSourceFromCwd(sourceConv: Conversation): { issueId: string; workspacePath: string } | null {
@@ -282,6 +315,28 @@ export function handoffFailureReason(error: unknown): string {
 
 export function logHandoffFallback(sourceConv: Conversation, reason: string): void {
   console.warn(`[summary-fork] handoff-fallback source=${sourceConv.name} reason=${reason}`);
+}
+
+/**
+ * When a handoff falls back to a summary fork, the user's focus text would
+ * otherwise be silently dropped. Prepend a small notice to the summary so the
+ * successor conversation still sees what was asked, and so the user gets a
+ * visible breadcrumb that the intended handoff failed.
+ */
+export function prependFallbackFocus(summary: string, focus: string | undefined, fallbackReason: string): string {
+  const trimmedFocus = focus?.trim();
+  if (!trimmedFocus) return summary;
+  const header = [
+    `**Note from Panopticon:** the intended handoff fell back to a summary fork (\`${fallbackReason}\`). The focus you requested is preserved below; the summary that follows is auto-generated, not an authored handoff document.`,
+    '',
+    '**Requested focus:**',
+    '',
+    `> ${trimmedFocus.split('\n').join('\n> ')}`,
+    '',
+    '---',
+    '',
+  ].join('\n');
+  return header + summary;
 }
 
 async function generateSummarySeed(
@@ -542,7 +597,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, forkFallbackReason);
         const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-        summary = result.summary;
+        summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
         usedSummaryModel = result.summaryModel;
       }
     } else {
@@ -556,7 +611,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, preconditionFallback);
         const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-        summary = result.summary;
+        summary = prependFallbackFocus(result.summary, options.focus, preconditionFallback);
         usedSummaryModel = result.summaryModel;
       } else {
         try {
@@ -572,7 +627,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
           effectiveForkMode = 'summary';
           logHandoffFallback(conv, forkFallbackReason);
           const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-          summary = result.summary;
+          summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
           usedSummaryModel = result.summaryModel;
         }
       }

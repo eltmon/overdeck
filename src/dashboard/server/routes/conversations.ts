@@ -132,6 +132,7 @@ import {
   handoffPreconditionFallbackReason,
   handoffFailureReason,
   logHandoffFallback,
+  prependFallbackFocus,
   type SummaryForkMode,
   type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
@@ -2915,7 +2916,7 @@ async function runForkPipeline(
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, forkFallbackReason);
-        summary = await buildSummary();
+        summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
       }
     } else {
       // Source authoring (legacy): deliver the prompt to the live source agent.
@@ -2924,7 +2925,7 @@ async function runForkPipeline(
         forkFallbackReason = preconditionFallback;
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, preconditionFallback);
-        summary = await buildSummary();
+        summary = prependFallbackFocus(await buildSummary(), handoffFocus, preconditionFallback);
       } else {
         try {
           const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
@@ -2934,7 +2935,7 @@ async function runForkPipeline(
           forkFallbackReason = handoffFailureReason(error);
           effectiveForkMode = 'summary';
           logHandoffFallback(parentConv, forkFallbackReason);
-          summary = await buildSummary();
+          summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
         }
       }
     }

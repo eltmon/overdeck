@@ -279,6 +279,15 @@ export function ConversationRow({
           <span>Spawn failed</span>
         </span>
       )}
+      {conv.forkFallbackReason && !conv.forkStatus && (
+        <span
+          className={styles.conversationForkFailed}
+          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.panopticon/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+        >
+          <TriangleAlert size={10} />
+          <span>Fallback: {conv.forkFallbackReason}</span>
+        </span>
+      )}
 
       {/* Timestamp */}
       {conv.lastAttachedAt && (

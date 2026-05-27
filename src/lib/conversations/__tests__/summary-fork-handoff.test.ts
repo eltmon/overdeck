@@ -14,9 +14,11 @@ import {
   HandoffStallError,
   authorHandoffExternal,
   createSummaryFork,
+  prependFallbackFocus,
   requestHandoffFromAgent,
   validateHandoffDoc,
 } from '../summary-fork.js';
+import { access } from 'node:fs/promises';
 import { deliverAgentMessage } from '../../agents.js';
 
 vi.mock('../../agents.js', () => ({
@@ -162,7 +164,7 @@ describe('validateHandoffDoc', () => {
   it('rejects a document missing the Suggested skills heading', () => {
     expect(validateHandoffDoc(invalidLongDoc())).toEqual({
       ok: false,
-      reason: 'handoff document must contain a ## Suggested skills section',
+      reason: 'handoff document must contain a Suggested skills heading',
     });
   });
 
@@ -174,11 +176,28 @@ describe('validateHandoffDoc', () => {
     expect(validateHandoffDoc(docWithSuggestedSkillsHeading('## suggested skills'))).toEqual({ ok: true });
   });
 
-  it('rejects a Suggested skills heading below H2 depth', () => {
-    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('### Suggested skills'))).toEqual({
-      ok: false,
-      reason: 'handoff document must contain a ## Suggested skills section',
-    });
+  it('accepts a Suggested skills heading at H3 depth', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('### Suggested skills'))).toEqual({ ok: true });
+  });
+
+  it('accepts a Suggested skills heading at H1 depth', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('# Suggested skills'))).toEqual({ ok: true });
+  });
+
+  it('accepts a Suggested skills heading with trailing colon', () => {
+    expect(validateHandoffDoc(docWithSuggestedSkillsHeading('## Suggested skills:'))).toEqual({ ok: true });
+  });
+
+  it('strips a wrapping ```markdown fence before validating', () => {
+    const inner = docWithSuggestedSkillsHeading('## Suggested skills');
+    const fenced = `\`\`\`markdown\n${inner}\n\`\`\``;
+    expect(validateHandoffDoc(fenced)).toEqual({ ok: true });
+  });
+
+  it('strips a wrapping ``` (no language) fence before validating', () => {
+    const inner = docWithSuggestedSkillsHeading('## Suggested skills');
+    const fenced = `\`\`\`\n${inner}\n\`\`\``;
+    expect(validateHandoffDoc(fenced)).toEqual({ ok: true });
   });
 });
 
@@ -374,6 +393,23 @@ describe('handoff fork handshake', () => {
   });
 });
 
+describe('prependFallbackFocus', () => {
+  it('returns the summary unchanged when no focus is provided', () => {
+    const summary = '## Conversation Summary Fork\n\nstuff';
+    expect(prependFallbackFocus(summary, undefined, 'handoff-validation')).toBe(summary);
+    expect(prependFallbackFocus(summary, '   ', 'handoff-validation')).toBe(summary);
+  });
+
+  it('prepends a fallback notice + the focus when focus is provided', () => {
+    const summary = '## Conversation Summary Fork\n\nstuff';
+    const out = prependFallbackFocus(summary, 'wire the Stripe webhook', 'handoff-validation');
+    expect(out).toContain('intended handoff fell back to a summary fork');
+    expect(out).toContain('handoff-validation');
+    expect(out).toContain('wire the Stripe webhook');
+    expect(out.endsWith(summary)).toBe(true);
+  });
+});
+
 describe('authorHandoffExternal', () => {
   it('writes the doc + sentinel from the authoring session output and never touches the source agent', async () => {
     const home = join(tmpdir(), `pan-handoff-external-ok-${Date.now()}`);
@@ -420,6 +456,71 @@ describe('authorHandoffExternal', () => {
     expect(result.forkMode).toBe('summary');
     expect(result.forkFallbackReason).toBe('handoff-validation');
     expect(deliverAgentMessage).not.toHaveBeenCalled();
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('persists rejected output to .rejected.md when validation fails', async () => {
+    const home = join(tmpdir(), `pan-handoff-rejected-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
+    const bad = invalidLongDoc();
+
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(bad));
+
+    await expect(
+      authorHandoffExternal(source, sourceFile, 'PAN-1351 status', 'claude-haiku-4-5', 'claude-code'),
+    ).rejects.toThrow(/Invalid handoff document/);
+
+    // The original doc path must NOT exist (validator threw before writing it)
+    // but the .rejected.md companion must, with the raw model output.
+    const paths = createHandoffPaths(source.name, new Date().toISOString());
+    // We can't reconstruct the exact timestamp, but we can scan the dir.
+    const { readdir, readFile } = await import('node:fs/promises');
+    const handoffDir = dirname(paths.docPath);
+    const entries = await readdir(handoffDir);
+    const rejected = entries.find((e) => e.endsWith('.rejected.md'));
+    expect(rejected).toBeTruthy();
+    const persisted = await readFile(join(handoffDir, rejected!), 'utf-8');
+    expect(persisted).toBe(bad);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('strips a markdown code fence wrapping before writing the doc', async () => {
+    const home = join(tmpdir(), `pan-handoff-fence-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
+    const inner = validDoc();
+    const fenced = `\`\`\`markdown\n${inner}\n\`\`\``;
+
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(fenced));
+
+    const result = await authorHandoffExternal(source, sourceFile, undefined, 'claude-haiku-4-5', 'claude-code');
+    expect(result.docText).toBe(inner);
+    // The on-disk doc must also be the sanitized inner, not the fenced raw.
+    const { readFile } = await import('node:fs/promises');
+    const persisted = await readFile(result.docPath, 'utf-8');
+    expect(persisted).toBe(inner);
+    // Sentinel must exist.
+    await expect(access(`${result.docPath}.done`)).resolves.toBeUndefined();
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('preserves the focus in the summary when external authoring falls back', async () => {
+    const home = join(tmpdir(), `pan-handoff-focus-preserved-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(invalidLongDoc()));
+
+    const result = await Effect.runPromise(createSummaryFork(source, {
+      forkMode: 'handoff',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'claude-haiku-4-5',
+      focus: 'implement Pi forking for PAN-XXXX',
+      localSummaryOnly: true,
+    }));
+
+    expect(result.forkFallbackReason).toBe('handoff-validation');
+    expect(result.summary).toContain('intended handoff fell back to a summary fork');
+    expect(result.summary).toContain('implement Pi forking for PAN-XXXX');
     rmSync(home, { recursive: true, force: true });
   });
 });
