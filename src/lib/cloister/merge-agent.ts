@@ -29,7 +29,6 @@ import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
-import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -157,85 +156,47 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
 const _completedPostMerge = new Set<string>();
 const _postMergeInFlight = new Map<string, Promise<void>>();
 
-async function dropLingeringPreMergeStashes(issueId: string, projectPath: string): Promise<void> {
-  try {
-    const stashes = await Effect.runPromise(listStashes(projectPath));
-    const preMergeStashes = stashes.filter((entry) => entry.kind === 'pre-merge' && entry.issueId === issueId.toUpperCase());
-    for (const stash of preMergeStashes) {
-      await Effect.runPromise(dropStash(projectPath, stash.ref));
-      console.log(`[merge-agent] ✓ Dropped lingering pre-merge stash ${stash.ref}`);
-    }
-  } catch (error: any) {
-    console.warn(`[merge-agent] Could not drop lingering pre-merge stashes: ${error.message}`);
-  }
-}
+// PAN-1531: dropLingeringPreMergeStashes removed. The pre-merge stash kind
+// is no longer created by Panopticon, so there's nothing for the post-merge
+// lifecycle to clean up. Pre-existing pre-merge:* residue in refs/stash is
+// expected and inert.
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<{ merged: boolean; reason: string }> {
+  // PAN-1531: single merge oracle — GitHub PR API is the authoritative answer
+  // for "is this PR merged." The prior ancestor-of-main and diff-fallback
+  // heuristics were retired because they produced "the oracles disagree"
+  // bugs (PAN-1024) and made the meaning of "merged" muddy. For non-GitHub
+  // projects the operator confirms manually.
   const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
   const quotedBranch = shellQuote(branchName);
 
-  await execAsync('git fetch origin main --prune', { cwd: projectPath }).catch(() => undefined);
-  await execAsync(`git fetch origin ${shellQuote(`${branchName}:refs/remotes/origin/${branchName}`)}`, { cwd: projectPath }).catch(() => undefined);
-
-  // Check 1: branch tip is an ancestor of origin/main (regular merge case).
-  const refsToCheck = [branchName, `origin/${branchName}`];
-  for (const ref of refsToCheck) {
-    const quotedRef = shellQuote(ref);
-    const revParseResult = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
-    const refSha = typeof revParseResult?.stdout === 'string' ? revParseResult.stdout : '';
-    if (!refSha.trim()) continue;
-    try {
-      await execAsync(`git merge-base --is-ancestor ${quotedRef} origin/main`, { cwd: projectPath });
-      return { merged: true, reason: `${ref} is an ancestor of origin/main` };
-    } catch {
-      // Not a regular merge ancestor — fall through to GitHub API check.
-    }
+  const ghResolved = resolveGitHubIssueSync(issueId);
+  if (!ghResolved.isGitHub) {
+    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
   }
 
-  // Check 2: GitHub API truth — authoritative for squash and rebase merges
-  // where the branch tip is intentionally not an ancestor of main. Run this
-  // BEFORE the local-diff fallback so that a squash-merged PR isn't mistaken
-  // for "still has unmerged changes" just because the branch retains its
-  // own commits (PAN-1024 hit this 2026-05-09: merge succeeded on GitHub
-  // but post-merge lifecycle was refused, leaving labels + workspace stale).
-  const ghResolved = resolveGitHubIssueSync(issueId);
-  if (ghResolved.isGitHub) {
-    const { owner, repo } = ghResolved;
+  const { owner, repo } = ghResolved;
+  try {
     const { stdout } = await execAsync(
       `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
       { cwd: projectPath },
-    ).catch(() => ({ stdout: '[]' }));
+    );
     const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
     const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
     if (mergedPr) {
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
-  }
-
-  // Check 3: local-diff fallback — for the non-GitHub case (Linear/Rally), or
-  // GitHub edge cases where the PR API returned nothing. If the branch has
-  // no remaining code diff against main, treat as merged.
-  for (const ref of refsToCheck) {
-    const quotedRef = shellQuote(ref);
-    const revParseResult2 = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
-    const refSha = typeof revParseResult2?.stdout === 'string' ? revParseResult2.stdout : '';
-    if (!refSha.trim()) continue;
-    const diffResult = await execAsync(
-      `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
-      { cwd: projectPath },
-    );
-    const codeDiff = typeof diffResult?.stdout === 'string' ? diffResult.stdout : '';
-    if (!codeDiff.trim()) {
-      return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
+    if (prs.length === 0) {
+      return { merged: true, reason: `No PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
     }
-    return { merged: false, reason: `${ref} still has unmerged changes` };
+    return { merged: false, reason: `GitHub PR for ${branchName} is open and not merged` };
+  } catch (err: any) {
+    return { merged: false, reason: `Unable to verify merge state for ${branchName} via GitHub PR API: ${err?.message?.slice(0, 200) || 'unknown'}` };
   }
-
-  return { merged: true, reason: `No live branch or open PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
 }
 
 /**
@@ -416,8 +377,6 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     }
 
     console.log(`[merge-agent] Running post-merge verify handoff for ${issueId}`);
-
-    await dropLingeringPreMergeStashes(issueId, projectPath);
 
     // 1. Clean up stale workflow labels and keep the legacy merged marker for history.
     // verifying-on-main is applied next and takes precedence in canonical state mapping.
@@ -1002,278 +961,10 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
   }
 }
 
-function defaultWorkspaceForIssue(issueId: string): string | undefined {
-  const project = resolveProjectFromIssueSync(issueId);
-  if (!project?.projectPath) return undefined;
-  return join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-}
-
-function buildShipPreparationPrompt(options: {
-  issueId: string;
-  workspacePath: string;
-  featureBranch: string;
-  targetBranch: string;
-  apiUrl: string;
-}): string {
-  return `SHIP TASK for ${options.issueId}:
-
-WORKSPACE: ${options.workspacePath}
-FEATURE BRANCH: ${options.featureBranch}
-TARGET BRANCH: ${options.targetBranch}
-
-Prepare this already-reviewed branch for the dashboard's human Merge button.
-
-Required steps:
-1. Work only in ${options.workspacePath}.
-2. Fetch the target branch: git fetch origin ${options.targetBranch}.
-3. Rebase ${options.featureBranch} onto origin/${options.targetBranch} using non-interactive rebase only.
-4. Resolve rebase conflicts if they are narrow and source-level. If conflicts are broad, abort and report SHIP BLOCKED.
-5. Run the required verification gates from the project instructions (at minimum: npm run typecheck, npm run lint, npm test when present/applicable).
-6. Push the prepared feature branch with --force-with-lease.
-7. Mark the issue ready for the human merge button:
-   curl -s -X POST ${options.apiUrl}/api/review/${options.issueId}/status \\
-     -H "Content-Type: application/json" \\
-     -d '{"readyForMerge":true}'
-8. Report SHIP READY with the pushed commit and verification summary.
-
-No-rescan rule:
-- After resolving detected conflict files, do NOT re-scan for additional conflicts.
-- If the rebase produces conflicts beyond the immediately visible set, abort and report SHIP BLOCKED for human triage.
-- Do not loop: resolve once, verify once, push once.
-
-Human-merge invariant:
-- Do NOT run gh pr merge.
-- Do NOT call any merge endpoint or destructive merge API POST.
-- Do NOT run git merge into main/master.
-- Do NOT push to main/master.
-- The existing dashboard Merge button owns the actual merge and postMergeLifecycle cleanup.`;
-}
-
-function buildShipSyncMainPrompt(options: {
-  issueId: string;
-  workspacePath: string;
-  workspaceBranch: string;
-  conflictFiles: string[];
-}): string {
-  return `SHIP SYNC-MAIN CONFLICT TASK for ${options.issueId}:
-
-WORKSPACE: ${options.workspacePath}
-WORKSPACE BRANCH: ${options.workspaceBranch}
-CONFLICT FILES:
-${options.conflictFiles.map(f => `- ${f}`).join('\n')}
-
-Resolve the in-progress sync-main conflict in the workspace branch only.
-
-Required steps:
-1. Work only in ${options.workspacePath}.
-2. Inspect the listed conflict files and resolve conflict markers by preserving the feature branch intent and current main behavior.
-3. Run the relevant verification gates from the project instructions.
-4. Commit the sync-main conflict resolution if the merge requires a commit, then push the workspace branch with --force-with-lease if needed.
-5. Report SHIP READY for the sync-main conflict resolution, or SHIP BLOCKED with exact files and reasons.
-
-Human-merge invariant:
-- Do NOT run gh pr merge.
-- Do NOT call any merge endpoint or destructive merge API POST.
-- Do NOT push to main/master.
-- Do NOT perform post-merge cleanup.`;
-}
-
-async function spawnShipRoleForTask(options: {
-  issueId: string;
-  workspacePath?: string;
-  prompt: string;
-}): Promise<{ success: boolean; message: string; tmuxSession?: string; error?: string }> {
-  const workspace = options.workspacePath ?? defaultWorkspaceForIssue(options.issueId);
-  if (!workspace) {
-    return {
-      success: false,
-      message: `Could not resolve workspace for ${options.issueId}`,
-      error: 'workspace resolution failed',
-    };
-  }
-
-  try {
-    const { spawnRun } = await import('../agents.js');
-    // Ship role delivers its rebase prompt through the work-agent's tmux session and
-    // performs git operations against the host worktree — it does not depend on the
-    // workspace's docker-compose services (server/frontend) being healthy. Pass
-    // `allowHost: true` so the stack-health pre-flight does not block ship when an
-    // ancillary container has exited (e.g. server-1 crashing on a stale init build).
-    // Blocking ship on those failures was forcing humans into a manual
-    // rebuild-and-retry loop for every merge — see PAN-1141 incident 2026-05-17.
-    const run = await spawnRun(options.issueId, 'ship', {
-      workspace,
-      prompt: options.prompt,
-      allowHost: true,
-    });
-    return {
-      success: true,
-      message: `ship role started as ${run.id}`,
-      tmuxSession: run.id,
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      message: error?.message ?? 'Failed to start ship role',
-      error: error?.message,
-    };
-  }
-}
-
-/**
- * Attempt merge and handle result (clean merge, conflicts, or failure)
- *
- * This function:
- * 1. Attempts to merge sourceBranch into current branch
- * 2. If clean merge: commits and optionally runs tests
- * 3. If preparation is needed: starts the ship role to rebase/verify/push
- * 4. If failure: returns error
- *
- * @param projectPath - Project root path
- * @param sourceBranch - Feature branch to merge
- * @param targetBranch - Target branch (usually main)
- * @param issueId - Issue identifier
- * @returns Promise that resolves with merge result
- */
-export async function spawnMergeAgentForBranches(
-  projectPath: string,
-  sourceBranch: string,
-  targetBranch: string,
-  issueId: string,
-  options?: { skipDoneReport?: boolean }
-): Promise<MergeResult> {
-  console.log(`[ship-role] Starting ship preparation for ${sourceBranch} against ${targetBranch}`);
-  announceMerge('started', issueId);
-  logActivity('ship_start', `Starting ship role for ${sourceBranch} -> ${targetBranch}`);
-
-  try {
-    const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
-    if (lockCleanup.errors.some(e => e.error.includes('Git processes are running'))) {
-      const message = 'Git processes are still running - cannot safely start ship role';
-      console.error(`[ship-role] ${message}`);
-      logActivity('ship_blocked', message);
-      return { success: false, reason: message };
-    }
-
-    const { stdout: remoteBranches } = await execAsync(`git ls-remote --heads origin ${sourceBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    if (!remoteBranches.trim()) {
-      const message = `Branch ${sourceBranch} is not pushed to remote.`;
-      console.error(`[ship-role] ${message}`);
-      logActivity('ship_blocked', message);
-      return { success: false, reason: message };
-    }
-
-    await execAsync(`git fetch origin ${sourceBranch} ${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
-    try {
-      await execAsync(
-        `git merge-base --is-ancestor origin/${sourceBranch} origin/${targetBranch}`,
-        { cwd: projectPath, encoding: 'utf-8' }
-      );
-      const message = `Branch ${sourceBranch} is already integrated into ${targetBranch} — no ship run needed`;
-      console.log(`[ship-role] ${message}`);
-      logActivity('ship_skipped', message);
-      return { success: true, reason: message, validationStatus: 'NOT_RUN', testsStatus: 'SKIP' };
-    } catch (e: any) {
-      if (e.code !== 1) throw e;
-    }
-  } catch (error: any) {
-    return { success: false, reason: `Ship pre-flight check failed: ${error.message}` };
-  }
-
-  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
-  const workspacePath = defaultWorkspaceForIssue(issueId) ?? projectPath;
-  const prompt = buildShipPreparationPrompt({
-    issueId,
-    workspacePath,
-    featureBranch: sourceBranch,
-    targetBranch,
-    apiUrl,
-  });
-
-  const shipResult = await spawnShipRoleForTask({ issueId, workspacePath, prompt });
-  if (!shipResult.success) {
-    console.error(`[ship-role] Failed to start ship role: ${shipResult.message}`);
-    announceMerge('failed', issueId, 'Could not start ship role');
-    logActivity('ship_error', `Failed to start ship role: ${shipResult.message}`);
-    return { success: false, reason: `Failed to start ship role: ${shipResult.message}` };
-  }
-
-  if (!options?.skipDoneReport) {
-    logActivity('ship_started', shipResult.message);
-  }
-  return {
-    success: true,
-    validationStatus: 'NOT_RUN',
-    testsStatus: 'SKIP',
-    reason: shipResult.message,
-    notes: 'Ship role started; it will rebase, verify, push, and mark readyForMerge for the human Merge button.',
-  };
-}
-
-/**
- * Start the ship role to rebase a feature branch onto a base branch,
- * verify it, push it, and mark it ready for the human Merge button.
- *
- * Used by the PR-based merge flow: triggerMerge() calls this to prepare the
- * feature branch, then calls `gh pr merge --squash` once the rebase is done.
- */
-export async function spawnRebaseAgentForBranch(
-  workspacePath: string,
-  featureBranch: string,
-  baseBranch: string,
-  issueId: string,
-): Promise<MergeResult> {
-  console.log(`[ship-role] Starting ship rebase of ${featureBranch} onto ${baseBranch} for ${issueId}`);
-  logActivity('ship_rebase_start', `Starting ship role for ${featureBranch} onto ${baseBranch}`);
-
-  try {
-    const { stdout: remoteBranches } = await execAsync(
-      `git ls-remote --heads origin ${featureBranch}`,
-      { cwd: workspacePath, encoding: 'utf-8' },
-    );
-    if (!remoteBranches.trim()) {
-      const message = `Branch ${featureBranch} is not pushed to remote`;
-      console.error(`[ship-role] ${message}`);
-      return { success: false, reason: message };
-    }
-  } catch {
-    return { success: false, reason: `Cannot verify remote branch ${featureBranch}` };
-  }
-
-  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
-  const prompt = buildShipPreparationPrompt({
-    issueId,
-    workspacePath,
-    featureBranch,
-    targetBranch: baseBranch,
-    apiUrl,
-  });
-
-  const shipResult = await spawnShipRoleForTask({ issueId, workspacePath, prompt });
-  if (!shipResult.success) {
-    return {
-      success: false,
-      reason: `Failed to start ship role: ${shipResult.message}`,
-    };
-  }
-
-  logActivity('ship_rebase_started', shipResult.message);
-  return {
-    success: true,
-    validationStatus: 'NOT_RUN',
-    testsStatus: 'SKIP',
-    reason: shipResult.message,
-    notes: 'Ship role started for rebase/verify/push; it will mark readyForMerge after preparation succeeds.',
-  };
-}
+// PAN-1531: ship-role machinery (buildShipPreparationPrompt, buildShipSyncMainPrompt,
+// spawnShipRoleForTask, spawnMergeAgentForBranches, spawnRebaseAgentForBranch,
+// defaultWorkspaceForIssue) removed. Rebase is now performed in-process via
+// rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See docs/MERGE-WORKFLOW.md.
 
 async function salvageStrandedMerge(
   projectPath: string,
@@ -1507,37 +1198,19 @@ export async function syncMainIntoWorkspace(
     return { success: true, commitCount, changedFiles };
   }
 
-  // Conflict case — delegate to ship role
+  // PAN-1531: sync-main conflict case — surface to operator instead of
+  // delegating to an LLM ship role. Abort the merge so the working tree is
+  // clean, then return the conflict files for the caller to display.
   const conflictFiles = await getConflictFiles(projectPath);
-  console.log(`[sync-main] ${conflictFiles.length} conflict(s), starting ship role...`);
+  console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
   logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
 
-  const workspaceBranch = await execAsync('git branch --show-current', { cwd: projectPath, encoding: 'utf-8' })
-    .then(r => r.stdout.trim())
-    .catch(() => `feature/${issueId.toLowerCase()}`);
+  try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch { /* non-fatal */ }
 
-  const prompt = buildShipSyncMainPrompt({
-    issueId,
-    workspacePath: projectPath,
-    workspaceBranch,
-    conflictFiles,
-  });
-
-  const shipResult = await spawnShipRoleForTask({ issueId, workspacePath: projectPath, prompt });
-  if (!shipResult.success) {
-    try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
-    const message = `Failed to start ship role for sync-main conflicts: ${shipResult.message}`;
-    console.error(`[sync-main] ${message}`);
-    logActivity('sync_main_error', message);
-    return { success: false, conflictFiles, reason: message };
-  }
-
-  console.log(`[sync-main] Ship role started for conflict resolution: ${shipResult.message}`);
-  logActivity('sync_main_ship_started', `Ship role resolving ${conflictFiles.length} conflict(s) for ${issueId}`);
   return {
-    success: true,
-    commitCount: 0,
-    changedFiles: conflictFiles,
+    success: false,
+    conflictFiles,
+    reason: `Sync-main produced ${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}. Resolve manually in the workspace, then re-run sync-main.`,
   };
 
 }

@@ -312,12 +312,9 @@ describe('syncMainIntoWorkspace', () => {
     });
   });
 
-  describe('conflict handling — ship role delegation', () => {
-    beforeEach(() => {
-      spawnRunMock.mockResolvedValue({ id: 'agent-pan-242-ship' });
-    });
-
-    it('starts the ship role when git merge has conflicts', async () => {
+  describe('conflict handling — operator-resolved (PAN-1531)', () => {
+    it('returns failure with conflict files when git merge has conflicts', async () => {
+      let mergeAbortCalled = false;
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
         if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
@@ -329,74 +326,18 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        return { stdout: '', stderr: '' };
-      });
-
-      const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
-
-      expect(spawnRunMock).toHaveBeenCalledWith(ISSUE_ID, 'ship', expect.objectContaining({
-        workspace: PROJECT_PATH,
-        prompt: expect.stringContaining('SHIP SYNC-MAIN CONFLICT TASK for PAN-242'),
-      }));
-      const prompt = spawnRunMock.mock.calls[0]?.[2]?.prompt as string;
-      expect(prompt).toContain('WORKSPACE BRANCH: feature/pan-242');
-      expect(prompt).toContain('- src/foo.ts');
-      expect(prompt).toContain('Do NOT run gh pr merge');
-      expect(result.success).toBe(true);
-      expect(result.changedFiles).toEqual(['src/foo.ts']);
-      expect(result.commitCount).toBe(0);
-    });
-
-    it('aborts merge and returns failure when the ship role cannot start', async () => {
-      spawnRunMock.mockRejectedValueOnce(new Error('Role run agent-pan-242-ship already running'));
-
-      let mergeAbortCalled = false;
-      execMock.mockImplementation(async (cmd: string) => {
-        if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git merge origin/main')) {
-          const err: any = new Error('CONFLICT');
-          err.stdout = 'CONFLICT (content): Merge conflict in src/foo.ts\n';
-          err.stderr = '';
-          throw err;
-        }
-        if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
-        if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
         if (cmd.includes('git merge --abort')) { mergeAbortCalled = true; return { stdout: '', stderr: '' }; }
         return { stdout: '', stderr: '' };
       });
 
       const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
 
-      expect(spawnRunMock).toHaveBeenCalledWith(ISSUE_ID, 'ship', expect.objectContaining({
-        workspace: PROJECT_PATH,
-      }));
+      // Ship role no longer involved — merge aborted, conflict surfaced to operator.
+      expect(spawnRunMock).not.toHaveBeenCalledWith(ISSUE_ID, 'ship', expect.anything());
       expect(result.success).toBe(false);
       expect(result.conflictFiles).toContain('src/foo.ts');
-      expect(result.reason).toMatch(/Failed to start ship role/i);
-      expect(result.reason).toContain('Role run agent-pan-242-ship already running');
+      expect(result.reason).toMatch(/conflict/i);
       expect(mergeAbortCalled).toBe(true);
-    });
-
-    it('falls back to the issue feature branch name when current branch cannot be read', async () => {
-      execMock.mockImplementation(async (cmd: string) => {
-        if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git merge origin/main')) {
-          const err: any = new Error('CONFLICT');
-          err.stdout = 'CONFLICT (content): Merge conflict in src/foo.ts\n';
-          throw err;
-        }
-        if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
-        if (cmd.includes('git branch --show-current')) throw new Error('detached HEAD');
-        return { stdout: '', stderr: '' };
-      });
-
-      const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
-
-      const prompt = spawnRunMock.mock.calls[0]?.[2]?.prompt as string;
-      expect(prompt).toContain('WORKSPACE BRANCH: feature/pan-242');
-      expect(result.success).toBe(true);
     });
   });
 
