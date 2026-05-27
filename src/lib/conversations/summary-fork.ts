@@ -183,6 +183,14 @@ async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollInt
 
 const DEFAULT_HANDOFF_AUTHOR_MODEL = 'claude-sonnet-4-6';
 const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
+// When the raw transcript exceeds this many characters, pre-compact it via
+// generateSmartSummary (which chunks internally) before sending to the
+// handoff authoring model. Threshold chosen to keep the final prompt
+// comfortably under Haiku's 200k-token window (~800k chars at 4 chars/token,
+// minus headroom for the template, focus, and a response budget). The exact
+// value isn't critical — anything that triggers compaction for "long"
+// transcripts is fine.
+const HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD = 100_000;
 
 function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string): string {
   const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
@@ -217,11 +225,41 @@ export async function authorHandoffExternal(
   // Skip thinking blocks — they're large and the structured output we want
   // doesn't need internal reasoning, only the user/assistant exchange.
   const transcript = serializeConversation(entries, /* includeThinking */ false);
-  const prompt = renderExternalHandoffPrompt(template, focus, transcript);
 
   const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
   const effectiveHarness: RuntimeName = harness ?? 'claude-code';
-  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length}`);
+
+  // If the raw transcript is small enough, feed it to the model verbatim —
+  // that's the richest input. For long transcripts we'd overflow any model's
+  // context window in a single-pass prompt, so first compact via the chunked
+  // generateSmartSummary path (which already handles chunking + merging) and
+  // feed the compact summary to the handoff authoring step. The handoff
+  // template treats {{transcript}} as opaque context — a compact summary
+  // works as well as the raw transcript, just with less fine detail.
+  let promptInput: string;
+  let inputLabel: 'raw-transcript' | 'compact-summary';
+  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD) {
+    console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length} | precompacting=true`);
+    const { config } = loadConfigSync();
+    const richMode = config.conversations.richCompaction;
+    const compact = await Effect.runPromise(generateSmartSummary({
+      jsonlPath: sourceSessionFile,
+      model: effectiveModel,
+      richMode,
+      mode: 'fork',
+      includeThinkingInSummary: false,
+      harness: effectiveHarness,
+    }));
+    promptInput = compact.summary;
+    inputLabel = 'compact-summary';
+    console.log(`[claude-invoke] purpose=handoff-author-external precompact-result | model=${effectiveModel} | compactChars=${compact.summary.length}`);
+  } else {
+    promptInput = transcript;
+    inputLabel = 'raw-transcript';
+  }
+
+  const prompt = renderExternalHandoffPrompt(template, focus, promptInput);
+  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | inputType=${inputLabel} | promptChars=${prompt.length}`);
 
   const docText = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
   const validation = validateHandoffDoc(docText);
