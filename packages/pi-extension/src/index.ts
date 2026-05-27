@@ -3,42 +3,12 @@
  *
  * Vendored extension loaded by the Pi Coding Agent (`pi --extension <path>`)
  * to emit Panopticon lifecycle signals via filesystem markers and HTTP POSTs.
- *
- * The extension writes to two roots, both under HOME:
- *   ~/.panopticon/agents/<agentId>/
- *     ready.json          — written on session_start. Carries the Pi session id
- *                           so PiRuntime.killAgent / resume can locate it.
- *     completed           — touched when the agent invokes `/pan-done`. Acts as
- *                           the "agent says it's finished" marker that Cloister
- *                           polls before waking the review specialist.
- *     pending-events.jsonl — buffered domain events when the dashboard is
- *                           unreachable. Drained automatically on the next
- *                           successful POST (PAN-1134).
- *   ~/.panopticon/heartbeats/<agentId>.json
- *     timestamp/tool/pid — refreshed on every tool_execution_end and
- *                          turn_end so the dashboard health monitor knows
- *                          the agent is still alive.
- *
- * Domain events flow through HTTP POST to /api/agents/:id/heartbeat, using
- * the same validation path as Claude Code hooks. POST failures buffer to
- * pending-events.jsonl and flush on retry — mirroring scripts/pan-hook-lib.sh.
- *
- * agentId comes EXCLUSIVELY from process.env.PANOPTICON_AGENT_ID. We never
- * default — an extension running outside Panopticon (e.g. the user starts pi
- * directly with -e for testing) just no-ops. This guarantees two extension
- * instances launched with different agent ids never collide on either path.
  */
 
-import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-
-// ────────────────────────────────────────────────────────────────────────
-// Pi extension API surface (subset). We type only what we touch so the
-// extension can be built without adding @mariozechner/pi-coding-agent as a
-// dependency — Pi loads us at runtime via dynamic import and supplies the
-// real ExtensionAPI instance.
-// ────────────────────────────────────────────────────────────────────────
+import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
 
 export interface PiExtensionAPI {
   on(event: 'session_start', handler: (event: SessionStartEvent, ctx: unknown) => void | Promise<void>): void
@@ -53,14 +23,36 @@ export interface SessionStartEvent {
   sessionId?: string
 }
 
+export interface UsageLike {
+  inputTokens?: number
+  outputTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+  cache_write_tokens?: number
+}
+
 export interface ToolExecutionEndEvent {
   toolCallId?: string
   toolName?: string
   isError?: boolean
+  usage?: UsageLike | null
+  costUsd?: number | null
+  cost?: number | null
+  model?: string
 }
 
 export interface TurnEndEvent {
   reason?: string
+  output?: string
+  transcript?: string
+  sessionLogPath?: string
+  usage?: UsageLike | null
+  costUsd?: number | null
+  cost?: number | null
+  model?: string
 }
 
 export interface PiCommand {
@@ -68,27 +60,16 @@ export interface PiCommand {
   handler: (args: string, ctx: unknown) => void | Promise<void>
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// Filesystem layout helpers (exported for tests).
-// ────────────────────────────────────────────────────────────────────────
-
 export interface PanopticonPaths {
   agentDir: string
   heartbeatsDir: string
   readyPath: string
   completedPath: string
   heartbeatPath: string
-  /**
-   * Plain-text file holding ONLY the Pi session id reported by the most recent
-   * spawn (PAN-636 workspace-3119). Survives killAgent so the next spawn can
-   * resume into the same session via `pi --session <id>`.
-   */
   sessionIdPath: string
-  /**
-   * Buffered domain events from POST failures. Drained on the next successful
-   * POST (PAN-1134). Same FIFO model as scripts/pan-hook-lib.sh.
-   */
   pendingEventsPath: string
+  costEventsPath: string
+  progressStatePath: string
 }
 
 export function panopticonPathsFor(agentId: string, home: string = homedir()): PanopticonPaths {
@@ -102,6 +83,8 @@ export function panopticonPathsFor(agentId: string, home: string = homedir()): P
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
     sessionIdPath: join(agentDir, 'session.id'),
     pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
+    costEventsPath: join(agentDir, 'cost-events.jsonl'),
+    progressStatePath: join(agentDir, 'pi-progress.json'),
   }
 }
 
@@ -109,48 +92,31 @@ async function writeJson(path: string, body: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(body, null, 2)}\n`, 'utf8')
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// HTTP event emitter — POSTs to the dashboard heartbeat endpoint.
-// Same validation path as Claude Code hooks. Buffers on failure.
-// ────────────────────────────────────────────────────────────────────────
-
 const POST_TIMEOUT_MS = 1_000
+const HEARTBEAT_PATH = (agentId: string) => `/api/agents/${agentId}/heartbeat`
 
 function getDashboardUrl(): string {
   return process.env['PANOPTICON_DASHBOARD_URL'] ?? 'http://localhost:3010'
 }
 
 async function postEvent(env: HookEnv, body: Record<string, unknown>): Promise<void> {
-  const url = `${getDashboardUrl()}/api/agents/${env.agentId}/heartbeat`
+  await postDashboard(env, HEARTBEAT_PATH(env.agentId), body)
+}
+
+async function postDashboard(env: HookEnv, path: string, body: Record<string, unknown>): Promise<void> {
+  const url = `${getDashboardUrl()}${path}`
   const paths = panopticonPathsFor(env.agentId, env.home)
-  const pendingPath = paths.pendingEventsPath
+  await drainPendingEvents(env, paths.pendingEventsPath)
 
-  // 1. Drain any previously-buffered events before emitting the new one.
-  await drainPendingEvents(env, url, pendingPath)
-
-  // 2. POST the new event.
   const ok = await postWithTimeout(url, body)
   if (ok) return
 
-  // 3. On failure, buffer for retry. On 4xx (client error), drop — the
-  // server told us this body is invalid and retrying won't help.
   if (ok === false) {
-    // Network/5xx failure — buffer.
-    const line = `${JSON.stringify(body)}\n`
     await mkdir(paths.agentDir, { recursive: true })
-    await writeFile(pendingPath, line, { encoding: 'utf8', flag: 'a' }).catch(() => {
-      // ignore write failure — event is lost, but extension must not block Pi.
-    })
+    await appendFile(paths.pendingEventsPath, `${JSON.stringify(path === HEARTBEAT_PATH(env.agentId) ? body : { __panopticonPath: path, body })}\n`, 'utf8').catch(() => {})
   }
-  // ok === null means 4xx — drop silently.
 }
 
-/**
- * POST a single event body. Returns:
- *   true  — 2xx success
- *   false — network failure / timeout / 5xx (caller should buffer)
- *   null  — 4xx client error (caller should drop)
- */
 async function postWithTimeout(url: string, body: Record<string, unknown>): Promise<boolean | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS)
@@ -171,12 +137,26 @@ async function postWithTimeout(url: string, body: Record<string, unknown>): Prom
   }
 }
 
-/**
- * Drain pending-events.jsonl in FIFO order. Reads the file, clears it,
- * then POSTs each line. If any POST fails, the remaining lines are written
- * back so they can be retried next time.
- */
-async function drainPendingEvents(env: HookEnv, url: string, pendingPath: string): Promise<void> {
+async function postJsonWithTimeout(url: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    return await res.json() as Record<string, unknown>
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function drainPendingEvents(env: HookEnv, pendingPath: string): Promise<void> {
   let raw: string
   try {
     raw = await readFile(pendingPath, 'utf8')
@@ -184,54 +164,53 @@ async function drainPendingEvents(env: HookEnv, url: string, pendingPath: string
     return
   }
   if (!raw.trim()) {
-    await unlink(pendingPath).catch(() => { /* ignore */ })
+    await unlink(pendingPath).catch(() => {})
     return
   }
 
-  // Clear the file before posting so we don't double-deliver on crash.
-  await unlink(pendingPath).catch(() => { /* ignore */ })
-
+  await unlink(pendingPath).catch(() => {})
   const lines = raw.split('\n').filter((l) => l.trim())
   const remaining: string[] = []
 
-  for (const line of lines) {
-    let body: Record<string, unknown>
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    let parsed: Record<string, unknown>
     try {
-      body = JSON.parse(line) as Record<string, unknown>
+      parsed = JSON.parse(line) as Record<string, unknown>
     } catch {
-      continue // skip malformed line
+      continue
     }
 
-    const ok = await postWithTimeout(url, body)
-    if (ok) {
-      continue // drained successfully
-    }
-    if (ok === null) {
-      continue // 4xx — drop
-    }
-    // Network failure — put this and the rest back.
-    remaining.push(line)
+    const path = typeof parsed['__panopticonPath'] === 'string'
+      ? parsed['__panopticonPath'] as string
+      : HEARTBEAT_PATH(env.agentId)
+    const body = parsed['body'] && typeof parsed['body'] === 'object'
+      ? parsed['body'] as Record<string, unknown>
+      : parsed
+
+    const ok = await postWithTimeout(`${getDashboardUrl()}${path}`, body)
+    if (ok || ok === null) continue
+    remaining.push(line, ...lines.slice(i + 1))
+    break
   }
 
   if (remaining.length > 0) {
     const paths = panopticonPathsFor(env.agentId, env.home)
     await mkdir(paths.agentDir, { recursive: true })
-    await writeFile(pendingPath, remaining.map((l) => `${l}\n`).join(''), { encoding: 'utf8' }).catch(() => {
-      // ignore write failure
-    })
+    await writeFile(pendingPath, remaining.map((l) => `${l}\n`).join(''), 'utf8').catch(() => {})
   }
 }
-
-// ────────────────────────────────────────────────────────────────────────
-// Hook implementations (exported for tests so we can drive each one in
-// isolation without instantiating the real Pi runtime).
-// ────────────────────────────────────────────────────────────────────────
 
 export interface HookEnv {
   agentId: string
   home?: string
   pid?: number
   now?: () => string
+  role?: string
+  issueId?: string
+  workspace?: string
+  sessionLogPath?: string
+  stuckTurnThreshold?: number
 }
 
 function envFor(env: HookEnv): {
@@ -246,6 +225,226 @@ function envFor(env: HookEnv): {
   }
 }
 
+async function readAgentState(env: HookEnv): Promise<Record<string, unknown>> {
+  const { paths } = envFor(env)
+  try {
+    return JSON.parse(await readFile(join(paths.agentDir, 'state.json'), 'utf8')) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+async function issueIdFor(env: HookEnv): Promise<string | null> {
+  if (env.issueId) return env.issueId.toUpperCase()
+  if (process.env['PANOPTICON_ISSUE_ID']) return process.env['PANOPTICON_ISSUE_ID']!.toUpperCase()
+  const state = await readAgentState(env)
+  const fromState = state['issueId'] ?? state['currentIssue']
+  if (typeof fromState === 'string' && fromState.trim()) return fromState.toUpperCase()
+  const match = env.agentId.match(/(?:agent-)?([a-z]+)-(\d+)/i)
+  return match ? `${match[1]!.toUpperCase()}-${match[2]}` : null
+}
+
+async function workspaceFor(env: HookEnv): Promise<string | null> {
+  if (env.workspace) return env.workspace
+  if (process.env['PANOPTICON_WORKSPACE']) return process.env['PANOPTICON_WORKSPACE']!
+  const state = await readAgentState(env)
+  return typeof state['workspace'] === 'string' && state['workspace'].trim() ? state['workspace'] : null
+}
+
+function roleFor(env: HookEnv): string {
+  return env.role ?? process.env['PANOPTICON_AGENT_ROLE'] ?? ''
+}
+
+function usageNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function extractUsage(event: { usage?: UsageLike | null }): { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } | null {
+  const usage = event.usage
+  if (!usage) return null
+  return {
+    inputTokens: usageNumber(usage.inputTokens ?? usage.input_tokens),
+    outputTokens: usageNumber(usage.outputTokens ?? usage.output_tokens),
+    cacheReadTokens: usageNumber(usage.cacheReadTokens ?? usage.cache_read_tokens),
+    cacheWriteTokens: usageNumber(usage.cacheWriteTokens ?? usage.cache_write_tokens),
+  }
+}
+
+async function recordCostEvent(env: HookEnv, event: ToolExecutionEndEvent | TurnEndEvent, tool: string, timestamp: string): Promise<void> {
+  const { paths } = envFor(env)
+  const issueId = await issueIdFor(env)
+  const usage = extractUsage(event)
+  const costUsd = typeof event.costUsd === 'number'
+    ? event.costUsd
+    : typeof event.cost === 'number'
+      ? event.cost
+      : null
+  const body = {
+    kind: 'cost-event',
+    agentId: env.agentId,
+    issueId,
+    agentRole: roleFor(env) || undefined,
+    tool,
+    model: event.model ?? 'pi',
+    usage,
+    costUsd,
+    timestamp,
+  }
+
+  await mkdir(paths.agentDir, { recursive: true })
+  await appendFile(paths.costEventsPath, `${JSON.stringify(body)}\n`, 'utf8').catch(() => {})
+  await postEvent(env, body)
+}
+
+function isClosedBead(issue: Record<string, unknown>): boolean {
+  const status = String(issue['status'] ?? '').toLowerCase()
+  return status === 'closed' || status === 'done' || status === 'completed'
+}
+
+function beadMatchesIssue(issue: Record<string, unknown>, issueId: string): boolean {
+  const label = issueId.toLowerCase()
+  const labels = Array.isArray(issue['labels']) ? issue['labels'] : []
+  return labels.some((entry) => String(entry).toLowerCase() === label)
+    || String(issue['title'] ?? '').toLowerCase().includes(issueId.toLowerCase())
+    || String(issue['id'] ?? '').toLowerCase().includes(issueId.toLowerCase())
+}
+
+async function allIssueBeadsClosed(workspace: string, issueId: string): Promise<boolean> {
+  let raw = ''
+  try {
+    raw = await readFile(join(workspace, '.beads', 'issues.jsonl'), 'utf8')
+  } catch {
+    return false
+  }
+  const issues = raw.split('\n')
+    .filter((line) => line.trim())
+    .map((line) => {
+      try { return JSON.parse(line) as Record<string, unknown> } catch { return null }
+    })
+    .filter((issue): issue is Record<string, unknown> => !!issue && beadMatchesIssue(issue, issueId))
+
+  return issues.length > 0 && issues.every(isClosedBead)
+}
+
+function statusComplete(value: unknown): boolean {
+  return String(value ?? '').toLowerCase() === 'completed'
+}
+
+function planItemsComplete(plan: Record<string, unknown>): boolean {
+  const root = (plan['plan'] && typeof plan['plan'] === 'object') ? plan['plan'] as Record<string, unknown> : plan
+  const items = Array.isArray(root['items']) ? root['items'] as Record<string, unknown>[] : []
+  if (items.length === 0) return true
+  return items.every((item) => {
+    const subItems = Array.isArray(item['subItems']) ? item['subItems'] as Record<string, unknown>[] : []
+    return statusComplete(item['status']) && subItems.every((subItem) => statusComplete(subItem['status']))
+  })
+}
+
+async function vbriefSatisfied(workspace: string): Promise<boolean> {
+  for (const path of [join(workspace, '.pan', 'spec.vbrief.json'), join(workspace, '.pan', 'continue.json')]) {
+    try {
+      const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
+      if (!planItemsComplete(parsed)) return false
+      return true
+    } catch {}
+  }
+  return true
+}
+
+async function evidenceClean(env: HookEnv): Promise<boolean> {
+  const issueId = await issueIdFor(env)
+  const workspace = await workspaceFor(env)
+  if (!issueId || !workspace) return false
+  return await allIssueBeadsClosed(workspace, issueId) && await vbriefSatisfied(workspace)
+}
+
+async function readTurnOutput(env: HookEnv, event: TurnEndEvent): Promise<string> {
+  if (event.output?.trim()) return event.output
+  if (event.transcript?.trim()) return event.transcript
+  const path = event.sessionLogPath ?? env.sessionLogPath ?? process.env['PANOPTICON_PI_SESSION_LOG']
+  if (!path) return ''
+  try {
+    const contents = await readFile(path, 'utf8')
+    return contents.slice(-64_000)
+  } catch {
+    return ''
+  }
+}
+
+async function postWorkComplete(env: HookEnv, reason: string, summary: string): Promise<void> {
+  const issueId = await issueIdFor(env)
+  await postDashboard(env, `/api/agents/${env.agentId}/work-complete`, { issueId, reason, summary })
+  await postEvent(env, { kind: 'resolution_set', resolution: 'done', resolutionCount: 1 })
+}
+
+async function classifyCompletion(env: HookEnv, output: string): Promise<string | null> {
+  const issueId = await issueIdFor(env)
+  const result = await postJsonWithTimeout(`${getDashboardUrl()}/api/agents/${env.agentId}/classify-completion`, { issueId, output })
+  return typeof result?.['verdict'] === 'string' ? result['verdict'] as string : null
+}
+
+async function markStuck(env: HookEnv, reason: string): Promise<void> {
+  const issueId = await issueIdFor(env)
+  await postDashboard(env, `/api/agents/${env.agentId}/stuck`, { issueId, reason })
+  await postEvent(env, { kind: 'resolution_set', resolution: 'stuck', resolutionCount: 1 })
+}
+
+async function updateProgress(env: HookEnv, kind: 'tool' | 'turn', timestamp: string, extra: Record<string, unknown> = {}): Promise<number> {
+  const { paths } = envFor(env)
+  let previous: Record<string, unknown> = {}
+  try {
+    previous = JSON.parse(await readFile(paths.progressStatePath, 'utf8')) as Record<string, unknown>
+  } catch {}
+  const previousCount = typeof previous['progresslessTurns'] === 'number' ? previous['progresslessTurns'] : 0
+  const nextCount = kind === 'tool' ? 0 : previousCount + 1
+  await mkdir(paths.agentDir, { recursive: true })
+  await writeJson(paths.progressStatePath, { ...previous, ...extra, lastEvent: kind, lastUpdated: timestamp, progresslessTurns: nextCount })
+  return nextCount
+}
+
+export async function handleWorkAgentTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
+  const output = await readTurnOutput(env, event)
+  if (await evidenceClean(env)) {
+    await postWorkComplete(env, 'evidence-clean', 'All issue beads are closed and the plan is satisfied')
+    return
+  }
+
+  if (/PANOPTICON_WORK_COMPLETE|Implementation complete|all beads closed|ready for review/i.test(output)) {
+    await postWorkComplete(env, 'structured-reply', output.slice(-1000))
+    return
+  }
+
+  const verdict = output.trim() ? await classifyCompletion(env, output) : null
+  if (verdict === 'FORGOT_COMPLETION' || verdict === 'done') {
+    await postWorkComplete(env, 'classifier', output.slice(-1000))
+    return
+  }
+  if (verdict === 'STOPPED_FOR_INPUT' || verdict === 'needs_input') {
+    await postEvent(env, { kind: 'resolution_set', resolution: 'needs_input', resolutionCount: 1 })
+    return
+  }
+
+  const turns = await updateProgress(env, 'turn', envFor(env).now())
+  const threshold = env.stuckTurnThreshold ?? Number(process.env['PANOPTICON_PI_STUCK_TURN_THRESHOLD'] ?? 3)
+  if (turns >= threshold) {
+    await markStuck(env, `No completion or progress detected after ${turns} Pi turn_end events`)
+  }
+}
+
+export async function handleSpecialistTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
+  const role = roleFor(env)
+  const output = await readTurnOutput(env, event)
+  const match = matchSpecialistCompletion(role, output)
+  if (!match) return
+  const issueId = await issueIdFor(env)
+  if (!issueId) return
+  await postDashboard(env, `/api/specialists/${match.name}/auto-complete`, {
+    issueId,
+    status: match.status,
+    notes: match.summary,
+  })
+}
+
 export async function handleSessionStart(env: HookEnv, event: SessionStartEvent): Promise<void> {
   const { paths, now } = envFor(env)
   const ts = now()
@@ -257,13 +456,9 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     timestamp: ts,
     pid: env.pid ?? process.pid,
   })
-  // Persist a plain-text session id so PiRuntime.spawnAgent can resume into
-  // the same Pi session on the next spawn (PAN-636 workspace-3119). We write
-  // this only when Pi gives us a sessionId — `null` would defeat resume.
   if (event.sessionId) {
     await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
   }
-  // PAN-1134: POST domain events to the dashboard heartbeat endpoint.
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
@@ -279,11 +474,12 @@ export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionE
     last_action: event.isError ? 'tool_error' : 'tool_end',
     pid,
   })
-  // PAN-1134: POST domain event so Pi agents show activity in the dashboard.
+  await updateProgress(env, 'tool', ts, { lastToolCallId: event.toolCallId ?? null })
   await postEvent(env, { kind: 'activity', activity: 'working', tool: event.toolName ?? 'unknown', timestamp: ts })
+  await recordCostEvent(env, event, event.toolName ?? 'unknown', ts)
 }
 
-export async function handleTurnEnd(env: HookEnv, _event: TurnEndEvent): Promise<void> {
+export async function handleTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
   const { paths, pid, now } = envFor(env)
   const ts = now()
   await mkdir(paths.heartbeatsDir, { recursive: true })
@@ -294,8 +490,15 @@ export async function handleTurnEnd(env: HookEnv, _event: TurnEndEvent): Promise
     last_action: 'turn_end',
     pid,
   })
-  // PAN-1134: turn_end approximates the Claude Stop hook (agent back at prompt).
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
+  await recordCostEvent(env, event, 'turn_end', ts)
+
+  const role = roleFor(env)
+  if (role === 'work') {
+    await handleWorkAgentTurnEnd(env, event)
+  } else if (normalizeSpecialistCompletionName(role)) {
+    await handleSpecialistTurnEnd(env, event)
+  }
 }
 
 export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
@@ -308,19 +511,6 @@ export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
   })
 }
 
-/**
- * Load the assembled workspace context layer (PAN-1201) and fold it into the
- * Pi session's system prompt.
- *
- * Panopticon assembles `<workspace>/.pan/context/workspace.md` at workspace
- * creation. Pi is launched with its CWD set to the workspace, so the bundle
- * is read relative to `process.cwd()`. The Pi API surface for extending the
- * system prompt is still settling upstream, so the append is duck-typed and
- * best-effort: when `ctx` exposes an `appendSystemPrompt(text)` method it is
- * called; otherwise this is a silent no-op (the launcher's
- * `--append-system-prompt` path still carries spawn context). Never throws —
- * the extension must not break Pi.
- */
 export async function handleWorkspaceContext(ctx: unknown, cwd: string = process.cwd()): Promise<void> {
   await appendSystemPromptFile(ctx, join(cwd, '.pan', 'context', 'workspace.md'))
 }
@@ -339,36 +529,22 @@ async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void>
   if (typeof append === 'function') {
     try {
       await append.call(ctx, content)
-    } catch {
-      // Pi API mismatch — ignore; spawn-time context delivery still applies.
-    }
+    } catch {}
   }
 }
 
-// ────────────────────────────────────────────────────────────────────────
-// Default export — registered with Pi via `pi --extension <dist/index.js>`.
-// ────────────────────────────────────────────────────────────────────────
-
 export default function panopticonPiExtension(pi: PiExtensionAPI): void {
   const agentId = process.env['PANOPTICON_AGENT_ID']
-  if (!agentId) {
-    // Running outside Panopticon (e.g. user testing pi directly with -e).
-    // Stay silent: the extension MUST be a no-op so two parallel instances
-    // without an agent id can never collide on heartbeat or ready files.
-    return
-  }
+  if (!agentId) return
 
   const env: HookEnv = { agentId }
 
   pi.on('session_start', async (event, ctx) => {
     try {
       await handleSessionStart(env, event)
-      // PAN-1201: fold the assembled workspace context layer into the prompt.
       await handleWorkspaceContext(ctx)
       await handleSessionBriefingContext(ctx)
-    } catch {
-      // Filesystem / network failures must never break Pi.
-    }
+    } catch {}
   })
 
   pi.on('tool_execution_end', async event => {

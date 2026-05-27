@@ -81,29 +81,52 @@ Dashboard UI + Deacon read snapshot
 | `tldr-read-enforcer` | PreToolUse (Read only) | Enforces TLDR MCP for Read tool calls |
 | `tldr-post-edit` | PostToolUse (Edit/Write) | TLDR post-edit bookkeeping |
 
-## The Six Pi Gaps
+## Pi Parity Matrix
 
-Pi's extension API (`pi --extension`) exposes only three lifecycle events: `session_start`, `tool_execution_end`, and `turn_end`. There is **no equivalent** for six of Claude Code's nine hooks:
+Pi's extension API (`pi --extension`) exposes three lifecycle events: `session_start`, `tool_execution_end`, and `turn_end`. Panopticon maps everything Pi can provide onto the same dashboard ingestion path used by Claude Code hooks.
 
-1. **PreToolUse** — Pi has no pre-tool event
-2. **Notification** — Pi has no notification system
-3. **PreCompact** — Pi has no compaction lifecycle hook
-4. **PostCompact** — Pi has no compaction lifecycle hook
-5. **UserPromptSubmit** — Pi has no user-prompt event
-6. **PermissionRequest** — Pi has no permission system (intentionally absent by design)
-
-These gaps are inherent to Pi's API surface. Pi agents cannot participate in hook-driven workflows that depend on these events.
-
-## Pi Partial Equivalents
-
-While the six gaps above have no workaround, three hooks have partial Pi equivalents:
-
-| Claude Hook | Pi Equivalent | Coverage |
+| Claude Code Hook | Pi Surface | Pi Coverage |
 |---|---|---|
-| `SessionStart` | `session_start` event | Writes `ready.json` with sessionId. Dashboard uses this for spawn readiness. |
-| `PostToolUse` | `tool_execution_end` event | Writes `heartbeat.json` with tool name. Used for liveness detection only — does not emit domain events. |
-| `Stop` | `turn_end` event | Approximates the Stop hook: fires when Pi finishes a turn and returns to the prompt. |
+| `PreToolUse` | none | Not available; Pi does not expose a pre-tool event. |
+| `PostToolUse` | `tool_execution_end` | Emits `agent.activity_changed`, writes the heartbeat file, records per-tool cost events, and resets Pi progress-stall tracking. |
+| `Stop` | `turn_end` | Emits idle activity, records turn cost, runs work-agent completion detection, and runs specialist auto-completion detection. |
+| `SessionStart` | `session_start` | Writes `ready.json`/`session.id`, emits `agent.model_set`, emits idle activity, and appends workspace/session briefing context when Pi provides a prompt context API. |
+| `Notification` | none | Not available; Pi does not expose notification events. |
+| `UserPromptSubmit` | none | Not available; Pi does not expose user-prompt submission events. |
+| `PreCompact` | none | Not available; Pi does not expose compaction lifecycle events. |
+| `PostCompact` | none | Not available; Pi does not expose compaction lifecycle events. |
+| `PermissionRequest` | not applicable | Pi has no Claude Code-style permission prompt system. |
 
-### Pi Event Channel (PAN-1134)
+The unavailable rows are API gaps rather than missing Panopticon code. Pi agents cannot participate in hook-driven workflows that depend on those missing lifecycle events until Pi exposes equivalent extension events.
 
-The Pi extension POSTs directly to `/api/agents/:id/heartbeat`, using the same validation path as Claude Code hooks. Network failures buffer to `pending-events.jsonl` in the agent state directory and flush on the next successful POST — the same FIFO model that `scripts/pan-hook-lib.sh` uses for Claude Code hooks. This gives Pi agents real-time activity tracking (`activity_changed`, `model_set`) through the same `bodyToEvent → decodeDomainEvent → appendAsync` pipeline that Claude Code hooks use, even though the six gaps remain.
+## Pi Event Channel (PAN-1134)
+
+The Pi extension POSTs directly to `/api/agents/:id/heartbeat`, using the same validation path as Claude Code hooks. Network and 5xx failures buffer to `pending-events.jsonl` in the agent state directory and flush on the next successful POST; 4xx responses are treated as invalid payloads and are not replayed. Heartbeat bodies flow through `bodyToEvent → decodeDomainEvent → AgentStateService.emit`, so Pi and Claude Code update the same runtime snapshot and event store.
+
+Pi also writes local compatibility files under `~/.panopticon/agents/<agent-id>/` and `~/.panopticon/heartbeats/`:
+
+| File | Writer | Purpose |
+|---|---|---|
+| `ready.json` | `session_start` | Spawn readiness, Pi session id, reason, pid, timestamp. |
+| `session.id` | `session_start` when Pi supplies a session id | Resume target for Pi sessions. |
+| `pending-events.jsonl` | failed POST replay buffer | FIFO retry queue for heartbeat and completion endpoint POSTs. |
+| `cost-events.jsonl` | `tool_execution_end`, `turn_end` | Local audit trail for Pi usage/cost payloads. |
+| `pi-progress.json` | tool/turn events | Progressless-turn counter used for stuck escalation. |
+| `../heartbeats/<agent-id>.json` | tool/turn events | Legacy liveness heartbeat for compatibility. |
+
+## Pi Completion Detection
+
+Pi work agents use `turn_end` to approximate Claude Code's `Stop` hook completion flow:
+
+1. Check evidence first: issue beads must all be closed and the workspace vBRIEF/continue state must be satisfied when present.
+2. Scan the turn output/transcript for explicit completion markers such as `PANOPTICON_WORK_COMPLETE`, `Implementation complete`, `all beads closed`, or `ready for review`.
+3. Ask the dashboard classifier endpoint for a final verdict when the transcript is ambiguous.
+4. Emit `agent.resolution_changed` with `done`, `needs_input`, or `stuck` as appropriate.
+
+Specialist Pi agents use the same `turn_end` surface to detect review, test, merge/ship, inspect, and UAT completion markers, then call `/api/specialists/:name/auto-complete` with `passed` or `failed`.
+
+## Harness-Aware Installation
+
+`pan admin hooks install --harness <claude-code|pi|both>` targets Claude Code, Pi, or both harnesses. With no explicit `--harness`, the installer detects available `claude` and `pi` binaries and chooses the installed harnesses. Claude Code installation copies shell hooks into `~/.panopticon/bin/` and mutates `~/.claude/settings.json`; Pi installation verifies that `packages/pi-extension/dist/index.js` exists so launcher-generated Pi commands can load it with `pi --extension`.
+
+`pan admin hooks status` reports the detected harness binaries and Pi extension build status.

@@ -1317,6 +1317,40 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 //   {kind: "resolution_set",    resolution, resolutionCount}
 //   {kind: "current_issue_set", currentIssue?}
 
+function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
+  return Effect.gen(function* () {
+    let raw: Record<string, unknown> | null;
+    try {
+      raw = bodyToEvent(id, body, timestamp);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'invalid heartbeat payload';
+      return { ok: false as const, response: jsonResponse({ success: false, error: message }, { status: 400 }) };
+    }
+    if (!raw) {
+      return { ok: true as const, emitted: false };
+    }
+
+    const candidate = { ...raw, sequence: 0 };
+    const decoded = decodeDomainEvent(candidate);
+    if (decoded._tag === 'Failure') {
+      return {
+        ok: false as const,
+        response: jsonResponse(
+          { success: false, error: 'invalid event', detail: String(decoded.failure) },
+          { status: 400 },
+        ),
+      };
+    }
+
+    const { AgentStateService } = yield* Effect.promise(
+      () => import('../services/agent-state-service.js'),
+    );
+    const agentState = yield* AgentStateService;
+    yield* agentState.emit(decoded.success as never);
+    return { ok: true as const, emitted: true };
+  });
+}
+
 const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/heartbeat',
@@ -1328,37 +1362,50 @@ const postAgentHeartbeatRoute = HttpRouter.add(
     }
     const body = (yield* readJsonBody) as Record<string, unknown>;
     const timestamp = (body['timestamp'] as string) ?? new Date().toISOString();
+    const result = yield* emitAgentRuntimeEvent(id, body, timestamp);
+    if (!result.ok) return result.response;
+    return jsonResponse({ success: true, emitted: result.emitted });
+  })),
+);
 
-    let raw: Record<string, unknown> | null;
-    try {
-      raw = bodyToEvent(id, body, timestamp);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'invalid heartbeat payload';
-      return jsonResponse({ success: false, error: message }, { status: 400 });
-    }
-    if (!raw) {
-      // Legacy 'uninitialized' or unknown kind — accept but no-op so hooks
-      // don't retry forever.
-      return jsonResponse({ success: true, emitted: false });
-    }
+const postAgentWorkCompleteRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/work-complete',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    const result = yield* emitAgentRuntimeEvent(id, { kind: 'resolution_set', resolution: 'done', resolutionCount: 1 }, new Date().toISOString());
+    if (!result.ok) return result.response;
+    return jsonResponse({ success: true, emitted: result.emitted });
+  })),
+);
 
-    // Placeholder sequence — appendAsync assigns the real server-side number.
-    const candidate = { ...raw, sequence: 0 };
-    const decoded = decodeDomainEvent(candidate);
-    if (decoded._tag === 'Failure') {
-      return jsonResponse(
-        { success: false, error: 'invalid event', detail: String(decoded.failure) },
-        { status: 400 },
-      );
-    }
+const postAgentStuckRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/stuck',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) return jsonResponse({ success: false, error: 'missing agent id' }, { status: 400 });
+    const result = yield* emitAgentRuntimeEvent(id, { kind: 'resolution_set', resolution: 'stuck', resolutionCount: 1 }, new Date().toISOString());
+    if (!result.ok) return result.response;
+    return jsonResponse({ success: true, emitted: result.emitted });
+  })),
+);
 
-    const { AgentStateService } = yield* Effect.promise(
-      () => import('../services/agent-state-service.js'),
-    );
-    const agentState = yield* AgentStateService;
-    yield* agentState.emit(decoded.success as never);
-
-    return jsonResponse({ success: true, emitted: true });
+const postAgentClassifyCompletionRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/classify-completion',
+  httpHandler(Effect.gen(function* () {
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const output = typeof body['output'] === 'string' ? body['output'] : '';
+    const verdict = /Implementation complete|all beads closed|ready for review|work complete/i.test(output)
+      ? 'FORGOT_COMPLETION'
+      : /blocked|needs input|waiting for/i.test(output)
+        ? 'STOPPED_FOR_INPUT'
+        : 'UNCLEAR';
+    return jsonResponse({ success: true, verdict });
   })),
 );
 
@@ -3768,6 +3815,9 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
   postAgentHeartbeatRoute,
+  postAgentWorkCompleteRoute,
+  postAgentStuckRoute,
+  postAgentClassifyCompletionRoute,
   postInternalAgentPermissionRequestRoute,
   postAgentPermissionResponseRoute,
   getAgentRuntimeRoute,

@@ -140,11 +140,12 @@ describe('handleSessionStart', () => {
       { toolName: 'Bash', isError: false },
     )
 
-    // 2 buffered + 1 new = 3 POSTs total.
-    expect(fetchCalls.length).toBe(3)
+    // 2 buffered + activity + cost = 4 POSTs total.
+    expect(fetchCalls.length).toBe(4)
     expect(fetchCalls[0]!.body).toEqual({ kind: 'model_set', model: 'pi', claudeSessionId: 'sess-abc', timestamp: fixedTime })
     expect(fetchCalls[1]!.body).toEqual({ kind: 'activity', activity: 'idle', timestamp: fixedTime })
     expect(fetchCalls[2]!.body).toEqual({ kind: 'activity', activity: 'working', tool: 'Bash', timestamp: fixedTime })
+    expect(fetchCalls[3]!.body).toMatchObject({ kind: 'cost-event', tool: 'Bash', costUsd: null })
 
     // Pending file should be gone after successful drain.
     expect(existsSync(paths.pendingEventsPath)).toBe(false)
@@ -224,17 +225,24 @@ describe('handleToolExecutionEnd', () => {
     expect(body.last_action).toBe('tool_error')
   })
 
-  it('PAN-1134: POSTs activity working with the tool name', async () => {
+  it('PAN-1134: POSTs activity working with the tool name and a cost event', async () => {
     await handleToolExecutionEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
-      { toolName: 'Bash', isError: false },
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now, issueId: 'PAN-636', role: 'work' },
+      { toolName: 'Bash', isError: false, usage: { inputTokens: 10, outputTokens: 3 }, costUsd: 0.001 },
     )
-    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls.length).toBe(2)
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'activity',
       activity: 'working',
       tool: 'Bash',
       timestamp: fixedTime,
+    })
+    expect(fetchCalls[1]!.body).toMatchObject({
+      kind: 'cost-event',
+      issueId: 'PAN-636',
+      tool: 'Bash',
+      usage: { inputTokens: 10, outputTokens: 3, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      costUsd: 0.001,
     })
   })
 })
@@ -257,17 +265,42 @@ describe('handleTurnEnd', () => {
     expect(body.pid).toBe(7)
   })
 
-  it('PAN-1134: POSTs activity idle', async () => {
+  it('PAN-1134: POSTs activity idle and a turn cost event', async () => {
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636' },
       {},
     )
-    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls.length).toBe(2)
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'activity',
       activity: 'idle',
       timestamp: fixedTime,
     })
+    expect(fetchCalls[1]!.body).toMatchObject({ kind: 'cost-event', issueId: 'PAN-636', tool: 'turn_end' })
+  })
+
+  it('posts work-complete when all issue beads are closed', async () => {
+    const workspace = join(h.home, 'workspace')
+    mkdirSync(join(workspace, '.beads'), { recursive: true })
+    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3010/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
+  })
+
+  it('posts specialist auto-complete when a specialist marker appears', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: 'CODE APPROVED — YOUR WORK IS COMPLETE' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3010/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
   })
 })
 
