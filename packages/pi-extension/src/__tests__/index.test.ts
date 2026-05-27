@@ -45,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('handleSessionStart', () => {
@@ -322,6 +323,21 @@ describe('handleTurnEnd', () => {
     expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
   })
 
+  it('routes work turn-end completion from launcher session type env', async () => {
+    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'work')
+    const workspace = join(h.home, 'workspace')
+    mkdirSync(join(workspace, '.beads'), { recursive: true })
+    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', workspace },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
+  })
+
   it('does not auto-complete work on negated ready-for-review output', async () => {
     await handleTurnEnd(
       { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636' },
@@ -330,6 +346,18 @@ describe('handleTurnEnd', () => {
 
     expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
     expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(false)
+  })
+
+  it('routes specialist auto-completion from launcher session type env', async () => {
+    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'review')
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, issueId: 'PAN-636' },
+      { output: 'CODE APPROVED — YOUR WORK IS COMPLETE' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'passed' })
   })
 
   it('posts specialist auto-complete when a specialist marker appears', async () => {

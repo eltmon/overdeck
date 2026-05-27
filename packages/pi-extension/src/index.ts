@@ -303,7 +303,7 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
 }
 
 function roleFor(env: HookEnv): string {
-  return env.role ?? process.env['PANOPTICON_AGENT_ROLE'] ?? ''
+  return env.role ?? process.env['PANOPTICON_AGENT_ROLE'] ?? process.env['PANOPTICON_SESSION_TYPE'] ?? ''
 }
 
 function usageNumber(value: unknown): number {
