@@ -786,11 +786,8 @@ export function CommandDeck({
       selectSession(selectedFeature, null);
     }
     if (name) {
-      // Selecting a conversation supersedes any feature/project selection.
-      // Without clearing selectedFeature, resolvedProjectForFeature keeps
-      // rightPaneProject pinned to the previously-selected issue, which both
-      // hides unscoped conversations (they only render when rightPaneProject
-      // is null) and shows a mismatched ZoneA issue header over scoped ones.
+      // Selecting a conversation supersedes any feature/project selection, so
+      // the content area renders the conversation (not a feature's Stage).
       // Anchoring selectedProject to the conversation's own project keeps the
       // "Back to conversations" control working for project-scoped chats.
       setSelectedFeature(null);
