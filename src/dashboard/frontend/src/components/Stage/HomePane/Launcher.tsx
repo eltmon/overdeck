@@ -1,5 +1,6 @@
 import { useState, type ReactNode, type KeyboardEvent } from 'react'
 import { Bot, Terminal, Globe } from 'lucide-react'
+import { orderIntents } from './launcherOrdering'
 import styles from '../stage.module.css'
 
 export type LauncherIntentKind = 'agent' | 'terminal' | 'web'
@@ -50,6 +51,8 @@ export interface LauncherProps {
   /** History / file-completion content shown below the rows; hidden in compact. */
   extras?: ReactNode
   placeholder?: string
+  /** Id of the last-run agent in this workspace; floats it to position 1. */
+  lastUsedAgentId?: string | null
 }
 
 /**
@@ -64,13 +67,15 @@ export function Launcher({
   compact = false,
   extras,
   placeholder = 'Ask, run, or search…',
+  lastUsedAgentId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
   const open = query.length > 0
+  const ordered = orderIntents({ intents, query, lastUsedAgentId })
 
   const choose = (index: number) => {
-    const intent = intents[index]
+    const intent = ordered[index]
     if (intent) onSelect?.(intent, query)
   }
 
@@ -78,7 +83,7 @@ export function Launcher({
     if (!open) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSelected((s) => Math.min(s + 1, intents.length - 1))
+      setSelected((s) => Math.min(s + 1, ordered.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setSelected((s) => Math.max(s - 1, 0))
@@ -103,7 +108,7 @@ export function Launcher({
       </div>
       {open && (
         <div className={styles.dropdown} role="listbox" aria-label="Quick actions">
-          {intents.map((intent, index) => (
+          {ordered.map((intent, index) => (
             <div
               key={intent.id}
               role="option"
