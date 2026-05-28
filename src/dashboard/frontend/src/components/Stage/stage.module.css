@@ -329,6 +329,37 @@
   white-space: nowrap;
 }
 
+/* HomePane collapsible sections */
+.sections {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.collapsible {
+  border-bottom: 1px solid var(--border);
+}
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  border: none;
+  background: transparent;
+  padding: 12px 2px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.collapsibleBody {
+  padding: 4px 2px 14px;
+}
+
 .homeSection:empty {
   display: none;
 }
