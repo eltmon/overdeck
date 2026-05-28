@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1549",
   "created": "2026-05-28T14:47:58.446Z",
-  "updated": "2026-05-28T19:05:29.378Z",
+  "updated": "2026-05-28T21:46:22.884Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -19,6 +19,41 @@
       "reason": "resume",
       "agentModel": "claude-opus-4-7",
       "timestamp": "2026-05-28T19:05:29.378Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:35Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-28T20:35:01.085Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T20:35:01.128Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:37Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-28T20:37:23.149Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T20:43Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-28T20:43:04.025Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T20:43:04.074Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T21:28:14.104Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-28T21:31:38.972Z"
     }
   ],
   "feedback": []
