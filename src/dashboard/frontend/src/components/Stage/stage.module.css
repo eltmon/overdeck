@@ -183,6 +183,48 @@
   color: var(--muted-foreground);
 }
 
+/* Docks (AgentDock + ActionDock) */
+.dock {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 20px 0 0;
+  position: relative;
+}
+
+.actionDock {
+  margin-top: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pill:hover {
+  background: var(--secondary);
+}
+
+.pillGhost {
+  font-weight: 500;
+  color: var(--muted-foreground);
+  border-style: dashed;
+}
+
+.pillTool {
+  font-weight: 500;
+}
+
 .homeSection:empty {
   display: none;
 }
