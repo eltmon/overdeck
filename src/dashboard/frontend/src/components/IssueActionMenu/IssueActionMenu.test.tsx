@@ -130,7 +130,6 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
     expect(screen.getByTestId('issue-action-switchModel')).toHaveTextContent('Switch model');
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-swarm')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
@@ -285,26 +284,6 @@ describe('IssueActionMenu', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-1/tell', expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ message: 'Please continue' }),
-      }));
-    });
-  });
-
-  it('opens the shared swarm dialog and dispatches via the mounted swarm endpoint', async () => {
-    const fetchMock = mockFetch();
-    vi.stubGlobal('fetch', fetchMock);
-    mockStore({ currentIssue: issue({ hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
-
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByTestId('issue-action-swarm'));
-
-    expect(screen.getByRole('dialog', { name: 'Swarm' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Dispatch swarm' }));
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/swarm', expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ issueId: 'PAN-1' }),
       }));
     });
   });

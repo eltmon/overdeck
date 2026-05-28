@@ -17,7 +17,6 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'plan finalize',
   'start',
   'start --auto',
-  'swarm',
   'tell',
   'done',
   'review request',

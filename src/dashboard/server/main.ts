@@ -36,7 +36,6 @@ import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
-import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -476,7 +475,6 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
-await resumeSwarmAutoAdvanceLoopOnStartup();
 
 // PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
 // stashes — the only kind that requires human review. Retired stash kinds

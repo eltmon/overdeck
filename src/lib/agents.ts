@@ -1958,10 +1958,10 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
-  // and the one-agent-per-issue uniqueness check is scoped to the slot.
-  slotId?: number;
-  swarmItemId?: string; // vBRIEF item ID this slot is working on
+  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
+  // is now in-context via subagents (see roles/work.md), not via slot agents.
+  // `allowHost` (workspace-isolation override) stays — it predates the swarm
+  // runtime and is used by review/test/ship agents independently.
   allowHost?: boolean;
   flywheelRunId?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
@@ -2716,9 +2716,9 @@ if (prompt) {
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
-  const agentId = options.slotId != null
-    ? `${sessionPrefix}-${options.issueId.toLowerCase()}-${options.slotId}`
-    : `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  // PAN-1517: slot-suffixed agent ids removed alongside the swarm runtime;
+  // there is one work agent per issue, period.
+  const agentId = `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {
