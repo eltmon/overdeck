@@ -21,6 +21,61 @@
   padding: 26px 30px;
 }
 
+/* WorkspaceHeader */
+.wsHead {
+  position: relative;
+}
+
+.wsTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wsIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-foreground);
+  font-weight: 700;
+}
+
+.wsName {
+  font-size: 26px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.wsBranch {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin: 6px 0 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wsBranchName {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wsLink {
+  color: var(--primary);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
 .homeSection:empty {
   display: none;
 }
