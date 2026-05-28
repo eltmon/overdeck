@@ -202,6 +202,42 @@
   flex-direction: column;
 }
 
+/* Sub-toggle panes (e.g. PlanPane, DocsPane) */
+.subPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.subTabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.subTab {
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.subTabActive {
+  color: var(--foreground);
+  background: var(--secondary);
+  font-weight: 600;
+}
+
+.subBody {
+  flex: 1;
+  overflow: auto;
+}
+
 .placeholderTitle {
   font-size: 15px;
   font-weight: 600;
