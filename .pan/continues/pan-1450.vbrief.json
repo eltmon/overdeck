@@ -1,0 +1,19 @@
+{
+  "version": "1",
+  "issueId": "PAN-1450",
+  "created": "2026-05-26T02:46:40.723Z",
+  "updated": "2026-05-26T02:46:40.723Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "gpt-5.5",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-26T02:46:40.723Z"
+    }
+  ]
+}

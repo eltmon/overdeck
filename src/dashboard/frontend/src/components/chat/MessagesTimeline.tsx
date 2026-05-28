@@ -145,6 +145,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [width, setWidth] = useState(800);
   // Track whether user has manually scrolled up
   const isPinnedToBottomRef = useRef(true);
+  // Set by wheel/touch/pointerdown/keydown — distinguishes a real user scroll
+  // from a programmatic scrollTop adjustment. Without this, virtualizer
+  // re-measurement after a row is added briefly grows scrollHeight before
+  // our auto-scroll catches up, the scroll event fires with
+  // distanceFromBottom > threshold, and pinning is lost even though the
+  // user never touched the timeline. (Regression of fix in commit 80b33db80.)
+  const userScrollIntentRef = useRef(false);
   // Visible state for scroll-to-bottom button
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
@@ -288,10 +295,29 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   // auto-scroll effects above.
   useLayoutEffect(() => {
     isPinnedToBottomRef.current = true;
+    userScrollIntentRef.current = false;
     setShowScrollToBottom(false);
     const el = scrollContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [conversationName]);
+
+  // Mark user-initiated scroll intent so handleScroll can distinguish a real
+  // scroll-up from a transient programmatic-scroll undershoot.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const markIntent = () => { userScrollIntentRef.current = true; };
+    el.addEventListener('wheel', markIntent, { passive: true });
+    el.addEventListener('touchstart', markIntent, { passive: true });
+    el.addEventListener('pointerdown', markIntent);
+    el.addEventListener('keydown', markIntent);
+    return () => {
+      el.removeEventListener('wheel', markIntent);
+      el.removeEventListener('touchstart', markIntent);
+      el.removeEventListener('pointerdown', markIntent);
+      el.removeEventListener('keydown', markIntent);
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -307,6 +333,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       }
     });
     isPinnedToBottomRef.current = true;
+    userScrollIntentRef.current = false;
     setShowScrollToBottom(false);
   }, [rowVirtualizer, virtualRows.length]);
 
@@ -315,8 +342,19 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     const atBottom = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
-    isPinnedToBottomRef.current = atBottom;
-    setShowScrollToBottom(!atBottom);
+    if (atBottom) {
+      // Landing at the bottom always re-pins, regardless of cause.
+      isPinnedToBottomRef.current = true;
+      userScrollIntentRef.current = false;
+      setShowScrollToBottom(false);
+    } else if (userScrollIntentRef.current) {
+      // Only unpin when the user actually scrolled. Programmatic scrolls that
+      // momentarily land short of the bottom (virtualizer re-measurement
+      // during streaming) must not unpin — the resize-observer auto-scroll
+      // below will catch up on the next tick.
+      isPinnedToBottomRef.current = false;
+      setShowScrollToBottom(true);
+    }
   }, []);
 
   const virtualItems = rowVirtualizer.getVirtualItems();

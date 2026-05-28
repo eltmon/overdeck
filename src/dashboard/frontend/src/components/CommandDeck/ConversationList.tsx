@@ -62,6 +62,23 @@ export interface Conversation {
   forkFallbackReason?: string | null;
   /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
   clearedToConvId?: number | null;
+  /** PAN-1523: current git branch at cwd, null when cwd is not a git repo. */
+  branch?: string | null;
+  /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
+  isWorktree?: boolean;
+  /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
+  pendingInputCount?: number;
+  pendingInputKinds?: ReadonlyArray<string>;
+  pendingAskUserQuestion?: {
+    toolUseId: string;
+    askedAt: string;
+    questions: ReadonlyArray<{
+      question: string;
+      header?: string;
+      multiSelect?: boolean;
+      options: ReadonlyArray<{ label: string; description?: string }>;
+    }>;
+  };
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
@@ -298,10 +315,12 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       {mutations.forkTarget && (
         <ForkModal
           conversation={mutations.forkTarget}
+          initialMode={mutations.forkTargetMode}
+          initialFocus={mutations.forkTargetFocus}
           isPending={mutations.isForkPending}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
-            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
           }}
         />
       )}

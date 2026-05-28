@@ -184,6 +184,35 @@ describe('role model configuration', () => {
     })).toThrow('config.yaml: roles.flywheel.maxAgents must be a positive integer');
   });
 
+  it('accepts xhigh/max effort on an Opus 4.7 role', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        work: { model: 'claude-opus-4-7', effort: 'xhigh' },
+        review: { model: 'workhorse:expensive', effort: 'max' },
+      },
+    });
+
+    expect(config.roles?.work?.effort).toBe('xhigh');
+    expect(config.roles?.review?.effort).toBe('max');
+  });
+
+  it('rejects an effort level the role model does not support (model-aware)', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        // claude-sonnet-4-6 supports low/medium/high only — xhigh is Opus-4.7-only.
+        test: { model: 'claude-sonnet-4-6', effort: 'xhigh' },
+      },
+    })).toThrow("config.yaml: roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high)");
+  });
+
+  it('rejects an effort value outside the enum', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        work: { model: 'claude-opus-4-7', effort: 'maximum' as never },
+      },
+    })).toThrow('config.yaml: roles.work.effort must be one of low, medium, high, xhigh, max');
+  });
+
   it('seeds missing workhorse slots while preserving user-defined slots', () => {
     // PAN-1067 added MODEL_DEPRECATIONS that transparently maps
     // 'gpt-5.5-mini' → 'gpt-5.4-mini' (a hallucinated tier that never

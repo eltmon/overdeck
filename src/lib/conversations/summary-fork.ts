@@ -22,7 +22,7 @@
  * wires the options through and handles tmux spawn + summary injection.
  */
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
@@ -37,12 +37,14 @@ import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.j
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import { getTranscriptAdapter } from './transcript-adapter.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError } from '../errors.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
+export type HandoffAuthor = 'source' | 'external';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -55,6 +57,22 @@ export interface SummaryForkOptions {
   handoffPollIntervalMs?: number;
   /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
   includeThinkingInSummary?: boolean;
+  /**
+   * Who authors the handoff document when forkMode === 'handoff'.
+   *
+   * - 'source' (legacy): deliver the handoff prompt to the live source agent
+   *   via deliverAgentMessage and wait for it to write the doc + .done sentinel.
+   *   Requires the source conversation to be alive. Pollutes the source's
+   *   context. Uses whatever model/harness the source is running on.
+   * - 'external' (default): spawn a separate authoring session with the chosen
+   *   model/harness that reads the source JSONL transcript and emits the doc.
+   *   Does not touch the source conversation. Works on ended sources.
+   */
+  handoffAuthor?: HandoffAuthor;
+  /** Model for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
+  handoffAuthorModel?: string;
+  /** Harness for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
+  handoffAuthorHarness?: RuntimeName;
 }
 
 export interface SummaryForkResult {
@@ -109,13 +127,28 @@ export class HandoffValidationError extends Error {
   }
 }
 
-export function validateHandoffDoc(text: string): HandoffDocValidation {
+/**
+ * Strip a wrapping ``` fenced code block from the doc body if the LLM
+ * helpfully wrapped its Markdown output in a fence. Returns the inner
+ * content if a fence was detected, otherwise returns the trimmed input.
+ */
+export function sanitizeHandoffDoc(text: string): string {
   const trimmed = text.trim();
-  if (trimmed.length < 200) {
+  const fenceMatch = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/);
+  return fenceMatch?.[1]?.trim() ?? trimmed;
+}
+
+export function validateHandoffDoc(text: string): HandoffDocValidation {
+  const sanitized = sanitizeHandoffDoc(text);
+  if (sanitized.length < 200) {
     return { ok: false, reason: 'handoff document must be at least 200 characters' };
   }
-  if (!/^##\s+Suggested skills\s*$/imu.test(trimmed)) {
-    return { ok: false, reason: 'handoff document must contain a ## Suggested skills section' };
+  // Accept any heading depth (H1-H6), case-insensitive, with an optional
+  // trailing colon. Real-world LLM outputs vary on heading conventions; the
+  // failure mode of a too-strict validator is silent fallback to summary fork
+  // with no surface to the user, which is the worst outcome.
+  if (!/^#{1,6}\s+suggested skills\s*:?\s*$/imu.test(sanitized)) {
+    return { ok: false, reason: 'handoff document must contain a Suggested skills heading' };
   }
   return { ok: true };
 }
@@ -149,6 +182,146 @@ async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollInt
   }
 }
 
+const DEFAULT_HANDOFF_AUTHOR_MODEL = 'claude-sonnet-4-6';
+const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
+// When the raw transcript exceeds this many characters, pre-compact it via
+// generateSmartSummary (which chunks internally) before sending to the
+// handoff authoring model. Threshold chosen to keep the final prompt
+// comfortably under Haiku's 200k-token window (~800k chars at 4 chars/token,
+// minus headroom for the template, focus, and a response budget). The exact
+// value isn't critical — anything that triggers compaction for "long"
+// transcripts is fine.
+const HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD = 100_000;
+
+function renderExternalHandoffPrompt(template: string, focus: string | undefined, transcript: string, outputPath: string): string {
+  const safeFocus = focus?.trim() || NO_HANDOFF_FOCUS;
+  return template
+    .split('{{focus}}').join(safeFocus)
+    .split('{{outputPath}}').join(outputPath)
+    .split('{{transcript}}').join(transcript);
+}
+
+/**
+ * Author a handoff document from an external authoring session.
+ *
+ * Reads the source JSONL transcript and asks a fresh, isolated model session
+ * (with the chosen model + harness) to write the handoff Markdown. The source
+ * conversation is never contacted — its context is not polluted.
+ *
+ * Returns the same { docPath, docText } shape as requestHandoffFromAgent so
+ * callers can substitute one for the other.
+ */
+export async function authorHandoffExternal(
+  sourceConv: Conversation,
+  sourceSessionFile: string,
+  focus: string | undefined,
+  model: string | undefined,
+  harness: RuntimeName | undefined,
+  options: { now?: Date } = {},
+): Promise<RequestHandoffResult> {
+  await ensureHandoffsDir();
+  const timestamp = (options.now ?? new Date()).toISOString();
+  const paths = createHandoffPaths(sourceConv.name, timestamp);
+  const template = await readFile(join(packageRoot, 'roles', 'handoff-external.md'), 'utf-8');
+  // The source's harness decides how the transcript is read/serialized; the
+  // authoring harness (model + harness picked by the user) is independent.
+  const sourceAdapter = getTranscriptAdapter(sourceConv.harness ?? undefined);
+  // Skip thinking blocks — they're large and the structured output we want
+  // doesn't need internal reasoning, only the user/assistant exchange.
+  const transcript = await sourceAdapter.serializeTranscript(sourceSessionFile, { includeThinking: false });
+
+  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+  const effectiveHarness: RuntimeName = harness ?? 'claude-code';
+
+  // If the raw transcript is small enough, feed it to the model verbatim —
+  // that's the richest input. For long transcripts we'd overflow any model's
+  // context window in a single-pass prompt, so first compact via the chunked
+  // generateSmartSummary path (which already handles chunking + merging) and
+  // feed the compact summary to the handoff authoring step. The handoff
+  // template treats {{transcript}} as opaque context — a compact summary
+  // works as well as the raw transcript, just with less fine detail.
+  let promptInput: string;
+  let inputLabel: 'raw-transcript' | 'compact-summary';
+  // Precompaction uses generateSmartSummary, which parses the JSONL via the
+  // Claude Code shape (entry.type === 'user'/'assistant'). Other harnesses
+  // (Pi, etc.) have different JSONL shapes, so for non-claude-code sources we
+  // hand the already-serialized transcript through verbatim. Pi sessions tend
+  // to be much shorter than long-running Claude Code sessions, so this works
+  // in practice today; harness-aware chunked compaction is tracked as a
+  // follow-up for when we need it.
+  const canPrecompact = (sourceConv.harness ?? 'claude-code') === 'claude-code';
+  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD && canPrecompact) {
+    console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length} | precompacting=true`);
+    const { config } = loadConfigSync();
+    const richMode = config.conversations.richCompaction;
+    const compact = await Effect.runPromise(generateSmartSummary({
+      jsonlPath: sourceSessionFile,
+      model: effectiveModel,
+      richMode,
+      mode: 'fork',
+      includeThinkingInSummary: false,
+      harness: effectiveHarness,
+    }));
+    promptInput = compact.summary;
+    inputLabel = 'compact-summary';
+    console.log(`[claude-invoke] purpose=handoff-author-external precompact-result | model=${effectiveModel} | compactChars=${compact.summary.length}`);
+  } else {
+    promptInput = transcript;
+    inputLabel = 'raw-transcript';
+  }
+
+  const prompt = renderExternalHandoffPrompt(template, focus, promptInput, paths.docPath);
+  console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | inputType=${inputLabel} | promptChars=${prompt.length} | outputPath=${paths.docPath}`);
+
+  // The prompt tells the model to use its Write tool to author the document
+  // directly at paths.docPath. We capture stdout only as a diagnostic log —
+  // the source of truth for the doc is the file on disk. Writing via tool
+  // avoids stdout preamble leaks like "Here is the handoff document:" that
+  // contaminated earlier attempts.
+  const stdout = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
+  console.log(`[claude-invoke] purpose=handoff-author-external acknowledgement | model=${effectiveModel} | stdoutChars=${stdout.length} | stdoutPreview=${JSON.stringify(stdout.slice(0, 120))}`);
+
+  let docText: string;
+  try {
+    docText = await readFile(paths.docPath, 'utf-8');
+  } catch (err) {
+    // The model didn't use Write — it almost certainly produced the doc on
+    // stdout instead. Persist whatever we got for diagnosis, then surface
+    // the failure as a validation error so the pipeline falls back to a
+    // summary fork rather than spinning forever.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, stdout, 'utf-8').catch((wErr) => {
+      console.warn(`[handoff-author-external] failed to persist stdout to ${rejectedPath}: ${wErr?.message ?? wErr}`);
+    });
+    console.warn(`[handoff-author-external] model did not call Write — stdout (${stdout.length} chars) saved to ${rejectedPath}: ${(err as { message?: string })?.message ?? err}`);
+    throw new HandoffValidationError(paths.docPath, 'authoring session did not call its Write tool to create the handoff doc');
+  }
+
+  const validation = validateHandoffDoc(docText);
+  if (!validation.ok) {
+    // The file exists but its content failed the contract check. Persist
+    // the rejected file for diagnosis and surface the reason.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, docText, 'utf-8').catch((err) => {
+      console.warn(`[handoff-author-external] failed to persist rejected doc to ${rejectedPath}: ${err?.message ?? err}`);
+    });
+    console.warn(`[handoff-author-external] validation rejected file content (${validation.reason}); copy saved to ${rejectedPath}`);
+    throw new HandoffValidationError(paths.docPath, validation.reason);
+  }
+
+  // Sanitize as a safety net in case the model wrapped the file in fences
+  // despite the prompt telling it not to. Overwrite the file with the
+  // cleaned text so downstream consumers see the same thing the validator
+  // approved.
+  const sanitized = sanitizeHandoffDoc(docText);
+  if (sanitized !== docText) {
+    await writeFile(paths.docPath, sanitized, 'utf-8');
+  }
+  await writeFile(paths.sentinelPath, '', 'utf-8');
+
+  return { docPath: paths.docPath, docText: sanitized };
+}
+
 export async function requestHandoffFromAgent(
   sourceConv: Conversation,
   focus?: string,
@@ -169,10 +342,18 @@ export async function requestHandoffFromAgent(
   );
   const validation = validateHandoffDoc(docText);
   if (!validation.ok) {
+    // The source agent already wrote the file to docPath. Move it aside to
+    // .rejected.md so the next handoff attempt doesn't reuse a stale invalid
+    // doc and so the operator can inspect what the agent wrote.
+    const rejectedPath = `${paths.docPath}.rejected.md`;
+    await writeFile(rejectedPath, docText, 'utf-8').catch((err) => {
+      console.warn(`[handoff-source] failed to persist rejected output to ${rejectedPath}: ${err?.message ?? err}`);
+    });
+    console.warn(`[handoff-source] validation rejected source-authored doc (${validation.reason}); raw output saved to ${rejectedPath}`);
     throw new HandoffValidationError(paths.docPath, validation.reason);
   }
 
-  return { docPath: paths.docPath, docText };
+  return { docPath: paths.docPath, docText: sanitizeHandoffDoc(docText) };
 }
 
 function workspaceSourceFromCwd(sourceConv: Conversation): { issueId: string; workspacePath: string } | null {
@@ -211,6 +392,28 @@ export function handoffFailureReason(error: unknown): string {
 
 export function logHandoffFallback(sourceConv: Conversation, reason: string): void {
   console.warn(`[summary-fork] handoff-fallback source=${sourceConv.name} reason=${reason}`);
+}
+
+/**
+ * When a handoff falls back to a summary fork, the user's focus text would
+ * otherwise be silently dropped. Prepend a small notice to the summary so the
+ * successor conversation still sees what was asked, and so the user gets a
+ * visible breadcrumb that the intended handoff failed.
+ */
+export function prependFallbackFocus(summary: string, focus: string | undefined, fallbackReason: string): string {
+  const trimmedFocus = focus?.trim();
+  if (!trimmedFocus) return summary;
+  const header = [
+    `**Note from Panopticon:** the intended handoff fell back to a summary fork (\`${fallbackReason}\`). The focus you requested is preserved below; the summary that follows is auto-generated, not an authored handoff document.`,
+    '',
+    '**Requested focus:**',
+    '',
+    `> ${trimmedFocus.split('\n').join('\n> ')}`,
+    '',
+    '---',
+    '',
+  ].join('\n');
+  return header + summary;
 }
 
 async function generateSummarySeed(
@@ -449,30 +652,61 @@ function sanitizeEntryForPlainFork(entry: any): any {
     summary = '';
     usedSummaryModel = null;
   } else if (forkMode === 'handoff') {
-    const preconditionFallback = await handoffPreconditionFallbackReason(conv);
-    if (preconditionFallback) {
-      forkFallbackReason = preconditionFallback;
-      effectiveForkMode = 'summary';
-      logHandoffFallback(conv, preconditionFallback);
-      const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-      summary = result.summary;
-      usedSummaryModel = result.summaryModel;
-    } else {
+    const handoffAuthor: HandoffAuthor = options.handoffAuthor ?? 'external';
+    if (handoffAuthor === 'external') {
+      // External authoring: read the source JSONL and have a fresh authoring
+      // session write the handoff doc. Source conversation is never touched.
+      // Works on ended source conversations and lets the user pick the
+      // authoring model/harness independently of the source.
       try {
-        const handoff = await requestHandoffFromAgent(conv, options.focus, {
-          timeoutMs: options.handoffTimeoutMs,
-          pollIntervalMs: options.handoffPollIntervalMs,
-        });
+        const handoff = await authorHandoffExternal(
+          conv,
+          sourceSessionFile,
+          options.focus,
+          options.handoffAuthorModel,
+          options.handoffAuthorHarness,
+        );
         summary = handoff.docText;
-        usedSummaryModel = null;
+        usedSummaryModel = options.handoffAuthorModel ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
         handoffDocPath = handoff.docPath;
       } catch (error) {
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, forkFallbackReason);
         const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
-        summary = result.summary;
+        summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
         usedSummaryModel = result.summaryModel;
+      }
+    } else {
+      // Source authoring (legacy): deliver the handoff prompt to the live
+      // source agent and wait for it to write the doc + .done sentinel.
+      // Requires the source conversation to be alive and pollutes its
+      // context with the handoff turn pair.
+      const preconditionFallback = await handoffPreconditionFallbackReason(conv);
+      if (preconditionFallback) {
+        forkFallbackReason = preconditionFallback;
+        effectiveForkMode = 'summary';
+        logHandoffFallback(conv, preconditionFallback);
+        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+        summary = prependFallbackFocus(result.summary, options.focus, preconditionFallback);
+        usedSummaryModel = result.summaryModel;
+      } else {
+        try {
+          const handoff = await requestHandoffFromAgent(conv, options.focus, {
+            timeoutMs: options.handoffTimeoutMs,
+            pollIntervalMs: options.handoffPollIntervalMs,
+          });
+          summary = handoff.docText;
+          usedSummaryModel = null;
+          handoffDocPath = handoff.docPath;
+        } catch (error) {
+          forkFallbackReason = handoffFailureReason(error);
+          effectiveForkMode = 'summary';
+          logHandoffFallback(conv, forkFallbackReason);
+          const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+          summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
+          usedSummaryModel = result.summaryModel;
+        }
       }
     }
   } else {

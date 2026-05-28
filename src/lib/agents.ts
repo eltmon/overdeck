@@ -16,7 +16,7 @@ import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
-import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfigSync } from './config.js';
@@ -269,6 +269,7 @@ export async function getAgentRuntimeBaseCommand(
   agentName?: string,
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -282,6 +283,7 @@ export async function getAgentRuntimeBaseCommand(
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
+  const effortFlag = effort ? ` --effort ${effort}` : '';
   // PAN-982: When agentDefinition is provided, pass it directly to --agent.
   // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
   // Still pass --model when launching with an agent definition so explicit model
@@ -305,9 +307,9 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -317,9 +319,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -355,7 +357,7 @@ export async function getRoleRuntimeBaseCommand(
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
-  effort?: 'low' | 'medium' | 'high',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -1962,6 +1964,8 @@ export interface SpawnOptions {
   // runtime and is used by review/test/ship agents independently.
   allowHost?: boolean;
   flywheelRunId?: string;
+  /** Claude Code `--effort` level for the spawned session (work/strike). */
+  effort?: RoleEffort;
 }
 
 export interface SpawnRunOptions {
@@ -1987,7 +1991,7 @@ export interface SpawnRunOptions {
   reviewOutputPath?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
 }
@@ -2170,6 +2174,8 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
   extraEnvExports?: string[];
+  /** Claude Code `--effort` level threaded into the launcher command. */
+  effort?: RoleEffort;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2278,7 +2284,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -2418,6 +2424,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
+      effort: options.effort,
     });
   }
 
@@ -2923,6 +2930,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
+    effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -3222,6 +3230,96 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
   }
 }
 
+/**
+ * Find and kill any running `launcher.sh` process for the given agent.
+ *
+ * PAN-1527: `tmux kill-session` only signals tmux-managed children. Planning
+ * agents (and any agent whose launcher escapes its tmux session) leave
+ * orphan launcher.sh processes alive — state.json says stopped, but bash is
+ * still burning CPU and tokens hours later. This locates them by command
+ * line and walks SIGTERM → grace → SIGKILL.
+ *
+ * Sync version: callable from CLI (`pan kill`) and from the existing
+ * `stopAgentSync`. Uses execSync only via `pgrep`, which is fast and
+ * non-blocking in practice. Acceptable per CLAUDE.md because this path is
+ * sync-by-nature already and is only called from CLI contexts and existing
+ * sync internals.
+ */
+function killLauncherProcessSync(agentId: string): void {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    pidsOut = execSync(
+      `pgrep -f ${JSON.stringify(launcherPath)}`,
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches — nothing to kill
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  // ~500ms grace period for orderly shutdown. Sync spawn of `sleep` is
+  // acceptable in CLI context; this function is never reached from the
+  // dashboard server (which uses the async `stopAgent` Effect below).
+  try {
+    execSync('sleep 0.5', { stdio: 'ignore' });
+  } catch { /* ignore */ }
+
+  const survivors: number[] = [];
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      survivors.push(pid);
+    } catch {
+      /* already dead */
+    }
+  }
+  for (const pid of survivors) {
+    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+  }
+}
+
+async function killLauncherProcessAsync(agentId: string): Promise<void> {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    const { stdout } = await execAsync(`pgrep -f ${JSON.stringify(launcherPath)}`);
+    pidsOut = stdout.trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  await new Promise<void>(resolve => setTimeout(resolve, 500));
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+    } catch {
+      /* already dead */
+    }
+  }
+}
+
 export function stopAgentSync(agentId: string): void {
   const normalizedId = normalizeAgentId(agentId);
 
@@ -3240,6 +3338,11 @@ export function stopAgentSync(agentId: string): void {
 
     killSessionSync(normalizedId);
   }
+
+  // PAN-1527: kill orphan launcher.sh processes that escape tmux (planning
+  // agents, dashboard-spawned launchers, anything that survived tmux
+  // kill-session). Runs even when no tmux session existed in the first place.
+  killLauncherProcessSync(normalizedId);
 
   const state = getAgentStateSync(normalizedId);
   if (state) {
@@ -3284,6 +3387,14 @@ export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxEr
 
       yield* killSession(normalizedId);
     }
+
+    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after
+    // killSession so tmux gets the first chance to take everything down
+    // cleanly; falls through and kills any survivor by command-line match.
+    yield* Effect.tryPromise({
+      try: () => killLauncherProcessAsync(normalizedId),
+      catch: (cause): never => { throw cause; },
+    }).pipe(Effect.catch(() => Effect.void));
 
     const state = yield* getAgentState(normalizedId);
     if (state) {

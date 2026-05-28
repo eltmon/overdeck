@@ -16,7 +16,7 @@ export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TitleSource = 'auto' | 'ai' | 'manual' | 'default';
+export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
 
 export interface Conversation {
   id: number;

@@ -15,7 +15,10 @@ const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
   if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
   if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
   if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
-  if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+  // PAN-1531: verifyMergedBeforeLifecycle is now PR-API-only. Tests rely on
+  // postMergeLifecycle proceeding past verification, so the gh pr list mock
+  // must report the PR as merged.
+  if (cmd.includes('gh pr list')) return { stdout: '[{"number":444,"mergedAt":"2026-04-27T00:00:00Z","mergeCommit":{"oid":"deadbeef"}}]', stderr: '' };
   return { stdout: '', stderr: '' };
 }));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
@@ -89,8 +92,8 @@ vi.mock('../../../src/lib/paths.js', () => ({
 }));
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
-  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: false }),
-  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: false }),
+  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 444 }),
+  resolveGitHubIssueSync: vi.fn().mockReturnValue({ isGitHub: true, owner: 'test', repo: 'test', number: 444 }),
   resolveTrackerType: vi.fn().mockReturnValue('github'),
   resolveTrackerTypeSync: vi.fn().mockReturnValue('github'),
 }));

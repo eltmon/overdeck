@@ -81,6 +81,7 @@ import {
   resumeAgent,
   restartAgent,
   messageAgent,
+  deliverAgentMessage,
   stopAgentSync,
   stopAgent,
   listRunningAgentsSync,
@@ -108,7 +109,6 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.j
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
-import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { recordFeatureRegistryLifecycle } from '../../../lib/registry/feature-registry-population.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -118,6 +118,7 @@ import { operatorInterventionEvent } from '../../../lib/operator-interventions.j
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import { getClosedIssueIdsForReadSource, ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
+import { resolveAgentGitInfo } from '../services/git-info.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -746,6 +747,9 @@ const getAgentsRoute = HttpRouter.add(
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
               pendingQuestionReason: enrichment.pendingQuestionReason,
+              pendingInputCount: enrichment.pendingInputCount,
+              pendingInputKinds: enrichment.pendingInputKinds,
+              pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
               resolution: runtimeState?.resolution || enrichment.resolution || 'working',
               resolutionCount: runtimeState?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
@@ -1245,7 +1249,17 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/agents/:id/answer-question ─────────────────────────────
+// ─── Route: POST /api/agents/:id/answer-question (PAN-1520) ──────────────────
+//
+// Operator answer for an AskUserQuestion the agent is blocked on. The Phase 1
+// hook (sync-sources/hooks/ask-user-question-hook) denies the upstream tool
+// call to prevent silent corruption (upstream returns option #1 under
+// --dangerously-skip-permissions), so by the time this endpoint is hit the
+// agent has restated the question as plain text and is waiting on a normal
+// user message. We compose that user message from the chosen option labels
+// and deliver it through the standard message pipeline.
+//
+// Body: { answers: string[] }  — one chosen-option label per question.
 
 const postAgentAnswerQuestionRoute = HttpRouter.add(
   'POST',
@@ -1253,44 +1267,35 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+    if (!id.trim()) {
+      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
+    }
+    const body = (yield* readJsonBody) as Record<string, unknown>;
 
-    const { answers } = body as any;
-    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+    const answers = body['answers'];
+    if (!Array.isArray(answers) || answers.length === 0) {
       return jsonResponse({ error: 'answers array required' }, { status: 400 });
+    }
+    if (!answers.every((a): a is string => typeof a === 'string' && a.length > 0)) {
+      return jsonResponse({ error: 'every answer must be a non-empty string' }, { status: 400 });
     }
 
     const pendingQuestions = yield* getAgentPendingQuestions(id);
     if (pendingQuestions.length === 0) {
-      return jsonResponse({ error: 'No pending questions found' }, { status: 400 });
+      return jsonResponse({ error: 'No pending questions found for this agent' }, { status: 404 });
     }
 
     const questionSet = pendingQuestions[0];
     const questions = questionSet.questions;
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
+    const lines: string[] = [];
     for (let i = 0; i < answers.length && i < questions.length; i++) {
-      const answer = answers[i];
-      const question = questions[i];
-      const optionIndex = question.options.findIndex(
-        (opt: { label: string }) => opt.label === answer
-      );
-
-      if (optionIndex === -1) {
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, '4'])));
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, answer])));
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
-      } else {
-        const keyNumber = optionIndex + 1;
-        yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, String(keyNumber)])));
-      }
-
-      yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'Tab'])));
-      yield* Effect.promise(() => delay(100));
+      const q = questions[i].question ?? `Question ${i + 1}`;
+      lines.push(`Q: ${q}\nA: ${answers[i]}`);
     }
+    const message = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
 
-    yield* Effect.promise(() => execAsync(buildTmuxCommandString(['send-keys', '-t', id, 'C-m'])));
-    return jsonResponse({ success: true });
+    yield* Effect.promise(() => deliverAgentMessage(id, message, 'ask-user-question-answer'));
+    return jsonResponse({ success: true, agentId: id, delivered: answers.length });
   })),
 );
 
@@ -1542,6 +1547,45 @@ const getAgentRuntimeRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'not found' }, { status: 404 });
     }
     return jsonResponse({ success: true, snapshot });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/git-info ─────────────────────────────────────
+//
+// Branch + worktree status for the agent's workspace (PAN-1523). Used by
+// AgentOutputPanel to render the Local/Worktree/Drifted chip in the panel
+// header. Work agents don't have a conversation row to enrich, so the panel
+// queries this dedicated endpoint instead.
+
+const getAgentGitInfoRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/git-info',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ error: 'missing agent id' }, { status: 400 });
+    }
+
+    const agentState = yield* getAgentState(id);
+    if (!agentState?.workspace || !agentState.issueId) {
+      return jsonResponse({
+        actualBranch: null,
+        branchDrifted: false,
+        workspaceMissing: true,
+        expectedBranch: null,
+      });
+    }
+
+    const expectedBranch = `feature/${agentState.issueId.toLowerCase()}`;
+    const info = yield* Effect.promise(() =>
+      resolveAgentGitInfo(agentState.workspace as string, expectedBranch),
+    );
+    return jsonResponse({
+      ...info,
+      expectedBranch,
+      workspacePath: agentState.workspace,
+    });
   })),
 );
 
@@ -2943,45 +2987,43 @@ const postAgentsRoute = HttpRouter.add(
       console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`);
     }).pipe(Effect.catch(() => Effect.void));
 
-    let preSpawnStashRef: string | null = null;
-    let preSpawnStashMessage: string | null = null;
-    let preSpawnBaselineHead: string | null = null;
-    try {
-      const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-      }));
-      if (statusOut.trim()) {
-        const { stdout: headOut } = yield* Effect.promise(() => execAsync('git rev-parse HEAD', {
+    // PAN-1531: dirty-worktree refusal replaces silent pre-spawn stashing.
+    // If the workspace has uncommitted changes the route returns 409 with the
+    // diff so the dashboard can present the user three explicit choices:
+    // Commit / Discard (typed confirmation required) / Stash as salvageable.
+    // Clients that have already resolved the dirtiness MUST pass
+    // `acknowledgeDirtyWorkspace: true` to bypass this gate (typically after
+    // the user clicked one of the three modal buttons).
+    const acknowledgeDirtyWorkspace = (body as any).acknowledgeDirtyWorkspace === true;
+    if (!acknowledgeDirtyWorkspace) {
+      try {
+        const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
           cwd: workspacePath,
           encoding: 'utf-8',
         }));
-        preSpawnBaselineHead = headOut.trim() || null;
-        preSpawnStashMessage = buildStashMessage('pre-spawn', issueId, new Date());
-        preSpawnStashRef = yield* Effect.promise(() => createNamedStash(workspacePath, preSpawnStashMessage!, true));
-        if (preSpawnStashRef) {
-          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_created', {
+        if (statusOut.trim()) {
+          const { stdout: diffOut } = yield* Effect.promise(() => execAsync('git diff HEAD --stat', {
+            cwd: workspacePath,
+            encoding: 'utf-8',
+          }).catch(() => ({ stdout: '' })));
+          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_refused_dirty_workspace', {
             issueId,
             workspacePath,
-            stashRef: preSpawnStashRef,
-            stashMessage: preSpawnStashMessage,
-            baselineHead: preSpawnBaselineHead,
+            porcelain: statusOut.trim(),
           }));
-        } else {
-          preSpawnBaselineHead = null;
+          return jsonResponse({
+            error: `Workspace ${workspacePath} has uncommitted changes. Choose an action and retry start with acknowledgeDirtyWorkspace=true.`,
+            code: 'WORKSPACE_DIRTY',
+            workspacePath,
+            porcelain: statusOut.trim(),
+            diffStat: diffOut.trim(),
+            actions: ['commit', 'discard', 'stash-salvage'],
+          }, { status: 409 });
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[start-agent] Failed to check workspace status for ${issueId}: ${message}`);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      preSpawnStashRef = null;
-      preSpawnStashMessage = null;
-      preSpawnBaselineHead = null;
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_failed', {
-        issueId,
-        workspacePath,
-        error: message,
-      }));
-      console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
     }
 
     // PAN-1048 review feedback 003: the route only resolves harness when the
@@ -3171,9 +3213,6 @@ const postAgentsRoute = HttpRouter.add(
             role,
             hostOverride: allowHost || undefined,
             message: 'Waiting for containers to start...',
-            ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-            ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-            ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
           updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
@@ -3245,9 +3284,6 @@ const postAgentsRoute = HttpRouter.add(
                       role,
                       message: `Container startup timed out before work agent spawn. Run pan workspace rebuild ${issueId} to reset the stack.`,
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
-                      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-                      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-                      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                     }, null, 2));
                     return;
                   }
@@ -3305,9 +3341,6 @@ const postAgentsRoute = HttpRouter.add(
                     role,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
-                    ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-                    ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-                    ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                   }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
@@ -3416,9 +3449,6 @@ const postAgentsRoute = HttpRouter.add(
       role,
       hostOverride: allowHost || undefined,
       message: 'Work agent spawn requested',
-      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
-      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
-      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
     updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
@@ -3741,6 +3771,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postInternalAgentPermissionRequestRoute,
   postAgentPermissionResponseRoute,
   getAgentRuntimeRoute,
+  getAgentGitInfoRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,

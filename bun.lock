@@ -56,14 +56,10 @@
         "typescript": "^5.3.2",
         "vitest": "^4.1.6",
       },
-      "optionalDependencies": {
-        "moonshine-linux-x64": "workspace:*",
-        "qwen-tts-linux-x64": "workspace:*",
-      },
     },
     "apps/desktop": {
       "name": "@panctl/desktop",
-      "version": "0.11.1",
+      "version": "0.16.0",
       "bin": {
         "panctl": "./bin/panctl.mjs",
       },
@@ -84,7 +80,7 @@
     },
     "packages/contracts": {
       "name": "@panctl/contracts",
-      "version": "0.11.1",
+      "version": "0.16.0",
       "dependencies": {
         "effect": "4.0.0-beta.45",
       },

@@ -1112,6 +1112,24 @@ export function CommandDeck({
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
+  // Listen for `/handoff …` submitted in the chat composer — opens the fork
+  // modal pre-set to handoff mode for the conversation that emitted the
+  // event. Trailing text after the verb becomes the focus and pre-fills the
+  // dialog's Focus textarea.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        conversation: Conversation;
+        mode?: 'summary' | 'fast-summary' | 'plain' | 'handoff';
+        focus?: string;
+      }>).detail;
+      if (!detail?.conversation) return;
+      projectConvMutations.openForkModal(detail.conversation, { mode: detail.mode, focus: detail.focus });
+    };
+    window.addEventListener('panopticon:open-fork-modal', handler);
+    return () => window.removeEventListener('panopticon:open-fork-modal', handler);
+  }, [projectConvMutations]);
+
   const createConversationForProject = useCallback(async (projectKey?: string) => {
     try {
       const payload: Record<string, unknown> = { model: sidebarModel, harness: sidebarHarness };
@@ -1479,10 +1497,12 @@ export function CommandDeck({
           {projectConvMutations.forkTarget && (
             <ForkModal
               conversation={projectConvMutations.forkTarget}
+              initialMode={projectConvMutations.forkTargetMode}
+              initialFocus={projectConvMutations.forkTargetFocus}
               isPending={projectConvMutations.isForkPending}
               onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
+              onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
               }}
             />
           )}

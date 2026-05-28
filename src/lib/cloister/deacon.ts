@@ -3350,24 +3350,43 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * PAN-1531: scanner narrowed to surface only `salvageable:*` stashes, which
+ * are the only kind that needs human attention. Hand-typed stashes, retired
+ * `pre-merge` / `pre-spawn` / `review-temp` residue, and other non-canonical
+ * entries are no longer flagged — they're inert in `refs/stash` and the
+ * operator can clean them up at their leisure via a future `pan stash audit`
+ * command.
+ *
+ * Also: git worktrees share `refs/stash` with the parent repo, so listing
+ * once at the project root is enough; iterating workspaces would yield the
+ * same stash N times. Take the project root from the first workspace; if
+ * none exist, scan nothing.
+ */
 export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
   const actions: string[] = [];
+  const seenProjectRoots = new Set<string>();
 
-  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+  for (const { workspacePath } of listFeatureWorkspaces()) {
     if (!existsSync(workspacePath)) continue;
 
+    // workspaces/feature-<id>/ → project root is two levels up
+    const projectRoot = workspacePath.replace(/\/workspaces\/[^/]+\/?$/, '');
+    if (seenProjectRoots.has(projectRoot)) continue;
+    seenProjectRoots.add(projectRoot);
+    if (!existsSync(projectRoot)) continue;
+
     try {
-      const stashes = await Effect.runPromise(listStashes(workspacePath));
+      const stashes = await Effect.runPromise(listStashes(projectRoot));
       for (const stash of stashes) {
-        if (stash.kind !== 'unknown') continue;
-        const message = `Non-canonical stash in ${issueId} (${workspacePath}): ${stash.ref} ${stash.message} — audit recommended`;
+        if (stash.kind !== 'salvageable') continue;
+        const message = `Salvageable stash in ${projectRoot}: ${stash.ref} ${stash.message} — review and recover or dismiss via workspace inspector`;
         console.warn(`[deacon] ${message}`);
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message });
         actions.push(message);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[deacon] Failed non-canonical stash scan for ${issueId}: ${message}`);
+      console.warn(`[deacon] Failed salvageable-stash audit for ${projectRoot}: ${message}`);
     }
   }
 
@@ -4963,7 +4982,12 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
       await Effect.runPromise(saveAgentState(state));
-      if (state.stoppedByUser !== true) {
+      // PAN-1530: only record failure markers for agents the auto-resume gate
+      // will actually retry. Planning agents are one-shot by design — writing
+      // lastFailureReason / lastFailureNextRetryAt for them pollutes state.json
+      // with a retry that will never fire and confuses the dashboard.
+      const isResumableRole = !dir.startsWith('planning-');
+      if (state.stoppedByUser !== true && isResumableRole) {
         const failedState = await Effect.runPromise(recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
         if (failedState) {
           notifyAgentStatusChanged(failedState, oldStatus, false);

@@ -6,6 +6,7 @@
  */
 
 import { Effect } from 'effect';
+import { initDashboardLogFile } from './server-log-file.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
@@ -44,6 +45,12 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 
 declare const Bun: unknown;
+
+// Persist this process's console output to <PANOPTICON_HOME>/logs/dashboard.log
+// in every launch mode (PAN-1552) — must run before any startup logging so the
+// record (including conversation-message 500 causes) survives `serve`/npx and
+// the desktop app, not just detached `pan up`.
+initDashboardLogFile();
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
@@ -469,21 +476,21 @@ try {
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
 
-// Non-canonical stash scan: walks every workspace at startup. Cheap when there
-// are few workspaces, expensive when there are many (each scan does a git
-// stash list + reflog walk per worktree). Gated behind PANOPTICON_DISABLE_DEACON
-// alongside the cloister auto-start so the same escape hatch lets operators
-// bring the dashboard up cleanly when there are too many workspaces.
+// PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
+// stashes — the only kind that requires human review. Retired stash kinds
+// (pre-merge, pre-spawn, review-temp) and ad-hoc residue are ignored. The
+// scan runs once per project root, not per worktree, because worktrees
+// share `refs/stash` with their parent.
 if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
   void import('../../lib/cloister/deacon.js')
     .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
     .then((findings) => {
       if (findings.length > 0) {
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
+        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} salvageable stash(es) on startup; review via workspace inspector` });
       }
     })
     .catch((err: any) => {
-      console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
+      console.warn(`[panopticon] Failed salvageable-stash startup scan: ${err.message}`);
     });
 }
 

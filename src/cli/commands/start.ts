@@ -10,6 +10,8 @@ import { exec, execFile, execFileSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
+import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssueSync, hasProjectsSync, listProjectsSync, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
@@ -86,6 +88,8 @@ interface IssueOptions {
   model: string;
   /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
   harness?: 'claude-code' | 'pi';
+  /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
+  effort?: RoleEffort;
   dryRun?: boolean;
   shadow?: boolean;
   remote?: boolean;
@@ -709,6 +713,25 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Resolve the Claude Code --effort level for this spawn: explicit --effort
+  // wins, otherwise fall back to roles.work.effort from config. The flag
+  // bypasses config-load validation, so validate it here (base enum + the
+  // resolved model's supported levels) before any workspace setup.
+  const yamlConfig = loadYamlConfig().config;
+  const resolvedEffort: RoleEffort | undefined = options.effort ?? yamlConfig.roles?.work?.effort;
+  if (resolvedEffort !== undefined) {
+    if (!ROLE_EFFORTS.includes(resolvedEffort)) {
+      process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
+      process.exit(1);
+    }
+    const workModel = resolveRoleModel('work', options.model || undefined, yamlConfig);
+    const supportedEfforts = getModelEffortLevelsSync(workModel);
+    if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
+      process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
+      process.exit(1);
+    }
+  }
+
   // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
@@ -1064,6 +1087,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       role: 'work',
       prompt,
       allowHost: options.host,
+      effort: resolvedEffort,
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
@@ -1087,6 +1111,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Harness:    ${agent.harness ?? 'claude-code'}`);
     console.log(`  Model:      ${agent.model}`);
     console.log(`  Role:       ${agent.role}`);
+    if (resolvedEffort) console.log(`  Effort:     ${resolvedEffort}`);
 
     // Show context info
     const planningContext = await readPlanningContext(workspace);

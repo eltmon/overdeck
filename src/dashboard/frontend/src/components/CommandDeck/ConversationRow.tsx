@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2 } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -198,6 +198,17 @@ export function ConversationRow({
             aria-label={`Waiting for permission in ${conv.name}`}
           />
         </span>
+      ) : (conv.pendingInputCount ?? 0) > 0 ? (
+        // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Show the
+        // same triangle-alert affordance as the permission case so operators
+        // can spot the row from a distance.
+        <span title={`Waiting on your input (${(conv.pendingInputKinds ?? []).join(', ') || 'question'})`} style={{ display: 'contents' }}>
+          <TriangleAlert
+            size={spinnerSize}
+            className={styles.conversationPermissionAlert}
+            aria-label={`Conversation ${conv.name} is awaiting input`}
+          />
+        </span>
       ) : conv.isWorking ? (
         <WorkingSpinner
           size={spinnerSize}
@@ -237,6 +248,18 @@ export function ConversationRow({
         </span>
       )}
 
+      {/* Branch / worktree chip (PAN-1523) */}
+      {conv.branch && (
+        <span
+          className={styles.conversationBranchChip}
+          title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+          aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+        >
+          {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+          <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+        </span>
+      )}
+
       {/* Fork status badges */}
       {conv.forkStatus && conv.forkStatus !== 'failed' && (
         <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
@@ -254,6 +277,15 @@ export function ConversationRow({
         <span className={styles.conversationForkFailed} title={conv.spawnError}>
           <AlertCircle size={10} />
           <span>Spawn failed</span>
+        </span>
+      )}
+      {conv.forkFallbackReason && !conv.forkStatus && (
+        <span
+          className={styles.conversationForkFailed}
+          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.panopticon/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+        >
+          <TriangleAlert size={10} />
+          <span>Fallback: {conv.forkFallbackReason}</span>
         </span>
       )}
 
@@ -288,6 +320,20 @@ export function ConversationRow({
           aria-label={`Rename ${conv.name}`}
         >
           <Pencil size={iconSize} />
+        </span>
+        <span
+          role="button"
+          tabIndex={0}
+          className={styles.conversationEditBtn}
+          onClick={e => { e.stopPropagation(); mutations.retitle(conv.name); }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.retitle(conv.name); } }}
+          title="Regenerate title from the whole conversation"
+          aria-label={`Regenerate title for ${conv.title ?? conv.name}`}
+          aria-disabled={mutations.isRetitlePending(conv.name)}
+        >
+          {mutations.isRetitlePending(conv.name)
+            ? <Loader2 size={iconSize} className={styles.conversationWorkingSpinner} />
+            : <Sparkles size={iconSize} />}
         </span>
         {conv.handoffDocPath && (
           <span
@@ -326,6 +372,19 @@ export function ConversationRow({
             aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
           >
             <GitBranchPlus size={iconSize} />
+          </span>
+        )}
+        {conv.claudeSessionId && !conv.forkStatus && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.conversationSummaryForkBtn}
+            onClick={e => { e.stopPropagation(); mutations.openForkModal(conv, { mode: 'handoff' }); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.openForkModal(conv, { mode: 'handoff' }); } }}
+            title="Hand off to a new conversation"
+            aria-label={`Hand off ${conv.title ?? conv.name} to a new conversation`}
+          >
+            <Share2 size={iconSize} />
           </span>
         )}
         {!confirmArchive && (

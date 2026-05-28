@@ -230,6 +230,26 @@ export const selectChannelPermissionRequests = memoizeArraySelector<
 )
 
 /**
+ * PAN-1520 — agents that have an outstanding AskUserQuestion the operator
+ * can answer by clicking an option. Sorted by askedAt (oldest first).
+ */
+export const selectAgentsWithPendingAskUserQuestion = memoizeArraySelector<
+  DashboardState,
+  'agentsById',
+  AgentSnapshot[]
+>(
+  'agentsById',
+  (agentsById) =>
+    Object.values(agentsById)
+      .filter((a) => a.pendingAskUserQuestion != null)
+      .sort((a, b) => {
+        const aTime = a.pendingAskUserQuestion?.askedAt ?? ''
+        const bTime = b.pendingAskUserQuestion?.askedAt ?? ''
+        return aTime === bTime ? a.id.localeCompare(b.id) : aTime.localeCompare(bTime)
+      }),
+)
+
+/**
  * Issues currently awaiting a human merge click — `readyForMerge: true`
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
  * don't age in the queue.

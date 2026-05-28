@@ -47,8 +47,13 @@ describe('ConversationTerminal', () => {
     });
 
     expect(screen.getByText('test-conv')).toBeInTheDocument();
-    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('33.04k');
-    expect(screen.getByRole('progressbar', { name: 'Context usage' })).toHaveAttribute('aria-valuenow', '17');
+    // ContextWindowMeter shows the rounded percentage in its ring label and the
+    // full token breakdown in the hover title.
+    expect(screen.getByTestId('context-window-meter-label')).toHaveTextContent('17');
+    expect(screen.getByTestId('context-window-meter')).toHaveAttribute(
+      'title',
+      expect.stringContaining('33k/200k'),
+    );
   });
 
   it('omits context usage when no usage is available', () => {
@@ -57,6 +62,6 @@ describe('ConversationTerminal', () => {
       contextUsage: null,
     });
 
-    expect(screen.queryByTestId('context-usage-indicator')).toBeNull();
+    expect(screen.queryByTestId('context-window-meter')).toBeNull();
   });
 });

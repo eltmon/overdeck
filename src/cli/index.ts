@@ -48,6 +48,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
+import type { RoleEffort } from '../lib/config-yaml.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
@@ -420,12 +421,14 @@ program
   .action(forkCommand);
 
 program
-  .command('handoff <conv>')
-  .description('Agent-authored conversation handoff that spawns a new conversation')
-  .option('--focus <text>', 'Guidance for what the source agent should focus on in the handoff')
-  .option('--model <model>', 'Model for the handoff-forked session')
-  .option('--harness <harness>', 'Harness for the handoff-forked session: claude-code or pi')
-  .option('--cwd <path>', 'Working directory for the handoff-forked session')
+  .command('handoff <conv> [focus...]')
+  .description('Conversation handoff that spawns a new conversation; trailing text becomes the focus')
+  .option('--model <model>', 'Model for the handoff-forked (new) conversation')
+  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
+  .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
+  .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
+  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code or pi (only when --author=external)')
   .action(handoffCommand);
 
 program
@@ -500,6 +503,7 @@ program
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -516,9 +520,9 @@ program
   .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
-  .option('--effort <level>', 'Strike effort: low | medium | high (default medium)')
+  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: 'low' | 'medium' | 'high'; dryRun?: boolean }) =>
+  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
     strikeCommand(ids, options),
   );
 
@@ -621,7 +625,11 @@ program
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
 
-    // Auto-sync skills, hooks, and MCP config on every startup
+    // Auto-sync on every startup: skills, agents, hooks, MCP config,
+    // and rendered context layers (~/.claude/CLAUDE.md + per-project
+    // CLAUDE.md files). Ensures bundled engineering rules and any
+    // edits to global.md / project.md reach every Claude Code session
+    // without the user remembering to run `pan sync` first.
     {
       const origWrite = process.stdout.write;
       const origErrWrite = process.stderr.write;
@@ -632,7 +640,7 @@ program
         await syncCommand({});
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
-        console.log(chalk.dim('  Auto-synced skills, hooks, and MCP config'));
+        console.log(chalk.dim('  Auto-synced skills, agents, rules, hooks, MCP config, and CLAUDE.md context layers'));
       } catch {
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;

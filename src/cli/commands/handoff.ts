@@ -7,10 +7,12 @@ import { sessionFilePath } from '../../lib/paths.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 interface HandoffOptions {
-  focus?: string;
   model?: string;
   harness?: string;
   cwd?: string;
+  author?: string;
+  authorModel?: string;
+  authorHarness?: string;
 }
 
 function resolveConversation(convRef: string) {
@@ -30,6 +32,7 @@ function validateHarness(harness: string | undefined): RuntimeName | undefined {
 
 export async function handoffCommand(
   convRef: string,
+  focusArgs: string[],
   options: HandoffOptions,
 ): Promise<void> {
   const conv = resolveConversation(convRef);
@@ -44,10 +47,18 @@ export async function handoffCommand(
     process.exit(1);
   }
 
+  const focus = focusArgs.join(' ').trim() || undefined;
   const harness = validateHarness(options.harness);
+  const authorHarness = validateHarness(options.authorHarness);
+  const author = options.author === 'source' ? 'source' : 'external';
+  if (options.author !== undefined && options.author !== 'source' && options.author !== 'external') {
+    console.log(chalk.yellow(`Invalid --author: ${options.author}. Expected source or external.`));
+    process.exit(1);
+  }
   console.log(chalk.gray(`Creating handoff from conversation: ${conv.name} (${conv.title || 'untitled'})`));
-  if (options.focus?.trim()) {
-    console.log(chalk.gray(`  Focus: ${options.focus.trim()}`));
+  console.log(chalk.gray(`  Author: ${author}${author === 'external' ? ` (model=${options.authorModel ?? 'default'}, harness=${authorHarness ?? 'claude-code'})` : ' (in-source agent)'}`));
+  if (focus) {
+    console.log(chalk.gray(`  Focus: ${focus}`));
   }
 
   const result = await Effect.runPromise(createSummaryFork(conv, {
@@ -55,7 +66,10 @@ export async function handoffCommand(
     cwd: options.cwd,
     harness,
     forkMode: 'handoff',
-    focus: options.focus,
+    focus,
+    handoffAuthor: author,
+    handoffAuthorModel: options.authorModel,
+    handoffAuthorHarness: authorHarness,
   }));
   const newConv = result.conversation;
 

@@ -25,7 +25,7 @@ async function resolvePreferredEditor(): Promise<EditorId> {
   const result = await getTransport().request((client) =>
     (client as PanRpcProtocolClient)[WS_METHODS.getAvailableEditors](),
   );
-  const availableEditors = (result as { editors: EditorId[] }).editors;
+  const availableEditors = (result as { editors: readonly EditorId[] }).editors;
   const preferred = getPreferredEditor();
   const editor = preferred && availableEditors.includes(preferred)
     ? preferred
@@ -43,15 +43,16 @@ export async function openFavoriteEditor(cwd: string): Promise<EditorId> {
   return editor;
 }
 
-export function useEditorOpenFavoriteShortcut(cwd: string): void {
+export function useEditorOpenFavoriteShortcut(cwd: string | null): void {
   useEffect(() => {
     if (!cwd) return;
+    const resolvedCwd = cwd;
     const root = document.getElementById('root') ?? document.body;
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || isEditableTarget(event.target) || !isEditorOpenFavoriteEvent(event)) return;
       event.preventDefault();
-      void openFavoriteEditor(cwd).catch((error) => {
+      void openFavoriteEditor(resolvedCwd).catch((error) => {
         toast.error(`Failed to open editor: ${error instanceof Error ? error.message : String(error)}`);
       });
     }

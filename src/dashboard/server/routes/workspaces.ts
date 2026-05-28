@@ -5793,53 +5793,35 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           });
         }
 
-        // Fallback: direct merge via merge-agent
-        console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
+        // Fallback (PAN-1531): direct server-side rebase via rebaseFeatureBranch.
+        // The ship-role LLM agent was retired — rebase is deterministic mechanical
+        // work and runs in-process. On success the workspace branch is pushed to
+        // origin with --force-with-lease and the dashboard flips readyForMerge so
+        // the human Merge button renders. On conflict the operator resolves
+        // manually in the workspace and re-requests review.
+        console.log(`[approve] Step 3/3: Running server-side rebase for ${issueId}...`);
 
         try {
-          const { spawnMergeAgentForBranches } = await import(
-            '../../../lib/cloister/merge-agent.js'
+          const { rebaseFeatureBranch } = await import(
+            '../../../lib/cloister/merge-rebase.js'
           );
-          const mergeResult = await spawnMergeAgentForBranches(
-            projectPath,
-            branchName,
-            'main',
-            issueId
+          const workspacePathForRebase = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          const rebaseResult = await Effect.runPromise(
+            rebaseFeatureBranch(workspacePathForRebase, branchName, 'main', issueId),
           );
 
-          if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
-            console.log(`merge-agent successfully merged ${issueId}`);
-          } else if (mergeResult.success && mergeResult.testsStatus === 'SKIP') {
-            console.log(`merge-agent merged ${issueId} (tests skipped)`);
-          } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
-            try {
-              await execAsync('git reset --hard HEAD~1', {
-                cwd: projectPath,
-                encoding: 'utf-8',
-              });
-            } catch {}
-            const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
-            completePendingOperation(issueId, error);
-            return jsonResponse({ error }, { status: 400 });
-          } else {
-            try {
-              await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
-            } catch {}
-            try {
-              await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
-            } catch {}
-            const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+          if (!rebaseResult.success) {
+            const conflictDetail = rebaseResult.conflictFiles?.length
+              ? `\nConflict files: ${rebaseResult.conflictFiles.join(', ')}`
+              : '';
+            const error = `Rebase blocked for ${issueId}.\nReason: ${rebaseResult.reason ?? 'Unknown'}${conflictDetail}\n\nResume in workspace:\n  cd ${workspacePathForRebase}\n  git rebase origin/main\n  # resolve conflicts, then\n  git push --force-with-lease`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });
           }
-        } catch (agentError: any) {
-          try {
-            await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
-          } catch {}
-          try {
-            await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
-          } catch {}
-          const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+
+          console.log(`[approve] Rebase complete for ${issueId} (${rebaseResult.skipped ? 'no-op' : 'rebased'}); ready for human Merge button`);
+        } catch (rebaseError: any) {
+          const error = `Server-side rebase failed: ${rebaseError.message}\n\nResolve manually:\n  cd <workspace>\n  git rebase origin/main\n  git push --force-with-lease`;
           completePendingOperation(issueId, error);
           return jsonResponse({ error }, { status: 400 });
         }

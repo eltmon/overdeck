@@ -22,6 +22,8 @@ import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel }
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
+import { ContextWindowMeter } from './ContextWindowMeter';
+import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -146,11 +148,23 @@ interface ComposerFooterProps {
   onSendFailed?: (text: string) => void;
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
+  /**
+   * Current context-window snapshot for this conversation. Rendered as a
+   * `<ContextWindowMeter>` in the toolbar right-cluster, mirroring t3code's
+   * placement (right side, just before the send button).
+   */
+  contextWindowUsage?: ContextWindowSnapshot | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
+export function ComposerFooter({
+  conversation,
+  onSend,
+  onSendFailed,
+  agentId,
+  contextWindowUsage = null,
+}: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   // Existing conversations are bound to the harness they were spawned with.
   // Falling back to a global localStorage default here caused the picker to
@@ -356,16 +370,89 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       event.preventDefault();
       return;
     }
-    if (!event.clipboardData) return;
-    const items = Array.from(event.clipboardData.items);
-    const imageFiles = items
-      .filter((item) => item.type.startsWith('image/'))
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null);
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return;
 
-    if (imageFiles.length === 0) return;
-    event.preventDefault();
-    enqueueImages(imageFiles);
+    // Harvest images from the canonical surface first:
+    //  - clipboardData.files: the FileList of files in this paste
+    //  - clipboardData.items (kind:'file'): per-item access; only consulted when
+    //    .files is empty (some Wayland Chromium screenshot-tool pastes).
+    // We do NOT iterate both surfaces and dedupe — Chromium synthesizes
+    // distinct File objects for each surface with their own `lastModified`
+    // ticks, so a key built from (name,size,lastModified) can't reliably
+    // recognize them as the same image and the user ends up with two copies
+    // of the same screenshot intermittently.
+    const collected: File[] = [];
+    const addIfImage = (file: File | null) => {
+      if (!file || !file.type.startsWith('image/')) return;
+      collected.push(file);
+    };
+    const filesFromFiles = clipboardData.files ? Array.from(clipboardData.files) : [];
+    if (filesFromFiles.length > 0) {
+      for (const file of filesFromFiles) addIfImage(file);
+    } else if (clipboardData.items) {
+      for (const item of Array.from(clipboardData.items)) {
+        if (item.kind === 'file') addIfImage(item.getAsFile());
+      }
+    }
+
+    if (collected.length > 0) {
+      event.preventDefault();
+      enqueueImages(collected);
+      return;
+    }
+
+    // Nothing in the synchronous DataTransfer surfaces. Decide whether to
+    // intervene further or let the paste fall through to Lexical.
+    const types = Array.from(clipboardData.types ?? []);
+    const hasImageType = types.some((t) => t.startsWith('image/'));
+    const hasFilesType = types.includes('Files'); // Chrome legacy marker for file pastes
+    const hasUriList = types.includes('text/uri-list');
+
+    // Case A: clipboard claims to carry image bytes but DataTransfer was empty.
+    // This is the Wayland Chromium screenshot-paste bug (PAN-539 regression on
+    // 2026-05-25). Recovery requires the async Clipboard API, which will
+    // trigger a permission prompt on first use — acceptable here because the
+    // alternative is silent failure.
+    if (hasImageType || hasFilesType) {
+      event.preventDefault();
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.read) {
+        void (async () => {
+          try {
+            const items = await navigator.clipboard.read();
+            const recovered: File[] = [];
+            for (const item of items) {
+              for (const type of item.types) {
+                if (!type.startsWith('image/')) continue;
+                const blob = await item.getType(type);
+                const ext = type.split('/')[1]?.split('+')[0] || 'png';
+                recovered.push(new File([blob], `paste-${Date.now()}.${ext}`, { type }));
+              }
+            }
+            if (recovered.length > 0) {
+              enqueueImages(recovered);
+            } else {
+              toast.error('Couldn\'t read the pasted image. Try saving it to a file and dragging it onto the composer.');
+            }
+          } catch {
+            toast.error('Clipboard read denied. Grant clipboard permission, or drag the image onto the composer instead.');
+          }
+        })();
+      } else {
+        toast.error('Couldn\'t read the pasted image. Try dragging the file onto the composer instead.');
+      }
+      return;
+    }
+
+    // Case B: file pasted from a file manager (text/uri-list). Browsers can't
+    // read file:// URIs from web origins, so async-clipboard won't help here.
+    // Tell the user to drag instead.
+    if (hasUriList) {
+      event.preventDefault();
+      toast.error('Paste-from-file-manager isn\'t supported. Drag the file onto the composer instead.');
+    }
+
+    // Otherwise this is a regular text paste — pass through unchanged.
   }, [enqueueImages, sending]);
 
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -377,7 +464,10 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
   }, [enqueueImages, sending, conversation.sessionAlive]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith('image/'))) {
+    const items = Array.from(event.dataTransfer.items);
+    // Accept any file-kind drag (files don't expose their MIME type during dragover —
+    // type is empty until drop on most browsers). Also accept anything declared as an image.
+    if (items.some((item) => item.kind === 'file' || item.type.startsWith('image/'))) {
       event.preventDefault();
     }
   }, []);
@@ -398,6 +488,32 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       editor.read(() => {
         messageText = $getRoot().getTextContent().trim();
       });
+    }
+
+    // Intercept slash-prefixed handoff invocations and open the fork modal
+    // pre-set to handoff mode for the current conversation. Matches:
+    //   /handoff
+    //   /handoff <focus text…>
+    //   /pan-handoff
+    //   /pan-handoff <focus text…>
+    //   /pan handoff
+    //   /pan handoff <focus text…>
+    // The leading slash is required — it's the convention that distinguishes
+    // dashboard UI actions from messages bound for the agent. Unprefixed
+    // `pan handoff …` falls through to the agent which runs the CLI directly
+    // in its Bash tool. Any trailing text after the verb becomes the focus
+    // and pre-fills the dialog's Focus textarea.
+    const handoffMatch = messageText.match(/^\/(?:pan[\s-])?handoff(?:\s+(.+))?$/i);
+    if (handoffMatch) {
+      const focus = handoffMatch[1]?.trim() || undefined;
+      window.dispatchEvent(new CustomEvent('panopticon:open-fork-modal', {
+        detail: { conversation, mode: 'handoff', focus },
+      }));
+      editor.update(() => {
+        $getRoot().clear();
+      });
+      setText('');
+      return;
     }
 
     const submitConversationName = conversation.name;
@@ -600,6 +716,22 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
             harness={harness}
             onHarnessChange={handleHarnessChange}
           />
+          {/*
+            Model drift indicator. The picker holds the model that the
+            *next* message will be sent with; if the running session's last
+            assistant turn used a different model (e.g. the user ran /model
+            inside Claude Code, or Cloister auto-routed), surface it here so
+            the picker doesn't silently lie about what's actually running.
+          */}
+          {contextWindowUsage?.lastModel && contextWindowUsage.lastModel !== model && (
+            <span
+              className={styles.composerToolbarModelDrift}
+              title={`Last assistant turn ran as ${contextWindowUsage.lastModel}; the picker value applies to the next message you send.`}
+              data-testid="composer-model-drift"
+            >
+              running: {contextWindowUsage.lastModel}
+            </span>
+          )}
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
@@ -614,6 +746,8 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           >
             {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
+
+          <ContextWindowMeter usage={contextWindowUsage} />
 
           <button
             className={styles.sendButton}

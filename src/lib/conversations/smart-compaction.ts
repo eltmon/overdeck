@@ -53,7 +53,7 @@ interface CutPointResult {
 // Entry parsing
 // ============================================================================
 
-async function parseEntries(jsonlPath: string): Promise<any[]> {
+export async function parseEntries(jsonlPath: string): Promise<any[]> {
   const content = await readFile(jsonlPath, 'utf-8');
   const entries: any[] = [];
   for (const line of content.split('\n')) {
@@ -421,7 +421,7 @@ function serializeEntry(entry: any, includeThinking: boolean = true): string | u
   return undefined;
 }
 
-function serializeConversation(entries: any[], includeThinking: boolean = true): string {
+export function serializeConversation(entries: any[], includeThinking: boolean = true): string {
   const parts: string[] = [];
   for (const entry of entries) {
     const serialized = serializeEntry(entry, includeThinking);
@@ -792,6 +792,8 @@ async function generateTurnPrefixSummary(
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
+  'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
+  'claude-opus-4-7': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window
 };
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;

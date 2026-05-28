@@ -1,5 +1,7 @@
 # Panopticon CLI - Development Guidelines
 
+> **Note:** Universal and dev-scope engineering rules — async tmux, no execSync in server, fake timers for retry tests, worktree discipline, work-agents-via-pan, stash discipline, dashboard-Node22-only, single-deacon invariant, no-destructive-requests, file-path references, Karpathy rules — live in [`sync-sources/rules/`](sync-sources/rules/) and are folded into `~/.claude/CLAUDE.md` automatically via `pan sync`. This file holds **project-specific** guidance that doesn't apply outside this repo.
+
 ## Engineering Philosophy: No Bandaids
 
 **NEVER apply workarounds, hacks, or "just get it working" fixes.** Every issue, no matter how minor, must be addressed at its root cause as soon as it arises. If something is broken, find out WHY it's broken and fix the underlying problem — don't paper over symptoms with fallback chains or special-case handling.
@@ -90,19 +92,6 @@ git push origin v0.9.4
 - `.husky/commit-msg` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z`. This catches the failure one step earlier than the push hook.
 
 **If asked to "release", "tag", "bump version", "publish", or anything similar:** the answer is `pan release stable --version X.Y.Z`. Never a workaround, never a manual tag, never `--no-verify`.
-
-## CRITICAL: No Blocking Calls in Dashboard Server Code
-
-**NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).
-
-These block the Node.js event loop, freezing all HTTP requests, WebSocket connections, and terminal streaming. This was a major issue tracked in PAN-70 (15 commits to fix execSync) and PAN-446 (139 sync FS calls still in routes).
-
-**Rules:**
-- Dashboard server code: use `execAsync` (promisified `exec`), `fs/promises`, or Effect `FileSystem` service
-- `existsSync` is acceptable (fast stat check, no data read)
-- tmux message delivery: use `sendKeysAsync()` from `src/lib/tmux.ts`
-- CLI commands only: sync calls are acceptable since they run in their own process
-- `sleep` via `execSync('sleep 0.3')` is NEVER acceptable in server code — use `await new Promise(r => setTimeout(r, 300))`
 
 ## Harnesses
 
@@ -224,20 +213,6 @@ tmux -L panopticon attach -t agent-min-846
 ```
 
 The default tmux socket (`/tmp/tmux-1000/default`) is NOT used by agents. Plain `tmux list-sessions` will show "no server running" or list unrelated sessions. This is a common source of false "agent not found" errors.
-
-## tmux Message Delivery
-
-Use `load-buffer` + `paste-buffer` pattern (NOT raw `send-keys` for text):
-```typescript
-// Correct (in sendKeysAsync):
-writeFileSync(tmpFile, keys);
-await execAsync(`tmux load-buffer ${tmpFile}`);
-await execAsync(`tmux paste-buffer -t ${session}`);
-await new Promise(r => setTimeout(r, 300));  // Let text render
-await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
-```
-
-Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
 ## PTY supervisor for orchestrator delivery
 
@@ -368,30 +343,6 @@ ensure the project key (uppercased, hyphens removed) matches the issue prefix yo
 Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
 returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
 `bd create` before handing off to implementation.
-
-## Stash Hygiene
-
-Stashes are git refs — they persist until explicitly dropped. Left alone, they accumulate fast (we cleared out 106 stashes during the 1.0 stabilization audit on 2026-04-23). The goal is to keep the list short enough that it stays meaningful.
-
-**Naming rules (when Panopticon code creates a stash):**
-- Start with a category prefix so stashes are greppable:
-  - `pre-merge:PAN-XXX:<iso-timestamp>` — safety snapshot before a merge operation
-  - `pre-spawn:PAN-XXX:<iso-timestamp>` — planning-debris snapshot before an agent start
-  - `review-temp:PAN-XXX:<n>` — short-lived stash during a review-request roundtrip
-  - `salvageable:PAN-XXX:<iso-timestamp>:<short-description>` — explicitly flagged as user work that may need recovery (e.g. uncommitted edits discovered during cleanup)
-
-**Drop-on-completion rules:**
-- `pre-merge:*` — drop once the merge succeeds (or the merge flow rolls back).
-- `pre-spawn:*` — drop once the agent has checkpointed its first real commit.
-- `review-temp:*` — drop when the review request completes (success OR failure).
-- `salvageable:*` — NEVER drop automatically. These must be either recovered to a branch or reviewed by the user.
-
-**Triage cadence:**
-- Any stash older than 4 weeks that is NOT `salvageable:*` is a candidate for cleanup.
-- Any `salvageable:*` stash surfaces in the dashboard's workspace inspector so the user can see it and decide.
-
-**Recovery:**
-- `git stash drop` preserves the stash commit in the reflog for 90 days. Anything dropped accidentally is recoverable during that window.
 
 ## CRITICAL: postMergeLifecycle Idempotency
 

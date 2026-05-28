@@ -3,14 +3,14 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import { ContextUsageIndicator } from './ContextUsageIndicator';
+import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -19,6 +19,7 @@ import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import { PanOpenInPicker } from '../PanOpenInPicker';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -461,8 +462,6 @@ export function ConversationPanel({
     ? 'var(--success)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
-  const headerContextUsage = messagesData?.contextUsage ?? conversation.contextUsage ?? null;
-
   return (
     <div className={styles.conversationTerminal}>
       {/* Header bar — hidden in embedded mode (ZoneB already shows session info), so its context indicator is omitted there. */}
@@ -493,7 +492,9 @@ export function ConversationPanel({
               />
             ) : (
               <>
-                {conversation.title ?? conversation.name}
+                <span className={styles.conversationTerminalTitleText}>
+                  {conversation.title ?? conversation.name}
+                </span>
                 <button
                   className={styles.conversationTitleEditBtn}
                   onClick={startEditingTitle}
@@ -517,12 +518,24 @@ export function ConversationPanel({
               </>
             )}
           </span>
+          {conversation.branch && (
+            <span
+              className={styles.terminalBranchBar}
+              title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
+            >
+              {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+              <span className={styles.terminalBranchBarMode}>
+                {conversation.isWorktree ? 'Worktree' : 'Local'}
+              </span>
+              <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+            </span>
+          )}
+          <PanOpenInPicker openInCwd={conversation.cwd} compact />
           {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
             <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
               {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
             </span>
           )}
-          <ContextUsageIndicator contextUsage={headerContextUsage} />
           <span className={styles.conversationTerminalStatus}>
             <Circle
               size={7}
@@ -907,6 +920,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
+  // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
+  // t3code's placement). The snapshot adapter normalizes the server's
+  // `ContextUsage` shape into t3code's `ContextWindowSnapshot` so future
+  // upstream changes port cleanly.
+  const contextWindowUsage = toContextWindowSnapshot(
+    data?.contextUsage ?? conversation.contextUsage ?? null,
+  );
 
   // Drop optimistic messages once the server has returned at least as many messages
   // as we had before plus the optimistic ones (the real message has arrived).
@@ -1113,7 +1133,13 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} agentId={agentId} />
+        <ComposerFooter
+          conversation={conversation}
+          onSend={handleMessageSent}
+          onSendFailed={handleSendFailed}
+          agentId={agentId}
+          contextWindowUsage={contextWindowUsage}
+        />
       )}
     </div>
   );

@@ -23,11 +23,13 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
+  type RoleEffort,
+  ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
 
 /**
  * Deprecation warning in API format
@@ -380,8 +382,8 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   }
 
   const effort = roleConfig.effort;
-  if (effort !== undefined && effort !== 'low' && effort !== 'medium' && effort !== 'high') {
-    errors.push(`${fieldPath}.effort must be low, medium, or high`);
+  if (effort !== undefined && !ROLE_EFFORTS.includes(effort as RoleEffort)) {
+    errors.push(`${fieldPath}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
   }
 
   const maxAgents = roleConfig.maxAgents;
@@ -393,6 +395,17 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (scope !== undefined && scope !== 'pan-only' && scope !== 'all-tracked-projects') {
     errors.push(`${fieldPath}.scope must be pan-only or all-tracked-projects`);
   }
+}
+
+/** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */
+function resolveModelRefToId(ref: unknown, workhorses: WorkhorsesConfig): ModelId | undefined {
+  if (typeof ref !== 'string' || ref.length === 0 || ref === PARENT_MODEL_REF) return undefined;
+  if (isWorkhorseRef(ref)) {
+    const resolved = workhorses[workhorseSlotFromRef(ref) as WorkhorseSlot];
+    if (!resolved || isWorkhorseRef(resolved)) return undefined;
+    return resolveModelIdSync(resolved);
+  }
+  return resolveModelIdSync(ref);
 }
 
 function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
@@ -430,6 +443,21 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
 
         validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
+
+        // Model-aware effort: reject levels the role's resolved model doesn't accept.
+        const effort = rawRoleConfig.effort;
+        if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
+          const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
+          const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
+          if (resolvedModel) {
+            const supported = getModelEffortLevelsSync(resolvedModel);
+            if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              errors.push(
+                `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+              );
+            }
+          }
+        }
 
         if (rawRoleConfig.sub !== undefined) {
           if (!isRecord(rawRoleConfig.sub)) {

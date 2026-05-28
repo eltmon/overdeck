@@ -1,0 +1,1259 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-28T14:38:04.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
+    "updated": "2026-05-28T14:42:03.548Z"
+  },
+  "plan": {
+    "id": "pan-1549",
+    "title": "Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
+    "status": "proposed",
+    "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-28T14:38:04.000Z",
+    "updated": "2026-05-28T14:42:03.548Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
+        "label": "PAN-1549",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1549.md",
+        "label": "PRD",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/design/pan-1549-workspace-panes.html",
+        "label": "Mockup",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "command-deck",
+      "refactor",
+      "ui"
+    ],
+    "narratives": {
+      "Problem": "The Command Deck's main work area shows one thing at a time and has no notion of 'the things I have open' — every navigation replaces the view and loses scroll/tab/terminal state. The live right-pane shell is `ProjectRightPaneTabs` (6 project-scoped tabs) in CommandDeck/index.tsx; an older `IssueWorkbench`/`ZoneCOverview` 10-tab Zone-C toggle still exists as dead code. The spatial Zone* names also describe where things sit, not what they are.",
+      "Proposal": "Replace the live right-pane shell with a workspace-scoped `Stage`: a persistent `PaneBar` of tabs over `Pane` content keyed by `paneType` (home | agent | terminal | files | commits | plan | docs | browser). Each workspace opens on a permanent, unclosable HOME pane (WorkspaceHeader + smart Launcher omnibox + AgentDock + ActionDock + Timeline); the user opens additional panes that persist per-workspace in localStorage and switch with Cmd+1..9. Pane state lives in a new sibling Zustand store; existing tab bodies (VBriefTab, BeadsTab, PrDiffTab, MarkdownTab, CostsTab, DiscussionsTab, ActivityTab, OverviewTab) and SessionPanel/XTerminal/ConversationPanel are RE-HOMED into pane wrappers, not rewritten. Build all Stage components unmounted (tree stays green), then atomically swap the mount and delete the legacy shell. CommandDeck/index.tsx changes ONLY to mount <Stage>."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Target the live `ProjectRightPaneTabs` shell, not the PRD's stated `IssueWorkbench`/`ZoneCOverview` Zone-C toggle (dead code per CommandDeck.test 'lens rendered instead of legacy IssueWorkbench').",
+        "rationale": "Modifying the unmounted legacy path would change nothing on screen; the user's intent is to change the live work area."
+      },
+      {
+        "summary": "Pane store at `lib/panesStore.ts` as a sibling Zustand store (like `lib/commandDeckSelection.ts`), persisted to localStorage `pan-panes:{workspaceId}` / `pan-active-pane:{workspaceId}`.",
+        "rationale": "No `src/store/` dir exists; the event-sourced `lib/store.ts` must not be entangled with local UI pane state. The selection store is the established sibling-store precedent."
+      },
+      {
+        "summary": "Stage is workspace/issue-scoped; project-only selection keeps the `ProjectOverview` Pipeline as a project landing (not a pane).",
+        "rationale": "Resolves PRD open Q5 — pipeline is project-scoped — and gives a clean project-vs-workspace boundary without forcing project data into a workspace pane."
+      },
+      {
+        "summary": "Build-then-swap: phases 1-5 add unmounted Stage components; phase 6 swaps the mount and deletes legacy.",
+        "rationale": "Keeps every bead independently mergeable with a green tree and an unchanged UI until the capstone swap."
+      },
+      {
+        "summary": "Confirm name 'Stage'; defer the Zone B -> Navigator rename (PRD Q2).",
+        "rationale": "The rename is cosmetic churn orthogonal to the Stage/HOME replacement that delivers the value."
+      },
+      {
+        "summary": "Costs and Discussions stay HomePane sections (reuse CostsTab/DiscussionsTab), not new pane types (PRD Q3/Q4).",
+        "rationale": "Avoids inventing pane types the PRD flagged as open; Discussions preserves live behavior, Costs is additive."
+      },
+      {
+        "summary": "On first load post-ship, synthesize HOME only; do not auto-reopen the last conversation (PRD Q6).",
+        "rationale": "Deterministic, testable; Timeline already gives one-click access to recent conversations."
+      },
+      {
+        "summary": "BrowserPane = iframe; FilesPane = minimal changed-files view from the diffs vs-main API, not a full filesystem browser.",
+        "rationale": "Neither has an existing backend/component and neither exists in the live UI today; minimal versions complete the launcher/ActionDock loops without speculative backend scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "panes-store",
+        "title": "Pane model + panesStore Zustand store with localStorage persistence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1549",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "panebar",
+            "stage-shell",
+            "agent-pane",
+            "terminal-pane",
+            "commits-pane",
+            "plan-pane",
+            "docs-pane",
+            "browser-pane",
+            "files-pane",
+            "mount-stage"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/lib/panesStore.ts` — a sibling Zustand store (modeled on `lib/commandDeckSelection.ts`, NOT part of the event-sourced `lib/store.ts`). Define `PaneType` ('home'|'agent'|'terminal'|'files'|'commits'|'plan'|'docs'|'browser'), the `WorkspacePane` interface (paneId, paneType, label, createdAt, isPermanent, plus optional conversationId/agentType/isRunning/viewMode/terminalId/fileBrowserScopePath/fileBrowserInitialQuery/docFilePath/browserInitialUrl per the PRD data model), and per-workspace state. Actions: ensureHome(workspaceId) (synthesizes an unclosable HOME pane if absent), addPane, closePane (refuses to close HOME), setActivePane, updatePane. Persist panes to `pan-panes:{workspaceId}` and active id to `pan-active-pane:{workspaceId}` with try/catch (matching the `mc-*` localStorage convention). Export selectors for a workspace's panes and active pane. This is the data-model + store-API foundation every Stage component depends on."
+        },
+        "subItems": [
+          {
+            "id": "panes-store.ac1",
+            "title": "`PaneType` and `WorkspacePane` match the PRD data model; HOME pane has isPermanent=true and is synthesized by ensureHome when no panes exist for a workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panes-store.ac2",
+            "title": "closePane refuses to remove the HOME pane and never leaves activePaneId pointing at a removed pane (falls back to HOME)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panes-store.ac3",
+            "title": "panes + activePaneId round-trip through localStorage keyed by workspaceId; corrupt/absent storage degrades gracefully to a HOME-only state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panes-store.ac4",
+            "title": "Vitest unit tests cover add/close/switch, HOME-unclosable, per-workspace isolation, and persistence round-trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "panebar",
+        "title": "PaneBar tab strip component",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/Stage/PaneBar.tsx`. Render one PaneTab per pane from the store (icon/dot, label, Cmd+N hint, active highlight, close × on non-HOME panes) plus a trailing '+' add-pane button. Clicking a tab sets the active pane; clicking × closes it; the HOME tab shows no close affordance. Match the mockup's PaneBar styling (rounded-top tabs, active tab raised). Pure presentation driven by the store + callbacks."
+        },
+        "subItems": [
+          {
+            "id": "panebar.ac1",
+            "title": "Renders a tab per pane in order with the active tab visually distinguished and HOME first with a Cmd+1 hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panebar.ac2",
+            "title": "HOME tab has no close button; every other tab's × closes that pane; '+' triggers an add-pane callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "panebar.ac3",
+            "title": "Component test asserts tab list, active state, close-button visibility rules, and click handlers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-shell",
+        "title": "Stage shell — PaneBar + active-pane renderer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/Stage/index.tsx`. Takes `workspaceId` (+ the workspace/issue context props the panes need). Calls ensureHome(workspaceId), renders `<PaneBar>` and the active pane via a `paneType` switch that dispatches to pane wrapper components (placeholders/stubs for now where wrappers don't yet exist). Defines the Pane wrapper prop contract (a pane wrapper receives its `WorkspacePane` + workspace context). NOT mounted anywhere yet — this and all later Stage components stay unmounted until the mount-stage bead."
+        },
+        "subItems": [
+          {
+            "id": "stage-shell.ac1",
+            "title": "Renders PaneBar + the active pane; switching the active pane in the store swaps the rendered pane body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-shell.ac2",
+            "title": "Unknown/not-yet-implemented paneType renders a safe placeholder rather than crashing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-shell.ac3",
+            "title": "Component test mounts Stage for a workspace and asserts HOME is auto-created and rendered active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyboard-shortcuts",
+        "title": "Stage keyboard shortcuts (Cmd+1..9 focus, Cmd+T new, Cmd+W close)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire keyboard handling in the Stage shell (or a small hook `useStageShortcuts`): Cmd+1 focuses HOME, Cmd+2..9 focus pane N (no-op if absent), Cmd+T opens a new pane, Cmd+W closes the active pane (no-op on HOME). Only active while the Stage is mounted/focused; do not hijack shortcuts when a text input/launcher is focused unless intended (Cmd+Enter family belongs to the Launcher, not here)."
+        },
+        "subItems": [
+          {
+            "id": "keyboard-shortcuts.ac1",
+            "title": "Cmd+1..9 set the active pane by index; out-of-range indices are no-ops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyboard-shortcuts.ac2",
+            "title": "Cmd+T adds a pane and Cmd+W closes the active pane but never closes HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyboard-shortcuts.ac3",
+            "title": "Shortcuts do not fire while the Launcher input or another text field is focused; test simulates keydowns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "homepane-shell",
+        "title": "HomePane shell + section layout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/Stage/HomePane/index.tsx` — the paneType='home' body. Lay out the section slots from the mockup: WorkspaceHeader, Launcher, AgentDock, ActionDock, Timeline, and a lower detail area (collapsible sections). Takes workspace/issue context (issueId, title, branch, agent, conversations, sessions) and an `openPane` callback (so docks/launcher/timeline can add panes via the store). Sections are filled in by later beads; this bead establishes the scaffold + props."
+        },
+        "subItems": [
+          {
+            "id": "homepane-shell.ac1",
+            "title": "Renders the section scaffold (header/launcher/agentdock/actiondock/timeline/detail) in mockup order with a constrained max-width content column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homepane-shell.ac2",
+            "title": "Exposes an `openPane(pane)` prop wired to the panesStore add/activate actions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-header",
+        "title": "WorkspaceHeader (name, branch, set-parent link)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create the WorkspaceHeader region of HomePane: project/workspace icon, name (issue title or workspace name), branch line (e.g. '⎇ feature/pan-1549') and the '↗ set parent' link affordance. Absorbs the Zone A issue-header role for the HOME pane. Reuse existing issue/agent data already passed into HomePane."
+        },
+        "subItems": [
+          {
+            "id": "workspace-header.ac1",
+            "title": "Shows the workspace name + branch from the issue/agent context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-header.ac2",
+            "title": "Renders without crashing when branch/agent is absent (non-agent workspace)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-stats",
+        "title": "HomePane stat chips (age, diff, files, convos)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add the stat chip row under WorkspaceHeader: workspace age (from issue.createdAt), diff size (+/− from the diffs vs-main API or existing enrichment), changed-files count, and conversation count (conversations filtered by workspace issueId). Compose from data already in the read model / existing endpoints; do not add server endpoints. A diff/files/convos chip may be clickable to open the corresponding pane in a later bead."
+        },
+        "subItems": [
+          {
+            "id": "home-stats.ac1",
+            "title": "Age chip renders a human 'N days' from issue.createdAt; convos chip reflects the count of conversations for this workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-stats.ac2",
+            "title": "Diff/files chips populate from existing diff data and degrade to a neutral zero/placeholder when unavailable (no crash, no fabricated numbers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-stats.ac3",
+            "title": "Stat derivation is unit-tested with fixture data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher",
+        "title": "Launcher omnibox + intent dropdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx` — a text input with a quick-action dropdown (one row per intent: Ask Claude Code, Run in terminal, Search the web, Ask Codex), first row auto-selected. Dropdown hidden when input is empty. Rows use onMouseDown+preventDefault so clicking does not blur the input first. Support a compact/suppressed mode that renders only the quick-action rows (no history/file completions) for embedding. Label rules: terminal->'Run in terminal:', web->'Search the web:', agent->'Ask {agentName}:'. This bead builds the component + rendering; ordering and action wiring are separate beads."
+        },
+        "subItems": [
+          {
+            "id": "launcher.ac1",
+            "title": "Typing reveals the dropdown with one row per intent and the first row auto-selected; clearing the input hides it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher.ac2",
+            "title": "Clicking a row uses onMouseDown+preventDefault and does not blur the input before the action fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher.ac3",
+            "title": "Compact mode renders only the quick-action rows; labels follow the terminal/web/agent rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-ordering",
+        "title": "Launcher intent ordering (default, URL-aware, last-used memory)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Implement intent ordering as a pure, unit-testable function consumed by the Launcher. Default order: claude-code (Cmd+Enter) -> terminal (Ctrl+Enter) -> web (Opt+Enter) -> codex (Cmd+Shift+Enter). When the input looks like a URL, float 'web' to position 1. Last-used-agent memory: if the user last ran a non-Claude agent, that agent takes position 1 so Cmd+Enter stays 'repeat last action'. Persist last-used-agent (localStorage)."
+        },
+        "subItems": [
+          {
+            "id": "launcher-ordering.ac1",
+            "title": "Default text input yields claude-code, terminal, web, codex in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-ordering.ac2",
+            "title": "URL-shaped input floats 'web' to position 1; last-used non-Claude agent floats to position 1 otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-ordering.ac3",
+            "title": "Ordering function has unit tests covering default, URL, and last-used permutations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-wiring",
+        "title": "Wire Launcher intents to actions + keyboard accelerators",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Connect Launcher intents to real actions: Ask Claude Code / Ask Codex -> create a conversation for the workspace (reuse the existing new-conversation flow used by CommandDeck's handleNewConversation/handleNewProjectConversation) with the chosen harness/agent, then open/focus an `agent` pane; Run in terminal -> open a `terminal` pane (new tmux session or the workspace's session); Search the web -> open a `browser` pane with a search URL built from the query. Keyboard accelerators while the launcher input is focused: Cmd+Enter (intent 1), Ctrl+Enter (terminal), Opt+Enter (web), Cmd+Shift+Enter (codex). On run, persist last-used agent (feeds ordering)."
+        },
+        "subItems": [
+          {
+            "id": "launcher-wiring.ac1",
+            "title": "Cmd+Enter runs the top intent; Ctrl/Opt/Cmd+Shift+Enter run terminal/web/codex respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-wiring.ac2",
+            "title": "Ask Claude Code/Codex creates a conversation via the existing conversation-creation path (no new endpoint) and opens an agent pane focused on it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-wiring.ac3",
+            "title": "Search the web opens a browser pane to a search URL; Run in terminal opens a terminal pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-pane",
+        "title": "AgentPane wrapper (conversation + terminal/findings toggle)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/AgentPane.tsx` for paneType='agent'. For a conversation-backed pane (conversationId) render the existing `ConversationPanel` with its viewMode (conversation|terminal) toggle; for a SessionNode-backed pane reuse `SessionPanel` (which already toggles conversation/terminal/findings). The pane reuses these components as-is — no rewrite. Persist the pane's viewMode in the WorkspacePane via updatePane."
+        },
+        "subItems": [
+          {
+            "id": "agent-pane.ac1",
+            "title": "A conversation-backed agent pane renders ConversationPanel with a working conversation/terminal toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-pane.ac2",
+            "title": "A session-backed agent pane renders SessionPanel (conversation/terminal/findings) without modifying SessionPanel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-pane.ac3",
+            "title": "Changing viewMode persists onto the pane (survives switching away and back)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-pane",
+        "title": "TerminalPane wrapper (XTerminal on a tmux session)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/TerminalPane.tsx` for paneType='terminal'. Render the existing `XTerminal` bound to the pane's tmux session name (terminalId). Reuse XTerminal as-is."
+        },
+        "subItems": [
+          {
+            "id": "terminal-pane.ac1",
+            "title": "Mounts XTerminal with the pane's session name; renders a sensible empty/connecting state when no session is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-pane.ac2",
+            "title": "Does not kill the tmux session when the pane is closed/unmounted (session survives, per terminal lifecycle rules)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "commits-pane",
+        "title": "CommitsPane wrapper (PrDiffTab)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/CommitsPane.tsx` for paneType='commits'. Render the existing `PrDiffTab` (git log + diff viewer) for the workspace issueId. Reuse as-is."
+        },
+        "subItems": [
+          {
+            "id": "commits-pane.ac1",
+            "title": "Renders PrDiffTab for the workspace issue and shows the diff/PR content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-pane",
+        "title": "PlanPane wrapper (VBriefTab + BeadsTab)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/PlanPane.tsx` for paneType='plan'. Render the existing `VBriefTab` (which already has List/DAG/Raw) and `BeadsTab` for the workspace issueId, with a simple sub-toggle or stacked layout. Reuse both tab bodies as-is."
+        },
+        "subItems": [
+          {
+            "id": "plan-pane.ac1",
+            "title": "Renders VBriefTab (List/DAG/Raw) and BeadsTab for the workspace issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pane",
+        "title": "DocsPane wrapper (PRD/STATE/INFERENCE markdown)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/DocsPane.tsx` for paneType='docs'. Provide a doc selector (PRD / STATE / INFERENCE, hiding INFERENCE when absent) feeding the existing `MarkdownTab`, sourced from the existing planning query used by ZoneCOverview. The pane's `docFilePath` selects the active doc. Reuse MarkdownTab + the planning query as-is."
+        },
+        "subItems": [
+          {
+            "id": "docs-pane.ac1",
+            "title": "Selector switches between PRD/STATE/INFERENCE and renders the chosen markdown via MarkdownTab; INFERENCE hidden when empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-pane",
+        "title": "BrowserPane wrapper (embedded iframe web view)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/BrowserPane.tsx` for paneType='browser'. Render an iframe to the pane's `browserInitialUrl` with a minimal URL bar. Used by the Launcher 'Search the web' intent and the ActionDock 'Web' button. Minimal by design (D8)."
+        },
+        "subItems": [
+          {
+            "id": "browser-pane.ac1",
+            "title": "Renders an iframe to browserInitialUrl and shows a neutral empty state when no URL is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "files-pane",
+        "title": "FilesPane wrapper (changed-files view from diffs vs-main)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `Stage/panes/FilesPane.tsx` for paneType='files'. List the workspace's changed files using the existing `/api/agents/:agentId/diffs/vs-main` `files[]` data; clicking a file opens it in a CommitsPane diff view. This is a minimal changed-files browser, NOT a full filesystem walk (D8). No new server endpoint."
+        },
+        "subItems": [
+          {
+            "id": "files-pane.ac1",
+            "title": "Lists changed files (path + add/del) for the workspace from the diffs vs-main data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "files-pane.ac2",
+            "title": "Clicking a file opens/focuses a commits pane scrolled/scoped to that file; empty state when no diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-dock",
+        "title": "AgentDock — agent pill launchers open agent panes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Build the AgentDock region of HomePane: pills for available agents/harnesses (Claude Code, Codex, '+ More Agents'). Clicking a pill creates/opens an agent conversation for the workspace (reuse the conversation-creation path) and opens an `agent` pane. Reuse the harness/agent metadata already available in the dashboard store."
+        },
+        "subItems": [
+          {
+            "id": "agent-dock.ac1",
+            "title": "Renders an agent pill per available harness plus a '+ More Agents' affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-dock.ac2",
+            "title": "Clicking a pill opens an agent pane backed by a (new or existing) conversation for that agent in this workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "action-dock",
+        "title": "ActionDock — tool buttons open terminal/files/web/commits panes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Build the ActionDock region of HomePane: Terminal, Files, Web, Commits buttons (each opens the corresponding pane via the store) plus a '+ Actions' overflow holding Plan and Docs. Buttons reuse the pane wrappers from the pane beads."
+        },
+        "subItems": [
+          {
+            "id": "action-dock.ac1",
+            "title": "Terminal/Files/Web/Commits buttons each open (or focus) the matching pane type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-dock.ac2",
+            "title": "'+ Actions' overflow exposes Plan and Docs, opening plan/docs panes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeline",
+        "title": "Timeline — date-grouped conversation history opens agent panes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Build the Timeline region of HomePane: the workspace's conversations grouped by date (Today / weekday / date), each card showing agent, relative time, and a last-message preview. Clicking a card opens or focuses an `agent` pane for that conversation. Source conversations from the same data CommandDeck already fetches, filtered to this workspace."
+        },
+        "subItems": [
+          {
+            "id": "timeline.ac1",
+            "title": "Conversations for the workspace render grouped by date with agent + relative time + preview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeline.ac2",
+            "title": "Clicking a conversation opens or focuses an agent pane bound to it (no duplicate pane if already open)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "homepane-sections",
+        "title": "Fold Overview/Activity/Discussions/Costs into HomePane collapsible sections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add the HomePane lower detail area: collapsible sections that re-home the tab bodies which do not get their own pane — Overview/Status (reuse `OverviewTab`: container, review pipeline, status history), Activity (reuse `ActivityTab`), Discussions (reuse `DiscussionsTab`, per D6), and Costs (reuse `CostsTab`, per D6). Each section renders the existing component unchanged. This guarantees no live content is orphaned when `ProjectRightPaneTabs` is deleted."
+        },
+        "subItems": [
+          {
+            "id": "homepane-sections.ac1",
+            "title": "Overview/Status section renders OverviewTab content for the workspace issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homepane-sections.ac2",
+            "title": "Activity, Discussions, and Costs sections render ActivityTab/DiscussionsTab/CostsTab respectively, collapsible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homepane-sections.ac3",
+            "title": "Every tab body currently reachable in the live shell (Plans/Beads via panes, Conversations/Discussions/Activity/Settings via sections) has a confirmed new home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-stage",
+        "title": "Mount the Stage in CommandDeck (swap ProjectRightPaneTabs)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1549",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "delete-legacy",
+            "update-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/dashboard/frontend/src/components/CommandDeck/index.tsx`, replace the `rightPaneProject ? <ProjectRightPaneTabs ...>` branch in the content area: when a feature (issue/workspace) is selected -> render `<Stage workspaceId={selectedFeature} ...>` wired with the workspace's issue/agent/conversations/sessions context; when only a PROJECT is selected (no feature) -> render `ProjectOverview` (the Pipeline) as the project landing. PRESERVE the `unscopedConversation` branch and the empty-state branch unchanged. This is the ONLY change to index.tsx (the 'do not grow the monster' constraint — no pane logic added here). This is the live swap and the project-vs-workspace boundary crystallizing in code."
+        },
+        "subItems": [
+          {
+            "id": "mount-stage.ac1",
+            "title": "Selecting a workspace in the Navigator shows the Stage (HOME pane) for that workspace; selecting a different workspace switches to its own persisted panes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-stage.ac2",
+            "title": "Selecting a project with no feature still shows the Pipeline (ProjectOverview); the unscoped-conversation and empty 'Select a project' branches are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-stage.ac3",
+            "title": "index.tsx gains only the mount swap — no pane state/logic added; typecheck + lint + existing non-retired tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-stage.ac4",
+            "title": "Browser UAT in an ISOLATED Playwright session: open a workspace, confirm HOME, open agent/terminal/commits/plan/docs panes, switch with Cmd+1..9, close with Cmd+W, and confirm panes persist across a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-legacy",
+        "title": "Delete the orphaned legacy right-pane shell (audited)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "After the swap, delete the now-orphaned legacy shell: the `ProjectRightPaneTabs` function + its `ProjectRightTab` type/constants in index.tsx, and the legacy `IssueWorkbench.tsx`, `ZoneCOverview.tsx`, `ZoneCConversation.tsx`. Apply the NO-LOSS AUDIT GATE (D9): before deleting each file/symbol, grep for remaining references; only delete what is truly orphaned. Relocate or remove the `OverviewTab` union type (H2) and audit `ZoneA`/`ZoneActionStrip`/`ZoneB` — preserve any that the Stage still reuses (e.g. SessionPanel must stay). Remove orphaned imports created by the deletions."
+        },
+        "subItems": [
+          {
+            "id": "delete-legacy.ac1",
+            "title": "ProjectRightPaneTabs, IssueWorkbench, ZoneCOverview, ZoneCConversation are removed only after grep confirms no remaining non-test references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-legacy.ac2",
+            "title": "The OverviewTab type and Zone* action strips are relocated/removed without breaking any retained component; reused components (SessionPanel, XTerminal, tab bodies) are NOT deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-legacy.ac3",
+            "title": "typecheck + lint pass with no orphaned imports or dead references after deletion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-tests",
+        "title": "Update/replace CommandDeck + legacy tests for the Stage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-28T14:38:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1549",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the test suite for the new shell: rewrite `CommandDeck.test.tsx` assertions that referenced ProjectRightPaneTabs/IssueWorkbench/the 'lens' to assert the Stage mount (workspace -> Stage, project-only -> Pipeline, unscoped conversation preserved). Delete `__tests__/ZoneCOverview.test.tsx` and `__tests__/IssueWorkbench.test.tsx` (their components are gone). Ensure the new Stage/panesStore/PaneBar/Launcher unit tests (authored in their own beads) run in the suite. Full `npm run typecheck`, `npm run lint`, and `npm test` (root + frontend) pass."
+        },
+        "subItems": [
+          {
+            "id": "update-tests.ac1",
+            "title": "CommandDeck.test.tsx asserts the Stage mount for a selected workspace and the Pipeline for project-only selection; no references to deleted components remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac2",
+            "title": "Tests for deleted components are removed; the full frontend + root test suites pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac3",
+            "title": "npm run typecheck and npm run lint pass clean",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "panes-store",
+        "to": "panebar",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "stage-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "panebar",
+        "to": "stage-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "keyboard-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "homepane-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "agent-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "terminal-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "commits-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "plan-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "docs-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-shell",
+        "to": "browser-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "agent-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "terminal-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "commits-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "plan-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "docs-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "browser-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "panes-store",
+        "to": "files-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "workspace-header",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-header",
+        "to": "home-stats",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "launcher",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher",
+        "to": "launcher-ordering",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-ordering",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-pane",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-pane",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-pane",
+        "to": "launcher-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "commits-pane",
+        "to": "files-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "agent-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-pane",
+        "to": "agent-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "files-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "commits-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-pane",
+        "to": "action-dock",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-pane",
+        "to": "timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-shell",
+        "to": "homepane-sections",
+        "type": "blocks"
+      },
+      {
+        "from": "keyboard-shortcuts",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "home-stats",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-wiring",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-dock",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "action-dock",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "timeline",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "homepane-sections",
+        "to": "mount-stage",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-stage",
+        "to": "delete-legacy",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-legacy",
+        "to": "update-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-stage",
+        "to": "update-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

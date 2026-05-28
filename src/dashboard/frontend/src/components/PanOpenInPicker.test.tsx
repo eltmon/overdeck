@@ -20,7 +20,7 @@ describe('PanOpenInPicker keyboard shortcut', () => {
     cleanup();
     localStorage.clear();
     wsTransportMock.getAvailableEditors.mockReset();
-    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'] });
+    wsTransportMock.getAvailableEditors.mockResolvedValue({ editors: ['cursor', 'vscode'], defaultCwd: '/home/test/Projects' });
     wsTransportMock.shellOpenInEditor.mockReset();
     wsTransportMock.shellOpenInEditor.mockResolvedValue({ success: true });
     wsTransportMock.request.mockReset();
@@ -31,15 +31,15 @@ describe('PanOpenInPicker keyboard shortcut', () => {
   });
 
   it('shows the shortcut in the primary button tooltip', async () => {
-    render(<PanOpenInPicker cwd="/tmp/workspace" />);
+    render(<PanOpenInPicker openInCwd="/tmp/workspace" />);
 
-    expect(await screen.findByRole('button', { name: 'Cursor' })).toHaveAttribute('title', 'Open in Cursor (⌘⇧O)');
+    expect(await screen.findByRole('button', { name: 'Cursor' })).toHaveAttribute('title', 'Open /tmp/workspace in Cursor (⌘⇧O)');
     expect(EDITOR_OPEN_FAVORITE_KEY).toBe('mod+shift+o');
   });
 
   it('opens the preferred editor from Ctrl+Shift+O while mounted', async () => {
     localStorage.setItem('panopticon:last-editor', 'vscode');
-    render(<PanOpenInPicker cwd="/tmp/workspace" />);
+    render(<PanOpenInPicker openInCwd="/tmp/workspace" />);
     await screen.findByRole('button', { name: 'VS Code' });
 
     fireEvent.keyDown(document.body, { key: 'O', ctrlKey: true, shiftKey: true });

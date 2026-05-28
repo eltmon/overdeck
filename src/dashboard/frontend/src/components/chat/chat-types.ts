@@ -52,6 +52,18 @@ export interface ContextUsage {
   estimatedTokens: number;
   contextWindow: number;
   percentUsed: number;
+  /** Last assistant turn's `usage.input_tokens`. Optional — older payloads omit it. */
+  lastInputTokens?: number;
+  /** Last assistant turn's `usage.cache_read_input_tokens`. */
+  lastCacheReadTokens?: number;
+  /** Last assistant turn's `usage.cache_creation_input_tokens`. */
+  lastCacheCreationTokens?: number;
+  /** Max input+cache observed since the last compact boundary — triggers 1M-context auto-detection. */
+  maxObservedInputTokens?: number;
+  /** Model the last assistant turn ran under, from JSONL. May differ from the conversation's stored `model`. */
+  lastModel?: string | null;
+  /** ISO timestamp of the last assistant turn. */
+  lastTurnAt?: string | null;
 }
 
 export type ConversationEvent =

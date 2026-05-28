@@ -1,6 +1,6 @@
 {
   "name": "@panctl/cli",
-  "version": "0.11.1",
+  "version": "0.16.0",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
@@ -97,10 +97,6 @@
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.mjs || true",
     "prepare": "husky"
-  },
-  "optionalDependencies": {
-    "moonshine-linux-x64": "workspace:*",
-    "qwen-tts-linux-x64": "workspace:*"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",

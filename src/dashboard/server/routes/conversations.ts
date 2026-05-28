@@ -28,6 +28,7 @@ import { resolveClaudeSessionId } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
+import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -97,6 +98,7 @@ import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -109,6 +111,7 @@ import {
   summarizeConversationActivity,
   type ParseState,
 } from '../services/conversation-service.js';
+import { resolveConversationGitInfo } from '../services/git-info.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
@@ -125,11 +128,15 @@ import {
   reserveSummaryForkSession,
   copySessionFromCompactBoundary,
   requestHandoffFromAgent,
+  authorHandoffExternal,
   handoffPreconditionFallbackReason,
   handoffFailureReason,
   logHandoffFallback,
+  prependFallbackFocus,
   type SummaryForkMode,
+  type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
+import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   CONVERSATION_TITLE_MODEL,
   serializeConversationTranscript,
@@ -725,11 +732,16 @@ export async function handleConversationMessage(
     }
     // Unmanaged @paths in prose are allowed to pass through
   }
+  const managedAttachmentPaths = managedChecks
+    .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
+    .map((c) => c.attachmentPath);
+  const harness: RuntimeName = conv.harness ?? 'claude-code';
+  const deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
 
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
-      message,
+      deliveredMessage,
       'conversation-message',
       resolveConversationDeliveryMethod(conv),
     );
@@ -785,6 +797,50 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+}
+
+/** Rewrite an outgoing conversation message so harnesses without Claude Code's
+ *  `@`-mention pre-submit parser still surface image attachments to the model.
+ *
+ *  Claude Code's TUI parses `@/abs/path` tokens at submit time and inlines the
+ *  file as vision input — the model sees the image, not the path. Pi (and
+ *  similar harnesses) lack that parser; the model sees `@/abs/path` as literal
+ *  text and may or may not decide to call its Read tool. Replace the
+ *  composer-injected `@path` prefix with an explicit instruction so any
+ *  harness with a Read tool will see and process the attachment. PAN-1535. */
+export function transformMessageForHarness(
+  message: string,
+  harness: RuntimeName,
+  managedPaths: string[],
+): string {
+  if (harness === 'claude-code') return message;
+  if (managedPaths.length === 0) return message;
+
+  // Strip each managed `@<path>` token (exact literal match, escaped for
+  // regex metacharacters) so we don't accidentally strip unmanaged prose
+  // mentions of similar-looking paths.
+  let body = message;
+  for (const p of managedPaths) {
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    body = body.replace(new RegExp(`(?<!\\S)@${escaped}`, 'g'), '');
+  }
+  // Collapse the multiple blank lines left behind by stripping, and trim.
+  const rest = body
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .reduce<string[]>((acc, line) => {
+      if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') return acc;
+      acc.push(line);
+      return acc;
+    }, [])
+    .join('\n')
+    .trim();
+
+  const bullets = managedPaths.map((p) => `- ${p}`).join('\n');
+  if (!rest) {
+    return `Please use your Read tool on the file(s) below and describe what you see.\n\nFiles:\n${bullets}`;
+  }
+  return `Please use your Read tool on the file(s) below before responding, then answer the message that follows based on what you see.\n\nFiles:\n${bullets}\n\nMessage:\n${rest}`;
 }
 
 function resolvePtySupervisorScriptPath(): string {
@@ -1199,6 +1255,119 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
 
   updateConversationTitle(conversationName, sanitized, 'ai');
   console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | outputChars=${sanitized.length}`);
+
+  // Schedule a one-shot follow-up retitle once the assistant's first complete
+  // response has landed. The first-message titler only sees the user's opening
+  // prompt; the refined pass uses the whole transcript and almost always
+  // produces a better label.
+  scheduleTitleRefinement(conversationName);
+}
+
+/** Conversations awaiting first-assistant-response title refinement. */
+const refinementScheduled = new Set<string>();
+
+/**
+ * After the first-message AI title is set, watch the JSONL for the first
+ * complete assistant response, then re-title from the whole transcript.
+ * Fires at most once per conversation. Skips if the user has manually renamed
+ * the conversation in the meantime or the conversation has already been
+ * refined. Times out after 10 minutes — large operations or stalled
+ * conversations will simply keep the first-message title.
+ */
+function scheduleTitleRefinement(conversationName: string): void {
+  if (refinementScheduled.has(conversationName)) return;
+  refinementScheduled.add(conversationName);
+
+  const TIMEOUT_MS = 10 * 60 * 1000;
+  const POLL_INTERVAL_MS = 1500;
+  const startedAt = Date.now();
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let running = false;
+  let done = false;
+
+  const stop = () => {
+    done = true;
+    if (timer) clearTimeout(timer);
+    refinementScheduled.delete(conversationName);
+  };
+
+  async function tick(): Promise<void> {
+    if (done) return;
+    if (running) {
+      timer = setTimeout(tick, POLL_INTERVAL_MS);
+      return;
+    }
+    running = true;
+    try {
+      if (Date.now() - startedAt > TIMEOUT_MS) {
+        console.log(`[title-refine] Timed out waiting for first assistant response in "${conversationName}"`);
+        stop();
+        return;
+      }
+
+      const conv = getConversationByName(conversationName);
+      if (!conv) {
+        stop();
+        return;
+      }
+      // Only refine titles that are still AI-generated from the first message.
+      // Manual renames and prior refinements are sacred.
+      if (conv.titleSource !== 'ai') {
+        stop();
+        return;
+      }
+
+      const sessionFile = await resolveSessionFile(conv);
+      if (!sessionFile || !existsSync(sessionFile)) {
+        timer = setTimeout(tick, POLL_INTERVAL_MS);
+        return;
+      }
+
+      const { messages } = await getCachedMessages(sessionFile, false);
+      const firstCompleteAssistant = messages.find(
+        (m) => m.role === 'assistant' && m.completedAt,
+      );
+      if (!firstCompleteAssistant) {
+        timer = setTimeout(tick, POLL_INTERVAL_MS);
+        return;
+      }
+
+      const transcript = serializeConversationTranscript(messages);
+      if (!transcript.trim()) {
+        timer = setTimeout(tick, POLL_INTERVAL_MS);
+        return;
+      }
+
+      console.log(`[claude-invoke] purpose=conversation-title-refine | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | transcriptChars=${transcript.length}`);
+      const refined = await summarizeTranscriptTitle(transcript);
+      if (!refined) {
+        console.warn(`[title-refine] Model returned empty refined title for "${conversationName}"`);
+        stop();
+        return;
+      }
+
+      // Re-check eligibility — user may have renamed during the model call.
+      const freshConv = getConversationByName(conversationName);
+      if (!freshConv || freshConv.titleSource !== 'ai') {
+        console.log(`[title-refine] Conversation "${conversationName}" no longer eligible (source=${freshConv?.titleSource ?? 'missing'}); skipping`);
+        stop();
+        return;
+      }
+
+      updateConversationTitle(conversationName, refined, 'ai-refined');
+      console.log(`[claude-invoke] SUCCESS purpose=conversation-title-refine | conversation=${conversationName} | title="${refined}"`);
+      stop();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[title-refine] failed for "${conversationName}":`, msg);
+      stop();
+    } finally {
+      running = false;
+    }
+  }
+
+  timer = setTimeout(tick, POLL_INTERVAL_MS);
 }
 
 // ─── Conversation retitle / about summary ─────────────────────────────────────
@@ -1379,8 +1548,56 @@ const getConversationsRoute = HttpRouter.add(
               }
             }
 
+            // PAN-1520 — scan the conv JSONL for any pending blocking surface
+            // (AskUserQuestion, ExitPlanMode, EnterPlanMode) so the dashboard
+            // can fire the unified indicator/notification/modal for conv
+            // sessions, not just work agents.
+            let pendingInputCount = 0;
+            let pendingInputKinds: PendingInputKind[] = [];
+            let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
+            if (sessionAlive && convSf && existsSync(convSf)) {
+              try {
+                const scan = await scanPendingInputsPromise(convSf);
+                const kinds: PendingInputKind[] = [];
+                if (scan.askUserQuestions.length > 0) {
+                  kinds.push('askUserQuestion');
+                  const first = scan.askUserQuestions[0];
+                  pendingAskUserQuestion = {
+                    toolUseId: first.toolId,
+                    askedAt: first.timestamp,
+                    questions: first.questions.map(q => ({
+                      question: q.question,
+                      header: q.header,
+                      multiSelect: q.multiSelect,
+                      options: q.options.map(o => ({ label: o.label, description: o.description })),
+                    })),
+                  };
+                }
+                if (scan.exitPlanModePending) kinds.push('exitPlanMode');
+                if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
+                pendingInputKinds = kinds;
+                pendingInputCount = kinds.length;
+              } catch {
+                // JSONL scan failure — leave as zero/empty; non-fatal
+              }
+            }
+
             const compacting = convSf ? isCompacting(convSf) : false;
-            return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting, contextUsage: null };
+            const gitInfo = await resolveConversationGitInfo(conv.cwd);
+            return {
+              ...conv,
+              sessionAlive,
+              isWorking,
+              currentTool,
+              isFavorited: favoritedNames.has(conv.name),
+              compacting,
+              contextUsage: null,
+              branch: gitInfo.branch,
+              isWorktree: gitInfo.isWorktree,
+              pendingInputCount,
+              pendingInputKinds,
+              pendingAskUserQuestion,
+            };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
         ));
@@ -1445,7 +1662,45 @@ const getConversationRoute = HttpRouter.add(
             contextUsage = null;
           }
         }
-        return jsonResponse({ ...conv, sessionAlive, contextUsage });
+        const gitInfo = await resolveConversationGitInfo(conv.cwd);
+        // PAN-1520 — pending-input surfaces for this conv.
+        let pendingInputCount = 0;
+        let pendingInputKinds: PendingInputKind[] = [];
+        let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined;
+        if (sessionAlive && convSf && existsSync(convSf)) {
+          try {
+            const scan = await scanPendingInputsPromise(convSf);
+            const kinds: PendingInputKind[] = [];
+            if (scan.askUserQuestions.length > 0) {
+              kinds.push('askUserQuestion');
+              const first = scan.askUserQuestions[0];
+              pendingAskUserQuestion = {
+                toolUseId: first.toolId,
+                askedAt: first.timestamp,
+                questions: first.questions.map(q => ({
+                  question: q.question,
+                  header: q.header,
+                  multiSelect: q.multiSelect,
+                  options: q.options.map(o => ({ label: o.label, description: o.description })),
+                })),
+              };
+            }
+            if (scan.exitPlanModePending) kinds.push('exitPlanMode');
+            if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
+            pendingInputKinds = kinds;
+            pendingInputCount = kinds.length;
+          } catch { /* non-fatal */ }
+        }
+        return jsonResponse({
+          ...conv,
+          sessionAlive,
+          contextUsage,
+          branch: gitInfo.branch,
+          isWorktree: gitInfo.isWorktree,
+          pendingInputCount,
+          pendingInputKinds,
+          pendingAskUserQuestion,
+        });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] get conversation failed:', msg);
@@ -1515,7 +1770,7 @@ const postConversationRoute = HttpRouter.add(
         if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
           return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
         }
-        let cwd = join(homedir(), 'Projects');
+        let cwd = getDefaultCwd();
         if (projectKey) {
           const projectConfig = getProjectSync(projectKey);
           if (projectConfig?.path && existsSync(projectConfig.path)) {
@@ -2212,7 +2467,9 @@ const postConversationMessageRoute = HttpRouter.add(
         return await handleConversationMessage(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] send message failed:', msg);
+        // Log the full stack (falls back to message) so a 500's cause is
+        // diagnosable after the fact, not just the bare message (PAN-1552).
+        console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
         // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
@@ -2584,6 +2841,9 @@ async function runForkPipeline(
   includeThinkingInSummary?: boolean,
   summaryHarness?: RuntimeName,
   handoffFocus?: string,
+  handoffAuthor: HandoffAuthor = 'external',
+  handoffAuthorModel?: string,
+  handoffAuthorHarness?: RuntimeName,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -2642,22 +2902,44 @@ async function runForkPipeline(
   };
 
   if (forkMode === 'handoff') {
-    const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
-    if (preconditionFallback) {
-      forkFallbackReason = preconditionFallback;
-      effectiveForkMode = 'summary';
-      logHandoffFallback(parentConv, preconditionFallback);
-      summary = await buildSummary();
-    } else {
+    if (handoffAuthor === 'external') {
+      // External authoring: separate session reads the source JSONL and
+      // writes the doc; source conversation is never touched.
       try {
-        const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+        const handoff = await authorHandoffExternal(
+          parentConv,
+          parentSessionFile,
+          handoffFocus,
+          handoffAuthorModel,
+          handoffAuthorHarness,
+        );
         summary = handoff.docText;
         handoffDocPath = handoff.docPath;
       } catch (error) {
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, forkFallbackReason);
-        summary = await buildSummary();
+        summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
+      }
+    } else {
+      // Source authoring (legacy): deliver the prompt to the live source agent.
+      const preconditionFallback = await handoffPreconditionFallbackReason(parentConv);
+      if (preconditionFallback) {
+        forkFallbackReason = preconditionFallback;
+        effectiveForkMode = 'summary';
+        logHandoffFallback(parentConv, preconditionFallback);
+        summary = prependFallbackFocus(await buildSummary(), handoffFocus, preconditionFallback);
+      } else {
+        try {
+          const handoff = await requestHandoffFromAgent(parentConv, handoffFocus);
+          summary = handoff.docText;
+          handoffDocPath = handoff.docPath;
+        } catch (error) {
+          forkFallbackReason = handoffFailureReason(error);
+          effectiveForkMode = 'summary';
+          logHandoffFallback(parentConv, forkFallbackReason);
+          summary = prependFallbackFocus(await buildSummary(), handoffFocus, forkFallbackReason);
+        }
       }
     }
   } else {
@@ -2714,11 +2996,8 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        if (conv.harness === 'pi') {
-          return jsonResponse({ error: 'Forking Pi conversations is not supported until Pi session transcript export is available.' }, { status: 400 });
-        }
-
-        const sourceSessionFile = await resolveForkSourceSessionFile(conv);
+        const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
+        const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
         if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
           return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
@@ -2748,6 +3027,39 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: focusResult.error }, { status: 400 });
         }
         const handoffFocus = focusResult.focus;
+        const requestedHandoffAuthor = body['handoffAuthor'];
+        let handoffAuthor: HandoffAuthor = 'external';
+        if (requestedHandoffAuthor !== undefined) {
+          if (requestedHandoffAuthor !== 'source' && requestedHandoffAuthor !== 'external') {
+            return jsonResponse({ error: 'Invalid handoffAuthor (expected "source" or "external")' }, { status: 400 });
+          }
+          handoffAuthor = requestedHandoffAuthor;
+        }
+        const handoffAuthorModel = typeof body['handoffAuthorModel'] === 'string'
+          ? body['handoffAuthorModel'].trim()
+          : undefined;
+        if (handoffAuthorModel && !SAFE_MODEL_PATTERN.test(handoffAuthorModel)) {
+          return jsonResponse({ error: 'Invalid handoffAuthorModel' }, { status: 400 });
+        }
+
+        // Capability gates — the source harness must support the requested
+        // fork mode. Plain forks copy raw Claude JSONL and spawn with
+        // --resume, so only Claude Code sources work. Source-authored handoff
+        // requires the source agent to write a sentinel file in response to a
+        // delivered prompt; harnesses without that signaling path (e.g. Pi,
+        // see PAN-1134) cannot author handoff docs in-session. Other modes
+        // (summary, external-authored handoff) work for any harness whose
+        // transcript adapter knows how to read the session file.
+        if (forkMode === 'plain' && !sourceAdapter.supportsPlainForkAsSource) {
+          return jsonResponse({
+            error: `Plain forks are not supported for ${sourceAdapter.name} sources — only Claude Code can be the source of a plain fork. Use a summary or handoff fork instead.`,
+          }, { status: 400 });
+        }
+        if (forkMode === 'handoff' && handoffAuthor === 'source' && !sourceAdapter.supportsSourceAuthoredHandoff) {
+          return jsonResponse({
+            error: `Source-authored handoffs are not supported for ${sourceAdapter.name} sources because the harness has no signaling channel for the .done sentinel. Use external authoring (handoffAuthor: "external") instead.`,
+          }, { status: 400 });
+        }
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
         const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
@@ -2780,6 +3092,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
+        const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
+          ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
+          : undefined;
         if (forkMode === 'plain' && launchHarness === 'pi') {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
           // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
@@ -2815,7 +3130,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });

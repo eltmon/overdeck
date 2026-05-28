@@ -2459,7 +2459,9 @@
 .conversationTerminalHeader {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+  row-gap: 6px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -2470,17 +2472,45 @@
   container-type: inline-size;
 }
 
+/* Progressively hide the lowest-priority chrome before the header wraps to a
+   second row. The session ID is a technical identifier (already 50% opacity);
+   the branch mode label ("Local"/"Worktree") is redundant with the icon. */
+@container (max-width: 640px) {
+  .conversationHeaderContainer .conversationSessionId {
+    display: none;
+  }
+}
+
+@container (max-width: 520px) {
+  .conversationHeaderContainer .terminalBranchBarMode {
+    display: none;
+  }
+}
+
 .conversationTerminalTitle {
   font-size: 12px;
   font-weight: 600;
   color: var(--foreground);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  /* Keep the title + edit/regenerate icons visible even when the cost bar,
+     status, session-id, and tab group consume most of the header. */
+  min-width: 200px;
+  /* Overflow + ellipsis live on the inner text span, not here — otherwise the
+     pencil/sparkle buttons get laid out past this container's right edge and
+     vanish behind overflow:hidden. */
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.conversationTerminalTitleText {
+  /* Inner span that holds just the title text. Shrinks to fit, ellipsises
+     when long, but does NOT clip its sibling buttons. */
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes spin {
@@ -2583,7 +2613,10 @@
   border-radius: 4px;
   display: flex;
   align-items: center;
-  opacity: 0.4;
+  /* 0.4 was too faint against the dark header — icons were effectively
+     invisible until hover. 0.75 is clearly visible at rest, hover still
+     lifts to 1.0 for affordance. */
+  opacity: 0.75;
   transition: opacity 0.15s, color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
@@ -3398,6 +3431,30 @@
 
 .composerToolbarSpacer {
   flex: 1;
+}
+
+/*
+ * Model drift hint (PAN-1523). Surfaces when the picker disagrees with
+ * the running session's last assistant model — e.g. the user ran /model
+ * inside Claude Code. Style is a subdued warning chip; clicking the
+ * picker is the explicit way to resync.
+ */
+.composerToolbarModelDrift {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+  flex-shrink: 0;
+  cursor: help;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Pipe divider between toolbar items (matches t3code style) */
@@ -4315,6 +4372,71 @@
   border-radius: 4px;
   background: color-mix(in srgb, var(--destructive) 12%, transparent);
   cursor: help;
+}
+
+/* ─── Branch / worktree chips (PAN-1523) ─────────────────────────────────── */
+
+.conversationBranchChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+  /* Sits inline with the title row, never wraps. */
+  max-width: 160px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+}
+
+.conversationBranchChipText {
+  /* Long branch names ellipsis inside the chip rather than pushing it wider. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminalBranchBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 8%, transparent);
+  flex-shrink: 0;
+  /* Ellipsis-friendly when the header is cramped. */
+  max-width: 320px;
+  min-width: 0;
+}
+
+.terminalBranchBarText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminalBranchBarMode {
+  /* The "Local" / "Worktree" label sits between the icon and the branch name. */
+  color: var(--foreground);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.terminalBranchBarDrift {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+}
+
+.terminalBranchBarMissing {
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 15%, transparent);
 }
 
 /* ─── Fork progress view (conversation detail) ──────────────────────────── */

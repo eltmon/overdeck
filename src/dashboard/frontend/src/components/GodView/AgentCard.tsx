@@ -193,12 +193,24 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         </div>
       </div>
 
-      {/* Pending question indicator */}
-      {agent.hasPendingQuestion && (
+      {/* PAN-1520 — unified pending-input indicator (covers AskUserQuestion,
+          PermissionRequest, ExitPlanMode, EnterPlanMode in one pulse). */}
+      {(agent.hasPendingQuestion || (agent.pendingInputCount ?? 0) > 0) && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
-          title="Agent needs input"
+          title={(() => {
+            const kinds = agent.pendingInputKinds ?? [];
+            if (kinds.length === 0) return 'Agent needs input';
+            const label: Record<string, string> = {
+              askUserQuestion: 'Question waiting',
+              permissionRequest: 'Permission pending',
+              exitPlanMode: 'Plan approval pending',
+              enterPlanMode: 'Plan being drafted',
+              sessionResume: 'Session resume waiting',
+            };
+            return kinds.map((k) => label[k] ?? k).join(', ');
+          })()}
         />
       )}
     </motion.div>

@@ -51,23 +51,53 @@ describe('computeContextUsage', () => {
     });
   });
 
-  it('returns context usage for a known Claude model without a compact boundary', async () => {
-    const buffer = Buffer.from('active conversation bytes');
+  it('returns context usage from the last assistant turn for a known Claude model', async () => {
+    // computeContextUsage now reads usage.input_tokens + cache_read +
+    // cache_creation from the most recent assistant turn (matches Claude
+    // Code's terminal indicator), instead of estimating via bytes/4.
+    const assistantLine = `${makeJsonlLine({
+      type: 'assistant',
+      message: {
+        model: 'claude-opus-4-7',
+        usage: {
+          input_tokens: 4_200,
+          output_tokens: 800,
+          cache_read_input_tokens: 26_000,
+          cache_creation_input_tokens: 2_841,
+        },
+      },
+      timestamp: '2026-05-26T14:30:00Z',
+    })}\n`;
+    const buffer = Buffer.from(assistantLine);
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-known-claude.jsonl', 'claude-opus-4-7');
 
-    expect(result).toEqual({
+    // 4200 + 26000 + 2841 = 33041 live context tokens
+    expect(result).toMatchObject({
       activeBytes: buffer.length,
-      estimatedTokens: Math.ceil(buffer.length / 4),
-      contextWindow: 200000,
-      percentUsed: (Math.ceil(buffer.length / 4) / 200000) * 100,
+      estimatedTokens: 33_041,
+      contextWindow: 200_000,
+      lastInputTokens: 4_200,
+      lastCacheReadTokens: 26_000,
+      lastCacheCreationTokens: 2_841,
+      maxObservedInputTokens: 33_041,
+      lastModel: 'claude-opus-4-7',
+      lastTurnAt: '2026-05-26T14:30:00Z',
     });
+    expect(result?.percentUsed).toBeCloseTo((33_041 / 200_000) * 100, 5);
   });
 
   it('returns context usage for a known GPT model', async () => {
-    const buffer = Buffer.from('gpt conversation bytes');
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: {
+        model: 'gpt-5.5',
+        usage: { input_tokens: 5_000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    })}\n`;
+    const buffer = Buffer.from(line);
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
@@ -75,19 +105,43 @@ describe('computeContextUsage', () => {
 
     expect(result).toMatchObject({
       activeBytes: buffer.length,
-      estimatedTokens: Math.ceil(buffer.length / 4),
-      contextWindow: 1050000,
+      estimatedTokens: 5_000,
+      contextWindow: 1_050_000,
     });
   });
 
   it('resolves deprecated model IDs before looking up context windows', async () => {
-    const buffer = Buffer.from('deprecated model bytes');
-    mockReadFile.mockResolvedValue(buffer);
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-5', usage: { input_tokens: 100 } },
+    })}\n`;
+    mockReadFile.mockResolvedValue(Buffer.from(line));
 
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-deprecated.jsonl', 'claude-opus-4-5');
 
-    expect(result?.contextWindow).toBe(200000);
+    expect(result?.contextWindow).toBe(200_000);
+  });
+
+  it('auto-promotes the effective context window to 1M when observed input exceeds the default', async () => {
+    // Opus' default capability says 200k; if the JSONL records an
+    // input_tokens past that ceiling we know Claude Code is in
+    // 1M extended-context mode (the context-1m-2025-08-07 beta).
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: {
+        model: 'claude-opus-4-7',
+        usage: { input_tokens: 340_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    })}\n`;
+    mockReadFile.mockResolvedValue(Buffer.from(line));
+
+    const { computeContextUsage } = await import('../conversation-service.js');
+    const result = await computeContextUsage('/fake/context-1m.jsonl', 'claude-opus-4-7');
+
+    expect(result?.contextWindow).toBe(1_000_000);
+    expect(result?.estimatedTokens).toBe(340_000);
+    expect(result?.percentUsed).toBeCloseTo(34, 0);
   });
 
   it('returns null for unknown, null, and empty models without reading the file', async () => {
@@ -101,21 +155,28 @@ describe('computeContextUsage', () => {
     expect(mockOpen).not.toHaveBeenCalled();
   });
 
-  it('uses the last compact boundary to compute active bytes', async () => {
-    const firstBoundary = `${makeJsonlLine({ type: 'system', subtype: 'compact_boundary' })}\n`;
-    const staleLine = `${makeJsonlLine({ type: 'user', message: { content: [{ type: 'text', text: 'before' }] } })}\n`;
-    const secondBoundary = `${makeJsonlLine({ type: 'system', subtype: 'compact_boundary' })}\n`;
-    const activeLine = `${makeJsonlLine({ type: 'assistant', message: { content: [{ type: 'text', text: 'after' }] } })}\n`;
-    const buffer = Buffer.from(firstBoundary + staleLine + secondBoundary + activeLine);
+  it('ignores assistant turns before the last compact boundary', async () => {
+    // The stale assistant message before the boundary should NOT contribute
+    // to estimatedTokens. Only the post-boundary turn counts.
+    const staleAssistant = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 999_999 } },
+    })}\n`;
+    const boundary = `${makeJsonlLine({ type: 'system', subtype: 'compact_boundary' })}\n`;
+    const activeAssistant = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 12_000, cache_read_input_tokens: 3_000 } },
+    })}\n`;
+    const buffer = Buffer.from(staleAssistant + boundary + activeAssistant);
     mockReadFile.mockResolvedValue(buffer);
 
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-multiple-boundaries.jsonl', 'claude-opus-4-7');
 
-    const activeBytes = Buffer.byteLength(secondBoundary + activeLine);
+    const activeBytes = Buffer.byteLength(boundary + activeAssistant);
     expect(result).toMatchObject({
       activeBytes,
-      estimatedTokens: Math.ceil(activeBytes / 4),
+      estimatedTokens: 15_000, // 12k + 3k, ignoring the pre-boundary 999_999
     });
   });
 
@@ -128,26 +189,30 @@ describe('computeContextUsage', () => {
     expect(result).toEqual({ activeBytes: 0, estimatedTokens: 0, contextWindow: 200000, percentUsed: 0 });
   });
 
+  it('returns zero usage when the file has lines but no assistant turn with usage data', async () => {
+    // User-only or system-only segment between boundaries — no token data
+    // to draw on. Should not crash; should return zeros.
+    const userLine = `${makeJsonlLine({ type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } })}\n`;
+    mockReadFile.mockResolvedValue(Buffer.from(userLine));
+
+    const { computeContextUsage } = await import('../conversation-service.js');
+    const result = await computeContextUsage('/fake/context-no-assistant.jsonl', 'claude-opus-4-7');
+
+    expect(result).toMatchObject({ estimatedTokens: 0, percentUsed: 0 });
+  });
+
   it('clamps percentUsed at 100', async () => {
-    const buffer = Buffer.alloc(5_000_000, 'x');
-    mockReadFile.mockResolvedValue(buffer);
+    // Force a usage well over the model window so the meter clamps.
+    const line = `${makeJsonlLine({
+      type: 'assistant',
+      message: { model: 'gpt-5.3-codex-spark', usage: { input_tokens: 999_999_999 } },
+    })}\n`;
+    mockReadFile.mockResolvedValue(Buffer.from(line));
 
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-overflow.jsonl', 'gpt-5.3-codex-spark');
 
     expect(result?.percentUsed).toBe(100);
-  });
-
-  it('reuses the compact boundary cache on repeated calls', async () => {
-    const boundary = `${makeJsonlLine({ type: 'system', subtype: 'compact_boundary' })}\n`;
-    const activeLine = `${makeJsonlLine({ type: 'user', message: { content: [{ type: 'text', text: 'cached' }] } })}\n`;
-    mockReadFile.mockResolvedValue(Buffer.from(boundary + activeLine));
-
-    const { computeContextUsage } = await import('../conversation-service.js');
-    await computeContextUsage('/fake/context-cache.jsonl', 'claude-opus-4-7');
-    await computeContextUsage('/fake/context-cache.jsonl', 'claude-opus-4-7');
-
-    expect(mockOpen).toHaveBeenCalledTimes(1);
   });
 });
 

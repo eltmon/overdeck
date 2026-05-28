@@ -40,7 +40,13 @@ export function openDashboardLogStdio(): ['ignore', number | 'ignore', number | 
     mkdirSync(LOGS_DIR, { recursive: true });
     const fd = openSync(DASHBOARD_LOG_FILE, 'a');
     return ['ignore', fd, fd];
-  } catch {
+  } catch (err) {
+    // Don't silently discard the dashboard's output (PAN-1552). Surface why the
+    // log file could not be opened so a detached `pan up` failure isn't invisible.
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `[pan up] could not open ${DASHBOARD_LOG_FILE} for logging: ${msg} — dashboard output will not be captured\n`,
+    );
     return ['ignore', 'ignore', 'ignore'];
   }
 }

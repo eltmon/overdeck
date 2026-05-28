@@ -46,7 +46,6 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
@@ -81,60 +80,12 @@ function reviewerAgentOutputPath(workspace: string, runId: string, subRole: Revi
   return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
 
-async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
-  // Drop any prior cycle's review-temp stash before creating a new one. Without
-  // this, accumulated stashes from previous rounds leak — PAN-1030 left ten
-  // review-temp:PAN-1030:1..10 stashes behind because each round's cleanup
-  // drops the *current* ref but `setReviewStatus` overwrites the ref before
-  // cleanup runs, so the prior round's ref gets orphaned. Drop-then-create is
-  // the only ordering that guarantees no orphans.
-  const priorStatus = getReviewStatusSync(issueId);
-  if (priorStatus?.reviewTempStashRef) {
-    try {
-      await Effect.runPromise(dropStash(workspace, priorStatus.reviewTempStashRef));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (!/not found|does not exist/i.test(message)) {
-        console.error(`[review-agent] Failed to drop prior review-temp stash for ${issueId} (non-fatal):`, err);
-      }
-    }
-  }
+// PAN-1531: ensureReviewTempStash / cleanupReviewTempStashPromise removed.
+// Review now runs against the committed diff only. The dirty-worktree gate
+// at pan done time (and the same gate added to /api/review/:id/request)
+// guarantees the worktree is clean before specialists see the diff.
 
-  const { stdout } = await execAsync('git status --porcelain', {
-    cwd: workspace,
-    encoding: 'utf-8',
-  });
-  if (!stdout.trim()) return null;
-
-  const existingEntries = await Effect.runPromise(listStashes(workspace));
-  const sequence = getNextReviewTempSequence([...existingEntries], issueId);
-  const message = buildStashMessage('review-temp', issueId, sequence);
-  // We read porcelain status immediately before stashing and rely on review orchestration being
-  // single-threaded per workspace; if another actor clears the dirtiness window before stash push,
-  // createNamedStash can legitimately return null and the review should just continue without one.
-  const ref = await Effect.runPromise(createNamedStash(workspace, message, true));
-  if (!ref) return null;
-
-  return { ref, message, sequence };
-}async function cleanupReviewTempStashPromise(issueId: string, workspace: string): Promise<void> {
-  const status = getReviewStatusSync(issueId);
-  if (!status?.reviewTempStashRef) return;
-
-  try {
-    await Effect.runPromise(dropStash(workspace, status.reviewTempStashRef));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/not found|does not exist/i.test(message)) {
-      throw error;
-    }
-  }
-
-  setReviewStatusSync(issueId, {
-    reviewTempStashRef: undefined,
-    reviewTempStashMessage: undefined,
-    reviewTempStashSequence: undefined,
-  });
-}async function buildConvoyPromptPromise(opts: {
+async function buildConvoyPromptPromise(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
@@ -423,35 +374,18 @@ function buildReviewRolePrompt(opts: {
     // Non-fatal: archiving is best-effort
   }
 
-  let reviewTempStash: Awaited<ReturnType<typeof ensureReviewTempStash>> = null;
-  try {
-    reviewTempStash = await ensureReviewTempStash(opts.issueId, opts.workspace);
-  } catch (err) {
-    console.error(`[review-agent] Failed to create review-temp stash for ${opts.issueId}:`, err);
-    return {
-      success: false,
-      message: 'Failed to create review-temp stash',
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-
-  // Set reviewing here so callers don't race against the async role spawn.
-  // The review role signals the terminal verdict with Panopticon's CLI, which
-  // transitions reviewStatus to passed/blocked/failed and fires the review.approved
-  // lifecycle event for reactive Cloister.
+  // PAN-1531: review-temp stash machinery removed. Reviewers see only the
+  // committed diff because the dirty-worktree gate refuses pan done /
+  // pan review request before reaching here. If callers somehow bypass the
+  // gate, uncommitted scratch becomes visible in the review — that's the
+  // correct fail-loud behavior, not a reason to silently stash.
   try {
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
-      reviewTempStashRef: reviewTempStash?.ref,
-      reviewTempStashMessage: reviewTempStash?.message,
-      reviewTempStashSequence: reviewTempStash?.sequence,
     });
   } catch (err) {
     console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
-    if (reviewTempStash) {
-      try { await Effect.runPromise(dropStash(opts.workspace, reviewTempStash.ref)); } catch {}
-    }
     return {
       success: false,
       message: 'Failed to initialize review status',
@@ -556,17 +490,9 @@ function buildReviewRolePrompt(opts: {
     };
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
-    try {
-      await Effect.runPromise(cleanupReviewTempStash(opts.issueId, opts.workspace));
-    } catch (cleanupError) {
-      console.error(`[review-agent] Failed to clean review-temp stash for ${opts.issueId}:`, cleanupError);
-    }
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'failed',
       reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,
-      reviewTempStashRef: undefined,
-      reviewTempStashMessage: undefined,
-      reviewTempStashSequence: undefined,
     });
     return {
       success: false,
@@ -676,17 +602,6 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
 }
 
 // ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
-
-/**
- * Effect variant of {@link cleanupReviewTempStash}. The Promise version swallows
- * its own errors (stash listing / drop failures), so the Effect form mirrors
- * that contract.
- */
-export const cleanupReviewTempStash = (
-  issueId: string,
-  workspace: string,
-): Effect.Effect<void> =>
-  Effect.promise(() => cleanupReviewTempStashPromise(issueId, workspace));
 
 /**
  * Effect variant of {@link buildConvoyPrompt}. Template reads are the only
