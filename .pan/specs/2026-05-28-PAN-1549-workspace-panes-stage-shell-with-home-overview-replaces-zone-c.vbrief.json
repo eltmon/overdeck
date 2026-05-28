@@ -4,7 +4,7 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-28T21:28:13.395Z"
+    "updated": "2026-05-28T21:31:38.981Z"
   },
   "plan": {
     "id": "pan-1549",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 54,
+    "sequence": 56,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-28T21:28:13.395Z",
+    "updated": "2026-05-28T21:31:38.981Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -1254,58 +1254,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1549",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-28T21:28:13.389Z",
+        "updatedAt": "2026-05-28T21:31:38.974Z",
         "work": {
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "status": "failed",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
+          "notes": "Verification FAILED at test (24374ms):\n\nt config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > role model configuration > seeds default workhorses and roles when config omits both sections\nAssertionError: expected 'claude-opus-4-8' to be 'claude-opus-4-7' // Object.is equality\n\nExpected: \"claude-opus-4-7\"\nReceived: \"claude-opus-4-8\"\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:133:56\n    131|     expect(config.roles).toEqual(DEFAULT_ROLES);\n    132|     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku…\n    133|     expect(resolveModel('review', 'security', config)).toBe('claude-op…\n       |                                                        ^\n    134|   });\n    135|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-28T21:28:13.389Z"
+              "status": "failed",
+              "at": "2026-05-28T21:31:38.974Z",
+              "notes": "Verification FAILED at test (24374ms):\n\nt config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-roles.test.ts > role model configuration > seeds default workhorses and roles when config omits both sections\nAssertionError: expected 'claude-opus-4-8' to be 'claude-opus-4-7' // Object.is equality\n\nExpected: \"claude-opus-4-7\"\nReceived: \"claude-opus-4-8\"\n\n ❯ src/lib/__tests__/config-yaml-roles.test.ts:133:56\n    131|     expect(config.roles).toEqual(DEFAULT_ROLES);\n    132|     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku…\n    133|     expect(resolveModel('review', 'security', config)).toBe('claude-op…\n       |                                                        ^\n    134|   });\n    135|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "status": "pending",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
           "notes": "All four convoy reviewers (security, correctness, performance, requirements) exited code 1 without writing reports — infrastructure failure, retry the convoy",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-28T21:28:13.389Z",
+              "status": "pending",
+              "at": "2026-05-28T21:31:38.974Z",
               "notes": "All four convoy reviewers (security, correctness, performance, requirements) exited code 1 without writing reports — infrastructure failure, retry the convoy"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-28T21:28:13.389Z"
+              "at": "2026-05-28T21:31:38.974Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-28T21:28:13.389Z",
+          "updatedAt": "2026-05-28T21:31:38.974Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-28T21:28:13.389Z"
+              "at": "2026-05-28T21:31:38.974Z"
             }
           ],
           "readyForMerge": false,
