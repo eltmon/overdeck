@@ -104,6 +104,85 @@
   color: var(--destructive);
 }
 
+/* Launcher */
+.launcher {
+  position: relative;
+  margin-bottom: 6px;
+}
+
+.launchBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--primary);
+  border-radius: 12px;
+  padding: 11px 14px;
+  background: var(--card);
+}
+
+.launchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.dropdown {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.ddRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.ddRow:last-child {
+  border-bottom: none;
+}
+
+.ddRowSel {
+  background: var(--accent);
+}
+
+.ddLab {
+  flex: 1;
+}
+
+.ddLab b {
+  font-weight: 600;
+}
+
+.ddKeys {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-family: 'SF Mono', monospace;
+}
+
+.gicon {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  color: var(--muted-foreground);
+}
+
 .homeSection:empty {
   display: none;
 }
