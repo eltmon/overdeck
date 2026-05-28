@@ -792,6 +792,8 @@ async function generateTurnPrefixSummary(
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
+  'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
+  'claude-opus-4-7': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window
 };
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;

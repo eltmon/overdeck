@@ -143,6 +143,29 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'claude-opus-4-8': {
+    model: 'claude-opus-4-8',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 4.8',
+    costPer1MTokens: 45.0, // Same pricing tier as Opus 4.7/4.6 — verify at launch
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 98,
+      'code-review': 99,
+      debugging: 98,
+      planning: 99,
+      documentation: 96,
+      testing: 95,
+      security: 99,
+      performance: 93,
+      synthesis: 99,
+      speed: 40,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks.',
+  },
+
   'claude-opus-4-7': {
     model: 'claude-opus-4-7',
     provider: 'anthropic',

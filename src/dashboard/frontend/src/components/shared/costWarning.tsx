@@ -7,7 +7,7 @@
  *
  * Tiers (blended $/1M tokens):
  *   extreme  ≥ $60     red, pulsing — gpt-5.5-pro ($119)
- *   high     $30–$59   amber       — opus-4-7, opus-4-6 ($45)
+ *   high     $30–$59   amber       — opus-4-8, opus-4-7, opus-4-6 ($45)
  *   (none)   <  $30                 — no badge
  */
 
