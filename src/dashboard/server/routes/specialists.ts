@@ -1504,13 +1504,13 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       () => import('../../../lib/cloister/review-agent.js'),
     );
     const prUrl = getReviewStatusSync(issueId)?.prUrl;
-    const result = yield* Effect.promise(() => spawnReviewRoleForIssue({
+    const result = yield* spawnReviewRoleForIssue({
       issueId,
       workspace: workspacePath,
       branch,
       prUrl,
       model,
-    }));
+    });
 
     return jsonResponse({
       success: result.success,
