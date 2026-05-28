@@ -130,7 +130,7 @@ describe('role model configuration', () => {
     expect(config.workhorses).toEqual(DEFAULT_WORKHORSES);
     expect(config.roles).toEqual(DEFAULT_ROLES);
     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
-    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-7');
+    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-8');
   });
 
   it('seeds missing roles while preserving partial user role config', () => {
