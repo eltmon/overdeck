@@ -117,10 +117,11 @@ describe('RolesPanel', () => {
     renderPanel();
 
     const cards = await screen.findAllByTestId('role-card');
-    expect(cards).toHaveLength(6);
+    expect(cards).toHaveLength(7);
     expect(cards.map((card) => within(card).getByRole('heading', { level: 4 }).textContent)).toEqual([
       'Plan',
       'Work',
+      'Strike',
       'Review',
       'Test',
       'Ship',
@@ -157,7 +158,7 @@ describe('RolesPanel', () => {
     expect(await screen.findByLabelText('Work Inspect model')).toHaveValue('workhorse:cheap');
     expect(screen.getByLabelText('Work Inspect Deep model')).toHaveValue('workhorse:mid');
 
-    await user.click(within(cards[2]).getByRole('button', { name: /show sub-roles/i }));
+    await user.click(within(cards[3]).getByRole('button', { name: /show sub-roles/i }));
     expect(await screen.findByLabelText('Review Security model')).toHaveValue('workhorse:expensive');
     expect(screen.getByLabelText('Review Correctness model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Review Performance model')).toHaveValue('workhorse:mid');
@@ -170,7 +171,7 @@ describe('RolesPanel', () => {
     renderPanel();
 
     const cards = await screen.findAllByTestId('role-card');
-    await user.click(within(cards[2]).getByRole('button', { name: /show sub-roles/i }));
+    await user.click(within(cards[3]).getByRole('button', { name: /show sub-roles/i }));
     await user.selectOptions(await screen.findByLabelText('Review Security model'), 'kimi-k2.6-flash');
 
     await waitFor(() => {
