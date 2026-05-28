@@ -26,6 +26,8 @@ import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
 import { DocsPane } from './panes/DocsPane'
 import { AgentPane } from './panes/AgentPane'
+import { FilesPane } from './panes/FilesPane'
+import { BrowserPane } from './panes/BrowserPane'
 import type { StageContext, PaneWrapperProps } from './types'
 import styles from './stage.module.css'
 
@@ -84,6 +86,10 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <DocsPane pane={pane} ctx={ctx} />
     case 'agent':
       return <AgentPane pane={pane} ctx={ctx} />
+    case 'files':
+      return <FilesPane pane={pane} ctx={ctx} />
+    case 'browser':
+      return <BrowserPane pane={pane} ctx={ctx} />
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }
@@ -141,6 +147,7 @@ export function Stage({
   const ctx: StageContext = {
     workspaceId,
     openPane,
+    agentId,
     resolveAgentPane: (pane) => {
       if (!pane.conversationId) return undefined
       const conversation = conversations.find((c) => c.name === pane.conversationId)

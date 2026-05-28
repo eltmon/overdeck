@@ -17,6 +17,8 @@ export interface AgentPaneData {
 export interface StageContext {
   workspaceId: WorkspaceId
   openPane: (spec: PaneSpec) => void
+  /** The workspace's agent id — used for diff/files queries (FilesPane). */
+  agentId?: string
   /**
    * Resolve an agent pane's backing conversation/session. Supplied by the
    * Stage mount point (the mount-stage capstone, per D10); absent during

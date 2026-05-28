@@ -3,19 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ActionDock } from './ActionDock'
 
 describe('ActionDock', () => {
-  it('Terminal and Commits buttons open the matching pane types', () => {
+  it('Terminal/Files/Web/Commits buttons open the matching pane types', () => {
     const onOpen = vi.fn()
     render(<ActionDock onOpen={onOpen} />)
     fireEvent.click(screen.getByRole('button', { name: /Terminal/ }))
     expect(onOpen).toHaveBeenCalledWith('terminal')
+    fireEvent.click(screen.getByRole('button', { name: /Files/ }))
+    expect(onOpen).toHaveBeenCalledWith('files')
+    fireEvent.click(screen.getByRole('button', { name: /Web/ }))
+    expect(onOpen).toHaveBeenCalledWith('browser')
     fireEvent.click(screen.getByRole('button', { name: /Commits/ }))
     expect(onOpen).toHaveBeenCalledWith('commits')
-  })
-
-  it('does not expose Files or Web (deferred to #1550)', () => {
-    render(<ActionDock onOpen={() => {}} />)
-    expect(screen.queryByRole('button', { name: /Files/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Web/ })).toBeNull()
   })
 
   it('"+ Actions" overflow exposes Plan and Docs', () => {

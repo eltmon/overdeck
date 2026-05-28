@@ -36,14 +36,14 @@ describe('Stage', () => {
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('renders a safe placeholder for a not-yet-implemented pane type', () => {
-    // 'files' is deferred to #1550, so it still falls through to the placeholder.
+  it('renders a safe placeholder for an unknown pane type (defensive default)', () => {
     usePanesStore.getState().ensureHome(WS)
-    usePanesStore.getState().addPane(WS, { paneType: 'files', label: 'Files' })
+    // Inject a paneType outside the union (e.g. corrupt persisted state).
+    usePanesStore.getState().addPane(WS, { paneType: 'bogus' as never, label: 'Bogus' })
     const { container } = renderStage(<Stage workspaceId={WS} />)
     const body = container.querySelector('[data-pane-type]')
     expect(body).not.toBeNull()
-    expect(body).toHaveAttribute('data-pane-type', 'files')
+    expect(body).toHaveAttribute('data-pane-type', 'bogus')
     expect(screen.getByText(/not implemented yet/i)).toBeTruthy()
   })
 

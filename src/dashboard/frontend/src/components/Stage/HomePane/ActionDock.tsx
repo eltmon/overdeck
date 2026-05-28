@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Terminal, GitCommit, ListTodo, FileText, Plus } from 'lucide-react'
+import { Terminal, FileCode, Globe, GitCommit, ListTodo, FileText, Plus } from 'lucide-react'
 import type { PaneType } from '../../../lib/panesStore'
 import styles from '../stage.module.css'
 
@@ -9,9 +9,9 @@ export interface ActionDockProps {
 }
 
 /**
- * ActionDock — the HomePane tool row (PAN-1549). Terminal and Commits buttons
- * open their panes directly; a "+ Actions" overflow exposes Plan and Docs.
- * Files and Web are deferred to #1550, so they are intentionally absent here.
+ * ActionDock — the HomePane tool row (PAN-1549). Terminal, Files, Web, and
+ * Commits buttons open their panes directly; a "+ Actions" overflow exposes
+ * Plan and Docs. The Web button opens an (empty) browser pane.
  */
 export function ActionDock({ onOpen }: ActionDockProps) {
   const [overflowOpen, setOverflowOpen] = useState(false)
@@ -20,6 +20,14 @@ export function ActionDock({ onOpen }: ActionDockProps) {
       <button type="button" className={`${styles.pill} ${styles.pillTool}`} onClick={() => onOpen('terminal')}>
         <Terminal size={14} />
         Terminal
+      </button>
+      <button type="button" className={`${styles.pill} ${styles.pillTool}`} onClick={() => onOpen('files')}>
+        <FileCode size={14} />
+        Files
+      </button>
+      <button type="button" className={`${styles.pill} ${styles.pillTool}`} onClick={() => onOpen('browser')}>
+        <Globe size={14} />
+        Web
       </button>
       <button type="button" className={`${styles.pill} ${styles.pillTool}`} onClick={() => onOpen('commits')}>
         <GitCommit size={14} />
