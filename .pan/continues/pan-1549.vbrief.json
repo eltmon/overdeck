@@ -1,0 +1,19 @@
+{
+  "version": "1",
+  "issueId": "PAN-1549",
+  "created": "2026-05-28T14:47:58.446Z",
+  "updated": "2026-05-28T14:47:58.446Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T14:47:58.446Z"
+    }
+  ]
+}
