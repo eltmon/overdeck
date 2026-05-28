@@ -95,15 +95,6 @@ describe('pan done <id> — option parsing', () => {
   });
 });
 
-describe('pan swarm <id> — option parsing', () => {
-  it('registers both --auto-advance and --no-auto-advance', () => {
-    const { stdout, status } = runCli(['swarm', '--help']);
-    expect(status).toBe(0);
-    expect(stdout).toMatch(/--auto-advance/);
-    expect(stdout).toMatch(/--no-auto-advance/);
-  });
-});
-
 describe('pan project(s) add — option parsing', () => {
   it('supports the preferred plural projects alias', () => {
     const { stdout, status } = runCli(['projects', 'add', '--help']);

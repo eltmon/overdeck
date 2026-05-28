@@ -131,7 +131,7 @@ Do not pass `--model` to `pan` itself unless the task genuinely warrants it — 
 | "Implement the OAuth flow" | No — chain of dependencies | Auth schema → middleware → routes → tests |
 | "Add a new field to this model" | No — single point of edit | Wouldn't help anyway |
 | "Refactor X to use Y" | No — shared state, sequencing matters | |
-| "Write tests AND implementation for one feature" | No — output → input | Tests inform implementation |
+| "Write tests AND the code for one feature" | No — output → input | Tests inform the code |
 
 ## Jidoka Inspection Gates
 
