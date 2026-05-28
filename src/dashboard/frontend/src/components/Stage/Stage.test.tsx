@@ -1,9 +1,25 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { Stage } from './index'
 import { usePanesStore } from '../../lib/panesStore'
 
+// The re-homed tab bodies (OverviewTab etc.) require DialogProvider + live
+// data; HomePaneSections has its own test, so stub it here to keep this test
+// focused on the Stage's pane mechanics.
+vi.mock('./HomePane/HomePaneSections', () => ({
+  HomePaneSections: () => <div data-testid="home-sections" />,
+}))
+
 const WS = 'PAN-1549'
+
+// The composed HOME pane renders re-homed tab bodies (HomePaneSections) that
+// use react-query, so the Stage must render inside a QueryClientProvider.
+function renderStage(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
+}
 
 beforeEach(() => {
   localStorage.clear()
@@ -12,7 +28,7 @@ beforeEach(() => {
 
 describe('Stage', () => {
   it('auto-creates HOME and renders it active for a fresh workspace', () => {
-    render(<Stage workspaceId={WS} />)
+    renderStage(<Stage workspaceId={WS} />)
     // HOME tab present and selected.
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(1)
@@ -24,7 +40,7 @@ describe('Stage', () => {
     // 'files' is deferred to #1550, so it still falls through to the placeholder.
     usePanesStore.getState().ensureHome(WS)
     usePanesStore.getState().addPane(WS, { paneType: 'files', label: 'Files' })
-    const { container } = render(<Stage workspaceId={WS} />)
+    const { container } = renderStage(<Stage workspaceId={WS} />)
     const body = container.querySelector('[data-pane-type]')
     expect(body).not.toBeNull()
     expect(body).toHaveAttribute('data-pane-type', 'files')
@@ -32,7 +48,7 @@ describe('Stage', () => {
   })
 
   it('switching the active pane swaps the rendered body', () => {
-    const { container } = render(<Stage workspaceId={WS} />)
+    const { container } = renderStage(<Stage workspaceId={WS} />)
 
     // Open a second pane via the + button → terminal becomes active. The new
     // terminal pane has no session, so TerminalPane shows its empty state.

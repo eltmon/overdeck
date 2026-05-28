@@ -5,10 +5,22 @@ import {
   selectActivePaneId,
   type WorkspacePane,
   type WorkspaceId,
+  type PaneType,
 } from '../../lib/panesStore'
+import type { Conversation } from '../CommandDeck/ConversationList'
 import { PaneBar } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { HomePane } from './HomePane'
+import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
+import { StatChips } from './HomePane/StatChips'
+import { Launcher } from './HomePane/Launcher'
+import { AgentDock } from './HomePane/AgentDock'
+import { ActionDock } from './HomePane/ActionDock'
+import { Timeline } from './HomePane/Timeline'
+import { HomePaneSections } from './HomePane/HomePaneSections'
+import { dispatchLauncherIntent } from './HomePane/launcherActions'
+import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
+import type { TimelineConversation } from './HomePane/timeline'
 import { TerminalPane } from './panes/TerminalPane'
 import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
@@ -21,6 +33,29 @@ export type { StageContext, PaneWrapperProps } from './types'
 
 export interface StageProps {
   workspaceId: WorkspaceId
+  /** Issue title for the workspace header (falls back to the id). */
+  issueTitle?: string
+  /** Feature branch; defaults to feature/<workspaceId>. */
+  branch?: string
+  /** Issue creation time for the age stat chip. */
+  issueCreatedAt?: number | string
+  /** The workspace's agent id — used as the workspace terminal session. */
+  agentId?: string
+  /** All conversations; the Stage filters to this workspace. */
+  conversations?: Conversation[]
+  /** Create a conversation for this workspace via the existing flow. */
+  onCreateConversation?: (agentId: string) => void
+}
+
+const PANE_LABELS: Record<PaneType, string> = {
+  home: 'Home',
+  agent: 'Agent',
+  terminal: 'Terminal',
+  files: 'Files',
+  commits: 'Commits',
+  plan: 'Plan',
+  docs: 'Docs',
+  browser: 'Web',
 }
 
 /** Safe fallback for pane types whose wrapper has not been built yet. */
@@ -35,12 +70,10 @@ function PanePlaceholder({ pane }: PaneWrapperProps) {
   )
 }
 
-/** Dispatch a pane to its wrapper. Wrapper beads slot their cases in here;
- * everything unbuilt falls through to a safe placeholder. */
+/** Dispatch a non-home pane to its wrapper. The home pane is composed in the
+ * Stage body (it needs workspace data), so it is handled before this. */
 function renderPane(pane: WorkspacePane, ctx: StageContext) {
   switch (pane.paneType) {
-    case 'home':
-      return <HomePane workspaceId={ctx.workspaceId} openPane={ctx.openPane} />
     case 'terminal':
       return <TerminalPane pane={pane} ctx={ctx} />
     case 'commits':
@@ -58,11 +91,19 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
 
 /**
  * Stage — the Command Deck's main work area (PAN-1549). Renders the persistent
- * PaneBar plus the active pane's body. Pane state lives in `panesStore`; this
- * shell wires the store to PaneBar and dispatches the active pane to its
- * wrapper. NOT mounted in CommandDeck until the `mount-stage` capstone bead.
+ * PaneBar plus the active pane. The permanent HOME pane is composed here from
+ * the workspace's data (header/stats/launcher/docks/timeline/sections); all
+ * other panes dispatch through renderPane. Pane state lives in `panesStore`.
  */
-export function Stage({ workspaceId }: StageProps) {
+export function Stage({
+  workspaceId,
+  issueTitle,
+  branch,
+  issueCreatedAt,
+  agentId,
+  conversations = [],
+  onCreateConversation,
+}: StageProps) {
   const ensureHome = usePanesStore((s) => s.ensureHome)
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
@@ -76,11 +117,93 @@ export function Stage({ workspaceId }: StageProps) {
 
   useStageShortcuts(workspaceId)
 
-  const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
+  const openPane = (spec: Parameters<typeof addPane>[1]) => addPane(workspaceId, spec)
+  const openTypedPane = (paneType: PaneType) =>
+    openPane({
+      paneType,
+      label: PANE_LABELS[paneType],
+      ...(paneType === 'terminal' ? { terminalId: agentId ?? null } : {}),
+    })
+
+  const wsConversations = conversations.filter(
+    (c) => (c.issueId ?? '').toUpperCase() === workspaceId.toUpperCase(),
+  )
+
+  /** Open the agent pane for a conversation, or focus it if already open. */
+  const openOrFocusAgentPane = (conversationId: string, label: string) => {
+    const existing = panes.find(
+      (p) => p.paneType === 'agent' && p.conversationId === conversationId,
+    )
+    if (existing) setActivePane(workspaceId, existing.paneId)
+    else openPane({ paneType: 'agent', label, conversationId })
+  }
+
   const ctx: StageContext = {
     workspaceId,
-    openPane: (spec) => addPane(workspaceId, spec),
+    openPane,
+    resolveAgentPane: (pane) => {
+      if (!pane.conversationId) return undefined
+      const conversation = conversations.find((c) => c.name === pane.conversationId)
+      return conversation ? { conversation } : undefined
+    },
   }
+
+  const timelineConversations: TimelineConversation[] = wsConversations.map((c) => ({
+    id: c.name,
+    agentLabel: c.title ?? c.model ?? 'Agent',
+    timestamp: c.lastAttachedAt ?? c.createdAt,
+    preview: c.title ?? undefined,
+  }))
+
+  const onAgentSelected = (id: string) => {
+    writeLastUsedAgent(workspaceId, id)
+    onCreateConversation?.(id)
+  }
+
+  const homePane = (
+    <HomePane
+      workspaceId={workspaceId}
+      openPane={openPane}
+      header={
+        <>
+          <WorkspaceHeader
+            name={issueTitle ?? workspaceId}
+            branch={branch ?? `feature/${workspaceId.toLowerCase()}`}
+            iconLabel={(issueTitle ?? workspaceId).charAt(0).toUpperCase()}
+          />
+          <StatChips createdAt={issueCreatedAt} conversationCount={wsConversations.length} />
+        </>
+      }
+      launcher={
+        <Launcher
+          lastUsedAgentId={readLastUsedAgent(workspaceId)}
+          onSelect={(intent, query) =>
+            dispatchLauncherIntent(intent, query, {
+              openAgent: (i) => onAgentSelected(i.id),
+              openTerminal: () => openTypedPane('terminal'),
+              openWeb: (_q, url) =>
+                openPane({ paneType: 'browser', label: PANE_LABELS.browser, browserInitialUrl: url }),
+              onAgentRun: (id) => writeLastUsedAgent(workspaceId, id),
+            })
+          }
+        />
+      }
+      agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
+      actionDock={<ActionDock onOpen={openTypedPane} />}
+      timeline={
+        <Timeline
+          conversations={timelineConversations}
+          onOpen={(id) => {
+            const conv = wsConversations.find((c) => c.name === id)
+            openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+          }}
+        />
+      }
+      detail={<HomePaneSections issueId={workspaceId} />}
+    />
+  )
+
+  const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
 
   return (
     <div className={styles.stage}>
@@ -89,9 +212,12 @@ export function Stage({ workspaceId }: StageProps) {
         activePaneId={activePaneId}
         onSelect={(paneId) => setActivePane(workspaceId, paneId)}
         onClose={(paneId) => closePane(workspaceId, paneId)}
-        onAdd={() => addPane(workspaceId, { paneType: 'terminal', label: 'Terminal' })}
+        onAdd={() => openTypedPane('terminal')}
       />
-      <div className={styles.pane}>{activePane && renderPane(activePane, ctx)}</div>
+      <div className={styles.pane}>
+        {activePane &&
+          (activePane.paneType === 'home' ? homePane : renderPane(activePane, ctx))}
+      </div>
     </div>
   )
 }
