@@ -5,29 +5,15 @@ import {
   selectActivePaneId,
   type WorkspacePane,
   type WorkspaceId,
-  type PaneSpec,
 } from '../../lib/panesStore'
 import { PaneBar } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { HomePane } from './HomePane'
+import { TerminalPane } from './panes/TerminalPane'
+import type { StageContext, PaneWrapperProps } from './types'
 import styles from './stage.module.css'
 
-/**
- * Context every pane wrapper receives. The Stage is workspace/issue-scoped
- * (PAN-1549 D3), so `workspaceId` doubles as the issue id. `openPane` lets a
- * pane (HOME docks/launcher/timeline) open + activate another pane. Later
- * pane-wrapper beads widen this as they need more workspace context.
- */
-export interface StageContext {
-  workspaceId: WorkspaceId
-  openPane: (spec: PaneSpec) => void
-}
-
-/** Prop contract for a pane wrapper component: its pane + the Stage context. */
-export interface PaneWrapperProps {
-  pane: WorkspacePane
-  ctx: StageContext
-}
+export type { StageContext, PaneWrapperProps } from './types'
 
 export interface StageProps {
   workspaceId: WorkspaceId
@@ -51,8 +37,10 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
   switch (pane.paneType) {
     case 'home':
       return <HomePane workspaceId={ctx.workspaceId} openPane={ctx.openPane} />
+    case 'terminal':
+      return <TerminalPane pane={pane} ctx={ctx} />
     // Remaining wrappers are added by their respective beads (agent-pane,
-    // terminal-pane, commits-pane, plan-pane, docs-pane).
+    // commits-pane, plan-pane, docs-pane).
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }

@@ -33,18 +33,18 @@ describe('Stage', () => {
 
   it('switching the active pane swaps the rendered body', () => {
     const { container } = render(<Stage workspaceId={WS} />)
-    const activeType = () => container.querySelector('[data-pane-type]')?.getAttribute('data-pane-type')
 
-    // Open a second pane via the + button → terminal becomes active.
+    // Open a second pane via the + button → terminal becomes active. The new
+    // terminal pane has no session, so TerminalPane shows its empty state.
     fireEvent.click(screen.getByLabelText('Open new pane'))
-    expect(activeType()).toBe('terminal')
+    expect(screen.getByText(/no terminal session/i)).toBeTruthy()
     expect(screen.getAllByRole('tab')).toHaveLength(2)
 
     // Switch back to HOME — rendered body changes to the HomePane scaffold.
     const homeTab = screen.getAllByRole('tab')[0]
     fireEvent.click(homeTab)
     expect(homeTab).toHaveAttribute('aria-selected', 'true')
-    expect(activeType()).toBeUndefined() // terminal placeholder gone
+    expect(screen.queryByText(/no terminal session/i)).toBeNull()
     expect(container.querySelector('[data-section="header"]')).not.toBeNull()
   })
 })

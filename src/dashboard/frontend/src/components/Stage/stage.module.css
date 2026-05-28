@@ -196,6 +196,12 @@
   color: var(--muted-foreground);
 }
 
+.terminalPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .placeholderTitle {
   font-size: 15px;
   font-weight: 600;
