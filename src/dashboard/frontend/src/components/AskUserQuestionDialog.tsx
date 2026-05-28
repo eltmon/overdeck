@@ -28,6 +28,8 @@ export interface AskUserQuestionSubject {
   issueId?: string | null
   /** Display label — 'Agent' or 'Conversation'. Falls back to 'Subject'. */
   kindLabel?: string
+  /** Optional human-readable title (e.g. conversation title) shown under the id. */
+  title?: string | null
   pendingAskUserQuestion?: {
     toolUseId: string
     askedAt: string
@@ -95,6 +97,9 @@ export function AskUserQuestionDialog({
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{agent.kindLabel ?? 'Subject'}</p>
               <p className="font-mono text-sm text-foreground">{agent.id}</p>
+              {agent.title ? (
+                <p className="mt-1 text-sm font-medium text-foreground">{agent.title}</p>
+              ) : null}
             </div>
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Issue</p>
