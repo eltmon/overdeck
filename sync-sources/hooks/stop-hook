@@ -122,9 +122,20 @@ if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
   KILLED_ANY=false
   for SUBROLE in security correctness performance requirements; do
     CONVOY_SESSION="agent-${REVIEW_ISSUE}-review-${SUBROLE}"
+    # Only reap a convoy reviewer whose pane is DEAD (the reviewer process has
+    # exited). An ALIVE pane means the reviewer is still actively running — and
+    # because convoy session names are reused across review cycles, killing it
+    # here would race a freshly-respawned convoy that reused the same name (a
+    # prior synthesis agent's delayed stop-hook reaping the NEW cycle's
+    # in-flight reviewers, which is how reviewers ended up "working" with a dead
+    # terminal). Finished/orphaned reviewers (dead pane) are still cleaned up.
+    PANE_DEAD=$(tmux -L panopticon display-message -p -t "$CONVOY_SESSION" '#{pane_dead}' 2>/dev/null)
+    if [ "$PANE_DEAD" != "1" ]; then
+      continue  # session missing (kill would no-op) or reviewer still running
+    fi
     if tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
       KILLED_ANY=true
-      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION" \
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION (pane dead)" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     fi
   done
