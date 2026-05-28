@@ -21,13 +21,13 @@ describe('Stage', () => {
   })
 
   it('renders a safe placeholder for a not-yet-implemented pane type', () => {
-    // Seed an agent pane and make it active.
+    // 'files' is deferred to #1550, so it still falls through to the placeholder.
     usePanesStore.getState().ensureHome(WS)
-    usePanesStore.getState().addPane(WS, { paneType: 'agent', label: 'Agent' })
+    usePanesStore.getState().addPane(WS, { paneType: 'files', label: 'Files' })
     const { container } = render(<Stage workspaceId={WS} />)
     const body = container.querySelector('[data-pane-type]')
     expect(body).not.toBeNull()
-    expect(body).toHaveAttribute('data-pane-type', 'agent')
+    expect(body).toHaveAttribute('data-pane-type', 'files')
     expect(screen.getByText(/not implemented yet/i)).toBeTruthy()
   })
 

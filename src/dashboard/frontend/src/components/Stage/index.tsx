@@ -13,6 +13,7 @@ import { TerminalPane } from './panes/TerminalPane'
 import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
 import { DocsPane } from './panes/DocsPane'
+import { AgentPane } from './panes/AgentPane'
 import type { StageContext, PaneWrapperProps } from './types'
 import styles from './stage.module.css'
 
@@ -48,7 +49,8 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <PlanPane pane={pane} ctx={ctx} />
     case 'docs':
       return <DocsPane pane={pane} ctx={ctx} />
-    // Remaining wrappers are added by their respective beads (agent-pane).
+    case 'agent':
+      return <AgentPane pane={pane} ctx={ctx} />
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }
