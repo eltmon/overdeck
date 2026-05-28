@@ -3474,6 +3474,16 @@ TaggedError("ProcessTimeoutError");
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
+		model: "claude-opus-4-8",
+		inputPer1k: .005,
+		outputPer1k: .025,
+		cacheReadPer1k: 5e-4,
+		cacheWrite5mPer1k: .00625,
+		cacheWrite1hPer1k: .01,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
 		model: "claude-opus-4-7",
 		inputPer1k: .005,
 		outputPer1k: .025,
