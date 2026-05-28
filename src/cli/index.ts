@@ -48,6 +48,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
+import type { RoleEffort } from '../lib/config-yaml.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
@@ -503,6 +504,7 @@ program
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -519,9 +521,9 @@ program
   .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
-  .option('--effort <level>', 'Strike effort: low | medium | high (default medium)')
+  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: 'low' | 'medium' | 'high'; dryRun?: boolean }) =>
+  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
     strikeCommand(ids, options),
   );
 

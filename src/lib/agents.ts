@@ -16,7 +16,7 @@ import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
-import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfigSync } from './config.js';
@@ -269,6 +269,7 @@ export async function getAgentRuntimeBaseCommand(
   agentName?: string,
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -282,6 +283,7 @@ export async function getAgentRuntimeBaseCommand(
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
+  const effortFlag = effort ? ` --effort ${effort}` : '';
   // PAN-982: When agentDefinition is provided, pass it directly to --agent.
   // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
   // Still pass --model when launching with an agent definition so explicit model
@@ -305,9 +307,9 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -317,9 +319,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -355,7 +357,7 @@ export async function getRoleRuntimeBaseCommand(
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
-  effort?: 'low' | 'medium' | 'high',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -1962,6 +1964,8 @@ export interface SpawnOptions {
   swarmItemId?: string; // vBRIEF item ID this slot is working on
   allowHost?: boolean;
   flywheelRunId?: string;
+  /** Claude Code `--effort` level for the spawned session (work/strike). */
+  effort?: RoleEffort;
 }
 
 export interface SpawnRunOptions {
@@ -1987,7 +1991,7 @@ export interface SpawnRunOptions {
   reviewOutputPath?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
 }
@@ -2170,6 +2174,8 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
   extraEnvExports?: string[];
+  /** Claude Code `--effort` level threaded into the launcher command. */
+  effort?: RoleEffort;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2278,7 +2284,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -2418,6 +2424,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
+      effort: options.effort,
     });
   }
 
@@ -2923,6 +2930,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
+    effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

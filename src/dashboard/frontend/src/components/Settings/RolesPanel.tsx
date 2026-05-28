@@ -7,7 +7,7 @@ type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strik
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 type Harness = 'claude-code' | 'pi';
-type Effort = 'low' | 'medium' | 'high';
+type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 interface RoleSubConfig {
@@ -533,6 +533,8 @@ export function RolesPanel() {
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
                           <option value="high">High</option>
+                          <option value="xhigh">Extra High</option>
+                          <option value="max">Max</option>
                         </select>
                       </label>
                       <label className="space-y-1.5">

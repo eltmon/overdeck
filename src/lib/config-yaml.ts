@@ -18,7 +18,7 @@ import yaml from 'js-yaml';
 import { parseDocument } from 'yaml';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
-import { MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
+import { MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync, type EffortLevel } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -293,7 +293,8 @@ export interface RoleSubConfig {
   model: ModelRef;
 }
 
-export type RoleEffort = 'low' | 'medium' | 'high';
+export type RoleEffort = EffortLevel;
+export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
@@ -1480,8 +1481,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code or pi`);
   }
-  if (roleConfig.effort !== undefined && roleConfig.effort !== 'low' && roleConfig.effort !== 'medium' && roleConfig.effort !== 'high') {
-    throw new Error(`config.yaml: roles.${role}.effort must be low, medium, or high`);
+  if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
+    throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
   }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
@@ -1515,7 +1516,15 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
     if (roleConfig.model) {
-      derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+      const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+      if (roleConfig.effort !== undefined) {
+        const supported = getModelEffortLevelsSync(resolvedModel);
+        if (supported !== undefined && !supported.includes(roleConfig.effort)) {
+          throw new Error(
+            `config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+          );
+        }
+      }
     }
     for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
       if (subConfig.model && subConfig.model !== PARENT_MODEL_REF) {
