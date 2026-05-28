@@ -4,7 +4,7 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-28T21:59:40.023Z"
+    "updated": "2026-05-28T22:25:40.984Z"
   },
   "plan": {
     "id": "pan-1549",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 67,
+    "sequence": 83,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-28T21:59:40.023Z",
+    "updated": "2026-05-28T22:25:40.984Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -1257,55 +1257,55 @@
         "phase": "review",
         "issueId": "PAN-1549",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-28T21:59:40.019Z",
+        "updatedAt": "2026-05-28T22:25:40.979Z",
         "work": {
-          "updatedAt": "2026-05-28T21:59:40.019Z",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-28T21:59:40.019Z",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-28T21:59:40.019Z"
+              "at": "2026-05-28T22:25:40.979Z"
             }
           ]
         },
         "review": {
           "status": "blocked",
-          "updatedAt": "2026-05-28T21:59:40.019Z",
-          "notes": "Timeline renders NaNd ago on missing timestamps; synchronous localStorage writes on every pane switch; unbounded workspace state growth in panesStore",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "notes": "onCreateConversation handler discards agentId, breaking agent-specific conversation creation",
           "history": [
             {
               "status": "blocked",
-              "at": "2026-05-28T21:59:40.019Z",
-              "notes": "Timeline renders NaNd ago on missing timestamps; synchronous localStorage writes on every pane switch; unbounded workspace state growth in panesStore"
+              "at": "2026-05-28T22:25:40.979Z",
+              "notes": "onCreateConversation handler discards agentId, breaking agent-specific conversation creation"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-28T21:59:40.019Z",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-28T21:59:40.019Z"
+              "at": "2026-05-28T22:25:40.979Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-28T21:59:40.019Z",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-28T21:59:40.019Z",
+          "updatedAt": "2026-05-28T22:25:40.979Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-28T21:59:40.019Z"
+              "at": "2026-05-28T22:25:40.979Z"
             }
           ],
           "readyForMerge": false,
