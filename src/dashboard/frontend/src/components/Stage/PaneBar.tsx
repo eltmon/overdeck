@@ -34,14 +34,22 @@ export function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneB
         const Icon = PANE_ICONS[pane.paneType] ?? Home
         const isActive = pane.paneId === activePaneId
         const closable = !pane.isPermanent && pane.paneType !== 'home'
+        // A div (not a <button>) so the close control can be a real nested
+        // <button> — HTML forbids interactive elements inside a <button>.
         return (
-          <button
+          <div
             key={pane.paneId}
-            type="button"
             role="tab"
+            tabIndex={0}
             aria-selected={isActive}
             className={`${styles.panetab} ${isActive ? styles.active : ''}`}
             onClick={() => onSelect(pane.paneId)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(pane.paneId)
+              }
+            }}
           >
             <span className={styles.panetabIcon}>
               <Icon size={14} />
@@ -49,8 +57,8 @@ export function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneB
             <span>{pane.label}</span>
             {index < 9 && <span className={styles.kbd}>⌘{index + 1}</span>}
             {closable && (
-              <span
-                role="button"
+              <button
+                type="button"
                 aria-label={`Close ${pane.label}`}
                 className={styles.close}
                 onClick={(e) => {
@@ -59,9 +67,9 @@ export function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneB
                 }}
               >
                 <X size={13} />
-              </span>
+              </button>
             )}
-          </button>
+          </div>
         )
       })}
       <button type="button" className={styles.add} aria-label="Open new pane" onClick={onAdd}>

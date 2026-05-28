@@ -143,13 +143,59 @@ function readActive(workspaceId: WorkspaceId): PaneId | null {
   }
 }
 
-function persist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId): void {
+function persist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | undefined): void {
   try {
     localStorage.setItem(panesKey(workspaceId), JSON.stringify(panes))
-    localStorage.setItem(activeKey(workspaceId), activeId)
+    // Guard against writing the literal string "undefined", which would hydrate
+    // as a truthy-but-invalid active id and force an unexpected HOME fallback.
+    if (activeId) localStorage.setItem(activeKey(workspaceId), activeId)
   } catch {
     /* ignore — persistence is best-effort */
   }
+}
+
+// ─── Debounced persistence ───────────────────────────────────────────────────
+// localStorage writes are synchronous and block the UI thread. setActivePane
+// fires on every tab click / ⌘1–9, so we coalesce writes into a single async
+// flush instead of serializing + writing on every pane mutation.
+
+const persistPending = new Map<WorkspaceId, { panes: WorkspacePane[]; activeId: PaneId | undefined }>()
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+
+function flushPending(): void {
+  persistTimer = null
+  for (const [workspaceId, { panes, activeId }] of persistPending) {
+    persist(workspaceId, panes, activeId)
+  }
+  persistPending.clear()
+}
+
+function schedulePersist(workspaceId: WorkspaceId, panes: WorkspacePane[], activeId: PaneId | undefined): void {
+  persistPending.set(workspaceId, { panes, activeId })
+  if (persistTimer == null) persistTimer = setTimeout(flushPending, 0)
+}
+
+/** Synchronously flush any pending persistence (used by tests and unload). */
+export function flushPanesPersistence(): void {
+  if (persistTimer != null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  flushPending()
+}
+
+// ─── LRU workspace eviction ──────────────────────────────────────────────────
+// A long-lived dashboard session can browse hundreds of issues; cap the
+// in-memory workspace state so it cannot grow unbounded. Evicted workspaces
+// keep their localStorage and rehydrate on next access.
+
+const MAX_WORKSPACES = 50
+const accessOrder: WorkspaceId[] = [] // most-recently accessed first
+
+function touchWorkspace(workspaceId: WorkspaceId): void {
+  const i = accessOrder.indexOf(workspaceId)
+  if (i !== -1) accessOrder.splice(i, 1)
+  accessOrder.unshift(workspaceId)
 }
 
 /** Pick a valid active id: keep `preferred` if it exists, else fall back to HOME. */
@@ -170,6 +216,7 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
   ...initialState,
 
   ensureHome: (workspaceId) => {
+    touchWorkspace(workspaceId)
     const state = get()
     // Already loaded into memory — just guarantee a valid active id.
     if (workspaceId in state.panesByWorkspace) {
@@ -179,7 +226,7 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
         set((s) => ({
           activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: activeId },
         }))
-        persist(workspaceId, panes, activeId)
+        schedulePersist(workspaceId, panes, activeId)
       }
       return
     }
@@ -187,20 +234,31 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
     const hydrated = readPanes(workspaceId)
     const panes = hydrated ?? [makeHomePane()]
     const activeId = resolveActiveId(panes, readActive(workspaceId))
-    set((s) => ({
-      panesByWorkspace: { ...s.panesByWorkspace, [workspaceId]: panes },
-      activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: activeId },
-    }))
-    persist(workspaceId, panes, activeId)
+    set((s) => {
+      const panesByWorkspace = { ...s.panesByWorkspace, [workspaceId]: panes }
+      const activePaneByWorkspace = { ...s.activePaneByWorkspace, [workspaceId]: activeId }
+      // Evict least-recently-used workspaces beyond the cap (memory only;
+      // localStorage is retained so they rehydrate on next access).
+      while (accessOrder.length > MAX_WORKSPACES) {
+        const evicted = accessOrder.pop()
+        if (evicted && evicted !== workspaceId) {
+          delete panesByWorkspace[evicted]
+          delete activePaneByWorkspace[evicted]
+        }
+      }
+      return { panesByWorkspace, activePaneByWorkspace }
+    })
+    schedulePersist(workspaceId, panes, activeId)
   },
 
   addPane: (workspaceId, spec) => {
+    touchWorkspace(workspaceId)
     const paneId = generatePaneId()
     const newPane: WorkspacePane = { ...spec, paneId, createdAt: Date.now() }
     set((s) => {
       const existing = s.panesByWorkspace[workspaceId] ?? [makeHomePane()]
       const panes = [...existing, newPane]
-      persist(workspaceId, panes, paneId)
+      schedulePersist(workspaceId, panes, paneId)
       return {
         panesByWorkspace: { ...s.panesByWorkspace, [workspaceId]: panes },
         activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: paneId },
@@ -218,7 +276,7 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
       if (!target || target.isPermanent || target.paneType === 'home') return s
       const panes = existing.filter((p) => p.paneId !== paneId)
       const activeId = resolveActiveId(panes, s.activePaneByWorkspace[workspaceId] ?? null)
-      persist(workspaceId, panes, activeId)
+      schedulePersist(workspaceId, panes, activeId)
       return {
         panesByWorkspace: { ...s.panesByWorkspace, [workspaceId]: panes },
         activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: activeId },
@@ -227,10 +285,11 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
   },
 
   setActivePane: (workspaceId, paneId) => {
+    touchWorkspace(workspaceId)
     set((s) => {
       const panes = s.panesByWorkspace[workspaceId]
       if (!panes || !panes.some((p) => p.paneId === paneId)) return s
-      persist(workspaceId, panes, paneId)
+      schedulePersist(workspaceId, panes, paneId)
       return {
         activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: paneId },
       }
@@ -244,7 +303,9 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
       const panes = existing.map((p) =>
         p.paneId === paneId ? { ...p, ...patch, paneId: p.paneId } : p,
       )
-      persist(workspaceId, panes, s.activePaneByWorkspace[workspaceId])
+      // Resolve defensively so persistence never receives an undefined active id.
+      const activeId = resolveActiveId(panes, s.activePaneByWorkspace[workspaceId] ?? null)
+      schedulePersist(workspaceId, panes, activeId)
       return { panesByWorkspace: { ...s.panesByWorkspace, [workspaceId]: panes } }
     })
   },

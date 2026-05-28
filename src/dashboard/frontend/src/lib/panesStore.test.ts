@@ -4,6 +4,7 @@ import {
   selectPanesForWorkspace,
   selectActivePaneId,
   selectActivePane,
+  flushPanesPersistence,
   type WorkspacePane,
 } from './panesStore'
 
@@ -128,6 +129,18 @@ describe('per-workspace isolation', () => {
     expect(panes(WS)).toHaveLength(2)
     expect(panes(WS2)).toHaveLength(1)
   })
+
+  it('evicts least-recently-used workspaces from memory beyond the cap', () => {
+    const store = usePanesStore.getState()
+    // Visit far more than the 50-workspace cap; the earliest must be evicted.
+    for (let i = 0; i < 60; i++) store.ensureHome(`WS-${i}`)
+    const state = usePanesStore.getState()
+    const live = Object.keys(state.panesByWorkspace).length
+    expect(live).toBeLessThanOrEqual(50)
+    // Oldest evicted from memory; most-recent retained.
+    expect(state.panesByWorkspace['WS-0']).toBeUndefined()
+    expect(state.panesByWorkspace['WS-59']).toBeDefined()
+  })
 })
 
 describe('localStorage persistence (ac3)', () => {
@@ -135,6 +148,7 @@ describe('localStorage persistence (ac3)', () => {
     const store = usePanesStore.getState()
     store.ensureHome(WS)
     const id = store.addPane(WS, { paneType: 'plan', label: 'Plan' })
+    flushPanesPersistence() // persistence is debounced/async
 
     // Storage written under the right keys.
     expect(localStorage.getItem(`pan-active-pane:${WS}`)).toBe(id)

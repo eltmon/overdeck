@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupConversationsByDate, dateGroupLabel, relativeTime } from './timeline'
+import { groupConversationsByDate, dateGroupLabel, relativeTime, toEpoch } from './timeline'
 
 const NOW = new Date('2026-05-28T12:00:00Z').getTime()
 const DAY = 86_400_000
@@ -23,6 +23,23 @@ describe('relativeTime', () => {
     expect(relativeTime(NOW - 5 * 60_000, NOW)).toBe('5m ago')
     expect(relativeTime(NOW - 2 * 3_600_000, NOW)).toBe('2h ago')
     expect(relativeTime(NOW - 3 * DAY, NOW)).toBe('3d ago')
+  })
+
+  it('returns an em-dash for invalid/missing timestamps (no "NaNd ago")', () => {
+    expect(relativeTime(NaN, NOW)).toBe('—')
+    expect(relativeTime(0, NOW)).toBe('—')
+    expect(relativeTime(toEpoch(undefined), NOW)).toBe('—')
+    expect(relativeTime(toEpoch('not-a-date'), NOW)).toBe('—')
+  })
+})
+
+describe('toEpoch', () => {
+  it('coerces epoch/ISO and degrades absent/invalid to 0', () => {
+    expect(toEpoch(NOW)).toBe(NOW)
+    expect(toEpoch(new Date(NOW).toISOString())).toBe(NOW)
+    expect(toEpoch(undefined)).toBe(0)
+    expect(toEpoch(null)).toBe(0)
+    expect(toEpoch('garbage')).toBe(0)
   })
 })
 

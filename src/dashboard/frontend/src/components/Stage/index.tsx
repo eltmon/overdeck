@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useCallback } from 'react'
 import {
   usePanesStore,
   selectPanesForWorkspace,
@@ -6,6 +6,7 @@ import {
   type WorkspacePane,
   type WorkspaceId,
   type PaneType,
+  type PaneSpec,
 } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { PaneBar } from './PaneBar'
@@ -123,91 +124,126 @@ export function Stage({
 
   useStageShortcuts(workspaceId)
 
-  const openPane = (spec: Parameters<typeof addPane>[1]) => addPane(workspaceId, spec)
-  const openTypedPane = (paneType: PaneType) =>
-    openPane({
-      paneType,
-      label: PANE_LABELS[paneType],
-      ...(paneType === 'terminal' ? { terminalId: agentId ?? null } : {}),
-    })
-
-  const wsConversations = conversations.filter(
-    (c) => (c.issueId ?? '').toUpperCase() === workspaceId.toUpperCase(),
+  // Stable handlers (store actions are stable; live pane state is read via
+  // getState() where needed) so the memoized HOME subtree is not invalidated
+  // when the user merely switches tabs.
+  const openPane = useCallback(
+    (spec: PaneSpec) => addPane(workspaceId, spec),
+    [addPane, workspaceId],
+  )
+  const openTypedPane = useCallback(
+    (paneType: PaneType) =>
+      addPane(workspaceId, {
+        paneType,
+        label: PANE_LABELS[paneType],
+        ...(paneType === 'terminal' ? { terminalId: agentId ?? null } : {}),
+      }),
+    [addPane, workspaceId, agentId],
+  )
+  const onAgentSelected = useCallback(
+    (id: string) => {
+      writeLastUsedAgent(workspaceId, id)
+      onCreateConversation?.(id)
+    },
+    [workspaceId, onCreateConversation],
+  )
+  const openOrFocusAgentPane = useCallback(
+    (conversationId: string, label: string) => {
+      const current = usePanesStore.getState().panesByWorkspace[workspaceId] ?? []
+      const existing = current.find(
+        (p) => p.paneType === 'agent' && p.conversationId === conversationId,
+      )
+      if (existing) setActivePane(workspaceId, existing.paneId)
+      else addPane(workspaceId, { paneType: 'agent', label, conversationId })
+    },
+    [workspaceId, setActivePane, addPane],
   )
 
-  /** Open the agent pane for a conversation, or focus it if already open. */
-  const openOrFocusAgentPane = (conversationId: string, label: string) => {
-    const existing = panes.find(
-      (p) => p.paneType === 'agent' && p.conversationId === conversationId,
-    )
-    if (existing) setActivePane(workspaceId, existing.paneId)
-    else openPane({ paneType: 'agent', label, conversationId })
-  }
+  const wsConversations = useMemo(
+    () =>
+      conversations.filter((c) => (c.issueId ?? '').toUpperCase() === workspaceId.toUpperCase()),
+    [conversations, workspaceId],
+  )
+  const timelineConversations: TimelineConversation[] = useMemo(
+    () =>
+      wsConversations.map((c) => ({
+        id: c.name,
+        agentLabel: c.title ?? c.model ?? 'Agent',
+        timestamp: c.lastAttachedAt ?? c.createdAt,
+        preview: c.title ?? undefined,
+      })),
+    [wsConversations],
+  )
 
-  const ctx: StageContext = {
-    workspaceId,
-    openPane,
-    agentId,
-    resolveAgentPane: (pane) => {
-      if (!pane.conversationId) return undefined
-      const conversation = conversations.find((c) => c.name === pane.conversationId)
-      return conversation ? { conversation } : undefined
-    },
-  }
+  const ctx: StageContext = useMemo(
+    () => ({
+      workspaceId,
+      openPane,
+      agentId,
+      resolveAgentPane: (pane) => {
+        if (!pane.conversationId) return undefined
+        const conversation = conversations.find((c) => c.name === pane.conversationId)
+        return conversation ? { conversation } : undefined
+      },
+    }),
+    [workspaceId, openPane, agentId, conversations],
+  )
 
-  const timelineConversations: TimelineConversation[] = wsConversations.map((c) => ({
-    id: c.name,
-    agentLabel: c.title ?? c.model ?? 'Agent',
-    timestamp: c.lastAttachedAt ?? c.createdAt,
-    preview: c.title ?? undefined,
-  }))
-
-  const onAgentSelected = (id: string) => {
-    writeLastUsedAgent(workspaceId, id)
-    onCreateConversation?.(id)
-  }
-
-  const homePane = (
-    <HomePane
-      workspaceId={workspaceId}
-      openPane={openPane}
-      header={
-        <>
-          <WorkspaceHeader
-            name={issueTitle ?? workspaceId}
-            branch={branch ?? `feature/${workspaceId.toLowerCase()}`}
-            iconLabel={(issueTitle ?? workspaceId).charAt(0).toUpperCase()}
+  const homePane = useMemo(
+    () => (
+      <HomePane
+        workspaceId={workspaceId}
+        openPane={openPane}
+        header={
+          <>
+            <WorkspaceHeader
+              name={issueTitle ?? workspaceId}
+              branch={branch ?? `feature/${workspaceId.toLowerCase()}`}
+              iconLabel={(issueTitle ?? workspaceId).charAt(0).toUpperCase()}
+            />
+            <StatChips createdAt={issueCreatedAt} conversationCount={wsConversations.length} />
+          </>
+        }
+        launcher={
+          <Launcher
+            lastUsedAgentId={readLastUsedAgent(workspaceId)}
+            onSelect={(intent, query) =>
+              dispatchLauncherIntent(intent, query, {
+                openAgent: (i) => onAgentSelected(i.id),
+                openTerminal: () => openTypedPane('terminal'),
+                openWeb: (_q, url) =>
+                  openPane({ paneType: 'browser', label: PANE_LABELS.browser, browserInitialUrl: url }),
+                onAgentRun: (id) => writeLastUsedAgent(workspaceId, id),
+              })
+            }
           />
-          <StatChips createdAt={issueCreatedAt} conversationCount={wsConversations.length} />
-        </>
-      }
-      launcher={
-        <Launcher
-          lastUsedAgentId={readLastUsedAgent(workspaceId)}
-          onSelect={(intent, query) =>
-            dispatchLauncherIntent(intent, query, {
-              openAgent: (i) => onAgentSelected(i.id),
-              openTerminal: () => openTypedPane('terminal'),
-              openWeb: (_q, url) =>
-                openPane({ paneType: 'browser', label: PANE_LABELS.browser, browserInitialUrl: url }),
-              onAgentRun: (id) => writeLastUsedAgent(workspaceId, id),
-            })
-          }
-        />
-      }
-      agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
-      actionDock={<ActionDock onOpen={openTypedPane} />}
-      timeline={
-        <Timeline
-          conversations={timelineConversations}
-          onOpen={(id) => {
-            const conv = wsConversations.find((c) => c.name === id)
-            openOrFocusAgentPane(id, conv?.title ?? 'Agent')
-          }}
-        />
-      }
-      detail={<HomePaneSections issueId={workspaceId} />}
-    />
+        }
+        agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
+        actionDock={<ActionDock onOpen={openTypedPane} />}
+        timeline={
+          <Timeline
+            conversations={timelineConversations}
+            onOpen={(id) => {
+              const conv = wsConversations.find((c) => c.name === id)
+              openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+            }}
+          />
+        }
+        detail={<HomePaneSections issueId={workspaceId} />}
+      />
+    ),
+    [
+      workspaceId,
+      issueTitle,
+      branch,
+      issueCreatedAt,
+      openPane,
+      openTypedPane,
+      onAgentSelected,
+      openOrFocusAgentPane,
+      timelineConversations,
+      wsConversations,
+    ],
   )
 
   const activePane = panes.find((p) => p.paneId === activePaneId) ?? null

@@ -16,7 +16,10 @@ const DAY_MS = 86_400_000
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function toEpoch(value: number | string): number {
+/** Coerce a timestamp (epoch ms, ISO string, or missing) to epoch ms; returns
+ * 0 for absent/invalid input so callers never propagate NaN. */
+export function toEpoch(value: number | string | null | undefined): number {
+  if (value == null) return 0
   const ms = typeof value === 'number' ? value : Date.parse(value)
   return Number.isFinite(ms) ? ms : 0
 }
@@ -37,8 +40,10 @@ export function dateGroupLabel(ts: number, now: number): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`
 }
 
-/** Short relative time, e.g. "just now", "5m ago", "2h ago", "3d ago". */
+/** Short relative time, e.g. "just now", "5m ago", "2h ago", "3d ago". Returns
+ * an em-dash for absent/invalid timestamps (0 or non-finite). */
 export function relativeTime(ts: number, now: number): string {
+  if (!Number.isFinite(ts) || ts <= 0) return '—'
   const secs = Math.max(0, Math.floor((now - ts) / 1000))
   if (secs < 60) return 'just now'
   const mins = Math.floor(secs / 60)

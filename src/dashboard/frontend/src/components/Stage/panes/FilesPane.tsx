@@ -19,7 +19,7 @@ async function fetchChangedFiles(agentId: string): Promise<TurnDiffFileChange[]>
  */
 export function FilesPane({ ctx }: PaneWrapperProps) {
   const agentId = ctx.agentId
-  const { data: files = [], isLoading } = useQuery({
+  const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ['stage-files-vs-main', agentId],
     queryFn: () => fetchChangedFiles(agentId as string),
     enabled: Boolean(agentId),
@@ -30,6 +30,9 @@ export function FilesPane({ ctx }: PaneWrapperProps) {
   }
   if (isLoading) {
     return <div className={styles.placeholder}>Loading changed files…</div>
+  }
+  if (isError) {
+    return <div className={styles.placeholder}>Couldn’t load changed files.</div>
   }
   if (files.length === 0) {
     return <div className={styles.placeholder}>No changed files vs main.</div>

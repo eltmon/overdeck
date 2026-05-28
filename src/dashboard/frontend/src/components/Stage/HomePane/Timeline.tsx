@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import {
   groupConversationsByDate,
   relativeTime,
+  toEpoch,
   type TimelineConversation,
 } from './timeline'
 import styles from '../stage.module.css'
@@ -20,10 +22,12 @@ export interface TimelineProps {
  * consumer to open or focus an agent pane bound to that conversation.
  */
 export function Timeline({ conversations, onOpen, now = Date.now() }: TimelineProps) {
+  // Group + pre-resolve epochs once per data change rather than on every render.
+  const groups = useMemo(() => groupConversationsByDate(conversations, now), [conversations, now])
+
   if (conversations.length === 0) {
     return <div className={styles.timelineEmpty}>No conversations yet.</div>
   }
-  const groups = groupConversationsByDate(conversations, now)
   return (
     <div className={styles.timeline}>
       {groups.map((group) => (
@@ -38,12 +42,7 @@ export function Timeline({ conversations, onOpen, now = Date.now() }: TimelinePr
             >
               <div className={styles.timelineCardHead}>
                 <span className={styles.timelineAgent}>{c.agentLabel ?? 'Agent'}</span>
-                <span className={styles.timelineTime}>
-                  {relativeTime(
-                    typeof c.timestamp === 'number' ? c.timestamp : Date.parse(c.timestamp),
-                    now,
-                  )}
-                </span>
+                <span className={styles.timelineTime}>{relativeTime(toEpoch(c.timestamp), now)}</span>
               </div>
               {c.preview && <div className={styles.timelinePreview}>{c.preview}</div>}
             </button>
