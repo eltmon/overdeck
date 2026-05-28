@@ -76,6 +76,34 @@
   font-family: inherit;
 }
 
+/* Stat chips */
+.stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+.chipAdd {
+  color: var(--success);
+}
+
+.chipDel {
+  color: var(--destructive);
+}
+
 .homeSection:empty {
   display: none;
 }
