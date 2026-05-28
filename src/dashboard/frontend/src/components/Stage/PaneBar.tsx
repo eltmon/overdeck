@@ -14,7 +14,7 @@ const PANE_ICONS: Record<PaneType, typeof Home> = {
 }
 
 export interface PaneBarProps {
-  panes: WorkspacePane[]
+  panes: readonly WorkspacePane[]
   activePaneId: PaneId | null
   onSelect: (paneId: PaneId) => void
   onClose: (paneId: PaneId) => void

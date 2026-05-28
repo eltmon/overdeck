@@ -1,6 +1,37 @@
 /* Stage — PaneBar + pane renderer styles (PAN-1549). Ported from the
    pan-1549 mockup, retargeted onto the app's global semantic tokens. */
 
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.pane {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: var(--background);
+}
+
+.placeholder {
+  padding: 26px 30px;
+  color: var(--muted-foreground);
+}
+
+.placeholderTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 6px;
+}
+
+.placeholderHint {
+  font-size: 13px;
+}
+
 .panebar {
   display: flex;
   align-items: stretch;

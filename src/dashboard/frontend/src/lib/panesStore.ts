@@ -252,11 +252,15 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
 
 // ─── Selectors ──────────────────────────────────────────────────────────────────
 
+/** Stable empty array so absent-workspace selectors keep a constant reference
+ * (avoids React's useSyncExternalStore "getSnapshot should be cached" loop). */
+const EMPTY_PANES: readonly WorkspacePane[] = []
+
 /** Panes for a workspace (empty until `ensureHome` runs). */
 export const selectPanesForWorkspace =
   (workspaceId: WorkspaceId) =>
-  (s: PanesState): WorkspacePane[] =>
-    s.panesByWorkspace[workspaceId] ?? []
+  (s: PanesState): readonly WorkspacePane[] =>
+    s.panesByWorkspace[workspaceId] ?? EMPTY_PANES
 
 /** Active pane id for a workspace, or null if none. */
 export const selectActivePaneId =
