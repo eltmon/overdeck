@@ -40,10 +40,11 @@ describe('Stage', () => {
     expect(activeType()).toBe('terminal')
     expect(screen.getAllByRole('tab')).toHaveLength(2)
 
-    // Switch back to HOME — rendered body changes to the home pane.
+    // Switch back to HOME — rendered body changes to the HomePane scaffold.
     const homeTab = screen.getAllByRole('tab')[0]
     fireEvent.click(homeTab)
     expect(homeTab).toHaveAttribute('aria-selected', 'true')
-    expect(activeType()).toBe('home')
+    expect(activeType()).toBeUndefined() // terminal placeholder gone
+    expect(container.querySelector('[data-section="header"]')).not.toBeNull()
   })
 })

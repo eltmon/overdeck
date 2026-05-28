@@ -5,19 +5,22 @@ import {
   selectActivePaneId,
   type WorkspacePane,
   type WorkspaceId,
+  type PaneSpec,
 } from '../../lib/panesStore'
 import { PaneBar } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
+import { HomePane } from './HomePane'
 import styles from './stage.module.css'
 
 /**
  * Context every pane wrapper receives. The Stage is workspace/issue-scoped
- * (PAN-1549 D3), so `workspaceId` doubles as the issue id. Later pane-wrapper
- * beads (agent/terminal/commits/plan/docs) widen this as they need more
- * workspace context; the contract is intentionally small here.
+ * (PAN-1549 D3), so `workspaceId` doubles as the issue id. `openPane` lets a
+ * pane (HOME docks/launcher/timeline) open + activate another pane. Later
+ * pane-wrapper beads widen this as they need more workspace context.
  */
 export interface StageContext {
   workspaceId: WorkspaceId
+  openPane: (spec: PaneSpec) => void
 }
 
 /** Prop contract for a pane wrapper component: its pane + the Stage context. */
@@ -46,8 +49,10 @@ function PanePlaceholder({ pane }: PaneWrapperProps) {
  * everything unbuilt falls through to a safe placeholder. */
 function renderPane(pane: WorkspacePane, ctx: StageContext) {
   switch (pane.paneType) {
-    // Pane wrappers are added by their respective beads (homepane-shell,
-    // agent-pane, terminal-pane, commits-pane, plan-pane, docs-pane).
+    case 'home':
+      return <HomePane workspaceId={ctx.workspaceId} openPane={ctx.openPane} />
+    // Remaining wrappers are added by their respective beads (agent-pane,
+    // terminal-pane, commits-pane, plan-pane, docs-pane).
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }
@@ -74,7 +79,10 @@ export function Stage({ workspaceId }: StageProps) {
   useStageShortcuts(workspaceId)
 
   const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
-  const ctx: StageContext = { workspaceId }
+  const ctx: StageContext = {
+    workspaceId,
+    openPane: (spec) => addPane(workspaceId, spec),
+  }
 
   return (
     <div className={styles.stage}>

@@ -16,6 +16,19 @@
   background: var(--background);
 }
 
+.home {
+  max-width: 680px;
+  padding: 26px 30px;
+}
+
+.homeSection:empty {
+  display: none;
+}
+
+.homeSection {
+  margin-bottom: 18px;
+}
+
 .placeholder {
   padding: 26px 30px;
   color: var(--muted-foreground);
