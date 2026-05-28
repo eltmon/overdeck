@@ -1,0 +1,94 @@
+/* Stage — PaneBar + pane renderer styles (PAN-1549). Ported from the
+   pan-1549 mockup, retargeted onto the app's global semantic tokens. */
+
+.panebar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  padding: 6px 8px 0;
+  height: 42px;
+  flex: 0 0 42px;
+  position: relative;
+  overflow-x: auto;
+}
+
+.panetab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  height: 36px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  white-space: nowrap;
+  background: transparent;
+  font-family: inherit;
+}
+
+.panetabIcon {
+  display: inline-flex;
+  flex: 0 0 14px;
+}
+
+.kbd {
+  font-size: 9.5px;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 14px;
+}
+
+.active {
+  background: var(--background);
+  color: var(--foreground);
+  font-weight: 600;
+  border-color: var(--border);
+  position: relative;
+  top: 1px;
+}
+
+.active .kbd {
+  color: var(--muted-foreground);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  padding: 1px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.close:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 36px;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+
+.add:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}

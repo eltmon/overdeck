@@ -4,7 +4,7 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-28T14:42:03.548Z"
+    "updated": "2026-05-28T19:16:35.757Z"
   },
   "plan": {
     "id": "pan-1549",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-28T14:42:03.548Z",
+    "updated": "2026-05-28T19:16:35.757Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -1252,7 +1252,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json"
+      "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1549",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-28T19:16:35.744Z",
+        "work": {
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-28T19:16:35.744Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-28T19:16:35.744Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-28T19:16:35.744Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"
