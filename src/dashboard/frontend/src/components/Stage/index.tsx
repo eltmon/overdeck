@@ -7,6 +7,7 @@ import {
   type WorkspaceId,
 } from '../../lib/panesStore'
 import { PaneBar } from './PaneBar'
+import { useStageShortcuts } from './useStageShortcuts'
 import styles from './stage.module.css'
 
 /**
@@ -69,6 +70,8 @@ export function Stage({ workspaceId }: StageProps) {
   useEffect(() => {
     ensureHome(workspaceId)
   }, [workspaceId, ensureHome])
+
+  useStageShortcuts(workspaceId)
 
   const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
   const ctx: StageContext = { workspaceId }
