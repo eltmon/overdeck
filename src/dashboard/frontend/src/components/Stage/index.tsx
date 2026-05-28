@@ -10,6 +10,7 @@ import { PaneBar } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { HomePane } from './HomePane'
 import { TerminalPane } from './panes/TerminalPane'
+import { CommitsPane } from './panes/CommitsPane'
 import type { StageContext, PaneWrapperProps } from './types'
 import styles from './stage.module.css'
 
@@ -39,8 +40,10 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
       return <HomePane workspaceId={ctx.workspaceId} openPane={ctx.openPane} />
     case 'terminal':
       return <TerminalPane pane={pane} ctx={ctx} />
+    case 'commits':
+      return <CommitsPane pane={pane} ctx={ctx} />
     // Remaining wrappers are added by their respective beads (agent-pane,
-    // commits-pane, plan-pane, docs-pane).
+    // plan-pane, docs-pane).
     default:
       return <PanePlaceholder pane={pane} ctx={ctx} />
   }
