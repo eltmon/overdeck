@@ -52,7 +52,7 @@ interface FlywheelConversationPaneProps {
 
 const DEFAULT_FLYWHEEL_CONFIG: Required<FlywheelRoleConfig> = {
   harness: 'claude-code',
-  model: 'claude-opus-4-7',
+  model: 'claude-opus-4-8',
   effort: 'high',
   maxAgents: 8,
   scope: 'pan-only',
