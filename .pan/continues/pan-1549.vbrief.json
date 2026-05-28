@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1549",
   "created": "2026-05-28T14:47:58.446Z",
-  "updated": "2026-05-28T21:46:22.884Z",
+  "updated": "2026-05-28T22:25:42.581Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,7 +54,35 @@
       "reason": "feedback",
       "note": "[2026-05-28T21:31Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-28T21:31:38.972Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T21:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T21:59:40.829Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T21:59:41.523Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-28T22:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-28T22:25:41.857Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-28T22:25:42.581Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-28T22:25:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1549\n\n# Review Synthesis — PAN-1549 — 2026-05-28T22:35:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1549/.pan/review/agent-pan-1549-review-cfb0283b/context.json\n- Branch: feature/pan-1549\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1549\n- HEAD reviewed: cfb0283b898ffbd67181ace82b1d1a656bb1d4af\n- Cycle number: 4\n- Prior cycle SHA: 603f209f031457abdd3c734ab6d181a077347c45\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | security.md | 0 |\n| correctness | ready | correctness.md | 1 |\n| performance | ready | performance.md | 0 |\n| requirements | ready | requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] `onCreateConversation` handler discards `agentId`, breaking agent-specific conversation creation — `src/dashboard/frontend/src/components/Stage/index.tsx:146` + `src/dashboard/frontend/src/components/CommandDeck/index.tsx:1220`\n`onAgentSelected` in `Stage/index.tsx` passes the chosen agent id to `onCreateConversation?.(id)`, but the `CommandDeck` mount wraps the handler as `() => handleNewConversation()` which ignores the argument. `handleNewConversation` → `createConversationForProject()` creates a conversation with `sidebarModel`/`sidebarHarness` rather than the selected agent, then clears `selectedFeature` and shows the global `ConversationPanel`. The user never lands in a Stage agent pane. This breaks the acceptance criterion that agent-specific launcher/dock clicks create a conversation and open an agent pane focused on it. The `onAgentSelected` callback was introduced in this cycle diff, so this is a new broken integration contract.\n\n## Non-blocking Findings\n\n### [correctness] `Timeline` date-group keys can collide across years — `src/dashboard/frontend/src/components/Stage/HomePane/Timeline.tsx:33`\n`dateGroupLabel` returns `\"May 28\"` for any year; two conversations from May 28 of different years produce the same React `key`, violating key uniqueness and causing potential stale DOM. Fix: include year or a timestamp in the key, e.g. `` `${group.label}-${group.items[0]?.timestamp}` ``.\n\n### [correctness] `FilesPane` stacks duplicate Commits panes — `src/dashboard/frontend/src/components/Stage/panes/FilesPane.tsx:41`\nEvery file click calls `openPane({ paneType: 'commits', label: 'Commits' })` without checking whether a Commits pane already exists. Clicking multiple files opens multiple identical Commits panes. Fix: check for an existing `paneType === 'commits'` pane and focus it before adding a new one.\n\n### [correctness] `useStageShortcuts` does not suppress Shift+Meta combinations — `src/dashboard/frontend/src/components/Stage/useStageShortcuts.ts:27` [demoted: previously reviewed]\n`e.shiftKey` is not checked; `⌘⇧1`–`⌘⇧9` incorrectly trigger pane switching because `/^[1-9]$/` matches even when Shift is held. This file was not changed in the cycle diff and was reviewed in a prior cycle.\n\n### [correctness] `AgentPane` session branch is unreachable dead code — `src/dashboard/frontend/src/components/Stage/panes/AgentPane.tsx:20-23` [demoted: previously reviewed]\nThe `SessionPanel` branch is tested but `resolveAgentPane` never returns a `session` object. This file was not changed in the cycle diff.\n\n### [correctness] Missing `beforeunload` flush for debounced persistence — `src/dashboard/frontend/src/lib/panesStore.ts` [demoted: previously reviewed]\n`panesStore.ts` coalesces localStorage writes via `setTimeout(..., 0)`. A page close in the same tick as a pane mutation could drop the write. Risk is negligible in practice (0 ms timeout). This file was not changed in the cycle diff.\n\n### [performance] `PaneBar` tab click handlers recreated every render — `src/dashboard/frontend/src/components/Stage/PaneBar.tsx:46`\nInline `onClick={() => onSelect(pane.paneId)}` and `onKeyDown` lambdas are recreated per tab on every `Stage` re-render. Negligible at typical pane counts (< 10). Consider wrapping `PaneBar` in `React.memo` or extracting a memoized `PaneTab` sub-component if pane counts grow significantly.\n\n### [performance] `DocsPane` unconditionally fetches full planning data on mount — `src/dashboard/frontend/src/components/Stage/panes/DocsPane.tsx:26-27` [demoted: previously reviewed]\n`usePlanningQuery(issueId)` runs regardless of which doc tab is active. React Query caches the result, so switching between PRD/STATE/INFERENCE tabs inside the pane is instant. This file was not changed in the cycle diff.\n\n### [requirements] Review notes in vBRIEF metadata may be stale\nThe vBRIEF `review.notes` field records three items (timeline NaN rendering, synchronous localStorage writes, unbounded workspace state growth) that were all addressed in commit `dca029ce6`. The notes no longer reflect the current code state.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1549/.pan/review/agent-pan-1549-review-cfb0283b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1549 -m \"Fixed review issues\"`"
+    }
+  ]
 }
