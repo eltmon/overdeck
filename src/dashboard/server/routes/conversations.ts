@@ -2467,7 +2467,9 @@ const postConversationMessageRoute = HttpRouter.add(
         return await handleConversationMessage(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] send message failed:', msg);
+        // Log the full stack (falls back to message) so a 500's cause is
+        // diagnosable after the fact, not just the bare message (PAN-1552).
+        console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
         // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({

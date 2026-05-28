@@ -6,6 +6,7 @@
  */
 
 import { Effect } from 'effect';
+import { initDashboardLogFile } from './server-log-file.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
@@ -45,6 +46,12 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 
 declare const Bun: unknown;
+
+// Persist this process's console output to <PANOPTICON_HOME>/logs/dashboard.log
+// in every launch mode (PAN-1552) — must run before any startup logging so the
+// record (including conversation-message 500 causes) survives `serve`/npx and
+// the desktop app, not just detached `pan up`.
+initDashboardLogFile();
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
