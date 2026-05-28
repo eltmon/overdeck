@@ -42,6 +42,34 @@ describe('Launcher', () => {
     expect(document.activeElement).toBe(input)
   })
 
+  it('runs keyboard accelerators: ⌘↵ top, ⌃↵ terminal, ⌥↵ web, ⌘⇧↵ codex', () => {
+    const onSelect = vi.fn()
+    render(<Launcher onSelect={onSelect} />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'go' } })
+
+    fireEvent.keyDown(input, { key: 'Enter', metaKey: true })
+    expect(onSelect).toHaveBeenLastCalledWith(DEFAULT_INTENTS[0], 'go') // claude-code (top)
+
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
+    expect(onSelect.mock.lastCall?.[0].kind).toBe('terminal')
+
+    fireEvent.keyDown(input, { key: 'Enter', altKey: true })
+    expect(onSelect.mock.lastCall?.[0].kind).toBe('web')
+
+    fireEvent.keyDown(input, { key: 'Enter', metaKey: true, shiftKey: true })
+    expect(onSelect.mock.lastCall?.[0].id).toBe('codex')
+  })
+
+  it('plain Enter runs the highlighted selection', () => {
+    const onSelect = vi.fn()
+    render(<Launcher onSelect={onSelect} />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'go' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith(DEFAULT_INTENTS[0], 'go')
+  })
+
   it('hides extras in compact mode but shows them otherwise', () => {
     const extras = <div data-testid="history">recent</div>
     const { rerender } = render(<Launcher extras={extras} />)

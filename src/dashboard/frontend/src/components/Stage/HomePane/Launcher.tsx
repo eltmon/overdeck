@@ -79,15 +79,39 @@ export function Launcher({
     if (intent) onSelect?.(intent, query)
   }
 
+  const chooseIntent = (intent: LauncherIntent | undefined) => {
+    if (intent) onSelect?.(intent, query)
+  }
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!open) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setSelected((s) => Math.min(s + 1, ordered.length - 1))
-    } else if (e.key === 'ArrowUp') {
+      return
+    }
+    if (e.key === 'ArrowUp') {
       e.preventDefault()
       setSelected((s) => Math.max(s - 1, 0))
-    } else if (e.key === 'Enter') {
+      return
+    }
+    if (e.key !== 'Enter') return
+
+    // Keyboard accelerators (PRD keymap). Modifier+Enter targets a specific
+    // intent regardless of the highlighted row; plain Enter runs the selection.
+    if (e.metaKey && e.shiftKey) {
+      e.preventDefault()
+      chooseIntent(ordered.find((i) => i.id === 'codex')) // ⌘⇧↵ → Codex
+    } else if (e.metaKey) {
+      e.preventDefault()
+      chooseIntent(ordered[0]) // ⌘↵ → top intent ("repeat last")
+    } else if (e.ctrlKey) {
+      e.preventDefault()
+      chooseIntent(ordered.find((i) => i.kind === 'terminal')) // ⌃↵ → terminal
+    } else if (e.altKey) {
+      e.preventDefault()
+      chooseIntent(ordered.find((i) => i.kind === 'web')) // ⌥↵ → web
+    } else {
       choose(selected)
     }
   }
