@@ -957,6 +957,38 @@ export function CommandDeck({
     return null;
   }, [projectsWithSessions, selectedFeature]);
 
+  // PAN-1549: create a conversation for the active workspace using the chosen
+  // agent's harness and return its name so the Stage can open an agent pane
+  // focused on it. Unlike createConversationForProject, this does NOT clear
+  // selectedFeature — the user stays in the Stage rather than dropping into the
+  // global ConversationPanel.
+  const createWorkspaceConversation = useCallback(
+    async (agentId: string): Promise<string | undefined> => {
+      const harness = agentId === 'codex' ? 'pi' : 'claude-code';
+      const projectKey = resolvedProjectForFeature?.name;
+      try {
+        const payload: Record<string, unknown> = { model: sidebarModel, harness };
+        if (projectKey) payload.projectKey = projectKey;
+        const res = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Request failed' }));
+          throw new Error((err as { error?: string }).error || 'Failed to create conversation');
+        }
+        const conv = (await res.json()) as Conversation;
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        return conv.name;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
+        return undefined;
+      }
+    },
+    [resolvedProjectForFeature, sidebarModel, queryClient],
+  );
+
   const resolvedProjectForConversation = useMemo(() => {
     if (!selectedConversation) return null;
     const conv = conversations.find(c => c.name === selectedConversation);
@@ -1217,7 +1249,7 @@ export function CommandDeck({
               agentId={selectedAgent?.id}
               issueCreatedAt={selectedIssue?.createdAt}
               conversations={conversations}
-              onCreateConversation={() => handleNewConversation()}
+              onCreateConversation={createWorkspaceConversation}
             />
           ) : selectedConversationNode ? (
             <div className="flex h-full min-h-0 flex-col">

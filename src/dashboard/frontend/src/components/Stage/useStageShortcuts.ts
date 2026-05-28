@@ -24,7 +24,7 @@ export function useStageShortcuts(workspaceId: WorkspaceId): void {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!e.metaKey) return
-      if (e.altKey || e.ctrlKey) return // leave ⌥/⌃ combos (Launcher etc.) alone
+      if (e.altKey || e.ctrlKey || e.shiftKey) return // leave ⌥/⌃/⇧ combos (Launcher etc.) alone
       if (isTextEntryFocused()) return
 
       const store = usePanesStore.getState()

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { FilesPane } from './FilesPane'
 import type { StageContext } from '../types'
-import type { WorkspacePane } from '../../../lib/panesStore'
+import { usePanesStore, type WorkspacePane } from '../../../lib/panesStore'
 
 const pane: WorkspacePane = { paneId: 'f', paneType: 'files', label: 'Files', createdAt: 1 }
 
@@ -18,6 +18,7 @@ function ctx(over: Partial<StageContext> = {}): StageContext {
 }
 
 beforeEach(() => {
+  usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({
@@ -51,5 +52,24 @@ describe('FilesPane', () => {
   it('shows an empty state when there is no agent workspace', () => {
     renderWithClient(<FilesPane pane={pane} ctx={ctx({ agentId: undefined })} />)
     expect(screen.getByText(/no agent workspace/i)).toBeTruthy()
+  })
+
+  it('focuses an existing Commits pane instead of stacking a duplicate', async () => {
+    usePanesStore.setState({
+      panesByWorkspace: {
+        'PAN-1549': [
+          { paneId: 'h', paneType: 'home', label: 'Home', createdAt: 1, isPermanent: true },
+          { paneId: 'c', paneType: 'commits', label: 'Commits', createdAt: 2 },
+        ],
+      },
+      activePaneByWorkspace: { 'PAN-1549': 'h' },
+    })
+    const openPane = vi.fn()
+    renderWithClient(<FilesPane pane={pane} ctx={ctx({ openPane })} />)
+    await waitFor(() => expect(screen.getByText('src/a.ts')).toBeTruthy())
+    fireEvent.click(screen.getByText('src/a.ts'))
+    // Existing Commits pane focused; no new pane opened.
+    expect(openPane).not.toHaveBeenCalled()
+    expect(usePanesStore.getState().activePaneByWorkspace['PAN-1549']).toBe('c')
   })
 })

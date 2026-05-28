@@ -46,8 +46,9 @@ export interface StageProps {
   agentId?: string
   /** All conversations; the Stage filters to this workspace. */
   conversations?: Conversation[]
-  /** Create a conversation for this workspace via the existing flow. */
-  onCreateConversation?: (agentId: string) => void
+  /** Create a conversation for this workspace via the existing flow, returning
+   * the new conversation's name (so the Stage can open an agent pane on it). */
+  onCreateConversation?: (agentId: string) => Promise<string | undefined>
 }
 
 const PANE_LABELS: Record<PaneType, string> = {
@@ -140,13 +141,6 @@ export function Stage({
       }),
     [addPane, workspaceId, agentId],
   )
-  const onAgentSelected = useCallback(
-    (id: string) => {
-      writeLastUsedAgent(workspaceId, id)
-      onCreateConversation?.(id)
-    },
-    [workspaceId, onCreateConversation],
-  )
   const openOrFocusAgentPane = useCallback(
     (conversationId: string, label: string) => {
       const current = usePanesStore.getState().panesByWorkspace[workspaceId] ?? []
@@ -157,6 +151,16 @@ export function Stage({
       else addPane(workspaceId, { paneType: 'agent', label, conversationId })
     },
     [workspaceId, setActivePane, addPane],
+  )
+  // Create a conversation for the chosen agent, then open a Stage agent pane
+  // focused on it (staying in the Stage).
+  const onAgentSelected = useCallback(
+    async (id: string) => {
+      writeLastUsedAgent(workspaceId, id)
+      const conversationName = await onCreateConversation?.(id)
+      if (conversationName) openOrFocusAgentPane(conversationName, 'Agent')
+    },
+    [workspaceId, onCreateConversation, openOrFocusAgentPane],
   )
 
   const wsConversations = useMemo(
@@ -246,6 +250,16 @@ export function Stage({
     ],
   )
 
+  const handleSelectPane = useCallback(
+    (paneId: string) => setActivePane(workspaceId, paneId),
+    [setActivePane, workspaceId],
+  )
+  const handleClosePane = useCallback(
+    (paneId: string) => closePane(workspaceId, paneId),
+    [closePane, workspaceId],
+  )
+  const handleAddPane = useCallback(() => openTypedPane('terminal'), [openTypedPane])
+
   const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
 
   return (
@@ -253,9 +267,9 @@ export function Stage({
       <PaneBar
         panes={panes}
         activePaneId={activePaneId}
-        onSelect={(paneId) => setActivePane(workspaceId, paneId)}
-        onClose={(paneId) => closePane(workspaceId, paneId)}
-        onAdd={() => openTypedPane('terminal')}
+        onSelect={handleSelectPane}
+        onClose={handleClosePane}
+        onAdd={handleAddPane}
       />
       <div className={styles.pane}>
         {activePane &&

@@ -184,6 +184,11 @@ export function flushPanesPersistence(): void {
   flushPending()
 }
 
+// Flush any debounced write if the page closes within the same tick as a mutation.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', flushPanesPersistence)
+}
+
 // ─── LRU workspace eviction ──────────────────────────────────────────────────
 // A long-lived dashboard session can browse hundreds of issues; cap the
 // in-memory workspace state so it cannot grow unbounded. Evicted workspaces

@@ -4,12 +4,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { Stage } from './index'
 import { usePanesStore } from '../../lib/panesStore'
+import type { Conversation } from '../CommandDeck/ConversationList'
 
 // The re-homed tab bodies (OverviewTab etc.) require DialogProvider + live
 // data; HomePaneSections has its own test, so stub it here to keep this test
 // focused on the Stage's pane mechanics.
 vi.mock('./HomePane/HomePaneSections', () => ({
   HomePaneSections: () => <div data-testid="home-sections" />,
+}))
+
+// AgentPane pulls in ConversationPanel (heavy, needs many providers); stub it so
+// this test stays focused on the Stage's pane open/switch mechanics.
+vi.mock('./panes/AgentPane', () => ({
+  AgentPane: () => <div data-testid="agent-pane" />,
 }))
 
 const WS = 'PAN-1549'
@@ -62,5 +69,23 @@ describe('Stage', () => {
     expect(homeTab).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText(/no terminal session/i)).toBeNull()
     expect(container.querySelector('[data-section="header"]')).not.toBeNull()
+  })
+
+  it('opens an agent pane on the created conversation when an AgentDock pill is clicked', async () => {
+    const onCreateConversation = vi.fn(async () => 'conv-new')
+    renderStage(
+      <Stage
+        workspaceId={WS}
+        conversations={[{ name: 'conv-new', issueId: WS } as unknown as Conversation]}
+        onCreateConversation={onCreateConversation}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Claude Code/ }))
+
+    // The conversation is created with the chosen agent id, then a Stage agent
+    // pane opens focused on it (a second tab appears).
+    expect(onCreateConversation).toHaveBeenCalledWith('claude-code')
+    await screen.findByRole('tab', { name: /Agent/ })
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
   })
 })

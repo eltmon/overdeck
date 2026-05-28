@@ -53,6 +53,15 @@ describe('useStageShortcuts', () => {
     expect(activeId()).toBe(d)
   })
 
+  it('does not switch panes on ⌘⇧N (Shift combos are left to the Launcher)', () => {
+    const homeId = panes()[0].paneId
+    usePanesStore.getState().addPane(WS, { paneType: 'terminal', label: 'T' })
+    usePanesStore.getState().setActivePane(WS, homeId)
+    render(<Host />)
+    fireEvent.keyDown(window, { key: '2', metaKey: true, shiftKey: true })
+    expect(activeId()).toBe(homeId) // ⌘⇧2 must NOT focus pane 2
+  })
+
   it('⌘T adds a pane', () => {
     render(<Host />)
     expect(panes()).toHaveLength(1)

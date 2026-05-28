@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { FileCode } from 'lucide-react'
 import type { TurnDiffFileChange } from '../../chat/chat-types'
+import { usePanesStore } from '../../../lib/panesStore'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
 
@@ -19,6 +20,7 @@ async function fetchChangedFiles(agentId: string): Promise<TurnDiffFileChange[]>
  */
 export function FilesPane({ ctx }: PaneWrapperProps) {
   const agentId = ctx.agentId
+  const setActivePane = usePanesStore((s) => s.setActivePane)
   const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ['stage-files-vs-main', agentId],
     queryFn: () => fetchChangedFiles(agentId as string),
@@ -38,7 +40,14 @@ export function FilesPane({ ctx }: PaneWrapperProps) {
     return <div className={styles.placeholder}>No changed files vs main.</div>
   }
 
-  const openCommits = () => ctx.openPane({ paneType: 'commits', label: 'Commits' })
+  // Open the Commits pane to view the diff, focusing an existing one rather
+  // than stacking a duplicate on every file click.
+  const openCommits = () => {
+    const current = usePanesStore.getState().panesByWorkspace[ctx.workspaceId] ?? []
+    const existing = current.find((p) => p.paneType === 'commits')
+    if (existing) setActivePane(ctx.workspaceId, existing.paneId)
+    else ctx.openPane({ paneType: 'commits', label: 'Commits' })
+  }
 
   return (
     <div className={styles.filesPane}>

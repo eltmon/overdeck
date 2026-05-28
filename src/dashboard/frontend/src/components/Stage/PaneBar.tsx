@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Home, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import styles from './stage.module.css'
@@ -27,7 +28,7 @@ export interface PaneBarProps {
  * ⌘N hint for the first nine panes, and exposes close (×, non-HOME only) and
  * add (+) affordances via callbacks.
  */
-export function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneBarProps) {
   return (
     <div className={styles.panebar} role="tablist" aria-label="Workspace panes">
       {panes.map((pane, index) => {
@@ -77,4 +78,4 @@ export function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd }: PaneB
       </button>
     </div>
   )
-}
+})

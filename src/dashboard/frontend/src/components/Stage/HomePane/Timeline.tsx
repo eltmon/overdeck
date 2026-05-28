@@ -31,7 +31,9 @@ export function Timeline({ conversations, onOpen, now = Date.now() }: TimelinePr
   return (
     <div className={styles.timeline}>
       {groups.map((group) => (
-        <section key={group.label} className={styles.timelineGroup}>
+        // Key by the first item's id, not the label — "May 28" repeats across
+        // years and would otherwise collide.
+        <section key={group.items[0]?.id ?? group.label} className={styles.timelineGroup}>
           <h4 className={styles.timelineLabel}>{group.label}</h4>
           {group.items.map((c) => (
             <button
