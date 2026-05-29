@@ -11,29 +11,67 @@ import { promisify } from "util";
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
 var __require = /* @__PURE__ */ createRequire(import.meta.url);
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Pipeable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Pipeable.js
 /**
+* The `Pipeable` module defines the shared interface and implementation helpers
+* for values that support Effect-style method chaining with `.pipe(...)`.
+*
+* A `Pipeable` value can pass itself through a sequence of unary functions from
+* left to right, so code can be written as `value.pipe(f, g, h)` instead of
+* deeply nesting calls. This is the method form used by many Effect data types
+* to compose transformations, validations, and effectful operations while
+* keeping the original value as the starting point of the pipeline.
+*
+* **Common tasks**
+*
+* - Type values that expose a `.pipe(...)` method with the {@link Pipeable} interface
+* - Implement a custom `.pipe(...)` method with {@link pipeArguments}
+* - Reuse the standard implementation through {@link Prototype}, {@link Class}, or {@link Mixin}
+*
+* **Gotchas**
+*
+* - Each function receives the result of the previous function, not the original value
+* - The overloads preserve precise types for long pipelines, but very long chains may be easier to read when split
+*
 * @since 2.0.0
 */
 /**
-* @since 2.0.0
-* @category utilities
-* @example
+* Applies a `pipe` method's variadic arguments to an initial value from left
+* to right.
+*
+* **When to use**
+*
+* Use to implement a custom `.pipe(...)` method from JavaScript's `arguments`
+* object.
+*
+* **Details**
+*
+* This helper is intended for implementing `Pipeable.pipe` methods that
+* receive JavaScript's `arguments` object. With no functions it returns the
+* original value; otherwise it feeds each result into the next function.
+*
+* **Example** (Implementing a pipe method)
+*
 * ```ts
 * import { Pipeable } from "effect"
 *
-* // pipeArguments is used internally to implement efficient piping
-* function customPipe<A>(self: A, ...fns: Array<(a: any) => any>): unknown {
-*   return Pipeable.pipeArguments(self, arguments as any)
+* class NumberBox {
+*   constructor(readonly value: number) {}
+*
+*   pipe(..._fns: ReadonlyArray<(value: number) => number>): number {
+*     return Pipeable.pipeArguments(this.value, arguments) as number
+*   }
 * }
 *
-* // Example usage
-* const add = (x: number) => (y: number) => x + y
-* const multiply = (x: number) => (y: number) => x * y
-*
-* const result = customPipe(5, add(2), multiply(3))
+* const result = new NumberBox(5).pipe(
+*   (n) => n + 2,
+*   (n) => n * 3
+* )
 * console.log(result) // 21
 * ```
+*
+* @category utils
+* @since 2.0.0
 */
 const pipeArguments = (self, args) => {
 	switch (args.length) {
@@ -55,44 +93,28 @@ const pipeArguments = (self, args) => {
 	}
 };
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Function.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Function.js
 /**
-* Creates a function that can be used in a data-last (aka `pipe`able) or
-* data-first style.
+* Creates a function that can be called in data-first style or data-last
+* (`pipe`-friendly) style.
 *
-* The first parameter to `dual` is either the arity of the uncurried function
-* or a predicate that determines if the function is being used in a data-first
-* or data-last style.
+* **When to use**
 *
-* Using the arity is the most common use case, but there are some cases where
-* you may want to use a predicate. For example, if you have a function that
-* takes an optional argument, you can use a predicate to determine if the
-* function is being used in a data-first or data-last style.
+* Use to expose one implementation through both direct and `pipe`-friendly
+* call styles.
 *
-* You can pass either the arity of the uncurried function or a predicate
-* which determines if the function is being used in a data-first or
-* data-last style.
+* **Details**
 *
-* @example
-* ```ts
-* import { dual, pipe } from "effect/Function"
-*
-* // Using arity to determine data-first or data-last style
-* const sum = dual<
-*   (that: number) => (self: number) => number,
-*   (self: number, that: number) => number
-* >(2, (self, that) => self + that)
-*
-* console.log(sum(2, 3)) // 5 (data-first)
-* console.log(pipe(2, sum(3))) // 5 (data-last)
-* ```
+* Pass either the arity of the uncurried function or a predicate that decides
+* whether the current call is data-first. Arity is the common case. Use a
+* predicate when optional arguments make arity ambiguous.
 *
 * **Example** (Using arity to determine data-first or data-last style)
 *
 * ```ts
-* import { dual, pipe } from "effect/Function"
+* import { Function, pipe } from "effect"
 *
-* const sum = dual<
+* const sum = Function.dual<
 *   (that: number) => (self: number) => number,
 *   (self: number, that: number) => number
 * >(2, (self, that) => self + that)
@@ -104,12 +126,12 @@ const pipeArguments = (self, args) => {
 * **Example** (Using call signatures to define the overloads)
 *
 * ```ts
-* import { dual, pipe } from "effect/Function"
+* import { Function, pipe } from "effect"
 *
 * const sum: {
 *   (that: number): (self: number) => number
 *   (self: number, that: number): number
-* } = dual(2, (self: number, that: number): number => self + that)
+* } = Function.dual(2, (self: number, that: number): number => self + that)
 *
 * console.log(sum(2, 3)) // 5
 * console.log(pipe(2, sum(3))) // 5
@@ -118,9 +140,9 @@ const pipeArguments = (self, args) => {
 * **Example** (Using a predicate to determine data-first or data-last style)
 *
 * ```ts
-* import { dual, pipe } from "effect/Function"
+* import { Function, pipe } from "effect"
 *
-* const sum = dual<
+* const sum = Function.dual<
 *   (that: number) => (self: number) => number,
 *   (self: number, that: number) => number
 * >(
@@ -164,11 +186,16 @@ const dual = function(arity, body) {
 	}
 };
 /**
-* The identity function, i.e. A function that returns its input argument.
+* Returns its input argument unchanged.
 *
-* @example
+* **When to use**
+*
+* Use to return a value unchanged where a function is required.
+*
+* **Example** (Returning the same value)
+*
 * ```ts
-* import { identity } from "effect/Function"
+* import { identity } from "effect"
 * import * as assert from "node:assert"
 *
 * assert.deepStrictEqual(identity(5), 5)
@@ -179,17 +206,20 @@ const dual = function(arity, body) {
 */
 const identity = (a) => a;
 /**
-* Creates a constant value that never changes.
+* Creates a zero-argument function that always returns the provided value.
 *
-* This is useful when you want to pass a value to a higher-order function (a function that takes another function as its argument)
-* and want that inner function to always use the same value, no matter how many times it is called.
+* **When to use**
 *
-* @example
+* Use when an API expects a thunk or callback and every invocation
+* should return the same value.
+*
+* **Example** (Creating a constant thunk)
+*
 * ```ts
-* import { constant } from "effect/Function"
+* import { Function } from "effect"
 * import * as assert from "node:assert"
 *
-* const constNull = constant(null)
+* const constNull = Function.constant(null)
 *
 * assert.deepStrictEqual(constNull(), null)
 * assert.deepStrictEqual(constNull(), null)
@@ -200,14 +230,20 @@ const identity = (a) => a;
 */
 const constant = (value) => () => value;
 /**
-* A thunk that returns always `undefined`.
+* Returns `undefined` when called.
 *
-* @example
+* **When to use**
+*
+* Use when an API expects a thunk and every invocation should return
+* `undefined`.
+*
+* **Example** (Returning undefined from a thunk)
+*
 * ```ts
-* import { constUndefined } from "effect/Function"
+* import { Function } from "effect"
 * import * as assert from "node:assert"
 *
-* assert.deepStrictEqual(constUndefined(), undefined)
+* assert.deepStrictEqual(Function.constUndefined(), undefined)
 * ```
 *
 * @category constants
@@ -215,14 +251,20 @@ const constant = (value) => () => value;
 */
 const constUndefined = /* @__PURE__ */ constant(void 0);
 /**
-* A thunk that returns always `void`.
+* Returns no meaningful value when called.
 *
-* @example
+* **When to use**
+*
+* Use when an API expects a thunk used only for its call effect and not for a
+* meaningful return value.
+*
+* **Example** (Returning void from a thunk)
+*
 * ```ts
-* import { constVoid } from "effect/Function"
+* import { Function } from "effect"
 * import * as assert from "node:assert"
 *
-* assert.deepStrictEqual(constVoid(), undefined)
+* assert.deepStrictEqual(Function.constVoid(), undefined)
 * ```
 *
 * @category constants
@@ -230,7 +272,7 @@ const constUndefined = /* @__PURE__ */ constant(void 0);
 */
 const constVoid = constUndefined;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/equal.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/equal.js
 /** @internal */
 const getAllObjectKeys = (obj) => {
 	const keys = new Set(Reflect.ownKeys(obj));
@@ -249,56 +291,82 @@ const getAllObjectKeys = (obj) => {
 /** @internal */
 const byReferenceInstances = /* @__PURE__ */ new WeakSet();
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Predicate.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Predicate.js
 /**
-* Predicate and Refinement helpers for runtime checks, filtering, and type narrowing.
-* This module provides small, pure functions you can combine to decide whether a
-* value matches a condition and, when using refinements, narrow TypeScript types.
+* Predicates are small boolean functions for checking values at runtime.
+* Refinements are predicates that also narrow TypeScript types after a
+* successful check. This module provides primitive guards for common JavaScript
+* values and combinators for building larger checks from smaller ones.
 *
-* Mental model:
-* - A `Predicate<A>` is just `(a: A) => boolean`.
-* - A `Refinement<A, B>` is a predicate that narrows `A` to `B` when true.
-* - Guards like `isString` are predicates/refinements for common runtime types.
-* - Combinators like `and`/`or` build new predicates from existing ones.
-* - `Tuple` and `Struct` lift element/property predicates to compound values.
+* **Mental model**
 *
-* Common tasks:
-* - Reuse an existing predicate on a different input shape -> {@link mapInput}
-* - Combine checks -> {@link and}, {@link or}, {@link not}, {@link xor}
-* - Build tuple/object checks -> {@link Tuple}, {@link Struct}
-* - Narrow `unknown` to a concrete type -> {@link Refinement}, {@link compose}
-* - Check runtime types -> {@link isString}, {@link isNumber}, {@link isObject}
+* - A `Predicate<A>` is `(a: A) => boolean`
+* - A `Refinement<A, B>` is `(a: A) => a is B`; when it returns `true`,
+*   TypeScript can treat the value as `B`
+* - Guards such as {@link isString}, {@link isNumber}, and {@link isObject}
+*   refine `unknown` values into useful runtime types
+* - Combinators such as {@link and}, {@link or}, {@link not}, and {@link xor}
+*   build new predicates while preserving refinement information where possible
+* - {@link Tuple} and {@link Struct} lift element and property predicates to
+*   tuple-like arrays and object shapes
 *
-* Gotchas:
-* - `isTruthy` uses JavaScript truthiness; `0`, "", and `false` are false.
-* - `isObject` excludes arrays; use {@link isObjectOrArray} for both.
-* - `isIterable` treats strings as iterable.
-* - `isPromise`/`isPromiseLike` are structural checks (then/catch), not `instanceof`.
-* - `isTupleOf` and `isTupleOfAtLeast` only check length, not element types.
+* **Common tasks**
+*
+* - Check primitive runtime types: {@link isString}, {@link isNumber},
+*   {@link isBoolean}, {@link isBigInt}, {@link isSymbol}
+* - Check object-like values: {@link isObject}, {@link isObjectOrArray},
+*   {@link hasProperty}, {@link isTagged}
+* - Combine predicates: {@link and}, {@link or}, {@link not}, {@link xor}
+* - Reuse a predicate on derived input: {@link mapInput}
+* - Compose refinements that narrow in stages: {@link compose}
+* - Validate tuple or object shapes: {@link Tuple}, {@link Struct}
+*
+* **Gotchas**
+*
+* - Predicates only return `true` or `false`; they do not explain why a value
+*   failed a check
+* - {@link isTruthy} uses JavaScript truthiness, so `0`, `""`, and `false`
+*   are rejected
+* - {@link isObject} excludes arrays; use {@link isObjectOrArray} when arrays
+*   should also pass
+* - {@link isIterable} accepts strings because strings are iterable in
+*   JavaScript
+* - {@link isPromise} and {@link isPromiseLike} are structural checks, not
+*   `instanceof` checks
+* - {@link isTupleOf} and {@link isTupleOfAtLeast} check length only, not
+*   element types
+*
+* **Quickstart**
 *
 * **Example** (Filter by a predicate)
 *
 * ```ts
-* import * as Predicate from "effect/Predicate"
+* import { Predicate } from "effect"
 *
-* const isPositive = (n: number) => n > 0
-* const data = [2, -1, 3]
+* const values: Array<unknown> = ["one", 2, "three", null]
+* const strings = values.filter(Predicate.isString)
 *
-* console.log(data.filter(isPositive))
+* console.log(strings)
+* // Output: ["one", "three"]
 * ```
 *
-* See also: {@link Predicate}, {@link Refinement}, {@link and}, {@link or}, {@link mapInput}
+* **See also**
+*
+* - {@link Predicate} for plain boolean checks
+* - {@link Refinement} for checks that narrow types
+* - {@link Struct} and {@link Tuple} for checking compound values
 *
 * @since 2.0.0
 */
 /**
 * Checks whether a value is a `function`.
 *
-* When to use:
-* - You need to guard an `unknown` value as callable.
+* **When to use**
 *
-* Behavior:
-* - Pure; does not mutate input.
+* Use when you need to guard an `unknown` value as callable.
+*
+* **Details**
+*
 * - Uses `typeof input === "function"`.
 *
 * **Example** (Guard function)
@@ -313,8 +381,7 @@ const byReferenceInstances = /* @__PURE__ */ new WeakSet();
 * }
 * ```
 *
-* See also: {@link isObjectKeyword}
-*
+* @see {@link isObjectKeyword}
 * @category guards
 * @since 2.0.0
 */
@@ -324,11 +391,12 @@ function isFunction(input) {
 /**
 * Checks whether a value is an `object` in the JavaScript sense (objects, arrays, functions).
 *
-* When to use:
-* - You want to accept arrays and functions as well as objects.
+* **When to use**
 *
-* Behavior:
-* - Pure; does not mutate input.
+* Use when you want to accept arrays and functions as well as objects.
+*
+* **Details**
+*
 * - Returns `true` for arrays and functions, `false` for `null`.
 *
 * **Example** (Object keyword)
@@ -340,10 +408,10 @@ function isFunction(input) {
 * console.log(Predicate.isObjectKeyword(null))
 * ```
 *
-* See also: {@link isObject}, {@link isObjectOrArray}
-*
+* @see {@link isObject}
+* @see {@link isObjectOrArray}
 * @category guards
-* @since 2.0.0
+* @since 4.0.0
 */
 function isObjectKeyword(input) {
 	return typeof input === "object" && input !== null || isFunction(input);
@@ -351,12 +419,13 @@ function isObjectKeyword(input) {
 /**
 * Checks whether a value has a given property key.
 *
-* When to use:
-* - You need to guard property access on `unknown` values.
+* **When to use**
+*
+* Use when you need to guard property access on `unknown` values.
 * - You want a simple structural guard for objects.
 *
-* Behavior:
-* - Pure; does not mutate input.
+* **Details**
+*
 * - Uses the `in` operator and {@link isObjectKeyword}.
 * - Does not check property value types.
 *
@@ -373,8 +442,8 @@ function isObjectKeyword(input) {
 * }
 * ```
 *
-* See also: {@link isTagged}, {@link isObjectKeyword}
-*
+* @see {@link isTagged}
+* @see {@link isObjectKeyword}
 * @category guards
 * @since 2.0.0
 */
@@ -382,12 +451,13 @@ const hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(
 /**
 * Checks whether a value has a `_tag` property equal to the given tag.
 *
-* When to use:
-* - You model tagged unions with a `_tag` field.
+* **When to use**
+*
+* Use when you model tagged unions with a `_tag` field.
 * - You want a quick, structural guard for tagged values.
 *
-* Behavior:
-* - Pure; does not mutate input.
+* **Details**
+*
 * - Uses {@link hasProperty} and strict equality on `_tag`.
 *
 * **Example** (Guard tagged)
@@ -400,47 +470,106 @@ const hasProperty = /* @__PURE__ */ dual(2, (self, property) => isObjectKeyword(
 * console.log(isOk({ _tag: "Ok", value: 1 }))
 * ```
 *
-* See also: {@link hasProperty}
-*
+* @see {@link hasProperty}
 * @category guards
 * @since 2.0.0
 */
 const isTagged = /* @__PURE__ */ dual(2, (self, tag) => hasProperty(self, "_tag") && self["_tag"] === tag);
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Hash.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Hash.js
 /**
-* This module provides utilities for hashing values in TypeScript.
+* The `Hash` module computes Effect hash values and defines the interface for
+* objects that want to provide their own hash implementation. Hashes are small
+* numeric fingerprints used by Effect data structures to bucket values quickly;
+* they are not cryptographic digests and they are not proof that two values are
+* equal.
 *
-* Hashing is the process of converting data into a fixed-size numeric value,
-* typically used for data structures like hash tables, equality comparisons,
-* and efficient data storage.
+* **Mental model**
+*
+* - {@link hash} dispatches by JavaScript type and handles primitives,
+*   arrays, typed arrays, maps, sets, plain objects, dates, regular
+*   expressions, and custom hashable objects
+* - Objects can implement {@link Hash} by defining a method at {@link symbol}
+* - Structural object hashes are cached, so repeated hashing of the same object
+*   is cheap after the first computation
+* - {@link random} gives reference-stable hash values for values that should
+*   be hashed by identity
+* - Lower-level helpers such as {@link combine}, {@link string},
+*   {@link number}, {@link structure}, {@link structureKeys}, and
+*   {@link array} are useful when implementing custom hashes
+*
+* **Quickstart**
+*
+* **Example** (Implementing a custom hash)
+*
+* ```ts
+* import { Hash } from "effect"
+*
+* class UserKey implements Hash.Hash {
+*   constructor(
+*     readonly id: string,
+*     readonly region: string
+*   ) {}
+*
+*   [Hash.symbol](): number {
+*     return Hash.combine(Hash.string(this.region))(Hash.string(this.id))
+*   }
+* }
+*
+* const value = Hash.hash(new UserKey("user-1", "eu"))
+* ```
+*
+* **Gotchas**
+*
+* - Hash collisions are possible; hash-based collections also need equality
+*   semantics to decide whether two values are actually the same
+* - Do not mutate an object after hashing it structurally, because the cached
+*   hash can become stale
+* - Use {@link random} or a custom {@link Hash} implementation for mutable
+*   objects that should be compared by reference identity
 *
 * @since 2.0.0
 */
 /**
-* The unique identifier used to identify objects that implement the Hash interface.
+* Defines the unique identifier used to identify objects that implement the Hash interface.
 *
+* **When to use**
+*
+* Use as the computed property key for the method that supplies a custom hash
+* value on a `Hash` implementor.
+*
+* @see {@link Hash} for the interface implemented with this symbol
+* @see {@link isHash} for checking whether a value implements `Hash`
+* @see {@link hash} for computing hash values
+*
+* @category symbols
 * @since 2.0.0
 */
 const symbol$1 = "~effect/interfaces/Hash";
 /**
 * Computes a hash value for any given value.
 *
+* **When to use**
+*
+* Use to compute an Effect hash for primitives, collections, and hashable
+* objects.
+*
+* **Details**
+*
 * This function can hash primitives (numbers, strings, booleans, etc.) as well as
 * objects, arrays, and other complex data structures. It automatically handles
 * different types and provides a consistent hash value for equivalent inputs.
 *
-* **⚠️ CRITICAL IMMUTABILITY REQUIREMENT**: Objects being hashed must be treated as
-* immutable after their first hash computation. Hash results are cached, so mutating
-* an object after hashing will lead to stale cached values and broken hash-based
-* operations. For mutable objects, use referential equality by implementing custom
-* `Hash` interface that hashes the object reference, not its content.
+* **Gotchas**
 *
-* **FORBIDDEN**: Modifying objects after `Hash.hash()` has been called on them
-* **ALLOWED**: Using immutable objects, or mutable objects with custom `Hash` interface
-* that uses referential equality (hashes the object reference, not content)
+* Objects being hashed must be treated as immutable after their first hash
+* computation. Hash results are cached, so mutating an object after hashing will
+* lead to stale cached values and broken hash-based operations. For mutable
+* objects, implement a custom `Hash` interface that hashes the object reference
+* rather than its content.
 *
-* @example
+* **Example** (Hashing different values)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -452,7 +581,7 @@ const symbol$1 = "~effect/interfaces/Hash";
 * // Hash objects and arrays
 * console.log(Hash.hash({ name: "John", age: 30 }))
 * console.log(Hash.hash([1, 2, 3]))
-* console.log(Hash.hash(new Date("2023-01-01")))
+* console.log(Hash.hash({ id: "user-1", roles: ["admin", "editor"] }))
 * ```
 *
 * @category hashing
@@ -490,11 +619,18 @@ const hash = (self) => {
 /**
 * Generates a random hash value for an object and caches it.
 *
+* **When to use**
+*
+* Use to hash an object by reference identity instead of structural content.
+*
+* **Details**
+*
 * This function creates a random hash value for objects that don't have their own
 * hash implementation. The hash value is cached using a WeakMap, so the same object
 * will always return the same hash value during its lifetime.
 *
-* @example
+* **Example** (Hashing objects by reference)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -518,16 +654,22 @@ const random = (self) => {
 /**
 * Combines two hash values into a single hash value.
 *
-* This function takes two hash values and combines them using a mathematical
-* operation to produce a new hash value. It's useful for creating hash values
-* of composite structures.
+* **When to use**
 *
-* @example
+* Use to build a hash for a composite value by folding together hash values for
+* its parts.
+*
+* **Details**
+*
+* Supports both direct and pipeable usage. The implementation combines two
+* hash values with `(self * 53) ^ b`.
+*
+* **Example** (Combining hash values)
+*
 * ```ts
-* import { Hash } from "effect" // combined hash value
+* import { Hash, pipe } from "effect"
 *
 * // Can also be used with pipe
-* import { pipe } from "effect"
 *
 * const hash1 = Hash.hash("hello")
 * const hash2 = Hash.hash("world")
@@ -538,17 +680,27 @@ const random = (self) => {
 * const result = pipe(hash1, Hash.combine(hash2))
 * ```
 *
+* @see {@link hash} for computing hash values from arbitrary inputs
+* @see {@link structureKeys} for hashing selected object fields without manual combination
+*
 * @category hashing
 * @since 2.0.0
 */
 const combine = /* @__PURE__ */ dual(2, (self, b) => self * 53 ^ b);
 /**
-* Optimizes a hash value by applying bit manipulation techniques.
+* Applies bit manipulation techniques to optimize a hash value.
+*
+* **When to use**
+*
+* Use to improve the bit distribution of a raw numeric hash value.
+*
+* **Details**
 *
 * This function takes a hash value and applies bitwise operations to improve
 * the distribution of hash values, reducing the likelihood of collisions.
 *
-* @example
+* **Example** (Optimizing a hash value)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -565,12 +717,19 @@ const combine = /* @__PURE__ */ dual(2, (self, b) => self * 53 ^ b);
 */
 const optimize = (n) => n & 3221225471 | n >>> 1 & 1073741824;
 /**
-* Checks if a value implements the Hash interface.
+* Checks whether a value implements the Hash interface.
+*
+* **When to use**
+*
+* Use to detect whether an unknown value provides a custom hash implementation.
+*
+* **Details**
 *
 * This function determines whether a given value has the Hash symbol property,
 * indicating that it can provide its own hash value implementation.
 *
-* @example
+* **Example** (Checking for Hash support)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -593,11 +752,18 @@ const isHash = (u) => hasProperty(u, symbol$1);
 /**
 * Computes a hash value for a number.
 *
+* **When to use**
+*
+* Use to hash a JavaScript number with Effect's numeric hash semantics.
+*
+* **Details**
+*
 * This function creates a hash value for numeric inputs, handling special cases
 * like NaN, Infinity, and -Infinity with distinct hash values. It uses bitwise operations to ensure good distribution
 * of hash values across different numeric inputs.
 *
-* @example
+* **Example** (Hashing numbers)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -625,11 +791,18 @@ const number = (n) => {
 /**
 * Computes a hash value for a string using the djb2 algorithm.
 *
+* **When to use**
+*
+* Use to hash a string directly.
+*
+* **Details**
+*
 * This function implements a variation of the djb2 hash algorithm, which is
 * known for its good distribution properties and speed. It processes each
 * character of the string to produce a consistent hash value.
 *
-* @example
+* **Example** (Hashing strings)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -652,11 +825,18 @@ const string = (str) => {
 /**
 * Computes a hash value for an object using only the specified keys.
 *
+* **When to use**
+*
+* Use to hash an object by a selected set of property keys.
+*
+* **Details**
+*
 * This function allows you to hash an object by considering only specific keys,
 * which is useful when you want to create a hash based on a subset of an object's
 * properties.
 *
-* @example
+* **Example** (Hashing selected object keys)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -684,13 +864,19 @@ const structureKeys = (o, keys) => {
 	return optimize(h);
 };
 /**
-* Computes a hash value for an object using all of its enumerable keys.
+* Computes a structural hash for an object using Effect's object key collection.
 *
-* This function creates a hash value based on all enumerable properties of an object.
-* It's a convenient way to hash an entire object structure when you want to consider
-* all its properties.
+* **When to use**
 *
-* @example
+* Use to hash an object from all structural keys collected by Effect.
+*
+* **Details**
+*
+* The hash is based on the object's structural keys and their values, including
+* symbol keys and relevant prototype keys for non-plain objects.
+*
+* **Example** (Hashing object structures)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -716,13 +902,24 @@ const iterableWith = (seed, f) => (iter) => {
 	return optimize(h);
 };
 /**
-* Computes a hash value for an array by hashing all of its elements.
+* Computes a hash value for an iterable by hashing all of its elements.
 *
-* This function creates a hash value based on all elements in the array.
-* The order of elements matters, so arrays with the same elements in different
-* orders will produce different hash values.
+* **When to use**
 *
-* @example
+* Use to hash the values yielded by an iterable with Effect hash semantics.
+*
+* **Details**
+*
+* The implementation folds element hashes from the seed `6151` with XOR and
+* then optimizes the final hash.
+*
+* **Gotchas**
+*
+* A hash is not an equality proof. Because this implementation uses XOR,
+* reordered inputs can produce the same hash.
+*
+* **Example** (Hashing arrays)
+*
 * ```ts
 * import { Hash } from "effect"
 *
@@ -732,12 +929,13 @@ const iterableWith = (seed, f) => (iter) => {
 *
 * console.log(Hash.array(arr1)) // hash of [1, 2, 3]
 * console.log(Hash.array(arr2)) // same hash as arr1
-* console.log(Hash.array(arr3)) // different hash (different order)
+* console.log(Hash.array(arr3)) // may match reordered inputs
 *
-* // Arrays with same elements in same order produce same hash
 * console.log(Hash.array(arr1) === Hash.array(arr2)) // true
-* console.log(Hash.array(arr1) === Hash.array(arr3)) // false
+* console.log(Hash.array(arr1) === Hash.array(arr3)) // true
 * ```
+*
+* @see {@link hash} for the general-purpose hash dispatcher
 *
 * @category hashing
 * @since 2.0.0
@@ -756,22 +954,22 @@ function withVisitedTracking$1(obj, fn) {
 	return result;
 }
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Equal.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Equal.js
 /**
-* The unique string identifier for the {@link Equal} interface.
+* Defines the unique string identifier for the `Equal` interface.
 *
-* Use this as a computed property key when implementing custom equality on a
-* class or object literal.
+* **When to use**
 *
-* When to use:
-* - As the method name when implementing the {@link Equal} interface.
-* - To check manually whether an object carries an equality method (prefer
+* Use when you use it as the computed property key when implementing custom equality on a
+*   class or object literal.
+* - Use it to check manually whether an object carries an equality method (prefer
 *   {@link isEqual} instead).
 *
-* Behavior:
-* - Pure constant — no allocation or side effects.
+* **Details**
 *
-* **Example** (implementing Equal on a class)
+* This is a pure constant with no allocation or side effects.
+*
+* **Example** (Implementing Equal on a Class)
 *
 * ```ts
 * import { Equal, Hash } from "effect"
@@ -791,7 +989,7 @@ function withVisitedTracking$1(obj, fn) {
 *
 * @see {@link Equal} — the interface that uses this symbol
 * @see {@link isEqual} — type guard for `Equal` implementors
-*
+* @category symbols
 * @since 2.0.0
 */
 const symbol = "~effect/interfaces/Equal";
@@ -923,19 +1121,21 @@ const compareSets = /* @__PURE__ */ makeCompareSet(compareBoth);
 /**
 * Checks whether a value implements the {@link Equal} interface.
 *
-* When to use:
-* - To branch on whether a value supports custom equality before calling
+* **When to use**
+*
+* Use when to branch on whether a value supports custom equality before calling
 *   its `[Equal.symbol]` method directly.
 * - In generic utility code that needs to distinguish `Equal` implementors
 *   from plain values.
 *
-* Behavior:
+* **Details**
+*
 * - Pure function, no side effects.
 * - Returns `true` if and only if `u` has a property keyed by
 *   {@link symbol}.
 * - Acts as a TypeScript type guard, narrowing the input to {@link Equal}.
 *
-* **Example** (type guard)
+* **Example** (Type Guard)
 *
 * ```ts
 * import { Equal, Hash } from "effect"
@@ -957,7 +1157,6 @@ const compareSets = /* @__PURE__ */ makeCompareSet(compareBoth);
 *
 * @see {@link Equal} — the interface being checked
 * @see {@link symbol} — the property key that signals `Equal` support
-*
 * @category guards
 * @since 2.0.0
 */
@@ -965,16 +1164,18 @@ const isEqual = (u) => hasProperty(u, symbol);
 /**
 * Wraps {@link equals} as an `Equivalence<A>`.
 *
-* When to use:
-* - When an API (e.g. `Array.dedupeWith`, `Equivalence.mapInput`) requires an
+* **When to use**
+*
+* Use when when an API (e.g. `Array.dedupeWith`, `Equivalence.mapInput`) requires an
 *   `Equivalence` and you want to reuse `Equal.equals`.
 *
-* Behavior:
+* **Details**
+*
 * - Returns a function `(a: A, b: A) => boolean` that delegates to
 *   {@link equals}.
 * - Pure; allocates a thin wrapper on each call.
 *
-* **Example** (deduplicating with Equal semantics)
+* **Example** (Deduplicating with Equal Semantics)
 *
 * ```ts
 * import { Array, Equal } from "effect"
@@ -985,30 +1186,33 @@ const isEqual = (u) => hasProperty(u, symbol);
 * ```
 *
 * @see {@link equals} — the underlying comparison function
-*
 * @category instances
-* @since 2.0.0
+* @since 4.0.0
 */
 const asEquivalence = () => equals;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/array.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/array.js
 /**
 * @since 2.0.0
 */
 /** @internal */
 const isArrayNonEmpty = (self) => self.length > 0;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Redactable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Redactable.js
 /**
-* Symbol used to identify objects that implement the {@link Redactable}
+* Defines the symbol used to identify objects that implement the {@link Redactable}
 * protocol.
 *
-* Add a method under this key to make an object redactable. The method
-* receives the current `Context` and must return the replacement value.
+* **When to use**
 *
-* - Use this symbol as the property key when implementing {@link Redactable}.
-* - Registered globally via `Symbol.for("~effect/Redactable")`,
-*   so it is identical across multiple copies of the library at runtime.
+* Use as the property key when implementing the `Redactable` protocol.
+*
+* **Details**
+*
+* Add a method under this key to make an object redactable. The method receives
+* the current `Context` and must return the replacement value. The symbol is
+* registered globally via `Symbol.for("~effect/Redactable")`, so it is
+* identical across multiple copies of the library at runtime.
 *
 * **Example** (Masking an API key)
 *
@@ -1024,63 +1228,75 @@ const isArrayNonEmpty = (self) => self.length > 0;
 * }
 * ```
 *
-* See also:
-* - {@link Redactable} - the interface this symbol belongs to
-* - {@link isRedactable} - check whether a value has this symbol
-*
-* @since 4.0.0
-* @category symbol
+* @see {@link Redactable} for the interface this symbol belongs to
+* @see {@link isRedactable} to check whether a value has this symbol
+* @category symbols
+* @since 3.10.0
 */
 const symbolRedactable = /* @__PURE__ */ Symbol.for("~effect/Redactable");
 /**
 * Type guard that checks whether a value implements the {@link Redactable}
 * interface.
 *
-* See also:
-* - {@link Redactable} - the interface being checked
-* - {@link redact} - applies redaction if the value is redactable
+* **When to use**
 *
-* @since 4.0.0
+* Use to narrow an unknown value before calling redaction-specific helpers.
+*
+* @see {@link Redactable} for the interface being checked
+* @see {@link redact} to apply redaction if the value is redactable
 * @category guards
+* @since 3.10.0
 */
 const isRedactable = (u) => hasProperty(u, symbolRedactable);
 /**
-* Redacts a value if it implements {@link Redactable}, otherwise returns it
+* Returns a redacted value if it implements {@link Redactable}, otherwise returns it
 * unchanged.
 *
-* - Use this as the general-purpose entry point for redaction: it is safe to
-*   call on any value.
-* - Internally calls {@link isRedactable} and, if `true`, delegates to
-*   {@link getRedacted}.
-* - Not recursive: nested redactable values inside the returned object are not
-*   automatically redacted.
-* - Pure with respect to its argument (does not mutate the input).
+* **When to use**
 *
-* See also:
-* - {@link isRedactable} - check before redacting
-* - {@link getRedacted} - lower-level variant for known redactables
+* Use as the general-purpose entry point for redaction when the input may
+* or may not implement the redaction protocol.
 *
-* @since 4.0.0
+* **Details**
+*
+* This function calls {@link isRedactable} and, when it returns `true`,
+* delegates to {@link getRedacted}.
+*
+* **Gotchas**
+*
+* Redaction is not recursive. Nested redactable values inside the returned
+* object are not automatically redacted.
+*
+* @see {@link isRedactable} to check before redacting
+* @see {@link getRedacted} for the lower-level variant for known redactables
+* @category destructors
+* @since 3.10.0
 */
 function redact(u) {
 	if (isRedactable(u)) return getRedacted(u);
 	return u;
 }
 /**
-* Calls `[symbolRedactable]` on a value that is already known to be
-* {@link Redactable} and returns the result.
+* Returns the result of calling `[symbolRedactable]` on a value that is
+* already known to be {@link Redactable}.
 *
-* - Use this when you have already verified the value is `Redactable` (e.g.,
-*   via {@link isRedactable}) and want to avoid a second check.
-* - Reads the current fiber's `Context` from the global fiber reference. If
-*   no fiber is active, an empty `Context` is passed to the redaction
-*   method.
-* - Does not mutate the input.
+* **When to use**
 *
-* See also:
-* - {@link redact} - higher-level variant that handles non-redactable values
-* - {@link isRedactable} - type guard to verify before calling this
+* Use when you have already verified the value is `Redactable`, for
+* example with {@link isRedactable}, and want to avoid a second check.
 *
+* **Details**
+*
+* This function reads the current fiber's `Context` from the global fiber
+* reference and passes it to the redaction method.
+*
+* **Gotchas**
+*
+* If no fiber is active, an empty `Context` is passed to the redaction method.
+*
+* @see {@link redact} for the higher-level variant that handles non-redactable values
+* @see {@link isRedactable} for the type guard to verify before calling this
+* @category destructors
 * @since 4.0.0
 */
 function getRedacted(redactable) {
@@ -1096,7 +1312,7 @@ const emptyContext$1 = {
 	}
 };
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Formatter.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Formatter.js
 /**
 * Utilities for converting arbitrary JavaScript values into human-readable
 * strings, with support for circular references, redaction, and common JS
@@ -1154,15 +1370,16 @@ const emptyContext$1 = {
 /**
 * Converts any JavaScript value into a human-readable string.
 *
-* When to use:
-* - Pretty-printing values for debugging, logging, or error messages.
+* **When to use**
+*
+* Use to pretty-print values for debugging, logging, or error messages.
 * - You need to handle `BigInt`, `Symbol`, `Set`, `Map`, `Date`, `RegExp`,
 *   or class instances that `JSON.stringify` cannot represent.
 * - You want circular references shown as `"[Circular]"` instead of
 *   throwing.
 *
-* Behavior:
-* - Does not mutate input.
+* **Details**
+*
 * - Output is **not** valid JSON; use {@link formatJson} when you need
 *   parseable JSON.
 * - Primitives: stringified naturally (`null`, `undefined`, `123`, `true`).
@@ -1177,8 +1394,6 @@ const emptyContext$1 = {
 * - Arrays/objects with 0–1 entries are inline; larger ones are
 *   pretty-printed when `space` is set.
 * - Circular references are replaced with `"[Circular]"`.
-*
-* Options:
 * - `space` — indentation unit (number of spaces, or a string like
 *   `"\t"`). Defaults to `0` (compact).
 * - `ignoreToString` — skip calling `toString()`. Defaults to `false`.
@@ -1218,9 +1433,10 @@ const emptyContext$1 = {
 * // {"name":"loop","self":[Circular]}
 * ```
 *
-* See also: {@link formatJson}, {@link Formatter}
-*
-* @since 4.0.0
+* @see {@link formatJson}
+* @see {@link Formatter}
+* @category formatting
+* @since 2.0.0
 */
 function format(input, options) {
 	const space = options?.space ?? 0;
@@ -1270,30 +1486,6 @@ function format(input, options) {
 }
 const CIRCULAR = "[Circular]";
 /**
-* Formats a single property key for display.
-*
-* When to use:
-* - You are building a custom formatter that needs to render object keys.
-*
-* Behavior:
-* - String keys are JSON-quoted (e.g. `"foo"`).
-* - Symbol and number keys are converted with `String()`.
-* - Pure function; does not mutate input.
-*
-* **Example** (Format property keys)
-*
-* ```ts
-* import { Formatter } from "effect"
-*
-* console.log(Formatter.formatPropertyKey("name"))
-* // "name"
-*
-* console.log(Formatter.formatPropertyKey(Symbol.for("id")))
-* // Symbol(id)
-* ```
-*
-* See also: {@link formatPath}, {@link format}
-*
 * @internal
 */
 function formatPropertyKey(name) {
@@ -1302,29 +1494,6 @@ function formatPropertyKey(name) {
 /**
 * Formats a `Date` as an ISO 8601 string, returning `"Invalid Date"` for
 * invalid dates instead of throwing.
-*
-* When to use:
-* - You want a safe `toISOString()` that never throws.
-*
-* Behavior:
-* - Returns `date.toISOString()` on success.
-* - Returns `"Invalid Date"` if `toISOString()` throws (e.g. for
-*   `new Date(NaN)`).
-* - Pure function; does not mutate input.
-*
-* **Example** (Safe date formatting)
-*
-* ```ts
-* import { Formatter } from "effect"
-*
-* console.log(Formatter.formatDate(new Date("2024-01-15T10:30:00Z")))
-* // 2024-01-15T10:30:00.000Z
-*
-* console.log(Formatter.formatDate(new Date("invalid")))
-* // Invalid Date
-* ```
-*
-* See also: {@link format}
 *
 * @internal
 */
@@ -1344,15 +1513,22 @@ function safeToString(input) {
 	}
 }
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Inspectable.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Inspectable.js
 /**
-* Symbol used by Node.js for custom object inspection.
+* Defines the symbol used by Node.js for custom object inspection.
+*
+* **When to use**
+*
+* Use to implement Node.js custom inspection for a value.
+*
+* **Details**
 *
 * This symbol is recognized by Node.js's `util.inspect()` function and the REPL
 * for custom object representation. When an object has a method with this symbol,
 * it will be called to determine how the object should be displayed.
 *
-* @example
+* **Example** (Defining custom Node inspection)
+*
 * ```ts
 * import { Inspectable } from "effect"
 *
@@ -1368,20 +1544,29 @@ function safeToString(input) {
 * console.log(obj) // Displays: CustomObject(hello)
 * ```
 *
-* @since 2.0.0
 * @category symbols
+* @since 2.0.0
 */
 const NodeInspectSymbol = /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom");
 /**
-* Safely converts a value to a JSON-serializable representation, useful for
-* implementing the `toJSON` method of the {@link Inspectable} interface.
+* Converts a value to a JSON-serializable representation safely.
+*
+* **When to use**
+*
+* Use when you need a safe, JSON-serializable representation of a value
+* without risking unhandled errors.
+*
+* **Details**
 *
 * This function attempts to extract JSON data from objects that implement the
 * `toJSON` method, recursively processes arrays, and handles errors gracefully.
 * For objects that don't have a `toJSON` method, it applies redaction to
 * protect sensitive information.
 *
-* @since 2.0.0
+* @see {@link toStringUnknown} for converting unknown values to strings
+*
+* @category converting
+* @since 4.0.0
 */
 const toJson = (input) => {
 	try {
@@ -1393,25 +1578,22 @@ const toJson = (input) => {
 	return redact(input);
 };
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Utils.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js
 /**
-* An `IterableIterator` that yields its wrapped value exactly once.
+* Yields its wrapped value exactly once through an `IterableIterator`.
 *
-* When to use:
+* **When to use**
 *
-* - Implement `[Symbol.iterator]()` on Effect-like types so they can be
-*   `yield*`-ed inside generator functions (e.g. `Effect.gen`, `Option.gen`).
-* - You almost never construct this directly — it is created internally by
-*   yieldable types.
+* Use to implement `[Symbol.iterator]()` on Effect-like types so they can be
+* `yield*`-ed inside generator functions, such as `Effect.gen` and
+* `Option.gen`.
 *
-* Behavior:
+* **Details**
 *
-* - The first call to `next()` returns `{ value: self, done: false }`.
-* - Every subsequent call returns `{ value: a, done: true }` where `a` is
-*   the argument passed to `next()`.
-* - `[Symbol.iterator]()` returns a **new** `SingleShotGen` wrapping the same
-*   value, so the outer type can be iterated multiple times.
-* - Does not mutate the wrapped value.
+* The first call to `next()` returns `{ value: self, done: false }`. Every
+* subsequent call returns `{ value: a, done: true }` where `a` is the argument
+* passed to `next()`. `[Symbol.iterator]()` returns a **new** `SingleShotGen`
+* wrapping the same value, so the outer type can be iterated multiple times.
 *
 * **Example** (Yielding a wrapped value in a generator)
 *
@@ -1429,8 +1611,7 @@ const toJson = (input) => {
 * // { value: 42, done: true }
 * ```
 *
-* @see {@link Gen} — the type-level signature that relies on `SingleShotGen`
-*
+* @see {@link Gen} for the type-level signature that relies on `SingleShotGen`
 * @category constructors
 * @since 2.0.0
 */
@@ -1441,6 +1622,13 @@ var SingleShotGen = class SingleShotGen {
 		this.self = self;
 	}
 	/**
+	* Yields the stored value once, then completes with the value sent back in.
+	*
+	* **When to use**
+	*
+	* Use to advance a `SingleShotGen` through its single yield and completion
+	* step.
+	*
 	* @since 2.0.0
 	*/
 	next(a) {
@@ -1453,6 +1641,13 @@ var SingleShotGen = class SingleShotGen {
 		});
 	}
 	/**
+	* Creates a fresh single-shot iterator over the stored value.
+	*
+	* **When to use**
+	*
+	* Use to iterate the wrapped value again without reusing the consumed
+	* iterator state.
+	*
 	* @since 2.0.0
 	*/
 	[Symbol.iterator]() {
@@ -1471,7 +1666,7 @@ const forced = { [InternalTypeId]: (body) => {
 /** @internal */
 const internalCall = /* @__PURE__ */ standard[InternalTypeId](() => (/* @__PURE__ */ new Error()).stack)?.includes(InternalTypeId) === true ? standard[InternalTypeId] : forced[InternalTypeId];
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/core.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/core.js
 /** @internal */
 const EffectTypeId = `~effect/Effect`;
 /** @internal */
@@ -1514,25 +1709,11 @@ const PipeInspectableProto = {
 	}
 };
 /** @internal */
-const YieldableProto = { [Symbol.iterator]() {
-	return new SingleShotGen(this);
-} };
-/** @internal */
-const YieldableErrorProto = {
-	...YieldableProto,
-	pipe() {
-		return pipeArguments(this, arguments);
-	}
-};
-/** @internal */
 const EffectProto = {
 	[EffectTypeId]: effectVariance,
 	...PipeInspectableProto,
 	[Symbol.iterator]() {
 		return new SingleShotGen(this);
-	},
-	asEffect() {
-		return this;
 	},
 	toJSON() {
 		return {
@@ -1775,12 +1956,15 @@ const withFiber = /* @__PURE__ */ makePrimitive({
 });
 /** @internal */
 const YieldableError = /* @__PURE__ */ function() {
-	class YieldableError extends globalThis.Error {
-		asEffect() {
+	class YieldableError extends globalThis.Error {}
+	const proto = /* @__PURE__ */ makePrimitiveProto({
+		op: "YieldableError",
+		[evaluate]() {
 			return exitFail(this);
 		}
-	}
-	Object.assign(YieldableError.prototype, YieldableErrorProto);
+	});
+	delete proto.toString;
+	Object.assign(YieldableError.prototype, proto);
 	return YieldableError;
 }();
 /** @internal */
@@ -1815,7 +1999,7 @@ const TaggedError$1 = (tag) => {
 };
 TaggedError$1("NoSuchElementError");
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/result.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/result.js
 const TypeId$1 = "~effect/data/Result";
 const CommonProto = {
 	[TypeId$1]: {
@@ -1824,7 +2008,9 @@ const CommonProto = {
 		_E: (_) => _
 	},
 	...PipeInspectableProto,
-	...YieldableProto
+	[Symbol.iterator]() {
+		return new SingleShotGen(this);
+	}
 };
 const SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
 	_tag: "Success",
@@ -1844,9 +2030,6 @@ const SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create
 			_tag: this._tag,
 			value: toJson(this.success)
 		};
-	},
-	asEffect() {
-		return exitSucceed(this.success);
 	}
 });
 const FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto), {
@@ -1867,9 +2050,6 @@ const FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create
 			_tag: this._tag,
 			failure: toJson(this.failure)
 		};
-	},
-	asEffect() {
-		return exitFail(this.failure);
 	}
 });
 /** @internal */
@@ -1891,19 +2071,14 @@ const succeed$3 = (success) => {
 	return a;
 };
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Result.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Result.js
 /**
 * Creates a `Result` holding a `Success` value.
 *
+* **Details**
+*
 * - Use when you have a value and want to lift it into the `Result` type
 * - The error type `E` defaults to `never`
-* - Does not mutate input; allocates a new `Success` wrapper
-*
-* **Previously Known As**
-*
-* This API replaces the following from Effect 3.x:
-*
-* - `Either.right`
 *
 * **Example** (Wrapping a value)
 *
@@ -1917,24 +2092,22 @@ const succeed$3 = (success) => {
 * ```
 *
 * @see {@link fail} to create a Failure
-* @see {@link void} for a pre-built `Success<void>`
+* @see {@link void_ void} for a pre-built `Success<void>`
 *
-* @category Constructors
+* @category constructors
 * @since 4.0.0
 */
 const succeed$2 = succeed$3;
 /**
 * Creates a `Result` holding a `Failure` value.
 *
-* - Use when you want to represent a failed computation
+* **When to use**
+*
+* Use to represent a failed computation with a typed failure value.
+*
+* **Details**
+*
 * - The success type `A` defaults to `never`
-* - Does not mutate input; allocates a new `Failure` wrapper
-*
-* **Previously Known As**
-*
-* This API replaces the following from Effect 3.x:
-*
-* - `Either.left`
 *
 * **Example** (Creating a failure)
 *
@@ -1950,12 +2123,18 @@ const succeed$2 = succeed$3;
 * @see {@link succeed} to create a Success
 * @see {@link mapError} to transform the error
 *
-* @category Constructors
+* @category constructors
 * @since 4.0.0
 */
 const fail$1 = fail$2;
 /**
 * Checks whether a `Result` is a `Failure`.
+*
+* **When to use**
+*
+* Use to narrow a known `Result` to the `Failure` variant.
+*
+* **Details**
 *
 * - Acts as a TypeScript type guard, narrowing to `Failure<A, E>`
 * - After narrowing, you can access `.failure` to read the error value
@@ -1981,83 +2160,84 @@ const fail$1 = fail$2;
 */
 const isFailure = isFailure$1;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Array.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Array.js
 /**
-* Utilities for working with immutable arrays (and non-empty arrays) in a
-* functional style. All functions treat arrays as immutable — they return new
-* arrays rather than mutating the input.
+* The `Array` module provides functional operations for JavaScript arrays,
+* readonly arrays, and arrays that are known to contain at least one element.
+* Operations that transform, reorder, or update collections allocate new arrays
+* instead of mutating their inputs, while preserving useful type information
+* such as non-emptiness when the operation can prove it.
 *
-* ## Mental model
+* **Mental model**
 *
-* - **`Array<A>`** is a standard JS array. All functions in this module return
-*   new arrays; the input is never mutated.
-* - **`NonEmptyReadonlyArray<A>`** (`readonly [A, ...Array<A>]`) is a readonly
-*   array guaranteed to have at least one element. Many functions preserve or
-*   require this guarantee at the type level.
-* - **`NonEmptyArray<A>`** is the mutable counterpart: `[A, ...Array<A>]`.
-* - Most functions are **dual** — they can be called either as
-*   `Array.fn(array, arg)` (data-first) or piped as
-*   `pipe(array, Array.fn(arg))` (data-last).
-* - Functions that access elements by index return `Option<A>` for safety; use
-*   the `*NonEmpty` variants (e.g. {@link headNonEmpty}) when you already know
-*   the array is non-empty.
-* - Set-like operations ({@link union}, {@link intersection},
-*   {@link difference}) use `Equal.equivalence()` by default; use the `*With`
-*   variants for custom equality.
+* - A regular `Array<A>` is still the built-in JavaScript array type; this
+*   module supplies functional constructors, combinators, searches, folds,
+*   grouping, sorting, and set-like operations around it.
+* - {@link NonEmptyReadonlyArray} and {@link NonEmptyArray} encode
+*   non-emptiness at the type level. APIs with `NonEmpty` in the name can avoid
+*   `Option` because an element is guaranteed to exist.
+* - Most functions are dual. You can call them data-first, such as
+*   `Array.map(values, f)`, or data-last in a pipeline, such as
+*   `pipe(values, Array.map(f))`.
+* - Safe element access returns {@link Option}; unsafe or `NonEmpty` variants
+*   are for code that already has a proof an index or element exists.
+* - Set-like operations such as {@link union}, {@link intersection}, and
+*   {@link difference} use the {@link Equal} protocol by default. Use the
+*   `*With` variants when equality is domain-specific.
 *
-* ## Common tasks
+* **Common tasks**
 *
-* - **Create** an array: {@link make}, {@link of}, {@link empty},
-*   {@link fromIterable}, {@link range}, {@link makeBy}, {@link replicate},
-*   {@link unfold}
-* - **Access** elements: {@link head}, {@link last}, {@link get}, {@link tail},
-*   {@link init}
-* - **Transform**: {@link map}, {@link flatMap}, {@link flatten}
-* - **Filter**: {@link filter}, {@link partition}, {@link dedupe}
-* - **Combine**: {@link append}, {@link prepend}, {@link appendAll},
-*   {@link prependAll}, {@link zip}, {@link cartesian}
-* - **Split**: {@link splitAt}, {@link chunksOf}, {@link span}, {@link window}
-* - **Search**: {@link findFirst}, {@link findLast}, {@link contains}
-* - **Sort**: {@link sort}, {@link sortBy}, {@link sortWith}
-* - **Fold**: {@link reduce}, {@link scan}, {@link join}
-* - **Group**: {@link groupBy}, {@link group}, {@link groupWith}
-* - **Set operations**: {@link union}, {@link intersection},
-*   {@link difference}
-* - **Match** on empty vs non-empty: {@link match}, {@link matchLeft},
-*   {@link matchRight}
-* - **Check** properties: {@link isArray}, {@link isArrayNonEmpty},
-*   {@link every}, {@link some}
+* - Create arrays with {@link make}, {@link of}, {@link empty},
+*   {@link fromIterable}, {@link range}, {@link makeBy}, {@link replicate}, and
+*   {@link unfold}.
+* - Access edges or indexes with {@link head}, {@link last}, {@link get},
+*   {@link tail}, and {@link init}.
+* - Transform and flatten with {@link map}, {@link flatMap}, and
+*   {@link flatten}.
+* - Keep, split, or deduplicate values with {@link filter}, {@link partition},
+*   {@link dedupe}, and {@link dedupeAdjacent}.
+* - Combine collections with {@link append}, {@link prepend}, {@link appendAll},
+*   {@link prependAll}, {@link zip}, and {@link cartesian}.
+* - Chunk, window, and slice with {@link splitAt}, {@link chunksOf},
+*   {@link span}, and {@link window}.
+* - Sort with {@link sort}, {@link sortWith}, and {@link sortBy}.
+* - Fold or aggregate with {@link reduce}, {@link scan}, {@link join}, and
+*   {@link countBy}.
+* - Match empty and non-empty cases with {@link match}, {@link matchLeft}, and
+*   {@link matchRight}.
 *
-* ## Gotchas
+* **Gotchas**
 *
-* - {@link fromIterable} returns the original array reference when given an
-*   array; if you need a copy, use {@link copy}.
-* - `sort`, `reverse`, etc. always allocate a new array — the input is never
-*   mutated.
-* - {@link makeBy} and {@link replicate} normalize `n` to an integer >= 1 —
-*   they never produce an empty array.
-* - {@link range}`(start, end)` is inclusive on both ends. If `start > end` it
-*   returns `[start]`.
-* - Functions returning `Option` (e.g. {@link head}, {@link findFirst}) return
-*   `Option.none()` for empty inputs — they never throw.
+* - {@link fromIterable} returns the original array reference when the input is
+*   already an array. Use {@link copy} when you need a fresh shallow copy.
+* - {@link makeBy}, {@link range}, and {@link replicate} always return
+*   non-empty arrays. `range(start, end)` is inclusive and returns `[start]`
+*   when `start > end`.
+* - Functions returning {@link Option}, such as {@link head} and
+*   {@link findFirst}, return `Option.none()` for empty inputs instead of
+*   throwing.
+* - `NonEmpty` return types describe what the function can prove, not what may
+*   happen for a particular runtime value after filtering.
 *
-* ## Quickstart
-*
-* **Example** (Basic array operations)
+* **Example** (Filtering and transforming)
 *
 * ```ts
-* import { Array } from "effect"
+* import { Array, Option, pipe } from "effect"
 *
-* const numbers = Array.make(1, 2, 3, 4, 5)
+* const numbers = [1, 2, 3, 4, 5]
 *
-* const doubled = Array.map(numbers, (n) => n * 2)
-* console.log(doubled) // [2, 4, 6, 8, 10]
+* const doubledEvens = pipe(
+*   numbers,
+*   Array.filter((n) => n % 2 === 0),
+*   Array.map((n) => n * 2)
+* )
 *
-* const evens = Array.filter(numbers, (n) => n % 2 === 0)
-* console.log(evens) // [2, 4]
+* console.log(doubledEvens)
+* // [4, 8]
 *
-* const sum = Array.reduce(numbers, 0, (acc, n) => acc + n)
-* console.log(sum) // 15
+* const first = Array.head(doubledEvens)
+* console.log(Option.getOrElse(first, () => 0))
+* // 4
 * ```
 *
 * @see {@link make} — create a non-empty array from elements
@@ -2068,10 +2248,12 @@ const isFailure = isFailure$1;
 * @since 2.0.0
 */
 /**
-* Reference to the global `Array` constructor.
+* Exposes the global array constructor.
 *
-* Use this when you need the native `Array` constructor while the `Array`
-* namespace is in scope (e.g. `Array.Array.isArray`, `Array.Array.from`).
+* **When to use**
+*
+* Use to access native JavaScript array constructor methods such as `isArray`
+* or `from` from the Effect module namespace.
 *
 * **Example** (Using the Array constructor)
 *
@@ -2088,6 +2270,12 @@ const isFailure = isFailure$1;
 const Array$1 = globalThis.Array;
 /**
 * Converts an `Iterable` to an `Array`.
+*
+* **When to use**
+*
+* Use to convert any `Iterable` (Set, Generator, etc.) into an array.
+*
+* **Details**
 *
 * - If the input is already an array, returns it **by reference** (no copy).
 * - Otherwise, creates a new array from the iterable.
@@ -2113,8 +2301,14 @@ const fromIterable = (collection) => Array$1.isArray(collection) ? collection : 
 /**
 * Concatenates two iterables into a single array.
 *
+* **When to use**
+*
+* Use to combine two iterable inputs into a new array with the second input's
+* elements after the first.
+*
+* **Details**
+*
 * - If either input is non-empty, the result is a `NonEmptyArray`.
-* - Does not mutate the inputs.
 *
 * **Example** (Concatenating arrays)
 *
@@ -2134,7 +2328,7 @@ const fromIterable = (collection) => Array$1.isArray(collection) ? collection : 
 const appendAll = /* @__PURE__ */ dual(2, (self, that) => fromIterable(self).concat(fromIterable(that)));
 Array$1.isArray;
 /**
-* Tests whether a `ReadonlyArray` is non-empty, narrowing the type to
+* Checks whether a `ReadonlyArray` is non-empty, narrowing the type to
 * `NonEmptyReadonlyArray`.
 *
 * **Example** (Checking for a non-empty readonly array)
@@ -2150,7 +2344,7 @@ Array$1.isArray;
 * @see {@link isReadonlyArrayEmpty} — opposite check
 *
 * @category guards
-* @since 2.0.0
+* @since 4.0.0
 */
 const isReadonlyArrayNonEmpty = isArrayNonEmpty;
 /** @internal */
@@ -2160,6 +2354,11 @@ function isOutOfBounds(i, as) {
 /**
 * Returns the first element of a `NonEmptyReadonlyArray` directly (no `Option`
 * wrapper).
+*
+* **When to use**
+*
+* Use to get the first element without `Option` wrapping when the array is known
+* to be non-empty.
 *
 * **Example** (Getting the head of a non-empty array)
 *
@@ -2182,6 +2381,10 @@ const headNonEmpty = /* @__PURE__ */ (/* @__PURE__ */ dual(2, (self, index) => {
 /**
 * Returns all elements except the first of a `NonEmptyReadonlyArray`.
 *
+* **When to use**
+*
+* Use to get all elements after the first when the array is known to be non-empty.
+*
 * **Example** (Getting the tail of a non-empty array)
 *
 * ```ts
@@ -2201,6 +2404,11 @@ const tailNonEmpty = (self) => self.slice(1);
 * Computes the union of two arrays using a custom equivalence, removing
 * duplicates.
 *
+* **When to use**
+*
+* Use when you need the union of two arrays but duplicate detection must use a
+* custom equivalence instead of the default `Equal.equivalence()`.
+*
 * **Example** (Union with custom equality)
 *
 * ```ts
@@ -2209,9 +2417,9 @@ const tailNonEmpty = (self) => self.slice(1);
 * console.log(Array.unionWith([1, 2], [2, 3], (a, b) => a === b)) // [1, 2, 3]
 * ```
 *
-* @see {@link union} — uses default equality
-* @see {@link intersection} — elements in both arrays
-* @see {@link difference} — elements only in the first array
+* @see {@link union} for the `Equal.equivalence()` variant
+* @see {@link intersectionWith} for keeping elements present in both arrays
+* @see {@link differenceWith} for keeping elements present only in the first array
 *
 * @category elements
 * @since 2.0.0
@@ -2249,6 +2457,11 @@ const union = /* @__PURE__ */ dual(2, (self, that) => unionWith(self, that, asEq
 * Removes duplicates using a custom equivalence, preserving the order of the
 * first occurrence.
 *
+* **When to use**
+*
+* Use to remove all duplicate elements with a custom equivalence when default
+* equality is not appropriate.
+*
 * **Example** (Deduplicating with custom equality)
 *
 * ```ts
@@ -2274,14 +2487,62 @@ const dedupeWith = /* @__PURE__ */ dual(2, (self, isEquivalent) => {
 	return [];
 });
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Context.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Effectable.js
 /**
+* Create a low-level `Effect` prototype.
+*
+* **When to use**
+*
+* Use when you need to create a custom Effect-like value without extending a
+* class, by providing a label and an evaluate function that receives the
+* current fiber.
+*
+* **Details**
+*
+* When the effect is evaluated, it calls `evaluate` with the current fiber.
+*
+* @see {@link Class} for a class-based approach to defining custom Effect values
+*
+* @category prototypes
 * @since 4.0.0
-* @category Type Identifiers
+*/
+const Prototype = (options) => makePrimitiveProto({
+	op: options.label,
+	[evaluate]: options.evaluate
+});
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Context.js
+/**
+* Runtime type identifier attached to `Context` service keys and used by
+* `isKey` to recognize them.
+*
+* @category type IDs
+* @since 4.0.0
 */
 const ServiceTypeId = "~effect/Context/Service";
 /**
-* @example
+* Creates a `Context` service key.
+*
+* **When to use**
+*
+* Use when a dependency must be provided by the surrounding context. Use
+* `Reference` when a dependency should have a default value.
+*
+* **Details**
+*
+* Call `Context.Service("Key")` for a function-style key, or use the two-stage
+* form `Context.Service<Self, Shape>()("Key")` for class-style service
+* declarations. The returned key can be yielded as an Effect and passed to
+* `Context.make`, `Context.add`, and the Context getter functions.
+*
+* **Gotchas**
+*
+* The string key is the runtime identity of the service. Reusing the same key
+* string for unrelated services makes them occupy the same slot in a
+* `Context`.
+*
+* **Example** (Creating service keys)
+*
 * ```ts
 * import { Context } from "effect"
 *
@@ -2302,8 +2563,10 @@ const ServiceTypeId = "~effect/Context/Service";
 * const config = Context.make(Config, { port: 8080 })
 * ```
 *
+* @see {@link Reference} for service keys with default values
+*
+* @category constructors
 * @since 4.0.0
-* @category Constructors
 */
 const Service = function() {
 	const prevLimit = Error.stackTraceLimit;
@@ -2332,17 +2595,18 @@ const Service = function() {
 };
 const ServiceProto = {
 	[ServiceTypeId]: ServiceTypeId,
-	...PipeInspectableProto,
-	...YieldableProto,
+	.../* @__PURE__ */ Prototype({
+		label: "Service",
+		evaluate(fiber) {
+			return exitSucceed(get(fiber.context, this));
+		}
+	}),
 	toJSON() {
 		return {
 			_id: "Service",
 			key: this.key,
 			stack: this.stack
 		};
-	},
-	asEffect() {
-		return (this.asEffect = constant(withFiber((fiber) => exitSucceed(get(fiber.context, this)))))();
 	},
 	of(self) {
 		return self;
@@ -2360,7 +2624,17 @@ const ServiceProto = {
 const ReferenceTypeId = "~effect/Context/Reference";
 const TypeId = "~effect/Context";
 /**
-* @example
+* Creates a `Context` from an existing service map without validating or
+* copying it.
+*
+* **Gotchas**
+*
+* This is unsafe because later mutation of the provided map can affect the
+* created `Context`. Prefer `empty`, `make`, `add`, or `merge` for normal
+* Context construction.
+*
+* **Example** (Creating a context from a map)
+*
 * ```ts
 * import { Context } from "effect"
 *
@@ -2372,8 +2646,8 @@ const TypeId = "~effect/Context";
 * const context = Context.makeUnsafe(map)
 * ```
 *
+* @category constructors
 * @since 4.0.0
-* @category Constructors
 */
 const makeUnsafe = (mapUnsafe) => {
 	const self = Object.create(Proto);
@@ -2403,9 +2677,25 @@ const Proto = {
 	}
 };
 /**
-* Checks if the provided argument is a `Context`.
+* Checks whether the provided argument is a `Context`.
 *
-* @example
+* **When to use**
+*
+* Use to narrow an unknown value before passing it to APIs that require a
+* `Context`.
+*
+* **Details**
+*
+* This checks the runtime `Context` marker and does not inspect which services
+* the context contains.
+*
+* **Gotchas**
+*
+* This guard only proves that the value is a `Context`; it does not prove that
+* any specific service is present.
+*
+* **Example** (Checking for contexts)
+*
 * ```ts
 * import { Context } from "effect"
 * import * as assert from "node:assert"
@@ -2413,14 +2703,18 @@ const Proto = {
 * assert.strictEqual(Context.isContext(Context.empty()), true)
 * ```
 *
-* @since 4.0.0
-* @category Guards
+* @see {@link isKey} for checking service keys
+* @see {@link isReference} for checking references with defaults
+*
+* @category guards
+* @since 2.0.0
 */
 const isContext = (u) => hasProperty(u, TypeId);
 /**
 * Returns an empty `Context`.
 *
-* @example
+* **Example** (Creating an empty context)
+*
 * ```ts
 * import { Context } from "effect"
 * import * as assert from "node:assert"
@@ -2428,15 +2722,16 @@ const isContext = (u) => hasProperty(u, TypeId);
 * assert.strictEqual(Context.isContext(Context.empty()), true)
 * ```
 *
-* @since 4.0.0
-* @category Constructors
+* @category constructors
+* @since 2.0.0
 */
 const empty = () => emptyContext;
 const emptyContext = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map());
 /**
 * Creates a new `Context` with a single service associated to the key.
 *
-* @example
+* **Example** (Creating a context with one service)
+*
 * ```ts
 * import { Context } from "effect"
 * import * as assert from "node:assert"
@@ -2448,16 +2743,27 @@ const emptyContext = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map());
 * assert.deepStrictEqual(Context.get(context, Port), { PORT: 8080 })
 * ```
 *
-* @since 4.0.0
-* @category Constructors
+* @category constructors
+* @since 2.0.0
 */
 const make = (key, service) => makeUnsafe(new Map([[key.key, service]]));
 /**
 * Adds a service to a given `Context`.
 *
-* @example
+* **When to use**
+*
+* Use when you always have a service value to store. Use `addOrOmit`
+* when the value is optional and a missing value should remove the service.
+*
+* **Details**
+*
+* If the context already contains the same service key, the new service
+* replaces the previous one.
+*
+* **Example** (Adding a service to a context)
+*
 * ```ts
-* import { pipe, Context } from "effect"
+* import { Context, pipe } from "effect"
 * import * as assert from "node:assert"
 *
 * const Port = Context.Service<{ PORT: number }>("Port")
@@ -2474,21 +2780,26 @@ const make = (key, service) => makeUnsafe(new Map([[key.key, service]]));
 * assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
 * ```
 *
-* @since 4.0.0
-* @category Adders
+* @see {@link addOrOmit} for adding or removing a service from an `Option`
+*
+* @category adders
+* @since 2.0.0
 */
 const add = /* @__PURE__ */ dual(3, (self, key, service) => withMapUnsafe(self, (map) => {
 	map.set(key.key, service);
 }));
 /**
-* Get a service from the context that corresponds to the given key.
+* Gets a service from the context that corresponds to the given key.
 *
-* @param self - The `Context` to search for the service.
-* @param service - The `Service` of the service to retrieve.
+* **When to use**
 *
-* @example
+* Use when the context type proves that the service is present. Use
+* `getOption` or `getOrElse` when a service may be absent.
+*
+* **Example** (Getting a service from a context)
+*
 * ```ts
-* import { pipe, Context } from "effect"
+* import { Context, pipe } from "effect"
 * import * as assert from "node:assert"
 *
 * const Port = Context.Service<{ PORT: number }>("Port")
@@ -2502,8 +2813,11 @@ const add = /* @__PURE__ */ dual(3, (self, key, service) => withMapUnsafe(self, 
 * assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
 * ```
 *
-* @since 4.0.0
-* @category Getters
+* @see {@link getOption} for optional service access
+* @see {@link getOrElse} for fallback values
+*
+* @category getters
+* @since 2.0.0
 */
 const get = /* @__PURE__ */ dual(2, (self, service) => {
 	if (!self.mapUnsafe.has(service.key)) {
@@ -2513,10 +2827,28 @@ const get = /* @__PURE__ */ dual(2, (self, service) => {
 	return self.mapUnsafe.get(service.key);
 });
 /**
-* @example
+* Gets the value for a `Context.Reference`, returning its cached default when
+* the context does not contain an override.
+*
+* **When to use**
+*
+* Use to resolve a `Context.Reference` against a context when you want either
+* the stored override or the reference's default value.
+*
+* **Details**
+*
+* Stored overrides take precedence. If no override is present, the reference's
+* default value is computed lazily and cached on the reference itself.
+*
+* **Gotchas**
+*
+* Mutable default values can be shared across contexts unless an override is
+* provided, because the default is cached on the `Context.Reference`.
+*
+* **Example** (Getting reference defaults unsafely)
+*
 * ```ts
 * import { Context } from "effect"
-* import * as assert from "node:assert"
 *
 * const LoggerRef = Context.Reference("Logger", {
 *   defaultValue: () => ({ log: (msg: string) => console.log(msg) })
@@ -2525,11 +2857,15 @@ const get = /* @__PURE__ */ dual(2, (self, service) => {
 * const context = Context.empty()
 * const logger = Context.getReferenceUnsafe(context, LoggerRef)
 *
-* assert.deepStrictEqual(logger, { log: (msg: string) => console.log(msg) })
+* console.log(typeof logger.log) // "function"
 * ```
 *
-* @since 4.0.0
+* @see {@link getUnsafe} for unsafe access with any service key
+* @see {@link get} for type-checked reference-aware access
+* @see {@link getOption} for optional access to non-reference keys
+*
 * @category unsafe
+* @since 4.0.0
 */
 const getReferenceUnsafe = (self, service) => {
 	if (!self.mapUnsafe.has(service.key)) return getDefaultValue(service);
@@ -2568,14 +2904,22 @@ const withMapUnsafe = (self, f) => {
 /**
 * Creates a context key with a default value.
 *
+* **When to use**
+*
+* Use when a service should be available even if it is not
+* explicitly stored in the `Context`. Use `Service` when the service must be
+* provided by the surrounding context.
+*
 * **Details**
 *
 * `Context.Reference` allows you to create a key that can hold a value. You
 * can provide a default value for the service, which will automatically be used
 * when the context is accessed, or override it with a custom implementation
-* when needed.
+* when needed. The default value is computed lazily and cached on the
+* reference.
 *
-* @example
+* **Example** (Creating references with default values)
+*
 * ```ts
 * import { Context } from "effect"
 *
@@ -2595,18 +2939,50 @@ const withMapUnsafe = (self, f) => {
 * const customLogger = Context.get(customContext, LoggerRef)
 * ```
 *
-* @since 4.0.0
-* @category References
+* @see {@link Service} for required services without default values
+*
+* @category references
+* @since 3.11.0
 */
 const Reference = Service;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Scheduler.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Scheduler.js
 /**
+* The `Scheduler` module defines the runtime scheduling services used by
+* Effect fibers. A scheduler decides how runnable tasks are enqueued, when they
+* are dispatched, and whether a fiber should yield after consuming its
+* operation budget.
+*
+* **Common tasks**
+*
+* - Use {@link Scheduler} to provide a custom runtime scheduler
+* - Use {@link MixedScheduler} for the default priority-aware scheduler
+* - Use {@link MaxOpsBeforeYield} to tune fairness for CPU-bound fibers
+* - Use {@link PreventSchedulerYield} only when a runtime should bypass yield checks
+*
+* **Gotchas**
+*
+* - Scheduler priorities affect the order of queued runtime tasks, not the
+*   semantic result of an `Effect`
+* - Disabling scheduler yields can improve throughput for controlled workloads,
+*   but it can also let long-running fibers monopolize the JavaScript thread
+*
 * @since 2.0.0
 */
 /**
-* @since 4.0.0
+* Context reference for the scheduler used by the Effect runtime.
+*
+* **When to use**
+*
+* Use to provide or override the scheduler used by the Effect runtime.
+*
+* **Details**
+*
+* The default value creates a `MixedScheduler`. Provide this service to
+* customize execution mode, task dispatching, or yield behavior.
+*
 * @category references
+* @since 2.0.0
 */
 const Scheduler = /* @__PURE__ */ Reference("effect/Scheduler", { defaultValue: () => new MixedScheduler() });
 const setImmediate = "setImmediate" in globalThis ? (f) => {
@@ -2638,18 +3014,23 @@ var PriorityBuckets = class {
 	}
 };
 /**
-* A scheduler implementation that provides efficient task scheduling
-* with support for both synchronous and asynchronous execution modes.
+* Provides a scheduler implementation that batches queued tasks and dispatches them by
+* priority.
 *
-* Features:
-* - Batches tasks for efficient execution
-* - Supports priority-based task scheduling
-* - Configurable execution mode (sync/async)
-* - Automatic yielding based on operation count
-* - Optimized for high-throughput scenarios
+* **When to use**
 *
-* @since 2.0.0
+* Use when you need the default runtime scheduler directly, including a
+* scheduler that batches queued work by priority and preserves FIFO order within
+* each priority.
+*
+* **Details**
+*
+* `MixedScheduler` supports synchronous and asynchronous execution modes, uses
+* operation counts to decide when fibers should yield, and is the default
+* scheduler implementation.
+*
 * @category schedulers
+* @since 2.0.0
 */
 var MixedScheduler = class {
 	executionMode;
@@ -2659,13 +3040,26 @@ var MixedScheduler = class {
 		this.setImmediate = setImmediateFn;
 	}
 	/**
+	* Returns whether the fiber has reached its operation budget and should yield.
+	*
+	* **When to use**
+	*
+	* Use to decide whether a fiber should yield after consuming its current
+	* operation budget.
+	*
 	* @since 2.0.0
 	*/
 	shouldYield(fiber) {
 		return fiber.currentOpCount >= fiber.maxOpsBeforeYield;
 	}
 	/**
-	* @since 2.0.0
+	* Creates a dispatcher that schedules work through this scheduler.
+	*
+	* **When to use**
+	*
+	* Use to create a dispatcher for enqueuing work through this scheduler.
+	*
+	* @since 4.0.0
 	*/
 	makeDispatcher() {
 		return new MixedSchedulerDispatcher(this.setImmediate);
@@ -2716,55 +3110,131 @@ var MixedSchedulerDispatcher = class {
 	}
 };
 /**
-* A service reference that controls the maximum number of operations a fiber
-* can perform before yielding control back to the scheduler. This helps
-* prevent long-running fibers from monopolizing the execution thread.
+* Context reference that controls the maximum number of operations a fiber
+* can perform before yielding control back to the scheduler.
 *
-* The default value is 2048 operations, which provides a good balance between
-* performance and fairness in concurrent execution.
+* **When to use**
 *
-* @since 4.0.0
+* Use to tune scheduler fairness for CPU-bound fibers by changing the operation
+* budget that triggers a scheduler yield.
+*
+* **Details**
+*
+* The default value is `2048` operations, which balances performance and
+* fairness by helping prevent long-running fibers from monopolizing the
+* execution thread.
+*
+* @see {@link PreventSchedulerYield} for bypassing scheduler yield checks entirely rather than tuning the operation budget
+*
 * @category references
+* @since 4.0.0
 */
 const MaxOpsBeforeYield = /* @__PURE__ */ Reference("effect/Scheduler/MaxOpsBeforeYield", { defaultValue: () => 2048 });
 /**
-* A service reference that controls whether the runtime should bypass scheduler
+* Context reference that controls whether the runtime should bypass scheduler
 * yield checks. When set to `true`, the fiber run loop won't call
 * `Scheduler.shouldYield`.
 *
-* @since 4.0.0
+* **When to use**
+*
+* Use to bypass scheduler yield checks for controlled runtime workloads where
+* cooperative yielding should be disabled.
+*
+* **Gotchas**
+*
+* Setting this reference to `true` can let long-running fibers monopolize the
+* JavaScript thread.
+*
+* @see {@link MaxOpsBeforeYield} for tuning yield frequency without disabling yield checks
+* @see {@link Scheduler} for providing custom scheduler yield behavior
+*
 * @category references
+* @since 4.0.0
 */
 const PreventSchedulerYield = /* @__PURE__ */ Reference("effect/Scheduler/PreventSchedulerYield", { defaultValue: () => false });
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Tracer.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Tracer.js
 /**
+* The `Tracer` module defines the low-level tracing model used by Effect to
+* describe and propagate spans. A span records the lifetime of an operation,
+* including its name, parent, attributes, links, annotations, sampling decision,
+* kind, and completion status.
+*
+* **Mental model**
+*
+* - `Tracer` is the backend interface responsible for creating spans
+* - `Span` values represent Effect-managed operations with mutable lifecycle
+*   hooks for ending spans and adding attributes, events, or links
+* - `ExternalSpan` represents trace context imported from another tracing
+*   system so Effect spans can be parented by or linked to external work
+* - `ParentSpan`, `Tracer`, and related context references control propagation,
+*   sampling, and trace-level filtering through the Effect context
+*
+* **Common tasks**
+*
+* - Implement a custom tracing backend with {@link make}
+* - Provide or inspect parent span context with {@link ParentSpan}
+* - Convert external trace identifiers into Effect span values with
+*   {@link externalSpan}
+* - Configure span metadata with {@link SpanOptions}, {@link SpanKind}, and
+*   {@link SpanLink}
+* - Disable propagation or adjust trace filtering with
+*   {@link DisablePropagation}, {@link CurrentTraceLevel}, and
+*   {@link MinimumTraceLevel}
+*
+* **Gotchas**
+*
+* - This module exposes the tracing data model and backend hooks; most
+*   application code should create spans through higher-level Effect APIs such
+*   as `Effect.withSpan`
+* - `ExternalSpan` only carries identity and metadata from another system; it
+*   does not have lifecycle methods like `Span`
+* - Propagation and sampling are context-dependent, so parent selection can be
+*   affected by disabled propagation, root span options, and trace-level
+*   thresholds
+*
 * @since 2.0.0
 */
 /**
-* @since 2.0.0
-* @category tags
-* @example
+* Defines the string key for the parent-span context service.
+*
+* **When to use**
+*
+* Use when integrating lower-level tracing code that needs the raw context key
+* for parent span lookup.
+*
+* **Example** (Reading the parent span key)
+*
 * ```ts
 * import { Tracer } from "effect"
 *
 * // The key used to identify parent spans in the context
 * console.log(Tracer.ParentSpanKey) // "effect/Tracer/ParentSpan"
 * ```
+*
+* @category tags
+* @since 4.0.0
 */
 const ParentSpanKey = "effect/Tracer/ParentSpan";
 Service()(ParentSpanKey);
 /**
-* @since 4.0.0
+* Defines the string key for the active tracer context reference.
+*
+* **When to use**
+*
+* Use when integrating lower-level tracing code that needs the raw context key
+* for active tracer lookup.
+*
 * @category references
+* @since 4.0.0
 */
 const TracerKey = "effect/Tracer";
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/metric.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/metric.js
 /** @internal */
 const FiberRuntimeMetricsKey = "effect/observability/Metric/FiberRuntimeMetricsKey";
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/references.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/references.js
 /** @internal */
 const CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStackFrame", { defaultValue: constUndefined });
 /** @internal */
@@ -2772,7 +3242,7 @@ const CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogL
 /** @internal */
 const MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", { defaultValue: () => "Info" });
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/internal/effect.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js
 /** @internal */
 var Interrupt = class extends ReasonBase {
 	fiberId;
@@ -2853,6 +3323,7 @@ var FiberImpl = class {
 		this._children = void 0;
 		this._interruptedCause = void 0;
 		this._yielded = void 0;
+		this.runtimeMetrics?.recordFiberStart(this.context);
 	}
 	[FiberTypeId];
 	id;
@@ -2906,7 +3377,6 @@ var FiberImpl = class {
 		return this._exit;
 	}
 	evaluate(effect) {
-		this.runtimeMetrics?.recordFiberStart(this.context);
 		if (this._exit) return;
 		else if (this._yielded !== void 0) {
 			const yielded = this._yielded;
@@ -3158,15 +3628,19 @@ hasProcessStdout || "Deno" in globalThis;
 /**
 * Creates a tagged error class with a `_tag` discriminator.
 *
+* **When to use**
+*
+* Use when modeling domain errors in Effect applications where you want
+* discriminated-union error handling.
+*
+* **Details**
+*
 * Like {@link Error}, but instances also carry a `readonly _tag` property,
 * enabling `Effect.catchTag` and `Effect.catchTags` for tag-based recovery.
-* The `_tag` is excluded from the constructor argument.
+* The `_tag` is excluded from the constructor argument. Yielding an instance
+* inside `Effect.gen` fails the effect with this error.
 *
-* - Use for domain errors in Effect applications where you want
-*   discriminated-union error handling.
-* - Yielding an instance inside `Effect.gen` fails the effect with this error.
-*
-* **Example** (tag-based error recovery)
+* **Example** (Tag-based error recovery)
 *
 * ```ts
 * import { Data, Effect } from "effect"
@@ -3197,20 +3671,18 @@ hasProcessStdout || "Deno" in globalThis;
 */
 const TaggedError = TaggedError$1;
 //#endregion
-//#region ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/dist/Effect.js
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Effect.js
 /**
 * Creates an `Effect` that always succeeds with a given value.
 *
-* **When to Use**
+* **When to use**
 *
-* Use this function when you need an effect that completes successfully with a
+* Use when you use this function when you need an effect that completes successfully with a
 * specific value without any errors or external dependencies.
 *
-* @see {@link fail} to create an effect that represents a failure.
+* **Example** (Creating a successful effect)
 *
-* @example
 * ```ts
-* // Title: Creating a Successful Effect
 * import { Effect } from "effect"
 *
 * // Creating an effect that represents a successful scenario
@@ -3220,32 +3692,30 @@ const TaggedError = TaggedError$1;
 * const success = Effect.succeed(42)
 * ```
 *
+* @see {@link fail} to create an effect that represents a failure.
+* @category creating effects
 * @since 2.0.0
-* @category Creating Effects
 */
 const succeed = succeed$1;
 /**
 * Creates an `Effect` that represents a synchronous side-effectful computation.
 *
-* **When to Use**
+* **When to use**
 *
-* Use `sync` when you are sure the operation will not fail.
+* Use when you are sure the operation will not fail.
 *
 * **Details**
 *
-* The provided function (`thunk`) must not throw errors; if it does, the error
-* will be treated as a "defect".
+* The provided function is evaluated lazily when the effect runs.
 *
-* This defect is not a standard error but indicates a flaw in the logic that
-* was expected to be error-free. You can think of it similar to an unexpected
-* crash in the program, which can be further managed or logged using tools like
-* {@link catchAllDefect}.
+* **Gotchas**
 *
-* @see {@link try_ | try} for a version that can handle failures.
+* The function must not throw. If it throws, the thrown value is treated as a
+* defect, not as a typed failure. Use `try` when throwing is expected.
 *
-* @example
+* **Example** (Capturing synchronous logging in an Effect)
+*
 * ```ts
-* // Title: Logging a Message
 * import { Effect } from "effect"
 *
 * const log = (message: string) =>
@@ -3258,8 +3728,9 @@ const succeed = succeed$1;
 * const program = log("Hello, World!")
 * ```
 *
+* @see {@link try_ | try} for a version that can handle failures.
+* @category creating effects
 * @since 2.0.0
-* @category Creating Effects
 */
 const sync = sync$1;
 const void_ = void_$1;
@@ -3268,17 +3739,18 @@ const try_ = try_$1;
 * Catches and handles specific errors by their `_tag` field, which is used as a
 * discriminator.
 *
-* **When to Use**
+* **When to use**
 *
-* `catchTag` is useful when your errors are tagged with a readonly `_tag` field
-* that identifies the error type. You can use this function to handle specific
-* error types by matching the `_tag` value. This allows for precise error
-* handling, ensuring that only specific errors are caught and handled.
+* Use when recovering from one specific tagged error in an effect error
+* channel.
 *
-* The error type must have a readonly `_tag` field to use `catchTag`. This
-* field is used to identify and match errors.
+* **Details**
 *
-* @example
+* The error type must have a readonly `_tag` field. `catchTag` matches that
+* field and only handles errors with the requested tag.
+*
+* **Example** (Handling a tagged error)
+*
 * ```ts
 * import { Effect } from "effect"
 *
@@ -3301,28 +3773,30 @@ const try_ = try_$1;
 * )
 * ```
 *
+* @see {@link catchTags} for handling multiple tagged errors in one call
+* @see {@link catchIf} for recovering from errors that match a predicate
+*
+* @category error handling
 * @since 2.0.0
-* @category Error Handling
 */
 const catchTag = catchTag$1;
 /**
-* Executes an effect synchronously, running it immediately and returning the
-* result.
+* Executes an effect synchronously and returns its success value.
 *
-* **When to Use**
+* **When to use**
 *
-* Use `runSync` to run an effect that does not fail and does not include
-* any asynchronous operations.
+* Use when you need to execute an effect that is guaranteed to complete
+* synchronously.
 *
-* If the effect fails or involves asynchronous work, it will throw an error,
-* and execution will stop where the failure or async operation occurs.
+* **Details**
 *
-* @see {@link runSyncExit} for a version that returns an `Exit` type instead of
-* throwing an error.
+* If the effect fails, dies, is interrupted, or performs asynchronous work,
+* `runSync` throws a `FiberFailure` instead of returning a value. Use
+* `runSyncExit` when you want the failure captured as an `Exit`.
 *
-* @example
+* **Example** (Running a synchronous effect)
+*
 * ```ts
-* // Title: Synchronous Logging
 * import { Effect } from "effect"
 *
 * const program = Effect.sync(() => {
@@ -3337,8 +3811,9 @@ const catchTag = catchTag$1;
 * // Output: 1
 * ```
 *
-* @example
-* // Title: Incorrect Usage with Failing or Async Effects
+* **Example** (Throwing for failed or async effects)
+*
+* ```ts
 * import { Effect } from "effect"
 *
 * try {
@@ -3358,9 +3833,12 @@ const catchTag = catchTag$1;
 * }
 * // Output:
 * // (FiberFailure) AsyncFiberException: Fiber #0 cannot be resolved synchronously. This is caused by using runSync on an effect that performs async work
+* ```
 *
+* @see {@link runSyncExit} for a version that returns an `Exit` type instead of
+* throwing an error.
+* @category running effects
 * @since 2.0.0
-* @category Running Effects
 */
 const runSync = runSync$1;
 Service()("effect/Effect/Transaction");
