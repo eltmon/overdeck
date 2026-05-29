@@ -9,9 +9,17 @@ import { useMergedFeed } from './useMergedFeed';
 export const SESSION_FEED_TAB_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarTab';
 
 interface SessionFeedSidebarProps {
-  onClose: () => void;
+  onClose?: () => void;
   onSelect?: (entry: SessionFeedEntry) => void;
   now?: Date;
+  /** PAN-1561: project-scoped mode — filter the feed to these issue ids. */
+  issueIds?: readonly string[];
+  /** PAN-1561: No-project mode — show only activity with no associated issue. */
+  unscoped?: boolean;
+  /** Heading text (defaults to "Activity Feed"). */
+  heading?: string;
+  /** Embedded as a deck column — fills its container, no close button. */
+  embedded?: boolean;
 }
 
 const TABS: Array<{ id: SessionFeedTab; label: string }> = [
@@ -34,7 +42,7 @@ const EMPTY_STATES: Record<SessionFeedTab, string> = {
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date() }: SessionFeedSidebarProps) {
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
 
   useEffect(() => {
@@ -43,20 +51,22 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   }, [activeTab]);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-border bg-background" aria-label="Session activity feed">
+    <aside className={`flex h-full min-h-0 flex-col bg-background ${embedded ? 'w-full' : 'w-80 shrink-0 border-l border-border'}`} aria-label="Session activity feed">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <History className="h-4 w-4" aria-hidden="true" />
-          Activity Feed
+          {heading}
         </div>
-        <button
-          type="button"
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          aria-label="Close activity feed"
-          onClick={onClose}
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Close activity feed"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
       </header>
 
       <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
@@ -80,7 +90,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         {isStubTab(activeTab) ? (
           <StubTabEmptyState tab={activeTab} />
         ) : (
-          <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} />
+          <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={issueIds} unscoped={unscoped} />
         )}
       </div>
     </aside>
@@ -91,13 +101,29 @@ type WiredSessionFeedTab = Exclude<SessionFeedTab, 'files' | 'comments'>;
 
 type StubSessionFeedTab = Extract<SessionFeedTab, 'files' | 'comments'>;
 
-function FeedTabContent({ tab, onSelect, now }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date }) {
+function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean }) {
   const feed = useMergedFeed(tab);
-  const groups = useMemo(
-    () => groupByContiguousLabel(feed.entries, (entry) => formatBucketLabel(entry.timestamp, now)),
-    [feed.entries, now],
+  // PAN-1561 scoping: `unscoped` keeps only entries with no issue (the No-project
+  // bucket); otherwise `issueIds` keeps entries for those issues (case-insensitive).
+  const idSet = useMemo(
+    () => (issueIds ? new Set(issueIds.map((id) => id.toLowerCase())) : null),
+    [issueIds],
   );
-  const isEmpty = tab === 'all' ? feed.allEntries.length === 0 : feed.entries.length === 0;
+  const scope = useMemo(() => {
+    const keep = (e: SessionFeedEntry) =>
+      unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+    return {
+      entries: unscoped || idSet ? feed.entries.filter(keep) : feed.entries,
+      allEntries: unscoped || idSet ? feed.allEntries.filter(keep) : feed.allEntries,
+    };
+  }, [feed.entries, feed.allEntries, idSet, unscoped]);
+  const scopedEntries = scope.entries;
+  const scopedAll = scope.allEntries;
+  const groups = useMemo(
+    () => groupByContiguousLabel(scopedEntries, (entry) => formatBucketLabel(entry.timestamp, now)),
+    [scopedEntries, now],
+  );
+  const isEmpty = tab === 'all' ? scopedAll.length === 0 : scopedEntries.length === 0;
 
   if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
   if (feed.isLoading) return <p className="text-xs text-muted-foreground">Loading activity…</p>;

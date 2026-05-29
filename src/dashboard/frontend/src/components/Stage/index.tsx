@@ -1,27 +1,18 @@
-import { useEffect, useMemo, useCallback } from 'react'
+import { useEffect, useMemo, useCallback, type ReactNode } from 'react'
 import {
   usePanesStore,
   selectPanesForWorkspace,
   selectActivePaneId,
   type WorkspacePane,
-  type WorkspaceId,
   type PaneType,
   type PaneSpec,
 } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
-import { PaneBar } from './PaneBar'
+import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
+import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
-import { HomePane } from './HomePane'
-import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
-import { StatChips } from './HomePane/StatChips'
-import { Launcher } from './HomePane/Launcher'
-import { AgentDock } from './HomePane/AgentDock'
-import { ActionDock } from './HomePane/ActionDock'
-import { Timeline } from './HomePane/Timeline'
-import { HomePaneSections } from './HomePane/HomePaneSections'
-import { dispatchLauncherIntent } from './HomePane/launcherActions'
-import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
-import type { TimelineConversation } from './HomePane/timeline-utils'
+import { TerminalDrawer } from '../terminal/TerminalDrawer'
+import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
 import { TerminalPane } from './panes/TerminalPane'
 import { CommitsPane } from './panes/CommitsPane'
 import { PlanPane } from './panes/PlanPane'
@@ -29,30 +20,30 @@ import { DocsPane } from './panes/DocsPane'
 import { AgentPane } from './panes/AgentPane'
 import { FilesPane } from './panes/FilesPane'
 import { BrowserPane } from './panes/BrowserPane'
-import type { StageContext, PaneWrapperProps } from './types'
+import type { StageContext, PaneWrapperProps, StageApi } from './types'
 import styles from './stage.module.css'
 
-export type { StageContext, PaneWrapperProps } from './types'
+export type { StageContext, PaneWrapperProps, StageApi } from './types'
 
 export interface StageProps {
-  workspaceId: WorkspaceId
-  /** Issue title for the workspace header (falls back to the id). */
-  issueTitle?: string
-  /** Feature branch; defaults to feature/<workspaceId>. */
-  branch?: string
-  /** Issue creation time for the age stat chip. */
-  issueCreatedAt?: number | string
-  /** The workspace's agent id — used as the workspace terminal session. */
-  agentId?: string
-  /** All conversations; the Stage filters to this workspace. */
+  /** Pane-store key for this deck (PAN-1561: the project key). */
+  deckKey: string
+  /** All conversations; used to resolve agent panes. */
   conversations?: Conversation[]
-  /** Create a conversation for this workspace via the existing flow, returning
-   * the new conversation's name (so the Stage can open an agent pane on it). */
+  /** Working directory for new drawer terminals (the project path). */
+  terminalCwd?: string
+  /** Create a conversation for the deck's project (for the "+" New conversation
+   * action); returns the new conversation name. */
   onCreateConversation?: (agentId: string) => Promise<string | undefined>
+  /** Render the permanent HOME tab (project-scoped). */
+  renderHome: (api: StageApi) => ReactNode
+  /** Render an `issue` tab's body for the given issue id. */
+  renderIssue: (issueId: string, api: StageApi) => ReactNode
 }
 
 const PANE_LABELS: Record<PaneType, string> = {
   home: 'Home',
+  issue: 'Issue',
   agent: 'Agent',
   terminal: 'Terminal',
   files: 'Files',
@@ -74,8 +65,9 @@ function PanePlaceholder({ pane }: PaneWrapperProps) {
   )
 }
 
-/** Dispatch a non-home pane to its wrapper. The home pane is composed in the
- * Stage body (it needs workspace data), so it is handled before this. */
+/** Dispatch a non-home/non-issue pane to its wrapper. The home and issue panes
+ * are composed by the caller's render props (they need project/issue data), so
+ * they are handled before this. */
 function renderPane(pane: WorkspacePane, ctx: StageContext) {
   switch (pane.paneType) {
     case 'terminal':
@@ -98,183 +90,199 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
 }
 
 /**
- * Stage — the Command Deck's main work area (PAN-1549). Renders the persistent
- * PaneBar plus the active pane. The permanent HOME pane is composed here from
- * the workspace's data (header/stats/launcher/docks/timeline/sections); all
- * other panes dispatch through renderPane. Pane state lives in `panesStore`.
+ * Stage — the project-scoped deck (PAN-1561, evolves PAN-1549). Renders the
+ * persistent PaneBar plus the active pane. Pane state lives in `panesStore`,
+ * keyed by `deckKey` (the project). The permanent HOME tab and any `issue` tab
+ * are composed by the caller via `renderHome` / `renderIssue` (they need the
+ * project's / issue's data); every other pane dispatches through `renderPane`.
  */
-export function Stage({
-  workspaceId,
-  issueTitle,
-  branch,
-  issueCreatedAt,
-  agentId,
-  conversations = [],
-  onCreateConversation,
-}: StageProps) {
+export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConversation, renderHome, renderIssue }: StageProps) {
   const ensureHome = usePanesStore((s) => s.ensureHome)
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
   const setActivePane = usePanesStore((s) => s.setActivePane)
-  const panes = usePanesStore(selectPanesForWorkspace(workspaceId))
-  const activePaneId = usePanesStore(selectActivePaneId(workspaceId))
+  const panes = usePanesStore(selectPanesForWorkspace(deckKey))
+  const activePaneId = usePanesStore(selectActivePaneId(deckKey))
+  const terminalOpen = useTerminalStateStore(
+    (s) => selectThreadTerminalState(s.terminalStateByThreadId, deckKey).terminalOpen,
+  )
+  const setTerminalOpen = useTerminalStateStore((s) => s.setTerminalOpen)
+  const toggleTerminal = useCallback(
+    () => setTerminalOpen(deckKey, !terminalOpen),
+    [setTerminalOpen, deckKey, terminalOpen],
+  )
 
   useEffect(() => {
-    ensureHome(workspaceId)
-  }, [workspaceId, ensureHome])
+    ensureHome(deckKey)
+  }, [deckKey, ensureHome])
 
-  useStageShortcuts(workspaceId)
+  // PAN-1561: keep the deck tab bar clean. (a) terminals now live in the drawer,
+  // not as deck tabs — drop any `terminal` panes left from before the migration;
+  // (b) collapse duplicate agent panes that point at the same conversation
+  // (stale accumulation), keeping the first. Creation paths dedupe too, so this
+  // self-heals existing decks on load.
+  useEffect(() => {
+    const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+    const seenConversationIds = new Set<string>()
+    const ISSUE_SCOPED = new Set<PaneType>(['files', 'commits', 'plan', 'docs'])
+    for (const p of current) {
+      // Terminals are drawer-only now.
+      if (p.paneType === 'terminal') {
+        closePane(deckKey, p.paneId)
+        continue
+      }
+      // Issue-scoped panes created at project scope (no issueId) were broken —
+      // they queried the project key as an issue. Drop them.
+      if (ISSUE_SCOPED.has(p.paneType) && !p.issueId) {
+        closePane(deckKey, p.paneId)
+        continue
+      }
+      // Collapse duplicate agent panes pointing at the same conversation.
+      if (p.paneType === 'agent' && p.conversationId) {
+        if (seenConversationIds.has(p.conversationId)) closePane(deckKey, p.paneId)
+        else seenConversationIds.add(p.conversationId)
+      }
+    }
+  }, [deckKey, closePane])
 
-  // Stable handlers (store actions are stable; live pane state is read via
-  // getState() where needed) so the memoized HOME subtree is not invalidated
-  // when the user merely switches tabs.
+  useStageShortcuts(deckKey)
+
   const openPane = useCallback(
-    (spec: PaneSpec) => addPane(workspaceId, spec),
-    [addPane, workspaceId],
+    (spec: PaneSpec) => addPane(deckKey, spec),
+    [addPane, deckKey],
   )
   const openTypedPane = useCallback(
-    (paneType: PaneType) =>
-      addPane(workspaceId, {
+    (paneType: PaneType, opts?: { terminalId?: string | null }) =>
+      addPane(deckKey, {
         paneType,
         label: PANE_LABELS[paneType],
-        ...(paneType === 'terminal' ? { terminalId: agentId ?? null } : {}),
+        ...(paneType === 'terminal' ? { terminalId: opts?.terminalId ?? null } : {}),
       }),
-    [addPane, workspaceId, agentId],
+    [addPane, deckKey],
   )
   const openOrFocusAgentPane = useCallback(
     (conversationId: string, label: string) => {
-      const current = usePanesStore.getState().panesByWorkspace[workspaceId] ?? []
+      const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
       const existing = current.find(
         (p) => p.paneType === 'agent' && p.conversationId === conversationId,
       )
-      if (existing) setActivePane(workspaceId, existing.paneId)
-      else addPane(workspaceId, { paneType: 'agent', label, conversationId })
+      if (existing) setActivePane(deckKey, existing.paneId)
+      else addPane(deckKey, { paneType: 'agent', label, conversationId })
     },
-    [workspaceId, setActivePane, addPane],
+    [deckKey, setActivePane, addPane],
   )
-  // Create a conversation for the chosen agent, then open a Stage agent pane
-  // focused on it (staying in the Stage).
-  const onAgentSelected = useCallback(
-    async (id: string) => {
-      writeLastUsedAgent(workspaceId, id)
-      const conversationName = await onCreateConversation?.(id)
-      if (conversationName) openOrFocusAgentPane(conversationName, 'Agent')
+  const openIssue = useCallback(
+    (issueId: string, label: string) => {
+      const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+      const existing = current.find((p) => p.paneType === 'issue' && p.issueId === issueId)
+      if (existing) setActivePane(deckKey, existing.paneId)
+      else addPane(deckKey, { paneType: 'issue', label, issueId })
     },
-    [workspaceId, onCreateConversation, openOrFocusAgentPane],
+    [deckKey, setActivePane, addPane],
   )
 
-  const wsConversations = useMemo(
-    () =>
-      conversations.filter((c) => (c.issueId ?? '').toUpperCase() === workspaceId.toUpperCase()),
-    [conversations, workspaceId],
-  )
-  const timelineConversations: TimelineConversation[] = useMemo(
-    () =>
-      wsConversations.map((c) => ({
-        id: c.name,
-        agentLabel: c.title ?? c.model ?? 'Agent',
-        timestamp: c.lastAttachedAt ?? c.createdAt,
-        preview: c.title ?? undefined,
-      })),
-    [wsConversations],
+  const api: StageApi = useMemo(
+    () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal }),
+    [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal],
   )
 
   const ctx: StageContext = useMemo(
     () => ({
-      workspaceId,
+      workspaceId: deckKey,
       openPane,
-      agentId,
       resolveAgentPane: (pane) => {
         if (!pane.conversationId) return undefined
         const conversation = conversations.find((c) => c.name === pane.conversationId)
         return conversation ? { conversation } : undefined
       },
     }),
-    [workspaceId, openPane, agentId, conversations],
-  )
-
-  const homePane = useMemo(
-    () => (
-      <HomePane
-        workspaceId={workspaceId}
-        openPane={openPane}
-        header={
-          <>
-            <WorkspaceHeader
-              name={issueTitle ?? workspaceId}
-              branch={branch ?? `feature/${workspaceId.toLowerCase()}`}
-              iconLabel={(issueTitle ?? workspaceId).charAt(0).toUpperCase()}
-            />
-            <StatChips createdAt={issueCreatedAt} conversationCount={wsConversations.length} />
-          </>
-        }
-        launcher={
-          <Launcher
-            lastUsedAgentId={readLastUsedAgent(workspaceId)}
-            onSelect={(intent, query) =>
-              dispatchLauncherIntent(intent, query, {
-                openAgent: (i) => onAgentSelected(i.id),
-                openTerminal: () => openTypedPane('terminal'),
-                openWeb: (_q, url) =>
-                  openPane({ paneType: 'browser', label: PANE_LABELS.browser, browserInitialUrl: url }),
-                onAgentRun: (id) => writeLastUsedAgent(workspaceId, id),
-              })
-            }
-          />
-        }
-        agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
-        actionDock={<ActionDock onOpen={openTypedPane} />}
-        timeline={
-          <Timeline
-            conversations={timelineConversations}
-            onOpen={(id) => {
-              const conv = wsConversations.find((c) => c.name === id)
-              openOrFocusAgentPane(id, conv?.title ?? 'Agent')
-            }}
-          />
-        }
-        detail={<HomePaneSections issueId={workspaceId} />}
-      />
-    ),
-    [
-      workspaceId,
-      issueTitle,
-      branch,
-      issueCreatedAt,
-      openPane,
-      openTypedPane,
-      onAgentSelected,
-      openOrFocusAgentPane,
-      timelineConversations,
-      wsConversations,
-    ],
+    [deckKey, openPane, conversations],
   )
 
   const handleSelectPane = useCallback(
-    (paneId: string) => setActivePane(workspaceId, paneId),
-    [setActivePane, workspaceId],
+    (paneId: string) => setActivePane(deckKey, paneId),
+    [setActivePane, deckKey],
   )
   const handleClosePane = useCallback(
-    (paneId: string) => closePane(workspaceId, paneId),
-    [closePane, workspaceId],
+    (paneId: string) => closePane(deckKey, paneId),
+    [closePane, deckKey],
   )
-  const handleAddPane = useCallback(() => openTypedPane('terminal'), [openTypedPane])
+  // PAN-1561: the "+" opens a menu of what to create, so it's explicit rather
+  // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
+  const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
+  const newActions = useMemo<NewPaneAction[]>(() => {
+    const actions: NewPaneAction[] = []
+    if (onCreateConversation) {
+      actions.push({
+        key: 'conversation',
+        label: 'New conversation',
+        icon: Bot,
+        onSelect: () => {
+          void onCreateConversation('claude-code').then((name) => {
+            if (name) openOrFocusAgentPane(name, 'Agent')
+          })
+        },
+      })
+    }
+    actions.push({
+      key: 'terminal',
+      label: 'New terminal',
+      icon: TerminalIcon,
+      onSelect: () => setTerminalOpen(deckKey, true),
+    })
+    actions.push({
+      key: 'web',
+      label: 'Web',
+      icon: Globe,
+      onSelect: () => openPane({ paneType: 'browser', label: 'Web' }),
+    })
+    return actions
+  }, [onCreateConversation, openOrFocusAgentPane, setTerminalOpen, deckKey, openPane])
 
-  const activePane = panes.find((p) => p.paneId === activePaneId) ?? null
+  // Display panes: drop `terminal` panes (drawer-only now) and resolve agent
+  // tab labels from the live conversation title so tabs are distinguishable
+  // instead of a row of identical "New conversation"s.
+  const displayPanes = useMemo(
+    () =>
+      panes
+        .filter((p) => p.paneType !== 'terminal')
+        .map((p) => {
+          if (p.paneType !== 'agent') return p
+          const conv = conversations.find((c) => c.name === p.conversationId)
+          const title = conv?.title?.trim()
+          // The server seeds untitled chats with the literal title "New
+          // conversation"; treat that as untitled and disambiguate by a short
+          // id so a row of brand-new chats isn't a wall of identical tabs.
+          const isPlaceholder = !title || title.toLowerCase() === 'new conversation'
+          const label = isPlaceholder
+            ? `Chat ${(p.conversationId ?? '').split('-').pop() ?? ''}`.trim()
+            : title
+          return label === p.label ? p : { ...p, label }
+        }),
+    [panes, conversations],
+  )
+
+  const activePane = displayPanes.find((p) => p.paneId === activePaneId) ?? displayPanes[0] ?? null
 
   return (
     <div className={styles.stage}>
       <PaneBar
-        panes={panes}
-        activePaneId={activePaneId}
+        panes={displayPanes}
+        activePaneId={activePane?.paneId ?? activePaneId}
         onSelect={handleSelectPane}
         onClose={handleClosePane}
         onAdd={handleAddPane}
+        newActions={newActions}
       />
       <div className={styles.pane}>
         {activePane &&
-          (activePane.paneType === 'home' ? homePane : renderPane(activePane, ctx))}
+          (activePane.paneType === 'home'
+            ? renderHome(api)
+            : activePane.paneType === 'issue'
+              ? renderIssue(activePane.issueId ?? '', api)
+              : renderPane(activePane, ctx))}
       </div>
+      {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
     </div>
   )
 }

@@ -18,6 +18,7 @@ export type PaneId = string
 
 export type PaneType =
   | 'home'
+  | 'issue'
   | 'agent'
   | 'terminal'
   | 'files'
@@ -33,6 +34,10 @@ export interface WorkspacePane {
   createdAt: number
   /** true for the HOME pane — it is synthesized and cannot be closed. */
   isPermanent?: boolean
+  // issue pane — an issue tab opened inside a project-scoped deck (PAN-1561)
+  issueId?: string
+  // agent id backing an issue-scoped pane (e.g. FilesPane diff target, PAN-1561)
+  agentId?: string
   // agent pane
   conversationId?: string
   agentType?: string
@@ -258,6 +263,26 @@ export const usePanesStore = create<PanesStore>((set, get) => ({
 
   addPane: (workspaceId, spec) => {
     touchWorkspace(workspaceId)
+    // Opening a pane that already exists must focus it, never add a duplicate
+    // (PAN-1561). Agent panes key on the conversation; issue tabs on the issue;
+    // the issue-scoped singleton panes (files/commits/plan/docs) key on
+    // (type, issueId) so each issue gets at most one. Browser panes are exempt —
+    // multiple are legitimate (different URLs).
+    const SINGLETON_TYPES: PaneType[] = ['files', 'commits', 'plan', 'docs']
+    const existingPanes = get().panesByWorkspace[workspaceId] ?? []
+    const dup = existingPanes.find(
+      (p) =>
+        (spec.paneType === 'agent' && p.paneType === 'agent' && !!spec.conversationId && p.conversationId === spec.conversationId) ||
+        (spec.paneType === 'issue' && p.paneType === 'issue' && !!spec.issueId && p.issueId === spec.issueId) ||
+        (SINGLETON_TYPES.includes(spec.paneType) && p.paneType === spec.paneType && p.issueId === spec.issueId),
+    )
+    if (dup) {
+      set((s) => ({
+        activePaneByWorkspace: { ...s.activePaneByWorkspace, [workspaceId]: dup.paneId },
+      }))
+      schedulePersist(workspaceId, existingPanes, dup.paneId)
+      return dup.paneId
+    }
     const paneId = generatePaneId()
     const newPane: WorkspacePane = { ...spec, paneId, createdAt: Date.now() }
     set((s) => {

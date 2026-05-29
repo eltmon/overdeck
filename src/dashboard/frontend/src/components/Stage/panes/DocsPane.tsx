@@ -22,7 +22,8 @@ const DOC_TABS: { key: DocKey; label: string; empty: string }[] = [
  * `docFilePath` selects the initial doc.
  */
 export function DocsPane({ pane, ctx }: PaneWrapperProps) {
-  const issueId = ctx.workspaceId
+  // PAN-1561: project-scoped deck — prefer the pane's own issue id.
+  const issueId = pane.issueId ?? ctx.workspaceId
   const summary = usePlanningSummaryQuery(issueId)
   const planning = usePlanningQuery(issueId)
   const hasInference = Boolean(summary.data?.hasInference)

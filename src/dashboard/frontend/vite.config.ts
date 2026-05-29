@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react';
 // Detect if running in container/Traefik mode
 const isContainerMode = process.env.TRAEFIK_ENABLED === 'true' || process.env.CONTAINER_MODE === 'true';
 
+// Backend target. Defaults to the conventional port; override with
+// VITE_PROXY_TARGET to preview a workspace's own backend before merge
+// (e.g. VITE_PROXY_TARGET=http://localhost:3012).
+const apiTarget = process.env.VITE_PROXY_TARGET ?? (isContainerMode ? 'http://server:3011' : 'http://localhost:3011');
+const wsTarget = apiTarget.replace(/^http/, 'ws');
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -16,11 +22,11 @@ export default defineConfig({
     } : undefined,
     proxy: {
       '/api': {
-        target: isContainerMode ? 'http://server:3011' : 'http://localhost:3011',
+        target: apiTarget,
         changeOrigin: true,
       },
       '/ws': {
-        target: isContainerMode ? 'ws://server:3011' : 'ws://localhost:3011',
+        target: wsTarget,
         ws: true,
       },
     },

@@ -10,19 +10,36 @@ export interface WorkspaceHeaderProps {
   iconLabel?: string
   /** Renders the "↗ set parent" link when provided. */
   onSetParent?: () => void
+  /**
+   * 'issue' (default) → icon tile + name + feature branch (PAN-1549 style).
+   * 'project' (PAN-1561) → `# <project>` heading with no icon tile, branch is
+   * the project's working branch (e.g. `main`).
+   */
+  variant?: 'issue' | 'project'
 }
 
 /**
  * WorkspaceHeader — the HomePane header region (PAN-1549). Absorbs the Zone A
  * issue-header role: icon tile, name, branch line, and an optional set-parent
- * link. Pure presentation; data is supplied by the Stage mount point.
+ * link. PAN-1561 adds a project `variant` that renders `# <project>` + `main`
+ * for the project-scoped Home tab. Pure presentation; data is supplied by the
+ * Stage mount point.
  */
-export function WorkspaceHeader({ name, branch, iconLabel, onSetParent }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ name, branch, iconLabel, onSetParent, variant = 'issue' }: WorkspaceHeaderProps) {
+  const isProject = variant === 'project'
   return (
     <div className={styles.wsHead}>
       <div className={styles.wsTitle}>
-        {iconLabel && <span className={styles.wsIcon}>{iconLabel}</span>}
-        <h3 className={styles.wsName}>{name}</h3>
+        {isProject ? (
+          <h3 className={styles.wsName}>
+            <span className={styles.wsHash}>#</span> {name}
+          </h3>
+        ) : (
+          <>
+            {iconLabel && <span className={styles.wsIcon}>{iconLabel}</span>}
+            <h3 className={styles.wsName}>{name}</h3>
+          </>
+        )}
       </div>
       <div className={styles.wsBranch}>
         {branch && (

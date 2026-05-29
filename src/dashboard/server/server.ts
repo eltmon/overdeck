@@ -60,6 +60,7 @@ import { webhooksRouteLayer } from './routes/webhooks.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
+import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
 import { artifactsRouteLayer } from './routes/artifacts.js';
@@ -321,6 +322,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   hooksRouteLayer,
   diffsRouteLayer,
   codexAuthRouteLayer,
+  terminalsRouteLayer,
   discoveredSessionsRouteLayer,
   flywheelRouteLayer,
   artifactsRouteLayer,

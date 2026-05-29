@@ -347,6 +347,9 @@ export default function App() {
   // Conversation deep-link state (/conv/:id?view=terminal&views=161:terminal)
   const initialConversationRoute = getConversationRouteState();
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
+  // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
+  // sidebar's Projects rail.
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,
   );
@@ -524,6 +527,12 @@ export default function App() {
     setIsSessionFeedSidebarOpen(open);
     window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
   }, []);
+
+  // PAN-1561: open a project's deck from the sidebar rail.
+  const handleSelectProject = useCallback((projectName: string | null) => {
+    setSelectedProjectKey(projectName);
+    if (projectName) setActiveTab('command-deck');
+  }, [setActiveTab]);
 
   // Handle browser back/forward
   useEffect(() => {
@@ -1039,6 +1048,8 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSearchOpen={() => setIsSearchOpen(true)}
+        selectedProject={selectedProjectKey}
+        onSelectProject={handleSelectProject}
       />
 
       {/* Main content area */}
@@ -1179,6 +1190,8 @@ export default function App() {
                 conversationViewMode={conversationViewMode}
                 onConvIdChange={setSelectedConvId}
                 onConversationViewModeChange={setConversationViewMode}
+                selectedProject={selectedProjectKey}
+                onSelectProject={setSelectedProjectKey}
               />
             </div>
           )}

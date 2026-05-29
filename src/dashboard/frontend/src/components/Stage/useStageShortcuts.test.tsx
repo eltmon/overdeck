@@ -6,6 +6,7 @@ import {
   selectPanesForWorkspace,
   selectActivePaneId,
 } from '../../lib/panesStore'
+import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
 
 const WS = 'PAN-1549'
 
@@ -27,6 +28,7 @@ function meta(key: string) {
 beforeEach(() => {
   localStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
+  useTerminalStateStore.setState({ terminalStateByThreadId: {} })
   usePanesStore.getState().ensureHome(WS)
 })
 afterEach(() => {
@@ -62,12 +64,17 @@ describe('useStageShortcuts', () => {
     expect(activeId()).toBe(homeId) // ⌘⇧2 must NOT focus pane 2
   })
 
-  it('⌘T adds a pane', () => {
+  it('⌘T toggles the terminal drawer (PAN-1561), not a deck tab', () => {
     render(<Host />)
+    const open = () => selectThreadTerminalState(useTerminalStateStore.getState().terminalStateByThreadId, WS).terminalOpen
+    expect(open()).toBe(false)
     expect(panes()).toHaveLength(1)
     meta('t')
-    expect(panes()).toHaveLength(2)
-    expect(panes()[1].paneType).toBe('terminal')
+    expect(open()).toBe(true)
+    // No new deck tab is created — terminals live in the drawer.
+    expect(panes()).toHaveLength(1)
+    meta('t')
+    expect(open()).toBe(false)
   })
 
   it('⌘W closes the active pane but never HOME', () => {

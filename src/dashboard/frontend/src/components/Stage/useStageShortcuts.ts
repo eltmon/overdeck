@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { usePanesStore, type WorkspaceId } from '../../lib/panesStore'
+import { useTerminalStateStore, selectThreadTerminalState } from '../terminal/terminalStateStore'
 
 /** True when focus is in a text-entry context where the Launcher / fields own
  * the keyboard (so the Stage must not hijack ⌘-combos). */
@@ -43,8 +44,12 @@ export function useStageShortcuts(workspaceId: WorkspaceId): void {
 
       const key = e.key.toLowerCase()
       if (key === 't') {
+        // PAN-1561: ⌘T toggles the terminal drawer (terminals are drawer-only,
+        // not deck tabs).
         e.preventDefault()
-        store.addPane(workspaceId, { paneType: 'terminal', label: 'Terminal' })
+        const tStore = useTerminalStateStore.getState()
+        const open = selectThreadTerminalState(tStore.terminalStateByThreadId, workspaceId).terminalOpen
+        tStore.setTerminalOpen(workspaceId, !open)
         return
       }
       if (key === 'w') {
