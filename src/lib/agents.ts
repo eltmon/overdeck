@@ -2389,14 +2389,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
   const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
 
   if (allowHost) {
+    // PAN-1556: host-override is a per-spawn detail, not user-facing activity —
+    // it fired once per convoy member and buried real feed items (conversations).
+    // Keep the console.warn for debugging; do not emit to the session feed.
     console.warn(`[agents] ${message}`);
-    emitActivityEntrySync({
-      source: role,
-      level: 'warn',
-      issueId: normalizedIssue,
-      message: `agent-spawn-host-override: ${normalizedIssue}`,
-      details,
-    });
     return;
   }
 
@@ -2703,12 +2699,18 @@ if (prompt) {
 
   await Effect.runPromise(saveAgentState(state));
 
-  emitActivityEntrySync({
-    source: role,
-    level: 'info',
-    message: `${role} role started for ${issueId}`,
-    issueId,
-  });
+  // PAN-1556: the review role emits a single dedicated "Review role spawned"
+  // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
+  // "role started" for review so the orchestrator + 4 convoy sub-reviewers
+  // don't each spam the session feed and bury conversations.
+  if (role !== 'review') {
+    emitActivityEntrySync({
+      source: role,
+      level: 'info',
+      message: `${role} role started for ${issueId}`,
+      issueId,
+    });
+  }
 
   return state;
 }

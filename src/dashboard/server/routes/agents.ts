@@ -2746,13 +2746,8 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (allowHost) {
-      emitActivityEntrySync({
-        source: 'dashboard',
-        level: 'warn',
-        issueId: issueId.toUpperCase(),
-        message: `agent-spawn-host-override: ${issueId.toUpperCase()}`,
-        details: 'Dashboard request included confirmed host override.',
-      });
+      // PAN-1556: host-override is a spawn detail, not user-facing activity.
+      console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
     if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {
