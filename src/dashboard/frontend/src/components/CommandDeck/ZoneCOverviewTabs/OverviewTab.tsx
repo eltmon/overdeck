@@ -32,7 +32,6 @@ import {
   type ActivitySection,
   type ReviewerRoundMetadata,
 } from './queries';
-import type { OverviewTab as OverviewTabKey } from '../ZoneCOverview';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
@@ -47,6 +46,20 @@ import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, L
 import { PlanDAGViewer } from '../../PlanDAG.js';
 import { PanOpenInPicker } from '../../PanOpenInPicker';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
+
+/** Overview sub-tab keys. Relocated here from the retired ZoneCOverview
+ * (PAN-1549 H2) so this live component no longer depends on the legacy shell. */
+export type OverviewTabKey =
+  | 'overview'
+  | 'activity'
+  | 'costs'
+  | 'prd'
+  | 'state'
+  | 'inference'
+  | 'vbrief'
+  | 'beads'
+  | 'prdiff'
+  | 'discussions';
 
 interface OverviewTabProps {
   issueId: string;

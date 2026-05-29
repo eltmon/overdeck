@@ -4,7 +4,7 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-28T14:42:03.548Z"
+    "updated": "2026-05-29T00:03:40.649Z"
   },
   "plan": {
     "id": "pan-1549",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 95,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-28T14:42:03.548Z",
+    "updated": "2026-05-29T00:03:40.649Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -81,7 +81,7 @@
       {
         "id": "panes-store",
         "title": "Pane model + panesStore Zustand store with localStorage persistence",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -109,7 +109,7 @@
           {
             "id": "panes-store.ac1",
             "title": "`PaneType` and `WorkspacePane` match the PRD data model; HOME pane has isPermanent=true and is synthesized by ensureHome when no panes exist for a workspace",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -117,7 +117,7 @@
           {
             "id": "panes-store.ac2",
             "title": "closePane refuses to remove the HOME pane and never leaves activePaneId pointing at a removed pane (falls back to HOME)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -125,7 +125,7 @@
           {
             "id": "panes-store.ac3",
             "title": "panes + activePaneId round-trip through localStorage keyed by workspaceId; corrupt/absent storage degrades gracefully to a HOME-only state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -133,7 +133,7 @@
           {
             "id": "panes-store.ac4",
             "title": "Vitest unit tests cover add/close/switch, HOME-unclosable, per-workspace isolation, and persistence round-trip",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -143,7 +143,7 @@
       {
         "id": "panebar",
         "title": "PaneBar tab strip component",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -159,7 +159,7 @@
           {
             "id": "panebar.ac1",
             "title": "Renders a tab per pane in order with the active tab visually distinguished and HOME first with a Cmd+1 hint",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "panebar.ac2",
             "title": "HOME tab has no close button; every other tab's × closes that pane; '+' triggers an add-pane callback",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "panebar.ac3",
             "title": "Component test asserts tab list, active state, close-button visibility rules, and click handlers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
       {
         "id": "stage-shell",
         "title": "Stage shell — PaneBar + active-pane renderer",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -201,7 +201,7 @@
           {
             "id": "stage-shell.ac1",
             "title": "Renders PaneBar + the active pane; switching the active pane in the store swaps the rendered pane body",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -209,7 +209,7 @@
           {
             "id": "stage-shell.ac2",
             "title": "Unknown/not-yet-implemented paneType renders a safe placeholder rather than crashing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -217,7 +217,7 @@
           {
             "id": "stage-shell.ac3",
             "title": "Component test mounts Stage for a workspace and asserts HOME is auto-created and rendered active",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -227,7 +227,7 @@
       {
         "id": "keyboard-shortcuts",
         "title": "Stage keyboard shortcuts (Cmd+1..9 focus, Cmd+T new, Cmd+W close)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -243,7 +243,7 @@
           {
             "id": "keyboard-shortcuts.ac1",
             "title": "Cmd+1..9 set the active pane by index; out-of-range indices are no-ops",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -251,7 +251,7 @@
           {
             "id": "keyboard-shortcuts.ac2",
             "title": "Cmd+T adds a pane and Cmd+W closes the active pane but never closes HOME",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
           {
             "id": "keyboard-shortcuts.ac3",
             "title": "Shortcuts do not fire while the Launcher input or another text field is focused; test simulates keydowns",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -269,7 +269,7 @@
       {
         "id": "homepane-shell",
         "title": "HomePane shell + section layout",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -285,7 +285,7 @@
           {
             "id": "homepane-shell.ac1",
             "title": "Renders the section scaffold (header/launcher/agentdock/actiondock/timeline/detail) in mockup order with a constrained max-width content column",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -293,7 +293,7 @@
           {
             "id": "homepane-shell.ac2",
             "title": "Exposes an `openPane(pane)` prop wired to the panesStore add/activate actions",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -303,7 +303,7 @@
       {
         "id": "workspace-header",
         "title": "WorkspaceHeader (name, branch, set-parent link)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -319,7 +319,7 @@
           {
             "id": "workspace-header.ac1",
             "title": "Shows the workspace name + branch from the issue/agent context",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -327,7 +327,7 @@
           {
             "id": "workspace-header.ac2",
             "title": "Renders without crashing when branch/agent is absent (non-agent workspace)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -337,7 +337,7 @@
       {
         "id": "home-stats",
         "title": "HomePane stat chips (age, diff, files, convos)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -353,7 +353,7 @@
           {
             "id": "home-stats.ac1",
             "title": "Age chip renders a human 'N days' from issue.createdAt; convos chip reflects the count of conversations for this workspace",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -361,7 +361,7 @@
           {
             "id": "home-stats.ac2",
             "title": "Diff/files chips populate from existing diff data and degrade to a neutral zero/placeholder when unavailable (no crash, no fabricated numbers)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +369,7 @@
           {
             "id": "home-stats.ac3",
             "title": "Stat derivation is unit-tested with fixture data",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -379,7 +379,7 @@
       {
         "id": "launcher",
         "title": "Launcher omnibox + intent dropdown",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -395,7 +395,7 @@
           {
             "id": "launcher.ac1",
             "title": "Typing reveals the dropdown with one row per intent and the first row auto-selected; clearing the input hides it",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -403,7 +403,7 @@
           {
             "id": "launcher.ac2",
             "title": "Clicking a row uses onMouseDown+preventDefault and does not blur the input before the action fires",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -411,7 +411,7 @@
           {
             "id": "launcher.ac3",
             "title": "Compact mode renders only the quick-action rows; labels follow the terminal/web/agent rules",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -421,7 +421,7 @@
       {
         "id": "launcher-ordering",
         "title": "Launcher intent ordering (default, URL-aware, last-used memory)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -437,7 +437,7 @@
           {
             "id": "launcher-ordering.ac1",
             "title": "Default text input yields claude-code, terminal, web, codex in that order",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -445,7 +445,7 @@
           {
             "id": "launcher-ordering.ac2",
             "title": "URL-shaped input floats 'web' to position 1; last-used non-Claude agent floats to position 1 otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -453,7 +453,7 @@
           {
             "id": "launcher-ordering.ac3",
             "title": "Ordering function has unit tests covering default, URL, and last-used permutations",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -463,7 +463,7 @@
       {
         "id": "launcher-wiring",
         "title": "Wire Launcher intents to actions + keyboard accelerators",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -479,7 +479,7 @@
           {
             "id": "launcher-wiring.ac1",
             "title": "Cmd+Enter runs the top intent; Ctrl/Opt/Cmd+Shift+Enter run terminal/web/codex respectively",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -487,7 +487,7 @@
           {
             "id": "launcher-wiring.ac2",
             "title": "Ask Claude Code/Codex creates a conversation via the existing conversation-creation path (no new endpoint) and opens an agent pane focused on it",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -495,7 +495,7 @@
           {
             "id": "launcher-wiring.ac3",
             "title": "Search the web opens a browser pane to a search URL; Run in terminal opens a terminal pane",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -505,7 +505,7 @@
       {
         "id": "agent-pane",
         "title": "AgentPane wrapper (conversation + terminal/findings toggle)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -521,7 +521,7 @@
           {
             "id": "agent-pane.ac1",
             "title": "A conversation-backed agent pane renders ConversationPanel with a working conversation/terminal toggle",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -529,7 +529,7 @@
           {
             "id": "agent-pane.ac2",
             "title": "A session-backed agent pane renders SessionPanel (conversation/terminal/findings) without modifying SessionPanel",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -537,7 +537,7 @@
           {
             "id": "agent-pane.ac3",
             "title": "Changing viewMode persists onto the pane (survives switching away and back)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -547,7 +547,7 @@
       {
         "id": "terminal-pane",
         "title": "TerminalPane wrapper (XTerminal on a tmux session)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -563,7 +563,7 @@
           {
             "id": "terminal-pane.ac1",
             "title": "Mounts XTerminal with the pane's session name; renders a sensible empty/connecting state when no session is set",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -571,7 +571,7 @@
           {
             "id": "terminal-pane.ac2",
             "title": "Does not kill the tmux session when the pane is closed/unmounted (session survives, per terminal lifecycle rules)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -581,7 +581,7 @@
       {
         "id": "commits-pane",
         "title": "CommitsPane wrapper (PrDiffTab)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -597,7 +597,7 @@
           {
             "id": "commits-pane.ac1",
             "title": "Renders PrDiffTab for the workspace issue and shows the diff/PR content",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -607,7 +607,7 @@
       {
         "id": "plan-pane",
         "title": "PlanPane wrapper (VBriefTab + BeadsTab)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -623,7 +623,7 @@
           {
             "id": "plan-pane.ac1",
             "title": "Renders VBriefTab (List/DAG/Raw) and BeadsTab for the workspace issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -633,7 +633,7 @@
       {
         "id": "docs-pane",
         "title": "DocsPane wrapper (PRD/STATE/INFERENCE markdown)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -649,7 +649,7 @@
           {
             "id": "docs-pane.ac1",
             "title": "Selector switches between PRD/STATE/INFERENCE and renders the chosen markdown via MarkdownTab; INFERENCE hidden when empty",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -659,7 +659,7 @@
       {
         "id": "browser-pane",
         "title": "BrowserPane wrapper (embedded iframe web view)",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -675,7 +675,7 @@
           {
             "id": "browser-pane.ac1",
             "title": "Renders an iframe to browserInitialUrl and shows a neutral empty state when no URL is set",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -685,7 +685,7 @@
       {
         "id": "files-pane",
         "title": "FilesPane wrapper (changed-files view from diffs vs-main)",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -701,7 +701,7 @@
           {
             "id": "files-pane.ac1",
             "title": "Lists changed files (path + add/del) for the workspace from the diffs vs-main data",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -709,7 +709,7 @@
           {
             "id": "files-pane.ac2",
             "title": "Clicking a file opens/focuses a commits pane scrolled/scoped to that file; empty state when no diff",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -719,7 +719,7 @@
       {
         "id": "agent-dock",
         "title": "AgentDock — agent pill launchers open agent panes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -735,7 +735,7 @@
           {
             "id": "agent-dock.ac1",
             "title": "Renders an agent pill per available harness plus a '+ More Agents' affordance",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -743,7 +743,7 @@
           {
             "id": "agent-dock.ac2",
             "title": "Clicking a pill opens an agent pane backed by a (new or existing) conversation for that agent in this workspace",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -753,7 +753,7 @@
       {
         "id": "action-dock",
         "title": "ActionDock — tool buttons open terminal/files/web/commits panes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -769,7 +769,7 @@
           {
             "id": "action-dock.ac1",
             "title": "Terminal/Files/Web/Commits buttons each open (or focus) the matching pane type",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -777,7 +777,7 @@
           {
             "id": "action-dock.ac2",
             "title": "'+ Actions' overflow exposes Plan and Docs, opening plan/docs panes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -787,7 +787,7 @@
       {
         "id": "timeline",
         "title": "Timeline — date-grouped conversation history opens agent panes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -803,7 +803,7 @@
           {
             "id": "timeline.ac1",
             "title": "Conversations for the workspace render grouped by date with agent + relative time + preview",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -811,7 +811,7 @@
           {
             "id": "timeline.ac2",
             "title": "Clicking a conversation opens or focuses an agent pane bound to it (no duplicate pane if already open)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -821,7 +821,7 @@
       {
         "id": "homepane-sections",
         "title": "Fold Overview/Activity/Discussions/Costs into HomePane collapsible sections",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -837,7 +837,7 @@
           {
             "id": "homepane-sections.ac1",
             "title": "Overview/Status section renders OverviewTab content for the workspace issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -845,7 +845,7 @@
           {
             "id": "homepane-sections.ac2",
             "title": "Activity, Discussions, and Costs sections render ActivityTab/DiscussionsTab/CostsTab respectively, collapsible",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -853,7 +853,7 @@
           {
             "id": "homepane-sections.ac3",
             "title": "Every tab body currently reachable in the live shell (Plans/Beads via panes, Conversations/Discussions/Activity/Settings via sections) has a confirmed new home",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -863,7 +863,7 @@
       {
         "id": "mount-stage",
         "title": "Mount the Stage in CommandDeck (swap ProjectRightPaneTabs)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -883,7 +883,7 @@
           {
             "id": "mount-stage.ac1",
             "title": "Selecting a workspace in the Navigator shows the Stage (HOME pane) for that workspace; selecting a different workspace switches to its own persisted panes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -891,7 +891,7 @@
           {
             "id": "mount-stage.ac2",
             "title": "Selecting a project with no feature still shows the Pipeline (ProjectOverview); the unscoped-conversation and empty 'Select a project' branches are unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -899,7 +899,7 @@
           {
             "id": "mount-stage.ac3",
             "title": "index.tsx gains only the mount swap — no pane state/logic added; typecheck + lint + existing non-retired tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -907,7 +907,7 @@
           {
             "id": "mount-stage.ac4",
             "title": "Browser UAT in an ISOLATED Playwright session: open a workspace, confirm HOME, open agent/terminal/commits/plan/docs panes, switch with Cmd+1..9, close with Cmd+W, and confirm panes persist across a page reload",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -917,7 +917,7 @@
       {
         "id": "delete-legacy",
         "title": "Delete the orphaned legacy right-pane shell (audited)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -933,7 +933,7 @@
           {
             "id": "delete-legacy.ac1",
             "title": "ProjectRightPaneTabs, IssueWorkbench, ZoneCOverview, ZoneCConversation are removed only after grep confirms no remaining non-test references",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -941,7 +941,7 @@
           {
             "id": "delete-legacy.ac2",
             "title": "The OverviewTab type and Zone* action strips are relocated/removed without breaking any retained component; reused components (SessionPanel, XTerminal, tab bodies) are NOT deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -949,7 +949,7 @@
           {
             "id": "delete-legacy.ac3",
             "title": "typecheck + lint pass with no orphaned imports or dead references after deletion",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -959,7 +959,7 @@
       {
         "id": "update-tests",
         "title": "Update/replace CommandDeck + legacy tests for the Stage",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-28T14:38:04.000Z",
         "metadata": {
@@ -975,7 +975,7 @@
           {
             "id": "update-tests.ac1",
             "title": "CommandDeck.test.tsx asserts the Stage mount for a selected workspace and the Pipeline for project-only selection; no references to deleted components remain",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -983,7 +983,7 @@
           {
             "id": "update-tests.ac2",
             "title": "Tests for deleted components are removed; the full frontend + root test suites pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -991,7 +991,7 @@
           {
             "id": "update-tests.ac3",
             "title": "npm run typecheck and npm run lint pass clean",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1252,7 +1252,70 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json"
+      "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1549",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-29T00:03:40.629Z",
+        "work": {
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "All four reviewers passed with zero blockers; prior cycle's agentId wiring fix verified. 58/58 in-scope requirements complete.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "All four reviewers passed with zero blockers; prior cycle's agentId wiring fix verified. 58/58 in-scope requirements complete."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-29T00:03:40.629Z"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1554"
+        }
+      }
     }
   },
   "status": "proposed"
