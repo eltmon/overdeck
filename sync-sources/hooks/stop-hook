@@ -125,9 +125,11 @@ if [[ "$AGENT_ID" =~ ^agent-.+-review-(security|correctness|performance|requirem
   R_STATE="$HOME/.panopticon/agents/$AGENT_ID/state.json"
   R_MARKER="$HOME/.panopticon/agents/$AGENT_ID/reviewer-signaled"
   if [ -f "$R_STATE" ] && [ ! -f "$R_MARKER" ]; then
-    R_OUT=$(grep -oE '"reviewOutputPath":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
-    R_SUB=$(grep -oE '"reviewSubRole":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
-    R_SYNTH=$(grep -oE '"reviewSynthesisAgentId":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
+    # state.json is pretty-printed ("key": "value" with whitespace after the
+    # colon), so the extraction must tolerate optional whitespace.
+    R_OUT=$(sed -nE 's/.*"reviewOutputPath"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
+    R_SUB=$(sed -nE 's/.*"reviewSubRole"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
+    R_SYNTH=$(sed -nE 's/.*"reviewSynthesisAgentId"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
     if [ -n "$R_OUT" ] && [ -n "$R_SUB" ] && [ -n "$R_SYNTH" ] && [ -s "$R_OUT" ]; then
       # Deliver via the load-buffer + paste-buffer + Enter pattern on the
       # panopticon socket (matches the API-error nudge above and the project's
