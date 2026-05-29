@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-05-28T22:53:59.924Z",
+  "updated": "2026-05-29T01:40:58.573Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -597,6 +597,11 @@
       "reason": "resume",
       "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
       "timestamp": "2026-05-28T22:53:59.924Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-29; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-29T01:40:58.573Z"
     }
   ]
 }
