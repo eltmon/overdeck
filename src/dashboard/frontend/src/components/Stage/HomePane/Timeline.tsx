@@ -4,7 +4,7 @@ import {
   relativeTime,
   toEpoch,
   type TimelineConversation,
-} from './timeline'
+} from './timeline-utils'
 import styles from '../stage.module.css'
 
 export interface TimelineProps {
