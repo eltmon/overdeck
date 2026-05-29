@@ -23,7 +23,6 @@ export type IssueActionKey =
   | 'donePlanning'
   | 'startAgent'
   | 'startSkipPlanning'
-  | 'swarm'
   | 'tell'
   | 'doneWork'
   | 'requestReview'
@@ -155,7 +154,9 @@ const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.ha
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
 const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && isTodo(state) && !isMerged(state);
-const hasParallelizablePlan = (state: IssueActionState) => canStartAgent(state) && state.hasBeads;
+// PAN-1517: `hasParallelizablePlan` removed alongside the `swarm` action entry —
+// parallelism is now an in-context concern owned by the work agent (see
+// roles/work.md "Parallel work via subagents"), not a separate spawn verb.
 const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && hasStoppedAgent(state) && !state.reviewStatus && !isMerged(state) && !isDoneOrCanceled(state);
 const canRestartReview = (state: IssueActionState) => {
   const review = state.reviewStatus;
@@ -207,7 +208,6 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'donePlanning', label: 'Done planning', panVerb: 'plan finalize', endpoint: '/api/issues/:id/complete-planning', enabledWhen: canFinalizePlanning, phasePrimary: phasePrimary('donePlanning'), kind: 'safe', group: 'planning' },
   { key: 'startAgent', label: 'Start agent', panVerb: 'start', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: phasePrimary('startAgent'), kind: 'dialog', group: 'work' },
   { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
-  { key: 'swarm', label: 'Swarm', panVerb: 'swarm', endpoint: '/api/swarm', enabledWhen: hasParallelizablePlan, phasePrimary: [], kind: 'dialog', group: 'work' },
   { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
   { key: 'doneWork', label: 'Done', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
   { key: 'requestReview', label: 'Request review', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },

@@ -377,7 +377,10 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
 
-  const printFlag = role === 'review' && subRole ? ' --print' : '';
+  // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
+  // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
+  // of headless `claude --print`. No role uses --print anymore.
+  const printFlag = '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
@@ -1958,10 +1961,10 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
-  // and the one-agent-per-issue uniqueness check is scoped to the slot.
-  slotId?: number;
-  swarmItemId?: string; // vBRIEF item ID this slot is working on
+  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
+  // is now in-context via subagents (see roles/work.md), not via slot agents.
+  // `allowHost` (workspace-isolation override) stays — it predates the swarm
+  // runtime and is used by review/test/ship agents independently.
   allowHost?: boolean;
   flywheelRunId?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
@@ -2366,13 +2369,6 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
-/**
- * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
- * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
- * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
- */
-const REVIEW_SUBROLE_TIMEOUT_SECONDS = 30 * 60;
-
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,
@@ -2389,14 +2385,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
   const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
 
   if (allowHost) {
+    // PAN-1556: host-override is a per-spawn detail, not user-facing activity —
+    // it fired once per convoy member and buried real feed items (conversations).
+    // Keep the console.warn for debugging; do not emit to the session feed.
     console.warn(`[agents] ${message}`);
-    emitActivityEntrySync({
-      source: role,
-      level: 'warn',
-      issueId: normalizedIssue,
-      message: `agent-spawn-host-override: ${normalizedIssue}`,
-      details,
-    });
     return;
   }
 
@@ -2490,8 +2482,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
-  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
+  // their prompt via tmux after Claude boots (same as the orchestrator/test/
+  // ship), not on stdin to a headless `claude --print`.
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -2584,28 +2578,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
-  // wiring so the launcher's own bash process — not the agent's good behavior,
-  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
-  // launcher signals deterministically on process exit and touches a marker
-  // file; Deacon only steps in if that bash process was SIGKILLed.
-  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
-    ? {
-        synthesisAgentId: options.reviewSynthesisAgentId,
-        subRole: options.subRole as string,
-        outputPath: options.reviewOutputPath,
-        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
-        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
-        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
-      }
-    : undefined;
+  // PAN-1557: convoy reviewers are interactive now, so the launcher no longer
+  // owns the REVIEWER_READY/FAILED signal (which previously rode a `claude
+  // --print` process exit). The Stop-hook delivers REVIEWER_READY to the
+  // synthesis agent when the reviewer finishes its turn with a written report;
+  // Deacon's REVIEWER_TIMEOUT remains the failure failsafe. We still persist
+  // the synthesis/output wiring on state.json so the Stop-hook can read it.
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
-
-  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
-  // by delivering through tmux after Claude boots. Headless review sub-roles run
-  // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScriptSync({
     role,
@@ -2614,19 +2594,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
-    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
+    promptFileMode: undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
     resumeSessionId: options.resumeSessionId,
-    reviewSignal,
-    // PAN-977: review sub-role launchers must outlive their tmux session. The
-    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
-    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
-    // process alive so it always runs its signal block when claude exits.
-    trapHup: reviewSignal ? true : undefined,
+    reviewSignal: undefined,
+    trapHup: undefined,
     ...piLauncherFields,
   });
 
@@ -2703,12 +2679,18 @@ if (prompt) {
 
   await Effect.runPromise(saveAgentState(state));
 
-  emitActivityEntrySync({
-    source: role,
-    level: 'info',
-    message: `${role} role started for ${issueId}`,
-    issueId,
-  });
+  // PAN-1556: the review role emits a single dedicated "Review role spawned"
+  // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
+  // "role started" for review so the orchestrator + 4 convoy sub-reviewers
+  // don't each spam the session feed and bury conversations.
+  if (role !== 'review') {
+    emitActivityEntrySync({
+      source: role,
+      level: 'info',
+      message: `${role} role started for ${issueId}`,
+      issueId,
+    });
+  }
 
   return state;
 }
@@ -2716,9 +2698,9 @@ if (prompt) {
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
-  const agentId = options.slotId != null
-    ? `${sessionPrefix}-${options.issueId.toLowerCase()}-${options.slotId}`
-    : `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  // PAN-1517: slot-suffixed agent ids removed alongside the swarm runtime;
+  // there is one work agent per issue, period.
+  const agentId = `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {

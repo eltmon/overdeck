@@ -1584,6 +1584,23 @@ const getConversationsRoute = HttpRouter.add(
 
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
+
+            // PAN-1556: surface the transcript's last-write time as the
+            // conversation's last-activity signal. The JSONL is appended on
+            // every message (including the user's), so its mtime — unlike
+            // lastAttachedAt, which only moves on terminal re-attach — bumps
+            // when a conversation gets a new reply. The session feed orders on
+            // this so an active conversation rises back to the top. A bare
+            // stat() is metadata-only (no JSONL scan), so it's cheap per row.
+            let lastActivityAt: string | null = null;
+            if (convSf && existsSync(convSf)) {
+              try {
+                lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
+              } catch {
+                // non-fatal — fall back to lastAttachedAt/createdAt downstream
+              }
+            }
+
             return {
               ...conv,
               sessionAlive,
@@ -1592,6 +1609,7 @@ const getConversationsRoute = HttpRouter.add(
               isFavorited: favoritedNames.has(conv.name),
               compacting,
               contextUsage: null,
+              lastActivityAt,
               branch: gitInfo.branch,
               isWorktree: gitInfo.isWorktree,
               pendingInputCount,

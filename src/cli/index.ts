@@ -108,7 +108,6 @@ import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
-import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
@@ -526,8 +525,6 @@ program
   .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
     strikeCommand(ids, options),
   );
-
-registerSwarmCommands(program);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);

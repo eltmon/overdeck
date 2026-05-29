@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-05-28T21:37:31.845Z",
+  "updated": "2026-05-28T22:53:59.924Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -562,6 +562,41 @@
       "reason": "resume",
       "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
       "timestamp": "2026-05-28T21:37:31.845Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:11:48.676Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:14:28.056Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:18:57.468Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:38:11.107Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:48:24.372Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:52:13.978Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-28; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-28T22:53:59.924Z"
     }
   ]
 }

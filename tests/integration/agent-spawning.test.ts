@@ -417,9 +417,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(setOption).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
     });
 
-    it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
-      const tmux = await import('../../src/lib/tmux.js');
-
+    it('launches review sub-roles as interactive sessions, not headless print mode (PAN-1557)', async () => {
       await spawnRun('PAN-SUBREVIEW-1', 'review', {
         workspace: '/tmp/test-workspace',
         subRole: 'security',
@@ -429,16 +427,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const agentDir = getAgentDir('agent-pan-subreview-1-review-security');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
 
-      expect(launcher).toContain('exec claude --print');
-      expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
-      expect(launcher).toContain("< '");
-      expect(launcher).toContain("initial-prompt.md'");
-      expect(launcher).not.toContain('prompt=$(cat');
+      // PAN-1557: convoy reviewers are interactive + attachable now. No --print,
+      // and the prompt is delivered via tmux after boot (not piped on stdin),
+      // so the launcher carries neither the print flag nor a prompt-file redirect.
+      expect(launcher).not.toContain('--print');
+      expect(launcher).not.toContain('initial-prompt.md');
       expect(launcher).not.toContain('"$prompt"');
-      expect(tmux.sendKeys).not.toHaveBeenCalled();
+      expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
     });
 
-    it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
+    it('review sub-role launcher carries no signal block — Stop-hook owns REVIEWER_READY (PAN-1557)', async () => {
       await spawnRun('PAN-SUBSIGNAL-1', 'review', {
         workspace: '/tmp/test-workspace',
         subRole: 'correctness',
@@ -450,22 +448,18 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const agentDir = getAgentDir('agent-pan-subsignal-1-review-correctness');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
 
-      // The launcher — not the agent, not Deacon — owns the signal: it runs
-      // claude as a child (no exec) so the contract block runs on exit, and is
-      // HUP-immune so it outlives the (short-lived) tmux session.
-      expect(launcher).not.toContain('exec claude');
-      expect(launcher).toContain("trap '' HUP");
-      expect(launcher).toContain('timeout 1800 claude --print');
-      expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
-      expect(launcher).toContain('CLAUDE_EXIT=$?');
-      expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
-      expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');
-      expect(launcher).toContain('"REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report"');
-      expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1800s deadline"');
-      expect(launcher).toContain(`touch '${join(agentDir, 'reviewer-signaled')}'`);
-      expect(launcher).toContain(`rm -f '${join(agentDir, 'reviewer-launcher.pid')}'`);
+      // PAN-1557: interactive reviewers don't exit, so the launcher no longer
+      // owns the signal — the Stop-hook delivers REVIEWER_READY when the
+      // reviewer finishes its turn with a written report. The launcher must NOT
+      // carry the old headless signal machinery.
+      expect(launcher).not.toContain("trap '' HUP");
+      expect(launcher).not.toContain('--print');
+      expect(launcher).not.toContain('REVIEWER_READY');
+      expect(launcher).not.toContain('REVIEWER_TIMEOUT');
+      expect(launcher).not.toContain('reviewer-launcher.pid');
 
-      // Synthesis wiring is persisted on AgentState too (Deacon backup path).
+      // Synthesis wiring is still persisted on AgentState so the Stop-hook can
+      // read reviewSynthesisAgentId/reviewOutputPath/reviewSubRole.
       const state = getAgentStateSync('agent-pan-subsignal-1-review-correctness');
       expect(state?.reviewSynthesisAgentId).toBe('agent-pan-subsignal-1-review');
       expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
