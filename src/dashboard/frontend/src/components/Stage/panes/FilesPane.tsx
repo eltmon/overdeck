@@ -18,8 +18,9 @@ async function fetchChangedFiles(agentId: string): Promise<TurnDiffFileChange[]>
  * Clicking a file opens/focuses the Commits pane to view the diff. Real
  * filesystem browsing is a follow-up (#1550).
  */
-export function FilesPane({ ctx }: PaneWrapperProps) {
-  const agentId = ctx.agentId
+export function FilesPane({ pane, ctx }: PaneWrapperProps) {
+  // PAN-1561: project-scoped deck — the pane carries its issue's agent id.
+  const agentId = pane.agentId ?? ctx.agentId
   const setActivePane = usePanesStore((s) => s.setActivePane)
   const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ['stage-files-vs-main', agentId],
@@ -44,9 +45,9 @@ export function FilesPane({ ctx }: PaneWrapperProps) {
   // than stacking a duplicate on every file click.
   const openCommits = () => {
     const current = usePanesStore.getState().panesByWorkspace[ctx.workspaceId] ?? []
-    const existing = current.find((p) => p.paneType === 'commits')
+    const existing = current.find((p) => p.paneType === 'commits' && p.issueId === pane.issueId)
     if (existing) setActivePane(ctx.workspaceId, existing.paneId)
-    else ctx.openPane({ paneType: 'commits', label: 'Commits' })
+    else ctx.openPane({ paneType: 'commits', label: 'Commits', issueId: pane.issueId, agentId })
   }
 
   return (

@@ -51,8 +51,8 @@ vi.mock('../Stage', () => ({
   Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
 }));
 
-vi.mock('./ActivityFeedSidebar', () => ({
-  ActivityFeedSidebar: (props: any) => (
+vi.mock('../sessionFeed/SessionFeedSidebar', () => ({
+  SessionFeedSidebar: (props: any) => (
     <div data-testid="activity-feed" data-issues={(props.issueIds ?? []).join(',')} />
   ),
 }));

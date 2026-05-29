@@ -8,9 +8,9 @@ import { type IssueCostBreakdown } from './ProjectOverview';
 import { Stage } from '../Stage';
 import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
-import { ActivityFeedSidebar } from './ActivityFeedSidebar';
+import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects } from './projectsData';
+import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { BeadsDialog } from '../BeadsDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
@@ -354,7 +354,8 @@ export function CommandDeck({
     return () => clearInterval(interval);
   }, [projectsWithSessions]);
 
-  // Agents from dashboard store (for terminal panel in detail view)
+  // Agents from the dashboard store — used to scope issue tabs' Files/Commits
+  // panes to the issue's workspace agent (PAN-1561).
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
   // Map aggregated costs per issue for the project tree sidebar and project overview.
@@ -476,11 +477,9 @@ export function CommandDeck({
     if (conv) {
       setSelectedConversation(conv.name);
       setSelectedFeature(null);
-      const projectName = resolveConversationProjectName(conv);
-      if (projectName) {
-        onSelectProject?.(projectName);
-        openConversationTabIn(projectName, conv.name, conv.title ?? 'Agent');
-      }
+      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+      onSelectProject?.(projectName);
+      openConversationTabIn(projectName, conv.name, conv.title ?? 'Agent');
       appliedConvId.current = convId;
     }
   }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn]);
@@ -763,11 +762,10 @@ export function CommandDeck({
     if (name) {
       setSelectedFeature(null);
       const conv = conversations.find((c) => c.name === name);
-      const projectName = resolveConversationProjectName(conv) ?? selectedProject;
-      if (projectName) {
-        if (projectName !== selectedProject) onSelectProject?.(projectName);
-        openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
-      }
+      // Unscoped conversations live in the No-project bucket.
+      const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+      if (projectName !== selectedProject) onSelectProject?.(projectName);
+      openConversationTabIn(projectName, name, conv?.title ?? 'Agent');
     }
   }, [selectSession, selectedFeature, conversations, resolveConversationProjectName, selectedProject, onSelectProject, openConversationTabIn]);
 
@@ -834,7 +832,8 @@ export function CommandDeck({
   );
 
   const handleNewConversation = useCallback(() => {
-    void createConversationForProject(selectedProject ?? undefined);
+    const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
+    void createConversationForProject(projectKey);
   }, [createConversationForProject, selectedProject]);
 
   const handleNewProjectConversation = useCallback((projectKey: string) => {
@@ -847,7 +846,9 @@ export function CommandDeck({
   const createDeckConversation = useCallback(
     (agentId: string): Promise<string | undefined> => {
       const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
-      return createConversationForProject(selectedProject ?? undefined, harness);
+      // The No-project bucket creates unscoped conversations (no projectKey).
+      const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
+      return createConversationForProject(projectKey, harness);
     },
     [createConversationForProject, selectedProject],
   );
@@ -947,11 +948,21 @@ export function CommandDeck({
   }, [projectsWithSessions, selectedProject]);
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
-  // Conversations whose cwd is under the selected project, the id set that
-  // filters the column-2 list, and the project's issue ids for the activity feed.
+  // For a real project: its scoped conversations + issue ids. For the special
+  // "No project" bucket: conversations not under any registered project.
+  const isNoProject = selectedProject === NO_PROJECT_KEY;
+  const unscopedConversations = useMemo(
+    () => conversations.filter((c) => isUnscopedConversation(c, registeredProjects)),
+    [conversations, registeredProjects],
+  );
   const projectConvs = useMemo(
-    () => (selectedProject ? (projectConversations[selectedProject] ?? []) : []),
-    [selectedProject, projectConversations],
+    () =>
+      isNoProject
+        ? unscopedConversations
+        : selectedProject
+          ? (projectConversations[selectedProject] ?? [])
+          : [],
+    [isNoProject, unscopedConversations, selectedProject, projectConversations],
   );
   const projectConvIdSet = useMemo(() => new Set(projectConvs.map(c => c.id)), [projectConvs]);
   const projectIssueIds = useMemo(
@@ -971,7 +982,7 @@ export function CommandDeck({
         ?? agents.find(a => a.issueId?.toLowerCase() === key)?.id;
       return { title, createdAt, branch, agentId };
     },
-    [issueTitles, issues, agents, selectedProjectData],
+    [issueTitles, issues, selectedProjectData, agents],
   );
 
   return (
@@ -1145,9 +1156,13 @@ export function CommandDeck({
               key={selectedProject}
               deckKey={selectedProject}
               conversations={conversations}
+              onCreateConversation={createDeckConversation}
+              terminalCwd={
+                registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
+              }
               renderHome={(api) => (
                 <ProjectHome
-                  projectName={selectedProject}
+                  projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   api={api}
@@ -1179,10 +1194,15 @@ export function CommandDeck({
           )}
         </div>
 
-        {/* Activity feed — project-scoped (PAN-1561, column 4) */}
+        {/* Project Activity — project-scoped session feed (PAN-1561, column 4).
+            The No-project bucket shows activity with no associated issue. */}
         {selectedProject && (
           <div className={styles.activityColumn}>
-            <ActivityFeedSidebar issueIds={projectIssueIds} />
+            {isNoProject ? (
+              <SessionFeedSidebar embedded heading="Activity" unscoped />
+            ) : (
+              <SessionFeedSidebar embedded heading="Project Activity" issueIds={projectIssueIds} />
+            )}
           </div>
         )}
       </div>

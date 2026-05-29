@@ -25,6 +25,8 @@ export interface StageApi {
   openIssue: (issueId: string, label: string) => void
   /** Open (or focus) an agent pane backed by a conversation. */
   openOrFocusAgentPane: (conversationId: string, label: string) => void
+  /** Toggle the terminal drawer stacked below the deck (PAN-1561). */
+  toggleTerminal: () => void
 }
 
 /**

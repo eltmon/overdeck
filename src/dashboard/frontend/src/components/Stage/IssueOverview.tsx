@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
 import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
@@ -21,7 +22,7 @@ export interface IssueOverviewProps {
   branch?: string
   /** Issue creation time for the age stat chip. */
   createdAt?: number | string
-  /** The issue's agent id — used as the workspace terminal session. */
+  /** The issue's agent id — scopes Files/Commits panes to this issue's workspace. */
   agentId?: string
   /** All conversations; filtered to this issue. */
   conversations?: Conversation[]
@@ -70,7 +71,19 @@ export function IssueOverview({
     const conversationName = await onCreateConversation?.(id)
     if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
   }
-  const openTerminal = () => api.openTypedPane('terminal', { terminalId: agentId ?? null })
+  // PAN-1561: terminal actions open the drawer stacked below, not a tab.
+  const openTerminal = () => api.toggleTerminal()
+
+  // Issue-scoped action panes carry this issue's id (and agent for Files) so
+  // they query the right workspace, not the project deck key.
+  const ISSUE_PANE_LABELS: Partial<Record<PaneType, string>> = {
+    files: 'Files', commits: 'Commits', plan: 'Plan', docs: 'Docs',
+  }
+  const onAction = (t: PaneType) => {
+    if (t === 'terminal') return api.toggleTerminal()
+    if (t === 'browser') return api.openPane({ paneType: 'browser', label: 'Web' })
+    api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId })
+  }
 
   return (
     <HomePane
@@ -101,9 +114,7 @@ export function IssueOverview({
         />
       }
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
-      actionDock={
-        <ActionDock onOpen={(t) => (t === 'terminal' ? openTerminal() : api.openTypedPane(t))} />
-      }
+      actionDock={<ActionDock onOpen={onAction} />}
       timeline={
         <Timeline
           conversations={timelineConversations}

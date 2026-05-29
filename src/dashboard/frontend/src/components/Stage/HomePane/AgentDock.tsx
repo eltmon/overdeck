@@ -1,4 +1,5 @@
-import { Bot, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { AgentIcon } from './AgentIcon'
 import styles from '../stage.module.css'
 
 export interface AgentPill {
@@ -37,7 +38,7 @@ export function AgentDock({ agents = DEFAULT_AGENT_PILLS, onSelectAgent, onMore 
           className={styles.pill}
           onClick={() => onSelectAgent(a.id)}
         >
-          <Bot size={14} />
+          <AgentIcon id={a.id} label={a.label} size={14} />
           {a.label}
         </button>
       ))}

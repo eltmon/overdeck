@@ -11,7 +11,9 @@ type PlanView = 'plan' | 'beads'
  * existing VBriefTab (List/DAG/Raw) and BeadsTab for the workspace issue.
  * Both tab bodies are reused as-is.
  */
-export function PlanPane({ ctx }: PaneWrapperProps) {
+export function PlanPane({ pane, ctx }: PaneWrapperProps) {
+  // PAN-1561: project-scoped deck — prefer the pane's own issue id.
+  const issueId = pane.issueId ?? ctx.workspaceId
   const [view, setView] = useState<PlanView>('plan')
   return (
     <div className={styles.subPane}>
@@ -37,9 +39,9 @@ export function PlanPane({ ctx }: PaneWrapperProps) {
       </div>
       <div className={styles.subBody}>
         {view === 'plan' ? (
-          <VBriefTab issueId={ctx.workspaceId} />
+          <VBriefTab issueId={issueId} />
         ) : (
-          <BeadsTab issueId={ctx.workspaceId} />
+          <BeadsTab issueId={issueId} />
         )}
       </div>
     </div>

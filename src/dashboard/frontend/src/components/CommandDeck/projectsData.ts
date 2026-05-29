@@ -6,6 +6,28 @@
  */
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
+/** Sentinel deck key for the "No project" bucket — conversations/terminals not
+ * under any registered project (PAN-1561). */
+export const NO_PROJECT_KEY = '__no-project__';
+export const NO_PROJECT_LABEL = 'No project';
+
+export interface RegisteredProjectLite {
+  key: string;
+  name?: string;
+  path: string;
+}
+
+/** True when a conversation's cwd is not under any registered project (or has no
+ * cwd) — i.e. it belongs in the No-project bucket. */
+export function isUnscopedConversation(
+  conv: { cwd?: string | null },
+  registeredProjects: readonly RegisteredProjectLite[],
+): boolean {
+  const cwd = conv.cwd;
+  if (!cwd) return true;
+  return !registeredProjects.some((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
+}
+
 export interface ProjectData {
   name: string;
   path: string;

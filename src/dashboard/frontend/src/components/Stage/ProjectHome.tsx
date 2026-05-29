@@ -82,7 +82,18 @@ export function ProjectHome({
         />
       }
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
-      actionDock={<ActionDock onOpen={(t) => api.openTypedPane(t)} />}
+      actionDock={
+        // Project scope: only project-appropriate actions. Files/Commits/Plan/
+        // Docs are issue-scoped and live on issue tabs (PAN-1561).
+        <ActionDock
+          actions={['terminal', 'browser']}
+          onOpen={(t) =>
+            t === 'terminal'
+              ? api.toggleTerminal()
+              : api.openPane({ paneType: 'browser', label: 'Web' })
+          }
+        />
+      }
       timeline={
         <Timeline
           conversations={timelineConversations}

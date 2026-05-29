@@ -7,7 +7,8 @@ import {
   Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { fetchProjects } from './CommandDeck/projectsData';
+import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchConversations } from './CommandDeck/ConversationList';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { DeaconPauseToggle } from './DeaconPauseToggle';
@@ -157,6 +158,29 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchProjects,
     refetchInterval: 30000,
   });
+
+  // PAN-1561: the "No project" bucket appears once a conversation exists that
+  // isn't under any registered project. These queries share keys with the
+  // CommandDeck (react-query dedupes — no extra network).
+  const { data: sidebarConversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    refetchInterval: 10000,
+  });
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: async (): Promise<RegisteredProjectLite[]> => {
+      const res = await fetch('/api/registered-projects');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 60000,
+  });
+  const hasUnscopedConversations = useMemo(
+    () => sidebarConversations.some((c) => isUnscopedConversation(c, registeredProjects)),
+    [sidebarConversations, registeredProjects],
+  );
 
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
@@ -395,6 +419,24 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                     </button>
                   );
                 })
+              )}
+              {/* No-project bucket — unscoped conversations/terminals (PAN-1561) */}
+              {hasUnscopedConversations && (
+                <button
+                  onClick={() => { onSelectProject?.(NO_PROJECT_KEY); setMobileOpen(false); }}
+                  title={NO_PROJECT_LABEL}
+                  data-testid="sidebar-project-no-project"
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2
+                    ${activeTab === 'command-deck' && selectedProject === NO_PROJECT_KEY
+                      ? 'bg-accent text-foreground border-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
+                    }
+                  `}
+                >
+                  <span className="h-2 w-2 rounded-full shrink-0 bg-muted-foreground/30" aria-hidden="true" />
+                  <span className="truncate italic">{NO_PROJECT_LABEL}</span>
+                </button>
               )}
             </div>
           ) : (

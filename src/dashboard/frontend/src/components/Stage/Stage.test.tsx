@@ -4,11 +4,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { Stage, type StageApi } from './index'
 import { usePanesStore } from '../../lib/panesStore'
+import { useTerminalStateStore } from '../terminal/terminalStateStore'
 
 // AgentPane pulls in ConversationPanel (heavy, needs many providers); stub it so
 // this test stays focused on the Stage's pane open/switch mechanics.
 vi.mock('./panes/AgentPane', () => ({
   AgentPane: () => <div data-testid="agent-pane" />,
+}))
+
+// TerminalDrawer mounts XTerminal + fetches /api/terminals; stub it so this test
+// stays focused on the Stage's pane/drawer toggle mechanics (PAN-1561).
+vi.mock('../terminal/TerminalDrawer', () => ({
+  TerminalDrawer: () => <div data-testid="terminal-drawer" />,
 }))
 
 const DECK = 'panopticon'
@@ -37,6 +44,7 @@ function renderStage(ui: ReactElement) {
 beforeEach(() => {
   localStorage.clear()
   usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
+  useTerminalStateStore.setState({ terminalStateByThreadId: {} })
 })
 
 describe('Stage', () => {
@@ -66,27 +74,37 @@ describe('Stage', () => {
     expect(screen.getByTestId('issue-overview')).toHaveTextContent('PAN-42')
   })
 
-  it('switching the active pane swaps the rendered body', () => {
+  it('switching the active pane swaps the rendered body', async () => {
     const { container } = renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
 
-    // Open a second pane via the + button → terminal becomes active. The new
-    // terminal pane has no session, so TerminalPane shows its empty state.
-    fireEvent.click(screen.getByLabelText('Open new pane'))
-    expect(screen.getByText(/no terminal session/i)).toBeTruthy()
+    // Open an agent pane via the StageApi → it becomes the active tab.
+    fireEvent.click(screen.getByRole('button', { name: /open agent/ }))
+    await screen.findByTestId('agent-pane')
     expect(screen.getAllByRole('tab')).toHaveLength(2)
 
     // Switch back to HOME — the project home body renders again.
     const homeTab = screen.getAllByRole('tab')[0]
     fireEvent.click(homeTab)
     expect(homeTab).toHaveAttribute('aria-selected', 'true')
-    expect(screen.queryByText(/no terminal session/i)).toBeNull()
+    expect(screen.queryByTestId('agent-pane')).toBeNull()
     expect(container.querySelector('[data-section="header"]')).not.toBeNull()
   })
 
   it('opens (and focuses) an agent pane via the StageApi', async () => {
     renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     fireEvent.click(screen.getByRole('button', { name: /open agent/ }))
-    await screen.findByRole('tab', { name: /Agent/ })
+    // The agent tab's label is derived from the live conversation (untitled →
+    // "Chat <id>"); assert the pane body + tab count rather than a static label.
+    await screen.findByTestId('agent-pane')
     expect(screen.getAllByRole('tab')).toHaveLength(2)
+  })
+
+  it('the + menu offers New terminal which opens the drawer (PAN-1561)', () => {
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
+    expect(screen.queryByTestId('terminal-drawer')).toBeNull()
+    // "+" opens a menu of what to create, rather than guessing.
+    fireEvent.click(screen.getByLabelText('Open new tab'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /New terminal/ }))
+    expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
   })
 })

@@ -1,5 +1,6 @@
 import { useState, type ReactNode, type KeyboardEvent } from 'react'
-import { Bot, Terminal, Globe } from 'lucide-react'
+import { Terminal, Globe } from 'lucide-react'
+import { AgentIcon } from './AgentIcon'
 import { orderIntents } from './launcherOrdering'
 import styles from '../stage.module.css'
 
@@ -37,8 +38,9 @@ export function intentLabel(intent: LauncherIntent): string {
   }
 }
 
-function IntentIcon({ kind }: { kind: LauncherIntentKind }) {
-  const Icon = kind === 'terminal' ? Terminal : kind === 'web' ? Globe : Bot
+function IntentIcon({ kind, id, label }: { kind: LauncherIntentKind; id: string; label?: string }) {
+  if (kind === 'agent') return <AgentIcon id={id} label={label} size={14} />
+  const Icon = kind === 'terminal' ? Terminal : Globe
   return <Icon size={14} />
 }
 
@@ -145,7 +147,7 @@ export function Launcher({
               }}
             >
               <span className={styles.gicon}>
-                <IntentIcon kind={intent.kind} />
+                <IntentIcon kind={intent.kind} id={intent.id} label={intent.agentName} />
               </span>
               <span className={styles.ddLab}>
                 <b>{intentLabel(intent)}</b> {query}
