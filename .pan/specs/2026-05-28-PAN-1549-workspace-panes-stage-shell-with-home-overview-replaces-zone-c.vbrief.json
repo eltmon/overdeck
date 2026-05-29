@@ -4,7 +4,7 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-28T22:25:40.984Z"
+    "updated": "2026-05-29T00:03:40.649Z"
   },
   "plan": {
     "id": "pan-1549",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 83,
+    "sequence": 95,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-28T22:25:40.984Z",
+    "updated": "2026-05-29T00:03:40.649Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -1254,61 +1254,65 @@
     "metadata": {
       "canonicalFilename": "2026-05-28-PAN-1549-workspace-panes-stage-shell-with-home-overview-replaces-zone-c.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "merge",
         "issueId": "PAN-1549",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-28T22:25:40.979Z",
+        "updatedAt": "2026-05-29T00:03:40.629Z",
         "work": {
-          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-28T22:25:40.979Z"
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-28T22:25:40.979Z",
-          "notes": "onCreateConversation handler discards agentId, breaking agent-specific conversation creation",
+          "status": "passed",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "All four reviewers passed with zero blockers; prior cycle's agentId wiring fix verified. 58/58 in-scope requirements complete.",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-28T22:25:40.979Z",
-              "notes": "onCreateConversation handler discards agentId, breaking agent-specific conversation creation"
+              "status": "passed",
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "All four reviewers passed with zero blockers; prior cycle's agentId wiring fix verified. 58/58 in-scope requirements complete."
             }
           ],
-          "approval": "changes_requested"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "status": "passed",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-28T22:25:40.979Z"
+              "status": "passed",
+              "at": "2026-05-29T00:03:40.629Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-28T22:25:40.979Z",
+          "updatedAt": "2026-05-29T00:03:40.629Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-28T22:25:40.979Z"
+              "at": "2026-05-29T00:03:40.629Z"
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1554"
         }
       }
