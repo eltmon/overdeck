@@ -420,13 +420,13 @@ describe('monitorReviewConvoySignals', () => {
 
     expect(agents.messageAgent).toHaveBeenCalledWith(
       'agent-pan-879-review',
-      'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
+      'REVIEWER_FAILED security reviewer session ended before writing a report',
     );
     expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',
     }));
     expect(actions).toEqual([
-      'Signaled REVIEWER_FAILED security reviewer launcher process died before signaling synthesis to agent-pan-879-review',
+      'Signaled REVIEWER_FAILED security reviewer session ended before writing a report to agent-pan-879-review',
     ]);
   });
 
@@ -455,7 +455,7 @@ describe('monitorReviewConvoySignals', () => {
 
     expect(agents.messageAgent).toHaveBeenCalledWith(
       'agent-pan-879-review',
-      'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
+      'REVIEWER_FAILED security reviewer session ended before writing a report',
     );
     expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',

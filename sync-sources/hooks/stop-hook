@@ -114,6 +114,39 @@ if [[ "$AGENT_ID" == planning-* ]]; then
   fi
 fi
 
+# PAN-1557: interactive convoy reviewer finished a turn. If it wrote its report
+# and hasn't signaled yet, deliver REVIEWER_READY to the synthesis agent.
+# Interactive reviewers (no `claude --print`) don't exit, so the launcher can't
+# own this signal the way it did for headless reviewers — the Stop-hook does.
+# A bare idle stop with no report is left alone: Deacon's REVIEWER_TIMEOUT is
+# the failure path, so we never emit a premature REVIEWER_FAILED.
+# Pattern: agent-<issueId>-review-<subRole>
+if [[ "$AGENT_ID" =~ ^agent-.+-review-(security|correctness|performance|requirements)$ ]]; then
+  R_STATE="$HOME/.panopticon/agents/$AGENT_ID/state.json"
+  R_MARKER="$HOME/.panopticon/agents/$AGENT_ID/reviewer-signaled"
+  if [ -f "$R_STATE" ] && [ ! -f "$R_MARKER" ]; then
+    R_OUT=$(grep -oE '"reviewOutputPath":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
+    R_SUB=$(grep -oE '"reviewSubRole":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
+    R_SYNTH=$(grep -oE '"reviewSynthesisAgentId":"[^"]*"' "$R_STATE" | head -1 | sed 's/.*":"//; s/"$//')
+    if [ -n "$R_OUT" ] && [ -n "$R_SUB" ] && [ -n "$R_SYNTH" ] && [ -s "$R_OUT" ]; then
+      # Deliver via the load-buffer + paste-buffer + Enter pattern on the
+      # panopticon socket (matches the API-error nudge above and the project's
+      # tmux-delivery rule). The synthesis session is always an interactive
+      # tmux session, so the paste reaches its prompt.
+      R_TMP=$(mktemp)
+      printf 'REVIEWER_READY %s %s' "$R_SUB" "$R_OUT" > "$R_TMP"
+      tmux -L panopticon load-buffer "$R_TMP" 2>/dev/null
+      tmux -L panopticon paste-buffer -t "$R_SYNTH" 2>/dev/null
+      sleep 0.3
+      tmux -L panopticon send-keys -t "$R_SYNTH" C-m 2>/dev/null
+      rm -f "$R_TMP"
+      touch "$R_MARKER"
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID signaled REVIEWER_READY $R_SUB to $R_SYNTH" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+    fi
+  fi
+fi
+
 # PAN-1059 session-reaper: when the review synthesis session ends, kill any
 # convoy sub-reviewer sessions (agent-<id>-review-{security,correctness,...}).
 # Pattern: agent-<issueId>-review   (no trailing sub-role suffix → synthesis)
@@ -122,20 +155,21 @@ if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
   KILLED_ANY=false
   for SUBROLE in security correctness performance requirements; do
     CONVOY_SESSION="agent-${REVIEW_ISSUE}-review-${SUBROLE}"
-    # Only reap a convoy reviewer whose pane is DEAD (the reviewer process has
-    # exited). An ALIVE pane means the reviewer is still actively running — and
-    # because convoy session names are reused across review cycles, killing it
-    # here would race a freshly-respawned convoy that reused the same name (a
-    # prior synthesis agent's delayed stop-hook reaping the NEW cycle's
-    # in-flight reviewers, which is how reviewers ended up "working" with a dead
-    # terminal). Finished/orphaned reviewers (dead pane) are still cleaned up.
-    PANE_DEAD=$(tmux -L panopticon display-message -p -t "$CONVOY_SESSION" '#{pane_dead}' 2>/dev/null)
-    if [ "$PANE_DEAD" != "1" ]; then
-      continue  # session missing (kill would no-op) or reviewer still running
+    # PAN-1557: only reap a convoy reviewer that has SIGNALED (its
+    # `reviewer-signaled` marker is present). The marker is cleared at spawn
+    # (review-agent.ts) and touched when the reviewer signals REVIEWER_READY
+    # — headless launchers and the interactive Stop-hook both honor it — so a
+    # present marker means "this cycle's reviewer is done; safe to reap." A
+    # reviewer with NO marker is either still running OR belongs to a newer
+    # review cycle that reused this session name; reaping it would be the
+    # cross-cycle race that left running reviewers terminal-less. Skip it.
+    CONVOY_MARKER="$HOME/.panopticon/agents/$CONVOY_SESSION/reviewer-signaled"
+    if [ ! -f "$CONVOY_MARKER" ]; then
+      continue
     fi
     if tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
       KILLED_ANY=true
-      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION (pane dead)" \
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION (signaled)" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     fi
   done

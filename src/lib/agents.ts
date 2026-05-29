@@ -377,7 +377,10 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
 
-  const printFlag = role === 'review' && subRole ? ' --print' : '';
+  // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
+  // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
+  // of headless `claude --print`. No role uses --print anymore.
+  const printFlag = '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
@@ -2366,13 +2369,6 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
-/**
- * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
- * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
- * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
- */
-const REVIEW_SUBROLE_TIMEOUT_SECONDS = 30 * 60;
-
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,
@@ -2486,8 +2482,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
-  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
+  // their prompt via tmux after Claude boots (same as the orchestrator/test/
+  // ship), not on stdin to a headless `claude --print`.
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -2580,28 +2578,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
-  // wiring so the launcher's own bash process — not the agent's good behavior,
-  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
-  // launcher signals deterministically on process exit and touches a marker
-  // file; Deacon only steps in if that bash process was SIGKILLed.
-  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
-    ? {
-        synthesisAgentId: options.reviewSynthesisAgentId,
-        subRole: options.subRole as string,
-        outputPath: options.reviewOutputPath,
-        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
-        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
-        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
-      }
-    : undefined;
+  // PAN-1557: convoy reviewers are interactive now, so the launcher no longer
+  // owns the REVIEWER_READY/FAILED signal (which previously rode a `claude
+  // --print` process exit). The Stop-hook delivers REVIEWER_READY to the
+  // synthesis agent when the reviewer finishes its turn with a written report;
+  // Deacon's REVIEWER_TIMEOUT remains the failure failsafe. We still persist
+  // the synthesis/output wiring on state.json so the Stop-hook can read it.
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
-
-  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
-  // by delivering through tmux after Claude boots. Headless review sub-roles run
-  // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScriptSync({
     role,
@@ -2610,19 +2594,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
-    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
+    promptFileMode: undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
     resumeSessionId: options.resumeSessionId,
-    reviewSignal,
-    // PAN-977: review sub-role launchers must outlive their tmux session. The
-    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
-    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
-    // process alive so it always runs its signal block when claude exits.
-    trapHup: reviewSignal ? true : undefined,
+    reviewSignal: undefined,
+    trapHup: undefined,
     ...piLauncherFields,
   });
 
