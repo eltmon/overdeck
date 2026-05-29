@@ -2,16 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
-import { Stage } from './index'
+import { Stage, type StageApi } from './index'
 import { usePanesStore } from '../../lib/panesStore'
-import type { Conversation } from '../CommandDeck/ConversationList'
-
-// The re-homed tab bodies (OverviewTab etc.) require DialogProvider + live
-// data; HomePaneSections has its own test, so stub it here to keep this test
-// focused on the Stage's pane mechanics.
-vi.mock('./HomePane/HomePaneSections', () => ({
-  HomePaneSections: () => <div data-testid="home-sections" />,
-}))
 
 // AgentPane pulls in ConversationPanel (heavy, needs many providers); stub it so
 // this test stays focused on the Stage's pane open/switch mechanics.
@@ -19,10 +11,24 @@ vi.mock('./panes/AgentPane', () => ({
   AgentPane: () => <div data-testid="agent-pane" />,
 }))
 
-const WS = 'PAN-1549'
+const DECK = 'panopticon'
 
-// The composed HOME pane renders re-homed tab bodies (HomePaneSections) that
-// use react-query, so the Stage must render inside a QueryClientProvider.
+// PAN-1561: the Stage is project-scoped and composes HOME / issue tabs via
+// render props. These stubs keep the test focused on pane mechanics; a HOME
+// that can open an agent tab exercises the StageApi.
+function renderHome(api: StageApi) {
+  return (
+    <div data-section="header" data-testid="project-home">
+      <button type="button" onClick={() => api.openOrFocusAgentPane('conv-new', 'Agent')}>
+        open agent
+      </button>
+    </div>
+  )
+}
+function renderIssue(issueId: string) {
+  return <div data-testid="issue-overview">{issueId}</div>
+}
+
 function renderStage(ui: ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
@@ -34,28 +40,34 @@ beforeEach(() => {
 })
 
 describe('Stage', () => {
-  it('auto-creates HOME and renders it active for a fresh workspace', () => {
-    renderStage(<Stage workspaceId={WS} />)
-    // HOME tab present and selected.
+  it('auto-creates HOME and renders it active for a fresh deck', () => {
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(1)
     expect(tabs[0]).toHaveTextContent('Home')
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('project-home')).toBeTruthy()
   })
 
   it('renders a safe placeholder for an unknown pane type (defensive default)', () => {
-    usePanesStore.getState().ensureHome(WS)
-    // Inject a paneType outside the union (e.g. corrupt persisted state).
-    usePanesStore.getState().addPane(WS, { paneType: 'bogus' as never, label: 'Bogus' })
-    const { container } = renderStage(<Stage workspaceId={WS} />)
+    usePanesStore.getState().ensureHome(DECK)
+    usePanesStore.getState().addPane(DECK, { paneType: 'bogus' as never, label: 'Bogus' })
+    const { container } = renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
     const body = container.querySelector('[data-pane-type]')
     expect(body).not.toBeNull()
     expect(body).toHaveAttribute('data-pane-type', 'bogus')
     expect(screen.getByText(/not implemented yet/i)).toBeTruthy()
   })
 
+  it('renders an issue tab body via renderIssue', () => {
+    usePanesStore.getState().ensureHome(DECK)
+    usePanesStore.getState().addPane(DECK, { paneType: 'issue', label: 'PAN-42', issueId: 'PAN-42' })
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
+    expect(screen.getByTestId('issue-overview')).toHaveTextContent('PAN-42')
+  })
+
   it('switching the active pane swaps the rendered body', () => {
-    const { container } = renderStage(<Stage workspaceId={WS} />)
+    const { container } = renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
 
     // Open a second pane via the + button → terminal becomes active. The new
     // terminal pane has no session, so TerminalPane shows its empty state.
@@ -63,7 +75,7 @@ describe('Stage', () => {
     expect(screen.getByText(/no terminal session/i)).toBeTruthy()
     expect(screen.getAllByRole('tab')).toHaveLength(2)
 
-    // Switch back to HOME — rendered body changes to the HomePane scaffold.
+    // Switch back to HOME — the project home body renders again.
     const homeTab = screen.getAllByRole('tab')[0]
     fireEvent.click(homeTab)
     expect(homeTab).toHaveAttribute('aria-selected', 'true')
@@ -71,20 +83,9 @@ describe('Stage', () => {
     expect(container.querySelector('[data-section="header"]')).not.toBeNull()
   })
 
-  it('opens an agent pane on the created conversation when an AgentDock pill is clicked', async () => {
-    const onCreateConversation = vi.fn(async () => 'conv-new')
-    renderStage(
-      <Stage
-        workspaceId={WS}
-        conversations={[{ name: 'conv-new', issueId: WS } as unknown as Conversation]}
-        onCreateConversation={onCreateConversation}
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: /Claude Code/ }))
-
-    // The conversation is created with the chosen agent id, then a Stage agent
-    // pane opens focused on it (a second tab appears).
-    expect(onCreateConversation).toHaveBeenCalledWith('claude-code')
+  it('opens (and focuses) an agent pane via the StageApi', async () => {
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} />)
+    fireEvent.click(screen.getByRole('button', { name: /open agent/ }))
     await screen.findByRole('tab', { name: /Agent/ })
     expect(screen.getAllByRole('tab')).toHaveLength(2)
   })

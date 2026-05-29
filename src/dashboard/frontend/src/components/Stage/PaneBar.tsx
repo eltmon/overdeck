@@ -1,10 +1,11 @@
 import { memo } from 'react'
-import { Home, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X } from 'lucide-react'
+import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import styles from './stage.module.css'
 
 const PANE_ICONS: Record<PaneType, typeof Home> = {
   home: Home,
+  issue: CircleDot,
   agent: Bot,
   terminal: Terminal,
   files: FileCode,

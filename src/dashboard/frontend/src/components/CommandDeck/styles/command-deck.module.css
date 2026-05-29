@@ -1138,6 +1138,18 @@
   font-size: 14px;
 }
 
+/* Activity feed column (PAN-1561, column 4) */
+.activityColumn {
+  width: 300px;
+  min-width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* Feature Header */
 .featureHeader {
   display: flex;

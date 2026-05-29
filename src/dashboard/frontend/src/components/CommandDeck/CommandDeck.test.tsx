@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
+import { usePanesStore } from '../../lib/panesStore';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -47,7 +48,13 @@ vi.mock('./SessionView/IssueHeader', () => ({
 }));
 
 vi.mock('../Stage', () => ({
-  Stage: (props: any) => <div data-testid="stage" data-workspace={props.workspaceId} />,
+  Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
+}));
+
+vi.mock('./ActivityFeedSidebar', () => ({
+  ActivityFeedSidebar: (props: any) => (
+    <div data-testid="activity-feed" data-issues={(props.issueIds ?? []).join(',')} />
+  ),
 }));
 
 vi.mock('./ZoneBActionStrip', () => ({
@@ -351,77 +358,55 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   );
 }
 
-describe('CommandDeck — Stage mount (PAN-1549)', () => {
+describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCommandDeckSelection.getState().clearAll();
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
     localStorage.clear();
   });
 
-  it('mounts the Stage for a selected feature/workspace', async () => {
+  const panes = (deck: string) => usePanesStore.getState().panesByWorkspace[deck] ?? [];
+
+  it('shows an empty state until a project is selected', async () => {
     renderCommandDeck();
-
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-    fireEvent.click(screen.getByTestId('feature-PAN-821'));
-
-    const stage = screen.getByTestId('stage');
-    expect(stage).toBeInTheDocument();
-    expect(stage).toHaveAttribute('data-workspace', 'PAN-821');
-    // The project Pipeline is not shown when a workspace is selected.
-    expect(screen.queryByTestId('project-overview')).not.toBeInTheDocument();
+    // With no project selected there is no tree to render — the deck shows its
+    // empty state and column 2 prompts for a project.
+    expect(await screen.findByText(/select a project to open its deck/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
   });
 
-  it('mounts the Stage when a session is selected (its feature is selected)', async () => {
-    renderCommandDeck();
+  it('mounts the project deck and activity feed for the selected project', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
 
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
+    const stage = screen.getByTestId('stage');
+    expect(stage).toHaveAttribute('data-deck', 'test-project');
+    expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+  });
+
+  it('opens an issue tab in the deck when a tree issue is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
+
+    fireEvent.click(screen.getByTestId('feature-PAN-821'));
+    expect(panes('test-project').some(p => p.paneType === 'issue' && p.issueId === 'PAN-821')).toBe(true);
+  });
+
+  it('opens an issue tab when a session is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
+
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
-
-    const stage = screen.getByTestId('stage');
-    expect(stage).toBeInTheDocument();
-    expect(stage).toHaveAttribute('data-workspace', 'PAN-821');
+    expect(panes('test-project').some(p => p.paneType === 'issue' && p.issueId === 'PAN-821')).toBe(true);
   });
 
-  it('renders the Pipeline (ProjectOverview) for a project-only selection', async () => {
-    renderCommandDeck();
-
+  it('opens an agent tab in the deck when a conversation is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
 
-    const overview = screen.getByTestId('project-overview');
-    expect(overview).toHaveAttribute('data-project', 'test-project');
-    expect(overview).toHaveAttribute('data-features', 'PAN-821');
-    // Issue-local unified cost data still flows to the Pipeline.
-    expect(overview).toHaveAttribute('data-cost', '12.34');
-    expect(overview).toHaveAttribute('data-model-cost', '7.89');
-    expect(overview).toHaveAttribute('data-stage-cost', '4.45');
-    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
-  });
-
-  it('renders the ConversationPanel when a conversation is selected (no feature)', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
     fireEvent.click(screen.getByTestId('conv-test'));
-
-    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
-  });
-
-  it('opens an unscoped conversation after a tree issue was selected (PAN-1332)', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-
-    // Select a feature — the Stage mounts.
-    fireEvent.click(screen.getByTestId('feature-PAN-821'));
-    expect(screen.getByTestId('stage')).toBeInTheDocument();
-
-    // Selecting a conversation clears the feature and takes over the content area.
-    fireEvent.click(await screen.findByTestId('conv-unscoped'));
-    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(panes('test-project').some(p => p.paneType === 'agent' && p.conversationId === 'test-conv')).toBe(true);
   });
 });

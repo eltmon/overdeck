@@ -51,6 +51,12 @@
   letter-spacing: -0.01em;
 }
 
+/* Project-variant header: `#` accent before the project name (PAN-1561). */
+.wsHash {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
 .wsBranch {
   color: var(--muted-foreground);
   font-size: 13px;

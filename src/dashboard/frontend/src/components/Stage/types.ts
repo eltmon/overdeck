@@ -1,11 +1,30 @@
 import type { SessionNode as SessionNodeType } from '@panctl/contracts'
-import type { WorkspacePane, WorkspaceId, PaneSpec } from '../../lib/panesStore'
+import type { WorkspacePane, WorkspaceId, PaneSpec, PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
 
 /** Backing data for an agent pane, resolved by the Stage mount point. */
 export interface AgentPaneData {
   conversation?: Conversation
   session?: SessionNodeType
+}
+
+/**
+ * StageApi — the pane-opening surface the Stage hands to its render props
+ * (ProjectHome and IssueOverview, PAN-1561). The Stage owns pane state keyed
+ * by the project deck; these helpers let the home/issue content open and focus
+ * tabs without reaching into the store directly.
+ */
+export interface StageApi {
+  /** The deck's pane-store key (the project key). */
+  deckKey: string
+  /** Open + activate an arbitrary pane. */
+  openPane: (spec: PaneSpec) => void
+  /** Open + activate a typed pane; `terminalId` scopes a terminal to an agent. */
+  openTypedPane: (paneType: PaneType, opts?: { terminalId?: string | null }) => void
+  /** Open (or focus, if already open) an issue tab in the project deck. */
+  openIssue: (issueId: string, label: string) => void
+  /** Open (or focus) an agent pane backed by a conversation. */
+  openOrFocusAgentPane: (conversationId: string, label: string) => void
 }
 
 /**

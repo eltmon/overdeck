@@ -18,6 +18,7 @@ export type PaneId = string
 
 export type PaneType =
   | 'home'
+  | 'issue'
   | 'agent'
   | 'terminal'
   | 'files'
@@ -33,6 +34,8 @@ export interface WorkspacePane {
   createdAt: number
   /** true for the HOME pane — it is synthesized and cannot be closed. */
   isPermanent?: boolean
+  // issue pane — an issue tab opened inside a project-scoped deck (PAN-1561)
+  issueId?: string
   // agent pane
   conversationId?: string
   agentType?: string
