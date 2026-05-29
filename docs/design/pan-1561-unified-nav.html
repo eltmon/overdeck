@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Unified nav — Home/Flywheel ▸ Projects+Conversations ▸ Issue tree ▸ the loved Home tab</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#171717; --muted:#6b7280; --muted2:#9ca3af;
+    --border:rgba(0,0,0,.09); --border-strong:rgba(0,0,0,.14);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08);
+    --claude:#e0662f; --codex:#10a37f;
+    --success:#16a34a; --warning:#f59e0b; --review:#8b5cf6; --destructive:#e11d48;
+    --surface:#fafafa; --surface-2:#f3f4f6;
+    --proj-pan:#e0662f; --proj-myn:#64748b; --proj-aur:#0ea5e9;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.55;padding:32px 24px 80px;}
+  .page{max-width:1240px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;}
+
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;background:var(--background);
+    box-shadow:0 8px 34px rgba(0,0,0,.11);display:flex;height:720px;}
+  .tag{position:absolute;z-index:6;font-size:10px;font-weight:700;letter-spacing:.02em;color:#fff;padding:2px 7px;border-radius:5px;white-space:nowrap;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.22);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-nav{background:#6b7280;} .t-tree{background:#9333ea;} .t-deck{background:#0ea5e9;}
+  .region{position:relative;}
+
+  /* ── Column 1: unified sidebar (Home/Flywheel + Projects + Conversations) ── */
+  .side{width:212px;flex:0 0 212px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:relative;font-size:13px;}
+  .side-scroll{padding:11px 9px;overflow:auto;flex:1;}
+  .nav{padding:8px 9px;border-radius:9px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--foreground);}
+  .nav .ic{font-size:15px;width:18px;text-align:center;} .nav.fly{color:var(--primary);}
+  .sh{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin:16px 8px 6px;display:flex;align-items:center;}
+  .sh .c{margin-left:auto;font-family:"SF Mono",monospace;}
+  .proj{padding:7px 9px;border-radius:9px;display:flex;align-items:center;gap:9px;font-weight:600;color:var(--foreground);}
+  .proj .sq{width:13px;height:13px;border-radius:4px;flex:0 0 13px;} .proj .c{margin-left:auto;color:var(--muted2);font-size:10.5px;font-family:"SF Mono",monospace;font-weight:500;}
+  .proj.active{background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05);} .proj.active .nm{color:var(--proj-pan);}
+  /* conversations as a simple LIST (like before) */
+  .crow{padding:6px 9px;border-radius:8px;display:flex;align-items:center;gap:8px;color:var(--foreground);font-weight:500;}
+  .crow .sq{width:12px;height:12px;border-radius:3px;flex:0 0 12px;}
+  .crow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;}
+  .crow .ago{margin-left:auto;color:var(--muted2);font-size:10.5px;white-space:nowrap;}
+  .crow .d{width:6px;height:6px;border-radius:50%;background:var(--success);flex:0 0 6px;}
+  .side-foot{border-top:1px solid var(--border);padding:8px 14px;color:var(--muted2);font-size:11px;}
+
+  /* ── Column 2: issue tree (appears on project click) ── */
+  .tree{width:248px;flex:0 0 248px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;position:relative;}
+  .tree-h{display:flex;align-items:center;gap:8px;padding:11px 12px 9px;border-bottom:1px solid var(--border);}
+  .tree-h .ttl{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:7px;}
+  .tree-h .ttl .sq{width:12px;height:12px;border-radius:4px;background:var(--proj-pan);}
+  .tree-h .filt{margin-left:auto;font-size:10.5px;color:var(--muted2);}
+  .tree-scroll{overflow:auto;padding:6px;flex:1;}
+  .iss{border-radius:8px;margin-bottom:2px;}
+  .iss-h{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;font-size:12.5px;}
+  .iss-h:hover{background:var(--surface-2);} .iss-h.sel{background:var(--primary-tint);}
+  .iss-h .car{color:var(--muted2);font-size:10px;width:9px;flex:0 0 9px;}
+  .sd{width:7px;height:7px;border-radius:50%;flex:0 0 7px;} .sd.active{background:var(--success);} .sd.thinking{background:var(--warning);} .sd.idle{background:#cbd5e1;}
+  .iss-h .id{font-family:"SF Mono",monospace;font-weight:700;font-size:11.5px;}
+  .iss-h .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground);}
+  .iss-h .st{margin-left:auto;font-size:9.5px;font-family:"SF Mono",monospace;color:var(--muted2);white-space:nowrap;}
+  .workers{padding:2px 0 6px 22px;}
+  .wk{display:flex;align-items:center;gap:7px;padding:3px 8px;font-size:11.5px;color:var(--muted);}
+  .rb{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;border:1.5px solid;flex:0 0 17px;}
+  .rb-work{border-color:var(--primary);color:var(--primary);} .rb-review{border-color:var(--review);color:var(--review);}
+  .rb-test{border-color:var(--success);color:var(--success);} .rb-sec{border-color:var(--destructive);color:var(--destructive);} .rb-perf{border-color:var(--warning);color:var(--warning);}
+  .wk .wd{margin-left:auto;width:6px;height:6px;border-radius:50%;} .wk .wd.active{background:var(--success);} .wk .wd.thinking{background:var(--warning);} .wk .wd.idle{background:#cbd5e1;}
+  .convoy{display:flex;gap:3px;}
+
+  /* ── Column 3: the deck (tabs + the LOVED Home tab) ── */
+  .deck{flex:1;display:flex;flex-direction:column;min-width:0;background:#fff;}
+  .tabs{display:flex;align-items:flex-end;height:46px;flex:0 0 46px;border-bottom:1px solid var(--border);background:var(--surface);padding:10px 10px 0;}
+  .tab{display:flex;align-items:center;gap:8px;padding:0 13px;height:36px;font-size:13px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;white-space:nowrap;}
+  .tab .kbd{font-size:10px;color:var(--muted2);} .tab .twodot{position:relative;width:13px;height:13px;border-radius:4px;}
+  .tab .twodot .a{position:absolute;inset:0;border-radius:4px;} .tab .twodot .b{position:absolute;right:-2px;bottom:-2px;width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;}
+  .tab.active{background:#fff;color:var(--foreground);font-weight:700;border-color:var(--border);position:relative;top:1px;}
+  .tab.home.active{padding-left:13px;} .tab.home.active::before{content:"";position:absolute;left:0;right:0;top:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--claude);}
+  .tab .gi{font-size:13px;}
+  .tab-add{display:flex;align-items:center;justify-content:center;width:34px;height:36px;color:var(--muted2);font-size:20px;}
+
+  .home{flex:1;overflow:auto;padding:30px 40px;}
+  .home-inner{max-width:760px;}
+  /* # project header */
+  .ph{display:flex;align-items:center;gap:14px;}
+  .ph .hash{font-size:46px;font-weight:800;color:var(--claude);line-height:1;}
+  .ph h3{font-size:44px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1;}
+  .pmeta{color:var(--muted);font-size:15px;margin:14px 0 2px;display:flex;align-items:center;gap:10px;}
+  .pmeta .sp{color:var(--muted2);}
+  .stats{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:14px;margin:14px 0 22px;font-family:"SF Mono",ui-monospace,Menlo,monospace;}
+  .stats .it{display:flex;align-items:center;gap:7px;} .stats .div{width:1px;height:15px;background:var(--border);}
+  .stats .add{color:var(--success);} .stats .del{color:var(--destructive);} .stats .chev{color:var(--muted2);}
+
+  .omni{display:flex;align-items:center;gap:13px;border:1px solid var(--border-strong);border-radius:15px;padding:16px 18px;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.05);margin-bottom:24px;}
+  .omni .cmd{color:var(--muted2);font-size:18px;} .omni .ph2{flex:1;color:var(--muted2);font-size:17px;}
+  .omni .run{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:7px 14px;}
+
+  .pills{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:13px;}
+  .pill{display:inline-flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:var(--foreground);background:#fff;border:1px solid var(--border-strong);border-radius:11px;padding:9px 14px;}
+  .pill .gi{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;}
+  .pill .car{color:var(--muted2);font-size:11px;}
+  .pill.ghost{border-style:dashed;color:var(--muted);font-weight:500;background:transparent;}
+  .pills.tools .pill{font-weight:600;background:var(--surface-2);border-color:transparent;}
+  .pills.tools .pill.ghost{background:transparent;border:1px dashed var(--border-strong);color:var(--muted);font-weight:500;}
+
+  .timeline{margin-top:26px;}
+  .tl-date{display:flex;align-items:center;gap:12px;color:var(--muted2);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 14px;}
+  .tl-date::before{content:"";width:14px;height:1px;background:var(--border-strong);}
+  .conv{background:var(--surface);border-radius:12px;padding:15px 17px;margin-bottom:14px;}
+  .conv-h{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:11px;font-weight:600;}
+  .conv-h .ago{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--muted2);}
+  .conv .ln{display:flex;gap:11px;align-items:flex-start;font-size:14px;margin-bottom:4px;}
+  .conv .av{width:24px;height:24px;border-radius:6px;flex:0 0 24px;background:linear-gradient(135deg,#444,#222);}
+  .conv .av.cc{background:var(--claude);}
+  .conv .tx{color:var(--foreground);opacity:.9;} .conv .tx.u{color:var(--muted);}
+
+  .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 24px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .callout{margin-top:14px;border:1px solid rgba(79,70,229,.32);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;} .callout b{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Unified nav (Home tab kept intact)</h1>
+  <p class="sub">The loved launch view <b>stays exactly as-is</b> (it's the existing HomePane — <code># panopticon</code>, the Launch/search/run omnibox, agent + action pills, the conversation timeline). What changes is the <b>navigation around it</b>: the old left sidebar and the Command Deck merge into <b>progressive columns</b> — <b>Home · Flywheel</b>, then <b>Projects</b> + <b>Conversations</b> (a plain list, like before); click a project and an <b>issue-tree column</b> appears. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Three progressive columns + the Home tab</h2>
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- Column 1: unified sidebar -->
+      <div class="side region">
+        <span class="tag t-nav" style="top:8px;right:8px;">Sidebar + Command Deck, merged</span>
+        <div class="side-scroll">
+          <div class="nav"><span class="ic">⌂</span> Home</div>
+          <div class="nav fly"><span class="ic">🌀</span> Flywheel</div>
+
+          <div class="sh">Projects</div>
+          <div class="proj active"><span class="sq" style="background:var(--proj-pan)"></span><span class="nm">panopticon</span><span class="c">7</span></div>
+          <div class="proj"><span class="sq" style="background:var(--proj-myn)"></span><span class="nm">mind-your-now</span><span class="c">3</span></div>
+          <div class="proj"><span class="sq" style="background:var(--proj-aur)"></span><span class="nm">auricle</span><span class="c">2</span></div>
+
+          <div class="sh region">Conversations <span class="c">6</span><span class="tag t-nav" style="top:-19px;left:0;">a plain list (like before)</span></div>
+          <div class="crow"><span class="sq" style="background:var(--claude)"></span><span class="nm">Claude Code</span><span class="d"></span><span class="ago">2m</span></div>
+          <div class="crow"><span class="sq" style="background:var(--codex)"></span><span class="nm">Codex</span><span class="d"></span><span class="ago">1h</span></div>
+          <div class="crow"><span class="sq" style="background:var(--claude)"></span><span class="nm">Claude Code</span><span class="ago">3h</span></div>
+          <div class="crow"><span class="sq" style="background:var(--claude)"></span><span class="nm">Claude Code</span><span class="ago">yest</span></div>
+          <div class="crow"><span class="sq" style="background:var(--codex)"></span><span class="nm">Codex</span><span class="ago">2d</span></div>
+        </div>
+        <div class="side-foot">v0.9.4</div>
+      </div>
+
+      <!-- Column 2: issue tree (appears on project click) -->
+      <div class="tree region">
+        <span class="tag t-tree" style="top:8px;right:8px;">Issue tree <small>(appears on project click)</small></span>
+        <div class="tree-h"><span class="ttl"><span class="sq"></span> panopticon issues</span><span class="filt">All ▾</span></div>
+        <div class="tree-scroll">
+          <div class="iss">
+            <div class="iss-h sel"><span class="car">▾</span><span class="sd active"></span><span class="id">PAN-1561</span><span class="ttl">Hoist PaneBar</span></div>
+            <div class="workers">
+              <div class="wk"><span class="rb rb-work">🔨</span> work · Claude <span class="wd active"></span></div>
+              <div class="wk"><span class="rb rb-review">🛡</span> review <span class="convoy"><span class="rb rb-sec" style="width:14px;height:14px">🔒</span><span class="rb rb-review" style="width:14px;height:14px">🐛</span><span class="rb rb-perf" style="width:14px;height:14px">⏱</span></span><span class="wd thinking"></span></div>
+            </div>
+          </div>
+          <div class="iss">
+            <div class="iss-h"><span class="car">▾</span><span class="sd active"></span><span class="id">PAN-1547</span><span class="ttl">Node 22 bump</span></div>
+            <div class="workers">
+              <div class="wk"><span class="rb rb-work">🔨</span> work · Codex <span class="wd active"></span></div>
+              <div class="wk"><span class="rb rb-test">✓</span> test <span class="wd idle"></span></div>
+            </div>
+          </div>
+          <div class="iss"><div class="iss-h"><span class="car">▸</span><span class="sd thinking"></span><span class="id">PAN-1540</span><span class="ttl">Kanban redesign</span><span class="st">review</span></div></div>
+          <div class="iss"><div class="iss-h"><span class="car">▸</span><span class="sd idle"></span><span class="id">PAN-1533</span><span class="ttl">Cost dashboard</span><span class="st">todo</span></div></div>
+          <div class="iss"><div class="iss-h"><span class="car">▸</span><span class="sd idle"></span><span class="id">PAN-1529</span><span class="ttl">Harness picker</span><span class="st">todo</span></div></div>
+        </div>
+      </div>
+
+      <!-- Column 3: deck with the LOVED Home tab -->
+      <div class="deck region">
+        <span class="tag t-deck" style="top:8px;right:10px;">Deck — the Home tab is unchanged (Image #1)</span>
+        <div class="tabs">
+          <div class="tab home active"><span class="kbd mono">⌘1</span> HOME</div>
+          <div class="tab"><span class="twodot"><span class="a" style="background:var(--claude)"></span><span class="b" style="background:#3b82f6"></span></span> Claude Code <span class="kbd mono">⌘2</span></div>
+          <div class="tab"><span class="twodot"><span class="a" style="background:var(--claude)"></span><span class="b" style="background:#eab308"></span></span> Claude Code <span class="kbd mono">⌘3</span></div>
+          <div class="tab"><span class="gi">⎇</span> Commits <span class="kbd mono">⌘4</span></div>
+          <div class="tab-add">+</div>
+        </div>
+
+        <div class="home">
+          <div class="home-inner">
+            <div class="ph"><span class="hash">#</span><h3>panopticon</h3></div>
+            <div class="pmeta">main <span class="sp">⎇ set parent</span></div>
+            <div class="stats">
+              <span class="it">🕐 19 days</span><span class="div"></span>
+              <span class="it">⇄ <span class="add">+1,524</span> <span class="del">-96</span> <span class="chev">›</span></span><span class="div"></span>
+              <span class="it">📁 7 files <span class="chev">›</span></span><span class="div"></span>
+              <span class="it">💬 6 convos <span class="chev">›</span></span>
+            </div>
+
+            <div class="omni"><span class="cmd">⌘</span><span class="ph2">Launch, search, run…</span><span class="run">↵ Run</span></div>
+
+            <div class="pills">
+              <span class="pill"><span class="gi" style="background:var(--claude)">✳</span> Claude Code <span class="car">▾</span></span>
+              <span class="pill"><span class="gi" style="background:#111">◎</span> Codex <span class="car">▾</span></span>
+              <span class="pill ghost">+ More Agents</span>
+            </div>
+            <div class="pills tools">
+              <span class="pill">▢ Terminal</span>
+              <span class="pill">📁 Files</span>
+              <span class="pill">🌐 Web</span>
+              <span class="pill">⎇ Commits</span>
+              <span class="pill ghost">+ Actions</span>
+            </div>
+
+            <div class="timeline">
+              <div class="tl-date">Just now</div>
+              <div class="conv">
+                <div class="conv-h">Claude Code <span class="ago">2m ago</span></div>
+                <div class="ln"><span class="av"></span><span class="tx u">Maybe we take the sidebar &amp; command deck and make them one thing…</span></div>
+                <div class="ln"><span class="av cc"></span><span class="tx">On it — Home/Flywheel, then Projects + Conversations, then an issue-tree column on project click.</span></div>
+              </div>
+              <div class="tl-date">Yesterday · May 28 · 11 AM</div>
+              <div class="conv">
+                <div class="conv-h">Codex <span class="ago">1d ago</span></div>
+                <div class="ln"><span class="av"></span><span class="tx">Engine mismatch warnings fixed; deps pinned for Node 22.</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>The one rule this time:</b> the Home tab = your existing HomePane, untouched. It already has the launch omnibox, agent pills, action pills, and the conversation timeline you love. Everything new is <i>navigation chrome</i> to its left. Conversations are back to a <b>plain list</b> in the sidebar; the <b>issue tree</b> is a column that only appears once you pick a project.
+  </div>
+
+  <h2>2 · The flow</h2>
+  <div class="legend">
+    <div class="row"><span class="key" style="background:#6b7280">1 · Sidebar</span><span>Home · Flywheel, then <b>Projects</b> + <b>Conversations</b> (plain list). Sidebar &amp; Command Deck merged into one column.</span></div>
+    <div class="row"><span class="key" style="background:#9333ea">2 · Tree</span><span>Click a project → its <b>issue tree</b> column appears (status dots, ids, workers — the real <code>FeatureItem</code> data).</span></div>
+    <div class="row"><span class="key" style="background:#0ea5e9">3 · Deck</span><span>Tabs; <b>Home</b> = the loved launch view. Click an issue/convo → opens as a tab.</span></div>
+  </div>
+
+  <p class="legend-note">Open questions: should the issue-tree column be <b>pinned</b> once shown, or collapse when you switch to a non-project view? Does <b>Conversations</b> stay global, or filter to the selected project? · Issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. (Earlier explorations: <a class="pill-link" href="pan-1561-project-deck-refined.html">refined</a> · <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549 origin</a>.)</p>
+
+</div>
+</body>
+</html>
