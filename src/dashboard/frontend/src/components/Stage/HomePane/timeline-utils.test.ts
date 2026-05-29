@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupConversationsByDate, dateGroupLabel, relativeTime, toEpoch } from './timeline'
+import { groupConversationsByDate, dateGroupLabel, relativeTime, toEpoch } from './timeline-utils'
 
 const NOW = new Date('2026-05-28T12:00:00Z').getTime()
 const DAY = 86_400_000
