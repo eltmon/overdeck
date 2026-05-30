@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import { useEffect, useMemo, useCallback, useState, type ReactNode } from 'react'
 import {
   usePanesStore,
   selectPanesForWorkspace,
@@ -8,6 +8,9 @@ import {
   type PaneSpec,
 } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
+import { useConversationMutations } from '../CommandDeck/useConversationMutations'
+import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
+import { ForkModal } from '../CommandDeck/ForkModal'
 import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
@@ -207,6 +210,28 @@ export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConver
     (paneId: string) => closePane(deckKey, paneId),
     [closePane, deckKey],
   )
+
+  // Right-click a conversation tab → the same actions as the conversation ⋮.
+  // Hosted here because the Stage already maps a pane to its conversation and
+  // can own the mutations + ForkModal. `tabMenu` stores the conversation *name*
+  // so the menu re-resolves live state (e.g. favorite toggles) on each render.
+  const convMutations = useConversationMutations(null, () => {})
+  const [tabMenu, setTabMenu] = useState<{ conversationName: string; paneId: string; top: number; left: number } | null>(null)
+  const handlePaneContextMenu = useCallback(
+    (pane: WorkspacePane, e: React.MouseEvent) => {
+      if (pane.paneType !== 'agent' || !pane.conversationId) return
+      if (!conversations.some((c) => c.name === pane.conversationId)) return
+      e.preventDefault()
+      setTabMenu({
+        conversationName: pane.conversationId,
+        paneId: pane.paneId,
+        top: Math.min(e.clientY, window.innerHeight - 360),
+        left: Math.min(e.clientX, window.innerWidth - 240),
+      })
+    },
+    [conversations],
+  )
+
   // PAN-1561: the "+" opens a menu of what to create, so it's explicit rather
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
@@ -264,6 +289,10 @@ export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConver
 
   const activePane = displayPanes.find((p) => p.paneId === activePaneId) ?? displayPanes[0] ?? null
 
+  // Re-resolve the right-clicked tab's conversation from the live list so the
+  // menu reflects current state and self-dismisses if the conversation is gone.
+  const tabMenuConv = tabMenu ? conversations.find((c) => c.name === tabMenu.conversationName) ?? null : null
+
   return (
     <div className={styles.stage}>
       <PaneBar
@@ -273,6 +302,7 @@ export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConver
         onClose={handleClosePane}
         onAdd={handleAddPane}
         newActions={newActions}
+        onPaneContextMenu={handlePaneContextMenu}
       />
       <div className={styles.pane}>
         {activePane &&
@@ -283,6 +313,29 @@ export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConver
               : renderPane(activePane, ctx))}
       </div>
       {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
+
+      {tabMenu && tabMenuConv && (
+        <ConversationActionMenu
+          conversation={tabMenuConv}
+          mutations={convMutations}
+          position={{ top: tabMenu.top, left: tabMenu.left }}
+          onClose={() => setTabMenu(null)}
+          onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
+        />
+      )}
+
+      {convMutations.forkTarget && (
+        <ForkModal
+          conversation={convMutations.forkTarget}
+          initialMode={convMutations.forkTargetMode}
+          initialFocus={convMutations.forkTargetFocus}
+          isPending={convMutations.isForkPending}
+          onClose={convMutations.closeForkModal}
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+            convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness)
+          }}
+        />
+      )}
     </div>
   )
 }

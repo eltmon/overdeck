@@ -32,6 +32,8 @@ export interface PaneBarProps {
   onAdd: () => void
   /** When provided, the "+" opens a menu of these create actions (PAN-1561). */
   newActions?: NewPaneAction[]
+  /** Right-click on a tab → host opens the conversation action menu at cursor. */
+  onPaneContextMenu?: (pane: WorkspacePane, e: React.MouseEvent) => void
 }
 
 /**
@@ -40,7 +42,7 @@ export interface PaneBarProps {
  * ⌘N hint for the first nine panes, and exposes close (×, non-HOME only) and
  * add (+) affordances via callbacks.
  */
-export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu }: PaneBarProps) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -87,6 +89,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             aria-selected={isActive}
             className={`${styles.panetab} ${isActive ? styles.active : ''}`}
             onClick={() => onSelect(pane.paneId)}
+            onContextMenu={(e) => onPaneContextMenu?.(pane, e)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
