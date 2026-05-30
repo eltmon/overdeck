@@ -4453,6 +4453,16 @@
   white-space: normal;
 }
 
+/* Contextual warning shown under a harness option only when picking it would
+   force a model swap (e.g. Pi + Anthropic-on-subscription). Distinct from the
+   neutral description above so the option doesn't read as broken at rest. */
+.harnessOptionNote {
+  font-size: 10px;
+  color: var(--warning, #d97706);
+  line-height: 1.35;
+  white-space: normal;
+}
+
 .pickerOptionLabel {
   flex: 1;
   text-align: left;

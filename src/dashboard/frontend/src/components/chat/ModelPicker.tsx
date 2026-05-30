@@ -29,7 +29,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
  */
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
-  'pi': 'gpt-5.4',
+  'pi': 'gpt-5.5',
 };
 
 /**
@@ -408,12 +408,14 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                   const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
                   const isActive = harness === opt.id;
                   const willAutoFlip = !decision.allowed;
-                  const subtitle = willAutoFlip && decision.reason ? decision.reason : opt.description;
                   const handleClick = () => {
                     if (isActive) return;
+                    // Keep the dropdown OPEN after a harness switch so the user
+                    // sees the checkmark move and — when the model is auto-flipped
+                    // below — sees the new model highlighted and can override it
+                    // in the same interaction instead of being slammed shut.
                     if (decision.allowed) {
                       onHarnessChange(opt.id);
-                      setOpen(false);
                       return;
                     }
                     // Auto-resolve: pick a model the new harness can run.
@@ -433,7 +435,6 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       if (replacementModel !== value) onChange(replacementModel, replacementEffort);
                       onHarnessChange(opt.id);
                     }
-                    setOpen(false);
                   };
                   return (
                     <button
@@ -448,7 +449,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       </span>
                       <span className={styles.harnessOptionBody}>
                         <span className={styles.harnessOptionName}>{opt.label}</span>
-                        {subtitle && <span className={styles.harnessOptionDesc}>{subtitle}</span>}
+                        {opt.description && <span className={styles.harnessOptionDesc}>{opt.description}</span>}
+                        {willAutoFlip && decision.reason && (
+                          <span className={styles.harnessOptionNote}>{decision.reason}</span>
+                        )}
                       </span>
                     </button>
                   );
