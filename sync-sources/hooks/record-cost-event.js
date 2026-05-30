@@ -3476,15 +3476,6 @@ const failCause = exitFailCause;
 /** @internal */
 const fail = exitFail;
 /** @internal */
-const sync$1 = /* @__PURE__ */ makePrimitive({
-	op: "Sync",
-	[evaluate](fiber) {
-		const value = this[args]();
-		const cont = fiber.getCont(contA);
-		return cont ? cont[contA](value, fiber) : fiber.yieldWith(exitSucceed(value));
-	}
-});
-/** @internal */
 const suspend = /* @__PURE__ */ makePrimitive({
 	op: "Suspend",
 	[evaluate](_fiber) {
@@ -3697,42 +3688,6 @@ const TaggedError = TaggedError$1;
 * @since 2.0.0
 */
 const succeed = succeed$1;
-/**
-* Creates an `Effect` that represents a synchronous side-effectful computation.
-*
-* **When to use**
-*
-* Use when you are sure the operation will not fail.
-*
-* **Details**
-*
-* The provided function is evaluated lazily when the effect runs.
-*
-* **Gotchas**
-*
-* The function must not throw. If it throws, the thrown value is treated as a
-* defect, not as a typed failure. Use `try` when throwing is expected.
-*
-* **Example** (Capturing synchronous logging in an Effect)
-*
-* ```ts
-* import { Effect } from "effect"
-*
-* const log = (message: string) =>
-*   Effect.sync(() => {
-*     console.log(message) // side effect
-*   })
-*
-* //      ┌─── Effect<void, never, never>
-* //      ▼
-* const program = log("Hello, World!")
-* ```
-*
-* @see {@link try_ | try} for a version that can handle failures.
-* @category creating effects
-* @since 2.0.0
-*/
-const sync = sync$1;
 const void_ = void_$1;
 const try_ = try_$1;
 /**
@@ -3925,8 +3880,7 @@ function encodeClaudeProjectDir(cwdPath) {
 }
 TaggedError("VcsError");
 TaggedError("VcsTimeoutError");
-/** A filesystem operation (read, write, mkdir, unlink, stat) failed. */
-var FsError = class extends TaggedError("FsError") {};
+TaggedError("FsError");
 TaggedError("FsNotFoundError");
 TaggedError("GitError");
 TaggedError("MergeConflictError");
@@ -3943,12 +3897,6 @@ TaggedError("ProcessSpawnError");
 TaggedError("ProcessTimeoutError");
 //#endregion
 //#region ../../src/lib/cost.ts
-/**
-* Cost Tracking System
-*
-* Track AI usage costs per feature, issue, and project.
-* Supports multiple AI providers with configurable pricing.
-*/
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
@@ -4140,6 +4088,15 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "custom",
+		model: "kimi-k2.6",
+		inputPer1k: 6e-4,
+		outputPer1k: .002,
+		cacheReadPer1k: 6e-5,
+		cacheWrite5mPer1k: 75e-5,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
 		model: "kimi-k2.5",
 		inputPer1k: 6e-4,
 		outputPer1k: .002,
@@ -4206,10 +4163,6 @@ function getPricingSync(provider, model) {
 	return pricing || null;
 }
 join(COSTS_DIR, "budgets.json");
-/** Compute the cost of one token-usage record at given pricing. Pure. */
-const calculateCost = (usage, pricing) => sync(() => calculateCostSync(usage, pricing));
-/** Look up pricing for a (provider, model) pair. Pure. */
-const getPricing = (provider, model) => sync(() => getPricingSync(provider, model));
 function parseArrayColumn(value) {
 	if (!value) return [];
 	try {
@@ -12330,19 +12283,6 @@ function appendCostEventSync(event) {
 		console.error("[cost-events] WAL write failed (continuing):", err);
 	}
 }
-/**
-* Effect variant of appendCostEvent. Failures surface as typed FsError on the
-* error channel instead of thrown exceptions. SQLite and WAL best-effort
-* writes preserve the same semantics as the sync variant.
-*/
-const appendCostEvent = (event) => try_({
-	try: () => appendCostEventSync(event),
-	catch: (cause) => new FsError({
-		path: getEventsFile(),
-		operation: "appendCostEvent",
-		cause
-	})
-});
 //#endregion
 //#region ../../src/lib/tldr-daemon.ts
 /**
@@ -12457,15 +12397,6 @@ function captureTldrMetricsSync(workspacePath) {
 	return metrics;
 }
 promisify(exec);
-/** Capture-and-checkpoint TLDR metrics; null when nothing new is logged. */
-const captureTldrMetrics = (workspacePath) => try_({
-	try: () => captureTldrMetricsSync(workspacePath),
-	catch: (cause) => new FsError({
-		path: workspacePath,
-		operation: "captureTldrMetrics",
-		cause
-	})
-});
 //#endregion
 //#region record-cost-event.ts
 /**
@@ -12549,7 +12480,7 @@ try {
 			"pipe"
 		]
 	}).trim();
-	if (workspaceRoot) tldrMetrics = captureTldrMetrics(workspaceRoot);
+	if (workspaceRoot) tldrMetrics = captureTldrMetricsSync(workspaceRoot);
 } catch {}
 let tldrAttachedToFirstEvent = false;
 for (const line of lines) {
@@ -12573,9 +12504,9 @@ for (const line of lines) {
 		if (model.includes("gpt")) provider = "openai";
 		else if (model.includes("gemini")) provider = "google";
 		else if (model.includes("kimi") || model.toLowerCase().startsWith("minimax")) provider = "custom";
-		const pricing = getPricing(provider, model);
+		const pricing = getPricingSync(provider, model);
 		if (!pricing) continue;
-		const cost = calculateCost({
+		const cost = calculateCostSync({
 			inputTokens,
 			outputTokens,
 			cacheReadTokens,
@@ -12589,7 +12520,7 @@ for (const line of lines) {
 			tldrBypassReasons: Object.keys(tldrMetrics.bypassReasons).length > 0 ? tldrMetrics.bypassReasons : void 0
 		} : {};
 		if (tldrMetrics && !tldrAttachedToFirstEvent) tldrAttachedToFirstEvent = true;
-		appendCostEvent({
+		appendCostEventSync({
 			ts: (/* @__PURE__ */ new Date()).toISOString(),
 			type: "cost",
 			agentId,
