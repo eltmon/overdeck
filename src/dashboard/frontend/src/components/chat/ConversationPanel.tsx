@@ -770,7 +770,7 @@ export function ConversationPanel({
               </>
             )}
             <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <PanOpenInPicker openInCwd={conversation.cwd} compact />
+            <PanOpenInPicker openInCwd={conversation.cwd} />
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
