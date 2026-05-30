@@ -150,8 +150,10 @@ describe('auto-merge executor', () => {
       log,
     });
 
+    const retryAt = new Date(NOW.getTime() + 60_000).toISOString();
     expect(markMerged).not.toHaveBeenCalled();
     expect(markFailed).not.toHaveBeenCalled();
+    expect(requeueToPending).toHaveBeenCalledWith(1, retryAt);
     expect(announceFailure).not.toHaveBeenCalled();
     expect(requeueToPending).toHaveBeenCalledWith(1, expect.any(String));
     expect(log).toHaveBeenCalledWith(

@@ -5,12 +5,21 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   addPanopticonHookIfMissing,
+  parseHookHarness,
   setupHooksCommand,
   type ClaudeSettings,
 } from '../setup/hooks.js';
 
 describe('setup hooks', () => {
   const originalHome = process.env.HOME;
+
+  it('parses hook harness choices', () => {
+    expect(parseHookHarness(undefined)).toBeUndefined();
+    expect(parseHookHarness('claude-code')).toBe('claude-code');
+    expect(parseHookHarness('pi')).toBe('pi');
+    expect(parseHookHarness('both')).toBe('both');
+    expect(() => parseHookHarness('bogus')).toThrow('Invalid harness');
+  });
 
   afterEach(() => {
     if (originalHome === undefined) {
@@ -89,7 +98,7 @@ describe('setup hooks', () => {
     process.env.HOME = home;
 
     try {
-      await setupHooksCommand();
+      await setupHooksCommand({ harness: 'claude-code' });
 
       const settings = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8')) as ClaudeSettings;
       expect(settings.hooks?.PreToolUse).toEqual(expect.arrayContaining([

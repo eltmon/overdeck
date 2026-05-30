@@ -113,6 +113,7 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
       host: '127.0.0.1',
       port: 0,
       fs: { allow: [root, projectRoot] },
+      watch: null,
     },
     esbuild: {
       jsx: 'transform',

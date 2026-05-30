@@ -1,5 +1,6 @@
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { validateAgentRuntimeEventAuth } from './agents.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getClaudePermissionFlagsStringSync } from '../../../lib/claude-permissions.js';
 /**
@@ -60,9 +61,13 @@ import {
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import {
+  getAgentRuntimeState,
+  getAgentState,
   saveAgentRuntimeState,
   messageAgent,
   transitionIssueToInProgress,
+  type AgentRuntimeState,
+  type AgentState,
 } from '../../../lib/agents.js';
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -83,14 +88,6 @@ type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'insp
 type ProjectSpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent';
 type SpecialistEventRole = 'review' | 'test' | 'ship';
 
-const VALID_SPECIALIST_NAMES: string[] = [
-  'merge-agent',
-  'review-agent',
-  'test-agent',
-  'inspect-agent',
-  'uat-agent',
-];
-
 function validateSpecialistAgentName(type: string): type is ProjectSpecialistAgentName {
   return type === 'review-agent' || type === 'test-agent' || type === 'merge-agent';
 }
@@ -100,6 +97,69 @@ function specialistEventRole(name: string): SpecialistEventRole | undefined {
   if (name === 'test' || name === 'test-agent') return 'test';
   if (name === 'merge' || name === 'merge-agent') return 'ship';
   return undefined;
+}
+
+function specialistNameForRole(role: string | undefined): ProjectSpecialistAgentName | null {
+  const baseRole = role?.split('.')[0];
+  if (baseRole === 'review') return 'review-agent';
+  if (baseRole === 'test') return 'test-agent';
+  if (baseRole === 'ship') return 'merge-agent';
+  return null;
+}
+
+type SpecialistAutoCompleteBody = {
+  agentId?: string;
+  issueId?: string;
+  role?: string;
+  sessionId?: string | null;
+  status?: string;
+  notes?: string;
+};
+
+export function validateSpecialistAutoCompleteMetadata(
+  name: string,
+  body: SpecialistAutoCompleteBody,
+  agentState: AgentState | null,
+  runtimeState: AgentRuntimeState | null,
+): { ok: true } | { ok: false; status: number; error: string } {
+  if (!validateSpecialistAgentName(name)) {
+    return { ok: false, status: 400, error: `Invalid specialist name: ${name}` };
+  }
+  if (!body.issueId || !body.status) {
+    return { ok: false, status: 400, error: 'issueId and status required' };
+  }
+  if (body.status !== 'passed' && body.status !== 'failed') {
+    return { ok: false, status: 400, error: 'status must be passed or failed' };
+  }
+  if (!body.agentId || !body.role) {
+    return { ok: false, status: 400, error: 'agentId and role required' };
+  }
+
+  const normalizedIssueId = body.issueId.toUpperCase();
+  const expectedName = specialistNameForRole(body.role);
+  if (expectedName !== name) {
+    return { ok: false, status: 403, error: 'role does not match specialist' };
+  }
+  if (!agentState || agentState.id !== body.agentId) {
+    return { ok: false, status: 403, error: 'agent run not found' };
+  }
+  if (agentState.issueId.toUpperCase() !== normalizedIssueId) {
+    return { ok: false, status: 403, error: 'agent issue does not match request' };
+  }
+  if (specialistNameForRole(agentState.role) !== name) {
+    return { ok: false, status: 403, error: 'agent role does not match specialist' };
+  }
+  if (agentState.status !== 'running' && agentState.status !== 'starting') {
+    return { ok: false, status: 409, error: 'agent run is not active' };
+  }
+  if (runtimeState?.currentIssue && runtimeState.currentIssue.toUpperCase() !== normalizedIssueId) {
+    return { ok: false, status: 403, error: 'runtime issue does not match request' };
+  }
+  if (runtimeState?.claudeSessionId && body.sessionId !== runtimeState.claudeSessionId) {
+    return { ok: false, status: 403, error: 'session does not match active run' };
+  }
+
+  return { ok: true };
 }
 
 // Read the request body as unknown JSON
@@ -830,40 +890,34 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/auto-complete',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
-    const body = yield* readJsonBody;
+    const body = (yield* readJsonBody) as SpecialistAutoCompleteBody;
     const eventStore = yield* EventStoreService;
-    const { issueId, status } = body as { issueId?: string; status?: string };
+    const { issueId: requestIssueId, status: requestStatus, agentId } = body;
 
-    if (!issueId || !status) {
-      return jsonResponse(
-        { error: 'issueId and status required' },
-        { status: 400 },
-      );
+    const agentState = agentId ? yield* getAgentState(agentId) : null;
+    const runtimeState = agentId ? yield* getAgentRuntimeState(agentId) : null;
+    const metadata = validateSpecialistAutoCompleteMetadata(name, body, agentState, runtimeState);
+    if (!metadata.ok) {
+      return jsonResponse({ error: metadata.error }, { status: metadata.status });
     }
+
+    const issueId = requestIssueId!;
+    const status = requestStatus!;
+    const completingAgentId = agentId!;
 
     console.log(`[specialists] Auto-detected completion for ${name}: ${issueId} -> ${status}`);
 
-    if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return jsonResponse(
-        { error: `Invalid specialist name: ${name}` },
-        { status: 400 },
-      );
-    }
-
-    const {
-      getTmuxSessionName,
-    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-
-    const tmuxSession = getTmuxSessionName(name as SpecialistAgentName);
-
-    // Set specialist to idle and clear currentIssue
-    saveAgentRuntimeState(tmuxSession, {
+    yield* Effect.promise(() => saveAgentRuntimeState(completingAgentId, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
       currentIssue: undefined,
-    });
+    }));
 
     // Update review/test status based on specialist type
     const existingStatus = getReviewStatusSync(issueId);

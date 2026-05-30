@@ -555,20 +555,16 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
-  // Scan all configured projects. Priority: numeric-suffix form (feature-1034) before
-  // full lowercased form (feature-pan-1034). The numeric-suffix is the canonical naming
-  // for git worktrees; the full lowercased form is the legacy fallback.
   for (const { config } of listProjectsSync()) {
     if (!config.path) continue;
-    for (const candidate of [`feature-${numericSuffix}`, `feature-${issueLower}`]) {
+    for (const candidate of [`feature-${issueLower}`, `feature-${numericSuffix}`]) {
       const p = join(config.path, 'workspaces', candidate);
       if (existsSync(p)) return { exists: true, isRemote: false, localPath: p };
     }
   }
 
-  // Fallback: canonical path under getProjectPath
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const workspacePath = join(projectPath, 'workspaces', `feature-${numericSuffix}`);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
 
   return { exists: false, isRemote: false };

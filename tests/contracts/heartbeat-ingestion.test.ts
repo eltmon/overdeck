@@ -66,6 +66,14 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
     expect((ev as any).type).toBe('agent.resolution_changed')
   })
 
+  it('cost-event → cost.event_recorded', () => {
+    const ev = bodyToEvent(AGENT, { kind: 'cost-event', issueId: 'PAN-1134', costUsd: 0.002, usage: { inputTokens: 10, outputTokens: 5 } }, TS)
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    expect((ev as any).type).toBe('cost.event_recorded')
+    expect((ev as any).payload).toMatchObject({ agentId: AGENT, issueId: 'PAN-1134', cost: 0.002, inputTokens: 10, outputTokens: 5 })
+  })
+
   it('channel_reply → agent.channel_reply', () => {
     const ev = bodyToEvent(
       AGENT,
