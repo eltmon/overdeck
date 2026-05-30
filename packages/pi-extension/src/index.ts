@@ -332,6 +332,20 @@ export async function handleSessionBriefingContext(
   await appendSystemPromptFile(ctx, join(home, 'session-context.md'))
 }
 
+/**
+ * Load the rendered global context layer (PAN-1566) and fold it into the
+ * Pi session's system prompt.
+ *
+ * `pan sync` renders the global layer (~/.panopticon/context/global.md +
+ * bundled engineering rules) into ~/.panopticon/context/pi-global.md so Pi
+ * sessions receive the same engineering rules that Claude Code gets via
+ * ~/.claude/CLAUDE.md.
+ */
+export async function handleGlobalContext(ctx: unknown): Promise<void> {
+  const home = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon')
+  await appendSystemPromptFile(ctx, join(home, 'context', 'pi-global.md'))
+}
+
 async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void> {
   const content = await readFile(file, 'utf8').catch(() => '')
   if (!content.trim()) return
@@ -363,6 +377,8 @@ export default function panopticonPiExtension(pi: PiExtensionAPI): void {
   pi.on('session_start', async (event, ctx) => {
     try {
       await handleSessionStart(env, event)
+      // PAN-1566: fold the global engineering-rules layer into the prompt.
+      await handleGlobalContext(ctx)
       // PAN-1201: fold the assembled workspace context layer into the prompt.
       await handleWorkspaceContext(ctx)
       await handleSessionBriefingContext(ctx)

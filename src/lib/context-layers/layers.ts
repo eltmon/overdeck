@@ -76,6 +76,11 @@ export function workspaceContextFile(workspacePath: string): string {
   return join(workspaceContextDir(workspacePath), 'workspace.md');
 }
 
+/** `~/.panopticon/context/pi-global.md` — the rendered global layer for Pi. */
+export function piGlobalContextFile(): string {
+  return join(getPanopticonHome(), 'context', 'pi-global.md');
+}
+
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */

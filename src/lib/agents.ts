@@ -96,7 +96,6 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
 }
 
 async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code' | 'pi' | undefined): Promise<string[]> {
-  if (harness === 'pi') return [];
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspace);
   try {
@@ -106,6 +105,16 @@ async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code'
     if (!isNodeNotFound(error)) throw error;
   }
   files.push(await ensureSessionContextBriefingFile());
+
+  // PAN-1566: Pi also receives the rendered global context layer.
+  if (harness === 'pi') {
+    const { piGlobalContextFile } = await import('./context-layers/index.js');
+    const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+
   return files;
 }
 
@@ -197,17 +206,52 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
 }
 
 /**
+ * Inject prompt-time memory context into a Pi prompt (PAN-1546).
+ * Mirrors Claude Code's UserPromptSubmit hook behaviour: every follow-up
+ * prompt gets relevant memory surfaced via RAG.
+ */
+async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promise<string> {
+  if (!prompt.trim()) return prompt;
+
+  const agentState = getAgentStateSync(agentId);
+  if (!agentState || !agentState.workspace || !agentState.issueId) {
+    return prompt;
+  }
+
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(agentState.workspace),
+      workspaceId: basename(agentState.workspace),
+      issueId: agentState.issueId,
+      runId: agentId,
+      sessionId: agentId,
+      agentRole: agentState.role ?? 'work',
+      agentHarness: agentState.harness ?? 'pi',
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
+    if (result.context) {
+      return `${result.context}\n\n---\n\n${prompt}`;
+    }
+  } catch (error) {
+    console.warn(`[agents] Prompt-time memory injection failed for ${agentId}:`, error instanceof Error ? error.message : String(error));
+  }
+  return prompt;
+}
+
+/**
  * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
  * Pi never reads tmux input — pasting prompts there is a no-op as far as the
  * model is concerned. Throws if Pi never reached readiness within the timeout.
  */
 async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForPiAgentReady(agentId, timeoutSec);
   if (!ready) {
     throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
   }
   try {
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: prompt });
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);

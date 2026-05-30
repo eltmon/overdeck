@@ -22,6 +22,7 @@ import {
   renderGlobalLayer,
   renderProjectLayer,
   applyManagedRegion,
+  piGlobalContextFile,
 } from './context-layers/index.js';
 
 export interface SyncItem {
@@ -501,6 +502,8 @@ export interface ContextLayerSyncResult {
   globalStubCreated: boolean;
   /** Names of registered projects whose CLAUDE.md was written this run. */
   projectsWritten: string[];
+  /** True when ~/.panopticon/context/pi-global.md was written this run. */
+  piGlobalWritten: boolean;
   errors: string[];
 }
 
@@ -519,6 +522,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     globalWritten: false,
     globalStubCreated: false,
     projectsWritten: [],
+    piGlobalWritten: false,
     errors: [],
   };
 
@@ -536,6 +540,20 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     }
   } catch (err: any) {
     result.errors.push(`global: ${err?.message ?? err}`);
+  }
+
+  // PAN-1566: Global layer → ~/.panopticon/context/pi-global.md
+  try {
+    const piManaged = renderGlobalLayer('pi', isDevMode());
+    const piGlobalFile = piGlobalContextFile();
+    const existingPi = existsSync(piGlobalFile) ? readFileSync(piGlobalFile, 'utf-8') : '';
+    if (piManaged.trim() !== existingPi.trim()) {
+      mkdirSync(dirname(piGlobalFile), { recursive: true });
+      writeFileSync(piGlobalFile, piManaged.trim() + '\n', 'utf-8');
+      result.piGlobalWritten = true;
+    }
+  } catch (err: any) {
+    result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
   // Project layers → <projectRoot>/CLAUDE.md

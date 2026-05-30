@@ -28,6 +28,7 @@ export {
   projectContextFile,
   workspaceContextDir,
   workspaceContextFile,
+  piGlobalContextFile,
   GLOBAL_STARTER,
   PROJECT_STARTER,
   globalLayer,
