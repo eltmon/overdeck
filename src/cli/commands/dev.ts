@@ -1,9 +1,10 @@
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn, ChildProcess } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
+import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -181,6 +182,21 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const frontendDir = join(__dirname, '..', '..', 'src', 'dashboard', 'frontend');
 
   console.log(chalk.bold('Starting Panopticon in development mode...\n'));
+
+  // Refuse to start a second dev session — two supervisors would fight over the
+  // ports, each respawning children the other just killed. readDevSupervisorMarker
+  // self-heals a stale marker left by a crashed `pan dev`.
+  {
+    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
+    const existing = readDevSupervisorMarker();
+    if (existing && existing.pid !== process.pid) {
+      console.error(chalk.yellow(`A \`pan dev\` session is already running (pid ${existing.pid}).`));
+      console.error(chalk.dim('  Stop it first with `pan down` (or Ctrl-C in that terminal) before starting another.'));
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   if (options.noResume) {
     console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
   }
@@ -271,42 +287,146 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   }
 
   // Tracked here (not in shutdown()) so child-close handlers can see it.
+  // `shuttingDown` = pan dev is intentionally tearing down (Ctrl-C / SIGTERM /
+  // routed `pan down`) → children are NOT respawned.
+  // `supervising`  = initial startup succeeded → a stray child death IS respawned.
   let shuttingDown = false;
+  let supervising = false;
 
-  // ── Start API server ───────────────────────────────────────────────────────
-  console.log(chalk.dim('Starting API server (Node 22)...'));
-  const apiChild = spawn(node22, [bundledServer], {
-    detached: false,
-    stdio: 'pipe',
-    env: {
-      ...process.env,
-      API_PORT: String(config.dashboardApiPort),
-      PANOPTICON_MODE: 'development',
-      ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-      ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
-    },
-  });
+  // Re-pointed each time a child is (re)spawned so shutdown() and the respawn
+  // schedulers always reference the live process.
+  let apiChild!: ChildProcess;
+  let viteChild!: ChildProcess;
 
-  apiChild.stdout?.on('data', (data) => {
-    process.stdout.write(chalk.dim(`[server] ${data}`));
-  });
-  apiChild.stderr?.on('data', (data) => {
-    process.stderr.write(chalk.dim(`[server] ${data}`));
-  });
+  // Crash-loop guards — timestamps of recent restarts per child. If a child
+  // dies faster than we can keep it up, give up rather than spin forever (the
+  // root cause is a real error, not a stray kill — masking it would be a bandaid).
+  let apiRestarts: number[] = [];
+  let viteRestarts: number[] = [];
 
-  apiChild.on('error', (err) => {
-    console.error(chalk.red('Failed to start API server:'), err.message);
-    process.exit(1);
-  });
+  const tooManyRestarts = (stamps: number[]): boolean => {
+    const now = Date.now();
+    const recent = stamps.filter((t) => now - t < 60_000);
+    stamps.length = 0;
+    stamps.push(...recent, now);
+    return recent.length >= 5;
+  };
 
-  apiChild.on('close', (code, signal) => {
-    console.error(chalk.yellow(`[pan dev] API child closed: pid=${apiChild.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
-    if (code !== 0 && code !== null) {
-      console.error(chalk.red(`API server exited with code ${code}`));
-      process.exit(1);
+  // ── API server (Node 22) ─────────────────────────────────────────────────────
+  const startApi = (): ChildProcess => {
+    const child = spawn(node22, [bundledServer], {
+      detached: false,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        API_PORT: String(config.dashboardApiPort),
+        PANOPTICON_MODE: 'development',
+        ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+        ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+      },
+    });
+    child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[server] ${data}`)));
+    child.stderr?.on('data', (data) => process.stderr.write(chalk.dim(`[server] ${data}`)));
+    child.on('error', (err) => {
+      console.error(chalk.red('Failed to start API server:'), err.message);
+      if (!supervising) process.exit(1);
+      else scheduleApiRespawn();
+    });
+    child.on('close', (code, signal) => {
+      console.error(chalk.yellow(`[pan dev] API child closed: pid=${child.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
+      if (!supervising) {
+        if (code !== 0 && code !== null) {
+          console.error(chalk.red(`API server exited with code ${code}`));
+          process.exit(1);
+        }
+        return;
+      }
+      if (shuttingDown) return;
+      scheduleApiRespawn();
+    });
+    return child;
+  };
+
+  const scheduleApiRespawn = (): void => {
+    if (!supervising || shuttingDown) return;
+    if (tooManyRestarts(apiRestarts)) {
+      console.error(chalk.red('[pan dev] API server crash-looping (≥5 restarts in 60s) — giving up. Fix the underlying error, then re-run `pan dev`.'));
+      void shutdown('crash-loop');
+      return;
     }
-  });
+    const delayMs = Math.min(500 * apiRestarts.length, 5000);
+    console.error(chalk.yellow(`[pan dev] API server died unexpectedly — reclaiming port ${config.dashboardApiPort} and restarting in ${delayMs}ms...`));
+    setTimeout(async () => {
+      if (!supervising || shuttingDown) return;
+      killPort(config.dashboardApiPort);
+      try { await waitForPortFree(config.dashboardApiPort, 3000); } catch { /* proceed */ }
+      apiChild = startApi();
+      try {
+        await waitForHealth(config.dashboardApiPort, '/api/health', 15000);
+        console.log(chalk.green('✓ API server recovered'));
+      } catch (err: any) {
+        console.error(chalk.red('[pan dev] API server unhealthy after restart:'), err.message);
+        // The child's own close handler reschedules if it actually exited.
+      }
+    }, delayMs);
+  };
 
+  // ── Vite dev server ──────────────────────────────────────────────────────────
+  const startVite = (): ChildProcess => {
+    const child = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(config.dashboardPort)], {
+      cwd: frontendDir,
+      detached: false,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        TRAEFIK_ENABLED: config.traefikEnabled ? 'true' : 'false',
+      },
+    });
+    child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[vite] ${data}`)));
+    child.stderr?.on('data', (data) => process.stderr.write(chalk.dim(`[vite] ${data}`)));
+    child.on('error', (err) => {
+      console.error(chalk.red('Failed to start Vite:'), err.message);
+      if (!supervising) {
+        if (apiChild) apiChild.kill('SIGTERM');
+        process.exit(1);
+      } else {
+        scheduleViteRespawn();
+      }
+    });
+    child.on('close', (code, signal) => {
+      console.error(chalk.yellow(`[pan dev] Vite child closed: pid=${child.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
+      if (!supervising || shuttingDown) return;
+      scheduleViteRespawn();
+    });
+    return child;
+  };
+
+  const scheduleViteRespawn = (): void => {
+    if (!supervising || shuttingDown) return;
+    if (tooManyRestarts(viteRestarts)) {
+      console.error(chalk.red('[pan dev] Vite crash-looping (≥5 restarts in 60s) — giving up. Fix the underlying error, then re-run `pan dev`.'));
+      void shutdown('crash-loop');
+      return;
+    }
+    const delayMs = Math.min(500 * viteRestarts.length, 5000);
+    console.error(chalk.yellow(`[pan dev] Vite died unexpectedly — reclaiming port ${config.dashboardPort} and restarting in ${delayMs}ms...`));
+    setTimeout(async () => {
+      if (!supervising || shuttingDown) return;
+      killPort(config.dashboardPort);
+      try { await waitForPortFree(config.dashboardPort, 3000); } catch { /* proceed */ }
+      viteChild = startVite();
+      try {
+        await waitForHttp200(config.dashboardPort, 10000);
+        console.log(chalk.green('✓ Vite dev server recovered'));
+      } catch (err: any) {
+        console.error(chalk.red('[pan dev] Vite unhealthy after restart:'), err.message);
+      }
+    }, delayMs);
+  };
+
+  // ── Initial startup (fail-fast until `supervising` flips on) ──────────────────
+  console.log(chalk.dim('Starting API server (Node 22)...'));
+  apiChild = startApi();
   try {
     await waitForHealth(config.dashboardApiPort, '/api/health', 15000);
     console.log(chalk.green('✓ API server ready'));
@@ -316,35 +436,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     process.exit(1);
   }
 
-  // ── Start Vite frontend ────────────────────────────────────────────────────
   console.log(chalk.dim('Starting Vite dev server...'));
-  const viteChild = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(config.dashboardPort)], {
-    cwd: frontendDir,
-    detached: false,
-    stdio: 'pipe',
-    env: {
-      ...process.env,
-      TRAEFIK_ENABLED: config.traefikEnabled ? 'true' : 'false',
-    },
-  });
-
-  viteChild.stdout?.on('data', (data) => {
-    process.stdout.write(chalk.dim(`[vite] ${data}`));
-  });
-  viteChild.stderr?.on('data', (data) => {
-    process.stderr.write(chalk.dim(`[vite] ${data}`));
-  });
-
-  viteChild.on('error', (err) => {
-    console.error(chalk.red('Failed to start Vite:'), err.message);
-    apiChild.kill('SIGTERM');
-    process.exit(1);
-  });
-
-  viteChild.on('close', (code, signal) => {
-    console.error(chalk.yellow(`[pan dev] Vite child closed: pid=${viteChild.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
-  });
-
+  viteChild = startVite();
   try {
     await waitForHttp200(config.dashboardPort, 10000);
     console.log(chalk.green('✓ Vite dev server ready'));
@@ -354,6 +447,15 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     viteChild.kill('SIGTERM');
     process.exit(1);
   }
+
+  // Both children are healthy: enable self-healing and publish the marker so the
+  // rest of the platform knows an interactive dev session owns these ports.
+  supervising = true;
+  writeDevSupervisorMarker({
+    pid: process.pid,
+    dashboardPort: config.dashboardPort,
+    apiPort: config.dashboardApiPort,
+  });
 
   // ── Sidecars ───────────────────────────────────────────────────────────────
   await startSidecars();
@@ -373,6 +475,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    supervising = false;
+    clearDevSupervisorMarker();
     console.log(chalk.dim(`\n${signal} received by pan dev (pid=${process.pid} ppid=${process.ppid}), shutting down...`));
 
     viteChild.kill('SIGTERM');

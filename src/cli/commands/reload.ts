@@ -66,6 +66,21 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
+  // Refuse to hijack a running `pan dev` session into detached production mode.
+  // Vite already hot-reloads the frontend; the dev supervisor handles server
+  // restarts in its own terminal.
+  {
+    const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../../lib/dev-supervisor.js');
+    const dev = readDevSupervisorMarker();
+    if (dev) {
+      for (const line of devSupervisorRefusalLines('reload the dashboard', dev)) {
+        console.error(chalk.yellow(line));
+      }
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   const lock = await Effect.runPromise(acquireRestartLock('pan reload'));
   if (!lock) {
     const holder = await Effect.runPromise(readRestartLockHolder());

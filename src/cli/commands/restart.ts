@@ -171,6 +171,19 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
+  // Refuse to hijack a running `pan dev` session into detached production mode.
+  if (scope === 'dashboard' || scope === 'full') {
+    const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../../lib/dev-supervisor.js');
+    const dev = readDevSupervisorMarker();
+    if (dev) {
+      for (const line of devSupervisorRefusalLines('restart the dashboard', dev)) {
+        console.error(chalk.yellow(line));
+      }
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   const lockInherited = process.env.PANOPTICON_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
   let restartLock: RestartLockHandle | null = null;

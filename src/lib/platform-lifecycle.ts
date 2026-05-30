@@ -24,6 +24,7 @@ import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
 import { Effect } from 'effect';
 import { LOGS_DIR, PANOPTICON_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
+import { readDevSupervisorMarker } from './dev-supervisor.js';
 
 const execAsync = promisify(exec);
 
@@ -145,6 +146,22 @@ async function describePid(pid: number): Promise<string> {
 ): Promise<void> {
   const graceMs = opts.graceTimeoutMs ?? 5000;
   const ports = [config.dashboardPort, config.dashboardApiPort];
+
+  // 0. If an interactive `pan dev` session owns these ports, route the stop to
+  //    the supervisor itself rather than port-killing its children. The dev
+  //    supervisor respawns any child that dies while it is up, so killing the
+  //    children directly would race its recovery logic. SIGTERMing the
+  //    supervisor sets its `shuttingDown` flag → graceful teardown, marker
+  //    cleared, no respawn. (PAN: dashboard-dev-resilience)
+  const dev = readDevSupervisorMarker();
+  if (dev && dev.dashboardPort === config.dashboardPort && dev.apiPort === config.dashboardApiPort) {
+    killPidsSync([dev.pid], 'SIGTERM');
+    const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs)));
+    if (freed.every(Boolean)) return;
+    // Supervisor failed to release the ports in time — escalate, then fall
+    // through to the normal port-based teardown to mop up orphaned children.
+    killPidsSync([dev.pid], 'SIGKILL');
+  }
 
   // 1. Collect pids across both ports, then SIGTERM.
   const allPids = new Set<number>();

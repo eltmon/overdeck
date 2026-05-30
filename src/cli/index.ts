@@ -621,6 +621,21 @@ program
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+
+    // Refuse to start a detached production dashboard on top of a running
+    // interactive `pan dev` session — they would fight over the same ports.
+    {
+      const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../lib/dev-supervisor.js');
+      const dev = readDevSupervisorMarker();
+      if (dev) {
+        for (const line of devSupervisorRefusalLines('start a detached dashboard', dev)) {
+          console.error(chalk.yellow(line));
+        }
+        process.exitCode = 2;
+        return;
+      }
+    }
+
     if (options.noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
