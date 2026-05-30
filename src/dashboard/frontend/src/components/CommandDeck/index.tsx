@@ -1109,10 +1109,6 @@ export function CommandDeck({
                     onCleanupOrphanedResources={handleCleanupOrphanedResources}
                     onOpenPlanDialog={handleOpenPlanDialog}
                     onNewConversation={handleNewProjectConversation}
-                    conversations={projectConvs}
-                    selectedConversation={selectedConversation}
-                    onSelectConversation={handleSelectConversation}
-                    conversationMutations={projectConvMutations}
                     containerStats={containerStats}
                   />
                 ) : (

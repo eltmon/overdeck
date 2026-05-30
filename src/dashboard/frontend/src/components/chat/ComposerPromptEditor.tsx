@@ -277,6 +277,26 @@ function ComposerPlugin({
     };
   }, [conversationName]);
 
+  // Flush draft on page teardown (hard reload, tab close, crash, dev-mode HMR
+  // full-page reload). React effect cleanups do NOT run on a page-level
+  // teardown — only on clean in-app unmounts — so the unmount flush above is
+  // not enough. Without this, text typed within the debounce window (or typed
+  // continuously, which keeps resetting the debounce) is lost when the page
+  // reloads out from under the editor. pagehide fires on reload/close/bfcache;
+  // visibilitychange→hidden is the more reliable mobile/background signal.
+  useEffect(() => {
+    const flush = () => saveDraft(conversationName, latestTextRef.current);
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [conversationName]);
+
   // Debounced draft persistence
   const handleChange = useCallback(() => {
     if (unmountingRef.current) return;
@@ -456,7 +476,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
 export function ComposerPromptEditor({
   conversationName,
   disabled = false,
-  placeholder = 'Message Claude…',
+  placeholder = 'Message the agent…',
   onCommandKeyDown,
   editorRef,
   onChange,
