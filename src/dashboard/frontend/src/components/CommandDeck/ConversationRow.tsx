@@ -313,7 +313,7 @@ export function ConversationRow({
       ) : isNested ? (
         // Nested project-tree rows stay single-line and ultra-compact.
         <>
-          <span className={styles.projectConvLabel}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           {conv.branch && (
             <span
               className={styles.conversationBranchChip}
@@ -329,7 +329,7 @@ export function ConversationRow({
       ) : (
         // Flat list rows: title on line 1, muted metadata on line 2.
         <span className={styles.conversationMain}>
-          <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+          <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
           <span className={styles.conversationMetaLine}>
             {conv.branch && (
               <span

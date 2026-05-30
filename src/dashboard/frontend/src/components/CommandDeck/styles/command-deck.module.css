@@ -2598,6 +2598,38 @@
   white-space: nowrap;
 }
 
+/* Title regeneration shimmer — applied to the title text while the "magic"
+   retitle is in flight, so the title itself signals it's updating. A gradient
+   sweeps across the text via background-clip. Falls back to a gentle pulse
+   where text background-clip isn't supported. */
+@keyframes titleShimmerSweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.titleRegenerating {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 20%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: titleShimmerSweep 1.25s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .titleRegenerating {
+    animation: none;
+    color: var(--muted-foreground);
+    -webkit-text-fill-color: var(--muted-foreground);
+  }
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

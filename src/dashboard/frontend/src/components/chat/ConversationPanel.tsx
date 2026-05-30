@@ -532,7 +532,7 @@ export function ConversationPanel({
                 />
               ) : (
                 <>
-                  <span className={styles.conversationTerminalTitleText}>
+                  <span className={`${styles.conversationTerminalTitleText} ${retitleMutation.isPending ? styles.titleRegenerating : ''}`}>
                     {conversation.title ?? conversation.name}
                   </span>
                   <button
