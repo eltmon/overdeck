@@ -15,6 +15,7 @@ import {
   type ContextPreviewResponse,
   type ContextProjectSummary,
   type ContextSyncResponse,
+  type ContextSyncTarget,
   type ContextWorkspaceSummary,
   type Harness,
 } from '@panctl/contracts';
@@ -27,7 +28,8 @@ import {
   projectContextFile,
   workspaceContextFile,
 } from '../../../lib/context-layers/layers.js';
-import { getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
+import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
+import { CLAUDE_DIR, getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -223,6 +225,55 @@ async function layerRecord(
   } as ResolvedLayer;
 }
 
+/**
+ * Describe one injection target so the dashboard can show the user where a
+ * managed region lands and whether their own content is preserved there.
+ */
+async function describeSyncTarget(
+  harness: Harness,
+  layerKind: 'global' | 'project',
+  projectKey: string | undefined,
+  label: string,
+  path: string,
+): Promise<ContextSyncTarget> {
+  const { exists, content } = await readOptionalFile(path);
+  return {
+    harness,
+    layerKind,
+    ...(projectKey ? { projectKey } : {}),
+    label,
+    path,
+    exists,
+    hasManagedRegion: exists ? hasManagedRegion(content) : false,
+    hasUserContent: exists ? userContentOutsideRegion(content).length > 0 : false,
+  };
+}
+
+/**
+ * The files `pan sync` writes Panopticon-managed regions into: the global
+ * Claude Code CLAUDE.md, and — for each project with a `project.md` — that
+ * project's CLAUDE.md (Claude Code) and AGENTS.md (Pi). The Pi global layer is
+ * a Panopticon-owned file, not a user file, so it is not listed as a target.
+ */
+async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTarget[]> {
+  const targets: ContextSyncTarget[] = [
+    await describeSyncTarget('claude-code', 'global', undefined, 'Claude Code · global', join(CLAUDE_DIR, 'CLAUDE.md')),
+  ];
+
+  for (const { key, config } of projects) {
+    const projectMd = await readOptionalFile(projectContextFile(config.path));
+    if (!projectMd.exists) continue; // no project.md → sync leaves this project's files alone
+    targets.push(
+      await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
+    );
+    targets.push(
+      await describeSyncTarget('pi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
+    );
+  }
+
+  return targets;
+}
+
 export async function buildContextLayerState(
   projects: ProjectEntry[],
   panopticonHome = getPanopticonHome(),
@@ -252,6 +303,7 @@ export async function buildContextLayerState(
     projects: catalog.summaries,
     workspaces: catalog.workspaces,
     layers: resolvedLayers.map(({ dir: _dir, ...layer }) => layer),
+    targets: await buildSyncTargets(catalog.projects),
     resolvedLayers,
   };
 }

@@ -22,8 +22,10 @@ import {
   renderGlobalLayer,
   renderProjectLayer,
   applyManagedRegion,
+  hasManagedRegion,
   piGlobalContextFile,
 } from './context-layers/index.js';
+import { backupFileSync, createBackupTimestamp } from './backup.js';
 
 export interface SyncItem {
   name: string;
@@ -495,16 +497,52 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
+/** A target file whose pre-existing hand-authored content was backed up the
+ *  first time `pan sync` injected a managed region into it. */
+export interface ContextFirstInjection {
+  /** The target file (e.g. ~/.claude/CLAUDE.md, <root>/AGENTS.md). */
+  file: string;
+  /** Where the pre-existing content was snapshotted before injection. */
+  backupPath: string;
+}
+
 export interface ContextLayerSyncResult {
   /** True when ~/.claude/CLAUDE.md's managed region was written this run. */
   globalWritten: boolean;
   /** True when global.md did not exist and a starter template was seeded. */
   globalStubCreated: boolean;
-  /** Names of registered projects whose CLAUDE.md was written this run. */
+  /** Names of registered projects whose CLAUDE.md/AGENTS.md was written this run. */
   projectsWritten: string[];
   /** True when ~/.panopticon/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
+  /** Files where a managed region was injected into pre-existing content for
+   *  the first time this run (each backed up first). */
+  firstInjections: ContextFirstInjection[];
   errors: string[];
+}
+
+/**
+ * Write a managed region into `targetFile`, preserving any hand-authored
+ * content outside the markers. Returns true when the file changed. The first
+ * time a region is injected into a non-empty file with no existing region, the
+ * file is backed up first and recorded in `result.firstInjections`.
+ */
+function writeManagedTargetSync(
+  targetFile: string,
+  managed: string,
+  result: ContextLayerSyncResult,
+  backupTimestamp: string,
+): boolean {
+  const existing = existsSync(targetFile) ? readFileSync(targetFile, 'utf-8') : '';
+  const next = applyManagedRegion(existing, managed);
+  if (next === existing) return false;
+  if (existing.trim().length > 0 && !hasManagedRegion(existing)) {
+    const backupPath = backupFileSync(targetFile, backupTimestamp);
+    if (backupPath) result.firstInjections.push({ file: targetFile, backupPath });
+  }
+  mkdirSync(dirname(targetFile), { recursive: true });
+  writeFileSync(targetFile, next, 'utf-8');
+  return true;
 }
 
 /**
@@ -523,19 +561,18 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     globalStubCreated: false,
     projectsWritten: [],
     piGlobalWritten: false,
+    firstInjections: [],
     errors: [],
   };
+  // One backup dir for every first-injection this run.
+  const backupTimestamp = createBackupTimestamp();
 
   // Global layer → ~/.claude/CLAUDE.md
   result.globalStubCreated = ensureGlobalLayer();
   try {
     const managed = renderGlobalLayer('claude-code', isDevMode());
     const claudeMd = join(CLAUDE_DIR, 'CLAUDE.md');
-    const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf-8') : '';
-    const next = applyManagedRegion(existing, managed);
-    if (next !== existing) {
-      mkdirSync(CLAUDE_DIR, { recursive: true });
-      writeFileSync(claudeMd, next, 'utf-8');
+    if (writeManagedTargetSync(claudeMd, managed, result, backupTimestamp)) {
       result.globalWritten = true;
     }
   } catch (err: any) {
@@ -556,19 +593,22 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
-  // Project layers → <projectRoot>/CLAUDE.md
+  // Project layers → <projectRoot>/CLAUDE.md (claude-code) + <projectRoot>/AGENTS.md (pi).
+  // No project.md → both renders are empty → leave the project's files alone.
   for (const { config } of listProjectsSync()) {
     if (!existsSync(config.path)) continue;
     try {
-      const managed = renderProjectLayer(config.path, 'claude-code');
-      if (!managed) continue; // no project.md → leave this project's CLAUDE.md alone
-      const claudeMd = join(config.path, 'CLAUDE.md');
-      const existing = existsSync(claudeMd) ? readFileSync(claudeMd, 'utf-8') : '';
-      const next = applyManagedRegion(existing, managed);
-      if (next !== existing) {
-        writeFileSync(claudeMd, next, 'utf-8');
-        result.projectsWritten.push(config.name);
+      const claudeManaged = renderProjectLayer(config.path, 'claude-code');
+      const piManaged = renderProjectLayer(config.path, 'pi');
+      if (!claudeManaged && !piManaged) continue;
+      let wrote = false;
+      if (claudeManaged) {
+        wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
       }
+      if (piManaged) {
+        wrote = writeManagedTargetSync(join(config.path, 'AGENTS.md'), piManaged, result, backupTimestamp) || wrote;
+      }
+      if (wrote) result.projectsWritten.push(config.name);
     } catch (err: any) {
       result.errors.push(`${config.name}: ${err?.message ?? err}`);
     }
