@@ -101,6 +101,7 @@ export async function reconcileTranscriptCheckpoint(
     fromOffset: checkpoint.lastOffset,
     toOffset: fileStat.size,
     identity: checkpointIdentity(checkpoint),
+    harness: inferCheckpointHarness(checkpoint.transcriptPath),
     trigger: 'reconciliation',
   });
 
@@ -110,6 +111,7 @@ export async function reconcileTranscriptCheckpoint(
 }
 
 function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
+  const harness = inferCheckpointHarness(checkpoint.transcriptPath);
   return {
     projectId: checkpoint.projectId,
     workspaceId: checkpoint.workspaceId,
@@ -117,8 +119,14 @@ function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
     runId: checkpoint.sessionId,
     sessionId: checkpoint.sessionId,
     agentRole: 'work',
-    agentHarness: 'claude-code',
+    agentHarness: harness,
   };
+}
+
+function inferCheckpointHarness(transcriptPath: string): string {
+  return transcriptPath.includes('/.panopticon/agents/') && transcriptPath.includes('/sessions/')
+    ? 'pi'
+    : 'claude-code';
 }
 
 async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs: number }> {
