@@ -506,7 +506,20 @@
   height: 43px;
   flex: 0 0 43px;
   position: relative;
+  /* Scroll horizontally when tabs overflow, but never vertically. Critically,
+     HIDE the scrollbar: a visible horizontal scrollbar steals ~15px of the
+     bar's height, which squeezes/clips the 36px tabs and makes the whole bar
+     vertically scrollable (the "bonked" tab strip). Hidden scrollbars consume
+     no space, so the tabs always fit; horizontal scroll still works via
+     trackpad / shift+wheel. */
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Chromium/WebKit: hide the scrollbar so it claims no vertical space. */
+.panebar::-webkit-scrollbar {
+  display: none;
 }
 
 .panetab {
