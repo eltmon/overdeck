@@ -650,12 +650,25 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   useEffect(() => {
     const tMount = performance.now();
     profMark(sessionName, tMount, 'XTerminal mount effect');
-    // The container-zero-size race the old 50ms setTimeout guarded against is
-    // already handled by the clientWidth/Height check inside connect() (which
-    // retries every 100ms until sized). Connecting synchronously saves 50ms on
-    // every Terminal click.
-    const cleanupFn = connect();
+    // Defer connect by one tick and guard it with a cancelled flag. React
+    // StrictMode (dev) double-invokes effects mount→unmount→mount synchronously;
+    // connecting synchronously (the previous approach) opened a WebSocket and
+    // created an xterm instance on EACH invocation, then tore it down — three
+    // full connect/teardown cycles per Terminal-view switch, with two
+    // "WebSocket closed before the connection is established" warnings and a
+    // reconnect flash before the surviving mount finally attached. Deferring
+    // lets the intervening unmount cancel the throwaway connects so only the
+    // last mount actually connects. setTimeout(0) (vs the old 50ms) keeps the
+    // cold-path latency win; connect()'s own clientWidth/Height check still
+    // covers the rare container-not-yet-sized case via its 100ms retry.
+    let cancelled = false;
+    let cleanupFn: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      if (!cancelled) cleanupFn = connect();
+    }, 0);
     return () => {
+      cancelled = true;
+      clearTimeout(timer);
       cleanupFn?.();
     };
   }, [connect, sessionName]);
