@@ -3,7 +3,7 @@ import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -22,6 +22,8 @@ import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
+import { useConversationMutations } from '../CommandDeck/useConversationMutations';
+import { ForkModal } from '../CommandDeck/ForkModal';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -102,8 +104,11 @@ export function ConversationPanel({
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const confirm = useConfirm();
+  // Self-hosted mutations + ForkModal so the header can favorite / stop / hand
+  // off / fork without threading callbacks through every embed site.
+  const convMutations = useConversationMutations(conversation.name, () => {});
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   // See ComposerFooter for rationale — never seed an existing conversation's
   // harness from the global localStorage default.
@@ -397,6 +402,28 @@ export function ConversationPanel({
     }
   }, [conversation.name, queryClient, onArchived]);
 
+  const handleExportTranscript = useCallback(() => {
+    const messages = messagesData?.messages ?? [];
+    if (messages.length === 0) {
+      toast.error('No messages to export yet');
+      return;
+    }
+    const md = messages
+      .map((m) => `## ${m.role}\n\n${m.text ?? ''}\n`)
+      .join('\n');
+    const header = `# ${conversation.title ?? conversation.name}\n\n`;
+    const blob = new Blob([header + md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(conversation.title ?? conversation.name).replace(/[^\w.-]+/g, '-')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported');
+  }, [messagesData, conversation.title, conversation.name]);
+
   const handleViewMode = useCallback((mode: ViewMode) => {
     if (mode === 'terminal') {
       const w = window as unknown as { __panTerminalClickAt?: number };
@@ -464,216 +491,299 @@ export function ConversationPanel({
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
   return (
     <div className={styles.conversationTerminal}>
-      {/* Header bar — hidden in embedded mode (ZoneB already shows session info), so its context indicator is omitted there. */}
+      {/* Header — hidden in embedded mode (ZoneB already shows session info).
+          Three-tier layout: row 1 = title + primary actions, row 2 = read-only
+          metadata, long-tail/config/destructive actions live in the ⋮ menu. */}
       {!embedded && (
-        <div className={`${styles.conversationTerminalHeader} ${styles.conversationHeaderContainer}`}>
-          <span className={styles.conversationTerminalTitle}>
-            {isWorking && (
-              <span title={workingLabel} style={{ display: 'contents' }}>
-                <WorkingIcon
-                  size={14}
-                  className={workingIconClass}
-                  aria-label={workingLabel}
-                />
-              </span>
-            )}
-            {editingTitle ? (
-              <input
-                ref={titleInputRef}
-                className={styles.conversationTitleInput}
-                value={draftTitle}
-                onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitTitleRename();
-                  if (e.key === 'Escape') cancelTitleEditing();
-                }}
-                onBlur={commitTitleRename}
-                aria-label={`Rename ${conversation.name}`}
-              />
-            ) : (
-              <>
-                <span className={styles.conversationTerminalTitleText}>
-                  {conversation.title ?? conversation.name}
+        <div
+          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`}
+          onContextMenu={(e) => {
+            // Right-click the header → open the ⋮ menu. Skip while renaming so
+            // the native copy/paste menu still works in the title input.
+            if (editingTitle) return;
+            e.preventDefault();
+            setMenuOpen(true);
+          }}
+        >
+          {/* Row 1 — title + primary actions */}
+          <div className={styles.conversationHeaderPrimary}>
+            <span className={styles.conversationTerminalTitle}>
+              {isWorking && (
+                <span title={workingLabel} style={{ display: 'contents' }}>
+                  <WorkingIcon
+                    size={14}
+                    className={workingIconClass}
+                    aria-label={workingLabel}
+                  />
                 </span>
-                <button
-                  className={styles.conversationTitleEditBtn}
-                  onClick={startEditingTitle}
-                  title="Rename conversation"
+              )}
+              {editingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  className={styles.conversationTitleInput}
+                  value={draftTitle}
+                  onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitTitleRename();
+                    if (e.key === 'Escape') cancelTitleEditing();
+                  }}
+                  onBlur={commitTitleRename}
                   aria-label={`Rename ${conversation.name}`}
-                >
-                  <Pencil size={12} />
-                </button>
+                />
+              ) : (
+                <>
+                  <span className={`${styles.conversationTerminalTitleText} ${retitleMutation.isPending ? styles.titleRegenerating : ''}`}>
+                    {conversation.title ?? conversation.name}
+                  </span>
+                  <button
+                    className={styles.conversationTitleEditBtn}
+                    onClick={startEditingTitle}
+                    title="Rename conversation"
+                    aria-label={`Rename ${conversation.name}`}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </>
+              )}
+            </span>
+
+            <div className={styles.conversationHeaderActions}>
+              {/* View toggle — only when session is live */}
+              {showTerminal && (
+                <div className={styles.viewToggle}>
+                  <button
+                    className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
+                    onClick={() => handleViewMode('conversation')}
+                  >
+                    Conversation
+                  </button>
+                  <button
+                    className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+                    onClick={() => handleViewMode('terminal')}
+                  >
+                    Terminal
+                  </button>
+                </div>
+              )}
+
+              {/* Copy link */}
+              <button
+                className={styles.copyLinkButton}
+                onClick={handleCopyLink}
+                title="Copy link to conversation"
+                aria-label="Copy link to conversation"
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+
+              {/* Overflow menu — long-tail / prefs / config / destructive */}
+              <div className={styles.headerMenuWrap}>
                 <button
-                  className={styles.conversationTitleEditBtn}
-                  onClick={() => retitleMutation.mutate()}
-                  disabled={retitleMutation.isPending}
-                  title="Regenerate the title from the whole conversation"
-                  aria-label={`Regenerate title for ${conversation.name}`}
-                  style={retitleMutation.isPending ? { opacity: 1 } : undefined}
+                  className={styles.copyLinkButton}
+                  onClick={() => setMenuOpen(v => !v)}
+                  title="More actions"
+                  aria-label="More conversation actions"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
                 >
-                  {retitleMutation.isPending
-                    ? <Loader2 size={12} className={styles.spinnerIcon} />
-                    : <Sparkles size={12} />}
+                  <MoreVertical size={16} />
                 </button>
+                {menuOpen && (
+                  <>
+                    <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
+                    <div role="menu" className={styles.headerMenu}>
+                      <button
+                        role="menuitem"
+                        className={`${styles.headerMenuItem} ${conversation.isFavorited ? styles.headerMenuItemActive : ''}`}
+                        onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
+                      >
+                        <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
+                        {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
+                      </button>
+
+                      <button
+                        role="menuitem"
+                        className={styles.headerMenuItem}
+                        onClick={() => { retitleMutation.mutate(); setMenuOpen(false); }}
+                        disabled={retitleMutation.isPending}
+                      >
+                        {retitleMutation.isPending
+                          ? <Loader2 size={14} className={styles.spinnerIcon} />
+                          : <Sparkles size={14} />}
+                        Regenerate title
+                      </button>
+
+                      <button
+                        role="menuitem"
+                        className={`${styles.headerMenuItem} ${hideToolCalls ? styles.headerMenuItemActive : ''}`}
+                        onClick={() => { toggleHideToolCalls(); setMenuOpen(false); }}
+                      >
+                        <Wrench size={14} />
+                        Hide tool calls
+                        {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
+                      </button>
+
+                      <button
+                        role="menuitem"
+                        className={`${styles.headerMenuItem} ${aboutOpen ? styles.headerMenuItemActive : ''}`}
+                        onClick={() => { setAboutOpen(v => !v); setMenuOpen(false); }}
+                        aria-expanded={aboutOpen}
+                      >
+                        <Info size={14} />
+                        About this conversation
+                        {aboutOpen && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
+                      </button>
+
+                      {conversation.harness === 'claude-code' && (
+                        <div className={styles.headerMenuDeliveryRow}>
+                          <span>Delivery method</span>
+                          <select
+                            className={styles.deliveryMethodSelect}
+                            value={deliveryMethod}
+                            onChange={(e) => handleDeliveryMethodChange(e.target.value as 'auto' | 'channels' | 'tmux')}
+                            disabled={deliveryMethodSaving}
+                            title="Message delivery method"
+                            aria-label="Message delivery method"
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="channels">Channels</option>
+                            <option value="tmux">Tmux</option>
+                          </select>
+                        </div>
+                      )}
+
+                      <div className={styles.headerMenuDivider} />
+                      {conversation.claudeSessionId && (
+                        <button
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          onClick={() => { convMutations.openForkModal(conversation, { mode: 'handoff' }); setMenuOpen(false); }}
+                        >
+                          <Share2 size={14} />
+                          Hand off to new conversation
+                        </button>
+                      )}
+                      {conversation.claudeSessionId && conversation.harness !== 'pi' && (
+                        <button
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          onClick={() => { convMutations.openForkModal(conversation); setMenuOpen(false); }}
+                        >
+                          <GitBranchPlus size={14} />
+                          Create summary fork
+                        </button>
+                      )}
+                      <button
+                        role="menuitem"
+                        className={styles.headerMenuItem}
+                        onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
+                      >
+                        <Download size={14} />
+                        Export transcript
+                      </button>
+
+                      {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
+                        <div className={styles.headerMenuDivider} />
+                      )}
+                      {conversation.handoffDocPath && (
+                        <button
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          onClick={() => { openHandoffDoc(); setMenuOpen(false); }}
+                        >
+                          <FileText size={14} />
+                          Open handoff doc
+                        </button>
+                      )}
+                      {conversation.handoffTargetConvId && (
+                        <button
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          onClick={() => { openHandoffTarget(); setMenuOpen(false); }}
+                        >
+                          <ExternalLink size={14} />
+                          Open handoff target
+                        </button>
+                      )}
+
+                      {(conversation.sessionAlive || onArchived) && (
+                        <div className={styles.headerMenuDivider} />
+                      )}
+                      {conversation.sessionAlive && (
+                        <button
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          onClick={() => { convMutations.stop(conversation.name); setMenuOpen(false); }}
+                        >
+                          <Square size={14} />
+                          Stop agent
+                        </button>
+                      )}
+                      {onArchived && (
+                        <button
+                          role="menuitem"
+                          className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+                          onClick={async () => {
+                            setMenuOpen(false);
+                            const ok = await confirm({
+                              title: conversation.isFavorited ? 'Archive favorited conversation' : 'Archive conversation',
+                              message: conversation.isFavorited
+                                ? `"${conversation.title ?? conversation.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`
+                                : `Archive "${conversation.title ?? conversation.name}"? This ends the session and moves it to the archive.`,
+                              confirmLabel: 'Archive',
+                              cancelLabel: 'Cancel',
+                              variant: 'destructive',
+                            });
+                            if (ok) handleArchive();
+                          }}
+                        >
+                          <Archive size={14} />
+                          Archive conversation
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2 — read-only metadata */}
+          <div className={styles.conversationMetaRow}>
+            <span className={styles.conversationTerminalStatus}>
+              <Circle size={7} style={{ fill: statusColor, color: statusColor }} />
+              {statusLabel}
+            </span>
+            {conversation.branch && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span
+                  className={styles.terminalBranchBar}
+                  title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
+                >
+                  {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+                  <span className={styles.terminalBranchBarMode}>
+                    {conversation.isWorktree ? 'Worktree' : 'Local'}
+                  </span>
+                  <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+                </span>
               </>
             )}
-          </span>
-          {conversation.branch && (
-            <span
-              className={styles.terminalBranchBar}
-              title={`${conversation.isWorktree ? 'Worktree' : 'Local'} · ${conversation.cwd}`}
-            >
-              {conversation.isWorktree ? <GitFork size={12} /> : <Folder size={12} />}
-              <span className={styles.terminalBranchBarMode}>
-                {conversation.isWorktree ? 'Worktree' : 'Local'}
-              </span>
-              <span className={styles.terminalBranchBarText}>{conversation.branch}</span>
+            <span className={styles.conversationMetaSep} aria-hidden>·</span>
+            <PanOpenInPicker openInCwd={conversation.cwd} />
+            {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span className={styles.featureCost}>
+                  {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
+                </span>
+              </>
+            )}
+            <span className={styles.conversationMetaSep} aria-hidden>·</span>
+            <span className={styles.conversationSessionId}>
+              {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
             </span>
-          )}
-          <PanOpenInPicker openInCwd={conversation.cwd} compact />
-          {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
-            <span className={styles.featureCost} style={{ marginRight: 'var(--mc-space-2)' }}>
-              {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
-            </span>
-          )}
-          <span className={styles.conversationTerminalStatus}>
-            <Circle
-              size={7}
-              style={{ fill: statusColor, color: statusColor }}
-            />
-            {statusLabel}
-          </span>
-          <span className={styles.conversationSessionId}>
-            {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
-          </span>
-
-          {conversation.handoffDocPath && (
-            <button
-              className={styles.copyLinkButton}
-              onClick={openHandoffDoc}
-              title="Handoff doc"
-              aria-label={`Open handoff doc for ${conversation.name}`}
-            >
-              <FileText size={14} />
-            </button>
-          )}
-
-          {conversation.handoffTargetConvId && (
-            <button
-              className={styles.copyLinkButton}
-              onClick={openHandoffTarget}
-              title="Open handoff target"
-              aria-label={`Open handoff target for ${conversation.name}`}
-            >
-              <ExternalLink size={14} />
-            </button>
-          )}
-
-          {/* Copy link button */}
-          <button
-            className={styles.copyLinkButton}
-            onClick={handleCopyLink}
-            title="Copy link to conversation"
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-          </button>
-
-          {/* Hide tool calls toggle */}
-          <button
-            className={styles.copyLinkButton}
-            onClick={toggleHideToolCalls}
-            title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-            aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
-            style={hideToolCalls ? { color: 'var(--primary)' } : undefined}
-          >
-            <Wrench size={14} />
-          </button>
-
-          {/* "About this conversation" drawer toggle */}
-          <button
-            className={styles.copyLinkButton}
-            onClick={() => setAboutOpen(v => !v)}
-            title={aboutOpen ? 'Hide conversation summary' : 'What is this conversation about?'}
-            aria-label={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
-            aria-expanded={aboutOpen}
-            style={aboutOpen ? { color: 'var(--primary)' } : undefined}
-          >
-            <Info size={14} />
-          </button>
-
-          {/* Archive button with inline confirmation (dialog for favorited) */}
-          {onArchived && !confirmArchive && (
-            <button
-              className={styles.copyLinkButton}
-              onClick={async () => {
-                if (conversation.isFavorited) {
-                  const ok = await confirm({
-                    title: 'Archive favorited conversation',
-                    message: `"${conversation.title ?? conversation.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
-                    confirmLabel: 'Archive',
-                    cancelLabel: 'Cancel',
-                    variant: 'destructive',
-                  });
-                  if (ok) handleArchive();
-                } else {
-                  setConfirmArchive(true);
-                }
-              }}
-              title="Archive conversation"
-            >
-              <Archive size={14} />
-            </button>
-          )}
-          {onArchived && confirmArchive && (
-            <span className={styles.archiveConfirm}>
-              <span className={styles.archiveConfirmLabel}>Archive?</span>
-              <button
-                className={styles.archiveConfirmYes}
-                onClick={() => { setConfirmArchive(false); handleArchive(); }}
-              >
-                Yes
-              </button>
-              <button
-                className={styles.archiveConfirmNo}
-                onClick={() => setConfirmArchive(false)}
-              >
-                No
-              </button>
-            </span>
-          )}
-
-          {/* View toggle — only show when session is live */}
-          {showTerminal && (
-            <div className={styles.viewToggle}>
-              <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
-                onClick={() => handleViewMode('conversation')}
-              >
-                Conversation
-              </button>
-              <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
-                onClick={() => handleViewMode('terminal')}
-              >
-                Terminal
-              </button>
-            </div>
-          )}
-          {/* Delivery method toggle */}
-          {conversation.harness === 'claude-code' && (
-            <select
-              className={styles.deliveryMethodSelect}
-              value={deliveryMethod}
-              onChange={(e) => handleDeliveryMethodChange(e.target.value as 'auto' | 'channels' | 'tmux')}
-              disabled={deliveryMethodSaving}
-              title="Message delivery method"
-              aria-label="Message delivery method"
-            >
-              <option value="auto">Auto</option>
-              <option value="channels">Channels</option>
-              <option value="tmux">Tmux</option>
-            </select>
-          )}
+          </div>
         </div>
       )}
 
@@ -768,6 +878,19 @@ export function ConversationPanel({
           </DiffWorkerPoolProvider>
         )}
       </div>
+
+      {convMutations.forkTarget && (
+        <ForkModal
+          conversation={convMutations.forkTarget}
+          initialMode={convMutations.forkTargetMode}
+          initialFocus={convMutations.forkTargetFocus}
+          isPending={convMutations.isForkPending}
+          onClose={convMutations.closeForkModal}
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+            convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
+          }}
+        />
+      )}
     </div>
   );
 }

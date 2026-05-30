@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1549 · Workspace Panes — layout &amp; naming proposal</title>
+<style>
+  :root{
+    /* Panopticon light-theme tokens (from src/dashboard/frontend/src/index.css) */
+    --background:#ffffff;
+    --foreground:#1f2937;
+    --muted:#6b7280;
+    --border:rgba(0,0,0,.10);
+    --border-strong:rgba(0,0,0,.16);
+    --card:#ffffff;
+    --primary:#4f46e5;          /* indigo — our real --primary */
+    --primary-tint:rgba(79,70,229,.08);
+    --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39;           /* Claude Code agent brand */
+    --claude-tint:rgba(224,123,57,.12);
+    --codex:#10a37f;            /* Codex agent */
+    --running:#16a34a;
+    --surface:#fafafa;
+    --surface-2:#f4f4f5;
+
+    /* annotation category colors */
+    --c-shell:#6b7280;
+    --c-stage:#0ea5e9;
+    --c-pane:#4f46e5;
+    --c-home:#0d9488;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-size:14px;line-height:1.55;padding:32px 24px 80px;
+  }
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:36px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+
+  /* ---------- naming tree ---------- */
+  .tree{
+    background:#0c1018;color:#e5e7eb;border-radius:10px;padding:18px 20px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+    line-height:1.7;overflow:auto;white-space:pre;
+  }
+  .tree .nm{color:#7dd3fc;font-weight:600;}
+  .tree .new{color:#34d399;}
+  .tree .was{color:#9ca3af;font-style:italic;}
+
+  /* ---------- rename table ---------- */
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;}
+  td code{color:var(--primary);}
+  .old code{color:#b45309;}
+
+  /* ===================================================================
+     MOCKUP — faithful render of the new Stage / HomePane
+     =================================================================== */
+  .frame-wrap{position:relative;margin-top:14px;}
+  .deck{
+    display:flex;height:660px;border:1px solid var(--border-strong);border-radius:12px;
+    overflow:hidden;background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);
+  }
+
+  /* annotation chip shared style */
+  .tag{
+    position:absolute;z-index:5;font-size:10.5px;font-weight:700;letter-spacing:.02em;
+    color:#fff;padding:2px 7px;border-radius:5px;white-space:nowrap;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-shell{background:var(--c-shell);}
+  .t-stage{background:var(--c-stage);}
+  .t-pane{background:var(--c-pane);}
+  .t-home{background:var(--c-home);}
+
+  .region{position:relative;}
+  .ol-stage{outline:2px dashed var(--c-stage);outline-offset:-2px;}
+  .ol-pane{outline:2px dashed var(--c-pane);outline-offset:-3px;}
+  .ol-home{outline:1.5px dashed var(--c-home);outline-offset:-2px;border-radius:8px;}
+
+  /* ---- Navigator (left) ---- */
+  .navigator{
+    width:210px;flex:0 0 210px;background:var(--surface);border-right:1px solid var(--border);
+    padding:12px 10px;font-size:12.5px;color:var(--muted);position:relative;
+  }
+  .nav-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:10px 4px 6px;}
+  .nav-item{padding:5px 8px;border-radius:6px;display:flex;align-items:center;gap:7px;color:var(--foreground);}
+  .nav-item.active{background:var(--primary-tint);color:var(--primary);font-weight:600;}
+  .nav-item.sub{padding-left:20px;color:var(--muted);font-weight:400;}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;}
+  .dot.run{background:var(--running);}
+  .sq{width:14px;height:14px;border-radius:4px;flex:0 0 14px;display:inline-block;}
+
+  /* ---- Stage (right) ---- */
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+
+  /* PaneBar */
+  .panebar{
+    display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--border);
+    background:var(--surface);padding:6px 8px 0;height:42px;flex:0 0 42px;position:relative;
+  }
+  .panetab{
+    display:flex;align-items:center;gap:7px;padding:0 12px;height:36px;font-size:12.5px;
+    color:var(--muted);border:1px solid transparent;border-bottom:none;cursor:default;
+    border-radius:8px 8px 0 0;white-space:nowrap;
+  }
+  .panetab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;line-height:14px;}
+  .panetab.active{
+    background:var(--background);color:var(--foreground);font-weight:600;
+    border-color:var(--border);position:relative;top:1px;
+  }
+  .panetab.active .kbd{color:var(--muted);}
+  .panetab .x{color:#bbb;font-size:13px;margin-left:2px;}
+  .panetab-add{display:flex;align-items:center;justify-content:center;width:30px;height:36px;color:#9ca3af;font-size:18px;}
+
+  /* Pane body (HomePane) */
+  .pane{flex:1;overflow:auto;padding:26px 30px;position:relative;background:var(--background);}
+  .home{max-width:680px;}
+
+  /* WorkspaceHeader */
+  .ws-head{position:relative;}
+  .ws-title{display:flex;align-items:center;gap:12px;}
+  .ws-title .icon{width:30px;height:30px;border-radius:8px;background:var(--claude);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .ws-title h3{font-size:26px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .ws-branch{color:var(--muted);font-size:13px;margin:6px 0 16px;display:flex;gap:10px;align-items:center;}
+  .ws-branch .lnk{color:var(--primary);}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;cursor:default;
+  }
+  .chip .mut{color:var(--muted);}
+
+  /* Launcher */
+  .launcher{position:relative;margin-bottom:6px;}
+  .launch-bar{
+    display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);
+    border-radius:12px;padding:11px 14px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);
+  }
+  .launch-bar .ph{color:#9ca3af;flex:1;}
+  .launch-bar .typed{flex:1;color:var(--foreground);}
+  .launch-bar .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;display:flex;gap:6px;align-items:center;}
+  .launch-bar .gly{color:var(--muted);}
+  .dropdown{
+    margin-top:6px;border:1px solid var(--border);border-radius:12px;background:#fff;
+    box-shadow:0 12px 34px rgba(0,0,0,.14);overflow:hidden;
+  }
+  .dd-row{display:flex;align-items:center;gap:11px;padding:10px 14px;font-size:13px;border-bottom:1px solid var(--border);}
+  .dd-row:last-child{border-bottom:none;}
+  .dd-row.sel{background:var(--primary-tint);}
+  .dd-row .lab{flex:1;}
+  .dd-row .lab b{font-weight:600;}
+  .dd-row .keys{color:#9ca3af;font-size:11px;font-family:"SF Mono",monospace;}
+  .gicon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex:0 0 20px;}
+
+  /* AgentDock + ActionDock */
+  .dock{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 0;position:relative;}
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--foreground);
+    background:#fff;border:1px solid var(--border-strong);border-radius:9px;padding:7px 12px;cursor:default;
+  }
+  .pill .car{color:#9ca3af;font-size:10px;}
+  .pill.ghost{font-weight:500;color:var(--muted);border-style:dashed;}
+  .actiondock{margin-top:10px;}
+  .pill.tool{font-weight:500;}
+
+  /* Timeline */
+  .timeline{margin-top:26px;position:relative;}
+  .tl-date{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;display:flex;align-items:center;gap:10px;}
+  .tl-date::after{content:"";flex:1;height:1px;background:var(--border);}
+  .convo{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff;}
+  .convo-h{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.04em;}
+  .convo-h .ago{margin-left:auto;text-transform:none;letter-spacing:0;}
+  .convo .msg{font-size:12.5px;color:var(--foreground);opacity:.85;}
+  .convo .msg.u{color:var(--muted);}
+
+  /* legend grid under mockup */
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;}
+  .legend .desc .was{color:var(--muted);font-style:italic;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1549 · Workspace Panes</h1>
+  <p class="sub">Layout + naming proposal — replacing the <code>Zone*</code> spatial names with a semantic <b>Stage → Pane</b> model. Reference design: the Subspace screenshots. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Top-down vocabulary</h2>
+  <div class="tree"><span class="nm">Command Deck</span>                  <span class="was">// shell — keep the name</span>
+├── <span class="nm">Navigator</span>               <span class="new">NEW name</span> <span class="was">(was Zone B — projects ▸ workspaces ▸ convos)</span>
+└── <span class="nm">Stage</span>                   <span class="new">NEW name</span> <span class="was">(was Zone C — the main work area)</span>
+    ├── <span class="nm">PaneBar</span>             <span class="new">NEW</span> <span class="was">// the persistent tab strip</span>
+    │   └── <span class="nm">PaneTab</span>         <span class="was">// one tab, backed by a Pane</span>
+    └── <span class="nm">Pane</span>                <span class="was">// active content, keyed by paneType</span>
+        ├── <span class="nm">HomePane</span>        <span class="was">(was ZoneCOverview)</span>
+        │   ├── <span class="nm">WorkspaceHeader</span>  <span class="was">(absorbs Zone A issue header)</span>
+        │   ├── <span class="nm">Launcher</span>        <span class="was">(was "Command Launcher" — the omnibox)</span>
+        │   ├── <span class="nm">AgentDock</span>       <span class="was">// agent pill launchers</span>
+        │   ├── <span class="nm">ActionDock</span>      <span class="was">// Terminal / Files / Web / Commits</span>
+        │   └── <span class="nm">Timeline</span>        <span class="was">// conversation history</span>
+        ├── <span class="nm">AgentPane</span>       <span class="was">(was ZoneCConversation)</span>
+        ├── <span class="nm">TerminalPane · FilesPane · CommitsPane · BrowserPane</span>
+        ├── <span class="nm">PlanPane</span>        <span class="was">// folds in the vBRIEF + Beads overview tabs</span>
+        └── <span class="nm">DocsPane</span>        <span class="was">// folds in the PRD / STATE / INFERENCE markdown tabs</span></div>
+  <p class="legend-note">The phrase to retire is <code>ZoneCOverviewTabs</code>: today it's "a strip of 10 sub-tabs." In the new model those tab bodies are re-homed — most into <code>HomePane</code> sections, the rest into <code>PlanPane</code> / <code>DocsPane</code>.</p>
+
+  <h2>2 · What gets renamed</h2>
+  <table>
+    <thead><tr><th style="width:38%">Today</th><th style="width:30%">New</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr class="old"><td><code>Command Deck</code> (shell)</td><td><code>Command Deck</code></td><td>Unchanged — established, no churn.</td></tr>
+      <tr class="old"><td><code>Zone B</code></td><td><code>Navigator</code></td><td>Left sidebar tree. Optional rename, for consistency.</td></tr>
+      <tr class="old"><td><code>Zone A</code> (issue header)</td><td>folds into <code>WorkspaceHeader</code></td><td>Issue id/title/actions move into the HomePane header + PaneBar context.</td></tr>
+      <tr class="old"><td><code>Zone C</code> (the area)</td><td><code>Stage</code></td><td>Now hosts <code>PaneBar</code> + active <code>Pane</code> instead of a Conversation/Overview toggle.</td></tr>
+      <tr class="old"><td><code>ZoneCConversation</code></td><td><code>AgentPane</code></td><td>Reused as-is, just rendered inside a pane.</td></tr>
+      <tr class="old"><td><code>ZoneCOverview</code></td><td><code>HomePane</code></td><td>Becomes the ⌘1 landing pane.</td></tr>
+      <tr class="old"><td><code>ZoneCOverviewTabs/</code> (folder)</td><td>split into panes/sections</td><td>See the taxonomy below — bodies are re-homed, not rewritten.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3 · The HomePane, annotated</h2>
+  <p class="sub">Dashed outlines + chips name each region. Colors: <span style="color:var(--c-stage);font-weight:700">Stage</span> · <span style="color:var(--c-pane);font-weight:700">Pane</span> · <span style="color:var(--c-home);font-weight:700">HomePane region</span>.</p>
+
+  <div class="frame-wrap">
+    <div class="deck">
+
+      <!-- Navigator -->
+      <div class="navigator region">
+        <span class="tag t-shell" style="top:6px;left:8px;">Navigator <small>(was Zone B)</small></span>
+        <div class="nav-h" style="margin-top:26px;">Projects</div>
+        <div class="nav-item active"><span class="sq" style="background:var(--claude)"></span> panopticon</div>
+        <div class="nav-item"><span class="sq" style="background:#64748b"></span> mind-your-now</div>
+        <div class="nav-item"><span class="sq" style="background:#0ea5e9"></span> auricle</div>
+        <div class="nav-h">Workspaces</div>
+        <div class="nav-item sub"><span class="dot run"></span> feature/pan-1549</div>
+        <div class="nav-item sub"><span class="dot" style="background:#cbd5e1"></span> feature/pan-1547</div>
+        <div class="nav-h">Conversations</div>
+        <div class="nav-item sub"><span class="dot run"></span> Claude Code</div>
+        <div class="nav-item sub"><span class="dot" style="background:#cbd5e1"></span> Codex</div>
+      </div>
+
+      <!-- Stage -->
+      <div class="stage region ol-stage">
+        <span class="tag t-stage" style="top:6px;right:8px;">Stage <small>(was Zone C)</small></span>
+
+        <!-- PaneBar -->
+        <div class="panebar region">
+          <span class="tag t-stage" style="top:-2px;left:120px;">PaneBar</span>
+          <div class="panetab active"><span class="sq" style="background:var(--c-home);width:12px;height:12px"></span> HOME <span class="kbd">⌘1</span></div>
+          <div class="panetab"><span class="sq" style="background:var(--claude);width:12px;height:12px"></span> Claude Code <span class="kbd">⌘2</span> <span class="x">×</span></div>
+          <div class="panetab"><span class="sq" style="background:#64748b;width:12px;height:12px"></span> panopticon-cli <span class="kbd">⌘3</span> <span class="x">×</span></div>
+          <div class="panetab"><span class="dot run"></span> Claude Code <span class="kbd">⌘4</span> <span class="x">×</span></div>
+          <div class="panetab-add">+</div>
+        </div>
+
+        <!-- Pane (HomePane) -->
+        <div class="pane region ol-pane">
+          <span class="tag t-pane" style="top:4px;right:8px;">Pane · paneType="home" → <b>HomePane</b> <small>(was ZoneCOverview)</small></span>
+
+          <div class="home">
+
+            <!-- WorkspaceHeader -->
+            <div class="ws-head region ol-home" style="padding:8px;margin:-8px -8px 14px;">
+              <span class="tag t-home" style="top:-9px;left:6px;">WorkspaceHeader <small>(absorbs Zone A)</small></span>
+              <div class="ws-title"><span class="icon">P</span><h3>panopticon</h3></div>
+              <div class="ws-branch"><span>⎇ main</span><span class="lnk">↗ set parent</span></div>
+              <div class="stats">
+                <span class="chip">⏱ <span>18 days</span></span>
+                <span class="chip">⇄ <span style="color:var(--running)">+0</span> <span class="mut">−%</span> ›</span>
+                <span class="chip">📄 <span>2 files</span> ›</span>
+                <span class="chip">💬 <span>5 convos</span> ›</span>
+              </div>
+            </div>
+
+            <!-- Launcher -->
+            <div class="launcher region ol-home" style="padding:8px;margin:0 -8px 10px;">
+              <span class="tag t-home" style="top:-9px;left:6px;">Launcher <small>(was "Command Launcher")</small></span>
+              <div class="launch-bar">
+                <span class="gly">⌘</span><span class="typed">this is a test</span>
+                <span class="run">↵ Run</span>
+              </div>
+              <div class="dropdown">
+                <div class="dd-row sel">
+                  <span class="gicon" style="background:var(--claude)">C</span>
+                  <span class="lab"><b>Ask Claude Code:</b></span><span class="keys">⌘ ↵</span>
+                </div>
+                <div class="dd-row">
+                  <span class="gicon" style="background:#374151">▢</span>
+                  <span class="lab"><b>Run in terminal:</b></span><span class="keys">⌃ ↵</span>
+                </div>
+                <div class="dd-row">
+                  <span class="gicon" style="background:#0ea5e9">🌐</span>
+                  <span class="lab"><b>Search the web:</b></span><span class="keys">⌥ ↵</span>
+                </div>
+                <div class="dd-row">
+                  <span class="gicon" style="background:var(--codex)">⚙</span>
+                  <span class="lab"><b>Ask Codex:</b></span><span class="keys">⌘ ⇧ ↵</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- AgentDock -->
+            <div class="dock region ol-home" style="padding:8px;margin:8px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">AgentDock</span>
+              <span class="pill"><span class="sq" style="background:var(--claude);width:13px;height:13px"></span> Claude Code <span class="car">▾</span></span>
+              <span class="pill"><span class="sq" style="background:var(--codex);width:13px;height:13px"></span> Codex <span class="car">▾</span></span>
+              <span class="pill ghost">+ More Agents</span>
+            </div>
+
+            <!-- ActionDock -->
+            <div class="dock actiondock region ol-home" style="padding:8px;margin:6px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">ActionDock</span>
+              <span class="pill tool">▢ Terminal</span>
+              <span class="pill tool">📄 Files</span>
+              <span class="pill tool">🌐 Web</span>
+              <span class="pill tool">⎇ Commits</span>
+              <span class="pill tool ghost">+ Actions</span>
+            </div>
+
+            <!-- Timeline -->
+            <div class="timeline region ol-home" style="padding:8px;margin:18px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">Timeline</span>
+              <p class="tl-date" style="margin-top:8px;">Today · 5 AM</p>
+              <div class="convo">
+                <div class="convo-h"><span class="sq" style="background:var(--claude);width:12px;height:12px"></span> Claude Code <span class="ago">2h ago</span></div>
+                <div class="msg u">👤 Can you file a GitHub issue for the workspace tabs feature…</div>
+                <div class="msg">🤖 Done — opened #1549 with the full pane taxonomy and phased delivery.</div>
+              </div>
+              <p class="tl-date">Sun · May 24</p>
+              <div class="convo">
+                <div class="convo-h"><span class="sq" style="background:#64748b;width:12px;height:12px"></span> Codex <span class="ago">3d ago</span></div>
+                <div class="msg">🤖 Engine mismatch warnings fixed; transitive deps pinned for Node 20.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- legend -->
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-stage)">Stage</span><span class="desc"><b>Stage</b> — the whole tabbed work area. <span class="was">was Zone C</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-stage)">PaneBar</span><span class="desc"><b>PaneBar / PaneTab</b> — persistent tabs, ⌘1–⌘9, + to open. <span class="was">new</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-pane)">Pane</span><span class="desc"><b>HomePane</b> — the ⌘1 landing pane. <span class="was">was ZoneCOverview</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">Header</span><span class="desc"><b>WorkspaceHeader</b> — name · branch · stat chips. <span class="was">absorbs Zone A</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">Launcher</span><span class="desc"><b>Launcher</b> — smart omnibox; first row auto-selected. <span class="was">"Command Launcher"</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">AgentDock</span><span class="desc"><b>AgentDock</b> — pill launchers, each opens an AgentPane.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">ActionDock</span><span class="desc"><b>ActionDock</b> — Terminal / Files / Web / Commits → open panes.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">Timeline</span><span class="desc"><b>Timeline</b> — convo history, date-grouped; click → AgentPane.</span></div>
+  </div>
+
+  <h2>4 · Pane taxonomy — where the old tabs go</h2>
+  <table>
+    <thead><tr><th style="width:24%">paneType</th><th style="width:30%">Renders</th><th>Was (ZoneCOverviewTabs)</th></tr></thead>
+    <tbody>
+      <tr><td><code>home</code></td><td><b>HomePane</b> — header, launcher, docks, timeline</td><td class="old">Overview tab + Activity feed</td></tr>
+      <tr><td><code>agent</code></td><td><b>AgentPane</b> — conversation + terminal toggle</td><td class="old">ZoneCConversation</td></tr>
+      <tr><td><code>terminal</code></td><td><b>TerminalPane</b> — XTerminal on a tmux session</td><td class="old">—</td></tr>
+      <tr><td><code>files</code></td><td><b>FilesPane</b> — file browser / recent docs</td><td class="old">—</td></tr>
+      <tr><td><code>commits</code></td><td><b>CommitsPane</b> — git log + diff viewer</td><td class="old">PR / Diff tab</td></tr>
+      <tr><td><code>plan</code></td><td><b>PlanPane</b> — vBRIEF (List/DAG/Raw) + Beads</td><td class="old">vBRIEF tab + Beads tab</td></tr>
+      <tr><td><code>docs</code></td><td><b>DocsPane</b> — markdown viewer</td><td class="old">PRD / STATE / INFERENCE tabs (MarkdownTab)</td></tr>
+      <tr><td><code>browser</code></td><td><b>BrowserPane</b> — embedded web view</td><td class="old">—</td></tr>
+      <tr><td colspan="3" style="color:var(--muted);font-style:italic;">Open questions: where do <b>Costs</b> and <b>Discussions</b> land? Candidates: HomePane section, +Actions menu, or their own pane types (<code>costs</code> / <code>discussions</code>).</td></tr>
+    </tbody>
+  </table>
+
+</div>
+</body>
+</html>

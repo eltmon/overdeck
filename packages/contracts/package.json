@@ -1,6 +1,6 @@
 {
   "name": "@panctl/contracts",
-  "version": "0.11.2",
+  "version": "0.16.2",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "effect": "4.0.0-beta.45"
+    "effect": "4.0.0-beta.73"
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",

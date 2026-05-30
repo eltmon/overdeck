@@ -2766,133 +2766,6 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 }
 
 /**
- * PAN-1178: detect swarm slot PRs that merged into their parent feature branch
- * but whose `/api/swarm/slot-merged` callback never fired.
- *
- * Slot branches merge into `feature/<parent>`, NOT into main. Neither
- * `reconcileStaleMergeStatus` (which scans for branches merged to main) nor the
- * GitHub-app `reviewStatus.prUrl` patrol (which tracks the issue's single main
- * PR) ever sees them. With no detector, `postMergeLifecycle` is never called
- * for the slot branch, `onSlotMergeComplete` never runs, and the swarm's
- * auto-advance stalls — every wave then needs a manual `pan swarm <id>` plus a
- * hand-rolled `/api/swarm/slot-merged` POST.
- *
- * This patrol closes that gap. For every active swarm (a feature workspace
- * whose continue vBRIEF carries a `swarmRuntime` with at least one `running`
- * slot) it asks GitHub which PRs merged into the parent feature branch, then
- * fires `postMergeLifecycle(issueId, projectPath, slotBranch, { skipDeploy })`
- * for each running slot whose slot branch is among them — exactly the loopback
- * the merge-agent drives on the happy path.
- *
- * Re-firing is guarded two ways: the durable gate is the runtime slot status
- * itself (once `onSlotMergeComplete` flips the slot to `merged` it is no longer
- * `running`, so the patrol skips it), and a short per-branch cooldown bridges
- * the window while the async loopback POST is still in flight.
- */
-const recentSlotMergeFires = new Map<string, number>();
-const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5 * 60 * 1000;
-
-interface MergedSlotPr {
-  number: number;
-  headRefName: string;
-  mergedAt: string | null;
-  url: string;
-}
-
-export async function detectMergedSwarmSlots(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { parseSlotBranch, postMergeLifecycle } = await import('./merge-agent.js');
-    const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
-    const { readContinueState } = await import('../vbrief/continue-state.js');
-
-    const now = Date.now();
-    // Drop cooldown entries that can no longer suppress anything, so the map
-    // stays bounded to slot branches fired within the last cooldown window.
-    for (const [branch, firedAt] of recentSlotMergeFires) {
-      if (now - firedAt >= SLOT_MERGE_REFIRE_COOLDOWN_MS) recentSlotMergeFires.delete(branch);
-    }
-
-    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-      // Slot sub-workspaces (`feature-<parent>-slot-N`) are not swarm parents.
-      if (/-slot-\d+$/i.test(issueId)) continue;
-
-      let runtime;
-      try {
-        const cont = await Effect.runPromise(readContinueState(workspacePath, issueId));
-        runtime = cont?.swarmRuntime;
-      } catch {
-        continue; // unreadable / malformed continue file — skip this workspace
-      }
-      if (!runtime) continue;
-
-      // Only `running` slots can have a lost slot-merged callback: a `pending`
-      // slot has no branch yet, and `merged`/`failed`/`failed-merge` slots are
-      // already terminal.
-      const runningSlots = runtime.slots.filter(slot => slot.status === 'running');
-      if (runningSlots.length === 0) continue;
-
-      const gh = resolveGitHubIssueSync(issueId);
-      if (!gh.isGitHub) continue;
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project) continue;
-
-      const issueLower = issueId.toLowerCase();
-      const featureBranch = `feature/${issueLower}`;
-
-      let mergedPrs: MergedSlotPr[];
-      try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          ['pr', 'list', '--repo', `${gh.owner}/${gh.repo}`, '--base', featureBranch,
-            '--state', 'merged', '--json', 'number,headRefName,mergedAt,url', '--limit', '50'],
-          { cwd: project.projectPath },
-        );
-        mergedPrs = JSON.parse(stdout || '[]') as MergedSlotPr[];
-      } catch {
-        continue; // gh query failed — leave it for the next patrol cycle
-      }
-
-      // Index merged slot PRs by head branch for an O(1) per-slot lookup.
-      const mergedSlotPrs = new Map<string, MergedSlotPr>();
-      for (const pr of mergedPrs) {
-        if (!pr.mergedAt) continue;
-        const slotInfo = parseSlotBranch(pr.headRefName);
-        if (!slotInfo) continue;
-        // Defensive: the base branch matched but the head encodes a different
-        // parent (should not happen, but never fire across issues).
-        if (slotInfo.issueLower !== issueLower) continue;
-        mergedSlotPrs.set(pr.headRefName, pr);
-      }
-      if (mergedSlotPrs.size === 0) continue;
-
-      for (const slot of runningSlots) {
-        const slotBranch = `feature/${issueLower}-slot-${slot.slotId}`;
-        const pr = mergedSlotPrs.get(slotBranch);
-        if (!pr) continue; // this slot's PR has not merged — nothing to do
-
-        const lastFired = recentSlotMergeFires.get(slotBranch);
-        if (lastFired !== undefined && now - lastFired < SLOT_MERGE_REFIRE_COOLDOWN_MS) continue;
-        recentSlotMergeFires.set(slotBranch, now);
-
-        const msg = `Detected merged swarm slot PR #${pr.number} (${slotBranch}) — firing postMergeLifecycle for ${issueId} slot ${slot.slotId}`;
-        actions.push(msg);
-        console.log(`[deacon] ${msg}`);
-        // postMergeLifecycle routes slot branches straight to the loopback
-        // `/api/swarm/slot-merged` POST and returns; projectPath is unused on
-        // that path but kept for signature parity with the main-branch case.
-        postMergeLifecycle(issueId, project.projectPath, slotBranch, { skipDeploy: true }).catch(err =>
-          console.warn(`[deacon] postMergeLifecycle (swarm slot) failed for ${issueId} slot ${slot.slotId}: ${err}`),
-        );
-      }
-    }
-  } catch (err: any) {
-    console.warn(`[deacon] Error in detectMergedSwarmSlots: ${err.message}`);
-  }
-  return actions;
-}
-
-/**
  * PAN-1027 reverse direction: detect issues whose internal mergeStatus='merged' but
  * whose GitHub PR is NOT merged (open, closed-without-merge, or reverted). When the
  * dashboard previously detected a merge that later got reverted (or the deacon's
@@ -4640,12 +4513,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...staleMergeActions);
   for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-1178: detect swarm slot PRs merged into a feature branch (not main) so
-  // the slot-merged loopback fires and the swarm's auto-advance is not stranded.
-  const swarmSlotActions = await detectMergedSwarmSlots();
-  actions.push(...swarmSlotActions);
-  for (const a of swarmSlotActions) addLog('action', a, state.patrolCycle);
-
   // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
   // (closed-without-merge, reopened after revert, or false positive from squash detection).
   // Without this, those issues get stuck because mergeStatus blocks all pipeline gates.
@@ -5048,36 +4915,30 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         continue;
       }
 
-      // PAN-977: headless review sub-role agents run via `claude --print` in a
-      // detached, HUP-immune launcher with NO tmux session. "No tmux session"
-      // is their normal steady state, not orphanhood — gating their liveness on
-      // sessionExists() resets them to stopped on every patrol and thrashes the
-      // convoy. Their lifecycle is owned by monitorReviewConvoySignals via the
-      // launcher pid. Here we only orphan-recover them once that launcher pid is
-      // actually gone (the launcher removes the pid file after it signals).
+      // PAN-1557: convoy reviewers are interactive — they own a tmux session
+      // (remain-on-exit on) like other specialists, so liveness is the session's
+      // pane, not a launcher pid. While the pane is alive the reviewer is working
+      // or idling attachably; a dead pane (Claude exited) or a missing session
+      // past the startup grace means it's done — fall through to mark stopped.
       if (state.reviewSubRole) {
-        const reviewerLauncherPid = join(AGENTS_DIR, dir, 'reviewer-launcher.pid');
-        if (existsSync(reviewerLauncherPid)) {
-          let launcherAlive = false;
+        if (sessionExistsSync(dir)) {
           try {
-            const pid = Number.parseInt(readFileSync(reviewerLauncherPid, 'utf-8').trim(), 10);
-            if (Number.isInteger(pid) && pid > 0) {
-              try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
-            }
-          } catch { launcherAlive = false; }
-          if (launcherAlive) continue; // launcher still working — not orphaned
+            const dead = ((await Effect.runPromise(listPaneValues(dir, '#{pane_dead}')))[0]?.trim() ?? '') === '1';
+            if (!dead) continue; // pane alive — still working / idling attachably
+            try { await Effect.runPromise(killSession(dir)); } catch { /* ignore */ }
+            logDeaconEventSync(`recoverOrphanedAgents: killed dead reviewer pane ${dir}`);
+          } catch {
+            continue; // can't check — assume alive
+          }
         } else {
-          // No pid file yet: the launcher either hasn't written it (startup
-          // race) or already finished and cleaned up. Give it a startup grace
-          // window keyed off startedAt before declaring the agent orphaned.
+          // No session yet — startup grace keyed off startedAt before orphaning.
           const startedMs = Date.parse(state.startedAt ?? '');
-          const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
-          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_LAUNCHER_GRACE_MS) {
+          const REVIEWER_STARTUP_GRACE_MS = 90_000;
+          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_STARTUP_GRACE_MS) {
             continue;
           }
         }
-        // Launcher pid is gone (or never appeared past the grace window) — the
-        // headless reviewer process has exited. Fall through to mark stopped.
+        // Session gone (or dead pane past grace) — fall through to mark stopped.
       } else if (sessionExistsSync(dir)) {
         // Planning sessions use remain-on-exit, so the tmux session persists after
         // Claude exits. Check if the pane's process is actually dead.
@@ -5265,54 +5126,45 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     const synthesisAlive = await Effect.runPromise(sessionExists(state.reviewSynthesisAgentId));
     if (!synthesisAlive) continue;
 
-    // PAN-977: the review sub-role launcher is HUP-immune and intentionally
-    // outlives its tmux session, so "tmux session missing" is NOT a failure.
-    // The launcher writes its pid to reviewer-launcher.pid and removes it once
-    // it has signaled. Deacon checks the launcher process itself: while that
-    // pid is alive the launcher is still working (or about to signal) and
-    // Deacon stays out of the way. Deacon only steps in once the launcher pid
-    // is gone with no signal marker — the rare SIGKILL-before-signal case.
-    const launcherPidPath = join(AGENTS_DIR, agentId, 'reviewer-launcher.pid');
-    let launcherAlive = false;
-    if (existsSync(launcherPidPath)) {
-      try {
-        const pid = Number.parseInt(readFileSync(launcherPidPath, 'utf-8').trim(), 10);
-        if (Number.isInteger(pid) && pid > 0) {
-          try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
-        }
-      } catch { launcherAlive = false; }
-    }
+    // PAN-1557: convoy reviewers are interactive now — there is no headless
+    // launcher process / pid file. Liveness is the reviewer's own tmux session:
+    // while it's alive the reviewer is still working (or idling attachably after
+    // writing its report); once it's gone the reviewer has crashed or been
+    // reaped. The Stop-hook is the primary signal (touches reviewer-signaled +
+    // delivers REVIEWER_READY); Deacon is the backup for when that didn't fire.
+    const reviewerSessionAlive = (await Effect.runPromise(sessionExists(agentId)).catch(() => false))
+      && !(await Effect.runPromise(isPaneDead(agentId)).catch(() => true));
 
-    // Startup grace: give the launcher time to write its pid file before a
-    // missing pid is read as death (avoids racing the bash env setup).
-    const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
-    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_LAUNCHER_GRACE_MS;
+    // Startup grace: give the session time to come up before "gone" reads as death.
+    const REVIEWER_STARTUP_GRACE_MS = 90_000;
+    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_STARTUP_GRACE_MS;
 
     let signal: 'ready' | 'failed' | 'timeout' | null = null;
     let reason = '';
-    if (launcherAlive) {
-      // Launcher still running — only intervene if it has blown well past its
-      // deadline (genuinely wedged, e.g. a hung `pan tell`).
-      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_LAUNCHER_GRACE_MS) {
+    if (outputWrittenForThisRun) {
+      // Report exists for this run but the Stop-hook didn't signal (no fresh
+      // marker) — back it up with READY. Safe: the report is on disk.
+      signal = 'ready';
+    } else if (reviewerSessionAlive) {
+      // Still working or idling attachably. Only intervene if well past the
+      // deadline (genuinely wedged).
+      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_STARTUP_GRACE_MS) {
         signal = 'timeout';
-        reason = `reviewer launcher still running past deadline ${state.reviewDeadlineAt}`;
+        reason = `reviewer still running past deadline ${state.reviewDeadlineAt}`;
       } else {
         continue;
       }
     } else if (withinStartupGrace) {
-      // Launcher pid not written yet — too early to call it dead.
+      // Session not up yet — too early to call it dead.
       continue;
-    } else if (outputWrittenForThisRun) {
-      // Launcher died after writing the report but before signaling READY.
-      signal = 'ready';
     } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
       signal = 'timeout';
       reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
     } else {
-      // Launcher pid is gone, no report, before deadline → the launcher bash
-      // process was SIGKILLed before it could run its signal block.
+      // Session gone, no report, before deadline → reviewer crashed or exited
+      // before writing a report.
       signal = 'failed';
-      reason = 'reviewer launcher process died before signaling synthesis';
+      reason = 'reviewer session ended before writing a report';
     }
 
     if (!signal) continue;

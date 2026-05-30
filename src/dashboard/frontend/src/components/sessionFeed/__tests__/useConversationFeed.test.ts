@@ -38,6 +38,21 @@ describe('mapConversationsToFeedEntries', () => {
     expect(entries.map((entry) => entry.conversationName)).toEqual(['active-a', 'active-b']);
   });
 
+  it('prefers lastActivityAt (transcript mtime) over lastAttachedAt — PAN-1556', () => {
+    const entries = mapConversationsToFeedEntries([
+      conversation({
+        createdAt: '2026-05-23T01:00:00.000Z',
+        lastAttachedAt: '2026-05-23T03:00:00.000Z',
+        lastActivityAt: '2026-05-23T05:00:00.000Z',
+      }),
+    ]);
+
+    expect(entries[0]).toMatchObject({
+      lastMessageDate: '2026-05-23T05:00:00.000Z',
+      timestamp: '2026-05-23T05:00:00.000Z',
+    });
+  });
+
   it('prefers lastAttachedAt for lastMessageDate and timestamp', () => {
     const entries = mapConversationsToFeedEntries([
       conversation({

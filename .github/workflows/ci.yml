@@ -151,7 +151,11 @@ jobs:
 
       - name: Start dashboard server
         run: |
-          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 &
+          # Detach stdin so the backgrounded server doesn't hold this step's pipe
+          # open (which would keep the step "running" indefinitely). The server
+          # must stay up for the Playwright step that follows, so it is not killed
+          # here — the job tears it down on completion.
+          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 < /dev/null &
           for i in $(seq 1 60); do
             if curl -sf http://localhost:3011/api/health > /dev/null; then
               exit 0
@@ -198,13 +202,22 @@ jobs:
 
       - name: Smoke test dashboard server
         run: |
-          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 &
+          # Detach stdin (< /dev/null) so the backgrounded server doesn't hold
+          # this step's pipe open, and capture its PID so we can stop it after
+          # the health check. Without the kill the orphaned server keeps the
+          # GitHub Actions step "running" indefinitely (observed: 2h+), so the
+          # required check never reports a result and PRs can't merge.
+          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 < /dev/null &
+          SERVER_PID=$!
+          ok=0
           for i in $(seq 1 60); do
             if curl -sf http://localhost:3011/api/health > /dev/null; then
               echo "Dashboard server started successfully"
-              exit 0
+              ok=1
+              break
             fi
             sleep 1
           done
-          cat /tmp/pan-dashboard.log
-          exit 1
+          kill "$SERVER_PID" 2>/dev/null || true
+          wait "$SERVER_PID" 2>/dev/null || true
+          if [ "$ok" != 1 ]; then cat /tmp/pan-dashboard.log; exit 1; fi

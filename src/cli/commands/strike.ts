@@ -7,13 +7,14 @@ import { promisify } from 'util';
 
 import { spawnAgent } from '../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import type { RoleEffort } from '../../lib/config-yaml.js';
 
 const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
   harness?: 'claude-code' | 'pi';
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   dryRun?: boolean;
 }
 
@@ -139,6 +140,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
       model: options.model,
       role: 'strike',
       prompt,
+      effort: options.effort,
     });
 
     spinner.succeed(`Strike agent spawned: ${agent.id}`);

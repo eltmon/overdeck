@@ -76,6 +76,11 @@ export function workspaceContextFile(workspacePath: string): string {
   return join(workspaceContextDir(workspacePath), 'workspace.md');
 }
 
+/** `~/.panopticon/context/pi-global.md` — the rendered global layer for Pi. */
+export function piGlobalContextFile(): string {
+  return join(getPanopticonHome(), 'context', 'pi-global.md');
+}
+
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */
@@ -97,19 +102,11 @@ mounted at /mnt/foo here"). Most machines should leave it untouched.
 ## Harness-specific blocks
 
 If you do add content, you can target a single harness with Mustache-style
-blocks:
-
-\`\`\`markdown
-{{#harness:claude}}
-Guidance only Claude Code sees on this machine.
-{{/harness:claude}}
-
-{{#harness:pi}}
-Guidance only Pi sees on this machine.
-{{/harness:pi}}
-\`\`\`
-
-Anything outside a block applies to every harness.
+blocks — an opening \`harness:claude\` (or \`harness:pi\`) tag and a matching
+closing tag, each wrapped in double curly braces. Anything outside a block
+applies to every harness. See \`docs/CONTEXT-LAYERS.md\` for the exact syntax
+and examples (not shown inline here — the renderer would strip live tags from
+this very file).
 `;
 
 /** Seeded into a project's `project.md` when it is registered. */

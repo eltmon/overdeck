@@ -42,6 +42,28 @@ export function applyManagedRegion(existing: string, managed: string): string {
   return (trimmed ? `${trimmed}\n\n${region}` : region) + '\n';
 }
 
+/** True when `existing` already contains a Panopticon-managed region. */
+export function hasManagedRegion(existing: string): boolean {
+  const beginIdx = existing.indexOf(REGION_BEGIN);
+  const endIdx = existing.indexOf(REGION_END);
+  return beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx;
+}
+
+/**
+ * Return `existing` with the Panopticon-managed region removed — i.e. only the
+ * hand-authored content the user owns, trimmed. When there is no region, the
+ * whole (trimmed) file is the user's. Used to decide whether a target file has
+ * pre-existing content worth preserving and backing up before first injection.
+ */
+export function userContentOutsideRegion(existing: string): string {
+  const beginIdx = existing.indexOf(REGION_BEGIN);
+  const endIdx = existing.indexOf(REGION_END);
+  if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
+    return (existing.slice(0, beginIdx) + existing.slice(endIdx + REGION_END.length)).trim();
+  }
+  return existing.trim();
+}
+
 /**
  * Render the global layer for one harness: `global.md` rendered, with the
  * applicable bundled engineering rules folded in below it.

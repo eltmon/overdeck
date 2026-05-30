@@ -48,6 +48,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
+import type { RoleEffort } from '../lib/config-yaml.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
@@ -107,7 +108,6 @@ import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
-import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
@@ -503,6 +503,7 @@ program
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -519,13 +520,11 @@ program
   .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
-  .option('--effort <level>', 'Strike effort: low | medium | high (default medium)')
+  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: 'low' | 'medium' | 'high'; dryRun?: boolean }) =>
+  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
     strikeCommand(ids, options),
   );
-
-registerSwarmCommands(program);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
@@ -622,6 +621,21 @@ program
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+
+    // Refuse to start a detached production dashboard on top of a running
+    // interactive `pan dev` session — they would fight over the same ports.
+    {
+      const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../lib/dev-supervisor.js');
+      const dev = readDevSupervisorMarker();
+      if (dev) {
+        for (const line of devSupervisorRefusalLines('start a detached dashboard', dev)) {
+          console.error(chalk.yellow(line));
+        }
+        process.exitCode = 2;
+        return;
+      }
+    }
+
     if (options.noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Project Deck (refined) — persistent conversations + Pipeline-as-Home</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f;
+    --success:#16a34a; --warning:#f59e0b; --info:#0ea5e9; --destructive:#e11d48; --review:#8b5cf6;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+    --proj-pan:#e07b39; --proj-myn:#64748b; --proj-aur:#0ea5e9;
+    --c-rail:#6b7280; --c-conv:#0ea5e9; --c-deck:#4f46e5; --c-phase:#9333ea;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.55;padding:32px 24px 80px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);
+    box-shadow:0 6px 30px rgba(0,0,0,.10);display:flex;height:680px;}
+  .tag{position:absolute;z-index:6;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:#fff;padding:2px 7px;border-radius:5px;white-space:nowrap;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-rail{background:var(--c-rail);} .t-conv{background:var(--c-conv);} .t-deck{background:var(--c-deck);} .t-phase{background:var(--c-phase);}
+  .region{position:relative;}
+
+  /* far-left rail */
+  .rail{width:184px;flex:0 0 184px;background:var(--surface);border-right:1px solid var(--border);padding:12px 9px;display:flex;flex-direction:column;position:relative;font-size:12.5px;}
+  .rnav{padding:8px 9px;border-radius:9px;display:flex;align-items:center;gap:9px;font-weight:600;color:var(--foreground);}
+  .rnav .ic{font-size:15px;width:17px;text-align:center;} .rnav.fly{color:var(--primary);}
+  .rail-h{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:15px 8px 6px;}
+  .proj{padding:7px 9px;border-radius:9px;display:flex;align-items:center;gap:9px;font-weight:600;color:var(--foreground);}
+  .proj .sq{width:13px;height:13px;border-radius:4px;flex:0 0 13px;} .proj .cnt{margin-left:auto;color:#9ca3af;font-size:10.5px;font-family:"SF Mono",monospace;font-weight:500;}
+  .proj.active{background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05);} .proj.active .nm{color:var(--proj-pan);}
+  .rail-foot{margin-top:auto;border-top:1px solid var(--border);padding-top:8px;color:#9ca3af;font-size:11px;}
+
+  /* persistent conversations column */
+  .convcol{width:236px;flex:0 0 236px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;position:relative;}
+  .convcol-h{display:flex;align-items:center;gap:8px;padding:12px 13px 10px;border-bottom:1px solid var(--border);}
+  .convcol-h .ttl{font-size:13px;font-weight:700;} .convcol-h .scope{font-size:10px;color:var(--proj-pan);font-family:"SF Mono",monospace;background:color-mix(in srgb,var(--proj-pan) 10%,transparent);border-radius:5px;padding:1px 6px;}
+  .convcol-h .add{margin-left:auto;color:var(--muted);font-size:16px;}
+  .convlist{overflow:auto;padding:8px;flex:1;}
+  .crow{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border-radius:9px;margin-bottom:4px;cursor:default;}
+  .crow.active{background:var(--primary-tint);}
+  .crow .sq{width:13px;height:13px;border-radius:4px;flex:0 0 13px;margin-top:2px;}
+  .crow .body{min-width:0;flex:1;}
+  .crow .top{display:flex;align-items:center;gap:6px;}
+  .crow .ag{font-weight:600;font-size:12.5px;} .crow .ago{margin-left:auto;color:#9ca3af;font-size:10.5px;}
+  .crow .msg{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .crow .dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex:0 0 6px;margin-top:6px;}
+
+  /* project deck */
+  .deck{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .tabstrip{display:flex;align-items:flex-end;height:44px;flex:0 0 44px;border-bottom:1px solid var(--border);background:var(--surface);padding:9px 8px 0;position:relative;}
+  .ptab{display:flex;align-items:center;gap:7px;padding:0 12px;height:35px;font-size:12.5px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;}
+  .ptab .x{color:#c4c4c4;font-size:12px;} .ptab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .ptab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .ptab.home.active::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--proj-pan);}
+  .ptab-add{display:flex;align-items:center;justify-content:center;width:30px;height:35px;color:#9ca3af;font-size:18px;}
+
+  .body{flex:1;overflow:auto;padding:20px 24px;position:relative;min-width:0;}
+  .phead{display:flex;align-items:center;gap:11px;margin-bottom:4px;}
+  .phead .icon{width:28px;height:28px;border-radius:8px;background:var(--proj-pan);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .phead h3{font-size:20px;margin:0;font-weight:700;} .phead .br{color:var(--muted);font-size:12px;}
+
+  /* metric strip */
+  .metrics{display:flex;gap:9px;margin:14px 0 18px;}
+  .metric{flex:1;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:10px 12px;}
+  .metric .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .metric .v.run{color:var(--success);} .metric .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-top:2px;}
+
+  /* phase group */
+  .phase{margin-bottom:16px;position:relative;}
+  .phase-h{display:flex;align-items:center;gap:9px;margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .phase-h .bar{width:3px;height:13px;border-radius:2px;}
+  .phase-h .cnt{color:#fff;border-radius:999px;font-size:10px;padding:0 7px;line-height:16px;}
+  .phase.prog .bar,.phase.prog .cnt{background:var(--warning);} .phase.rev .bar,.phase.rev .cnt{background:var(--review);}
+  .phase.todo .bar,.phase.todo .cnt{background:#94a3b8;} .phase.done .bar,.phase.done .cnt{background:var(--success);}
+
+  .igroup{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:#fff;}
+  .issue{border-bottom:1px solid var(--border);} .issue:last-child{border-bottom:none;}
+  .issue-h{display:flex;align-items:center;gap:9px;padding:10px 13px;font-size:13px;}
+  .issue-h .car{color:#9ca3af;font-size:11px;width:9px;}
+  .sd{width:8px;height:8px;border-radius:50%;flex:0 0 8px;} .sd.active{background:var(--success);} .sd.thinking{background:var(--warning);} .sd.idle{background:#cbd5e1;}
+  .issue-h .id{font-family:"SF Mono",monospace;font-weight:700;}
+  .issue-h .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .issue-h .res{margin-left:auto;display:flex;gap:7px;color:#b6bcc6;font-size:11px;}
+  .issue-h .state{font-size:10.5px;font-family:"SF Mono",monospace;padding:1px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+  .state.prog{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 40%,transparent);background:color-mix(in srgb,var(--warning) 8%,transparent);}
+  .state.rev{color:var(--review);border-color:color-mix(in srgb,var(--review) 40%,transparent);background:color-mix(in srgb,var(--review) 8%,transparent);}
+  .state.done{color:var(--success);border-color:color-mix(in srgb,var(--success) 40%,transparent);background:color-mix(in srgb,var(--success) 8%,transparent);}
+  .issue-h .cost{font-size:11px;color:#9ca3af;font-variant-numeric:tabular-nums;}
+
+  /* workers row */
+  .workers{background:var(--surface);border-top:1px solid var(--border);padding:8px 13px 10px 30px;display:flex;flex-direction:column;gap:6px;}
+  .worker{display:flex;align-items:center;gap:9px;font-size:12px;}
+  .rbadge{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;border:1.5px solid;flex:0 0 20px;}
+  .rb-work{border-color:var(--primary);color:var(--primary);background:color-mix(in srgb,var(--primary) 6%,transparent);}
+  .rb-review{border-color:var(--review);color:var(--review);background:color-mix(in srgb,var(--review) 6%,transparent);}
+  .rb-test{border-color:var(--success);color:var(--success);background:color-mix(in srgb,var(--success) 6%,transparent);}
+  .rb-ship{border-color:var(--success);color:var(--success);background:color-mix(in srgb,var(--success) 6%,transparent);}
+  .rb-sec{border-color:var(--destructive);color:var(--destructive);background:color-mix(in srgb,var(--destructive) 6%,transparent);}
+  .rb-perf{border-color:var(--warning);color:var(--warning);background:color-mix(in srgb,var(--warning) 6%,transparent);}
+  .worker .role{font-weight:600;width:64px;flex:0 0 64px;} .worker .who{color:var(--muted);display:inline-flex;align-items:center;gap:6px;}
+  .worker .who .sq{width:11px;height:11px;border-radius:3px;}
+  .worker .stt{margin-left:auto;color:#9ca3af;font-size:11px;font-family:"SF Mono",monospace;display:flex;align-items:center;gap:6px;}
+  .worker .open{color:var(--primary);font-weight:600;font-size:11px;border:1px solid var(--primary-border);border-radius:6px;padding:2px 8px;}
+  .convoy{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11.5px;}
+
+  /* legend + icon map */
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;}
+  .callout{margin-top:14px;border:1px solid var(--primary-border);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;} .callout b{color:var(--primary);}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--surface-2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;} td code{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Project Deck <span style="color:var(--primary)">(refined)</span></h1>
+  <p class="sub">Grounded in the <b>real</b> command-deck data: status dots, role badges, resource icons, phase buckets — all mirrored from <code>FeatureItem</code> / <code>RoleBadge</code> / <code>StatusDot</code> / <code>ProjectOverview</code>. Two changes you asked for: a <b>persistent Conversations column</b> (your #1, project-scoped), and the <b>Pipeline reborn as the project Home tab</b> (phase-grouped issues with their workers inline) — not a separate ugly view. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Three panes: Rail · Conversations · Deck</h2>
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- far-left rail -->
+      <div class="rail region">
+        <span class="tag t-rail" style="top:8px;right:8px;">Rail</span>
+        <div class="rnav"><span class="ic">⌂</span> Home</div>
+        <div class="rnav fly"><span class="ic">🌀</span> Flywheel</div>
+        <div class="rail-h">Projects</div>
+        <div class="proj active"><span class="sq" style="background:var(--proj-pan)"></span><span class="nm">panopticon</span><span class="cnt">7</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-myn)"></span><span class="nm">mind-your-now</span><span class="cnt">3</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-aur)"></span><span class="nm">auricle</span><span class="cnt">2</span></div>
+        <div class="rail-foot">v0.9.4</div>
+      </div>
+
+      <!-- persistent conversations column -->
+      <div class="convcol region">
+        <span class="tag t-conv" style="top:8px;right:8px;">Conversations <small>(persistent · #1)</small></span>
+        <div class="convcol-h"><span class="ttl">Conversations</span><span class="scope">panopticon</span><span class="add">+</span></div>
+        <div class="convlist">
+          <div class="crow active"><span class="sq" style="background:var(--claude)"></span><div class="body"><div class="top"><span class="ag">Claude Code</span><span class="ago">2m</span></div><div class="msg">hoist the panebar to top level…</div></div><span class="dot"></span></div>
+          <div class="crow"><span class="sq" style="background:var(--codex)"></span><div class="body"><div class="top"><span class="ag">Codex</span><span class="ago">1h</span></div><div class="msg">engine mismatch on Node 20…</div></div><span class="dot"></span></div>
+          <div class="crow"><span class="sq" style="background:var(--claude)"></span><div class="body"><div class="top"><span class="ag">Claude Code</span><span class="ago">3h</span></div><div class="msg">review the kanban redesign diff</div></div></div>
+          <div class="crow"><span class="sq" style="background:var(--claude)"></span><div class="body"><div class="top"><span class="ag">Claude Code</span><span class="ago">yest</span></div><div class="msg">vBRIEF for cost dashboard refresh</div></div></div>
+        </div>
+      </div>
+
+      <!-- project deck -->
+      <div class="deck">
+        <div class="tabstrip region">
+          <span class="tag t-deck" style="top:-2px;left:160px;">Deck tabs (scoped to panopticon)</span>
+          <div class="ptab home active"><span>⌂</span> Home <span class="kbd">⌘1</span></div>
+          <div class="ptab"><span>🔨</span> PAN-1561 <span class="kbd">⌘2</span> <span class="x">×</span></div>
+          <div class="ptab"><span>▢</span> Terminal <span class="kbd">⌘3</span> <span class="x">×</span></div>
+          <div class="ptab-add">+</div>
+        </div>
+
+        <div class="body region">
+          <span class="tag t-phase" style="top:6px;right:8px;">Home tab = the Pipeline <small>(phase-grouped, redesigned)</small></span>
+
+          <div class="phead"><span class="icon">P</span><h3>panopticon</h3><span class="br">⎇ main</span></div>
+
+          <div class="metrics">
+            <div class="metric"><div class="v run">3</div><div class="l">agents running</div></div>
+            <div class="metric"><div class="v">7</div><div class="l">open issues</div></div>
+            <div class="metric"><div class="v">5</div><div class="l">conversations</div></div>
+            <div class="metric"><div class="v">$4.18</div><div class="l">cost today</div></div>
+          </div>
+
+          <!-- IN PROGRESS -->
+          <div class="phase prog region">
+            <span class="tag t-phase" style="top:-12px;left:0;">phase bucket (from getPipelineIssuePhase)</span>
+            <div class="phase-h" style="margin-top:6px;"><span class="bar"></span> In Progress <span class="cnt">2</span></div>
+            <div class="igroup">
+              <div class="issue">
+                <div class="issue-h"><span class="car">▾</span><span class="sd active"></span><span class="id">PAN-1561</span><span class="ttl">Hoist PaneBar to top level</span><span class="res">📁 ⎇ ▢ 📖 🐞</span><span class="state prog">In Progress</span><span class="cost">$1.42</span></div>
+                <div class="workers">
+                  <div class="worker"><span class="rbadge rb-work">🔨</span><span class="role">work</span><span class="who"><span class="sq" style="background:var(--claude)"></span>Claude Code</span><span class="stt"><span class="sd active"></span>running · 2m</span><span class="open">terminal ›</span></div>
+                  <div class="worker"><span class="rbadge rb-review">🛡</span><span class="role">review</span><span class="convoy"><span class="rbadge rb-sec" style="width:17px;height:17px">🔒</span><span class="rbadge rb-review" style="width:17px;height:17px">🐛</span><span class="rbadge rb-perf" style="width:17px;height:17px">⏱</span><span class="rbadge rb-review" style="width:17px;height:17px">☑</span> convoy · 4</span><span class="stt"><span class="sd thinking"></span>queued</span></div>
+                </div>
+              </div>
+              <div class="issue">
+                <div class="issue-h"><span class="car">▾</span><span class="sd active"></span><span class="id">PAN-1547</span><span class="ttl">Node 22 engine bump</span><span class="res">📁 ⎇ ▢</span><span class="state prog">In Progress</span><span class="cost">$0.38</span></div>
+                <div class="workers">
+                  <div class="worker"><span class="rbadge rb-work">🔨</span><span class="role">work</span><span class="who"><span class="sq" style="background:var(--codex)"></span>Codex</span><span class="stt"><span class="sd active"></span>running · 8m</span><span class="open">terminal ›</span></div>
+                  <div class="worker"><span class="rbadge rb-test">✓</span><span class="role">test</span><span class="who">vitest + UAT</span><span class="stt"><span class="sd idle"></span>waiting</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- IN REVIEW -->
+          <div class="phase rev">
+            <div class="phase-h"><span class="bar"></span> In Review <span class="cnt">1</span></div>
+            <div class="igroup">
+              <div class="issue">
+                <div class="issue-h"><span class="car">▸</span><span class="sd thinking"></span><span class="id">PAN-1540</span><span class="ttl">Kanban redesign</span><span class="res">📁 ⎇ ⇄ 📖</span><span class="state rev">In Review</span><span class="cost">$3.10</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TODO -->
+          <div class="phase todo">
+            <div class="phase-h"><span class="bar"></span> Todo <span class="cnt">3</span></div>
+            <div class="igroup">
+              <div class="issue"><div class="issue-h"><span class="car">▸</span><span class="sd idle"></span><span class="id">PAN-1533</span><span class="ttl">Cost dashboard refresh</span><span class="res">📖</span><span class="state">Todo</span></div></div>
+              <div class="issue"><div class="issue-h"><span class="car">▸</span><span class="sd idle"></span><span class="id">PAN-1529</span><span class="ttl">Harness picker polish</span><span class="res"></span><span class="state">Todo</span></div></div>
+            </div>
+          </div>
+
+          <!-- DONE -->
+          <div class="phase done">
+            <div class="phase-h"><span class="bar"></span> Done · recent <span class="cnt">1</span></div>
+            <div class="igroup">
+              <div class="issue"><div class="issue-h"><span class="car">▸</span><span class="sd idle"></span><span class="id">PAN-1554</span><span class="ttl">PAN-1549 workspace panes</span><span class="res">⇄</span><span class="state done">Merged</span><span class="cost">$6.02</span></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · Icons map to the real components (I read them)</h2>
+  <table>
+    <thead><tr><th style="width:18%">Element</th><th style="width:30%">Real source</th><th>Mockup mirrors</th></tr></thead>
+    <tbody>
+      <tr><td>Status dot</td><td><code>StatusDot.tsx</code></td><td>active=green · thinking/waiting=amber · idle=gray (pulsing in app)</td></tr>
+      <tr><td>work</td><td><code>RoleBadge</code> Hammer / <code>--primary</code></td><td>🔨 indigo ring</td></tr>
+      <tr><td>review</td><td>ShieldCheck / <code>--signal-review</code></td><td>🛡 violet ring</td></tr>
+      <tr><td>review convoy</td><td>security=Lock(red) · correctness=Bug · performance=Gauge(amber) · requirements=ListChecks</td><td>🔒 🐛 ⏱ ☑ (4)</td></tr>
+      <tr><td>test / ship</td><td>CheckCircle2 / Rocket · <code>--success</code></td><td>✓ green · 🚀</td></tr>
+      <tr><td>resource strip</td><td><code>FeatureItem</code> resource icons</td><td>📁 workspace · ⎇ branch · ▢ tmux · 📖 vBRIEF · 🐞 beads · ⇄ PR · 📦 docker</td></tr>
+      <tr><td>phase buckets</td><td><code>ProjectOverview</code> + <code>getPipelineIssuePhase</code></td><td>In Progress / In Review / Todo / Done groups</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>What this resolves:</b> (1) Conversations get a <b>persistent, project-scoped column</b> — always one click away, never global by accident. (2) <b>"Where does Pipeline go?"</b> — it <i>is</i> the project Home tab now, rebuilt with the real status dots / role badges / resource icons so it reads cleanly instead of the current dense view. (3) The issue-tree-with-workers (your #2) sits right in that pipeline, workers inline under each in-progress issue. Open any issue/conversation → it becomes a deck tab.
+  </div>
+
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-rail)">Rail</span><span class="desc"><b>Rail</b> — Home · Flywheel · Projects (switch project).</span></div>
+    <div class="row"><span class="key" style="background:var(--c-conv)">Conv</span><span class="desc"><b>Conversations</b> — persistent column, scoped to the open project.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-deck)">Deck</span><span class="desc"><b>Deck</b> — tabs; Home tab = the Pipeline; issues/convos open as tabs.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-phase)">Pipeline</span><span class="desc"><b>Pipeline</b> — phase-grouped issues + inline workers (work/review/test/ship).</span></div>
+  </div>
+
+  <p class="legend-note">Issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. Prior: <a class="pill-link" href="pan-1561-project-scoped-deck.html">project-scoped v1</a> · <a class="pill-link" href="pan-1561-global-panebar-grouped.html">grouped bar</a> · <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549 origin</a>.</p>
+
+</div>
+</body>
+</html>

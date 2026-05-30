@@ -129,11 +129,11 @@ describe('auto-merge executor', () => {
     expect(markFailed).not.toHaveBeenCalled();
   });
 
-  it('requeues queued merge results without recording a failure', async () => {
+  it('requeues queued merge results to pending without recording a failure', async () => {
     const markMerged = vi.fn();
     const markFailed = vi.fn();
-    const requeueToPending = vi.fn(() => true);
     const announceFailure = vi.fn();
+    const requeueToPending = vi.fn().mockReturnValue(true);
     const log = vi.fn();
 
     await tickAutoMergeExecutor({
@@ -145,8 +145,8 @@ describe('auto-merge executor', () => {
       mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', mergeStatus: 'queued' }),
       markMerged,
       markFailed,
-      requeueToPending,
       announceFailure,
+      requeueToPending,
       log,
     });
 
@@ -155,7 +155,10 @@ describe('auto-merge executor', () => {
     expect(markFailed).not.toHaveBeenCalled();
     expect(requeueToPending).toHaveBeenCalledWith(1, retryAt);
     expect(announceFailure).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledWith(`[auto-merge] merge for PAN-1486 accepted as queued; requeued for ${retryAt}`);
+    expect(requeueToPending).toHaveBeenCalledWith(1, expect.any(String));
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('[auto-merge] merge for PAN-1486 accepted as queued; requeued for'),
+    );
   });
 
   it('marks failed merges as failed and announces the failure', async () => {

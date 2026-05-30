@@ -308,7 +308,6 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
  * reference feature-level context (child stories, description, URL).
  */
 async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi'): Promise<string[]> {
-  if (harness === 'pi') return [];
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -318,6 +317,16 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
     if (!isNotFound(error)) throw error;
   }
   files.push(await ensureSessionContextBriefingFile());
+
+  // PAN-1566: Pi also receives the rendered global context layer.
+  if (harness === 'pi') {
+    const { piGlobalContextFile } = await import('../context-layers/index.js');
+    const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+
   return files;
 }
 

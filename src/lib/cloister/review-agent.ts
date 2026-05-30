@@ -130,11 +130,11 @@ async function buildConvoyPromptPromise(opts: {
     '',
     '─────────────────────────────────────────────────────────────',
     '',
-    'Write exactly one final report to the output file shown above, then stop.',
-    'You do NOT need to signal synthesis or run any pan command. The Panopticon',
-    'launcher that started you detects your completion on process exit and signals',
-    'the synthesis agent automatically — REVIEWER_READY when the output file was',
-    'written, REVIEWER_FAILED otherwise. Your only job is to write the report file.',
+    'Write exactly one final report to the output file shown above, then stop',
+    'and wait. You do NOT need to signal synthesis or run any pan command —',
+    'when you finish your turn with the report written, Panopticon detects it',
+    'and signals the synthesis agent REVIEWER_READY automatically. Your only',
+    'job is to write the report file, then stop.',
     'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
 

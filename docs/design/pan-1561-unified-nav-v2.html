@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Unified nav v2 — real tree + conversations-by-title + activity feed</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#171717; --muted:#6b7280; --muted2:#9ca3af;
+    --accent:#f4f4f5;                 /* hover bg (matches --accent) */
+    --border:rgba(0,0,0,.09); --border-strong:rgba(0,0,0,.14);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08);
+    --claude:#e0662f; --codex:#10a37f;
+    --success:#16a34a; --warning:#f59e0b; --review:#8b5cf6; --destructive:#e11d48; --info:#0ea5e9;
+    --muted-foreground:#6b7280;
+    --surface:#fafafa; --surface-2:#f3f4f6;
+    --proj-pan:#e0662f; --proj-myn:#64748b; --proj-aur:#0ea5e9;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.55;padding:32px 22px 80px;}
+  .page{max-width:1320px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+  .mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;}
+
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;background:var(--background);
+    box-shadow:0 8px 34px rgba(0,0,0,.11);display:flex;height:720px;}
+  .tag{position:absolute;z-index:6;font-size:10px;font-weight:700;letter-spacing:.02em;color:#fff;padding:2px 7px;border-radius:5px;white-space:nowrap;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.22);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-nav{background:#6b7280;} .t-mid{background:#9333ea;} .t-deck{background:#0ea5e9;} .t-act{background:#0d9488;}
+  .region{position:relative;}
+
+  /* ── Col 1: sidebar (Home/Flywheel/Projects) ── */
+  .side{width:184px;flex:0 0 184px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:relative;font-size:13px;}
+  .side-scroll{padding:11px 9px;overflow:auto;flex:1;}
+  .nav{padding:8px 9px;border-radius:9px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--foreground);}
+  .nav .ic{font-size:15px;width:18px;text-align:center;} .nav.fly{color:var(--primary);}
+  .sh{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);margin:16px 8px 6px;}
+  .proj{padding:7px 9px;border-radius:9px;display:flex;align-items:center;gap:9px;font-weight:600;color:var(--foreground);}
+  .proj .sq{width:13px;height:13px;border-radius:4px;flex:0 0 13px;} .proj .c{margin-left:auto;color:var(--muted2);font-size:10.5px;font-family:"SF Mono",monospace;font-weight:500;}
+  .proj.active{background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05);} .proj.active .nm{color:var(--proj-pan);}
+  .side-foot{border-top:1px solid var(--border);padding:8px 14px;color:var(--muted2);font-size:11px;}
+
+  /* ── Col 2: conversations (top) + issue tree (below) ── */
+  .mid{width:286px;flex:0 0 286px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;position:relative;}
+  .mid-h{display:flex;align-items:center;gap:7px;padding:9px 11px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2);font-weight:700;}
+  .mid-h .c{margin-left:auto;font-family:"SF Mono",monospace;font-weight:600;}
+  .mid-h .add{color:var(--muted2);font-size:14px;font-weight:400;}
+  .mid-h .filt{margin-left:auto;font-size:9.5px;color:var(--muted2);display:flex;gap:4px;}
+  .mid-h .filt b{color:var(--primary);}
+
+  /* conversation row — shows the TITLE */
+  .convs{padding:2px 6px 8px;border-bottom:1px solid var(--border);max-height:200px;overflow:auto;}
+  .crow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;font-size:12px;cursor:default;}
+  .crow:hover{background:var(--accent);} .crow.sel{background:var(--primary-tint);}
+  .crow .ci{width:14px;display:flex;justify-content:center;flex:0 0 14px;}
+  .dot{width:8px;height:8px;border-radius:50%;} .dot.g{background:var(--success);} .dot.m{background:var(--muted2);}
+  .spin{color:var(--warning);font-size:11px;}
+  .crow .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--foreground);}
+  .crow .ago{color:var(--muted2);font-size:10.5px;white-space:nowrap;}
+
+  /* issue tree — faithful to FeatureItem */
+  .tree{flex:1;overflow:auto;padding:2px 0 8px;}
+  .featRow{display:flex;align-items:center;padding-left:6px;}
+  .caret{width:16px;flex:0 0 16px;display:flex;justify-content:center;color:var(--muted2);font-size:10px;cursor:pointer;}
+  .feat{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 3px;font-size:12px;flex:1;min-width:0;border-radius:6px;cursor:pointer;color:var(--foreground);}
+  .feat:hover{background:var(--accent);} .feat.sel{background:var(--primary-tint);}
+  .feat .stat{width:16px;flex:0 0 16px;display:flex;align-items:center;justify-content:center;}
+  .sd{width:7px;height:7px;border-radius:50%;} .sd.active{background:var(--success);} .sd.thinking{background:var(--warning);} .sd.idle{background:#cbd5e1;}
+  .feat .id{font-family:"SF Mono",monospace;color:var(--muted-foreground);font-size:12px;flex:0 0 auto;min-width:54px;}
+  .feat .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .badge{font-size:10px;line-height:1.2;padding:1px 6px;border-radius:999px;border:1px solid transparent;white-space:nowrap;}
+  .badge.run{background:color-mix(in srgb,var(--success) 16%,transparent);color:var(--success);border-color:color-mix(in srgb,var(--success) 40%,transparent);}
+  .badge.wait{background:color-mix(in srgb,var(--warning) 22%,transparent);color:var(--warning);border-color:color-mix(in srgb,var(--warning) 52%,transparent);font-weight:700;}
+  .state{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--accent);color:var(--muted-foreground);border:1px solid transparent;white-space:nowrap;flex:0 0 auto;}
+  .state.prog{background:color-mix(in srgb,var(--primary) 16%,transparent);color:var(--primary);border-color:color-mix(in srgb,var(--primary) 36%,transparent);}
+  .state.rev{background:color-mix(in srgb,var(--warning) 16%,transparent);color:var(--warning);border-color:color-mix(in srgb,var(--warning) 36%,transparent);}
+  .state.done{background:color-mix(in srgb,var(--success) 14%,transparent);color:var(--success);border-color:color-mix(in srgb,var(--success) 32%,transparent);}
+  .state.todo{background:var(--accent);color:var(--muted-foreground);border-color:color-mix(in srgb,var(--muted-foreground) 16%,transparent);}
+
+  /* worker (session) rows — grid, indented */
+  .sess{display:grid;grid-template-columns:12px 16px minmax(0,1fr) auto;align-items:center;column-gap:6px;padding:4px 8px 4px 34px;font-size:12px;cursor:pointer;}
+  .sess:hover{background:var(--accent);}
+  .sess .sdslot{display:flex;justify-content:center;}
+  .sess .icon{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;border:1.4px solid;}
+  .ic-work{border-color:var(--primary);color:var(--primary);} .ic-review{border-color:var(--review);color:var(--review);}
+  .ic-test{border-color:var(--success);color:var(--success);} .ic-sec{border-color:var(--destructive);color:var(--destructive);} .ic-perf{border-color:var(--warning);color:var(--warning);}
+  .sess .lbl{color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sess .pill{font-size:10px;text-transform:lowercase;padding:1px 6px;border-radius:3px;background:var(--accent);color:var(--muted-foreground);white-space:nowrap;}
+  .sess.child{padding-left:54px;}
+
+  /* ── Col 3: deck (tabs + loved Home tab) ── */
+  .deck{flex:1;display:flex;flex-direction:column;min-width:0;background:#fff;}
+  .tabs{display:flex;align-items:flex-end;height:46px;flex:0 0 46px;border-bottom:1px solid var(--border);background:var(--surface);padding:10px 10px 0;}
+  .tab{display:flex;align-items:center;gap:8px;padding:0 13px;height:36px;font-size:13px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;white-space:nowrap;}
+  .tab .kbd{font-size:10px;color:var(--muted2);} .tab .twodot{position:relative;width:13px;height:13px;border-radius:4px;}
+  .tab .twodot .b{position:absolute;right:-2px;bottom:-2px;width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;}
+  .tab.active{background:#fff;color:var(--foreground);font-weight:700;border-color:var(--border);position:relative;top:1px;}
+  .tab.home.active::before{content:"";position:absolute;left:0;right:0;top:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--claude);}
+  .tab-add{display:flex;align-items:center;justify-content:center;width:34px;height:36px;color:var(--muted2);font-size:20px;}
+
+  .home{flex:1;overflow:auto;padding:26px 30px;}
+  .home-inner{max-width:620px;}
+  .ph{display:flex;align-items:center;gap:12px;}
+  .ph .hash{font-size:40px;font-weight:800;color:var(--claude);line-height:1;}
+  .ph h3{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:0;line-height:1;}
+  .pmeta{color:var(--muted);font-size:14px;margin:13px 0 2px;display:flex;align-items:center;gap:9px;} .pmeta .sp{color:var(--muted2);}
+  .stats{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;margin:13px 0 20px;font-family:"SF Mono",ui-monospace,Menlo,monospace;}
+  .stats .it{display:flex;align-items:center;gap:6px;} .stats .div{width:1px;height:14px;background:var(--border);}
+  .stats .add{color:var(--success);} .stats .del{color:var(--destructive);} .stats .chev{color:var(--muted2);}
+  .omni{display:flex;align-items:center;gap:12px;border:1px solid var(--border-strong);border-radius:14px;padding:15px 17px;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.05);margin-bottom:22px;}
+  .omni .cmd{color:var(--muted2);font-size:17px;} .omni .ph2{flex:1;color:var(--muted2);font-size:16px;}
+  .omni .run{font-size:13px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 13px;}
+  .pills{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px;}
+  .pill2{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--foreground);background:#fff;border:1px solid var(--border-strong);border-radius:11px;padding:8px 13px;}
+  .pill2 .gi{width:21px;height:21px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;} .pill2 .car{color:var(--muted2);font-size:11px;}
+  .pill2.ghost{border-style:dashed;color:var(--muted);font-weight:500;background:transparent;}
+  .pills.tools .pill2{background:var(--surface-2);border-color:transparent;} .pills.tools .pill2.ghost{background:transparent;border:1px dashed var(--border-strong);}
+  .timeline{margin-top:24px;}
+  .tl-date{display:flex;align-items:center;gap:11px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px;} .tl-date::before{content:"";width:14px;height:1px;background:var(--border-strong);}
+  .conv{background:var(--surface);border-radius:12px;padding:14px 16px;margin-bottom:13px;}
+  .conv-h{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;font-weight:600;} .conv-h .ago{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--muted2);}
+  .conv .ln{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;margin-bottom:4px;} .conv .av{width:22px;height:22px;border-radius:6px;flex:0 0 22px;background:linear-gradient(135deg,#444,#222);} .conv .av.cc{background:var(--claude);}
+  .conv .tx{color:var(--foreground);opacity:.9;} .conv .tx.u{color:var(--muted);}
+
+  /* ── Col 4: activity feed (right) ── */
+  .act{width:248px;flex:0 0 248px;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;position:relative;padding:12px 12px;}
+  .act-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-foreground);}
+  .act-sub{font-size:11px;color:var(--muted2);margin:3px 0 12px;}
+  .act-scroll{overflow:auto;flex:1;}
+  .act-bucket{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-foreground);margin:0 0 8px;}
+  .acard{border:1px solid var(--border);background:#fff;border-radius:9px;padding:8px 9px;margin-bottom:7px;display:flex;gap:8px;align-items:flex-start;}
+  .acard .ad{width:6px;height:6px;border-radius:50%;background:var(--primary);flex:0 0 6px;margin-top:5px;}
+  .acard .abody{min-width:0;flex:1;}
+  .acard .atx{font-size:12px;font-weight:500;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .acard .ameta{font-size:10px;color:var(--muted2);margin-top:3px;font-family:"SF Mono",monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .legend{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 18px;margin-top:18px;font-size:12px;}
+  .legend .row{display:flex;gap:8px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:9.5px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .callout{margin-top:14px;border:1px solid rgba(79,70,229,.32);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;} .callout b{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Unified nav <span style="color:var(--primary)">v2</span></h1>
+  <p class="sub">Fixes from your notes: the <b>issue tree is faithful</b> to the real <code>FeatureItem</code> (compact 12px rows, gray mono ids, colored state pills — In&nbsp;Progress=indigo, In&nbsp;Review=amber, Done=green — aggregate badges, indented worker rows with role icons + lowercase status pills). <b>Conversations moved into the same column, above the tree</b>, and now show the <b>conversation title</b> (not the agent name). The <b>Activity feed is back</b>, on the right. Home tab still untouched. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Sidebar · Conversations+Tree · Deck · Activity</h2>
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- Col 1: sidebar -->
+      <div class="side region">
+        <span class="tag t-nav" style="top:8px;right:8px;">Sidebar</span>
+        <div class="side-scroll">
+          <div class="nav"><span class="ic">⌂</span> Home</div>
+          <div class="nav fly"><span class="ic">🌀</span> Flywheel</div>
+          <div class="sh">Projects</div>
+          <div class="proj active"><span class="sq" style="background:var(--proj-pan)"></span><span class="nm">panopticon</span><span class="c">7</span></div>
+          <div class="proj"><span class="sq" style="background:var(--proj-myn)"></span><span class="nm">mind-your-now</span><span class="c">3</span></div>
+          <div class="proj"><span class="sq" style="background:var(--proj-aur)"></span><span class="nm">auricle</span><span class="c">2</span></div>
+        </div>
+        <div class="side-foot">v0.9.4</div>
+      </div>
+
+      <!-- Col 2: conversations + issue tree -->
+      <div class="mid region">
+        <span class="tag t-mid" style="top:7px;right:8px;">Conversations + Tree</span>
+
+        <!-- conversations (by title) -->
+        <div class="mid-h" style="margin-top:22px;">Conversations <span class="c">6</span> <span class="add">+</span></div>
+        <div class="convs">
+          <div class="crow sel"><span class="ci"><span class="spin">◌</span></span><span class="ttl">Hoist the panebar to top level</span><span class="ago">2m</span></div>
+          <div class="crow"><span class="ci"><span class="spin">◌</span></span><span class="ttl">Fix Node 20 engine mismatch warnings</span><span class="ago">8m</span></div>
+          <div class="crow"><span class="ci"><span class="dot g"></span></span><span class="ttl">Review the kanban redesign diff</span><span class="ago">1h</span></div>
+          <div class="crow"><span class="ci"><span class="dot m"></span></span><span class="ttl">vBRIEF for cost dashboard refresh</span><span class="ago">3h</span></div>
+          <div class="crow"><span class="ci"><span class="dot m"></span></span><span class="ttl">Harness picker UX polish notes</span><span class="ago">yest</span></div>
+        </div>
+
+        <!-- issue tree -->
+        <div class="mid-h"><span>Issues</span><span class="filt"><b>All</b> · Alive · Failed</span></div>
+        <div class="tree">
+          <!-- PAN-1561 expanded with workers -->
+          <div class="featRow"><span class="caret">▾</span>
+            <div class="feat sel"><span class="stat"><span class="sd active"></span></span><span class="id">PAN-1561</span><span class="ttl">Hoist PaneBar</span><span class="badge run">work</span><span class="state prog">In&nbsp;Progress</span></div>
+          </div>
+          <div class="sess"><span class="sdslot"><span class="sd active"></span></span><span class="icon ic-work">🔨</span><span class="lbl">Work (sonnet)</span><span class="pill">running</span></div>
+          <div class="sess"><span class="sdslot"><span class="sd thinking"></span></span><span class="icon ic-review">🛡</span><span class="lbl">Review · convoy</span><span class="pill">queued</span></div>
+          <div class="sess child"><span class="sdslot"><span class="sd thinking"></span></span><span class="icon ic-sec" style="width:14px;height:14px">🔒</span><span class="lbl">Security</span><span class="pill">queued</span></div>
+          <div class="sess child"><span class="sdslot"><span class="sd thinking"></span></span><span class="icon ic-perf" style="width:14px;height:14px">⏱</span><span class="lbl">Performance</span><span class="pill">queued</span></div>
+
+          <!-- PAN-1547 expanded -->
+          <div class="featRow"><span class="caret">▾</span>
+            <div class="feat"><span class="stat"><span class="sd active"></span></span><span class="id">PAN-1547</span><span class="ttl">Node 22 bump</span><span class="badge run">work</span><span class="state prog">In&nbsp;Progress</span></div>
+          </div>
+          <div class="sess"><span class="sdslot"><span class="sd active"></span></span><span class="icon ic-work">🔨</span><span class="lbl">Work (gpt-5)</span><span class="pill">running</span></div>
+          <div class="sess"><span class="sdslot"><span class="sd idle"></span></span><span class="icon ic-test">🧪</span><span class="lbl">Tests</span><span class="pill">idle</span></div>
+
+          <!-- collapsed rows -->
+          <div class="featRow"><span class="caret">▸</span>
+            <div class="feat"><span class="stat"><span class="sd thinking"></span></span><span class="id">PAN-1540</span><span class="ttl">Kanban redesign</span><span class="state rev">In&nbsp;Review</span></div>
+          </div>
+          <div class="featRow"><span class="caret">▸</span>
+            <div class="feat"><span class="stat"><span class="sd idle"></span></span><span class="id">PAN-1533</span><span class="ttl">Cost dashboard refresh</span><span class="state todo">Todo</span></div>
+          </div>
+          <div class="featRow"><span class="caret">▸</span>
+            <div class="feat"><span class="stat"><span class="sd idle"></span></span><span class="id">PAN-1554</span><span class="ttl">Workspace panes</span><span class="state done">Done</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 3: deck -->
+      <div class="deck region">
+        <span class="tag t-deck" style="top:8px;left:10px;">Deck — Home tab unchanged</span>
+        <div class="tabs">
+          <div class="tab home active"><span class="kbd mono">⌘1</span> HOME</div>
+          <div class="tab"><span class="twodot" style="background:var(--claude)"><span class="b" style="background:#3b82f6"></span></span> Claude Code <span class="kbd mono">⌘2</span></div>
+          <div class="tab"><span class="gi">⎇</span> Commits <span class="kbd mono">⌘3</span></div>
+          <div class="tab-add">+</div>
+        </div>
+        <div class="home">
+          <div class="home-inner">
+            <div class="ph"><span class="hash">#</span><h3>panopticon</h3></div>
+            <div class="pmeta">main <span class="sp">⎇ set parent</span></div>
+            <div class="stats">
+              <span class="it">🕐 19 days</span><span class="div"></span>
+              <span class="it">⇄ <span class="add">+1,524</span> <span class="del">-96</span> <span class="chev">›</span></span><span class="div"></span>
+              <span class="it">📁 7 files <span class="chev">›</span></span><span class="div"></span>
+              <span class="it">💬 6 convos <span class="chev">›</span></span>
+            </div>
+            <div class="omni"><span class="cmd">⌘</span><span class="ph2">Launch, search, run…</span><span class="run">↵ Run</span></div>
+            <div class="pills">
+              <span class="pill2"><span class="gi" style="background:var(--claude)">✳</span> Claude Code <span class="car">▾</span></span>
+              <span class="pill2"><span class="gi" style="background:#111">◎</span> Codex <span class="car">▾</span></span>
+              <span class="pill2 ghost">+ More Agents</span>
+            </div>
+            <div class="pills tools">
+              <span class="pill2">▢ Terminal</span><span class="pill2">📁 Files</span><span class="pill2">🌐 Web</span><span class="pill2">⎇ Commits</span><span class="pill2 ghost">+ Actions</span>
+            </div>
+            <div class="timeline">
+              <div class="tl-date">Just now</div>
+              <div class="conv">
+                <div class="conv-h">Claude Code <span class="ago">2m ago</span></div>
+                <div class="ln"><span class="av"></span><span class="tx u">the issue tree is butchered; conversations should show titles; don't forget the activity feed.</span></div>
+                <div class="ln"><span class="av cc"></span><span class="tx">Rebuilt the tree faithfully, titles wired, activity feed restored on the right.</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 4: activity feed -->
+      <div class="act region">
+        <span class="tag t-act" style="top:8px;right:10px;">Activity feed <small>(was missing)</small></span>
+        <div class="act-h" style="margin-top:16px;">Activity</div>
+        <div class="act-sub">Recent workspace action updates</div>
+        <div class="act-scroll">
+          <div class="act-bucket">Just Now</div>
+          <div class="acard"><span class="ad"></span><div class="abody"><div class="atx">Flattening panesStore to one list</div><div class="ameta">panopticon · PAN-1561 · 1m</div></div></div>
+          <div class="acard"><span class="ad"></span><div class="abody"><div class="atx">Hoisting PaneBar to app shell</div><div class="ameta">panopticon · PAN-1561 · 2m</div></div></div>
+          <div class="act-bucket" style="margin-top:14px;">Earlier Today</div>
+          <div class="acard"><span class="ad"></span><div class="abody"><div class="atx">Pinned deps for Node 22</div><div class="ameta">panopticon · PAN-1547 · 41m</div></div></div>
+          <div class="acard"><span class="ad"></span><div class="abody"><div class="atx">Rebased onto origin/main</div><div class="ameta">panopticon · PAN-1540 · 2h</div></div></div>
+          <div class="act-bucket" style="margin-top:14px;">Yesterday</div>
+          <div class="acard"><span class="ad"></span><div class="abody"><div class="atx">Merged PR #1554</div><div class="ameta">panopticon · PAN-1554 · 1d</div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Four columns:</b> ① <b>Sidebar</b> (Home · Flywheel · Projects) → ② <b>Conversations + Issue tree</b> (appears on project click; conversations on top, by title; the real tree below) → ③ <b>Deck</b> (your untouched Home tab) → ④ <b>Activity feed</b>. The tree now matches the live component: 12px rows, gray mono ids, indigo/amber/green state pills, work/review-convoy/test workers nested with status pills.
+  </div>
+
+  <h2>2 · Tree fidelity — corrected against the real CSS</h2>
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--primary)">In&nbsp;Progress</span><span>indigo pill (<code>featureState_progress</code> = <code>--primary</code>) — I had this amber before.</span></div>
+    <div class="row"><span class="key" style="background:var(--warning)">In&nbsp;Review</span><span>amber pill (<code>featureState_review</code> = <code>--warning</code>).</span></div>
+    <div class="row"><span class="key" style="background:var(--success)">Done</span><span>green pill (<code>featureState_done</code>).</span></div>
+    <div class="row"><span class="key" style="background:#9333ea">Workers</span><span>indented grid rows: dot · role icon · muted label · lowercase status pill.</span></div>
+  </div>
+
+  <p class="legend-note">Open: should the issue-tree column persist or collapse on Home/Flywheel? Conversations global vs project-scoped? · Issue <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. Prior: <a class="pill-link" href="pan-1561-unified-nav.html">unified-nav v1</a> · <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549 origin</a>.</p>
+
+</div>
+</body>
+</html>

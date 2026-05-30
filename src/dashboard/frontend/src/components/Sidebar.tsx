@@ -4,9 +4,11 @@ import {
   Eye, Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText,
+  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchConversations } from './CommandDeck/ConversationList';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { DeaconPauseToggle } from './DeaconPauseToggle';
@@ -73,18 +75,24 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const NAV_GROUPS: NavGroup[] = [
+// PAN-1561: the primary rail is Home · Flywheel · Projects. Everything else
+// moves into the collapsible "More" section (MORE_GROUPS) below the Projects
+// list — every route stays reachable, no feature is lost.
+const PRIMARY_ITEMS: NavItem[] = [
+  { id: 'home' as Tab, label: 'Home', icon: Home },
+  { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
+];
+
+const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { id: 'home' as Tab, label: 'Home', icon: Home },
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },
       { id: 'awaiting-merge' as Tab, label: 'Awaiting Merge', icon: GitMerge },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
       { id: 'autopreso' as Tab, label: 'AutoPreso', icon: Mic },
-      { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
     ],
   },
   {
@@ -114,18 +122,65 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const MORE_COLLAPSED_KEY = 'panopticon.ui.sidebarMoreCollapsed';
+
 interface SidebarProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   onSearchOpen: () => void;
+  /** PAN-1561: the project whose deck is open (rail highlight). */
+  selectedProject?: string | null;
+  /** PAN-1561: open a project's deck from the rail. */
+  onSelectProject?: (projectName: string) => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
   });
+  const [moreCollapsed, setMoreCollapsed] = useState(() => {
+    return localStorage.getItem(MORE_COLLAPSED_KEY) === 'true';
+  });
+  const toggleMoreCollapsed = useCallback(() => {
+    setMoreCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(MORE_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // PAN-1561: project rail — shares the `command-deck-projects` query with the
+  // CommandDeck so the list is deduped and consistent.
+  const { data: projects = [] } = useQuery({
+    queryKey: ['command-deck-projects'],
+    queryFn: fetchProjects,
+    refetchInterval: 30000,
+  });
+
+  // PAN-1561: the "No project" bucket appears once a conversation exists that
+  // isn't under any registered project. These queries share keys with the
+  // CommandDeck (react-query dedupes — no extra network).
+  const { data: sidebarConversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    refetchInterval: 10000,
+  });
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: async (): Promise<RegisteredProjectLite[]> => {
+      const res = await fetch('/api/registered-projects');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 60000,
+  });
+  const hasUnscopedConversations = useMemo(
+    () => sidebarConversations.some((c) => isUnscopedConversation(c, registeredProjects)),
+    [sidebarConversations, registeredProjects],
+  );
 
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
@@ -223,6 +278,35 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toggleCollapsed]);
 
+  const renderNavItem = ({ id, label, icon: Icon, badge, title }: NavItem) => {
+    const isActive = activeTab === id;
+    const liveBadge = badge === 'flywheel-live' && hasActiveFlywheelRun;
+    return (
+      <button
+        key={id}
+        onClick={() => { onTabChange(id); setMobileOpen(false); }}
+        title={title ?? (collapsed ? label : undefined)}
+        data-testid={`sidebar-${id}`}
+        className={`
+          w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium
+          ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-1.5'}
+          ${isActive
+            ? 'bg-accent text-foreground border-l-2 border-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground border-l-2 border-transparent'
+          }
+        `}
+      >
+        <Icon className="shrink-0 w-4 h-4" />
+        {!collapsed && <span className="truncate">{label}</span>}
+        {!collapsed && liveBadge && (
+          <span className="ml-auto rounded-full border border-success/30 bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-success">
+            live
+          </span>
+        )}
+      </button>
+    );
+  };
+
   return (
     <>
       {/* Mobile hamburger button — only visible on small screens */}
@@ -291,46 +375,104 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
           )}
         </div>
 
-        {/* ─── Nav groups ─── */}
+        {/* ─── Nav: Home · Flywheel · Projects · More (PAN-1561) ─── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} className={collapsed ? 'mb-2' : 'mb-1'}>
-              {!collapsed && (
-                <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1 first:mt-2">
-                  {group.label}
-                </p>
+          {/* Primary rail */}
+          <div className={collapsed ? 'mb-2' : 'mb-1'}>
+            {PRIMARY_ITEMS.map(renderNavItem)}
+          </div>
+
+          {/* ─── Projects ─── */}
+          {!collapsed ? (
+            <div className="mb-1" data-testid="sidebar-projects">
+              <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1">
+                Projects
+              </p>
+              {projects.length === 0 ? (
+                <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No projects</p>
+              ) : (
+                projects.map((project) => {
+                  const isActive = activeTab === 'command-deck' && selectedProject === project.name;
+                  const hasActivity = project.features.length > 0;
+                  return (
+                    <button
+                      key={project.path}
+                      onClick={() => { onSelectProject?.(project.name); setMobileOpen(false); }}
+                      title={project.name}
+                      data-testid={`sidebar-project-${project.name}`}
+                      className={`
+                        w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2
+                        ${isActive
+                          ? 'bg-accent text-foreground border-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
+                        }
+                      `}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full shrink-0 ${hasActivity ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{project.name}</span>
+                      {project.features.length > 0 && (
+                        <span className="ml-auto text-[11px] text-muted-foreground">{project.features.length}</span>
+                      )}
+                    </button>
+                  );
+                })
               )}
-              {collapsed && <div className="h-px mx-2 bg-border my-2" />}
-              {group.items.map(({ id, label, icon: Icon, badge, title }) => {
-                const isActive = activeTab === id;
-                const liveBadge = badge === 'flywheel-live' && hasActiveFlywheelRun;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => { onTabChange(id); setMobileOpen(false); }}
-                    title={title ?? (collapsed ? label : undefined)}
-                    data-testid={`sidebar-${id}`}
-                    className={`
-                      w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium
-                      ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-1.5'}
-                      ${isActive
-                        ? 'bg-accent text-foreground border-l-2 border-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-foreground border-l-2 border-transparent'
-                      }
-                    `}
-                  >
-                    <Icon className={`shrink-0 ${collapsed ? 'w-4 h-4' : 'w-4 h-4'}`} />
-                    {!collapsed && <span className="truncate">{label}</span>}
-                    {!collapsed && liveBadge && (
-                      <span className="ml-auto rounded-full border border-success/30 bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-success">
-                        live
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {/* No-project bucket — unscoped conversations/terminals (PAN-1561) */}
+              {hasUnscopedConversations && (
+                <button
+                  onClick={() => { onSelectProject?.(NO_PROJECT_KEY); setMobileOpen(false); }}
+                  title={NO_PROJECT_LABEL}
+                  data-testid="sidebar-project-no-project"
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2
+                    ${activeTab === 'command-deck' && selectedProject === NO_PROJECT_KEY
+                      ? 'bg-accent text-foreground border-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
+                    }
+                  `}
+                >
+                  <span className="h-2 w-2 rounded-full shrink-0 bg-muted-foreground/30" aria-hidden="true" />
+                  <span className="truncate italic">{NO_PROJECT_LABEL}</span>
+                </button>
+              )}
             </div>
-          ))}
+          ) : (
+            <div className="h-px mx-2 bg-border my-2" />
+          )}
+
+          {/* ─── More (collapsible) — every other view (PAN-1561) ─── */}
+          {!collapsed ? (
+            <div className="mb-1" data-testid="sidebar-more">
+              <button
+                type="button"
+                onClick={toggleMoreCollapsed}
+                aria-expanded={!moreCollapsed}
+                className="w-full flex items-center gap-1.5 px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1 hover:text-foreground transition-colors"
+              >
+                {moreCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                <MoreHorizontal className="w-3 h-3" />
+                More
+              </button>
+              {!moreCollapsed && MORE_GROUPS.map((group) => (
+                <div key={group.label} className="mb-1">
+                  <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70 mt-3 mb-1">
+                    {group.label}
+                  </p>
+                  {group.items.map(renderNavItem)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            MORE_GROUPS.map((group) => (
+              <div key={group.label} className="mb-2">
+                <div className="h-px mx-2 bg-border my-2" />
+                {group.items.map(renderNavItem)}
+              </div>
+            ))
+          )}
 
           {/* ─── Pipeline filter groups ─── */}
           {!collapsed && activeTab === 'pipeline' && (

@@ -155,7 +155,7 @@ describe('FlywheelConversationPane helpers', () => {
   it('applies flywheel config defaults', () => {
     expect(resolveFlywheelConfig(undefined)).toMatchObject({
       harness: 'claude-code',
-      model: 'claude-opus-4-7',
+      model: 'claude-opus-4-8',
       effort: 'high',
       maxAgents: 8,
       scope: 'pan-only',
@@ -281,7 +281,7 @@ describe('FlywheelConversationPane', () => {
     renderPane();
 
     expect(await screen.findByText('RUN-2 (complete)')).toBeInTheDocument();
-    expect(screen.getByText('Model: claude-opus-4-7')).toBeInTheDocument();
+    expect(screen.getByText('Model: claude-opus-4-8')).toBeInTheDocument();
     expect(screen.getByText('Effort: high')).toBeInTheDocument();
     // Completed runs still show every action button — they are present-but-disabled
     // so operators always see the same affordances regardless of run state.

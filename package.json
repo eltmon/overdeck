@@ -1,6 +1,6 @@
 {
   "name": "@panctl/cli",
-  "version": "0.11.2",
+  "version": "0.16.2",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
@@ -35,11 +35,11 @@
       "apps/desktop"
     ],
     "catalog": {
-      "effect": "4.0.0-beta.45",
-      "@effect/platform-bun": "4.0.0-beta.45",
-      "@effect/platform-node": "4.0.0-beta.45",
-      "@effect/sql-sqlite-bun": "4.0.0-beta.45",
-      "@effect/vitest": "4.0.0-beta.45",
+      "effect": "4.0.0-beta.73",
+      "@effect/platform-bun": "4.0.0-beta.73",
+      "@effect/platform-node": "4.0.0-beta.73",
+      "@effect/sql-sqlite-bun": "4.0.0-beta.73",
+      "@effect/vitest": "4.0.0-beta.73",
       "@effect/language-service": "0.84.2",
       "@types/bun": "^1.2.0",
       "typescript": "^5.7.3"
@@ -63,7 +63,7 @@
     "node": ">=22.0.0"
   },
   "overrides": {
-    "@effect/platform-node-shared": "4.0.0-beta.45"
+    "@effect/platform-node-shared": "4.0.0-beta.73"
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
@@ -82,7 +82,8 @@
     "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
     "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/ && npm run lint:permissions && npm run lint:skills",
+    "lint": "eslint src/ && npm run lint:effect && npm run lint:permissions && npm run lint:skills",
+    "lint:effect": "node scripts/check-effect-versions.mjs",
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "prelint:skills": "npm run build:contracts && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
@@ -101,10 +102,11 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",
     "@anthropic-ai/sdk": "^0.96.0",
-    "@effect/platform-bun": "4.0.0-beta.45",
-    "@effect/platform-node": "4.0.0-beta.45",
-    "@effect/platform-node-shared": "4.0.0-beta.45",
-    "@effect/vitest": "4.0.0-beta.45",
+    "@effect/platform-bun": "4.0.0-beta.73",
+    "@effect/platform-node": "4.0.0-beta.73",
+    "@effect/platform-node-shared": "4.0.0-beta.73",
+    "@effect/vitest": "4.0.0-beta.73",
+    "effect": "4.0.0-beta.73",
     "@google-cloud/speech": "^7.3.1",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",
@@ -140,7 +142,6 @@
     "@typescript-eslint/parser": "6.21.0",
     "@vitest/coverage-v8": "^4.1.6",
     "@napi-rs/canvas": "^1.0.0",
-    "effect": "catalog:",
     "eslint": "^8.55.0",
     "husky": "^9.1.7",
     "playwright": "^1.59.1",

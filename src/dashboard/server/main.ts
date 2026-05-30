@@ -6,6 +6,7 @@
  */
 
 import { Effect } from 'effect';
+import { initDashboardLogFile } from './server-log-file.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
@@ -35,7 +36,6 @@ import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
-import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
@@ -45,6 +45,12 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 
 declare const Bun: unknown;
+
+// Persist this process's console output to <PANOPTICON_HOME>/logs/dashboard.log
+// in every launch mode (PAN-1552) — must run before any startup logging so the
+// record (including conversation-message 500 causes) survives `serve`/npx and
+// the desktop app, not just detached `pan up`.
+initDashboardLogFile();
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
@@ -469,7 +475,6 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
-await resumeSwarmAutoAdvanceLoopOnStartup();
 
 // PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
 // stashes — the only kind that requires human review. Retired stash kinds

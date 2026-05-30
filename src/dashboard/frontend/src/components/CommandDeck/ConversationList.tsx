@@ -170,11 +170,14 @@ interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
   excludeIds?: Set<number>;
+  /** When provided, show only conversations whose id is in this set (PAN-1561
+   * project scope). Applied after `excludeIds`. */
+  includeIds?: Set<number>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds }: ConversationListProps) {
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
 
@@ -221,6 +224,10 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       filtered = filtered.filter((c) => !excludeIds.has(c.id));
     }
 
+    if (includeIds) {
+      filtered = filtered.filter((c) => includeIds.has(c.id));
+    }
+
     if (tab === 'favorites') {
       filtered = filtered.filter((c) => c.isFavorited);
     }
@@ -236,7 +243,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     );
 
     return [...active, ...inactive];
-  }, [conversations, sort, tab, excludeIds]);
+  }, [conversations, sort, tab, excludeIds, includeIds]);
 
   if (isLoading) {
     return (

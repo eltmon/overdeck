@@ -130,8 +130,11 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   payload: Schema.Struct({
     agentId: AgentId,
     role: Schema.optional(Role),
-    hasPendingQuestion: Schema.Boolean,
-    pendingQuestionCount: Schema.Number,
+    // Optional because this event type predates these fields (PAN-440). The event
+    // store is append-only, so older persisted events lack them — a required schema
+    // makes those events fail replay decode ("Missing key").
+    hasPendingQuestion: Schema.optional(Schema.Boolean),
+    pendingQuestionCount: Schema.optional(Schema.Number),
     pendingQuestionPrompt: Schema.optional(Schema.String),
     pendingQuestionReason: Schema.optional(Schema.String),
     // PAN-1520 — unified pending-input surfaces

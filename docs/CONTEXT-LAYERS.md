@@ -71,12 +71,48 @@ Content **outside** the markers is preserved untouched — a hand-authored
 (`global.md` / `project.md`) and re-run `pan sync`; never edit the region
 directly.
 
+For each registered project that has a `project.md`, the project layer is
+rendered into **two** target files: `<root>/CLAUDE.md` (rendered for
+`claude-code`) and `<root>/AGENTS.md` (rendered for `pi`). Both use the same
+managed-region markers, so a hand-authored `AGENTS.md` is preserved exactly
+like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
+
 `pan sync` also:
 
 - distributes Panopticon's bundled skills → `~/.claude/skills/` and agent
   definitions → `~/.claude/agents/`, with manifest-based conflict resolution
   (a file you modified is left alone; an unmodified one is updated);
 - folds the bundled **engineering rules** into the global CLAUDE.md region.
+
+## Respecting your existing context
+
+Panopticon is designed to **augment, never replace** any context files you
+already maintain. Three guarantees:
+
+1. **Managed-region surgery.** `pan sync` only ever owns the span between the
+   `BEGIN/END PANOPTICON CONTEXT` markers in `~/.claude/CLAUDE.md`, each
+   project's `CLAUDE.md`, and each project's `AGENTS.md`. Everything outside
+   the markers — including content you add *above* or *below* the region — is
+   preserved verbatim across every sync.
+
+2. **First-injection backup.** The first time a sync injects a region into a
+   file that already had hand-authored content (no region yet), that file is
+   snapshotted into `~/.panopticon/backups/<timestamp>/context/` *before* the
+   write. `pan sync` prints a one-time notice naming the file and its backup so
+   the very first write that touches your content always has a safety net.
+
+3. **Opt-in per project.** A project's files are touched only when its
+   `.pan/context/project.md` exists. Register a project but write no
+   `project.md` and its `CLAUDE.md`/`AGENTS.md` are never modified.
+
+The Pi **global** layer is the one exception to "we only write managed
+regions": it renders to `~/.panopticon/context/pi-global.md`, a
+Panopticon-owned file (whole-file write), not your `AGENTS.md`. Project-level
+Pi context *does* go into your `AGENTS.md` as a managed region.
+
+The dashboard Context page surfaces all of this: for the selected layer it
+lists the exact target files, whether each already has your own content
+(preserved), and restates that the region is the only part `pan sync` owns.
 
 ## Bundled rules
 

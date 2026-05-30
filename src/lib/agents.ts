@@ -16,7 +16,7 @@ import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
-import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfigSync } from './config.js';
@@ -96,7 +96,6 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
 }
 
 async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code' | 'pi' | undefined): Promise<string[]> {
-  if (harness === 'pi') return [];
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspace);
   try {
@@ -106,6 +105,16 @@ async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code'
     if (!isNodeNotFound(error)) throw error;
   }
   files.push(await ensureSessionContextBriefingFile());
+
+  // PAN-1566: Pi also receives the rendered global context layer.
+  if (harness === 'pi') {
+    const { piGlobalContextFile } = await import('./context-layers/index.js');
+    const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+
   return files;
 }
 
@@ -197,17 +206,52 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
 }
 
 /**
+ * Inject prompt-time memory context into a Pi prompt (PAN-1546).
+ * Mirrors Claude Code's UserPromptSubmit hook behaviour: every follow-up
+ * prompt gets relevant memory surfaced via RAG.
+ */
+async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promise<string> {
+  if (!prompt.trim()) return prompt;
+
+  const agentState = getAgentStateSync(agentId);
+  if (!agentState || !agentState.workspace || !agentState.issueId) {
+    return prompt;
+  }
+
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(agentState.workspace),
+      workspaceId: basename(agentState.workspace),
+      issueId: agentState.issueId,
+      runId: agentId,
+      sessionId: agentId,
+      agentRole: agentState.role ?? 'work',
+      agentHarness: agentState.harness ?? 'pi',
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
+    if (result.context) {
+      return `${result.context}\n\n---\n\n${prompt}`;
+    }
+  } catch (error) {
+    console.warn(`[agents] Prompt-time memory injection failed for ${agentId}:`, error instanceof Error ? error.message : String(error));
+  }
+  return prompt;
+}
+
+/**
  * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
  * Pi never reads tmux input — pasting prompts there is a no-op as far as the
  * model is concerned. Throws if Pi never reached readiness within the timeout.
  */
 async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForPiAgentReady(agentId, timeoutSec);
   if (!ready) {
     throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
   }
   try {
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: prompt });
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
@@ -269,6 +313,7 @@ export async function getAgentRuntimeBaseCommand(
   agentName?: string,
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -282,6 +327,7 @@ export async function getAgentRuntimeBaseCommand(
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
+  const effortFlag = effort ? ` --effort ${effort}` : '';
   // PAN-982: When agentDefinition is provided, pass it directly to --agent.
   // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
   // Still pass --model when launching with an agent definition so explicit model
@@ -305,9 +351,9 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -317,9 +363,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -355,7 +401,7 @@ export async function getRoleRuntimeBaseCommand(
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
-  effort?: 'low' | 'medium' | 'high',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -375,7 +421,10 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
 
-  const printFlag = role === 'review' && subRole ? ' --print' : '';
+  // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
+  // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
+  // of headless `claude --print`. No role uses --print anymore.
+  const printFlag = '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
@@ -1956,12 +2005,14 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
-  // and the one-agent-per-issue uniqueness check is scoped to the slot.
-  slotId?: number;
-  swarmItemId?: string; // vBRIEF item ID this slot is working on
+  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
+  // is now in-context via subagents (see roles/work.md), not via slot agents.
+  // `allowHost` (workspace-isolation override) stays — it predates the swarm
+  // runtime and is used by review/test/ship agents independently.
   allowHost?: boolean;
   flywheelRunId?: string;
+  /** Claude Code `--effort` level for the spawned session (work/strike). */
+  effort?: RoleEffort;
 }
 
 export interface SpawnRunOptions {
@@ -1987,7 +2038,7 @@ export interface SpawnRunOptions {
   reviewOutputPath?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
 }
@@ -2170,6 +2221,8 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
   extraEnvExports?: string[];
+  /** Claude Code `--effort` level threaded into the launcher command. */
+  effort?: RoleEffort;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2278,7 +2331,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -2360,13 +2413,6 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
-/**
- * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
- * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
- * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
- */
-const REVIEW_SUBROLE_TIMEOUT_SECONDS = 30 * 60;
-
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,
@@ -2383,14 +2429,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
   const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
 
   if (allowHost) {
+    // PAN-1556: host-override is a per-spawn detail, not user-facing activity —
+    // it fired once per convoy member and buried real feed items (conversations).
+    // Keep the console.warn for debugging; do not emit to the session feed.
     console.warn(`[agents] ${message}`);
-    emitActivityEntrySync({
-      source: role,
-      level: 'warn',
-      issueId: normalizedIssue,
-      message: `agent-spawn-host-override: ${normalizedIssue}`,
-      details,
-    });
     return;
   }
 
@@ -2418,6 +2460,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
+      effort: options.effort,
     });
   }
 
@@ -2483,8 +2526,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
-  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
+  // their prompt via tmux after Claude boots (same as the orchestrator/test/
+  // ship), not on stdin to a headless `claude --print`.
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -2577,28 +2622,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
-  // wiring so the launcher's own bash process — not the agent's good behavior,
-  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
-  // launcher signals deterministically on process exit and touches a marker
-  // file; Deacon only steps in if that bash process was SIGKILLed.
-  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
-    ? {
-        synthesisAgentId: options.reviewSynthesisAgentId,
-        subRole: options.subRole as string,
-        outputPath: options.reviewOutputPath,
-        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
-        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
-        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
-      }
-    : undefined;
+  // PAN-1557: convoy reviewers are interactive now, so the launcher no longer
+  // owns the REVIEWER_READY/FAILED signal (which previously rode a `claude
+  // --print` process exit). The Stop-hook delivers REVIEWER_READY to the
+  // synthesis agent when the reviewer finishes its turn with a written report;
+  // Deacon's REVIEWER_TIMEOUT remains the failure failsafe. We still persist
+  // the synthesis/output wiring on state.json so the Stop-hook can read it.
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
-
-  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
-  // by delivering through tmux after Claude boots. Headless review sub-roles run
-  // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScriptSync({
     role,
@@ -2607,19 +2638,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
-    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
+    promptFileMode: undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
     resumeSessionId: options.resumeSessionId,
-    reviewSignal,
-    // PAN-977: review sub-role launchers must outlive their tmux session. The
-    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
-    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
-    // process alive so it always runs its signal block when claude exits.
-    trapHup: reviewSignal ? true : undefined,
+    reviewSignal: undefined,
+    trapHup: undefined,
     ...piLauncherFields,
   });
 
@@ -2696,12 +2723,18 @@ if (prompt) {
 
   await Effect.runPromise(saveAgentState(state));
 
-  emitActivityEntrySync({
-    source: role,
-    level: 'info',
-    message: `${role} role started for ${issueId}`,
-    issueId,
-  });
+  // PAN-1556: the review role emits a single dedicated "Review role spawned"
+  // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
+  // "role started" for review so the orchestrator + 4 convoy sub-reviewers
+  // don't each spam the session feed and bury conversations.
+  if (role !== 'review') {
+    emitActivityEntrySync({
+      source: role,
+      level: 'info',
+      message: `${role} role started for ${issueId}`,
+      issueId,
+    });
+  }
 
   return state;
 }
@@ -2709,9 +2742,9 @@ if (prompt) {
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
-  const agentId = options.slotId != null
-    ? `${sessionPrefix}-${options.issueId.toLowerCase()}-${options.slotId}`
-    : `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  // PAN-1517: slot-suffixed agent ids removed alongside the swarm runtime;
+  // there is one work agent per issue, period.
+  const agentId = `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {
@@ -2923,6 +2956,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
+    effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

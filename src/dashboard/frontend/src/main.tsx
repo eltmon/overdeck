@@ -3,7 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DialogProvider } from './components/DialogProvider';
 import App from './App';
+import { installRecovery, RootErrorBoundary } from './recovery';
 import './index.css';
+
+// Recover from asset/module load failures during a server restart (the blank
+// page + 404 symptom). Install before render so a failure mid-boot is caught.
+installRecovery();
 
 /**
  * Retry on transient network errors (PAN-207: ERR_NETWORK_CHANGED)
@@ -36,10 +41,12 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <DialogProvider>
-        <App />
-      </DialogProvider>
-    </QueryClientProvider>
+    <RootErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <App />
+        </DialogProvider>
+      </QueryClientProvider>
+    </RootErrorBoundary>
   </React.StrictMode>
 );

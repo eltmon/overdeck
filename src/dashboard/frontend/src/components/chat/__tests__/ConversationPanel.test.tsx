@@ -18,7 +18,14 @@ vi.mock('../../DialogProvider', () => ({
 // Mock heavy child components that are not under test
 vi.mock('../../XTerminal', () => ({ XTerminal: () => null }));
 vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
-vi.mock('../ComposerFooter', () => ({ ComposerFooter: () => null }));
+// PAN-1523 moved the context-usage meter into the composer footer. Capture the
+// usage snapshot ConversationPanel computes and passes down so we can assert it
+// without rendering the real ContextWindowMeter.
+vi.mock('../ComposerFooter', () => ({
+  ComposerFooter: ({ contextWindowUsage }: { contextWindowUsage: unknown }) => (
+    <div data-testid="composer-footer" data-usage={JSON.stringify(contextWindowUsage)} />
+  ),
+}));
 vi.mock('../ModelPicker', () => ({
   loadStoredHarness: () => 'claude-code',
   saveStoredHarness: vi.fn(),
@@ -131,7 +138,7 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
   });
 
-  it('renders context usage in the header', () => {
+  it('passes conversation context usage to the composer footer', () => {
     renderPanel({
       ...mockConversation,
       contextUsage: {
@@ -141,7 +148,10 @@ describe('ConversationPanel rename flow', () => {
         percentUsed: 0.75,
       },
     });
-    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('1.50k');
+    expect(screen.getByTestId('composer-footer')).toHaveAttribute(
+      'data-usage',
+      expect.stringContaining('"usedTokens":1500'),
+    );
   });
 
   it('prefers the latest messages response context usage', () => {
@@ -168,7 +178,10 @@ describe('ConversationPanel rename flow', () => {
         },
       },
     );
-    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('33.04k');
+    expect(screen.getByTestId('composer-footer')).toHaveAttribute(
+      'data-usage',
+      expect.stringContaining('"usedTokens":33041'),
+    );
   });
 
   it('shows title input with current value when pencil button is clicked', () => {

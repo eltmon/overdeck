@@ -102,7 +102,7 @@ import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type Pen
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
-import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
   computeContextUsage,
@@ -966,6 +966,30 @@ async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[
   return files;
 }
 
+// PAN-1566: Pi conversations are launched with --no-context-files and the
+// extension fold no-ops (no ctx.appendSystemPrompt), so the global rules layer
+// must be delivered as launcher --append-system-prompt files. Mirror the Claude
+// conversation files but prepend the Pi-rendered global layer (pi-global.md).
+async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  const files: string[] = [];
+  const globalFile = piGlobalContextFile();
+  try {
+    await stat(globalFile);
+    files.push(globalFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  const contextFile = workspaceContextFile(cwd);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
 function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
@@ -1138,10 +1162,21 @@ export async function spawnConversationSession(
       setTerminalEnv: true,
       unsetProviderEnv: true,
       panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+      // Point the agent's hook/heartbeat POSTs at THIS server's loopback API.
+      // Without it the Pi extension falls back to http://localhost:3010
+      // (index.ts:120) — which in dev is the Vite dev server, whose /api proxy
+      // targets the unresolvable docker host `server`, spamming ENOTFOUND on
+      // every tool/turn. Resolve the port exactly as the server does so this is
+      // correct in dev (3011) and prod (whatever API_PORT/PORT is set to).
+      extraEnvExports: [
+        `export PANOPTICON_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+      ],
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
-      appendSystemPromptFiles: piFields ? [] : await claudeConversationSystemPromptFiles(cwd),
+      appendSystemPromptFiles: piFields
+        ? await piConversationSystemPromptFiles(cwd)
+        : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
       ...(piFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
@@ -1584,6 +1619,23 @@ const getConversationsRoute = HttpRouter.add(
 
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
+
+            // PAN-1556: surface the transcript's last-write time as the
+            // conversation's last-activity signal. The JSONL is appended on
+            // every message (including the user's), so its mtime — unlike
+            // lastAttachedAt, which only moves on terminal re-attach — bumps
+            // when a conversation gets a new reply. The session feed orders on
+            // this so an active conversation rises back to the top. A bare
+            // stat() is metadata-only (no JSONL scan), so it's cheap per row.
+            let lastActivityAt: string | null = null;
+            if (convSf && existsSync(convSf)) {
+              try {
+                lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
+              } catch {
+                // non-fatal — fall back to lastAttachedAt/createdAt downstream
+              }
+            }
+
             return {
               ...conv,
               sessionAlive,
@@ -1592,6 +1644,7 @@ const getConversationsRoute = HttpRouter.add(
               isFavorited: favoritedNames.has(conv.name),
               compacting,
               contextUsage: null,
+              lastActivityAt,
               branch: gitInfo.branch,
               isWorktree: gitInfo.isWorktree,
               pendingInputCount,
@@ -2467,7 +2520,9 @@ const postConversationMessageRoute = HttpRouter.add(
         return await handleConversationMessage(name, body);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error('[conversations] send message failed:', msg);
+        // Log the full stack (falls back to message) so a 500's cause is
+        // diagnosable after the fact, not just the bare message (PAN-1552).
+        console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
         // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
@@ -2816,6 +2871,19 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
 
+/**
+ * Title a handoff conversation after the WORK it carries (the focus), not the
+ * parent's title. A handoff with no focus falls back to "Handoff: <parent>".
+ * The focus is collapsed to one line and trimmed to a sane title length; the
+ * AI title-refiner can still sharpen it once the successor starts working.
+ */
+function handoffTitleFromFocus(focus: string | undefined, fallback: string): string {
+  const f = focus?.replace(/\s+/g, ' ').trim();
+  if (!f) return `Handoff: ${fallback}`;
+  const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}…` : f;
+  return `Handoff: ${trimmed}`;
+}
+
 async function injectForkSummary(conv: Conversation, summary: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   if (conv.harness === 'pi') {
@@ -2948,7 +3016,7 @@ async function runForkPipeline(
   updateConversationTitle(
     convName,
     effectiveForkMode === 'handoff'
-      ? `Handoff: ${parentConv.title || parentConv.name}`
+      ? handoffTitleFromFocus(handoffFocus, parentConv.title || parentConv.name)
       : `Summary Fork: ${parentConv.title || parentConv.name}`,
     'manual',
   );
@@ -3105,7 +3173,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const defaultTitle = forkMode === 'plain'
           ? `Fork: ${conv.title || conv.name}`
           : forkMode === 'handoff'
-            ? `Handoff: ${conv.title || conv.name}`
+            ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
             : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({

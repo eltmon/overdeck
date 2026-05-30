@@ -154,69 +154,14 @@ export interface ContinueState {
   sessionHistory: ContinueSessionEntry[];
   /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
   feedback?: ContinueFeedbackEntry[];
-  /** Swarm dispatch runtime state. Present only for swarm-mode issues. */
-  swarmRuntime?: SwarmRuntime;
 }
 
-// ─── Swarm runtime types ─────────────────────────────────────────────────────
-
-/** Runtime state for a single swarm slot. */
-export interface SwarmSlotRuntime {
-  slotId: number;
-  itemId: string;
-  itemTitle: string;
-  sessionName: string;
-  workspace: string;
-  status: 'pending' | 'running' | 'merged' | 'failed' | 'failed-merge';
-  /** ISO 8601 datetime, set when the slot agent is dispatched. */
-  dispatchedAt?: string;
-  /** ISO 8601 datetime, set when the slot branch is merged into the feature branch. */
-  mergedAt?: string;
-  consecutiveConflictCount?: number;
-  prUrl?: string;
-  recoveryAction?: 'retry' | 'drop' | 'handoff';
-  recoveredAt?: string;
-}
-
-/** Context update written by a synthesis agent before a convergence-point item is dispatched. */
-export interface SynthesisOutput {
-  /** Item ID this output targets (the downstream convergence item). */
-  targetItemId: string;
-  /** ISO 8601 datetime when synthesis was written. */
-  writtenAt: string;
-  /** Markdown context update the downstream work agent should read before starting. */
-  contextUpdate: string;
-}
-
-/**
- * Swarm runtime state stored in the continue vBRIEF. Replaces the
- * `~/.panopticon/swarms/{issueId}.json` sidecar from PAN-970.
- */
-export interface SwarmRuntime {
-  /** Model used for slot agents. */
-  model: string;
-  /** Current dependency wave being dispatched. */
-  currentWave?: number;
-  /** Total dependency waves in the plan at dispatch time. */
-  totalWaves?: number;
-  /** Whether event/polling auto-advance is enabled. */
-  autoAdvance?: boolean;
-  /** Whether this swarm was explicitly confirmed to bypass workspace isolation. */
-  hostOverride?: boolean;
-  autoAdvanceFailureCount?: number;
-  autoAdvanceRetryAfter?: string;
-  lastAutoAdvanceError?: string;
-  /** Ready items intentionally held for a later dispatch cycle. */
-  deferred?: Array<{ itemId: string; itemTitle: string }>;
-  /** All slots dispatched across all dispatch cycles. */
-  slots: SwarmSlotRuntime[];
-  /** Synthesis agent output keyed by target item ID. */
-  synthesisOutputs: Record<string, SynthesisOutput>;
-  /** ISO 8601 datetime of first dispatch. */
-  createdAt: string;
-  /** ISO 8601 datetime of most recent update. */
-  updatedAt: string;
-}
+// PAN-1517: SwarmRuntime, SwarmSlotRuntime, and SynthesisOutput interfaces
+// removed. The swarm runtime is gone — parallelism is now an in-context
+// concern owned by the work agent (see roles/work.md "Parallel work via
+// subagents"). Continue files written before this change may still carry a
+// `swarmRuntime` field; the validator silently ignores unknown fields and the
+// type definition is gone so callers can't observe it.
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -457,47 +402,9 @@ function validateContinueState(value: unknown, path: string): asserts value is C
     throw new Error(`Continue file ${path} has malformed feedback array`);
   }
 
-  if (v.swarmRuntime !== undefined) {
-    validateSwarmRuntime(v.swarmRuntime, path);
-  }
-}
-
-function validateSwarmRuntime(value: unknown, path: string): asserts value is SwarmRuntime {
-  if (!value || typeof value !== 'object') {
-    throw new Error(`Continue file ${path} has malformed swarmRuntime`);
-  }
-  const runtime = value as Record<string, unknown>;
-  if (typeof runtime.model !== 'string') {
-    throw new Error(`Continue file ${path} has malformed swarmRuntime.model`);
-  }
-  if (!Array.isArray(runtime.slots)) {
-    throw new Error(`Continue file ${path} has malformed swarmRuntime.slots`);
-  }
-  if (!runtime.synthesisOutputs || typeof runtime.synthesisOutputs !== 'object' || Array.isArray(runtime.synthesisOutputs)) {
-    throw new Error(`Continue file ${path} has malformed swarmRuntime.synthesisOutputs`);
-  }
-  if (typeof runtime.createdAt !== 'string' || typeof runtime.updatedAt !== 'string') {
-    throw new Error(`Continue file ${path} has malformed swarmRuntime timestamps`);
-  }
-  for (const slot of runtime.slots) {
-    if (!slot || typeof slot !== 'object') {
-      throw new Error(`Continue file ${path} has malformed swarmRuntime slot`);
-    }
-    const s = slot as Record<string, unknown>;
-    if (typeof s.slotId !== 'number' || typeof s.itemId !== 'string' || typeof s.itemTitle !== 'string' ||
-        typeof s.sessionName !== 'string' || typeof s.workspace !== 'string' || typeof s.status !== 'string') {
-      throw new Error(`Continue file ${path} has malformed swarmRuntime slot fields`);
-    }
-  }
-  for (const output of Object.values(runtime.synthesisOutputs as Record<string, unknown>)) {
-    if (!output || typeof output !== 'object') {
-      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output`);
-    }
-    const o = output as Record<string, unknown>;
-    if (typeof o.targetItemId !== 'string' || typeof o.writtenAt !== 'string' || typeof o.contextUpdate !== 'string') {
-      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output fields`);
-    }
-  }
+  // PAN-1517: swarmRuntime validation removed alongside the runtime itself.
+  // Legacy `swarmRuntime` fields in pre-PAN-1517 continue files are silently
+  // ignored — TypeScript can't see them via the type and no code reads them.
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

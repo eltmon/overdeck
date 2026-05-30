@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { extractFromTranscriptDelta } from '../../../src/lib/memory/pipeline.js';
@@ -216,6 +219,42 @@ describe('extractFromTranscriptDelta', () => {
 
     expect(result.status).toBe('written');
     expect(writeObservation.mock.calls[0]![0].id).toBe('obs-5ae912f2f824e63d45cac4c8b0935079');
+  });
+
+  it('uses the Pi transcript source compressor for Pi transcript deltas', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'pan-memory-pi-'));
+    const transcriptPath = join(dir, 'pi.jsonl');
+    const raw = [
+      JSON.stringify({ type: 'session', id: 'pi-session' }),
+      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: 'ingest Pi transcript' }] } }),
+      JSON.stringify({ type: 'message', message: { role: 'assistant', content: [{ type: 'text', text: 'Pi transcript ingested' }] } }),
+    ].join('\n') + '\n';
+    await writeFile(transcriptPath, raw, 'utf8');
+
+    try {
+      const writePendingTurn = vi.fn(async () => ({ path: '/tmp/pending.json', fileName: 'pending.json' }));
+      const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, Buffer.byteLength(raw, 'utf8')).checkpoint }));
+      const result = await extractFromTranscriptDelta(input({
+        sessionId: 'pi-session',
+        transcriptPath,
+        toOffset: Buffer.byteLength(raw, 'utf8'),
+        identity: { ...identity, sessionId: 'pi-session', agentHarness: 'pi' },
+        harness: 'pi',
+        claimRange: (claimInput) => claimedRange(claimInput.expectedFromOffset, claimInput.toOffset),
+        extract: async () => extractedPayload(),
+        writeObservation: async () => ({ jsonlPath: '/tmp/observations.jsonl', markdownPath: '/tmp/observations.md' }),
+        writePendingTurn,
+        emitObservationCreated: async () => undefined,
+        maybeTriggerRollup: async () => ({ status: 'below-threshold' as const, pendingCount: 1, threshold: 4 }),
+        commitRange,
+      }));
+
+      expect(result.status).toBe('written');
+      expect(writePendingTurn.mock.calls[0]![0].compressedText).toBe('U: ingest Pi transcript\nA: Pi transcript ingested');
+      expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({ consumedOffset: Buffer.byteLength(raw, 'utf8') }));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('commits checkpoints only to the last fully consumed JSONL line', async () => {

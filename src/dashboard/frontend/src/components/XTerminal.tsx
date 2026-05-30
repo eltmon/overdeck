@@ -1,7 +1,34 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Terminal } from '@xterm/xterm';
+import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { useTheme } from '../hooks/useTheme';
+
+// Terminal background, exported so embedders can match the surrounding chrome.
+export const XTERM_BG = { dark: '#1a1a2e', light: '#ffffff' } as const;
+
+// xterm palette that follows the app's light/dark theme (PAN-1561). The ANSI
+// colors are tuned per-mode for contrast against the background.
+function xtermTheme(isDark: boolean): ITheme {
+  if (isDark) {
+    return {
+      background: XTERM_BG.dark, foreground: '#eaeaea', cursor: '#eaeaea', cursorAccent: '#1a1a2e',
+      selectionBackground: '#3a3a5e',
+      black: '#1a1a2e', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c', blue: '#6272a4',
+      magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2',
+      brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94', brightYellow: '#ffffa5',
+      brightBlue: '#d6acff', brightMagenta: '#ff92df', brightCyan: '#a4ffff', brightWhite: '#ffffff',
+    };
+  }
+  return {
+    background: XTERM_BG.light, foreground: '#24292e', cursor: '#24292e', cursorAccent: '#ffffff',
+    selectionBackground: '#bcd3f5',
+    black: '#24292e', red: '#d73a49', green: '#22863a', yellow: '#b08800', blue: '#0366d6',
+    magenta: '#6f42c1', cyan: '#1b7c83', white: '#6a737d',
+    brightBlack: '#959da5', brightRed: '#cb2431', brightGreen: '#28a745', brightYellow: '#dbab09',
+    brightBlue: '#2188ff', brightMagenta: '#8a63d2', brightCyan: '#3192aa', brightWhite: '#24292e',
+  };
+}
 
 // Debounce utility to prevent resize spam
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
@@ -36,6 +63,9 @@ interface XTerminalProps {
   token?: string;
   onDisconnect?: () => void;
   autoCopyOnSelect?: boolean;
+  /** When embedded in a host that owns its own chrome (e.g. the terminal
+   * drawer), hide the built-in settings gear to avoid duplicate controls. */
+  embedded?: boolean;
 }
 
 interface TerminalSnapshotMessage {
@@ -65,7 +95,10 @@ const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
-export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp }: XTerminalProps) {
+export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
+  const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
+  const isDarkRef = useRef(isDark);
+  isDarkRef.current = isDark;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -329,29 +362,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         allowProposedApi: true,
         macOptionClickForcesSelection: true,
         rightClickSelectsWord: false,
-        theme: {
-          background: '#1a1a2e',
-          foreground: '#eaeaea',
-          cursor: '#eaeaea',
-          cursorAccent: '#1a1a2e',
-          selectionBackground: '#3a3a5e',
-          black: '#1a1a2e',
-          red: '#ff5555',
-          green: '#50fa7b',
-          yellow: '#f1fa8c',
-          blue: '#6272a4',
-          magenta: '#ff79c6',
-          cyan: '#8be9fd',
-          white: '#f8f8f2',
-          brightBlack: '#6272a4',
-          brightRed: '#ff6e6e',
-          brightGreen: '#69ff94',
-          brightYellow: '#ffffa5',
-          brightBlue: '#d6acff',
-          brightMagenta: '#ff92df',
-          brightCyan: '#a4ffff',
-          brightWhite: '#ffffff',
-        },
+        theme: xtermTheme(isDarkRef.current),
       });
 
       fit = new FitAddon();
@@ -639,12 +650,25 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   useEffect(() => {
     const tMount = performance.now();
     profMark(sessionName, tMount, 'XTerminal mount effect');
-    // The container-zero-size race the old 50ms setTimeout guarded against is
-    // already handled by the clientWidth/Height check inside connect() (which
-    // retries every 100ms until sized). Connecting synchronously saves 50ms on
-    // every Terminal click.
-    const cleanupFn = connect();
+    // Defer connect by one tick and guard it with a cancelled flag. React
+    // StrictMode (dev) double-invokes effects mount→unmount→mount synchronously;
+    // connecting synchronously (the previous approach) opened a WebSocket and
+    // created an xterm instance on EACH invocation, then tore it down — three
+    // full connect/teardown cycles per Terminal-view switch, with two
+    // "WebSocket closed before the connection is established" warnings and a
+    // reconnect flash before the surviving mount finally attached. Deferring
+    // lets the intervening unmount cancel the throwaway connects so only the
+    // last mount actually connects. setTimeout(0) (vs the old 50ms) keeps the
+    // cold-path latency win; connect()'s own clientWidth/Height check still
+    // covers the rare container-not-yet-sized case via its 100ms retry.
+    let cancelled = false;
+    let cleanupFn: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      if (!cancelled) cleanupFn = connect();
+    }, 0);
     return () => {
+      cancelled = true;
+      clearTimeout(timer);
       cleanupFn?.();
     };
   }, [connect, sessionName]);
@@ -665,13 +689,21 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
   }, [sendResizeIfNeeded]);
 
+  // Recolor a live terminal when the app theme toggles (PAN-1561).
+  useEffect(() => {
+    if (terminalInstance.current) {
+      terminalInstance.current.options.theme = xtermTheme(isDark);
+    }
+  }, [isDark]);
+
   const handleClick = () => {
     terminalInstance.current?.focus();
   };
 
   return (
     <div className="relative w-full h-full">
-      {/* Settings button */}
+      {/* Settings button — hidden when embedded (the host owns the chrome). */}
+      {!embedded && (
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <button
           onClick={() => setShowSettings(!showSettings)}
@@ -684,9 +716,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           </svg>
         </button>
       </div>
+      )}
 
       {/* Settings panel */}
-      {showSettings && (
+      {!embedded && showSettings && (
         <div className="absolute top-10 right-2 z-20 w-64 p-3 rounded-lg bg-card border border-border shadow-xl">
           <h3 className="text-sm font-semibold text-foreground mb-3">Terminal Settings</h3>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -712,7 +745,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         tabIndex={0}
         style={{
           padding: '8px',
-          backgroundColor: '#1a1a2e',
+          backgroundColor: isDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',
         }}

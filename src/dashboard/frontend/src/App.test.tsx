@@ -29,6 +29,7 @@ const {
       issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
+      agentsWithPendingAskUserQuestion: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
     },
@@ -114,6 +115,8 @@ vi.mock('./lib/store', () => ({
     Object.values(state.channelPermissionRequestsById ?? {}),
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
+  selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
+    state.agentsWithPendingAskUserQuestion ?? [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
@@ -165,6 +168,7 @@ beforeEach(() => {
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
+  mockDashboardState.agentsWithPendingAskUserQuestion = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
   mockOpenIssue.mockClear()
