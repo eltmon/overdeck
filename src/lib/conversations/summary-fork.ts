@@ -222,16 +222,23 @@ export async function authorHandoffExternal(
   await ensureHandoffsDir();
   const timestamp = (options.now ?? new Date()).toISOString();
   const paths = createHandoffPaths(sourceConv.name, timestamp);
-  const template = await readFile(join(packageRoot, 'roles', 'handoff-external.md'), 'utf-8');
+
+  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+  const effectiveHarness: RuntimeName = harness ?? 'claude-code';
+
+  // The authoring harness decides the prompt template: Claude Code's `Write`
+  // tool vs Pi's lowercase `write` tool, with harness-specific phrasing about
+  // how the model should call it. Both templates share the same H2 contract,
+  // and the file-on-disk read below is harness-independent.
+  const templateName = effectiveHarness === 'pi' ? 'handoff-external-pi.md' : 'handoff-external.md';
+  const template = await readFile(join(packageRoot, 'roles', templateName), 'utf-8');
+
   // The source's harness decides how the transcript is read/serialized; the
   // authoring harness (model + harness picked by the user) is independent.
   const sourceAdapter = getTranscriptAdapter(sourceConv.harness ?? undefined);
   // Skip thinking blocks — they're large and the structured output we want
   // doesn't need internal reasoning, only the user/assistant exchange.
   const transcript = await sourceAdapter.serializeTranscript(sourceSessionFile, { includeThinking: false });
-
-  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
-  const effectiveHarness: RuntimeName = harness ?? 'claude-code';
 
   // If the raw transcript is small enough, feed it to the model verbatim —
   // that's the richest input. For long transcripts we'd overflow any model's

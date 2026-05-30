@@ -462,6 +462,47 @@ describe('authorHandoffExternal', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
+  it('uses the Pi-specific authoring template + write tool when the authoring harness is Pi (PAN-1541)', async () => {
+    const home = join(tmpdir(), `pan-handoff-pi-author-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
+    const docText = validDoc();
+
+    mockAuthoringSessionThatWrites(docText);
+    vi.mocked(mockedRunModelSummary).mockClear();
+
+    const result = await authorHandoffExternal(source, sourceFile, 'continue PAN-1541', 'pi-model', 'pi');
+
+    expect(result.docText).toBe(docText);
+    expect(mockedRunModelSummary).toHaveBeenCalledTimes(1);
+    const callArgs = vi.mocked(mockedRunModelSummary).mock.calls[0];
+    // The authoring harness is threaded to the LLM call so runPiModelSummary runs.
+    expect(callArgs?.[3]).toBe('pi');
+    const prompt = callArgs?.[0] as string;
+    // Pi uses its lowercase `write` tool, not Claude Code's `Write` tool.
+    expect(prompt).toContain('External-session handoff authoring (Pi)');
+    expect(prompt).toContain('`write` tool');
+    expect(prompt).not.toContain('**Write** tool');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('uses the Claude Code authoring template when the authoring harness is claude-code (PAN-1541)', async () => {
+    const home = join(tmpdir(), `pan-handoff-cc-author-${Date.now()}`);
+    const source = await createSourceConversation(home);
+    const sourceFile = sessionFilePath(source.cwd, source.claudeSessionId!);
+    const docText = validDoc();
+
+    mockAuthoringSessionThatWrites(docText);
+    vi.mocked(mockedRunModelSummary).mockClear();
+
+    await authorHandoffExternal(source, sourceFile, 'continue', 'claude-haiku-4-5', 'claude-code');
+
+    const prompt = vi.mocked(mockedRunModelSummary).mock.calls[0]?.[0] as string;
+    expect(prompt).toContain('**Write** tool');
+    expect(prompt).not.toContain('(Pi)');
+    rmSync(home, { recursive: true, force: true });
+  });
+
   it('falls back to summary fork when the file content fails validation', async () => {
     const home = join(tmpdir(), `pan-handoff-external-invalid-${Date.now()}`);
     const source = await createSourceConversation(home);
