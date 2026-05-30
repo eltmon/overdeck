@@ -84,7 +84,7 @@ import {
   waitForClaudePrompt,
   listSessionNames,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -736,7 +736,17 @@ export async function handleConversationMessage(
     .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
     .map((c) => c.attachmentPath);
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  const deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
+  let deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
+
+  // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
+  // UserPromptSubmit hook; Pi has no such hook, so inject server-side here for
+  // issue-linked Pi conversations (no-op otherwise).
+  if (harness === 'pi') {
+    deliveredMessage = await injectPiConversationMemory(
+      { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
+      deliveredMessage,
+    );
+  }
 
   try {
     await deliverAgentMessage(

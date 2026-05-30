@@ -240,6 +240,42 @@ async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promis
 }
 
 /**
+ * Prompt-time memory injection for a Pi CONVERSATION follow-up (PAN-1546).
+ *
+ * The rpc/work-agent path (injectPiPromptTimeMemory) reads agent-state.json,
+ * which conversations do not have — they deliver follow-ups via tmux
+ * paste-buffer, not the FIFO. This builds the memory identity from the
+ * conversation's cwd + issueId instead. Only issue-linked conversations have
+ * memory to surface; everything else (and any failure) passes through
+ * unchanged so a memory hiccup can never block a message.
+ */
+export async function injectPiConversationMemory(
+  opts: { cwd: string; issueId?: string | null; conversationName: string },
+  prompt: string,
+): Promise<string> {
+  if (!prompt.trim() || !opts.issueId || !opts.cwd) return prompt;
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(opts.cwd),
+      workspaceId: basename(opts.cwd),
+      issueId: opts.issueId,
+      runId: opts.conversationName,
+      sessionId: opts.conversationName,
+      agentRole: 'work',
+      agentHarness: 'pi',
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
+    if (result.context) {
+      return `${result.context}\n\n---\n\n${prompt}`;
+    }
+  } catch (error) {
+    console.warn(`[agents] Conversation memory injection failed for ${opts.conversationName}:`, error instanceof Error ? error.message : String(error));
+  }
+  return prompt;
+}
+
+/**
  * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
  * Pi never reads tmux input — pasting prompts there is a no-op as far as the
  * model is concerned. Throws if Pi never reached readiness within the timeout.
