@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
@@ -18,7 +18,23 @@ export function _resetDashboardSessionTokenForTests(): void {
 }
 
 function getDashboardSessionToken(): string {
-  browserSessionToken ??= process.env['PANOPTICON_DASHBOARD_SESSION_TOKEN'] ?? randomBytes(32).toString('base64url');
+  if (browserSessionToken) return browserSessionToken;
+  const override = process.env['PANOPTICON_DASHBOARD_SESSION_TOKEN'];
+  if (override) {
+    browserSessionToken = override;
+    return browserSessionToken;
+  }
+  // Derive a stable session token from the persisted internal token so the
+  // browser's session cookie survives dashboard restarts. Without this the
+  // token was random per-process, so every restart invalidated open tabs'
+  // cookies — and a plain refresh could no longer re-mint, since the one-time
+  // bootstrap hash token is already consumed on first load. Falls back to a
+  // random token only when no internal token is configured, in which case the
+  // auth gate already 503s before the session token is ever consulted.
+  const internal = getInternalTokenSync();
+  browserSessionToken = internal
+    ? createHmac('sha256', internal).update('panopticon-dashboard-session-v1').digest('base64url')
+    : randomBytes(32).toString('base64url');
   return browserSessionToken;
 }
 
