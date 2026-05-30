@@ -23,3 +23,5 @@ Use link text = issue ID, target = the tracker URL:
 PRs follow the same rule: `#1430` → `[#1430](https://github.com/eltmon/panopticon-cli/pull/1430)`.
 
 **When to apply:** any time an issue/PR ID appears as something the user might want to open — lists, audits, status reports, recommendations, "I filed X". Bare IDs are fine only inside code blocks, commit messages, PR bodies, or other file content (GitHub auto-links `#1564` there anyway).
+
+**Link EVERY occurrence — not just the first.** Do not link an ID on first mention and then write it bare for the rest of the message. Each time `PAN-1134` (or any ID) appears in prose, it must be a fresh markdown link, even if you linked it three sentences earlier. The user scans and clicks from wherever their eye lands; a bare repeat is a dead link exactly where they reached for one. The only exception is consecutive repetition inside a single sentence where one link already serves the whole clause.
