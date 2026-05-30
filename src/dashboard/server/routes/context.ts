@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -510,7 +511,17 @@ export async function saveContextLayer(
     throw new Error(`Context layer path escapes its directory: ${layer.file}`);
   }
   await mkdir(layer.dir, { recursive: true });
-  await writeFile(layer.file, request.content, 'utf-8');
+  // Atomic write: write to a temp file in the same directory, then rename over
+  // the target. rename(2) is atomic on POSIX, so a concurrent reader (or a
+  // crash mid-write) never sees a partially written context file.
+  const tempFile = join(layer.dir, `.${randomUUID()}.tmp`);
+  try {
+    await writeFile(tempFile, request.content, 'utf-8');
+    await rename(tempFile, layer.file);
+  } catch (err) {
+    await rm(tempFile, { force: true }).catch(() => undefined);
+    throw err;
+  }
   const savedLayer = await layerRecord(
     layer.file,
     targetForLayer(layer) as Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
