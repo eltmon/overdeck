@@ -32,6 +32,11 @@ let fetchResponse: { status: number } = { status: 200 }
 beforeEach(() => {
   fetchCalls = []
   fetchResponse = { status: 200 }
+  // Neutralize any ambient PANOPTICON_DASHBOARD_URL (set on developer machines
+  // running a live `pan dev`) so the default-host tests assert against the
+  // production fallback (http://localhost:3011), not the host's value. Tests
+  // that exercise the env var stub it explicitly; afterEach unstubs.
+  vi.stubEnv('PANOPTICON_DASHBOARD_URL', undefined)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) => {

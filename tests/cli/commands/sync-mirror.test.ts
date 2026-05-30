@@ -16,7 +16,7 @@ const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
 const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
 const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], skipped: [], conflicts: [], diffs: [] });
-const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [] });
+const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
 const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0 }, agents: { copied: 0 }, rules: { copied: 0 } });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
@@ -137,7 +137,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockLoadConfig.mockReturnValue({ sync: {} });
     mockListProjects.mockReturnValue([]);
     mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [] });
+    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
   });
 

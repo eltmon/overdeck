@@ -76,6 +76,7 @@ pan-untroubled
 pan-up
 pan-wipe
 pan-workspace-config
+pipeline-list
 pipeline-status
 plan
 react-best-practices
