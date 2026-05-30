@@ -1,8 +1,7 @@
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
-import { createSummaryFork } from '../../lib/conversations/summary-fork.js';
+import { forkConversationViaServer, ForkServerError } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 
@@ -60,27 +59,43 @@ export async function handoffCommand(
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
+  console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
 
-  const result = await Effect.runPromise(createSummaryFork(conv, {
-    model: options.model,
-    cwd: options.cwd,
-    harness,
-    forkMode: 'handoff',
-    focus,
-    handoffAuthor: author,
-    handoffAuthorModel: options.authorModel,
-    handoffAuthorHarness: authorHarness,
-  }));
-  const newConv = result.conversation;
-
-  if (result.forkFallbackReason) {
-    console.log(chalk.yellow(`Handoff fell back to summary fork: ${result.forkFallbackReason}`));
+  // PAN-1568: route through the dashboard server, which authors the doc AND
+  // spawns the tmux session. The old in-process path never spawned, so the
+  // handoff was born dead.
+  let newConv;
+  try {
+    newConv = await forkConversationViaServer(conv.name, {
+      model: options.model,
+      cwd: options.cwd,
+      harness,
+      forkMode: 'handoff',
+      focus,
+      handoffAuthor: author,
+      handoffAuthorModel: options.authorModel,
+      handoffAuthorHarness: authorHarness,
+    });
+  } catch (err) {
+    if (err instanceof ForkServerError) {
+      console.log(chalk.red(err.message));
+      process.exit(1);
+    }
+    throw err;
   }
 
-  const label = result.forkMode === 'handoff' ? 'Handoff forked' : 'Summary forked';
-  console.log(chalk.green(`${label} conversation ${conv.name} → ${newConv.name}`));
+  if (newConv.forkStatus === 'failed') {
+    console.log(chalk.red(`Handoff failed: ${newConv.forkError ?? 'unknown error'}`));
+    console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://pan.localhost/conv/${newConv.id})`));
+    process.exit(1);
+  }
+  if (newConv.forkFallbackReason) {
+    console.log(chalk.yellow(`Handoff fell back to summary fork: ${newConv.forkFallbackReason}`));
+  }
+
+  console.log(chalk.green(`Handoff forked conversation ${conv.name} → ${newConv.name}`));
   console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
-  console.log(chalk.gray(`  Session: ${newConv.tmuxSession}`));
+  console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
   console.log(chalk.gray(`  Model: ${newConv.model || 'default'}`));
   console.log(chalk.gray(`  Harness: ${newConv.harness || 'claude-code'}`));
   if (newConv.handoffDocPath) {
