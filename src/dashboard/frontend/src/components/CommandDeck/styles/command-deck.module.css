@@ -2161,6 +2161,79 @@
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
+/* Two-line flat row: title on line 1, muted metadata on line 2. */
+.conversationMain {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.conversationMain .conversationName {
+  flex: 0 0 auto;
+}
+
+.conversationMetaLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.conversationMetaLine time {
+  flex-shrink: 0;
+  opacity: 0.8;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+.conversationMetaSep {
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+/* ⋮ overflow trigger — in-flow (reserves a stable slot so it never overlaps
+   the absolutely-positioned star), fades in on row hover/focus. */
+.conversationKebabBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  border-radius: 4px;
+  padding: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.1s, color 0.1s;
+}
+
+.conversationItem:hover .conversationKebabBtn,
+.conversationItem:focus-within .conversationKebabBtn,
+.projectConvItem:hover .conversationKebabBtn,
+.projectConvItem:focus-within .conversationKebabBtn {
+  opacity: 1;
+}
+
+.conversationKebabBtn:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.projectConvItem .conversationKebabBtn {
+  width: 16px;
+  height: 16px;
+}
+
 .conversationStopBtn {
   position: absolute;
   left: 12px;
@@ -2661,6 +2734,143 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Conversation header: three-tier layout ───────────────────────────────
+   Row 1 (.conversationHeaderPrimary) holds the title + the small set of
+   primary actions; row 2 (.conversationMetaRow) holds read-only metadata;
+   the long tail of prefs/config/destructive actions lives in the ⋮ menu. */
+.conversationHeaderShell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--card);
+}
+
+.conversationHeaderPrimary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.conversationHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.conversationMetaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.conversationMetaSep {
+  color: var(--muted-foreground);
+  opacity: 0.4;
+  user-select: none;
+}
+
+/* ⋮ overflow menu */
+.headerMenuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.headerMenuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.headerMenu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  z-index: 50;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover, var(--card));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.headerMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.headerMenuItem:hover {
+  background: var(--accent);
+}
+
+.headerMenuItem:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.headerMenuItemActive {
+  color: var(--primary);
+}
+
+.headerMenuItemCheck {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: var(--primary);
+}
+
+.headerMenuItemDestructive {
+  color: var(--destructive);
+}
+
+.headerMenuItemDestructive:hover {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+.headerMenuDivider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.headerMenuDeliveryRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+.headerMenuDeliveryRow select {
+  margin-left: auto;
 }
 
 /* "About this conversation" drawer — collapsible summary beneath the header */

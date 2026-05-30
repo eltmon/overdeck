@@ -494,11 +494,17 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  border-bottom: 1px solid var(--border);
+  /* Bottom border via an inset shadow (not border-bottom): with box-sizing
+     border-box, a real border-bottom shrank the content box to 35px while tabs
+     are 36px, so `overflow-x: auto` (which forces overflow-y to auto) clipped
+     every tab by 1px — that was the active-tab funkiness. An inset shadow
+     paints inside the box, isn't clipped, doesn't scroll, and the active tab
+     paints over it (see .panetab z-index + .active top) to merge into content. */
+  box-shadow: inset 0 -1px 0 0 var(--border);
   background: var(--card);
   padding: 6px 8px 0;
-  height: 42px;
-  flex: 0 0 42px;
+  height: 43px;
+  flex: 0 0 43px;
   position: relative;
   overflow-x: auto;
 }
@@ -518,6 +524,10 @@
   white-space: nowrap;
   background: transparent;
   font-family: inherit;
+  /* Sit above the bar's inset bottom-border shadow so the active tab can
+     cover it and merge into the content below. */
+  position: relative;
+  z-index: 1;
 }
 
 .panetabIcon {
@@ -540,6 +550,10 @@
   font-weight: 600;
   border-color: var(--border);
   position: relative;
+  /* Drop 1px so the active tab's bottom covers the bar's inset bottom-border
+     shadow, merging seamlessly into the content below. Now that the bar is
+     43px tall (border via inset shadow, not border-bottom), this no longer
+     overflows the content box, so it isn't clipped. */
   top: 1px;
 }
 
