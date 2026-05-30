@@ -1138,6 +1138,15 @@ export async function spawnConversationSession(
       setTerminalEnv: true,
       unsetProviderEnv: true,
       panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+      // Point the agent's hook/heartbeat POSTs at THIS server's loopback API.
+      // Without it the Pi extension falls back to http://localhost:3010
+      // (index.ts:120) — which in dev is the Vite dev server, whose /api proxy
+      // targets the unresolvable docker host `server`, spamming ENOTFOUND on
+      // every tool/turn. Resolve the port exactly as the server does so this is
+      // correct in dev (3011) and prod (whatever API_PORT/PORT is set to).
+      extraEnvExports: [
+        `export PANOPTICON_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+      ],
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
@@ -2836,6 +2845,19 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
 
+/**
+ * Title a handoff conversation after the WORK it carries (the focus), not the
+ * parent's title. A handoff with no focus falls back to "Handoff: <parent>".
+ * The focus is collapsed to one line and trimmed to a sane title length; the
+ * AI title-refiner can still sharpen it once the successor starts working.
+ */
+function handoffTitleFromFocus(focus: string | undefined, fallback: string): string {
+  const f = focus?.replace(/\s+/g, ' ').trim();
+  if (!f) return `Handoff: ${fallback}`;
+  const trimmed = f.length > 70 ? `${f.slice(0, 69).trimEnd()}…` : f;
+  return `Handoff: ${trimmed}`;
+}
+
 async function injectForkSummary(conv: Conversation, summary: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   if (conv.harness === 'pi') {
@@ -2968,7 +2990,7 @@ async function runForkPipeline(
   updateConversationTitle(
     convName,
     effectiveForkMode === 'handoff'
-      ? `Handoff: ${parentConv.title || parentConv.name}`
+      ? handoffTitleFromFocus(handoffFocus, parentConv.title || parentConv.name)
       : `Summary Fork: ${parentConv.title || parentConv.name}`,
     'manual',
   );
@@ -3125,7 +3147,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const defaultTitle = forkMode === 'plain'
           ? `Fork: ${conv.title || conv.name}`
           : forkMode === 'handoff'
-            ? `Handoff: ${conv.title || conv.name}`
+            ? handoffTitleFromFocus(handoffFocus, conv.title || conv.name)
             : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({
