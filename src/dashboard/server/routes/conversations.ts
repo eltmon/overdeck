@@ -102,7 +102,7 @@ import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type Pen
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
-import { workspaceContextFile } from '../../../lib/context-layers/layers.js';
+import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
 import {
   computeContextUsage,
@@ -966,6 +966,30 @@ async function claudeConversationSystemPromptFiles(cwd: string): Promise<string[
   return files;
 }
 
+// PAN-1566: Pi conversations are launched with --no-context-files and the
+// extension fold no-ops (no ctx.appendSystemPrompt), so the global rules layer
+// must be delivered as launcher --append-system-prompt files. Mirror the Claude
+// conversation files but prepend the Pi-rendered global layer (pi-global.md).
+async function piConversationSystemPromptFiles(cwd: string): Promise<string[]> {
+  const files: string[] = [];
+  const globalFile = piGlobalContextFile();
+  try {
+    await stat(globalFile);
+    files.push(globalFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  const contextFile = workspaceContextFile(cwd);
+  try {
+    await stat(contextFile);
+    files.push(contextFile);
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+  files.push(await ensureSessionContextBriefingFile());
+  return files;
+}
+
 function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
@@ -1150,7 +1174,9 @@ export async function spawnConversationSession(
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
-      appendSystemPromptFiles: piFields ? [] : await claudeConversationSystemPromptFiles(cwd),
+      appendSystemPromptFiles: piFields
+        ? await piConversationSystemPromptFiles(cwd)
+        : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
       ...(piFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,

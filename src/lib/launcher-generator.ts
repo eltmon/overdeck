@@ -572,6 +572,16 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   tokens.push('--no-context-files');
 
+  // PAN-1566: deliver Panopticon's injected context (global engineering-rules
+  // layer, workspace/briefing) via --append-system-prompt. The pi-extension
+  // session_start fold cannot do this — @earendil-works/pi-coding-agent's ctx
+  // exposes no appendSystemPrompt method, so that path silently no-ops. The CLI
+  // flag reads the file CONTENTS at launch via bash command substitution and is
+  // the reliable delivery path; absent/empty files contribute nothing.
+  for (const file of systemPromptFiles(config)) {
+    tokens.push('--append-system-prompt', `"$(cat ${shellQuote(file)} 2>/dev/null)"`);
+  }
+
   if (config.resumeSessionId) {
     tokens.push('--session', shellQuote(config.resumeSessionId));
   }
