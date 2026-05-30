@@ -36,7 +36,7 @@ import {
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
-import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import { runModelSummary } from './smart-compaction.js';
 import { getTranscriptAdapter } from './transcript-adapter.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -242,26 +242,21 @@ export async function authorHandoffExternal(
   // works as well as the raw transcript, just with less fine detail.
   let promptInput: string;
   let inputLabel: 'raw-transcript' | 'compact-summary';
-  // Precompaction uses generateSmartSummary, which parses the JSONL via the
-  // Claude Code shape (entry.type === 'user'/'assistant'). Other harnesses
-  // (Pi, etc.) have different JSONL shapes, so for non-claude-code sources we
-  // hand the already-serialized transcript through verbatim. Pi sessions tend
-  // to be much shorter than long-running Claude Code sessions, so this works
-  // in practice today; harness-aware chunked compaction is tracked as a
-  // follow-up for when we need it.
-  const canPrecompact = (sourceConv.harness ?? 'claude-code') === 'claude-code';
-  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD && canPrecompact) {
+  // Precompaction goes through the source adapter's compactSummary, which is
+  // harness-agnostic: claude-code uses the entry-aware smart-compaction flow,
+  // Pi (and future harnesses) serialize their transcript and run the generic
+  // chunk-and-merge summarizer. Either way a long source transcript is
+  // compacted before it reaches the authoring model's context window.
+  if (transcript.length > HANDOFF_TRANSCRIPT_COMPACT_THRESHOLD) {
     console.log(`[claude-invoke] purpose=handoff-author-external | model=${effectiveModel} | harness=${effectiveHarness} | source=${sourceConv.name} | transcriptChars=${transcript.length} | precompacting=true`);
     const { config } = loadConfigSync();
     const richMode = config.conversations.richCompaction;
-    const compact = await Effect.runPromise(generateSmartSummary({
-      jsonlPath: sourceSessionFile,
+    const compact = await sourceAdapter.compactSummary(sourceSessionFile, {
       model: effectiveModel,
       richMode,
-      mode: 'fork',
-      includeThinkingInSummary: false,
+      includeThinking: false,
       harness: effectiveHarness,
-    }));
+    });
     promptInput = compact.summary;
     inputLabel = 'compact-summary';
     console.log(`[claude-invoke] purpose=handoff-author-external precompact-result | model=${effectiveModel} | compactChars=${compact.summary.length}`);
@@ -422,6 +417,7 @@ async function generateSummarySeed(
   localSummaryOnly: boolean | undefined,
   includeThinkingInSummary: boolean | undefined,
   summaryHarness?: RuntimeName,
+  sourceHarness?: RuntimeName,
 ): Promise<{ summary: string; summaryModel: string | null }> {
   if (localSummaryOnly) {
     return {
@@ -429,7 +425,7 @@ async function generateSummarySeed(
       summaryModel: null,
     };
   }
-  return generateSummaryForFork(sourceSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
+  return generateSummaryForFork(sourceSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, sourceHarness);
 }
 
 async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string> {
@@ -509,20 +505,37 @@ async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string
   return summary;
 }
 
-export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string, includeThinkingInSummary?: boolean, summaryHarness: RuntimeName = 'claude-code'): Promise<{ summary: string; summaryModel: string | null }> {
+export async function generateSummaryForFork(
+  jsonlPath: string,
+  summaryModel?: string,
+  includeThinkingInSummary?: boolean,
+  summaryHarness: RuntimeName = 'claude-code',
+  sourceHarness?: RuntimeName,
+): Promise<{ summary: string; summaryModel: string | null }> {
   if (!summaryModel) {
     // Fork summaries serialize the entire conversation in one shot. Sonnet 4.6's
     // 1M-token context handles large sessions that would overflow Haiku's 200k.
     summaryModel = 'claude-sonnet-4-6';
   }
 
-  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | harness=${summaryHarness} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
+  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | summaryHarness=${summaryHarness} | sourceHarness=${sourceHarness ?? 'claude-code'} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
 
   const { config } = loadConfigSync();
   const richMode = config.conversations.richCompaction;
 
+  // The source harness selects which transcript adapter parses/serializes the
+  // JSONL (Pi and Claude Code have different shapes); the summary harness
+  // selects which CLI backend runs the summarizer LLM. They are independent —
+  // e.g. a Pi source can be summarized by a Claude model.
+  const adapter = getTranscriptAdapter(sourceHarness);
+
   try {
-    const result = await Effect.runPromise(generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary, harness: summaryHarness }));
+    const result = await adapter.compactSummary(jsonlPath, {
+      model: summaryModel,
+      richMode,
+      includeThinking: includeThinkingInSummary,
+      harness: summaryHarness,
+    });
     console.log(`[claude-invoke] SUCCESS purpose=summary-fork | model=${summaryModel} | outputChars=${result.summary.length}`);
     return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
   } catch (err: any) {
@@ -673,7 +686,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, forkFallbackReason);
-        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
         summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
         usedSummaryModel = result.summaryModel;
       }
@@ -687,7 +700,7 @@ function sanitizeEntryForPlainFork(entry: any): any {
         forkFallbackReason = preconditionFallback;
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, preconditionFallback);
-        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
         summary = prependFallbackFocus(result.summary, options.focus, preconditionFallback);
         usedSummaryModel = result.summaryModel;
       } else {
@@ -703,14 +716,14 @@ function sanitizeEntryForPlainFork(entry: any): any {
           forkFallbackReason = handoffFailureReason(error);
           effectiveForkMode = 'summary';
           logHandoffFallback(conv, forkFallbackReason);
-          const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+          const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
           summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
           usedSummaryModel = result.summaryModel;
         }
       }
     }
   } else {
-    const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary);
+    const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
     summary = result.summary;
     usedSummaryModel = result.summaryModel;
   }

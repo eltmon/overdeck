@@ -2973,7 +2973,7 @@ async function runForkPipeline(
     if (localSummaryOnly) {
       return Effect.runPromise(generateFallbackSummary(parentSessionFile));
     }
-    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
+    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, parentConv.harness ?? undefined);
     return result.summary;
   };
 

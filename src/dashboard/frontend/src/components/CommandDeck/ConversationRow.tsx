@@ -443,7 +443,7 @@ export function ConversationRow({
               Hand off to new conversation
             </button>
           )}
-          {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && (
+          {conv.claudeSessionId && !conv.forkStatus && (
             <button
               role="menuitem"
               className={styles.headerMenuItem}

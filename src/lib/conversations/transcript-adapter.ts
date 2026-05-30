@@ -23,6 +23,7 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { Effect } from 'effect';
 
 import type { Conversation } from '../database/conversations-db.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -30,7 +31,22 @@ import { sessionFilePath } from '../paths.js';
 import {
   parseEntries as parseClaudeCodeEntries,
   serializeConversation as serializeClaudeCodeConversation,
+  generateSmartSummary,
+  summarizeSerializedText,
 } from './smart-compaction.js';
+
+export interface CompactSummaryOptions {
+  /** Model for the summarizer LLM. */
+  model?: string;
+  /** Use the rich (Claude-native-style) summary prompt variant. */
+  richMode?: boolean;
+  /** Include thinking blocks in the serialized source. Default: true. */
+  includeThinking?: boolean;
+  /** Harness backend the summarizer LLM runs on. Default: 'claude-code'. */
+  harness?: RuntimeName;
+  /** Per-LLM-call timeout (ms). */
+  timeoutMs?: number;
+}
 
 export interface ConversationTranscriptAdapter {
   /** Display name for logging/errors. */
@@ -58,6 +74,21 @@ export interface ConversationTranscriptAdapter {
    * summaries; thinking blocks are optional (defaults to including them).
    */
   serializeTranscript(sessionFile: string, options?: { includeThinking?: boolean }): Promise<string>;
+
+  /**
+   * Produce a model-generated compact summary of the transcript, suitable for
+   * seeding a summary fork or feeding the handoff authoring prompt.
+   *
+   * claude-code uses the entry-aware smart-compaction flow (rich, file-op
+   * aware); other harnesses serialize the transcript and run a generic
+   * chunk-and-merge summarizer over the text. The `harness` option selects the
+   * summarizer LLM backend and is independent of which adapter (= source
+   * harness) produced the transcript.
+   */
+  compactSummary(
+    sessionFile: string,
+    options?: CompactSummaryOptions,
+  ): Promise<{ summary: string; summaryModel: string | null }>;
 }
 
 // ─── Claude Code ──────────────────────────────────────────────────────────
@@ -76,6 +107,23 @@ const claudeCodeAdapter: ConversationTranscriptAdapter = {
   async serializeTranscript(sessionFile, options) {
     const entries = await parseClaudeCodeEntries(sessionFile);
     return serializeClaudeCodeConversation(entries, options?.includeThinking ?? true);
+  },
+
+  async compactSummary(sessionFile, options) {
+    // Claude Code keeps the entry-aware smart-compaction flow: it parses the
+    // JSONL into typed entries, finds compact boundaries, and carries file-op
+    // detail into the summary. This is richer than text-only chunking.
+    const result = await Effect.runPromise(
+      generateSmartSummary({
+        jsonlPath: sessionFile,
+        model: options?.model,
+        richMode: options?.richMode ?? false,
+        mode: 'fork',
+        includeThinkingInSummary: options?.includeThinking ?? true,
+        harness: options?.harness ?? 'claude-code',
+      }),
+    );
+    return { summary: result.summary, summaryModel: result.summaryModel };
   },
 };
 
@@ -173,6 +221,25 @@ const piAdapter: ConversationTranscriptAdapter = {
       if (serialized) parts.push(serialized);
     }
     return parts.join('\n\n');
+  },
+
+  async compactSummary(sessionFile, options) {
+    // Pi's JSONL shape is not what the Claude-Code entry parser understands, so
+    // we serialize the transcript through this adapter first, then run the
+    // generic text chunk-and-merge summarizer over it.
+    const serialized = await piAdapter.serializeTranscript(sessionFile, {
+      includeThinking: options?.includeThinking ?? true,
+    });
+    if (!serialized.trim()) {
+      return { summary: '', summaryModel: null };
+    }
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model,
+      richMode: options?.richMode ?? false,
+      harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
+    });
+    return { summary, summaryModel: options?.model ?? null };
   },
 };
 

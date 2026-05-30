@@ -849,7 +849,74 @@ async function generateChunkedSummary(
   }
 
   return running ?? '';
-}async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
+}
+
+/**
+ * Split already-serialized transcript text into chunks that fit the summarizer
+ * model's context budget. Splits on turn boundaries (the canonical serialized
+ * form separates turns with a blank line) so a chunk never cuts mid-turn unless
+ * a single turn is itself larger than the budget.
+ */
+function chunkSerializedTextByBudget(text: string, budgetChars: number): string[] {
+  if (text.length <= budgetChars) return text.trim() ? [text] : [];
+  const turns = text.split('\n\n');
+  const chunks: string[] = [];
+  let current = '';
+  for (const turn of turns) {
+    const candidate = current ? `${current}\n\n${turn}` : turn;
+    if (candidate.length > budgetChars && current) {
+      chunks.push(current);
+      current = turn;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim()) chunks.push(current);
+  return chunks;
+}
+
+/**
+ * Harness-agnostic chunk-and-merge summarizer. Takes transcript text already
+ * serialized by a ConversationTranscriptAdapter (so it works for any harness)
+ * and runs the same incremental summary prompt the Claude-Code entry path uses,
+ * carrying a running <previous-summary> forward across chunks. Returns the
+ * final structured summary string.
+ *
+ * `harness` selects the summarizer LLM backend (claude-code or pi) and is
+ * independent of which harness produced the transcript.
+ */
+export async function summarizeSerializedText(
+  serialized: string,
+  options: {
+    model?: string;
+    richMode?: boolean;
+    timeoutMs?: number;
+    harness?: RuntimeName;
+  } = {},
+): Promise<string> {
+  const model = options.model;
+  const richMode = options.richMode ?? false;
+  const timeoutMs = options.timeoutMs ?? FORK_SUMMARY_TIMEOUT_MS;
+  const harness = options.harness ?? 'claude-code';
+
+  const budget = getChunkBudgetChars(model);
+  const chunks = chunkSerializedTextByBudget(serialized, budget);
+  if (chunks.length === 0) return '';
+
+  let running: string | undefined;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    if (!chunk.trim()) continue;
+    console.log(
+      `[smart-compaction] Summarizing serialized chunk ${i + 1}/${chunks.length} ` +
+      `(${chunk.length} chars) with ${model ?? DEFAULT_SUMMARY_MODEL}`,
+    );
+    running = await generateSummaryFromPrompt(chunk, running, model, richMode, timeoutMs, harness);
+  }
+  return running ?? '';
+}
+
+async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
   const entries = await parseEntries(options.jsonlPath);
   if (entries.length === 0) {
     throw new Error(`Session file is empty: ${options.jsonlPath}`);
