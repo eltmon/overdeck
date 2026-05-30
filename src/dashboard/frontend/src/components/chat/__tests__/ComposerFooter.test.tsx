@@ -19,6 +19,7 @@ vi.mock('lexical', () => ({
 }));
 
 vi.mock('../ComposerPromptEditor', () => ({
+  loadDraft: () => '',
   ComposerPromptEditor: ({ editorRef, onChange, disabled, onPaste }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean; onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void }) => {
     editorRef.current = {
       read: (callback: () => void) => callback(),
@@ -325,6 +326,26 @@ describe('ComposerFooter image attachments', () => {
       );
     });
     expect(screen.queryByText('switch-me.png')).not.toBeInTheDocument();
+  });
+
+  it('preserves the editor draft when the conversation prop changes without remounting (deck reuse)', () => {
+    // Regression: drafts vanished on navigate-away-and-back. The project-scoped
+    // deck reuses ComposerFooter across conversation switches, so the
+    // conversation-change effect fires after the keyed LexicalComposer has
+    // remounted and reloaded the new conversation's draft. Calling
+    // $getRoot().clear() in that effect wiped the just-loaded draft AND the
+    // resulting onChange('') deleted it from localStorage. The effect must not
+    // touch the editor content on a switch.
+    const view = render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.change(screen.getByTestId('composer-editor'), {
+      target: { value: 'half-written message' },
+    });
+    expect(editorState.text).toBe('half-written message');
+
+    view.rerender(<ComposerFooter conversation={secondConversation} />);
+
+    expect(editorState.text).toBe('half-written message');
   });
 
   it('deletes uploaded images when the composer unmounts before send', async () => {

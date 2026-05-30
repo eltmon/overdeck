@@ -16,7 +16,7 @@ import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
-import { ComposerPromptEditor } from './ComposerPromptEditor';
+import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
 import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
@@ -609,13 +609,20 @@ export function ComposerFooter({
     }
 
     setPendingImages([]);
-    setText('');
     setSending(false);
     setModel(conversation.model ?? getDefaultConversationModel());
     setHarness(conversation.harness ?? 'claude-code');
-    editorRef.current?.update(() => {
-      $getRoot().clear();
-    });
+    // Do NOT clear the editor here. The inner LexicalComposer is keyed by
+    // conversation.name, so it already remounts on a conversation switch and
+    // seeds the new conversation's saved draft via initialConfig. Calling
+    // $getRoot().clear() would wipe that just-loaded draft AND the resulting
+    // onChange('') would delete it from localStorage — losing the user's typed
+    // text whenever they navigate away and back (the pane is reused across
+    // switches, so this effect fires after the remount). Instead, sync our
+    // local `text` mirror (used for the send-button enabled state) to the new
+    // conversation's draft, since OnChangePlugin does not fire for the seeded
+    // initial editor state.
+    setText(loadDraft(conversation.name));
   }, [conversation.name, conversation.model, deleteUploadedImage]);
 
   useEffect(() => {

@@ -32,7 +32,7 @@ function getDraftKey(conversationName: string): string {
   return `conv-draft:${conversationName}`;
 }
 
-function loadDraft(conversationName: string): string {
+export function loadDraft(conversationName: string): string {
   try {
     return localStorage.getItem(getDraftKey(conversationName)) ?? '';
   } catch {
