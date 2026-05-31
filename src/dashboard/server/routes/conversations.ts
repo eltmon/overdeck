@@ -321,6 +321,7 @@ async function getCachedMessages(
         byteOffset: incremental.byteOffset,
         streaming: incremental.streaming,
         totalCost: cachedResult.totalCost + incremental.totalCost,
+        totalTokens: cachedResult.totalTokens + incremental.totalTokens,
         pendingToolUse: incremental.pendingToolUse,
         unresolvedResults: incremental.unresolvedResults,
         lastSequence: incremental.lastSequence,
@@ -2354,9 +2355,9 @@ const getConversationMessagesRoute = HttpRouter.add(
           // conversation content (root cause of empty reviewer Conversation tab).
           const result = await getCachedMessages(sessionFile, false);
 
-          // Cache cost in DB so the conversation list can show it without re-parsing
-          if (result.totalCost > 0 && conv) {
-            updateConversationCost(name, result.totalCost);
+          // Cache cost + tokens in DB so the conversation list can show them without re-parsing
+          if (conv && (result.totalCost > 0 || result.totalTokens > 0)) {
+            updateConversationCost(name, result.totalCost, result.totalTokens);
           }
 
           let contextUsage = null;
@@ -2373,6 +2374,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             workLog: result.workLog,
             streaming: result.streaming,
             totalCost: result.totalCost,
+            totalTokens: result.totalTokens,
             proposedPlan: result.proposedPlan,
             compactBoundaries: (result.compactBoundaries?.length ?? 0) > 0 ? result.compactBoundaries : undefined,
             compacting: isCompacting(sessionFile) || undefined,

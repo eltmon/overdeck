@@ -33,8 +33,10 @@ export interface ParseResult {
   byteOffset: number;
   /** True when the last assistant message has no completedAt and file was modified recently. */
   streaming: boolean;
-  /** Total estimated cost in USD computed from assistant message usage data. */
+  /** Total estimated cost in USD computed from assistant message usage data (cache-discount aware). */
   totalCost: number;
+  /** Total token throughput (input + output + cache read + cache write) across assistant messages. */
+  totalTokens: number;
   /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
   pendingToolUse: Map<string, WorkLogEntry>;
   /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
@@ -245,6 +247,7 @@ export async function parseConversationMessages(
       byteOffset: 0,
       streaming: false,
       totalCost: 0,
+      totalTokens: 0,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
@@ -308,6 +311,7 @@ export async function parseConversationMessages(
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   let totalCost = 0;
+  let totalTokens = 0;
 
   // Pending assistant message being assembled from content blocks
   let pendingAssistant: ChatMessage | null = null;
@@ -442,16 +446,23 @@ export async function parseConversationMessages(
       const msg = entry.message;
       const content = Array.isArray(msg.content) ? msg.content : [];
 
-      // Accumulate cost from usage data
-      if (msg.usage && msg.model) {
-        const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
-        if (pricing) {
-          totalCost += calculateCostSync({
-            inputTokens: msg.usage.input_tokens ?? 0,
-            outputTokens: msg.usage.output_tokens ?? 0,
-            cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
-            cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
-          }, pricing);
+      // Accumulate cost and token throughput from usage data
+      if (msg.usage) {
+        totalTokens +=
+          (msg.usage.input_tokens ?? 0) +
+          (msg.usage.output_tokens ?? 0) +
+          (msg.usage.cache_read_input_tokens ?? 0) +
+          (msg.usage.cache_creation_input_tokens ?? 0);
+        if (msg.model) {
+          const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
+          if (pricing) {
+            totalCost += calculateCostSync({
+              inputTokens: msg.usage.input_tokens ?? 0,
+              outputTokens: msg.usage.output_tokens ?? 0,
+              cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+            }, pricing);
+          }
         }
       }
 
@@ -774,6 +785,7 @@ export async function parseConversationMessages(
     byteOffset: newByteOffset,
     streaming,
     totalCost,
+    totalTokens,
     pendingToolUse,
     unresolvedResults,
     lastSequence: sequence,

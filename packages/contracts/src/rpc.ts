@@ -176,6 +176,8 @@ export interface ConversationResponse {
   workLog: WorkLogEntry[];
   streaming: boolean;
   totalCost: number;
+  /** Total token throughput (input + output + cache read + cache write). */
+  totalTokens?: number;
   byteOffset: number;
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];

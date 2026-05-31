@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 47;
+export const SCHEMA_VERSION = 48;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -418,7 +418,8 @@ export function initSchema(db: Database.Database): void {
       title            TEXT,                               -- human-readable title, auto-set from first message
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
-      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
+      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD (cache-discount aware)
+      total_tokens     INTEGER DEFAULT 0,                  -- cached total tokens (input+output+cache read/write)
       archived_at      TEXT,                               -- ISO timestamp when archived, null = active
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
       effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
@@ -1381,6 +1382,13 @@ export function runMigrations(db: Database.Database): void {
         ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
         WHERE json_type(payload, '$.issueId') = 'text';
     `);
+  }
+
+  // v47 → v48: cache total token throughput on conversations (PAN: conversation token display)
+  if (currentVersion < 48) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

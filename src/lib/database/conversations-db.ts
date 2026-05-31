@@ -36,8 +36,10 @@ export interface Conversation {
   titleSource: TitleSource | null;
   /** Original auto-generated title seed — used for canReplaceThreadTitle logic. */
   titleSeed: string | null;
-  /** Cached total cost in USD, updated when messages are fetched. */
+  /** Cached total cost in USD, updated when messages are fetched. Cache-discount aware. */
   totalCost: number;
+  /** Cached total token throughput (input+output+cache read/write), updated when messages are fetched. */
+  totalTokens: number;
   /** ISO timestamp when archived, null = not archived. */
   archivedAt: string | null;
   /** Model used to spawn this conversation (e.g. 'minimax-m2.7-highspeed'). Null = default. */
@@ -112,6 +114,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     titleSource: (row['title_source'] as TitleSource | null) ?? null,
     titleSeed: (row['title_seed'] as string | null) ?? null,
     totalCost: (row['total_cost'] as number) ?? 0,
+    totalTokens: (row['total_tokens'] as number) ?? 0,
     archivedAt: (row['archived_at'] as string | null) ?? null,
     model: (row['model'] as string | null) ?? null,
     effort: (row['effort'] as string | null) ?? null,
@@ -143,7 +146,7 @@ export function listConversations(options?: { limit?: number; offset?: number })
   const db = getDatabase();
   let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -171,7 +174,7 @@ export function listActiveConversations(): Conversation[] {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -188,7 +191,7 @@ export function getConversationByName(name: string): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -204,7 +207,7 @@ export function getConversationById(id: number): Conversation | null {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -220,7 +223,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -236,7 +239,7 @@ export function listArchivedConversations(): Conversation[] {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations
@@ -475,7 +478,7 @@ export function createConversation(opts: {
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
-              title_source, title_seed, total_cost, archived_at, model, effort,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
               handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
        FROM conversations WHERE id = ?`,
@@ -570,12 +573,18 @@ export function unarchiveConversation(name: string): void {
   ).run(name);
 }
 
-/** Update the cached total cost for a conversation. */
-export function updateConversationCost(name: string, totalCost: number): void {
+/** Update the cached total cost (and optionally total tokens) for a conversation. */
+export function updateConversationCost(name: string, totalCost: number, totalTokens?: number): void {
   const db = getDatabase();
-  db.prepare(
-    `UPDATE conversations SET total_cost = ? WHERE name = ?`,
-  ).run(totalCost, name);
+  if (totalTokens !== undefined) {
+    db.prepare(
+      `UPDATE conversations SET total_cost = ?, total_tokens = ? WHERE name = ?`,
+    ).run(totalCost, totalTokens, name);
+  } else {
+    db.prepare(
+      `UPDATE conversations SET total_cost = ? WHERE name = ?`,
+    ).run(totalCost, name);
+  }
 }
 
 /** Set the model for a conversation unconditionally. */

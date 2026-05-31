@@ -10,6 +10,13 @@ import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import styles from './styles/command-deck.module.css';
 
+/** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
 
 const PHASE_ICONS = {
@@ -355,7 +362,13 @@ export function ConversationRow({
             {conv.totalCost !== undefined && conv.totalCost > 0 && (
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
-                <span>{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+                <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+              </>
+            )}
+            {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
               </>
             )}
             {forkBadges}

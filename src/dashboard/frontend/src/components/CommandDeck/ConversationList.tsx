@@ -35,8 +35,10 @@ export interface Conversation {
   titleSource?: 'auto' | 'ai' | 'manual' | null;
   /** Original auto-generated title seed. */
   titleSeed?: string | null;
-  /** Cached total cost in USD. */
+  /** Cached total cost in USD (cache-discount aware). */
   totalCost?: number;
+  /** Cached total token throughput (input + output + cache read/write). */
+  totalTokens?: number;
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
