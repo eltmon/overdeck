@@ -4,7 +4,7 @@
     "created": "2026-05-31T00:00:00.000Z",
     "author": "agent:plan",
     "description": "Plan for PAN-1395: Ctrl+K palette — semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-05-31T04:42:07.044Z"
+    "updated": "2026-05-31T16:47:04.586Z"
   },
   "plan": {
     "id": "PAN-1395",
@@ -412,8 +412,8 @@
     "metadata": {
       "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json"
     },
-    "sequence": 1,
-    "updated": "2026-05-31T04:42:07.044Z"
+    "sequence": 2,
+    "updated": "2026-05-31T16:47:04.586Z"
   },
   "status": "proposed"
 }
