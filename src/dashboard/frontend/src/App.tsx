@@ -49,6 +49,7 @@ import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -626,7 +627,12 @@ export default function App() {
     if (dismissedAskUserQuestionAgentIds.has(s.id)) return false;
     return true;
   });
-  const currentAskUserQuestionSubject = visibleAskUserQuestionSubjects[0] ?? null;
+  const currentAskUserQuestionSubject =
+    (focusedAskUserQuestionId
+      ? visibleAskUserQuestionSubjects.find((s) => s.id === focusedAskUserQuestionId)
+      : undefined) ??
+    visibleAskUserQuestionSubjects[0] ??
+    null;
 
   useEffect(() => {
     setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
@@ -878,6 +884,8 @@ export default function App() {
       }
       return changed ? next : prev;
     });
+    // PAN-1395 — drop the focus once its subject is no longer pending.
+    setFocusedAskUserQuestionId((prev) => (prev && liveSubjectIds.has(prev) ? prev : null));
   }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
 
   const channelPermissionResponseMutation = useMutation({
