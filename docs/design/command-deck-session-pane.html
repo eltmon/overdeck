@@ -3,53 +3,44 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Command Deck · Session AgentPane — layout, naming &amp; progressive disclosure</title>
+<title>Command Deck · Session AgentPane — conversation-first</title>
 <style>
   :root{
-    /* Panopticon light-theme tokens (carried from pan-1549-workspace-panes.html) */
     --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
     --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16); --card:#ffffff;
     --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
     --claude:#e07b39; --claude-tint:rgba(224,123,57,.12); --codex:#10a37f;
     --running:#16a34a; --thinking:#9333ea; --waiting:#d97706; --idle:#9ca3af; --failed:#dc2626;
     --surface:#fafafa; --surface-2:#f4f4f5;
-    /* progressive-disclosure layer colors */
-    --glance:#0d9488; --scan:#4f46e5; --dig:#6b7280;
+    --glance:#0d9488; --primary-surface:#4f46e5; --dig:#6b7280;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:#eceef1;color:var(--foreground);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
     font-size:14px;line-height:1.55;padding:32px 24px 80px;}
   .page{max-width:1180px;margin:0 auto;}
-  h1{font-size:22px;margin:0 0 4px;}
-  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
-  .sub{color:var(--muted);margin:0 0 8px;}
-  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  h1{font-size:22px;margin:0 0 4px;} h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;} code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
   table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
   th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
   th{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
-  tr:last-child td{border-bottom:none;}
-  td code{color:var(--primary);} .old code{color:#b45309;}
+  tr:last-child td{border-bottom:none;} td code{color:var(--primary);} .old code{color:#b45309;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;}
 
-  /* annotation chips */
   .tag{position:absolute;z-index:6;font-size:10px;font-weight:700;letter-spacing:.02em;color:#fff;
-    padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:"SF Mono",ui-monospace,Menlo,monospace;
-    box-shadow:0 1px 4px rgba(0,0,0,.25);}
+    padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);}
   .tag small{font-weight:500;opacity:.85;font-style:italic;}
   .t-stage{background:#0ea5e9;} .t-pane{background:var(--primary);}
-  .t-glance{background:var(--glance);} .t-scan{background:var(--scan);} .t-dig{background:var(--dig);}
+  .t-glance{background:var(--glance);} .t-primary{background:var(--primary);} .t-dig{background:var(--dig);}
   .region{position:relative;}
   .ol-glance{outline:1.5px dashed var(--glance);outline-offset:-2px;border-radius:8px;}
-  .ol-scan{outline:1.5px dashed var(--scan);outline-offset:-2px;border-radius:8px;}
-  .ol-dig{outline:1.5px dashed var(--dig);outline-offset:-2px;border-radius:8px;}
-  .ol-pane{outline:2px dashed var(--primary);outline-offset:-3px;}
+  .ol-primary{outline:2px solid var(--primary);outline-offset:-2px;border-radius:8px;}
+  .ol-dig{outline:1.5px dashed var(--dig);outline-offset:-2px;border-radius:6px;}
 
-  .deck{display:flex;height:720px;border:1px solid var(--border-strong);border-radius:12px;
-    overflow:hidden;background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);}
+  .deck{display:flex;height:740px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);}
 
   /* Navigator */
-  .navigator{width:210px;flex:0 0 210px;background:var(--surface);border-right:1px solid var(--border);
-    padding:12px 10px;font-size:12.5px;color:var(--muted);position:relative;}
+  .navigator{width:200px;flex:0 0 200px;background:var(--surface);border-right:1px solid var(--border);padding:12px 10px;font-size:12.5px;color:var(--muted);}
   .nav-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:12px 4px 6px;}
   .nav-item{padding:5px 8px;border-radius:6px;display:flex;align-items:center;gap:7px;color:var(--foreground);}
   .nav-item.active{background:var(--primary-tint);color:var(--primary);font-weight:600;}
@@ -59,98 +50,81 @@
   .dot.run{background:var(--running);} .dot.think{background:var(--thinking);} .dot.wait{background:var(--waiting);}
   .sq{width:13px;height:13px;border-radius:4px;flex:0 0 13px;display:inline-block;}
 
-  /* Stage */
+  /* Stage / PaneBar */
   .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
-  .panebar{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--border);
-    background:var(--surface);padding:6px 8px 0;height:42px;flex:0 0 42px;position:relative;}
-  .panetab{display:flex;align-items:center;gap:7px;padding:0 12px;height:36px;font-size:12.5px;color:var(--muted);
-    border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;}
+  .panebar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:6px 8px 0;height:42px;flex:0 0 42px;position:relative;}
+  .panetab{display:flex;align-items:center;gap:7px;padding:0 12px;height:36px;font-size:12.5px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;}
   .panetab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;line-height:14px;}
   .panetab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
-  .panetab .x{color:#bbb;font-size:13px;margin-left:2px;}
-  .panetab-add{display:flex;align-items:center;justify-content:center;width:30px;height:36px;color:#9ca3af;font-size:18px;}
+  .panetab .x{color:#bbb;font-size:13px;margin-left:2px;} .panetab-add{display:flex;align-items:center;justify-content:center;width:30px;height:36px;color:#9ca3af;font-size:18px;}
 
-  .pane{flex:1;overflow:auto;position:relative;background:var(--background);display:flex;flex-direction:column;}
+  /* AgentPane = conversation-first */
+  .pane{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--background);position:relative;}
 
-  /* ===== AgentContextStrip (GLANCE) ===== */
-  .ctx{position:relative;margin:14px 16px 0;border:1px solid var(--border-strong);border-radius:10px;
-    background:var(--surface);padding:11px 14px;}
-  .ctx-row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .rolebadge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.03em;
-    text-transform:uppercase;color:#fff;background:var(--claude);border-radius:6px;padding:3px 9px;}
-  .statusdot{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;}
-  .statusdot .d{width:9px;height:9px;border-radius:50%;}
-  .meta{color:var(--muted);font-size:12px;display:inline-flex;align-items:center;gap:5px;}
-  .branchchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--foreground);
-    background:#fff;border:1px solid var(--border);border-radius:999px;padding:2px 9px;}
+  /* ConversationHeader (title + working + view toggle + menu) */
+  .conv-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);}
+  .work-ico{width:16px;height:16px;border-radius:50%;border:2px solid var(--thinking);border-top-color:transparent;}
+  .conv-title{font-size:14px;font-weight:700;}
+  .conv-title .mut{color:var(--muted);font-weight:500;}
   .spacer{flex:1;}
-  .ctx-row2{margin-top:9px;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;}
-  .lastline{flex:1;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--foreground);
-    background:#0c1018;color:#cbd5e1;border-radius:6px;padding:5px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .vtoggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .vtoggle button{font-size:11.5px;font-weight:600;color:var(--muted);padding:4px 11px;border:none;background:#fff;cursor:default;}
+  .vtoggle button.on{color:var(--primary);background:var(--primary-tint);}
+  .vtoggle button .b{font-size:9px;color:#9ca3af;font-weight:500;margin-left:4px;}
+  .kebab{color:var(--muted);font-size:16px;padding:0 4px;}
 
-  /* ===== view toggle ===== */
-  .toggle{display:flex;gap:4px;margin:14px 16px 0;position:relative;}
-  .seg{font-size:12px;font-weight:600;color:var(--muted);padding:5px 12px;border:1px solid var(--border);
-    border-radius:8px;background:#fff;}
-  .seg.on{color:var(--primary);background:var(--primary-tint);border-color:var(--primary-border);}
-  .seg .b{font-size:10px;color:#9ca3af;font-weight:500;margin-left:5px;}
+  /* AgentContextStrip — thin glance band */
+  .ctx{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:relative;font-size:12px;}
+  .rolebadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--claude);border-radius:5px;padding:2px 8px;}
+  .statusdot{display:inline-flex;align-items:center;gap:5px;font-weight:600;}
+  .statusdot .d{width:8px;height:8px;border-radius:50%;}
+  .meta{color:var(--muted);display:inline-flex;align-items:center;gap:4px;}
+  .branchchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--foreground);background:#fff;border:1px solid var(--border);border-radius:999px;padding:2px 8px;}
 
-  /* ===== transcript (SCAN) ===== */
-  .body{flex:1;position:relative;margin:12px 16px 0;}
-  .round-div{display:flex;align-items:center;gap:10px;color:#9ca3af;font-size:10.5px;text-transform:uppercase;
-    letter-spacing:.05em;margin:6px 0 10px;}
+  /* MessagesTimeline — the dominant body */
+  .timeline{flex:1;overflow:auto;padding:16px 16px 8px;position:relative;}
+  .round-div{display:flex;align-items:center;gap:10px;color:#9ca3af;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin:4px 0 12px;}
   .round-div::before,.round-div::after{content:"";flex:1;height:1px;background:var(--border);}
-  .turn{display:flex;gap:10px;margin-bottom:14px;}
-  .av{width:26px;height:26px;border-radius:7px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:12px;font-weight:700;}
+  .turn{display:flex;gap:10px;margin-bottom:16px;}
+  .av{width:26px;height:26px;border-radius:7px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;}
   .av.u{background:#64748b;} .av.a{background:var(--claude);}
-  .bub{flex:1;}
-  .who{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
-  .txt{font-size:13px;color:var(--foreground);}
-  .txt.dim{color:var(--muted);}
-  .tooluse{font-family:"SF Mono",monospace;font-size:11.5px;color:var(--primary);background:var(--primary-tint);
-    border:1px solid var(--primary-border);border-radius:6px;padding:4px 9px;display:inline-block;margin-top:4px;}
-  .auq{border:1px solid var(--waiting);background:rgba(217,119,6,.07);border-radius:8px;padding:9px 11px;margin-top:5px;}
+  .bub{flex:1;min-width:0;} .who{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+  .txt{font-size:13px;color:var(--foreground);} .txt.dim{color:var(--muted);}
+  .tooluse{font-family:"SF Mono",monospace;font-size:11.5px;color:var(--primary);background:var(--primary-tint);border:1px solid var(--primary-border);border-radius:6px;padding:4px 9px;display:inline-block;margin-top:5px;}
+  .auq{border:1px solid var(--waiting);background:rgba(217,119,6,.07);border-radius:8px;padding:9px 11px;margin-top:6px;}
   .auq .h{font-size:11px;font-weight:700;color:var(--waiting);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
-  .auq .opt{font-size:12px;color:var(--foreground);padding:2px 0;}
-  .auq .note{font-size:11px;color:var(--muted);margin-top:5px;}
+  .auq .opt{font-size:12px;color:var(--foreground);padding:2px 0;} .auq .note{font-size:11px;color:var(--muted);margin-top:5px;}
 
-  /* composer */
-  .composer{margin:10px 16px 16px;border:1.5px solid var(--primary-border);border-radius:10px;
-    background:#fff;padding:9px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(79,70,229,.06);}
-  .composer .ph{color:#9ca3af;flex:1;font-size:13px;}
-  .composer .send{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  /* ComposerFooter — integrated footer (the front-and-center input) */
+  .composer{border-top:1px solid var(--border);background:var(--surface);padding:10px 14px 12px;position:relative;}
+  .composer-box{border:1.5px solid var(--primary-border);border-radius:12px;background:#fff;box-shadow:0 2px 12px rgba(79,70,229,.08);padding:10px 12px;}
+  .composer-text{color:#9ca3af;font-size:13.5px;min-height:22px;}
+  .composer-tools{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .ctool{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--foreground);border:1px solid var(--border);border-radius:7px;padding:4px 9px;background:#fff;}
+  .ctool .car{color:#9ca3af;font-size:9px;} .ctool.icon{color:var(--muted);}
+  .send{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;background:var(--primary);border-radius:8px;padding:6px 14px;}
 
-  /* legend */
   .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 22px;margin-top:18px;font-size:12.5px;}
   .legend .row{display:flex;gap:9px;align-items:flex-start;}
   .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 7px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
   .legend .desc .was{color:var(--muted);font-style:italic;}
-  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <h1>Command Deck · Session view = <code>AgentPane</code></h1>
-  <p class="sub">Mockup #1 of the contextual-view restoration. Vocabulary follows
-  <code>pan-1549-workspace-panes.html</code> (Stage → PaneBar → Pane). This is what a
-  <b>single-click on a session node</b> (work / review / planning / reviewer) should open.
-  <b>Draft for alignment — no code yet.</b></p>
+  <h1>Command Deck · Session view = <code>AgentPane</code> <span style="font-size:13px;color:var(--muted);font-weight:400">(conversation-first · rev 2)</span></h1>
+  <p class="sub">Vocabulary follows <code>pan-1549-workspace-panes.html</code>. <b>Rev 2 fixes rev 1's mistake:</b> the
+  conversation is the workflow — transcript + integrated composer are ONE front-and-center surface
+  (faithful to the real <code>ConversationPanel</code>: header → <code>MessagesTimeline</code> → <code>ComposerFooter</code>),
+  not a transcript with a disjointed input bar.</p>
 
   <div class="callout">
-    <b>Core move:</b> clicking a session in the Navigator opens an <code>AgentPane</code> (paneType=<code>agent</code>)
-    <i>backed by that session</i>. <code>AgentPane</code> already renders <code>SessionPanel</code> when handed a
-    <code>{ session }</code> — it's simply never handed one today (<code>resolveAgentPane</code> resolves only
-    conversations). Fix = resolve sessions too + route single-click here. This also de-fangs the
-    double-click bug (single-click stops yanking the layout).
+    <b>Hierarchy now:</b> the <span style="color:var(--primary);font-weight:700">conversation</span> (timeline + composer
+    footer with model/effort/send) fills the pane — that's how you actually work with an agent. The
+    <span style="color:var(--glance);font-weight:700">AgentContextStrip</span> shrinks to a thin glance band; Terminal/Findings
+    are alternate views via the header toggle.
   </div>
-
-  <h2>1 · The session AgentPane, annotated by disclosure layer</h2>
-  <p class="sub">Outlines name the progressive-disclosure layer:
-    <span style="color:var(--glance);font-weight:700">GLANCE</span> (always on) ·
-    <span style="color:var(--scan);font-weight:700">SCAN</span> (the default body) ·
-    <span style="color:var(--dig);font-weight:700">DIG</span> (one click away). Shown: an active <b>planning</b> session.</p>
 
   <div class="deck">
     <!-- Navigator -->
@@ -159,7 +133,6 @@
       <div class="nav-item active"><span class="sq" style="background:var(--claude)"></span> panopticon</div>
       <div class="nav-h">Workspaces</div>
       <div class="nav-item sub"><span class="dot run"></span> feature/pan-1395</div>
-      <!-- session children of the workspace -->
       <div class="nav-item sel" style="padding-left:18px;"><span class="dot think"></span> Planning · opus-4-8</div>
       <div class="nav-item sub"><span class="dot" style="background:#cbd5e1"></span> Work · gpt-5.5</div>
       <div class="nav-item sub"><span class="dot wait"></span> Review · kimi-k2.6</div>
@@ -170,7 +143,6 @@
     <!-- Stage -->
     <div class="stage region">
       <span class="tag t-stage" style="top:6px;right:8px;">Stage</span>
-      <!-- PaneBar -->
       <div class="panebar region">
         <span class="tag t-stage" style="top:-2px;left:110px;">PaneBar</span>
         <div class="panetab"><span class="sq" style="background:var(--glance);width:12px;height:12px"></span> HOME <span class="kbd">⌘1</span></div>
@@ -179,99 +151,98 @@
         <div class="panetab-add">+</div>
       </div>
 
-      <!-- AgentPane -->
-      <div class="pane region ol-pane">
-        <span class="tag t-pane" style="top:4px;right:8px;">Pane · paneType="agent" → <b>AgentPane</b> <small>(session-backed)</small></span>
+      <!-- AgentPane (conversation-first) -->
+      <div class="pane region">
+        <span class="tag t-pane" style="top:46px;right:8px;">Pane · paneType="agent" → <b>AgentPane</b> <small>(session-backed)</small></span>
 
-        <!-- GLANCE: AgentContextStrip -->
+        <!-- ConversationHeader -->
+        <div class="conv-head">
+          <span class="work-ico" title="thinking"></span>
+          <span class="conv-title">Planning <span class="mut">· PAN-1395 — Ctrl+K semantic search</span></span>
+          <span class="spacer"></span>
+          <div class="vtoggle region">
+            <span class="tag t-dig" style="top:-20px;right:0;">view toggle → DIG</span>
+            <button class="on">Conversation</button>
+            <button>Findings <span class="b">review</span></button>
+            <button>Terminal <span class="b">tmux</span></button>
+          </div>
+          <span class="kebab">⋮</span>
+        </div>
+
+        <!-- AgentContextStrip (thin GLANCE band) -->
         <div class="ctx region ol-glance">
-          <span class="tag t-glance" style="top:-9px;left:8px;">AgentContextStrip <small>(was ZoneB)</small></span>
-          <div class="ctx-row1">
-            <span class="rolebadge"><span class="sq" style="background:#fff;width:9px;height:9px;border-radius:2px;opacity:.9"></span> PLANNING</span>
-            <span class="statusdot"><span class="d" style="background:var(--thinking)"></span> Thinking…</span>
-            <span class="meta">⊙ opus-4-8</span>
-            <span class="branchchip">⎇ feature/pan-1395</span>
-            <span class="spacer"></span>
-            <span class="meta">$0.93 · <b style="color:var(--foreground)">$1.4/hr</b></span>
-            <span class="meta">6m elapsed</span>
-          </div>
-          <div class="ctx-row2">
-            <span style="flex:0 0 auto;font-size:11px;">last&nbsp;output</span>
-            <span class="lastline">· Reading .pan/continue.json … (ctx 17% · ↓1.1k tokens)</span>
-          </div>
+          <span class="tag t-glance" style="top:-9px;left:10px;">AgentContextStrip <small>(GLANCE · was ZoneB)</small></span>
+          <span class="rolebadge">Planning</span>
+          <span class="statusdot"><span class="d" style="background:var(--thinking)"></span> Thinking…</span>
+          <span class="meta">⊙ opus-4-8</span>
+          <span class="branchchip">⎇ feature/pan-1395</span>
+          <span class="spacer"></span>
+          <span class="meta">$0.93 · <b style="color:var(--foreground)">$1.4/hr</b></span>
+          <span class="meta">6m</span>
         </div>
 
-        <!-- view toggle -->
-        <div class="toggle region">
-          <span class="tag t-scan" style="top:-9px;left:0;">AgentViewToggle</span>
-          <span class="seg on">Conversation</span>
-          <span class="seg">Findings <span class="b">review</span></span>
-          <span class="seg">Terminal <span class="b">live</span></span>
-        </div>
-
-        <!-- SCAN: transcript -->
-        <div class="body region ol-scan">
-          <span class="tag t-scan" style="top:-9px;right:8px;">ConversationView <small>(SessionPanel · default for work/planning)</small></span>
+        <!-- MessagesTimeline (PRIMARY surface) -->
+        <div class="timeline region ol-primary">
+          <span class="tag t-primary" style="top:4px;right:8px;">MessagesTimeline — the workflow surface (PRIMARY)</span>
           <div class="round-div">Round 1 · planning kickoff</div>
           <div class="turn">
             <div class="av u">E</div>
-            <div class="bub"><div class="who">Operator</div>
-              <div class="txt dim">Begin planning session for PAN-1395: Ctrl+K palette — semantic conversation search (Phase 2).</div></div>
+            <div class="bub"><div class="who">You</div>
+              <div class="txt dim">Begin planning for PAN-1395: Ctrl+K palette — semantic conversation search (Phase 2).</div></div>
           </div>
           <div class="turn">
             <div class="av a">C</div>
             <div class="bub"><div class="who">Claude Code · opus-4-8</div>
-              <div class="txt">Read the existing PAN-457 embedding stack and the continue state. A few design forks materially change the plan — surfacing them.</div>
+              <div class="txt">Read the PAN-457 embedding stack + continue state. A few design forks materially change the plan — surfacing them.</div>
               <div class="tooluse">⚙ AskUserQuestion · 4 questions</div>
               <div class="auq">
-                <div class="h">⌨ Awaiting operator answer — shown in the Q&amp;A dialog</div>
-                <div class="opt">1 · greenfield embeddings.db + sqlite-vec &nbsp;·&nbsp; <b>vs</b> &nbsp; reuse panopticon.db + embed()</div>
-                <div class="opt">2 · new chunk layer &nbsp;·&nbsp; <b>vs</b> &nbsp; replace session layer</div>
-                <div class="note">Intercepted by ask-user-question-hook (PAN-1520) → the dashboard Q&amp;A modal. Answer there; it returns here as the operator turn.</div>
+                <div class="h">⌨ Awaiting your answer — shown in the Q&amp;A dialog</div>
+                <div class="opt">1 · greenfield embeddings.db + sqlite-vec &nbsp;<b>vs</b>&nbsp; reuse panopticon.db + embed()</div>
+                <div class="opt">2 · new chunk layer &nbsp;<b>vs</b>&nbsp; replace session layer</div>
+                <div class="note">Intercepted by ask-user-question-hook (PAN-1520) → the dashboard Q&amp;A modal; the answer returns as your next turn here.</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- composer -->
-        <div class="composer">
-          <span class="ph">Message the planning agent…</span>
-          <span class="send">↵ Send</span>
+        <!-- ComposerFooter (integrated, front-and-center) -->
+        <div class="composer region">
+          <span class="tag t-primary" style="top:-9px;left:14px;">ComposerFooter — integrated (PRIMARY)</span>
+          <div class="composer-box">
+            <div class="composer-text">Message the planning agent…</div>
+            <div class="composer-tools">
+              <span class="ctool"><span class="sq" style="background:var(--claude);width:11px;height:11px"></span> opus-4-8 <span class="car">▾</span></span>
+              <span class="ctool">effort: high <span class="car">▾</span></span>
+              <span class="ctool icon">🎤</span>
+              <span class="ctool icon">📎</span>
+              <span class="send">Send ➤</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- legend -->
   <div class="legend">
-    <div class="row"><span class="key" style="background:var(--glance)">GLANCE</span><span class="desc"><b>AgentContextStrip</b> — role · status · model · branch · $/hr · last-output line. Answers "what is it doing, is it healthy?" at a glance.</span></div>
-    <div class="row"><span class="key" style="background:var(--scan)">SCAN</span><span class="desc"><b>ConversationView</b> — transcript w/ round dividers (default for work/planning). Review sessions default to <b>FindingsView</b> (ReviewSummary).</span></div>
-    <div class="row"><span class="key" style="background:var(--dig)">DIG</span><span class="desc"><b>Terminal</b> (live tmux), per-round cards, delivery-method toggle — one click via the toggle.</span></div>
+    <div class="row"><span class="key" style="background:var(--glance)">GLANCE</span><span class="desc"><b>AgentContextStrip</b> — thin band: role · status · model · branch · $/hr. Health at a glance.</span></div>
+    <div class="row"><span class="key" style="background:var(--primary)">PRIMARY</span><span class="desc"><b>Conversation</b> = MessagesTimeline + ComposerFooter (model/effort/send/voice/image). How you actually work the agent — front and center.</span></div>
+    <div class="row"><span class="key" style="background:var(--dig)">DIG</span><span class="desc"><b>view toggle</b> → Findings (review verdict) / Terminal (live tmux). One click in the header.</span></div>
   </div>
 
-  <h2>2 · Per session-type defaults (same AgentPane, different default view)</h2>
+  <h2>Per session-type default view</h2>
   <table>
-    <thead><tr><th style="width:20%">Session type</th><th style="width:24%">Default view</th><th>Glance strip emphasis</th></tr></thead>
+    <thead><tr><th style="width:20%">Type</th><th style="width:26%">Default</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td><code>planning</code></td><td>Conversation</td><td>status (thinking/waiting on Q&amp;A) · model · cost</td></tr>
-      <tr><td><code>work</code></td><td>Conversation</td><td>status · branch (drift!) · $/hr · last-output</td></tr>
-      <tr><td><code>review</code></td><td><b>Findings</b> (ReviewSummary: verdict banner + 4-reviewer strip)</td><td>verdict · reviewers done · blocked count</td></tr>
-      <tr><td><code>reviewer</code> (correctness/…)</td><td><b>Findings</b> (round cards)</td><td>role · latest verdict · findings count</td></tr>
+      <tr><td><code>planning</code> / <code>work</code></td><td>Conversation (read + message)</td><td>composer active when session alive; greys out when ended</td></tr>
+      <tr><td><code>review</code></td><td><b>Findings</b> (ReviewSummary: verdict + 4-reviewer strip)</td><td>conversation still one toggle away</td></tr>
+      <tr><td><code>reviewer</code></td><td><b>Findings</b> (round cards)</td><td>—</td></tr>
     </tbody>
   </table>
 
-  <h2>3 · Naming cleanup this introduces (cryptic → semantic)</h2>
-  <table>
-    <thead><tr><th style="width:34%">Today (cryptic)</th><th style="width:26%">New (semantic)</th><th>Note</th></tr></thead>
-    <tbody>
-      <tr class="old"><td><code>ZoneB.tsx</code> (agent context strip)</td><td><code>AgentContextStrip</code></td><td>Lives inside AgentPane as the glance header. (Not the Navigator — clears the Zone-B ambiguity.)</td></tr>
-      <tr class="old"><td><code>ZoneCConversation</code></td><td><code>AgentPane</code></td><td>Already the established name; just reachable for sessions now.</td></tr>
-      <tr class="old"><td><code>SessionPanel</code> view toggle</td><td><code>AgentViewToggle</code> (Conversation/Findings/Terminal)</td><td>Component keeps its name; the toggle gets a semantic label.</td></tr>
-      <tr class="old"><td><code>resolveAgentPane</code> (conversations only)</td><td>resolve <code>{ session }</code> too</td><td>The one functional change that makes all the above reachable.</td></tr>
-    </tbody>
-  </table>
-  <p class="sub">Full rename map for the Issue + Project contexts comes with their mockups; the design doc's
-  remaining <code>Zone*</code> / <code>ZoneCOverviewTabs</code> references will be snapped to this vocabulary then.</p>
+  <h2>Faithful to the real component</h2>
+  <p class="sub">This mirrors <code>chat/ConversationPanel.tsx</code> (header → <code>MessagesTimeline</code> → <code>ComposerFooter</code>
+  with <code>ModelPicker</code>/<code>EffortPicker</code>/image-paste/voice). The session AgentPane <b>is</b> that panel,
+  given a <code>{ session }</code> instead of a <code>{ conversation }</code>, plus the thin AgentContextStrip header.</p>
 
 </div>
 </body>
