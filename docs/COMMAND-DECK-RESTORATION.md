@@ -245,3 +245,27 @@ Zone tabs (`ZoneCOverviewTabs/*`✓), `ZoneB`✓, the **entire `components/drawe
 6. The **ActionStrip** must reflect the real ~41-action, phase-gated registry (primary inline, rest overflow), not 4 hand-picked buttons.
 7. Consider the **IssueComposer** (spawn-and-send) — message an issue with no live agent.
 All still subject to progressive disclosure (§6/§9): glance = state + next-action; most of the above is SCAN cards or DIG panes, NOT all-on.
+
+## 12. Data-wiring verdict — what was REAL vs tacked-on
+
+A dedicated pass classified every issue-view surface by whether it was backed by
+live data or was an aspirational shell. **Result: nearly everything was REAL.**
+
+- **REAL (live endpoint/store), safe to restore:** PhaseTimeline (derived from ReviewStatus),
+  VerificationGates (typecheck/lint/test/uat from ReviewStatus), ReviewSpecialists, Artifacts
+  (`/api/workspaces/:id/artifacts`), ActivityRail (WS `subscribeIssueEvents`), WorkspaceSection +
+  containers (`/api/workspaces/:id` + container actions), services URLs, tmux attach, sync-main,
+  containerize, Postgres refresh-db, memory-summary, ActiveAgent output (WS `subscribeAgentOutput`),
+  status-history tree, verification cycle counter + auto-requeue, status billboard, Plan DAG,
+  the 7-tile grid (Agent/Cost/By-Stage/Services/Attach/Actions/Workspace), pipeline stepper,
+  reviewer grid ×4 + RoundCard, tests, **PR + diffstat + review decision** (`/api/issues/:id/pr`,
+  fully wired despite an old "placeholder" comment), cost total/by-model/by-stage/per-session/sparkline,
+  CostsTab, ActivityTab, DiscussionsTab (Linear+GitHub), BeadsTab, PrDiffTab, MarkdownTab (PRD/STATE/INFERENCE),
+  recent activity, memory status.
+- **TACKED-ON / hardcoded:** only the OverviewTab **quick-links footer chips** (static nav, no data).
+- **Gone (not shells — replaced):** InspectorPanel, phase-contextual TerminalTabs (the Drawer's single
+  terminal tab replaced them).
+
+**Implication for the rebuild:** the kitchen-sink is justified — throw it all in, surface the
+obviously-important prominently, scale back by human judgment (not by "was it ever real"), and drop
+the hardcoded quick-links. See `docs/design/command-deck-issue-pane.html` (rev 2, kitchen-sink).
