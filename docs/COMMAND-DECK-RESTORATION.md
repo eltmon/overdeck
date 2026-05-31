@@ -269,3 +269,65 @@ live data or was an aspirational shell. **Result: nearly everything was REAL.**
 **Implication for the rebuild:** the kitchen-sink is justified — throw it all in, surface the
 obviously-important prominently, scale back by human judgment (not by "was it ever real"), and drop
 the hardcoded quick-links. See `docs/design/command-deck-issue-pane.html` (rev 2, kitchen-sink).
+
+## 13. DECISIONS LOG (live — read this first after a compaction)
+
+Running record of what's been **decided** with the user (2026-05-31 session). Mockups
+live in `docs/design/command-deck-*.html`. The doc above (§0–12) is the archaeology;
+this section is the agreed direction.
+
+### Locked decisions
+1. **The real shell is 4 regions and the LEFT is already correct — do NOT redesign it.**
+   Outer sidebar (Home · Flywheel · PROJECTS · grouped lenses OPERATIONS[Command Deck/Board/
+   Pipeline/Awaiting Merge/Agents/AutoPreso]/INFRASTRUCTURE[Resources]/OBSERVABILITY[Activity])
+   · **Command Deck rail** (Conversations + Issues tree→agents→Resources) · **Stage** (tabbed
+   conversations) · **Project Activity** (right feed). The gap is the **Stage**, not the rail.
+2. **Issue view = tree (in the existing rail) + cockpit (in the Stage).** Clicking an issue or
+   an agent in the rail tree opens a Stage **issue-cockpit tab**. The agent tree is NOT duplicated
+   in the body — it lives in the rail.
+3. **"Session" is dissolved.** Never say "session pane." You click *the Security reviewer* / *the
+   Work agent*; the conversation component renders that agent's conversation. (See memory
+   `project_issue_view_is_tree_plus_conversation`.)
+4. **Cockpit = status band + body.** Status band (persistent issue-context header): WorkspaceHeader
+   (id·title·branch·phase) · **PhaseTimeline (6: Triaged→Planned→Implemented→Reviewed→Shipping→Merged)**
+   · **ActionStrip** (phase-gated, ~41-action registry `lib/issueActions.ts`; primary inline + ⋮overflow)
+   · **Cost top-right** · **VerificationGates** (typecheck/lint/test/uat) · **PR card** (#/state/diffstat).
+   Body = overview when issue-row selected / that agent's conversation when an agent selected.
+   (User explicitly LOVED: VerificationGates visible, PR card, header/phase/actions. Cost MUST be top-right.)
+5. **Tab behavior = HYBRID + pop-out.** Default **A** (one issue tab; body follows rail selection);
+   **⌘/double-click an agent → opens it in its own tab (B)**; **any pane can pop out to its own window.**
+6. **Scoped Launcher** kept, but must show it's scoped ("on PAN-1242") with issue-limited autocomplete.
+7. **Data verdict:** nearly every historical issue surface was REAL/live-data-backed (§12); only the
+   OverviewTab quick-links were hardcoded (drop). Restoration = re-wiring dormant components.
+8. **Vocabulary = pan-1549 Stage→PaneBar→Pane** (HomePane/AgentPane/PlanPane/DocsPane/CommitsPane/
+   TerminalPane/FilesPane/BrowserPane). Renames: ZoneB→AgentContextStrip · ZoneCConversation→AgentPane ·
+   ReviewPipelineSection→PipelineStepper · PlanDAGViewer→PlanPane · MarkdownTab→DocsPane.
+
+### Tentative / open
+- **Q2** (issue-row body): leaning **overview** (gates/reviewers/PR/cost dashboard) when the issue row
+  itself is selected, conversation when an agent is. NOT finally confirmed.
+- **Q3** (Project Activity right panel): scope-to-issue vs project-wide — open.
+- **Project-level landing** (click a project → what lands?) — OPEN, under investigation. User notes there
+  may be **multiple pipeline views** and it's unclear which is used where (investigating §14).
+
+### Mockup inventory (docs/design/)
+- `command-deck-session-pane.html` — rev2 conversation-first agent view (now subsumed into the issue cockpit body).
+- `command-deck-issue-pane.html` — rev2 kitchen-sink issue (superseded by the rethink).
+- `command-deck-issue-rethink.html` — tree+conversation issue cockpit (the direction).
+- `command-deck-stage-options.html` — A vs B vs hybrid tab behavior (decided: hybrid).
+- Canonical vocabulary ref: `pan-1549-workspace-panes.html`.
+
+### Implementation order (when we start coding — not yet)
+1. **Session/agent reachability** — add session resolution to `resolveAgentPane` (Stage/index.tsx:196) +
+   route rail agent-click to open the cockpit/conversation. This also fixes the double-click bug.
+2. **Issue cockpit** — status band as a Stage tab (re-mount dormant ZoneCOverviewTabs/* + drawer/* surfaces).
+3. **Project landing** — re-mount ProjectOverview into the project Home (pending §14 + landing decision).
+
+### Reusable / dormant (no rebuild)
+`components/primitives/*` (VerbBadge/PhaseGlyph/PhaseHeader/MetricTile/IssueRow/IssueCard/AgentCard),
+all `components/drawer/*` (PhaseTimeline/VerificationGates/ReviewSpecialists/Artifacts/ActivityRail/
+WorkspaceSection), `ZoneCOverviewTabs/*`, `ZoneB.tsx`, `SessionPanel`/`ReviewSummary`, `ProjectOverview.tsx`,
+`PlanDAG`, `RoundCard`, `ActivitySparkline`, `BeadsTasksPanel`, `lib/issueActions.ts`.
+
+## 14. Project-level landing + pipeline views (OPEN — investigating)
+_(to be filled: where clicking a project should land, and an audit of how many Pipeline/Board views exist and which is used where)_
