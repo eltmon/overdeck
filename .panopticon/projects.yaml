@@ -342,11 +342,3 @@ projects:
       compile:
         command: uv run python -m compileall src
         required: true
-  eltmon-stream:
-    name: eltmon-stream
-    path: /home/eltmon/Projects/eltmon-stream
-    issue_prefix: ELS
-    workspace:
-      type: standalone
-      workspaces_dir: workspaces
-      default_branch: main
