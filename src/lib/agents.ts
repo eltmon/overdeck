@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, packageRoot } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, getAgentSessionsSync, getAgentSessions, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -3112,7 +3112,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 }
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
-  const tmuxSessions = getAgentSessionsSync();
+  // Match liveness against ALL panopticon-socket sessions, not just `agent-*`.
+  // Agent state dirs are named by role prefix (planning-/agent-/conv-/strike-);
+  // getAgentSessions only returns `agent-*`, so planning/conv/strike sessions
+  // would always read tmuxActive:false and get dropped by the enrichment poller.
+  const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
   const agents: (AgentState & { tmuxActive: boolean })[] = [];
@@ -3143,13 +3147,18 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
   Effect.gen(function* () {
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
     // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
-    // process that lacks access to that socket and `getAgentSessions()` returns
+    // process that lacks access to that socket and `listSessions()` returns
     // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
     // are genuinely running. Do not conclude "the agent isn't running" / "the
     // enrichment poller skips it" from an out-of-server-process reading. Trust
     // the live dashboard server's view (it owns the socket) or check the tmux
     // session directly with `tmux -L panopticon list-sessions`.
-    const tmuxSessions = yield* getAgentSessions();
+    //
+    // Use the UNFILTERED session list (not getAgentSessions, which is `agent-*`
+    // only): agent state dirs carry role prefixes (planning-/agent-/conv-/strike-),
+    // and planning/conv/strike sessions must read tmuxActive:true so the
+    // enrichment poller scans them for AskUserQuestion / pending input (PAN-1395).
+    const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
     if (!existsSync(AGENTS_DIR)) return [];
