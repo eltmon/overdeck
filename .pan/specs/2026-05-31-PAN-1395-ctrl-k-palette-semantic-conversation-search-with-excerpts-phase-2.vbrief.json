@@ -1,76 +1,108 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-05-31T00:00:00.000Z",
-    "author": "agent:plan",
-    "description": "Plan for PAN-1395: Ctrl+K palette — semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-05-31T16:47:04.586Z"
+    "created": "2026-05-31T21:30:18.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
+    "updated": "2026-05-31T22:26:09.785Z"
   },
   "plan": {
-    "id": "PAN-1395",
+    "id": "pan-1395",
     "title": "Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
     "status": "proposed",
-    "author": "agent:plan",
+    "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-05-31T21:30:18.000Z",
+    "updated": "2026-05-31T22:26:09.785Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
         "label": "PAN-1395",
         "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/729",
+        "label": "#729 keyword+semantic conversation search",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/185",
+        "label": "#185 hybrid BM25+vector RRF",
+        "type": "issue"
       }
     ],
     "tags": [
-      "dashboard",
-      "frontend",
+      "palette",
       "search",
       "embeddings",
       "conversations",
-      "feature"
+      "dashboard"
     ],
     "narratives": {
-      "Problem": "Phase 1 shipped a unified Ctrl+K palette (commit 77e0943c5) with commands / memory / observations / issues groups. It cannot search conversation CONTENT. Conversation embeddings today are session-level (one vector per conversation built from summary/tags via buildEmbeddingText) and cannot produce per-message excerpts. Users have no way to semantically find a past conversation by what was said in it and jump to the exact message.",
-      "Proposal": "Add a chunk level to the existing conversation-embeddings system: a streaming JSONL chunker, a new Float32-BLOB SQLite chunk table that is lazily populated and idempotent on byteOffset, and brute-force cosine search over chunk vectors that returns excerpts using the existing memory-excerpt marker convention. Surface results as a Conversations group in the existing CommandPalette, selectable to deep-link /conv/:id scrolled to the matched message. Add a Conversation Search settings section with a provider/model/key picker, enable toggle, and a bulk-index cost guard. Reuse everything that already exists (providers.ts embed(), search.ts cosineSimilarity, discovered-sessions-db.ts vector helpers, config keys, the palette excerpt renderer); build only the chunk layer.",
-      "Constraints": "No new embedding pipeline or provider — reuse embed(provider,{text,model,apiKey}). Indexing is LAZY / on first search (NOT an eager startup backfill); restarting the dashboard must not re-embed everything. Storage is SQLite Float32 BLOB + brute-force cosine — no native vector dep (no sqlite-vec). Excerpts use the existing marker convention, never injected HTML. Semantic search must be fully disable-able and must degrade gracefully when no provider/API key is configured.",
-      "Risks": "Embedding cost on first/bulk index of many conversations (mitigated by the ~$1 cost-guard confirmation and lazy indexing). Brute-force cosine over many chunks could be slow for very large histories — acceptable for Phase 2 scope (current-project conversations), revisit if it regresses. Provider/key may be absent in headless/cron sessions — the disabled/empty state covers this.",
-      "Alternatives": "Eager batch backfill / incremental watcher (rejected in favour of lazy-on-first-search per operator decision 2 — note this diverges from the issue body wording). sqlite-vec native vector index (rejected per decision 1 to avoid a native dependency). Lexical/full-text search (out of scope — this issue is semantic only)."
+      "Problem": "Phase 1 wired commands, memory FTS, observations, and issues into the Ctrl+K palette but left conversations out. Conversation transcripts live as JSONL session files and are not keyword-or-semantically searchable from the palette. The user wants to search conversations semantically and see an excerpt that points at the matching message.",
+      "Proposal": "Build a conversation semantic-search subsystem: a JSONL chunker, a sqlite-vec + FTS5 sidecar DB, a pluggable embedding provider (OpenAI text-embedding-3-small default), a hybrid (BM25 + vector, RRF-fused) ranker, and incremental indexing (startup scan + chokidar watcher, idempotent on byteOffset). Extend GET /api/palette/search to fill the already-reserved conversations[] with ⦇…⦈-marked excerpts. Add a Conversations group to CommandPalette that opens the conversation drawer scrolled to the matched message. Add a Settings → Conversation Search section (provider/model/key, enable toggle, last-indexed, Reindex button) with a >$1 cost guard. Feature ships OFF by default."
     },
-    "autoDecisions": [
-      {
-        "summary": "Storage & vectors: SQLite Float32 BLOB + brute-force cosine (no sqlite-vec).",
-        "rationale": "Operator decision 1. A new per-message chunk table stores Float32 BLOB vectors and reuses the existing cosineSimilarity / topKCosine helpers, avoiding a native dependency."
-      },
-      {
-        "summary": "Indexing trigger: lazy / on first search (not eager batch backfill).",
-        "rationale": "Operator decision 2. The first search of a conversation triggers chunk + embed + store; subsequent searches hit the cache. Idempotency on byteOffset makes appended JSONL cheap to re-index. This deliberately diverges from the issue body's 'incremental watcher / batch backfill' wording."
-      },
-      {
-        "summary": "Embed provider: config-driven across openai / voyage / ollama, openai text-embedding-3-small default.",
-        "rationale": "Operator decision 3. Reuse the existing embed() provider abstraction; the search path must not assume OpenAI is always present and must offer a graceful disabled/empty state when no provider/key is configured."
-      },
-      {
-        "summary": "Open-at-message: deep-link + scroll to the matched message via sequence/byteOffset.",
-        "rationale": "Operator decision 4. The parser already emits sequence and byteOffset; ConversationPanel / MessagesTimeline honor a scroll target so /conv/:id can land on the matched message."
-      }
-    ],
+    "autoDecisions": [],
     "items": [
       {
-        "id": "chunker",
-        "title": "Streaming JSONL conversation chunker (per-message chunks)",
+        "id": "config-block",
+        "title": "Add conversationSearch config block (OFF by default)",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-31T00:00:00.000Z",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
-          "difficulty": "moderate",
+          "difficulty": "simple",
           "issueLabel": "pan-1395",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a chunker that streams a conversation JSONL session message-by-message and emits per-message chunks { sessionId, role, ts, byteOffset, charLength, text, sequence }, splitting long messages into ~512-token windows with overlap (short messages -> single chunk). REUSE the existing JSONL parsing — src/lib/conversations/jsonl-async.ts and parseConversationMessages() in src/dashboard/server/services/conversation-service.ts (already emit `sequence` and byte offsets). This item does NOT write to the DB — it only produces chunk records. byteOffset is the idempotency key consumed by the chunk-store item."
+          "Action": "Add a conversationSearch section to ~/.panopticon/config.yaml schema (src/lib/config-yaml.ts): { enabled: false, provider: 'openai', model: 'text-embedding-3-small', apiKeyRef, dbPath default ~/.panopticon/conversations/embeddings.db }. Default enabled=false. Expose a typed accessor other beads read."
+        },
+        "subItems": [
+          {
+            "id": "config-block.ac1",
+            "title": "config.yaml exposes conversationSearch with enabled defaulting to false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-block.ac2",
+            "title": "A typed accessor returns provider/model/dbPath/enabled; covered by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chunker",
+        "title": "JSONL conversation chunker emitting byte-offset-keyed records",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1395",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "indexer",
+            "ranker",
+            "chunker-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement a streaming chunker (new lib module) that reads a JSONL session, segments by message boundary, splits long messages on ~512-token windows with overlap, and emits records { sessionId, projectId, role, ts, byteOffset, charLength, text }. byteOffset must point at the message's start in the file and remain stable across appends. This record shape is the cross-cutting contract consumed by the indexer and ranker."
         },
         "subItems": [
           {
             "id": "chunker.ac1",
-            "title": "Streaming a session JSONL emits one or more chunks per message, each with sessionId/role/ts/byteOffset/charLength/text/sequence.",
+            "title": "Streams a JSONL session and emits one+ records per message with correct sessionId/projectId/role/ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -78,7 +110,7 @@
           },
           {
             "id": "chunker.ac2",
-            "title": "Long messages are split into ~512-token windows with overlap; short messages produce a single chunk.",
+            "title": "Long messages split into ~512-token overlapping windows",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -86,15 +118,7 @@
           },
           {
             "id": "chunker.ac3",
-            "title": "byteOffset and sequence are stable and match parseConversationMessages() output, suitable as an idempotency key for re-indexing appended JSONL.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "chunker.ac4",
-            "title": "Unit tests cover: short single-message session, a long message that splits into multiple overlapping windows, and empty/whitespace edge messages.",
+            "title": "byteOffset/charLength accurately locate the source bytes and are stable when the file is later appended to",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -103,56 +127,79 @@
         ]
       },
       {
-        "id": "chunk-store",
-        "title": "Chunk-embeddings SQLite table (Float32 BLOB), lazy + idempotent",
+        "id": "db-schema",
+        "title": "Embeddings sidecar DB: sqlite-vec + FTS5 schema and init",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-31T00:00:00.000Z",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
-          "difficulty": "moderate",
+          "difficulty": "complex",
+          "issueLabel": "pan-1395",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "indexer",
+            "ranker",
+            "endpoint"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the sidecar DB module at ~/.panopticon/conversations/embeddings.db using better-sqlite3: a chunks table (the chunker record fields + embedding), a sqlite-vec virtual table for cosine ANN, an FTS5 table over chunk text for BM25, and a per-file byteOffset cursor table for incremental idempotency. Load the sqlite-vec extension behind a single guarded init; fail closed (report unavailable) if the extension can't load rather than crashing the dashboard."
+        },
+        "subItems": [
+          {
+            "id": "db-schema.ac1",
+            "title": "DB initializes with chunks, vec virtual table, FTS5 table, and per-file cursor table at the configured path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac2",
+            "title": "sqlite-vec extension load is isolated and failure degrades the feature to unavailable without crashing the server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-schema.ac3",
+            "title": "Upsert keyed on (sessionId, byteOffset) is idempotent — re-inserting the same chunk does not duplicate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider",
+        "title": "Pluggable embedding provider (OpenAI default) + token-cost estimator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
           "issueLabel": "pan-1395",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a new SQLite table storing per-chunk embedding vectors as Float32 BLOBs, keyed on (sessionId, byteOffset), with columns for role/ts/charLength/text/sequence and the embedding provider/model/dim. Follow the existing patterns in src/lib/database/discovered-sessions-db.ts (loadEmbeddings, getEmbedding, topKCosine) and add the schema in src/lib/database/schema.ts. Provide upsert (idempotent on byteOffset) and load-by-session / load-all helpers. Table is LAZY-populated by the search item — no eager startup backfill here."
+          "Action": "Add an embedding-provider abstraction reading the config block: default OpenAI text-embedding-3-small via @ai-sdk/openai (already a dep), batched embed of N chunk texts, and a pure estimateCost(textChunks) helper used by the cost guard. Provider is selected by config; unknown/disabled provider yields a clear unavailable error."
         },
         "subItems": [
           {
-            "id": "chunk-store.ac1",
-            "title": "A new table is created via a schema.ts migration and stores Float32 BLOB vectors keyed on (sessionId, byteOffset).",
+            "id": "provider.ac1",
+            "title": "embed(texts[]) returns vectors via the configured provider, batched",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "chunk-store.ac2",
-            "title": "Upsert is idempotent on byteOffset: re-indexing a conversation whose JSONL grew does not duplicate existing rows.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "chunk-store.ac3",
-            "title": "Load helpers return decoded Float32Array vectors compatible with the existing cosineSimilarity / topKCosine helpers.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "chunk-store.ac4",
-            "title": "Each row records embedding provider + model + dimension so stale-provider rows are detectable.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "chunk-store.ac5",
-            "title": "Unit tests cover upsert idempotency and BLOB encode/decode roundtrip.",
+            "id": "provider.ac2",
+            "title": "estimateCost(texts[]) returns a USD estimate from token count and model price; unit-tested",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -161,11 +208,11 @@
         ]
       },
       {
-        "id": "search",
-        "title": "Semantic chunk search + lazy indexing orchestration",
+        "id": "indexer",
+        "title": "Incremental indexer: scan, chunk, embed, upsert (idempotent)",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-31T00:00:00.000Z",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1395",
@@ -173,52 +220,28 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add chunk-level semantic search. On the first search of a conversation, lazily chunk + embed + store its messages (idempotent on byteOffset); on subsequent searches reuse stored vectors. Embed the QUERY via the existing provider abstraction embed(provider, {text, model, apiKey}) in src/lib/conversations/embeddings/providers.ts (openai text-embedding-3-small default; voyage/ollama supported). Rank chunks by brute-force cosine (cosineSimilarity from src/lib/conversations/search.ts), group hits by conversation, and return each result with an excerpt around the best-matching message using the existing memory-excerpt marker convention (the U+2987/U+2988 marker pair, NOT raw HTML) so the frontend highlights safely. MUST degrade to an empty/disabled result (no throw) when no embedding provider/API key is configured OR semantic search is disabled in config."
+          "Action": "Orchestrate indexing: enumerate JSONL session files across project dirs, read each file's persisted byteOffset cursor, process only new/appended bytes via the chunker, embed via the provider, upsert into the DB, advance the cursor. Expose a full-reindex entry (clears cursors) and an index-one-file entry (for the watcher). Skip entirely when feature disabled."
         },
         "subItems": [
           {
-            "id": "search.ac1",
-            "title": "First search of a conversation lazily indexes its chunks; subsequent searches reuse stored vectors with no re-embed.",
+            "id": "indexer.ac1",
+            "title": "Startup scan embeds only chunks past each file's stored cursor",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "search.ac2",
-            "title": "The query is embedded via the existing embed() provider abstraction (config-driven provider/model/key).",
+            "id": "indexer.ac2",
+            "title": "Restarting the dashboard does not re-embed already-indexed chunks",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "search.ac3",
-            "title": "Brute-force cosine ranks chunks; hits are grouped by conversation and the best chunk drives the excerpt.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "search.ac4",
-            "title": "Excerpts use the existing marker convention (no raw HTML), matching how memory excerpts are highlighted.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "search.ac5",
-            "title": "When no provider/API key is configured OR semantic search is disabled, search returns an empty/disabled result without throwing.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "search.ac6",
-            "title": "Unit tests cover ranking order on a fixture, excerpt extraction + markers, and the disabled/empty-state path.",
+            "id": "indexer.ac3",
+            "title": "No-ops when conversationSearch.enabled is false",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -227,56 +250,74 @@
         ]
       },
       {
-        "id": "palette-wiring",
-        "title": "Palette endpoint + Conversations group in the Ctrl+K palette",
+        "id": "watcher",
+        "title": "Live JSONL watcher feeding the incremental indexer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a chokidar watcher (started only when feature enabled) on the JSONL session directories; debounce change events and call the indexer's index-one-file entry for changed/added files. Stop the watcher cleanly on shutdown / when the feature is disabled at runtime."
+        },
+        "subItems": [
+          {
+            "id": "watcher.ac1",
+            "title": "Appending to a watched JSONL file triggers incremental indexing of just the new bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watcher.ac2",
+            "title": "Watcher only runs while the feature is enabled and stops cleanly on shutdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ranker",
+        "title": "Hybrid BM25 + vector ranker fused with RRF, with ⦇…⦈ excerpts",
         "status": "pending",
         "priority": "high",
-        "created": "2026-05-31T00:00:00.000Z",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
-          "difficulty": "moderate",
+          "difficulty": "complex",
           "issueLabel": "pan-1395",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Extend GET /api/palette/search?q=&limit= (route src/dashboard/server/routes/palette.ts) so its response gains a `conversations` array alongside the existing { memory, observations, summaries }, populated by the search item. Add a Conversations result group to src/dashboard/frontend/src/components/CommandPalette.tsx, REUSING the existing excerpt-segment renderer for the highlight markers. Preserve the Phase-1 debounce (~250ms) and keyboard navigation; render conversation title + highlighted excerpt; handle loading / empty / no-results states. No regression to the existing palette groups."
+          "Action": "Implement query-time ranking: embed the query, get vector top-k from sqlite-vec and BM25 top-k from FTS5, fuse with Reciprocal Rank Fusion, and return ranked chunk rows. Build the excerpt around the matched region using the ⦇…⦈ marker convention and produce excerptSegments {text, match}[] (reuse the memory tokenizer pattern)."
         },
         "subItems": [
           {
-            "id": "palette-wiring.ac1",
-            "title": "GET /api/palette/search returns a `conversations` array without breaking the existing memory/observations/summaries fields.",
+            "id": "ranker.ac1",
+            "title": "Returns hits whose source messages need not contain the exact query words (semantic recall)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "palette-wiring.ac2",
-            "title": "CommandPalette renders a Conversations group showing conversation title + highlighted excerpt via the existing segment renderer.",
+            "id": "ranker.ac2",
+            "title": "BM25 and vector lists are fused via RRF into a single ranked order",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "palette-wiring.ac3",
-            "title": "Debounced query and keyboard navigation work for the new group; loading / empty / no-results states render correctly.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "palette-wiring.ac4",
-            "title": "No regression in the Phase-1 palette groups (commands / memory / observations / issues).",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "palette-wiring.ac5",
-            "title": "A component test covers the Conversations group rendering and keyboard selection.",
+            "id": "ranker.ac3",
+            "title": "Each hit carries excerpt (⦇…⦈) and excerptSegments {text, match}[]",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -285,40 +326,32 @@
         ]
       },
       {
-        "id": "open-at-message",
-        "title": "Open conversation deep-linked + scrolled to the matched message",
+        "id": "endpoint",
+        "title": "Fill conversations[] in GET /api/palette/search",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-31T00:00:00.000Z",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
-          "difficulty": "moderate",
+          "difficulty": "medium",
           "issueLabel": "pan-1395",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Selecting a conversation result navigates to /conv/:id and scrolls to the matched message using the sequence / byteOffset emitted by the parser, honored by ConversationPanel / MessagesTimeline. Thread the scroll target through the route/drawer so it also works on a cold deep-link load, not just when the conversation is already open."
+          "Action": "Extend src/dashboard/server/routes/palette.ts to populate the already-reserved conversations array with { sessionId, conversationId, projectId, role, ts, displayContent, excerpt, excerptSegments, rank } from the ranker. Additive only — commands/memory/observations/issues groups are untouched. Return an empty conversations[] when the feature is disabled."
         },
         "subItems": [
           {
-            "id": "open-at-message.ac1",
-            "title": "Selecting a conversation result opens that conversation (drawer/route /conv/:id).",
+            "id": "endpoint.ac1",
+            "title": "Response conversations[] contains the documented fields, ranked, when the feature is enabled",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "open-at-message.ac2",
-            "title": "The conversation view scrolls to the matched message using sequence/byteOffset.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "open-at-message.ac3",
-            "title": "Deep-linking works from a cold load (conversation not already open), not only when already mounted.",
+            "id": "endpoint.ac2",
+            "title": "conversations[] is empty and existing groups are unchanged when the feature is disabled",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -327,48 +360,254 @@
         ]
       },
       {
-        "id": "settings-cost",
-        "title": "Conversation Search settings section + bulk-index cost guard",
+        "id": "open-at-msg",
+        "title": "Resolve sessionId + byteOffset to a message for open-at-message",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-05-31T00:00:00.000Z",
+        "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
-          "difficulty": "moderate",
+          "difficulty": "medium",
           "issueLabel": "pan-1395",
           "requiresInspection": false,
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a Conversation Search settings section exposing embedding provider / model / API key, an enable-disable toggle, and a last-indexed indicator, REUSING the existing config keys (conversations.embeddings, embeddingProvider, embeddingModel, apiKeys) in src/lib/config-yaml.ts / src/lib/config.ts. Before a lazy bulk index whose estimated embedding cost would exceed ~$1, show the estimate and require explicit confirmation. Disabling semantic search must be fully supported and must make the palette Conversations path return the disabled/empty state with no embedding calls."
+          "Action": "Add backend support so a (sessionId, byteOffset) pair resolves to the target message identity used by the conversation drawer (extend the conversations-by-id messages handler or add a resolve helper). The frontend uses this to scroll to the matched message."
         },
         "subItems": [
           {
-            "id": "settings-cost.ac1",
-            "title": "Settings expose provider / model / API key, an enable toggle, and a last-indexed indicator for Conversation Search.",
+            "id": "open-at-msg.ac1",
+            "title": "Given sessionId + byteOffset, the backend returns the matching message's locator (id/index) for the drawer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-group",
+        "title": "CommandPalette: Conversations group above Memory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Render a Conversations result group in CommandPalette.tsx, ordered above Memory, using the existing excerpt-segment renderer for excerptSegments. Group is hidden when conversations[] is empty/feature disabled."
+        },
+        "subItems": [
+          {
+            "id": "palette-group.ac1",
+            "title": "Typing a phrase shows a Conversations group above Memory with highlighted excerpts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "settings-cost.ac2",
-            "title": "An estimated token/$ cost is shown before a bulk (lazy) index; an index estimated above ~$1 requires explicit confirmation.",
+            "id": "palette-group.ac2",
+            "title": "No Conversations group renders when there are no conversation hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "select-open",
+        "title": "Selecting a conversation hit opens the drawer scrolled to the message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the conversation result's open action (sessionId + byteOffset) to open the conversation drawer and scroll to the matching message using the open-at-msg locator."
+        },
+        "subItems": [
+          {
+            "id": "select-open.ac1",
+            "title": "Selecting a conversation result opens its drawer scrolled to the matched message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings",
+        "title": "Settings: Conversation Search section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Conversation Search section in dashboard Settings: embedding provider/model/api-key inputs, an enable/disable toggle (OFF by default), the last-indexed timestamp, and a 'Reindex all conversations' button. Persists to the conversationSearch config block."
+        },
+        "subItems": [
+          {
+            "id": "settings.ac1",
+            "title": "Provider/model/api-key and an enable toggle (default off) are editable and persist",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "settings-cost.ac3",
-            "title": "Disabling semantic search makes the palette Conversations path return the disabled/empty state with no embedding calls.",
+            "id": "settings.ac2",
+            "title": "Last-indexed timestamp and a Reindex-all button are shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-guard",
+        "title": "Reindex cost guard (>$1 requires explicit confirm)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before a full reindex, estimate token cost via provider.estimateCost and show it; require an explicit confirmation when the estimate exceeds $1 before any embedding API calls are made."
+        },
+        "subItems": [
+          {
+            "id": "cost-guard.ac1",
+            "title": "Estimated reindex cost is shown before the reindex runs",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "settings-cost.ac4",
-            "title": "Settings persist via the existing config (conversations.embeddings / embeddingProvider / embeddingModel / apiKeys).",
+            "id": "cost-guard.ac2",
+            "title": "Reindex estimated over $1 blocks until the user explicitly confirms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chunker-tests",
+        "title": "Unit tests: chunker boundaries + byte-offset across appends",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add unit tests for the chunker: message-boundary correctness, ~512-token window splitting/overlap, and byteOffset accuracy verified before and after the fixture file is appended to."
+        },
+        "subItems": [
+          {
+            "id": "chunker-tests.ac1",
+            "title": "Tests assert boundary segmentation and window splitting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunker-tests.ac2",
+            "title": "A test appends to the fixture and asserts byteOffset of earlier and new chunks is correct",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ranker-tests",
+        "title": "Unit tests: FTS + vector RRF ranker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add unit tests for the ranker: RRF fusion of two known rank lists produces the expected order, and excerpt/excerptSegments are emitted with the ⦇…⦈ marker. Use a deterministic stub embedding provider."
+        },
+        "subItems": [
+          {
+            "id": "ranker-tests.ac1",
+            "title": "RRF fusion of two seeded lists yields the expected fused order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ranker-tests.ac2",
+            "title": "Excerpt segments are produced with correct match flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "endpoint-test",
+        "title": "Integration test: palette search endpoint with a fixture session",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T21:30:18.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1395",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add an integration test that indexes a fixture JSONL session (stub provider), calls GET /api/palette/search, and asserts the conversations[] shape/ranking when enabled, an empty conversations[] plus intact Phase-1 groups when disabled."
+        },
+        "subItems": [
+          {
+            "id": "endpoint-test.ac1",
+            "title": "Enabled: endpoint returns conversation hits for the fixture with documented fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "endpoint-test.ac2",
+            "title": "Disabled: conversations[] empty and commands/memory/observations/issues groups unchanged (no Phase-1 regression)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -379,41 +618,109 @@
     ],
     "edges": [
       {
-        "from": "chunker",
-        "to": "chunk-store",
+        "from": "config-block",
+        "to": "provider",
+        "type": "blocks"
+      },
+      {
+        "from": "config-block",
+        "to": "settings",
+        "type": "blocks"
+      },
+      {
+        "from": "config-block",
+        "to": "indexer",
         "type": "blocks"
       },
       {
         "from": "chunker",
-        "to": "search",
+        "to": "indexer",
         "type": "blocks"
       },
       {
-        "from": "chunk-store",
-        "to": "search",
+        "from": "chunker",
+        "to": "ranker",
         "type": "blocks"
       },
       {
-        "from": "search",
-        "to": "palette-wiring",
+        "from": "chunker",
+        "to": "chunker-tests",
         "type": "blocks"
       },
       {
-        "from": "search",
-        "to": "settings-cost",
+        "from": "db-schema",
+        "to": "indexer",
         "type": "blocks"
       },
       {
-        "from": "palette-wiring",
-        "to": "open-at-message",
+        "from": "db-schema",
+        "to": "ranker",
+        "type": "blocks"
+      },
+      {
+        "from": "db-schema",
+        "to": "endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "provider",
+        "to": "indexer",
+        "type": "blocks"
+      },
+      {
+        "from": "provider",
+        "to": "ranker",
+        "type": "blocks"
+      },
+      {
+        "from": "provider",
+        "to": "cost-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "indexer",
+        "to": "watcher",
+        "type": "blocks"
+      },
+      {
+        "from": "ranker",
+        "to": "endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "ranker",
+        "to": "ranker-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "endpoint",
+        "to": "palette-group",
+        "type": "blocks"
+      },
+      {
+        "from": "endpoint",
+        "to": "endpoint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "open-at-msg",
+        "to": "select-open",
+        "type": "blocks"
+      },
+      {
+        "from": "palette-group",
+        "to": "select-open",
+        "type": "blocks"
+      },
+      {
+        "from": "settings",
+        "to": "cost-guard",
         "type": "blocks"
       }
     ],
     "metadata": {
       "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json"
-    },
-    "sequence": 2,
-    "updated": "2026-05-31T16:47:04.586Z"
+    }
   },
   "status": "proposed"
 }
