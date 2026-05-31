@@ -329,5 +329,29 @@ all `components/drawer/*` (PhaseTimeline/VerificationGates/ReviewSpecialists/Art
 WorkspaceSection), `ZoneCOverviewTabs/*`, `ZoneB.tsx`, `SessionPanel`/`ReviewSummary`, `ProjectOverview.tsx`,
 `PlanDAG`, `RoundCard`, `ActivitySparkline`, `BeadsTasksPanel`, `lib/issueActions.ts`.
 
-## 14. Project-level landing + pipeline views (OPEN — investigating)
-_(to be filled: where clicking a project should land, and an audit of how many Pipeline/Board views exist and which is used where)_
+## 14. Project-level landing + pipeline-view audit
+
+### Where clicking a project lands TODAY
+Selecting a project (Sidebar.tsx:400 → `setSelectedProjectKey`) renders **`Stage/ProjectHome.tsx`**
+(CommandDeck/index.tsx:1150-1166) — a sparse Home pane: project name + stat chips (conv count only) +
+Launcher + AgentDock + ActionDock (terminal/browser) + Timeline. **NOT a pipeline/overview.** And the
+global **Pipeline / Board / Agents / Resources tabs do NOT filter to the selected project** (cross-project).
+So there is **no project-scoped pipeline view live today.**
+
+### Pipeline/board audit (the "multiple pipelines, unsure what's used where")
+| Component | Path | Status | Render |
+|---|---|---|---|
+| `PipelineView` | `components/Pipeline/PipelineView.tsx` | **LIVE** `activeTab==='pipeline'` (global) | swimlanes by phase (ship/review/verifying/work/plan/todo) |
+| `KanbanBoard` | `components/KanbanBoard.tsx` | **LIVE** Board/`kanban` (global) | drag-drop kanban by status |
+| `ProjectOverview` | `components/CommandDeck/ProjectOverview.tsx` | **DORMANT/DEAD** (never mounted) | **project-scoped** pipeline swimlanes + hero metrics + stuck callout + cost cards |
+| `ReviewPipelineSection` | `ZoneCOverviewTabs/ReviewPipelineSection.tsx` | **LIVE** in OverviewTab (per issue) | per-issue Verify→Review→Test→Merge (= cockpit PipelineStepper) |
+
+**Verdict:** 4 pipeline-ish things — 2 global live (Pipeline=phase-swimlanes, Board=status-kanban; genuinely
+distinct), 1 per-issue live, and **1 dead project-scoped `ProjectOverview`** = exactly the rich project
+pipeline the user "spent tokens on," orphaned by PAN-1561, never re-mounted.
+
+### Recommended project landing (mirrors the issue cockpit)
+Project-click → **project cockpit** in the Stage Home = re-mount dormant **`ProjectOverview`** (hero metrics ·
+**project-scoped pipeline swimlanes** · stuck/blocked callout · per-issue cost cards), rail alongside for nav.
+Keep **global** Pipeline + Board as cross-project **zoom-out lenses** (outer sidebar). Open: keep BOTH global
+Pipeline (swimlanes) AND Board (kanban), or is one redundant?
