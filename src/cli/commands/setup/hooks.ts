@@ -365,6 +365,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   const hookScripts = [
     'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
     'pre-tool-hook',
+    'ask-user-question-hook',
     'auto-approve-hook',
     'heartbeat-hook',
     'stop-hook',
@@ -488,15 +489,13 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // --dangerously-skip-permissions so headless agents never hang on Claude
   // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
   // hook's permissionDecision is NOT honored, so this must be registered here in
-  // settings.json. AskUserQuestion is skipped by the hook (not auto-allowed) so
-  // it renders its native interactive choice menu for the operator.
+  // settings.json. AskUserQuestion is skipped by the hook so ask-user-question-hook's
+  // deny still wins.
   addHookIfMissing('PreToolUse', 'auto-approve-hook');
   addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
-  // AskUserQuestion is intentionally NOT intercepted: the upstream silent-corruption
-  // bug (anthropics/claude-code#10400, fabricating option #1 as the answer) only
-  // occurs under --dangerously-skip-permissions, which Panopticon no longer uses
-  // (config permissionMode: auto). Under default/auto the native AUQ menu renders
-  // normally, so the former PAN-1520 block is removed.
+  // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
+  // (option #1 fabricated as answer under --dangerously-skip-permissions).
+  addHookIfMissing('PreToolUse', 'ask-user-question-hook', 'AskUserQuestion');
   addHookIfMissing('PostToolUse', 'heartbeat-hook');
   addHookIfMissing('PostToolUse', 'permission-event-hook');
   addHookIfMissing('Stop', 'stop-hook');

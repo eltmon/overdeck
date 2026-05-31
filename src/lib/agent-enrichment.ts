@@ -182,13 +182,10 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
     return ''
   }
 }/**
- * Legacy PAN-1520 deny marker. The ask-user-question-hook that produced this
- * was removed once Panopticon stopped using --dangerously-skip-permissions
- * (the native AUQ menu renders fine under permissionMode: auto). This branch is
- * retained only to gracefully resolve any in-flight session whose JSONL still
- * carries an old deny tool_result; new sessions never produce it. Detection of a
- * genuinely-pending AUQ now relies on an AskUserQuestion tool_use with no
- * tool_result yet (see scanPendingInputsPromise), which covers the native menu.
+ * PAN-1520 — the hook (`sync-sources/hooks/ask-user-question-hook`) returns a
+ * deny verdict with this reason string. When we see a tool_result whose content
+ * matches this, treat it as a "still pending" — the operator has NOT actually
+ * answered; the upstream tool was denied to force a plain-text restate.
  */
 const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
 
