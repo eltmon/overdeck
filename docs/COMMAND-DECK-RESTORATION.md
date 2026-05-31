@@ -395,3 +395,5 @@ Progress notes appended below as slices land (commit hashes).
   tab. Verify: Command Deck → expand an issue → click Work/Review/a reviewer → its conversation opens.
   NEXT (S2): wrap that pane (or the issue tab) with the issue **status band** (PhaseTimeline + gates +
   PR + ActionStrip + cost-top-right) per the rethink mockup; then S3 hybrid tabs/pop-out, S4 project cockpit.
+
+- **S1 VERIFIED LIVE** (browser): clicking Work in the PAN-1242 rail tree opened its SessionPanel (branch chip + Conversation/Terminal toggle + real transcript), no unavailable-placeholder. The core tree→conversation interaction now works on main.
