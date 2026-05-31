@@ -62,7 +62,6 @@ describe('setup hooks', () => {
     ['Stop', 'stop-hook', '.*'],
     ['Stop', 'permission-event-hook', '.*'],
     ['PreToolUse', 'gh-issue-trailer-hook', 'Bash'],
-    ['PreToolUse', 'ask-user-question-hook', 'AskUserQuestion'],
     ['PreToolUse', 'tldr-read-enforcer', 'Read'],
     ['PostToolUse', 'tldr-post-edit', 'Edit|Write'],
   ] as const)('adds restored tool-event hook %s:%s once', (hookType, scriptName, matcher) => {
@@ -109,10 +108,6 @@ describe('setup hooks', () => {
         {
           matcher: 'Bash',
           hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'gh-issue-trailer-hook') }],
-        },
-        {
-          matcher: 'AskUserQuestion',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'ask-user-question-hook') }],
         },
       ]));
       expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([

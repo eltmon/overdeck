@@ -1283,13 +1283,12 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
 
 // ─── Route: POST /api/agents/:id/answer-question (PAN-1520) ──────────────────
 //
-// Operator answer for an AskUserQuestion the agent is blocked on. The Phase 1
-// hook (sync-sources/hooks/ask-user-question-hook) denies the upstream tool
-// call to prevent silent corruption (upstream returns option #1 under
-// --dangerously-skip-permissions), so by the time this endpoint is hit the
-// agent has restated the question as plain text and is waiting on a normal
-// user message. We compose that user message from the chosen option labels
-// and deliver it through the standard message pipeline.
+// Operator answer for an AskUserQuestion surfaced in the dashboard. The former
+// ask-user-question-hook that denied the tool (a --dangerously-skip-permissions
+// workaround) has been removed now that the native AUQ menu renders under
+// permissionMode: auto. This endpoint composes a user message from the chosen
+// option labels and delivers it through the standard message pipeline as the
+// operator's reply.
 //
 // Body: { answers: string[] }  — one chosen-option label per question.
 
