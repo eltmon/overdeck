@@ -366,3 +366,22 @@ Design phase essentially complete. The model: **Project → Issue → Agent**, e
 | **Agent** (in issue / popped) | conversation · Findings · Terminal | — | `command-deck-session-pane.html` (subsumed) |
 
 Lenses reference: `pipeline-views-compared.html`. Tab behavior: hybrid (A default + B on ⌘/dbl-click) + pop-out (§13). Project landing = revive dormant `ProjectOverview` (§14). All historical surfaces verified real-data-backed except hardcoded quick-links (§12). Implementation order unchanged (§13): (1) `resolveAgentPane` session resolution + rail→Stage wiring, (2) issue cockpit Stage tab, (3) project cockpit Home.
+
+## 16. IMPLEMENTATION LOG (live — update as slices land)
+User authorized full implementation on `main`, incrementally, dogfooded. Discipline:
+every commit must `npm run typecheck` clean; keep the dashboard building (Vite HMR is live).
+"When there are options, make them selectable and keep all options available."
+
+Slices (in dependency order):
+- [ ] **S1 · Agent reachability (foundation).** `Stage` `resolveAgentPane` resolves sessions
+  (not just conversations) via a new `resolveSession` prop; clicking an agent in the rail tree
+  opens its conversation as an `agent` pane (SessionPanel). Fixes the broken tree-click AND the
+  double-click side-effect. Files: Stage/index.tsx, Stage/types.ts, CommandDeck/index.tsx.
+- [ ] **S2 · Issue cockpit Stage tab.** Status band (WorkspaceHeader + PhaseTimeline + ActionStrip
+  + cost-top-right + VerificationGates + PR) above the body; body = overview (issue) / agent convo.
+  Re-mount dormant ZoneCOverviewTabs/* + drawer/* (PhaseTimeline, VerificationGates, ReviewSpecialists).
+- [ ] **S3 · Hybrid tabs + pop-out.** A default (body follows rail) + ⌘/dbl-click → own tab; pane pop-out.
+- [ ] **S4 · Project cockpit Home.** Re-mount ProjectOverview as ProjectHome body (hero/stuck/swimlanes/cost).
+- [ ] **S5 · Polish/options.** View toggles where options exist; keep global Pipeline/Board lenses.
+
+Progress notes appended below as slices land (commit hashes).
