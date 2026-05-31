@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-05-29T01:40:58.573Z",
+  "updated": "2026-05-31T00:46:54.633Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -602,6 +602,36 @@
       "reason": "resume",
       "note": "Reopened on 2026-05-29; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
       "timestamp": "2026-05-29T01:40:58.573Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-29; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-29T08:59:52.616Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-30; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-30T05:36:47.104Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-30; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-30T20:58:37.751Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-30; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-30T21:00:03.246Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-30; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-30T21:13:01.606Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-31; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-05-31T00:46:54.633Z"
     }
   ]
 }
