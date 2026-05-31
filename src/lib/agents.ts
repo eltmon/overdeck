@@ -3141,6 +3141,14 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
+    // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
+    // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
+    // process that lacks access to that socket and `getAgentSessions()` returns
+    // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
+    // are genuinely running. Do not conclude "the agent isn't running" / "the
+    // enrichment poller skips it" from an out-of-server-process reading. Trust
+    // the live dashboard server's view (it owns the socket) or check the tmux
+    // session directly with `tmux -L panopticon list-sessions`.
     const tmuxSessions = yield* getAgentSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 

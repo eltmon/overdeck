@@ -3,7 +3,7 @@ name: flywheel
 description: Panopticon Flywheel role — singleton orchestrator that inventories PAN issues and emits ranked operator suggestions.
 effort: high
 # No `model:` pin — Cloister resolves it from config.yaml roles.flywheel.
-permissionMode: bypassPermissions
+permissionMode: default
 hooks:
   PreToolUse:
     - matcher: ".*"

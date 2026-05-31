@@ -4,7 +4,7 @@ description: Panopticon test role — runs project verification and browser UAT 
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.test.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
-permissionMode: bypassPermissions
+permissionMode: default
 effort: high
 tools:
   - Read

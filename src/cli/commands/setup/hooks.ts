@@ -366,6 +366,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
     'pre-tool-hook',
     'ask-user-question-hook',
+    'auto-approve-hook',
     'heartbeat-hook',
     'stop-hook',
     'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
@@ -483,6 +484,14 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // PAN-982, but Claude Code did not honor them when Panopticon invoked agents
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
+  // Auto-approve tool calls for Panopticon agents (self-scoped via
+  // PANOPTICON_AGENT_ID inside the hook) — replaces launching agents with
+  // --dangerously-skip-permissions so headless agents never hang on Claude
+  // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
+  // hook's permissionDecision is NOT honored, so this must be registered here in
+  // settings.json. AskUserQuestion is skipped by the hook so ask-user-question-hook's
+  // deny still wins.
+  addHookIfMissing('PreToolUse', 'auto-approve-hook');
   addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
   // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
   // (option #1 fabricated as answer under --dangerously-skip-permissions).

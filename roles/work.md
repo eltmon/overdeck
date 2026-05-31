@@ -4,7 +4,7 @@ description: Panopticon work role — claims beads, writes code, commits per bea
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
-permissionMode: bypassPermissions
+permissionMode: default
 effort: high
 hooks:
   PreToolUse:

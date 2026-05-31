@@ -1129,6 +1129,17 @@ export async function spawnConversationSession(
   // is on. Writes a per-session bridge token and MCP config so Claude loads
   // the panopticon-bridge stdio server on startup.
   //
+  // TRAP — this relay is NOT why conversations avoid "Do you want to proceed?".
+  // The bridge handles Claude's `notifications/claude/channel/permission_request`
+  // (a channel-level event) plus out-of-band message delivery. It does NOT
+  // intercept the in-terminal tool-approval prompt. Conversations skip that
+  // prompt only because they resolve to `bypass` mode and launch with
+  // --dangerously-skip-permissions (see permissionFlags above + claude-permissions.ts).
+  // Under `auto` mode the in-terminal prompt fires and a headless session hangs
+  // on it regardless of this bridge. So "make a session interactive like a
+  // conversation" does not mean "wire this bridge" — it means either bypass
+  // (DSP, which Auto users forbid) or a human/operator answering the prompt.
+  //
   // Plain forks skip channels wiring entirely. Two reasons:
   //   1. The panopticon-bridge MCP server registers its tool schema into
   //      Claude's context budget. On a plain fork the whole source JSONL is

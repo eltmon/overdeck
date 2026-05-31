@@ -49,6 +49,25 @@ export function readYoloEnv(env: NodeJS.ProcessEnv = process.env): ClaudePermiss
  * (typically from the --yolo CLI flag, already converted to a ClaudePermissionMode).
  * PAN_YOLO env var takes precedence over the explicit override so a parent process
  * can force a mode for any child pan invocation.
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * AUDIT TRAP — read this before concluding "we don't use --dangerously-skip-permissions".
+ * ──────────────────────────────────────────────────────────────────────────
+ * Grepping the source for `--dangerously-skip-permissions` and finding it only
+ * here (gated, lint-enforced) does NOT mean DSP is off. Whether DSP is passed is
+ * decided at RUNTIME by this resolver, whose inputs are, in order:
+ *   1. `PAN_YOLO` env on the *launching* process (e.g. the dashboard server) — not your shell
+ *   2. an explicit `--yolo` flag
+ *   3. `config.claude.permissionMode` in `~/.panopticon/config.yaml`
+ *   4. default `auto`
+ * So a perfectly clean codebase still launches every agent with DSP if the
+ * effective config value is `bypass`. To verify DSP is actually off, check the
+ * RESOLVED value (`resolvePermissionModeSync()` / the rendered config / the
+ * server's env), NOT just the source. And remember: a running `claude` process
+ * keeps the flags it was launched with — after flipping the config to `auto`,
+ * already-running agents/conversations still show `--dangerously-skip-permissions`
+ * in their cmdline until they are respawned. (This exact gap — code clean,
+ * config `bypass` — is how DSP survived a code-only audit. See PAN settings-desync bug.)
  */
 export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): ClaudePermissionMode {
   const fromEnv = readYoloEnv();
