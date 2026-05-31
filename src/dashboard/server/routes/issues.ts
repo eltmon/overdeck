@@ -64,6 +64,7 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { getAgentState, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
+import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
@@ -1234,6 +1235,21 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     console.log(autoSpawn
       ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
       : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
+
+    // A planning agent waiting for an operator answer is NOT done. The plan-role
+    // Stop hook POSTs this endpoint on EVERY turn-end — including the turn where
+    // the agent calls AskUserQuestion and waits. Completing here would mark the
+    // session stopped, which trips the reducer that clears pendingAskUserQuestion
+    // (event-reducers.ts), so the dashboard question dialog would vanish the
+    // instant it was asked. If there's an unanswered AskUserQuestion, no-op.
+    const jsonlPath = yield* getAgentJsonlPath(sessionName);
+    const pendingAuq = jsonlPath
+      ? yield* Effect.promise(() => scanPendingInputsPromise(jsonlPath).then(s => s.askUserQuestions.length).catch(() => 0))
+      : 0;
+    if (pendingAuq > 0) {
+      console.log(`[complete-planning] ${id} has ${pendingAuq} pending AskUserQuestion(s) — agent is waiting for the operator, not done. No-op.`);
+      return jsonResponse({ ok: true, skipped: 'pending-ask-user-question' });
+    }
 
     // Detect remote planning session (non-fatal reads)
     const { isRemotePlanning, remoteVmName } = yield* Effect.promise(async (): Promise<{ isRemotePlanning: boolean; remoteVmName: string | null }> => {
