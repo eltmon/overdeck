@@ -203,3 +203,45 @@ in <2s without scrolling; any dig detail ≤2 clicks.
 3. **Project context (①)** — re-mount `ProjectOverview` surfaces, add 7-day trend.
 
 Mockups (static HTML) per context before any code, iterated with the user.
+
+## 11. ISSUE-CLICK view — complete inventory across ALL eras (focused dig)
+
+A dedicated pass on *only* the issue-click view (distinct from agent/session click).
+The issue view changed shape **six times** and the peak surfaces are scattered across
+three different eras — none of which the current view retains. **Mockup #2 missed
+several of these (flagged ✗MISSED below).**
+
+### Era table (issue-click → what rendered)
+| Era | Commit | Component | Issue-view shape | Issue-vs-agent routing |
+|---|---|---|---|---|
+| 1 | `2b2803712` 01-18 | `IssueDetailPanel`✗ | id/title/status/priority/assignee/labels/desc + Start Agent | separate component from agent (`WorkspacePanel`) |
+| 2 | `3805c83fb` 02-08 | `WorkspacePanel`✗ | sidebar+content; +cost by-model/by-stage/per-session | unified; layout switches on `agent` prop |
+| 3 | `96da47f42` 03-17 | `InspectorPanel`✗ (rich) | agent info · **git status + Sync Main** · workspace path+location · PRD/Beads dialogs · cost by-model/stage/session · service URLs · container controls (+Postgres refresh DB) · tmux attach · **review/test/verification status + cycle counter + auto-requeue** · **status-history tree** · Review&Test/Merge/Stop/Reopen/Reset-cycles actions · `TerminalTabs` (phase-contextual) | one wrapped `DetailPanelLayout`; agent = sub-section |
+| 4–5 | `29e43a0c2` 04-26 / `5a44fda35` 05-19 | Zone: `IssueWorkbench`✗ → `ZoneA`✗+`ZoneCOverview`✗+`IssueComposer`✗ | **ZoneA** = `IssueHeader` + **ActionStrip (~41 actions, phase-gated)**; **ZoneCOverview** = **10 tabs**; **IssueComposer** = spawn-and-send | issue→ZoneCOverview; agent→ZoneB+ZoneCConversation (`isAgentSelected`) |
+| 6 | `194c98643` 05-28 | Drawer: `drawer/*`✓(on disk) | **8 tabs** + right `ActivityRail`; overview tab = **PhaseTimeline → WorkspaceSection → ActiveAgent → VerificationGates → BeadsList → ReviewSpecialists** | single `selectedAgentId`, persists across tabs |
+| 7 | `f65307454`→HEAD | `Stage/IssueOverview`✓ | HomePane (header/launcher/AgentDock/ActionDock/Timeline) + HomePaneSections collapsibles re-homing OverviewTab/Activity/Discussions/Costs | issue→issue tab; agent→AgentPane (conversation only) |
+
+### Union of issue-view surfaces ever shown (the complete menu)
+- **Identity/header:** id · title · branch · source link · phase glyph.
+- **Action set (~41, `lib/issueActions.ts`):** plan · autoPlan · watchPlanning · donePlanning · startAgent · startSkipPlanning · swarm · tell · doneWork · stop · pause/unpause · untroubled · recoverAgent · resumeSession · switchModel · requestReview · restartReview · recoverReview · syncMain · createWorkspace · copySettings · beads · inference · discussions · transcripts · upload · syncDiscussions · statusReview · open · viewPr · reopen · closeOut · wipe · destroyWorkspace · resetIssue · cancel · resetSession · restartFromPlan · restartAgent · reviewTest · inspectBead. (phase-primary subset surfaces inline; rest in overflow.)
+- **Progress/state:** ✗MISSED **PhaseTimeline** (6: triaged/planned/implemented/reviewed/shipping/merged) · **PipelineStepper** (Verify→Review→Test→Merge) · ✗MISSED **VerificationGates** (typecheck/lint/test/uat, distinct from "tests") · cycle counter + auto-requeue · status-history tree.
+- **Review:** reviewer grid ×4 (correctness/security/performance/requirements) w/ round cards · ReviewSpecialists rows.
+- **Work artifacts:** Plan DAG · vBRIEF · Beads (list+graph) · PRD/STATE/INFERENCE markdown · ✗MISSED **Artifacts panel** (list/filter/sort).
+- **Code:** PR + diffstat + review decision · diff viewer.
+- **Cost:** total · by-model · by-stage · per-session · sparkline/trend.
+- **Workspace/infra:** ✗MISSED **WorkspaceSection** (path · containers start/stop/restart · services URLs · tmux attach · sync-main · containerize · Postgres refresh DB) · stack-health alert.
+- **Live:** ActiveAgent output buffer · ✗MISSED **ActivityRail** (real-time, 320px) · recent activity list · ✗MISSED **IssueComposer** (spawn-and-send) · memory-summary generator.
+- **Conversation/terminal:** transcript · live terminal (phase-contextual TerminalTabs in era 3).
+
+### Dormant & reusable (no rebuild)
+Zone tabs (`ZoneCOverviewTabs/*`✓), `ZoneB`✓, the **entire `components/drawer/*`✓** (PhaseTimeline, DrawerVerificationGates, DrawerReviewSpecialists, DrawerArtifactsPanel, DrawerActivityRail, DrawerWorkspaceSection, DrawerActiveAgent, DrawerBeadsList — all on disk, functional, unmounted), `lib/issueActions.ts`✓ (the 41-action registry), `InspectorPanel` recoverable from `96da47f42`.
+
+### What mockup #2 (command-deck-issue-pane.html) must add on revision
+1. It's planning-phase-skewed → make **phase-agnostic** (show a work/review-phase issue so PR/diff/reviewers/tests/gates populate).
+2. Add **PhaseTimeline** (issue-level progress) — distinct from the review PipelineStepper.
+3. Add **VerificationGates** (typecheck/lint/test/uat) — distinct from a single "tests" card.
+4. Add **WorkspaceSection** surfaces (containers/services/attach/sync-main) — likely SCAN card + DIG.
+5. Add **Artifacts** + **ActivityRail** (Drawer innovations) — decide layer.
+6. The **ActionStrip** must reflect the real ~41-action, phase-gated registry (primary inline, rest overflow), not 4 hand-picked buttons.
+7. Consider the **IssueComposer** (spawn-and-send) — message an issue with no live agent.
+All still subject to progressive disclosure (§6/§9): glance = state + next-action; most of the above is SCAN cards or DIG panes, NOT all-on.
