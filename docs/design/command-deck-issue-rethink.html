@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Command Deck · Issue — RETHINK (tree + conversation)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f; --kimi:#7c3aed;
+    --running:#16a34a; --thinking:#9333ea; --waiting:#d97706; --idle:#9ca3af; --failed:#dc2626; --done:#16a34a; --error:#dc2626;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.5;padding:30px 24px 70px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;} h2{font-size:15px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;} code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;}
+
+  .deck{display:flex;height:760px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);}
+  /* Navigator */
+  .navigator{width:172px;flex:0 0 172px;background:var(--surface);border-right:1px solid var(--border);padding:11px 8px;font-size:12px;color:var(--muted);}
+  .nav-h{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:10px 4px 5px;}
+  .nav-item{padding:4px 7px;border-radius:6px;display:flex;align-items:center;gap:6px;color:var(--foreground);}
+  .nav-item.sel{background:var(--primary-tint);color:var(--primary);font-weight:600;}
+  .nav-item.sub{padding-left:15px;color:var(--muted);font-weight:400;}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;} .dot.run{background:var(--running);} .dot.wait{background:var(--waiting);} .dot.fail{background:var(--failed);}
+  .sq{width:12px;height:12px;border-radius:4px;flex:0 0 12px;display:inline-block;}
+  /* Stage */
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .panebar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:5px 8px 0;height:38px;flex:0 0 38px;}
+  .panetab{display:flex;align-items:center;gap:6px;padding:0 11px;height:33px;font-size:12px;color:var(--muted);border:1px solid transparent;border-radius:8px 8px 0 0;}
+  .panetab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .panetab .kbd{font-size:9px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .panetab-add{display:flex;align-items:center;justify-content:center;width:26px;height:33px;color:#9ca3af;font-size:16px;}
+  .pane{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--background);}
+
+  /* ===== TOP STATUS BAND ===== */
+  .statusband{padding:12px 16px 10px;border-bottom:1px solid var(--border);}
+  .hdr{display:flex;align-items:flex-start;gap:12px;}
+  .icon{width:28px;height:28px;border-radius:7px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex:0 0 28px;}
+  .htitle h3{font-size:18px;margin:0;font-weight:700;} .htitle .id{color:var(--muted);font-weight:600;font-size:14px;margin-right:6px;}
+  .hsub{color:var(--muted);font-size:12px;margin-top:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .phaseglyph{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--waiting);background:rgba(217,119,6,.12);border-radius:6px;padding:2px 8px;}
+  .costbox{margin-left:auto;text-align:right;flex:0 0 auto;}
+  .costbox .big{font-size:20px;font-weight:700;} .costbox .lab{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;} .costbox .mini{font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+  .ptl{display:flex;align-items:center;margin:12px 0 0;}
+  .pstep{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+  .pstep .b{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;background:var(--idle);}
+  .pstep.done .b{background:var(--done);} .pstep.cur .b{background:var(--waiting);} .pstep.cur{color:var(--foreground);font-weight:700;}
+  .pstep .ln{width:18px;height:2px;background:var(--border);margin:0 5px;}
+
+  .actrow{display:flex;align-items:center;gap:7px;margin-top:11px;flex-wrap:wrap;}
+  .act{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;background:var(--primary);border-radius:8px;padding:6px 12px;}
+  .act.secondary{color:var(--foreground);background:#fff;border:1px solid var(--border-strong);}
+  .act.disabled{color:#9ca3af;background:#fff;border:1px solid var(--border);}
+  .act.ghost{color:var(--muted);background:#fff;border:1px dashed var(--border-strong);font-weight:500;}
+
+  /* scan chips row */
+  .scanrow{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;}
+  .scard{border:1px solid var(--border);border-radius:9px;padding:7px 11px;background:#fff;display:flex;align-items:center;gap:10px;}
+  .scard .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;}
+  .gate{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;}
+  .gi{width:13px;height:13px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:#fff;}
+  .pr-state{font-size:9.5px;font-weight:700;text-transform:uppercase;color:#fff;background:var(--running);border-radius:5px;padding:1px 6px;}
+  .add{color:var(--running);font-family:"SF Mono",monospace;font-size:11.5px} .del{color:var(--failed);font-family:"SF Mono",monospace;font-size:11.5px}
+
+  /* ===== WORK AREA: tree + conversation ===== */
+  .work{flex:1;display:flex;min-height:0;}
+  .tree{width:236px;flex:0 0 236px;border-right:1px solid var(--border);background:var(--surface);overflow:auto;padding:8px 6px;}
+  .tree-h{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:6px 6px 6px;}
+  .tnode{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:12.5px;color:var(--foreground);cursor:default;}
+  .tnode .ico{width:14px;text-align:center;color:var(--muted);font-size:12px;}
+  .tnode .nm{flex:1;} .tnode .nm .mdl{color:var(--muted);font-weight:400;font-size:11px;}
+  .tnode .st{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.02em;}
+  .tnode.sel{background:var(--primary-tint);}
+  .tnode.sel .nm{color:var(--primary);font-weight:700;}
+  .tnode.sub{padding-left:24px;font-size:12px;}
+  .st.run{color:var(--running);} .st.err{color:var(--error);} .st.stop{color:var(--idle);} .st.unk{color:var(--idle);} .st.wait{color:var(--waiting);}
+  .sdot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;}
+
+  /* conversation (right) */
+  .convo{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .cv-head{display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--border);}
+  .rolebadge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#fff;border-radius:5px;padding:2px 8px;}
+  .cv-title{font-size:13px;font-weight:700;} .cv-title .mut{color:var(--muted);font-weight:500;font-size:12px;}
+  .spacer{flex:1;}
+  .vtoggle{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+  .vtoggle b{font-size:11px;font-weight:600;color:var(--muted);padding:4px 10px;background:#fff;} .vtoggle b.on{color:var(--primary);background:var(--primary-tint);}
+  .ctxline{display:flex;align-items:center;gap:9px;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+  .branch{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:10.5px;color:var(--foreground);}
+  .cv-body{flex:1;overflow:auto;padding:14px;}
+  .turn{display:flex;gap:9px;margin-bottom:14px;}
+  .av{width:24px;height:24px;border-radius:6px;flex:0 0 24px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;}
+  .who{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+  .txt{font-size:12.5px;} .finding{border:1px solid var(--failed);background:rgba(220,38,38,.06);border-radius:7px;padding:8px 10px;margin-top:5px;font-size:12px;}
+  .finding .h{font-size:10px;font-weight:700;color:var(--failed);text-transform:uppercase;margin-bottom:3px;}
+  .composer{border-top:1px solid var(--border);background:var(--surface);padding:9px 14px;}
+  .cbox{border:1.5px solid var(--primary-border);border-radius:10px;background:#fff;padding:8px 11px;}
+  .cbox .ph{color:#9ca3af;font-size:13px;} .ctools{display:flex;align-items:center;gap:7px;margin-top:8px;}
+  .ctool{font-size:11px;color:var(--foreground);border:1px solid var(--border);border-radius:7px;padding:3px 8px;background:#fff;} .csend{margin-left:auto;font-size:11.5px;font-weight:600;color:#fff;background:var(--primary);border-radius:7px;padding:5px 12px;}
+
+  /* footer: scoped launcher + dock */
+  .footer{border-top:1px solid var(--border);padding:9px 16px;background:var(--background);}
+  .launch{display:flex;align-items:center;gap:9px;border:1.5px solid var(--primary-border);border-radius:10px;padding:7px 12px;background:#fff;}
+  .launch .scope{font-size:10.5px;font-weight:700;color:var(--primary);background:var(--primary-tint);border-radius:5px;padding:2px 7px;}
+  .launch .ph{color:#9ca3af;flex:1;font-size:12.5px;} .launch .run{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 8px;}
+  .dock{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;}
+  .pill{font-size:11.5px;color:var(--foreground);border:1px solid var(--border-strong);border-radius:7px;padding:5px 10px;background:#fff;} .pill .car{color:#9ca3af;font-size:9px;}
+
+  /* annotation chips */
+  .an{position:absolute;font-size:9px;font-weight:700;color:#fff;border-radius:4px;padding:1px 6px;font-family:"SF Mono",monospace;z-index:5;}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;} th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--border);} th{background:var(--surface-2);font-size:11px;text-transform:uppercase;color:var(--muted);} tr:last-child td{border-bottom:none;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Command Deck · Issue — <span style="color:var(--primary)">RETHINK</span>: tree + conversation</h1>
+  <p class="sub">Built from your favorite workflow: the <b>agent tree</b> (Work · Review→reviewers · Ship) is the
+  spine; click any node → its <b>conversation</b> on the right. No "session" concept — you're reading
+  <i>the Correctness reviewer</i>, not "a session." Status you loved (gates, PR) stays at the top; cost moves
+  top-right; the disjointed card-stack is gone.</p>
+
+  <div class="callout"><b>Shape:</b> top status band (header · cost · phase · actions · gates · PR) → then the whole
+  body is <b>tree | conversation</b> (like an inbox). The Review <i>synthesizer</i> sits above its 4 reviewers in the
+  tree; selecting any node swaps the right side. Scoped Launcher + dig dock live in a thin footer.</p>
+
+  <div class="deck">
+    <!-- Navigator -->
+    <div class="navigator">
+      <div class="nav-h" style="margin-top:2px;">Projects</div>
+      <div class="nav-item sel"><span class="sq" style="background:var(--claude)"></span> panopticon</div>
+      <div class="nav-h">Workspaces</div>
+      <div class="nav-item sel"><span class="dot wait"></span> PAN-1242</div>
+      <div class="nav-item"><span class="dot run"></span> PAN-1395</div>
+      <div class="nav-h">Conversations</div>
+      <div class="nav-item sub"><span class="dot run"></span> Claude Code</div>
+    </div>
+
+    <!-- Stage -->
+    <div class="stage">
+      <div class="panebar">
+        <div class="panetab active"><span class="sq" style="background:var(--primary);width:11px;height:11px"></span> PAN-1242 <span class="kbd">⌘1</span></div>
+        <div class="panetab">▤ Plan <span class="kbd">⌘2</span></div>
+        <div class="panetab-add">+</div>
+      </div>
+
+      <div class="pane">
+        <!-- TOP STATUS BAND -->
+        <div class="statusband">
+          <div class="hdr">
+            <span class="icon">P</span>
+            <div class="htitle">
+              <h3><span class="id">PAN-1242</span>Board view follow-up — New-issue column footer button</h3>
+              <div class="hsub"><span>⎇ feature/pan-1242</span><span class="phaseglyph">◐ In Review</span><span>· 12d old · 8 convos</span></div>
+            </div>
+            <div class="costbox"><div class="lab">cost</div><div class="big">$4.20</div><div class="mini">review $2.8 · work $1.0</div></div>
+          </div>
+          <div class="ptl">
+            <div class="pstep done"><span class="b">✓</span> Triaged</div><span class="ln"></span>
+            <div class="pstep done"><span class="b">✓</span> Planned</div><span class="ln"></span>
+            <div class="pstep done"><span class="b">✓</span> Implemented</div><span class="ln"></span>
+            <div class="pstep cur"><span class="b">◐</span> Reviewed</div><span class="ln"></span>
+            <div class="pstep"><span class="b">○</span> Shipping</div><span class="ln"></span>
+            <div class="pstep"><span class="b">○</span> Merged</div>
+          </div>
+          <div class="actrow">
+            <span class="act">▸ Review &amp; Test</span>
+            <span class="act secondary">✎ Tell…</span>
+            <span class="act disabled">⌦ Merge <span style="font-size:9px">(blocked)</span></span>
+            <span class="act ghost">⋮ 41 actions</span>
+          </div>
+          <div class="scanrow">
+            <div class="scard"><span class="lab">Gates 2/3</span>
+              <span class="gate"><span class="gi" style="background:var(--done)">✓</span>type</span>
+              <span class="gate"><span class="gi" style="background:var(--done)">✓</span>lint</span>
+              <span class="gate"><span class="gi" style="background:var(--failed)">✗</span>test</span>
+              <span class="gate"><span class="gi" style="background:var(--idle)">○</span>uat</span>
+            </div>
+            <div class="scard"><span class="lab">PR</span><span style="font-weight:700;color:var(--primary)">#1430</span><span class="pr-state">open</span><span class="add">+312</span><span class="del">−47</span><span style="color:var(--muted);font-size:11px">changes requested · view diff ↗</span></div>
+          </div>
+        </div>
+
+        <!-- WORK AREA: tree + conversation -->
+        <div class="work">
+          <!-- agent tree -->
+          <div class="tree">
+            <div class="tree-h">Agents</div>
+            <div class="tnode"><span class="ico">◷</span><span class="sdot" style="background:var(--idle)"></span><span class="nm">Planning <span class="mdl">opus</span></span><span class="st stop">done</span></div>
+            <div class="tnode"><span class="ico">⌨</span><span class="sdot" style="background:var(--idle)"></span><span class="nm">Work <span class="mdl">gpt-5.5</span></span><span class="st stop">stopped</span></div>
+            <div class="tnode"><span class="ico">⊕</span><span class="sdot" style="background:var(--error)"></span><span class="nm">Review <span class="mdl">kimi</span></span><span class="st err">error</span></div>
+            <div class="tnode sub"><span class="ico">✓</span><span class="sdot" style="background:var(--done)"></span><span class="nm">Correctness</span><span class="st" style="color:var(--done)">approved</span></div>
+            <div class="tnode sub sel"><span class="ico">⛉</span><span class="sdot" style="background:var(--failed)"></span><span class="nm">Security</span><span class="st err">2 findings</span></div>
+            <div class="tnode sub"><span class="ico">◷</span><span class="sdot" style="background:var(--thinking)"></span><span class="nm">Performance</span><span class="st" style="color:var(--thinking)">running</span></div>
+            <div class="tnode sub"><span class="ico">▤</span><span class="sdot" style="background:var(--idle)"></span><span class="nm">Requirements</span><span class="st unk">pending</span></div>
+            <div class="tnode"><span class="ico">⏏</span><span class="sdot" style="background:var(--idle)"></span><span class="nm">Ship <span class="mdl">kimi</span></span><span class="st unk">—</span></div>
+          </div>
+
+          <!-- selected node's conversation -->
+          <div class="convo">
+            <div class="cv-head">
+              <span class="rolebadge" style="background:var(--kimi)">⛉ Security reviewer</span>
+              <span class="cv-title"><span class="mut">kimi-k2.6 · round 2</span></span>
+              <span class="spacer"></span>
+              <div class="vtoggle"><b class="on">Conversation</b><b>Findings</b><b>Terminal</b></div>
+            </div>
+            <div class="ctxline"><span>⛉ 2 findings</span><span class="branch">⎇ feature/pan-1242</span><span>· $0.34 · 1m12s</span><span class="spacer"></span><span>stopped</span></div>
+            <div class="cv-body">
+              <div class="turn"><div class="av" style="background:var(--kimi)">K</div><div><div class="who">Security reviewer · kimi</div>
+                <div class="txt">Reviewed the new footer-button handler and the column-create path. Two issues:</div>
+                <div class="finding"><div class="h">⛉ High · unsanitized issue title</div>The new-issue footer passes <code>title</code> straight into the column label without escaping — XSS via crafted issue title in the board view.</div>
+                <div class="finding"><div class="h">⛉ Med · missing authz check</div><code>POST /api/board/column</code> doesn't verify project membership before creating a column.</div>
+              </div></div>
+              <div class="turn"><div class="av" style="background:#64748b">E</div><div><div class="who">You</div><div class="txt" style="color:var(--muted)">Is the XSS reachable from the kanban card render, or only the column header?</div></div></div>
+            </div>
+            <div class="composer"><div class="cbox"><div class="ph">Reply to the Security reviewer…</div>
+              <div class="ctools"><span class="ctool">⊙ kimi-k2.6 ▾</span><span class="ctool">🎤</span><span class="ctool">📎</span><span class="csend">Send ➤</span></div>
+            </div></div>
+          </div>
+        </div>
+
+        <!-- footer: scoped launcher + dig dock -->
+        <div class="footer">
+          <div class="launch"><span class="scope">on PAN-1242</span><span class="ph">Run a command, ask an agent, open the web — scoped to this issue…</span><span class="run">↵</span></div>
+          <div class="dock">
+            <span class="pill">▤ Plan <span class="car">vBRIEF·DAG·Beads</span></span>
+            <span class="pill">📄 Docs</span>
+            <span class="pill">⎇ Commits</span>
+            <span class="pill">📦 Artifacts</span>
+            <span class="pill">▢ Terminal</span>
+            <span class="pill">📁 Files</span>
+            <span class="pill">💲 Cost detail</span>
+            <span class="pill">⊟ Workspace</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What changed from the kitchen sink</h2>
+  <table>
+    <thead><tr><th style="width:26%">Element</th><th>Rethink</th></tr></thead>
+    <tbody>
+      <tr><td>Agent tree</td><td><b>Now the spine</b> (left of body), mirrors your screenshot: Planning · Work · Review→Correctness/Security/Performance/Requirements · Ship. Click → conversation.</td></tr>
+      <tr><td>Reviewers</td><td>Live in the tree under the Review <b>synthesizer</b>; selecting one shows its <b>conversation/Findings/Terminal</b> (your "I always want to see their output").</td></tr>
+      <tr><td>"Session" pane</td><td><b>Gone.</b> Dissolved into "click an agent → its conversation, in the issue." No standalone session concept.</td></tr>
+      <tr><td>Cost</td><td>Moved <b>top-right</b>, beside the header/action area (with mini breakdown).</td></tr>
+      <tr><td>Verification gates · PR</td><td>Kept in the top status band (the parts you loved).</td></tr>
+      <tr><td>Launcher</td><td>Kept but <b>scoped</b> — "on PAN-1242" chip makes the issue-context obvious; autocomplete limited to this issue.</td></tr>
+      <tr><td>Disjointed lower cards</td><td>Removed; Workspace/Cost-detail/Docs/Artifacts become <b>dig pills</b> in the thin footer.</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Open questions for you: (1) default selected node — the active/failing agent, or the Review synthesizer? (2) tree on the left vs a horizontal strip under the action bar? (3) should selecting a tree node open it inline (as drawn) or as its own pane tab?</p>
+
+</div>
+</body>
+</html>
