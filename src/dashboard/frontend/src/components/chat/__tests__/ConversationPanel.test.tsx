@@ -16,8 +16,14 @@ vi.mock('../../DialogProvider', () => ({
 }));
 
 // Mock heavy child components that are not under test
-vi.mock('../../XTerminal', () => ({ XTerminal: () => null }));
+vi.mock('../../XTerminal', () => ({ XTerminal: () => <div data-testid="xterminal" /> }));
 vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
+vi.mock('../../DiffWorkerPoolProvider', () => ({
+  DiffWorkerPoolProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock('../../DiffPanel', () => ({
+  DiffPanel: () => <div data-testid="diff-panel" />,
+}));
 // PAN-1523 moved the context-usage meter into the composer footer. Capture the
 // usage snapshot ConversationPanel computes and passes down so we can assert it
 // without rendering the real ContextWindowMeter.
@@ -130,12 +136,40 @@ describe('ConversationPanel rename flow', () => {
   });
 
   afterEach(() => {
+    window.history.replaceState(null, '', '/');
     vi.clearAllMocks();
   });
 
   it('renders the conversation title in the header', () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+  });
+
+  it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
+    window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
+    const activeConversation = {
+      ...mockConversation,
+      sessionAlive: true,
+      endedAt: null,
+    };
+    const client = makeClient();
+    client.setQueryData(['conversation-diffs', 'test-conv'], {
+      summaries: [{ turnId: 'turn-1', completedAt: '2024-01-01T00:00:00Z', status: 'completed', files: [] }],
+    });
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel
+            conversation={activeConversation}
+            viewMode="terminal"
+            onArchived={() => {}}
+          />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTestId('diff-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
   });
 
   it('passes conversation context usage to the composer footer', () => {

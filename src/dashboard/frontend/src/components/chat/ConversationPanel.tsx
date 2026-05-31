@@ -476,6 +476,10 @@ export function ConversationPanel({
   }, [conversation.handoffTargetConvId]);
 
   const showTerminal = conversation.sessionAlive || resumed;
+  // Diff deep-links are transcript-oriented. If this pane was previously left in
+  // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
+  // and looks like a reconnect loop when the user only asked to inspect a diff.
+  const effectiveViewMode = diffOpen ? 'conversation' : viewMode;
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
@@ -552,13 +556,13 @@ export function ConversationPanel({
               {showTerminal && (
                 <div className={styles.viewToggle}>
                   <button
-                    className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
+                    className={`${styles.viewToggleBtn} ${effectiveViewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
                     onClick={() => handleViewMode('conversation')}
                   >
                     Conversation
                   </button>
                   <button
-                    className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+                    className={`${styles.viewToggleBtn} ${effectiveViewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
                     onClick={() => handleViewMode('terminal')}
                   >
                     Terminal
@@ -830,11 +834,11 @@ export function ConversationPanel({
       <div className="flex flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
-          {showTerminal && viewMode === 'terminal' && (
+          {showTerminal && effectiveViewMode === 'terminal' && (
             <XTerminal sessionName={conversation.tmuxSession} />
           )}
-          {/* Conversation view — shown when in conversation mode or session ended */}
-          {(viewMode === 'conversation' || !showTerminal) && (
+          {/* Conversation view — shown when in conversation mode, diff mode, or session ended */}
+          {(effectiveViewMode === 'conversation' || !showTerminal) && (
             <ConversationView
               conversation={conversation}
               onResume={!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined}
