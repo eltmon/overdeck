@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
-import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, DSP_FLAG, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -1041,30 +1041,10 @@ export async function spawnConversationSession(
     // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
     // no-ops. They exist as a belt-and-braces guard for future code paths that might
     // forget to thread the resolved mode through. The critical safety property:
-    // The DSP literal lives in claude-permissions.ts only; reference it via
-    // the imported constants so the lint guard stays tight.
-    // NEVER add DSP when the resolved mode is 'auto'. Enterprise users rely
-    // on Auto being honored; a silent escalation to bypass is a P0 trust violation.
+    // The bypass CLI flag was removed; only --permission-mode is ever appended.
     const mode = resolvePermissionModeSync();
-    if (mode === 'auto') {
-      if (!runtimeCommand.includes('--permission-mode')) {
-        runtimeCommand = `${runtimeCommand} --permission-mode auto`;
-      }
-      // Refuse to run with mixed signals: if the base command already contains DSP
-      // while the user explicitly chose Auto, that is a substrate bug that must
-      // surface, not be silently downgraded.
-      if (runtimeCommand.includes(DSP_FLAG)) {
-        throw new Error(
-          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains ${DSP_FLAG}. This is a substrate bug; do not silently bypass user Settings.`,
-        );
-      }
-    } else {
-      if (!runtimeCommand.includes(DSP_FLAG)) {
-        runtimeCommand = `${runtimeCommand} ${DSP_FLAG}`;
-      }
-      if (!runtimeCommand.includes('--permission-mode')) {
-        runtimeCommand = `${runtimeCommand} --permission-mode ${BYPASS_PERMISSION_MODE}`;
-      }
+    if (!runtimeCommand.includes('--permission-mode')) {
+      runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
     providerEnv = await getProviderEnvForModel(model);
@@ -1129,16 +1109,14 @@ export async function spawnConversationSession(
   // is on. Writes a per-session bridge token and MCP config so Claude loads
   // the panopticon-bridge stdio server on startup.
   //
-  // TRAP — this relay is NOT why conversations avoid "Do you want to proceed?".
+  // TRAP — this relay is NOT how conversations handle "Do you want to proceed?".
   // The bridge handles Claude's `notifications/claude/channel/permission_request`
   // (a channel-level event) plus out-of-band message delivery. It does NOT
-  // intercept the in-terminal tool-approval prompt. Conversations skip that
-  // prompt only because they resolve to `bypass` mode and launch with
-  // --dangerously-skip-permissions (see permissionFlags above + claude-permissions.ts).
-  // Under `auto` mode the in-terminal prompt fires and a headless session hangs
-  // on it regardless of this bridge. So "make a session interactive like a
-  // conversation" does not mean "wire this bridge" — it means either bypass
-  // (DSP, which Auto users forbid) or a human/operator answering the prompt.
+  // intercept the in-terminal tool-approval prompt. That prompt is governed by
+  // the resolved `--permission-mode` (see permissionFlags above): under `auto`
+  // it fires and a human at the dashboard terminal answers it; under `bypass`
+  // it is suppressed. Either way this bridge is orthogonal — "make a session
+  // interactive like a conversation" does not mean "wire this bridge".
   //
   // Plain forks skip channels wiring entirely. Two reasons:
   //   1. The panopticon-bridge MCP server registers its tool schema into
