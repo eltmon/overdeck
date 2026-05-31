@@ -3,27 +3,31 @@ import { existsSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// "In container" and "behind Traefik" are two different things and must not be
+// "In container" and "behind Traefik" are two different things and must NOT be
 // conflated (PAN-1153). Traefik routinely fronts the dev server while Vite runs
-// on the *host* — the most common dev setup. Detect a real container via the
-// signals Docker actually provides; never via TRAEFIK_ENABLED.
-const isContainerMode = process.env.CONTAINER_MODE === 'true' || existsSync('/.dockerenv');
-
-// The browser reaches Vite over TLS (wss) whenever Traefik fronts it — true
-// both inside the container and on a Traefik-enabled host. This drives the HMR
-// client transport only, NOT the proxy target.
-const behindTraefik = process.env.TRAEFIK_ENABLED === 'true' || isContainerMode;
-
-// Backend target. Defaults to the conventional port; override with
-// VITE_PROXY_TARGET to preview a workspace's own backend before merge
-// (e.g. VITE_PROXY_TARGET=http://localhost:3012).
+// on the *host* — the most common dev setup. Detect a real container only via
+// the signals Docker actually provides; never via TRAEFIK_ENABLED.
 //
-// Use 127.0.0.1 (not `localhost`) for the host-mode default: the dashboard
-// server binds 0.0.0.0:3011 (IPv4 only), but `localhost` resolves to ::1
-// (IPv6) first on this stack, so Vite's proxy got ECONNREFUSED and returned
-// 502 for every /api and /ws call. Pinning IPv4 makes the dev proxy reliable.
-const apiTarget = process.env.VITE_PROXY_TARGET ?? (isContainerMode ? 'http://server:3011' : 'http://127.0.0.1:3011');
-const wsTarget = apiTarget.replace(/^http/, 'ws');
+// Use 127.0.0.1 (not `localhost`) for the host default: the dashboard server
+// binds 0.0.0.0:3011 (IPv4 only), but `localhost` resolves to ::1 (IPv6) first
+// on this stack, so the proxy got ECONNREFUSED and 502'd. Pinning IPv4 keeps the
+// dev proxy reliable. Override with VITE_PROXY_TARGET to point at another backend
+// (e.g. a workspace's own port before merge).
+export function resolveProxy(
+  env: NodeJS.ProcessEnv = process.env,
+  fileExists: (p: string) => boolean = existsSync,
+) {
+  const isContainerMode = env.CONTAINER_MODE === 'true' || fileExists('/.dockerenv');
+  // The browser reaches Vite over TLS (wss) whenever Traefik fronts it — true
+  // both inside the container and on a Traefik-enabled host. This drives the HMR
+  // client transport only, NOT the proxy target.
+  const behindTraefik = env.TRAEFIK_ENABLED === 'true' || isContainerMode;
+  const apiTarget =
+    env.VITE_PROXY_TARGET ?? (isContainerMode ? 'http://server:3011' : 'http://127.0.0.1:3011');
+  return { isContainerMode, behindTraefik, apiTarget, wsTarget: apiTarget.replace(/^http/, 'ws') };
+}
+
+const { behindTraefik, apiTarget, wsTarget } = resolveProxy();
 
 export default defineConfig({
   plugins: [react()],
