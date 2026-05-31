@@ -19,7 +19,7 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
 
   if (data?.session) {
     // SessionPanel owns its own view toggle + persistence; do not modify it.
-    return <SessionPanel session={data.session} issueId={ctx.workspaceId} />
+    return <SessionPanel session={data.session} issueId={pane.issueId ?? ctx.workspaceId} />
   }
 
   if (data?.conversation) {

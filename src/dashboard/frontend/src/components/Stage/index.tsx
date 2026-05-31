@@ -8,6 +8,7 @@ import {
   type PaneSpec,
 } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
+import type { SessionNode as SessionNodeType } from '@panctl/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
 import { ForkModal } from '../CommandDeck/ForkModal'
@@ -33,6 +34,9 @@ export interface StageProps {
   deckKey: string
   /** All conversations; used to resolve agent panes. */
   conversations?: Conversation[]
+  /** Resolve a session id → its SessionNode, so an `agent` pane can be backed by
+   * a pipeline session (Work/Review/reviewer/…), not just a conversation. */
+  resolveSession?: (sessionId: string) => SessionNodeType | undefined
   /** Working directory for new drawer terminals (the project path). */
   terminalCwd?: string
   /** Create a conversation for the deck's project (for the "+" New conversation
@@ -99,7 +103,7 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
  * are composed by the caller via `renderHome` / `renderIssue` (they need the
  * project's / issue's data); every other pane dispatches through `renderPane`.
  */
-export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConversation, renderHome, renderIssue }: StageProps) {
+export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd, onCreateConversation, renderHome, renderIssue }: StageProps) {
   const ensureHome = usePanesStore((s) => s.ensureHome)
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
@@ -194,12 +198,17 @@ export function Stage({ deckKey, conversations = [], terminalCwd, onCreateConver
       workspaceId: deckKey,
       openPane,
       resolveAgentPane: (pane) => {
+        // Session-backed agent pane (rail tree click) → SessionPanel.
+        if (pane.agentId && resolveSession) {
+          const session = resolveSession(pane.agentId)
+          if (session) return { session }
+        }
         if (!pane.conversationId) return undefined
         const conversation = conversations.find((c) => c.name === pane.conversationId)
         return conversation ? { conversation } : undefined
       },
     }),
-    [deckKey, openPane, conversations],
+    [deckKey, openPane, conversations, resolveSession],
   )
 
   const handleSelectPane = useCallback(

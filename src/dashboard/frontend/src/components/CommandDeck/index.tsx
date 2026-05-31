@@ -468,6 +468,18 @@ export function CommandDeck({
     store.addPane(projectKey, { paneType: 'terminal', label: 'Terminal', terminalId: sessionId });
   }, []);
 
+  // Open a session-backed agent pane (clicking an agent in the rail tree). The pane
+  // carries the sessionId on `agentId` and the owning issue on `issueId`; Stage's
+  // resolveSession turns that into the live SessionNode → SessionPanel.
+  const openSessionPaneIn = useCallback((projectKey: string, sessionId: string, issueId: string, label: string) => {
+    const store = usePanesStore.getState();
+    store.ensureHome(projectKey);
+    const panes = store.panesByWorkspace[projectKey] ?? [];
+    const existing = panes.find((p) => p.paneType === 'agent' && p.agentId === sessionId);
+    if (existing) store.setActivePane(projectKey, existing.paneId);
+    else store.addPane(projectKey, { paneType: 'agent', label, agentId: sessionId, issueId });
+  }, []);
+
   // On mount or when convId changes (popstate), apply the deep-link: switch to
   // the conversation's project and open it as an agent tab in that deck.
   useEffect(() => {
@@ -531,8 +543,25 @@ export function CommandDeck({
     setSelectedFeature(issueId);
     selectSession(issueId, sessionId);
     setSelectedConversation(null);
-    if (selectedProject) openIssueTabIn(selectedProject, issueId, issueId);
-  }, [selectSession, selectedProject, openIssueTabIn]);
+    if (!selectedProject) return;
+    // Clicking an agent in the rail tree opens THAT agent's conversation (SessionPanel),
+    // not the issue tab. Label from the session's role/type (e.g. "Security", "Work").
+    const session = projectsWithSessions
+      .flatMap((p) => p.features)
+      .flatMap((f) => f.sessions ?? [])
+      .find((s) => s.sessionId === sessionId);
+    const raw = session?.role ?? session?.type ?? 'Agent';
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+    openSessionPaneIn(selectedProject, sessionId, issueId, label);
+  }, [selectSession, selectedProject, projectsWithSessions, openSessionPaneIn]);
+
+  // Resolve a session id → its live SessionNode for Stage's session-backed agent panes.
+  const resolveSession = useCallback((sessionId: string) =>
+    projectsWithSessions
+      .flatMap((p) => p.features)
+      .flatMap((f) => f.sessions ?? [])
+      .find((s) => s.sessionId === sessionId),
+  [projectsWithSessions]);
 
   const handleStopSession = useCallback(async (sessionId: string) => {
     try {
@@ -725,8 +754,14 @@ export function CommandDeck({
   }, []);
 
   const handleOpenPlanDialog = useCallback((issueId: string) => {
-    const issue = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
-    if (issue) setPlanDialogIssue(issue);
+    const found = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
+    // Never silently no-op: if the issue isn't in the loaded `issues` list (filtered/
+    // paginated/out-of-sync), synthesize a minimal one so the dialog still opens.
+    const issue = found ?? ({
+      id: issueId, identifier: issueId, title: issueId, status: 'Todo',
+      priority: 0, labels: [], url: '', createdAt: '', updatedAt: '',
+    } as unknown as Issue);
+    setPlanDialogIssue(issue);
   }, [issues]);
 
   const handleViewJsonl = useCallback((sessionId: string) => {
@@ -1152,6 +1187,7 @@ export function CommandDeck({
               key={selectedProject}
               deckKey={selectedProject}
               conversations={conversations}
+              resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
               terminalCwd={
                 registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
