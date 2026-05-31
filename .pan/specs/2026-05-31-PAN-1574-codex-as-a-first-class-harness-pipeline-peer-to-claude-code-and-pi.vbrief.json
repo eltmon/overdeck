@@ -1,0 +1,1178 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-31T07:48:02Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1574: Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
+    "updated": "2026-05-31T07:52:04.706Z"
+  },
+  "plan": {
+    "id": "pan-1574",
+    "title": "Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
+    "status": "proposed",
+    "uid": "74c6fa4c-897f-49d7-9f34-e9b4a443d1a0",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-05-31T07:48:02Z",
+    "updated": "2026-05-31T07:52:04.706Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1574",
+        "label": "PAN-1574",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1574.md",
+        "label": "PRD (research-complete, Codex CLI 0.135.0)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "harness",
+      "runtime",
+      "codex",
+      "infrastructure",
+      "agent-lifecycle"
+    ],
+    "narratives": {
+      "Problem": "Codex exists in the repo only as an OpenAI auth provider (CLIProxy) and a cosmetic skill-sync target. There is no `codex` runtime: `src/lib/runtimes/` is claude-code + pi only, and both `RuntimeName` and `Harness` are `'claude-code' | 'pi'`. Picking a GPT model routes through Pi or Claude Code — the `codex` binary is never spawned as a Panopticon agent. The pipeline cannot spawn, message, health-check, cost-track, resume, or recover a Codex agent. Critically, getHarness() (contracts/types.ts) normalizes any unknown runtime string to 'claude-code', so every missed touch-point silently degrades a Codex agent to Claude Code rather than erroring — completeness of the touch-point map is the correctness contract.",
+      "Proposal": "Add Codex as the third first-class harness by implementing the AgentRuntime abstraction for it, modeled method-by-method on Pi (src/lib/runtimes/pi.ts). Transport: Phase-1 `codex exec resume <thread-id> <prompt>` (stable surface); the experimental `codex app-server` daemon is a deferred phase-2 follow-up. Context via a per-agent CODEX_HOME/AGENTS.md (sidesteps the project-AGENTS.md three-writer collision). Heartbeat/done via a per-agent CODEX_HOME config.toml `notify` hook. Cost via parsing the rollout JSONL `token_count` records. Sessions resolved by captured thread-id → rollout file (Claude-style external store, not Pi's per-agent dir). Widen every harness/runtime union and every reject-unknown-harness validator, add an explicit harness-policy arm so Codex does not inherit Pi's Anthropic-subscription ToS block, and surface Codex in every picker. Claude Code stays the default; Codex is opt-in per spawn. All work ships as one complete feature."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Decompose into 24 beads across type-widening, runtime adapter, launcher, cost/session parsing, context layering, conversations/memory, pickers/doctor, and an end-to-end pipeline verify — following the PRD's build-order phases but splitting each phase into independently-reviewable beads.",
+        "rationale": "PRD §8 phases are build order, not bead boundaries. The planning prompt mandates aggressive decomposition into independently reviewable/mergeable units."
+      },
+      {
+        "summary": "Foundation bead `types-widen` bundles ALL compile-enforced sites (union members + every Record<Harness>/Schema.Literals that fails to compile when codex is added) plus the start-harness.test.ts fixture fix, because they are the minimal atomic change that keeps `npm run typecheck` green. Runtime-`if` consumer branches that fail SILENT (not at typecheck) are split into their own additive beads.",
+        "rationale": "Adding a union member breaks Record<Harness> exhaustiveness (HARNESS_MARKERS, HARNESS_DEFAULT_MODEL) and ContextHarnessPreviews Schema decode at compile time, and flips start-harness.test.ts:107 (which asserts 'codex' is invalid) red. These cannot land separately without a red tree. Additive runtime checks (validators, pickers, policy) compile fine without codex, so they are independent beads."
+      },
+      {
+        "summary": "Phase-1 delivery transport is `codex exec resume`; the `codex app-server` unix-socket daemon is explicitly out of scope for this issue (deferred phase-2 follow-up).",
+        "rationale": "PRD D-2: exec-resume is on Codex's stable CLI surface; app-server is tagged [experimental] and its bindings must be regenerated per upgrade. Shipping on the stable surface first is the lower-risk v1; the daemon is a fast-follow."
+      },
+      {
+        "summary": "Codex harness context is delivered via a per-agent CODEX_HOME/AGENTS.md, NOT the project-root AGENTS.md.",
+        "rationale": "PRD §7.2 / D-4: three writers (Pi context, Codex context, skill mirror) would otherwise contend for the same managed region of the project AGENTS.md. Per-agent CODEX_HOME (option c) sidesteps the collision entirely and is consistent with the per-agent notify/heartbeat design (D-5)."
+      },
+      {
+        "summary": "Only 4 beads carry requiresInspection:true (types-widen, runtime-skeleton, spawn-agent, context-layering).",
+        "rationale": "These are the genuine foundations: the cross-cutting type contract everything imports, the adapter shape every runtime method builds on, the per-agent CODEX_HOME spawn contract heartbeat/context/delivery depend on, and the AGENTS.md ownership decision (§7.2). The umbrella's size justifies >3; the remaining 20 beads are mechanical/leaf/test work whose defects surface at typecheck, lint, the verification gate, or end-of-MR review."
+      }
+    ],
+    "items": [
+      {
+        "id": "types-widen",
+        "title": "Widen canonical harness/runtime unions and all compile-enforced records/schemas to include 'codex'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "frontend-pickers",
+            "validators",
+            "harness-policy",
+            "runtime-skeleton",
+            "launcher-codex",
+            "agents-threading",
+            "session-converter",
+            "context-layering",
+            "context-preview",
+            "conversations-route",
+            "memory-source",
+            "event-snapshots",
+            "spawn-entry-points"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'codex' to every canonical type union AND every compile-enforced Record<Harness>/Schema site so `npm run typecheck` stays green across all packages, with safe stub/default values. Unions: RuntimeName (runtimes/types.ts:20), Harness + KNOWN_HARNESSES (contracts/types.ts:49,51), FlywheelHarness (contracts/flywheel.ts:9), ArtifactAgentHarness (contracts/artifacts.ts:15), LauncherHarness (launcher-generator.ts:7), HarnessMarker + HARNESS_MARKERS + KNOWN_HARNESS_MARKERS (context-layers/harness.ts:27-36), CONTEXT_PREVIEW_HARNESSES + ContextHarnessPreviews struct codex:Schema.String (contracts/context-layers.ts:5,138-143). Compile-enforced records: HARNESS_DEFAULT_MODEL (chat ModelPicker.tsx:30) and the ModelPicker Harness type (ModelPicker.tsx:14). Also fix the now-red fixture in start-harness.test.ts:107 (swap the 'codex'-as-invalid case to 'cursor'). This bead introduces no runtime behavior — codex is a known-but-inert harness afterward."
+        },
+        "subItems": [
+          {
+            "id": "types-widen.ac1",
+            "title": "RuntimeName, Harness, KNOWN_HARNESSES, FlywheelHarness, ArtifactAgentHarness, LauncherHarness all include 'codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "types-widen.ac2",
+            "title": "HARNESS_MARKERS / HarnessMarker / KNOWN_HARNESS_MARKERS include a codex marker; CONTEXT_PREVIEW_HARNESSES and ContextHarnessPreviews struct include codex (Schema decode succeeds)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "types-widen.ac3",
+            "title": "Frontend HARNESS_DEFAULT_MODEL Record and ModelPicker Harness type include codex with a defensible default model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "types-widen.ac4",
+            "title": "start-harness.test.ts no longer uses 'codex' as the invalid-harness fixture; `npm run typecheck` is green in root, contracts, and frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-pickers",
+        "title": "Surface Codex in all frontend harness pickers and literal mirrors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add Codex to the data-driven and hardcoded picker sites so it is selectable everywhere Pi is: ModelPicker HARNESS_OPTIONS ({id:'codex',label:'Codex'}) and pickModelForHarness default branch (shared/ModelPicker/ModelPicker.tsx:17-20,412); chat ModelPicker loadStoredHarness + harness badge (ModelPicker.tsx:170-176,351); frontend types.ts:86; useRestartAgent.ts:14; useSwitchModel.ts:13; PlanDialog.tsx:63,137,200; RolesPanel.tsx:9 AND the hardcoded Flywheel harness <select> <option>s at RolesPanel.tsx:520-521 (NOT data-driven); FlywheelConversationPane.tsx:38,54; useConversationFeed.ts:16,77-80 (mapHarnessToAgent); ForkModal.tsx:156-173 source-authoring guard."
+        },
+        "subItems": [
+          {
+            "id": "frontend-pickers.ac1",
+            "title": "Codex appears as a selectable option in every harness picker including the hardcoded Flywheel RolesPanel select",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers.ac2",
+            "title": "mapHarnessToAgent and the ForkModal source-authoring guard handle 'codex' without falling through to a wrong default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "validators",
+        "title": "Accept 'codex' in every reject-unknown-harness validator and CLI guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Widen the runtime validators that currently reject anything not in {claude-code, pi}: config-yaml.ts:1481-1482 (RoleConfig.harness validator) and the role-harness type/default at :302,365,501,639; settings-api.ts:380-381; start.ts:701-703; handoff.ts:25; artifacts.ts:389; artifacts/lifecycle.ts:210; setup/hooks.ts:298; context-layers.ts:160-164. Update the 'must be claude-code or pi' error messages to include codex."
+        },
+        "subItems": [
+          {
+            "id": "validators.ac1",
+            "title": "A role configured with harness: codex passes config-yaml and settings-api validation; error messages list codex as valid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "validators.ac2",
+            "title": "All CLI guards (start, handoff, artifacts, lifecycle, context-layers) accept --harness codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-policy",
+        "title": "Add explicit Codex arm to harness-policy so it does not inherit Pi's Anthropic-subscription block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In harness-policy.ts:69-93, canUseHarnessSync returns ALLOWED for claude-code then the implicit else (commented // harness === 'pi') applies the Pi-Anthropic-subscription ToS block to ANYTHING non-claude — so Codex would wrongly inherit it. Add an explicit `if (harness === 'codex')` arm (ALLOWED; Codex+ChatGPT-subscription is fine, it is not the Pi+Anthropic+subscription case) BEFORE the Pi block, and convert the implicit else into an explicit `=== 'pi'` check. The existing gpt-5.5+api-key block in canUseModelWithAuthSync already applies to all harnesses and is correct for codex — do not change it. Add a `codex:` key to the policy decisions map in routes/settings.ts:829-830."
+        },
+        "subItems": [
+          {
+            "id": "harness-policy.ac1",
+            "title": "canUseHarnessSync('codex', …) returns ALLOWED and never applies the Pi-Anthropic-subscription ToS block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy.ac2",
+            "title": "The non-claude else branch is now an explicit harness === 'pi' check; a unit test covers the codex arm",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-policy.ac3",
+            "title": "routes/settings.ts policy map returns a codex decision cell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-skeleton",
+        "title": "Create src/lib/runtimes/codex.ts skeleton (introspection methods + Effect wrapper) and register it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "spawn-agent",
+            "send-message",
+            "kill-agent",
+            "cost-parser",
+            "notify-heartbeat"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/runtimes/codex.ts implementing AgentRuntimeSync and the Effect AgentRuntime, modeled on pi.ts. In this bead implement the introspection methods and the D-7 session model: name ('codex'); getSessionPath resolving $CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<threadId>.jsonl by a captured thread-id (Claude-style EXTERNAL store — NOT Pi's <agentDir>/sessions); getLastActivity (rollout mtime); listSessions (walk $CODEX_HOME/sessions); isRunning (sessionExists). Stub spawnAgent/sendMessage/killAgent/getHeartbeat/getTokenUsage/getSessionCost as not-yet-implemented (throw or passive default) so the tree compiles. Copy Pi's Effect wrapper shape (pi.ts:406-481) verbatim — hold an inner sync runtime and lift async methods via Effect.tryPromise. Register in runtimes/index.ts: export createCodexRuntimeSync/createCodexRuntime, add to getGlobalRegistry (:93-102), add a harness === 'codex' arm to getRuntimeForAgent (:74-78). This bead establishes the adapter shape and the thread-id-keyed external-session-store model every later runtime method depends on."
+        },
+        "subItems": [
+          {
+            "id": "runtime-skeleton.ac1",
+            "title": "codex.ts compiles implementing both AgentRuntimeSync and the Effect AgentRuntime; introspection methods (name, getSessionPath, getLastActivity, listSessions, isRunning) are real",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-skeleton.ac2",
+            "title": "getSessionPath resolves a rollout JSONL by captured thread-id under $CODEX_HOME/sessions (external store, D-7), with a unit test against a fixture rollout tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-skeleton.ac3",
+            "title": "getRuntimeForAgent('codex'-harness agent) returns the Codex runtime; the global registry includes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-codex",
+        "title": "Add buildCodexCommand and Codex routing/config fields to launcher-generator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In launcher-generator.ts add codexMode/codexHome/codexSessionDir to LauncherConfig; route harness === 'codex' in buildCommand/buildNonConversationCommand and the conversation path (:373,458,372) to a new buildCodexCommand modeled on buildPiCommand (:548-613). The work-agent (exec) form emits `codex exec [--json] [-m <model>] -c approval_policy=never -s <sandbox> --skip-git-repo-check` (note the VERIFIED flag traps: exec rejects -a/--ask-for-approval; set approval via -c approval_policy=never). The conversation form emits bare `codex` (TUI). Add harness === 'codex' to the PTY-supervisor early-return (:179) — Codex gets NO PTY supervisor (like Pi)."
+        },
+        "subItems": [
+          {
+            "id": "launcher-codex.ac1",
+            "title": "buildCodexCommand emits a valid headless `codex exec` line with approval_policy=never and a sandbox mode; bare `codex` for TUI/conversation mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-codex.ac2",
+            "title": "Codex is excluded from PTY-supervisor wrapping; a unit test asserts the generated command for both modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-threading",
+        "title": "Thread the Codex harness through agents.ts (launcher fields, base-command, process-name, harness resolution)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Thread codex through agents.ts (the heaviest file, ~30 sites). Add getCodexLauncherFields (resolves per-agent CODEX_HOME path + model, returns the codexMode/codexHome/codexSessionDir launcher fields); short-circuit getAgentRuntimeBaseCommand for codex (:347-358, :434-446); spread the codex launcher fields at the three launcher call sites (:2296-2298, :2605-2607, :3606-3618); add 'codex' to the process-name set (:134-135); accept codex in resolveEffectiveHarness (:300); confirm the claude-only guards (:1445, :1547) take the correct codex path. Widen any local harness annotations on AgentState/SpawnOptions/SpawnRunOptions that are not already the contracts Harness type. This bead is mechanical threading; spawnAgent's file-writing contract is a separate bead."
+        },
+        "subItems": [
+          {
+            "id": "agents-threading.ac1",
+            "title": "getCodexLauncherFields returns a per-agent CODEX_HOME + model and is spread at all three launcher call sites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-threading.ac2",
+            "title": "getAgentRuntimeBaseCommand and resolveEffectiveHarness handle codex; the process-name set includes codex; typecheck green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-agent",
+        "title": "Implement codex.ts spawnAgent: per-agent CODEX_HOME layout, config.toml + AGENTS.md, launch, readiness wait",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "send-message",
+            "notify-heartbeat",
+            "context-layering",
+            "recovery-paths"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement spawnAgent in codex.ts modeled on pi.ts:289-357. Create the per-agent CODEX_HOME directory and write its config.toml (with the Panopticon-owned `notify` array pointing at the heartbeat shim — wired fully in notify-heartbeat) and a placeholder AGENTS.md (populated by context-layering). Generate the launcher command (buildCodexCommand), start the tmux session on the panopticon socket (sendKeysAsync only), and detect readiness by the FIRST appearance of the rollout JSONL or the first --json `thread.started` event (D-5) — capture the UUIDv7 thread-id at this point for getSessionPath/sendMessage. This bead crystallizes the per-agent CODEX_HOME directory layout (config.toml + AGENTS.md + sessions) that heartbeat, context delivery, and exec-resume delivery all assume."
+        },
+        "subItems": [
+          {
+            "id": "spawn-agent.ac1",
+            "title": "spawnAgent creates a per-agent CODEX_HOME with config.toml and AGENTS.md, launches the codex agent in a tmux session, and returns after readiness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-agent.ac2",
+            "title": "The thread-id is captured at spawn from the rollout file / --json thread.started and persisted so getSessionPath and sendMessage can resolve it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-agent.ac3",
+            "title": "A Codex work agent can be spawned in a real workspace and reaches a ready state visible to the orchestrator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "send-message",
+        "title": "Implement Codex message delivery via `codex exec resume` (D-2 phase 1) and the agents.ts delivery split",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Implement sendMessage in codex.ts as a one-shot `codex exec resume <threadId> <prompt>` per orchestrator message (VERIFIED trap: exec resume rejects -s; set sandbox via -c sandbox_mode=read-only). Add the agents.ts delivery branch: shouldDeliverPromptViaCodex + a writeCodexAgentPrompt analog and the delivery split at :2568-2569 and :2716-2744. Prompt may be passed via stdin (`-`). This is D-2 phase 1 only — app-server is out of scope."
+        },
+        "subItems": [
+          {
+            "id": "send-message.ac1",
+            "title": "sendMessage delivers a follow-up turn to a running Codex agent via `codex exec resume <threadId>` and the agent processes it (history replayed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "send-message.ac2",
+            "title": "agents.ts routes Codex agent prompts through the codex delivery branch, not the Pi FIFO or Claude PTY path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kill-agent",
+        "title": "Implement codex.ts killAgent with a graceful->SIGKILL ladder that preserves the rollout JSONL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Implement killAgent in codex.ts modeled on pi.ts:246-287: graceful turn-interrupt/SIGTERM then SIGKILL ladder, killing the tmux session. NEVER delete the rollout JSONL (JSONL-is-sacred; Pi's killAgent preserves session files — mirror exactly)."
+        },
+        "subItems": [
+          {
+            "id": "kill-agent.ac1",
+            "title": "killAgent stops the Codex agent's tmux session via the SIGTERM->SIGKILL ladder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kill-agent.ac2",
+            "title": "The rollout JSONL under $CODEX_HOME/sessions is preserved after kill (asserted by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-parser",
+        "title": "Add codex-parser.ts (parseCodexSessionSync) and wire Codex token/cost into the runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/cost-parsers/codex-parser.ts exporting parseCodexSessionSync that reads the rollout JSONL `event_msg/token_count` records (info.{total_token_usage,last_token_usage}: input/cached_input/output/reasoning_output/total) and returns the shared SessionUsage shape (jsonl-parser.ts:44-55). Wire it into codex.ts getTokenUsage/getSessionCost. cost.ts itself is provider/model-keyed and needs no harness branch — only add codex model pricing rows to DEFAULT_PRICING IF codex routes to un-priced models (check providers.ts; likely gpt-5.x already priced)."
+        },
+        "subItems": [
+          {
+            "id": "cost-parser.ac1",
+            "title": "parseCodexSessionSync parses token_count records from a fixture rollout into SessionUsage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-parser.ac2",
+            "title": "codex.ts getTokenUsage/getSessionCost return live token + cost for a Codex session; any un-priced codex model has a DEFAULT_PRICING row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "notify-heartbeat",
+        "title": "Add the notify shim, config.toml notify wiring, and getHeartbeat/done via agent-turn-complete (D-5)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create a small Panopticon `notify` shim script that, given Codex's agent-turn-complete JSON argv (type, thread-id, turn-id, cwd, input-messages, last-assistant-message), writes ~/.panopticon/agents/<id>/heartbeat.json and a completed marker. Wire the per-agent CODEX_HOME/config.toml `notify` array (written in spawn-agent) to point at this shim. Implement codex.ts getHeartbeat as the 3-tier ladder (tier1 = notify-written heartbeat.json <60s; tier2 = rollout mtime; tier3 = tmux), matching pi.ts:141-197. Readiness (first rollout / thread.started) is in spawn-agent; this bead adds the turn-end heartbeat + done signal."
+        },
+        "subItems": [
+          {
+            "id": "notify-heartbeat.ac1",
+            "title": "On agent-turn-complete the notify shim writes heartbeat.json and a completed marker for the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notify-heartbeat.ac2",
+            "title": "codex.ts getHeartbeat returns a fresh heartbeat after a turn completes (3-tier ladder)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notify-heartbeat.ac3",
+            "title": "The notify is set via per-agent CODEX_HOME only — the user's global ~/.codex/config.toml is never modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-converter",
+        "title": "Extend session-format-converter for the Codex rollout format (third format)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In session-format-converter.ts add extractCodexTranscript(raw) for the rollout response_item/event_msg shape; replace the binary extract ternary at :154-155 ('anything not pi -> claude') with a switch(fromHarness) so codex does not fall into the Claude extractor; add a toHarness === 'codex' write branch at :159 seeding a codex rollout + resume pointer. Mind the two-schema trap: rollout-file event names (task_started/agent_message/token_count) differ from the --json stdout names."
+        },
+        "subItems": [
+          {
+            "id": "session-converter.ac1",
+            "title": "extractCodexTranscript parses a fixture rollout JSONL into the shared transcript shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-converter.ac2",
+            "title": "Conversion from/to codex no longer mis-routes through the Claude extractor; round-trip test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-layering",
+        "title": "Deliver layered Codex context via per-agent CODEX_HOME/AGENTS.md, avoiding the project-AGENTS.md collision",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "context-preview",
+            "workspace-bundle"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire Codex into the layered context system (sync.ts, multi-harness since PAN-1566). Add a renderGlobalLayer('codex', …) write that targets the per-agent CODEX_HOME/AGENTS.md (D-4), NOT the user's global ~/.codex/AGENTS.md and NOT the project-root AGENTS.md. Add {{#harness:codex}} block support (the markers are added in types-widen). Resolve the §7.2 three-writer collision via option (c): Codex harness context lives in the per-agent CODEX_HOME/AGENTS.md so it never contends with Pi's managed region or the skill mirror in the project AGENTS.md. Honor the PAN-1569 preservation contract — pre-existing human AGENTS.md content is preserved (managed BEGIN/END region only). This bead encodes the AGENTS.md ownership decision other context beads build on."
+        },
+        "subItems": [
+          {
+            "id": "context-layering.ac1",
+            "title": "renderGlobalLayer('codex') writes Panopticon's layered context to the per-agent CODEX_HOME/AGENTS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-layering.ac2",
+            "title": "The project-root AGENTS.md is NOT contended by Codex; Pi's managed region and the skill-mirror blocks are unaffected (§7.2 option c)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-layering.ac3",
+            "title": "Pre-existing human AGENTS.md content is preserved (PAN-1569); {{#harness:codex}} blocks render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "context-preview",
+        "title": "Add a Codex column to the /context preview route and sync targets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Wire the /context preview for codex in routes/context.ts: PREVIEW_HARNESSES (:68), buildSyncTargets pi->AGENTS.md mapping extended for codex per §7.2 (:259-276), the ?'Claude Code':'Pi' title ternary (:390), the fullPrompt sections (:398-417), and the previews return map (:466-476). routes/hooks.ts:433 if applicable. (The contracts CONTEXT_PREVIEW_HARNESSES + ContextHarnessPreviews codex field were added in types-widen.)"
+        },
+        "subItems": [
+          {
+            "id": "context-preview.ac1",
+            "title": "GET /context returns a codex preview column with the correct title and full prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-preview.ac2",
+            "title": "Schema decode of the context previews response succeeds with the codex key populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-bundle",
+        "title": "Thread Codex through the workspace context bundle and global system-prompt files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "assembleWorkspaceContext already takes a harness; thread codex through workspace.ts:573 (currently hardcodes 'claude-code'). Add a harness === 'codex' arm to claudeSystemPromptFiles (agents.ts:110) so a Codex agent receives its global context file (Codex will not auto-read ~/.claude/CLAUDE.md; it reads the per-agent CODEX_HOME/AGENTS.md)."
+        },
+        "subItems": [
+          {
+            "id": "workspace-bundle.ac1",
+            "title": "assembleWorkspaceContext produces a Codex-targeted bundle when harness is codex (no hardcoded claude-code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-bundle.ac2",
+            "title": "claudeSystemPromptFiles returns the correct global context file path for codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-route",
+        "title": "Add Codex branches to the conversations route and conversation-lifecycle session scan",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "routes/conversations.ts has many `?? 'claude-code'` defaults and `=== 'pi'`/`=== 'claude-code'` branches governing delivery, session-id capture, and fork rules (:176,181-183,506,710,744,803-826,1015-1089,1894,2077,2130-2233,2888-2920,3163) — add codex arms (delivery via exec-resume from send-message; session-id = captured thread-id; fork rules). In services/conversation-lifecycle.ts the `harness === 'pi'` skip of the ~/.claude/projects scan (:55,187-193,265) must also skip codex (Codex stores under $CODEX_HOME, not ~/.claude/projects)."
+        },
+        "subItems": [
+          {
+            "id": "conversations-route.ac1",
+            "title": "A Codex conversation session captures its thread-id, delivers turns via exec-resume, and honors fork rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-route.ac2",
+            "title": "conversation-lifecycle skips the ~/.claude/projects scan for codex agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-source",
+        "title": "Add a Codex transcript source to the memory subsystem",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a codex transcript source in memory/transcript-source.ts (:55,75,109,117,135,176,267) reading the rollout JSONL under $CODEX_HOME/sessions, and thread codex through memory/pipeline.ts:289 and memory/reconciliation.ts:128-129 so Codex agent transcripts feed the memory pipeline like Pi/Claude."
+        },
+        "subItems": [
+          {
+            "id": "memory-source.ac1",
+            "title": "The memory transcript source reads a Codex rollout JSONL and yields observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-source.ac2",
+            "title": "memory pipeline + reconciliation handle codex transcripts (test over a fixture)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "event-snapshots",
+        "title": "Ensure Codex agents emit runtime:'codex' in event reducers, snapshots, and handoff defaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Verify/extend the default-runtime sites so a Codex agent surfaces as runtime:'codex' rather than degrading to claude-code: event-reducers.ts:666 (default runtime:'claude-code' — codex must set explicitly); cloister/handoff-logger.ts:127; the dashboard agents-route snapshot emits at routes/agents.ts:767,806,885,920,949,2183,2238,2994 (confirm codex agents emit runtime:'codex')."
+        },
+        "subItems": [
+          {
+            "id": "event-snapshots.ac1",
+            "title": "A spawned Codex agent appears with runtime:'codex' in the dashboard snapshot and event stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-entry-points",
+        "title": "Thread Codex through the remaining spawn entry points and option/display types",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Pass codex through the remaining spawn entry points (Appendix A.8): planning/spawn-planning-session.ts:564,576; cloister/specialists.ts:141-156; cloister/inspect-agent.ts:183; runtime/claude.ts:106; remote/remote-agents.ts:180; routes/issues.ts:820-822,1028; routes/agents.ts:2128,3129-3136; services/flywheel-actions.ts:40,125,144; cli/commands/flywheel.ts:87,258,274; and the CLI option/display types in plan.ts:8, start.ts:90, strike.ts:16, status.ts:191, workspace.ts:573."
+        },
+        "subItems": [
+          {
+            "id": "spawn-entry-points.ac1",
+            "title": "Codex can be selected at plan kickoff, work start, flywheel, specialists/inspect, and remote spawn paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-entry-points.ac2",
+            "title": "CLI option/display types render 'Codex' (not a fallback) for codex agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-codex",
+        "title": "Add a Codex binary check to pan doctor",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add checkCodex() to doctor.ts:41-110: detect the `codex` binary on PATH and report `codex --version`, with a remediation hint if missing, modeled on the existing claude/pi checks."
+        },
+        "subItems": [
+          {
+            "id": "doctor-codex.ac1",
+            "title": "pan doctor reports Codex presence and version, or a clear 'not installed' remediation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tests-harness-set",
+        "title": "Update harness-enumeration tests and add Codex unit tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend the tests that enumerate/assert the harness set (Appendix A.16, excluding start-harness.test.ts which is fixed in types-widen): contracts flywheel/artifacts/context-layers tests; tests/lib/context-layers/{harness,render}; settings-api; dashboard context-routes; conversation-lifecycle; memory {transcript-source,reconciliation,pipeline}; artifacts-lifecycle/index-store; cli flywheel.test; integration agent-spawning; work-agent-lifecycle; frontend HomePage/FlywheelPage/issueActions.parity/FlywheelConversationPane. Add codex coverage for the new units (codex runtime introspection, codex-parser, buildCodexCommand) where not already covered by their owning beads."
+        },
+        "subItems": [
+          {
+            "id": "tests-harness-set.ac1",
+            "title": "All harness-enumeration tests include codex and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-harness-set.ac2",
+            "title": "`npm test` (root + frontend) is green with codex coverage added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recovery-paths",
+        "title": "Add Codex arms to the agents.ts recovery and second-spawn paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add codex handling to the agents.ts recovery/resume paths and the second spawn entry (Appendix A.7): :2527-2530, :2834-2837, :3688, :3876, :4030, :4144-4230. A recovered Codex agent must resume via its captured thread-id (exec-resume) and re-establish its CODEX_HOME, not degrade to claude-code."
+        },
+        "subItems": [
+          {
+            "id": "recovery-paths.ac1",
+            "title": "A stopped Codex agent can be resumed/recovered by the deacon/recovery paths using its thread-id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recovery-paths.ac2",
+            "title": "Recovery does not silently degrade a codex agent to claude-code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-benchmark",
+        "title": "End-to-end: a Codex work agent completes a trivial benchmark issue plan->work->review->test->ship",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-31T07:48:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1574",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Integration verification (PRD §8 phase 5 / §10 success criteria): run a trivial benchmark issue end-to-end on the Codex harness and confirm the full pipeline works — Codex selectable in every picker, spawn + exec-resume delivery + kill, live cost/tokens and health in the dashboard, layered AGENTS.md delivered with human content preserved, resume/recovery, and zero regression to Claude Code / Pi default paths (full suite green). This bead is the feature's acceptance gate, not new surface area."
+        },
+        "subItems": [
+          {
+            "id": "pipeline-benchmark.ac1",
+            "title": "A trivial benchmark issue completes plan->work->review->test->ship on the Codex harness with visible health, cost, resume, and recovery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-benchmark.ac2",
+            "title": "Claude Code and Pi default paths are unchanged — full regression suite (typecheck, lint, test root+frontend) is green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-benchmark.ac3",
+            "title": "Codex is gated by harness-policy in every picker and never inherits Pi's Anthropic-subscription block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "types-widen",
+        "to": "frontend-pickers",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "validators",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "harness-policy",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "runtime-skeleton",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "launcher-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "agents-threading",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "session-converter",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "context-layering",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "context-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "conversations-route",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "memory-source",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "event-snapshots",
+        "type": "blocks"
+      },
+      {
+        "from": "types-widen",
+        "to": "spawn-entry-points",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-skeleton",
+        "to": "spawn-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-skeleton",
+        "to": "send-message",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-skeleton",
+        "to": "kill-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-skeleton",
+        "to": "cost-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-skeleton",
+        "to": "notify-heartbeat",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-codex",
+        "to": "spawn-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-threading",
+        "to": "spawn-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-threading",
+        "to": "send-message",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-threading",
+        "to": "recovery-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-threading",
+        "to": "spawn-entry-points",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-agent",
+        "to": "send-message",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-agent",
+        "to": "notify-heartbeat",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-agent",
+        "to": "context-layering",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-agent",
+        "to": "recovery-paths",
+        "type": "blocks"
+      },
+      {
+        "from": "send-message",
+        "to": "conversations-route",
+        "type": "blocks"
+      },
+      {
+        "from": "session-converter",
+        "to": "memory-source",
+        "type": "blocks"
+      },
+      {
+        "from": "context-layering",
+        "to": "context-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "context-layering",
+        "to": "workspace-bundle",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-agent",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "send-message",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "kill-agent",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "notify-heartbeat",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-parser",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "context-layering",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-pickers",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "harness-policy",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-codex",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "recovery-paths",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      },
+      {
+        "from": "tests-harness-set",
+        "to": "pipeline-benchmark",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-31-PAN-1574-codex-as-a-first-class-harness-pipeline-peer-to-claude-code-and-pi.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
