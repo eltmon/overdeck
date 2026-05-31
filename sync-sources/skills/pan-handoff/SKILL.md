@@ -49,6 +49,8 @@ Use a normal summary fork when a quick passive summary is enough. Use a plain fo
 
 The positional text after `<conv>` is the focus — a short statement of what the successor should concentrate on. Quotes are optional; everything after the conversation reference (excluding flags) is joined with spaces. Keep it short and task-oriented; the focus is injected into the handoff-authoring prompt, not used as the new conversation's user request.
 
+**Hard limit: the focus must be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and no conversation is created — so write it under 500 chars on the first try. Don't pack the backstory into the focus; the detail belongs in the transcript the author reads. The focus only steers what the author emphasizes.
+
 ## Authoring modes
 
 `--author external` (default) spawns a separate authoring session that reads the source JSONL transcript and writes the handoff document. The source conversation is never contacted — its context stays clean, and the source can be ended. Use `--author-model` and `--author-harness` to choose the authoring model and harness independently of the source and of the new conversation. Cheaper models work well for routine handoffs; reach for a larger model when the conversation has nuance the document needs to preserve.
