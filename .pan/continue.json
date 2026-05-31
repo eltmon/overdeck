@@ -1,93 +1,31 @@
 {
   "version": "1",
   "issueId": "PAN-1395",
-  "created": "2026-05-31T16:38:07.226Z",
-  "updated": "2026-05-31T16:42:30.000Z",
-  "gitState": { "branch": "feature/pan-1395", "sha": "01ea62e2d", "dirty": true },
+  "created": "2026-05-31T21:24:02.162Z",
+  "updated": "2026-05-31T21:30:18.000Z",
+  "gitState": { "branch": "feature/pan-1395", "sha": "e734a0006", "dirty": true },
   "decisions": [
-    {
-      "id": "D1",
-      "summary": "Chunk-level (message-level) index, not session-level. Phase 2 adds a NEW sidecar index of conversation message chunks with byte offsets, distinct from the existing session-level enrichment-summary embeddings in src/lib/database/discovered-sessions-db.ts (topKCosine/loadEmbeddings) which embed whole-session summaries. The existing session search stays untouched; Phase 2 is additive.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D2",
-      "summary": "Sidecar DB at ~/.panopticon/conversations/embeddings.db holds three things: (a) an FTS5 table over chunk text for BM25, (b) per-chunk embedding vectors stored as BLOBs, (c) a per-file index-state table (jsonlPath -> {lastByteOffset, mtime, size}) for incremental/idempotent indexing.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D3",
-      "summary": "AUTO-DECISION (revisit at b1 inspection): prefer brute-force JS cosine over BLOB-stored embeddings (reusing the existing loadEmbeddings/cosine pattern already proven in src/lib/conversations/search.ts) rather than adding the sqlite-vec native extension. The issue says 'sqlite-vec (or comparable)'; brute-force cosine over a single user's local chunk corpus is well within budget (<1s for ~100k chunks) and avoids a new native-addon build/load surface. The b1 foundation bead requiresInspection=deep so a reviewer can mandate sqlite-vec if scale or policy demands.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D4",
-      "summary": "Hybrid ranking = FTS5 BM25 over chunk text + vector cosine, fused by Reciprocal Rank Fusion (RRF), matching closed #185. Excerpts reuse the EXACT same marker convention as memory excerpts in routes/palette.ts: open=U+2987 (⦇), close=U+2988 (⦈), rendered by the existing excerptSegments renderer in CommandPalette.tsx. No HTML injection.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D5",
-      "summary": "Default embedding model OpenAI text-embedding-3-small via the existing pluggable embed()/EmbeddingProviderName abstraction in src/lib/conversations/. Provider/model/apiKey/enabled live under a conversation-search section of ~/.panopticon/config.yaml; semantic search can be disabled entirely (the palette then returns an empty conversations array, no regressions to Phase 1 groups).",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D6",
-      "summary": "Search surface = extend the existing GET /api/palette/search?q=&limit= in src/dashboard/server/routes/palette.ts to add a `conversations` array; do NOT add a new RPC. Frontend adds a `Conversations` group ABOVE `Memory` in CommandPalette.tsx result order and reuses the excerpt renderer.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D7",
-      "summary": "Run in AUTO planning mode: no live human is attached to this planning tmux session, and the issue body is highly prescriptive (scope, storage path, default model, marker convention, response shape are all specified). Consequential-but-licensed choices (D3) are recorded as autoDecisions and gated by b1 inspection rather than blocking on AskUserQuestion.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    },
-    {
-      "id": "D8",
-      "summary": "Scope guard: do NOT touch the `/` SearchModal issue flow, do NOT add codebase semantic search, do NOT add a `pan` CLI verb. Phase 2 is dashboard-only and additive. Existing Phase 1 palette groups (commands/memory/observations/issues) must be regression-free.",
-      "recordedAt": "2026-05-31T16:42:30.000Z"
-    }
+    { "id": "D1", "summary": "Embedding provider: cloud-default + pluggable. Default OpenAI text-embedding-3-small (matches closed #729); provider/model/api-key configurable via ~/.panopticon/config.yaml. No bundled local model in this issue.", "recordedAt": "2026-05-31T21:30:18.000Z" },
+    { "id": "D2", "summary": "Indexing: hybrid. On dashboard startup, scan project JSONL dirs and embed new/appended chunks (idempotent on byteOffset cursor); also run a live chokidar watcher to embed deltas as conversations grow.", "recordedAt": "2026-05-31T21:30:18.000Z" },
+    { "id": "D3", "summary": "Feature is OFF by default. It must be explicitly enabled in the new Settings → Conversation Search section. Disabled state means no embedding, no watcher, and no conversations group in the palette.", "recordedAt": "2026-05-31T21:30:18.000Z" },
+    { "id": "D4", "summary": "Vector store: sqlite-vec loadable extension on better-sqlite3 (already a dep) for ANN cosine, plus FTS5 for BM25, in one sidecar DB at ~/.panopticon/conversations/embeddings.db. Hybrid results fused with Reciprocal Rank Fusion (RRF), matching closed #185.", "recordedAt": "2026-05-31T21:30:18.000Z" },
+    { "id": "D5", "summary": "Reuse the existing Phase-1 palette contract: PaletteResponse.conversations[] (already reserved as unknown[]), and the ⦇…⦈ excerpt marker + PaletteExcerptSegment {text, match} renderer. Do not inject HTML for highlights.", "recordedAt": "2026-05-31T21:30:18.000Z" },
+    { "id": "D6", "summary": "Open-at-message resolves via sessionId + byteOffset against the existing conversations-by-id message handler; selecting a conversation hit opens the conversation drawer scrolled to the matching message.", "recordedAt": "2026-05-31T21:30:18.000Z" }
   ],
   "hazards": [
-    {
-      "id": "H1",
-      "summary": "byteOffset accuracy across appended JSONL writes. JSONL session files are appended live; byteOffset must be the absolute byte position of the message's line in the file AT INDEX TIME and must remain valid for later 'open-at-message' resolution. Multi-byte UTF-8 means byte offset != char offset.",
-      "mitigation": "Chunker computes byteOffset by summing Buffer.byteLength of consumed lines (not string length). b3 tests assert byte-offset correctness specifically after a simulated append. Incremental indexer keys idempotency on (jsonlPath, byteOffset) and only processes bytes beyond the stored lastByteOffset."
-    },
-    {
-      "id": "H2",
-      "summary": "Open-conversation-at-message: the conversation drawer/viewer may key on message index, not byte offset. The selected chunk gives sessionId+byteOffset; the drawer must resolve that to the right message and scroll to it.",
-      "mitigation": "b12 resolves byteOffset -> message by re-reading the JSONL and mapping cumulative byte length to a message index/anchor, then scrolls. Confirm the drawer component name and its scroll/anchor API during b12 (research found conversation components under src/dashboard/frontend/src/components/; the ConversationView/drawer is the integration point). If the drawer cannot accept an anchor, add a minimal scroll-to-anchor prop."
-    },
-    {
-      "id": "H3",
-      "summary": "Embedding cost / accidental large reindex. A full reindex of all historical JSONL could embed millions of tokens and cost real money against the user's OpenAI key.",
-      "mitigation": "b14 cost-estimate endpoint computes estimated tokens x model price; b16 frontend requires explicit confirm when estimate > $1. Incremental indexing (b5) is the default path so a dashboard restart never re-embeds (uses per-file index state)."
-    },
-    {
-      "id": "H4",
-      "summary": "JSONL files are sacred (CLAUDE.md) - indexing must be strictly read-only over ~/.claude/projects/**.jsonl. Never write, truncate, or move a session file.",
-      "mitigation": "Chunker and indexer open JSONL read-only (createReadStream). All writes go ONLY to the sidecar ~/.panopticon/conversations/embeddings.db. b9 integration test uses a fixture session copied into a temp dir; never mutates real session files."
-    },
-    {
-      "id": "H5",
-      "summary": "sqlite extension/native-addon risk if sqlite-vec is chosen at inspection. Loading a native sqlite extension under the dashboard's Node-22 runtime can fail per-platform.",
-      "mitigation": "Default path (D3) avoids the extension entirely. If b1 inspection mandates sqlite-vec, that bead must verify extension load under `node dist/dashboard/server.js` (Node 22), not Bun, before downstream beads proceed."
-    },
-    {
-      "id": "H6",
-      "summary": "Provider disabled / missing API key must degrade gracefully, not 500 the whole palette search (which also serves memory/observations/summaries).",
-      "mitigation": "b8 wraps conversation search in try/catch and returns conversations:[] on missing key/disabled/embedding-error, leaving Phase 1 groups intact. b9 includes a 'disabled -> empty conversations, other groups present' assertion."
-    }
+    { "id": "H1", "summary": "sqlite-vec is a native loadable extension; load can fail on some platforms/Node builds.", "mitigation": "Isolate extension load behind a single init in the embeddings-db module; fail closed (feature reports unavailable) rather than crashing the dashboard. Add a doctor/health surface noting load status." },
+    { "id": "H2", "summary": "byteOffset must stay accurate after a JSONL file is appended to (live agent sessions append continuously).", "mitigation": "Chunk record schema keys idempotency on (sessionId, byteOffset). Indexer tracks a per-file byte cursor and only processes bytes beyond it. Chunker unit tests must assert offset accuracy across an append." },
+    { "id": "H3", "summary": "Full reindex can incur real API spend (every chunk embedded).", "mitigation": "Cost guard estimates token cost before a full reindex and requires explicit confirm when > $1. Feature OFF by default prevents surprise spend on upgrade." },
+    { "id": "H4", "summary": "Dashboard server must run under Node 22 only (node-pty + circular ESM); the watcher and sqlite-vec must not change that.", "mitigation": "No bun-only APIs; use better-sqlite3 (Node native) and chokidar. Rebuild dist before restart." },
+    { "id": "H5", "summary": "Restarting the dashboard must not re-embed everything.", "mitigation": "Persisted byteOffset cursors per file in the sidecar DB; startup scan is incremental and idempotent. Integration/acceptance check restart does not re-embed." },
+    { "id": "H6", "summary": "No regressions to Phase-1 palette groups (commands / memory / observations / issues).", "mitigation": "Endpoint change is additive (fills the reserved conversations[] only); existing groups and their tests stay green. Conversations group is gated on feature-enabled." }
   ],
   "resumePoint": null,
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
-    {
-      "timestamp": "2026-05-31T16:38:07.226Z",
-      "reason": "planning",
-      "note": "Initial planning session for PAN-1395 (Phase 2 Ctrl+K semantic conversation search). Researched Phase 1 palette (CommandPalette.tsx, routes/palette.ts) and existing session-level conversation search (src/lib/conversations/search.ts, discovered-sessions-db.ts). Authored 16-bead plan in auto mode.",
-      "agentModel": "agent:claude-opus-4-8"
-    }
+    { "timestamp": "2026-05-31T21:24:02.162Z", "reason": "planning", "note": "Planning session started for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)", "agentModel": "agent:claude-opus-4-8" },
+    { "timestamp": "2026-05-31T21:30:18.000Z", "reason": "planning", "note": "Fresh plan from issue body (no PRD draft exists; no prior-workspace/git-history input per operator). Operator answered 4 design forks via AskUserQuestion: cloud-default pluggable embeddings, hybrid startup+watcher indexing, OFF-by-default opt-in, sqlite-vec.", "agentModel": "agent:claude-opus-4-8" }
   ],
   "feedback": []
 }
