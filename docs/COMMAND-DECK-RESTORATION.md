@@ -355,3 +355,14 @@ Project-click → **project cockpit** in the Stage Home = re-mount dormant **`Pr
 **project-scoped pipeline swimlanes** · stuck/blocked callout · per-issue cost cards), rail alongside for nav.
 Keep **global** Pipeline + Board as cross-project **zoom-out lenses** (outer sidebar). Open: keep BOTH global
 Pipeline (swimlanes) AND Board (kanban), or is one redundant?
+
+## 15. Synthesis — three nested cockpits, one shell (all three mocked)
+Design phase essentially complete. The model: **Project → Issue → Agent**, each a "cockpit" in the same Stage, navigated from the unchanged left rail (Conversations + Issues→agents), with global Pipeline/Board as cross-project zoom-out lenses.
+
+| Level | Stage shows | Click-through | Mockup |
+|---|---|---|---|
+| **Project** (Home tab) | revived ProjectOverview: hero metrics · stuck callout · project phase swimlanes · cost | issue card → issue cockpit tab | `command-deck-project-pane.html` |
+| **Issue** (issue tab) | status band (phase/gates/PR/actions/cost-top-right) + agent-tree-driven body | agent → its conversation (in-tab; ⌘/dbl-click = new tab; pop-out) | `command-deck-issue-rethink.html` |
+| **Agent** (in issue / popped) | conversation · Findings · Terminal | — | `command-deck-session-pane.html` (subsumed) |
+
+Lenses reference: `pipeline-views-compared.html`. Tab behavior: hybrid (A default + B on ⌘/dbl-click) + pop-out (§13). Project landing = revive dormant `ProjectOverview` (§14). All historical surfaces verified real-data-backed except hardcoded quick-links (§12). Implementation order unchanged (§13): (1) `resolveAgentPane` session resolution + rail→Stage wiring, (2) issue cockpit Stage tab, (3) project cockpit Home.
