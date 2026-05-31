@@ -385,3 +385,13 @@ Slices (in dependency order):
 - [ ] **S5 · Polish/options.** View toggles where options exist; keep global Pipeline/Board lenses.
 
 Progress notes appended below as slices land (commit hashes).
+
+### Progress
+- **S1 DONE** (`7fb1d9984`, frontend tsc clean). Stage `resolveSession` prop + `resolveAgentPane`
+  session resolution; `handleSelectSession` → `openSessionPaneIn` (agent pane carrying
+  `agentId=sessionId`,`issueId`); `AgentPane` uses `pane.issueId`; `handleOpenPlanDialog` no longer
+  silently no-ops. Net: clicking an agent in the Command Deck rail tree now opens that agent's
+  SessionPanel (conversation/Findings/Terminal) in a Stage `agent` tab; re-clicks focus the existing
+  tab. Verify: Command Deck → expand an issue → click Work/Review/a reviewer → its conversation opens.
+  NEXT (S2): wrap that pane (or the issue tab) with the issue **status band** (PhaseTimeline + gates +
+  PR + ActionStrip + cost-top-right) per the rethink mockup; then S3 hybrid tabs/pop-out, S4 project cockpit.
