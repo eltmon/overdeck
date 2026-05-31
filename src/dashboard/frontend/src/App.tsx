@@ -567,6 +567,25 @@ export default function App() {
   const [dismissedAskUserQuestionAgentIds, setDismissedAskUserQuestionAgentIds] =
     useState<Set<string>>(new Set());
 
+  // PAN-1395 — a subject the operator explicitly asked to re-open from the
+  // Activity Feed / Project Activity "Needs you" list. Prioritised over the
+  // default oldest-first selection (so clicking a specific question shows THAT
+  // one) and un-dismissed (so an ESC-dismissed question becomes reachable again).
+  const [focusedAskUserQuestionId, setFocusedAskUserQuestionId] = useState<string | null>(null);
+  const askUserQuestionReopenId = useAskUserQuestionUiStore((s) => s.reopenId);
+  const askUserQuestionReopenNonce = useAskUserQuestionUiStore((s) => s.reopenNonce);
+  useEffect(() => {
+    if (!askUserQuestionReopenId) return;
+    setDismissedAskUserQuestionAgentIds((prev) => {
+      if (!prev.has(askUserQuestionReopenId)) return prev;
+      const next = new Set(prev);
+      next.delete(askUserQuestionReopenId);
+      return next;
+    });
+    setFocusedAskUserQuestionId(askUserQuestionReopenId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askUserQuestionReopenNonce]);
+
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
   const visibleChannelPermissionRequests = channelPermissionRequests.filter(

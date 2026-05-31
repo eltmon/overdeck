@@ -1,9 +1,11 @@
-import { History, X } from 'lucide-react';
+import { History, MessageCircleQuestion, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeedLabels';
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
+import { useDashboardStore, selectAgentsWithPendingAskUserQuestion } from '../../lib/store';
+import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
 export const SESSION_FEED_TAB_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarTab';
@@ -69,6 +71,8 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         )}
       </header>
 
+      <NeedsYouSection issueIds={issueIds} unscoped={unscoped} />
+
       <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
         {TABS.map((tab) => (
           <button
@@ -94,6 +98,60 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * NeedsYouSection — pinned, always-visible list of agents with an outstanding
+ * AskUserQuestion the operator can re-open by clicking. The durable counterpart
+ * to the transient toast / desktop notification: even after the dialog is
+ * dismissed with ESC, the question stays reachable here until it is actually
+ * answered. Clicking an entry fires a reopen signal that App.tsx turns back into
+ * the AskUserQuestion dialog. Scoped to `issueIds` (Project Activity) unless
+ * `unscoped` (home Activity Feed). PAN-1395.
+ */
+function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[]; unscoped?: boolean }) {
+  const pendingAgents = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
+  const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
+
+  const scoped = useMemo(() => {
+    if (unscoped || !issueIds || issueIds.length === 0) return pendingAgents;
+    const wanted = new Set(issueIds.map((id) => id.toLowerCase()));
+    return pendingAgents.filter((a) => a.issueId && wanted.has(a.issueId.toLowerCase()));
+  }, [pendingAgents, issueIds, unscoped]);
+
+  if (scoped.length === 0) return null;
+
+  return (
+    <div className="border-b border-amber-500/30 bg-amber-500/5 px-2 py-2">
+      <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+        <MessageCircleQuestion className="h-3.5 w-3.5" aria-hidden="true" />
+        Needs you
+      </div>
+      <div className="flex flex-col gap-1">
+        {scoped.map((agent) => {
+          const q = agent.pendingAskUserQuestion;
+          const count = q?.questions?.length ?? 0;
+          const first = q?.questions?.[0]?.question ?? 'Waiting for your answer';
+          const label = agent.issueId ?? agent.id;
+          return (
+            <button
+              key={agent.id}
+              type="button"
+              onClick={() => requestReopen(agent.id)}
+              className="flex w-full flex-col items-start gap-0.5 rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+              title="Re-open this question"
+            >
+              <span className="text-xs font-medium text-foreground">
+                {label}
+                {count > 1 ? ` · ${count} questions` : ''}
+              </span>
+              <span className="w-full truncate text-xs text-muted-foreground">{first}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
