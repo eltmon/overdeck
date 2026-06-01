@@ -4545,7 +4545,8 @@ function initSchema(db) {
       title            TEXT,                               -- human-readable title, auto-set from first message
       title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
       title_seed       TEXT,                               -- original auto-generated title for replacement check
-      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
+      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD (cache-discount aware)
+      total_tokens     INTEGER DEFAULT 0,                  -- cached total tokens (input+output+cache read/write)
       archived_at      TEXT,                               -- ISO timestamp when archived, null = active
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
       effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
@@ -4762,7 +4763,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 47`);
+	db.pragma(`user_version = 48`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4770,7 +4771,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 47) return;
+	if (currentVersion === 48) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5351,7 +5352,10 @@ function runMigrations(db) {
         ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
         WHERE json_type(payload, '$.issueId') = 'text';
     `);
-	db.pragma(`user_version = 47`);
+	if (currentVersion < 48) try {
+		db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
+	} catch {}
+	db.pragma(`user_version = 48`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
