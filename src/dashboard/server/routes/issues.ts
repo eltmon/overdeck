@@ -64,7 +64,7 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { getAgentState, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
-import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../lib/agent-enrichment.js';
+import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
@@ -1242,10 +1242,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // session stopped, which trips the reducer that clears pendingAskUserQuestion
     // (event-reducers.ts), so the dashboard question dialog would vanish the
     // instant it was asked. If there's an unanswered AskUserQuestion, no-op.
-    const jsonlPath = yield* getAgentJsonlPath(sessionName);
-    const pendingAuq = jsonlPath
-      ? yield* Effect.promise(() => scanPendingInputsPromise(jsonlPath).then(s => s.askUserQuestions.length).catch(() => 0))
-      : 0;
+    //
+    // Scan ALL of the planning session's JSONL files, not just the newest:
+    // Claude Code rotates session files mid-run, so the open question can live
+    // in a non-active file, and the active-file lookup can transiently fail with
+    // ENOENT as files are renamed. Scanning only the active file is exactly how
+    // TIN-1 completed planning while the operator's question was still open.
+    const pendingAuq = yield* countPendingAskUserQuestionsForAgent(sessionName);
     if (pendingAuq > 0) {
       console.log(`[complete-planning] ${id} has ${pendingAuq} pending AskUserQuestion(s) — agent is waiting for the operator, not done. No-op.`);
       return jsonResponse({ ok: true, skipped: 'pending-ask-user-question' });

@@ -86,13 +86,24 @@ export async function getActiveSessionPath(projectDir: string): Promise<string |
     const entries = await readdir(projectDir)
     const jsonlFiles = entries.filter(f => f.endsWith('.jsonl'))
     if (jsonlFiles.length === 0) return null
-    const withMtime = await Promise.all(
-      jsonlFiles.map(async f => ({
-        name: f,
-        path: join(projectDir, f),
-        mtime: (await stat(join(projectDir, f))).mtime.getTime(),
-      }))
-    )
+    // Claude Code rotates/renames JSONL session files, so a file present at
+    // readdir() can vanish before stat(). Stat each file independently and DROP
+    // the ones that disappear — never let a single ENOENT reject the whole batch
+    // and collapse the result to null. (PAN: the null path made the
+    // complete-planning pending-AskUserQuestion guard scan nothing → it
+    // completed planning while the operator's question was still open.)
+    const withMtime = (
+      await Promise.all(
+        jsonlFiles.map(async f => {
+          try {
+            return { name: f, path: join(projectDir, f), mtime: (await stat(join(projectDir, f))).mtime.getTime() }
+          } catch {
+            return null
+          }
+        }),
+      )
+    ).filter((x): x is { name: string; path: string; mtime: number } => x !== null)
+    if (withMtime.length === 0) return null
     withMtime.sort((a, b) => b.mtime - a.mtime)
     return withMtime[0].path
   } catch {
@@ -154,6 +165,44 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   const projectDir = getClaudeProjectDir(workspace)
   return await getActiveSessionPath(projectDir)
 }
+
+/**
+ * Count outstanding AskUserQuestions across ALL of an agent's workspace JSONL
+ * session files — not just the newest one. Claude Code rotates session files,
+ * so an open AskUserQuestion can sit in a file that is not the most-recently-
+ * modified. The complete-planning guard MUST be robust to that: scanning only
+ * the active file let TIN-1 complete planning while the operator's question was
+ * still open. Returns 0 only when no file has an unanswered AUQ.
+ */
+async function countPendingAskUserQuestionsForAgentPromise(agentId: string): Promise<number> {
+  const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
+  if (!workspace) return 0
+  const projectDir = getClaudeProjectDir(workspace)
+  if (!existsSync(projectDir)) return 0
+  let files: string[]
+  try {
+    files = (await readdir(projectDir)).filter(f => f.endsWith('.jsonl'))
+  } catch {
+    return 0
+  }
+  let total = 0
+  for (const f of files) {
+    try {
+      const scan = await scanPendingInputsPromise(join(projectDir, f))
+      total += scan.askUserQuestions.length
+    } catch {
+      // A file vanishing mid-scan (rotation) is not "no question" — but we
+      // can't read it, so skip it; other files still contribute.
+    }
+  }
+  return total
+}
+
+/** Effect-native: count pending AskUserQuestions across all of an agent's JSONL files. */
+export const countPendingAskUserQuestionsForAgent = (
+  agentId: string,
+): Effect.Effect<number> =>
+  Effect.promise(() => countPendingAskUserQuestionsForAgentPromise(agentId))
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 
