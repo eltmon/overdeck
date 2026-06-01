@@ -50,3 +50,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </RootErrorBoundary>
   </React.StrictMode>
 );
+
+// Signal the index.html boot watchdog that the bundle loaded and the app
+// mounted, so it stands down. If this never runs (entry bundle failed to load
+// during a server restart), the watchdog polls the server and reloads once.
+(window as Window & { __panMounted?: boolean }).__panMounted = true;
