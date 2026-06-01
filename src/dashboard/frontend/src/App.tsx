@@ -557,15 +557,19 @@ export default function App() {
   const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
   const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
     useState<Set<string>>(new Set());
-  // PAN-1520 — track AskUserQuestions the operator has already answered so the
-  // dialog hides immediately, before the next enrichment poll clears the field.
-  const [optimisticallyAnsweredAskUserQuestionIds, setOptimisticallyAnsweredAskUserQuestionIds] =
-    useState<Set<string>>(new Set());
-  // PAN-1520 — agent IDs the operator has dismissed without answering. Stays
-  // dismissed for the lifetime of this snapshot — we wait for the agent to
-  // restate or for a fresh `pendingAskUserQuestion.toolUseId` before re-showing.
-  const [dismissedAskUserQuestionAgentIds, setDismissedAskUserQuestionAgentIds] =
-    useState<Set<string>>(new Set());
+  // PAN-1520 / PAN-1563 — AUQs the operator already answered (so the dialog hides
+  // immediately, before the next enrichment poll clears the field) and subjects
+  // dismissed without answering. These live in the shared askUserQuestionUiStore
+  // so the "Needs you" sidebar honors them too — otherwise an answered card
+  // lingered there after the dialog closed.
+  const optimisticallyAnsweredAskUserQuestionIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
+  const dismissedAskUserQuestionAgentIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
+  const markAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.markAnswered);
+  const unmarkAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.unmarkAnswered);
+  const markAskUserQuestionDismissed = useAskUserQuestionUiStore((s) => s.markDismissed);
+  const undismissAskUserQuestion = useAskUserQuestionUiStore((s) => s.undismiss);
+  const reconcileAnsweredAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileAnswered);
+  const reconcileDismissedAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileDismissed);
 
   // PAN-1395 — a subject the operator explicitly asked to re-open from the
   // Activity Feed / Project Activity "Needs you" list. Prioritised over the
@@ -587,12 +591,7 @@ export default function App() {
     // never claim those are "no longer waiting".
     const knownAgent = agentEntry != null;
     const stillPending = agentEntry?.pendingAskUserQuestion != null;
-    setDismissedAskUserQuestionAgentIds((prev) => {
-      if (!prev.has(askUserQuestionReopenId)) return prev;
-      const next = new Set(prev);
-      next.delete(askUserQuestionReopenId);
-      return next;
-    });
+    undismissAskUserQuestion(askUserQuestionReopenId);
     setFocusedAskUserQuestionId(askUserQuestionReopenId);
     if (knownAgent && !stillPending) {
       toast.info('That question is no longer waiting', {
@@ -833,11 +832,7 @@ export default function App() {
     onMutate: (variables) => {
       const toolUseId = currentAskUserQuestionSubject?.pendingAskUserQuestion?.toolUseId;
       if (toolUseId) {
-        setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
-          const next = new Set(prev);
-          next.add(toolUseId);
-          return next;
-        });
+        markAskUserQuestionAnswered(toolUseId);
       }
       return { subjectId: variables.id, toolUseId };
     },
@@ -846,12 +841,7 @@ export default function App() {
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) {
-        setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
-          if (!prev.has(context.toolUseId!)) return prev;
-          const next = new Set(prev);
-          next.delete(context.toolUseId!);
-          return next;
-        });
+        unmarkAskUserQuestionAnswered(context.toolUseId);
       }
       toast.error(`Failed to deliver answer: ${error.message}`);
     },
@@ -871,12 +861,8 @@ export default function App() {
 
   const handleDismissAskUserQuestion = useCallback(() => {
     if (!currentAskUserQuestionSubject) return;
-    setDismissedAskUserQuestionAgentIds((prev) => {
-      const next = new Set(prev);
-      next.add(currentAskUserQuestionSubject.id);
-      return next;
-    });
-  }, [currentAskUserQuestionSubject]);
+    markAskUserQuestionDismissed(currentAskUserQuestionSubject.id);
+  }, [currentAskUserQuestionSubject, markAskUserQuestionDismissed]);
 
   // PAN-1520 — purge optimistic state for AUQs that have actually cleared
   // server-side, and re-allow dismissed subjects whose tool-use id has
@@ -889,29 +875,15 @@ export default function App() {
       .map((c) => c.pendingAskUserQuestion?.toolUseId)
       .filter((id): id is string => typeof id === 'string');
     const liveToolUseIds = new Set<string>([...liveAgentToolUseIds, ...liveConvToolUseIds]);
-    setOptimisticallyAnsweredAskUserQuestionIds((prev) => {
-      let changed = false;
-      const next = new Set<string>();
-      for (const id of prev) {
-        if (liveToolUseIds.has(id)) { next.add(id); } else { changed = true; }
-      }
-      return changed ? next : prev;
-    });
+    reconcileAnsweredAskUserQuestions(liveToolUseIds);
     const liveSubjectIds = new Set<string>([
       ...agentsWithAskUserQuestion.map((a) => a.id),
       ...convAskUserQuestionRows.map((c) => c.name),
     ]);
-    setDismissedAskUserQuestionAgentIds((prev) => {
-      let changed = false;
-      const next = new Set<string>();
-      for (const id of prev) {
-        if (liveSubjectIds.has(id)) { next.add(id); } else { changed = true; }
-      }
-      return changed ? next : prev;
-    });
+    reconcileDismissedAskUserQuestions(liveSubjectIds);
     // PAN-1395 — drop the focus once its subject is no longer pending.
     setFocusedAskUserQuestionId((prev) => (prev && liveSubjectIds.has(prev) ? prev : null));
-  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
+  }, [agentsWithAskUserQuestion, convAskUserQuestionRows, reconcileAnsweredAskUserQuestions, reconcileDismissedAskUserQuestions]);
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({

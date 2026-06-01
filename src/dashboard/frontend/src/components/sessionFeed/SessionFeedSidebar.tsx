@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { History, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeedLabels';
@@ -117,6 +118,10 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
   const subjects = useDashboardStore(selectPendingInputSubjects);
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
+  // PAN-1563 — honor the same answered/dismissed state the dialog uses so an
+  // answered or dismissed item disappears from here too, not just the modal.
+  const answeredToolUseIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
+  const dismissedSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
 
   // Resolve a friendly title per issue id so the entry reads like a human label
   // (e.g. the issue title) rather than the raw id. PAN-1520.
@@ -134,6 +139,41 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
     return subjects.filter((s) => s.issueId && wanted.has(s.issueId.toLowerCase()));
   }, [subjects, issueIds, unscoped]);
 
+  // PAN-1563 — build the visible rows: drop answered/dismissed subjects, then
+  // collapse duplicates. Several agents on one issue (e.g. the review convoy:
+  // correctness/security/performance/requirements) each surface a subject that
+  // renders identically ("PAN-1190 · Waiting on your input"), so the operator
+  // saw the same card N times. A distinct AskUserQuestion has its own toolUseId
+  // and survives; otherwise we dedupe on the displayed label+detail so genuinely
+  // different prompts are kept but indistinguishable rows collapse to one.
+  const rows = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{
+      key: string;
+      agentId: string;
+      label: string;
+      detail: string;
+      count: number;
+      title: string;
+    }> = [];
+    for (const subject of scoped) {
+      const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
+      if (toolUseId && answeredToolUseIds.has(toolUseId)) continue;
+      if (dismissedSubjectIds.has(subject.agentId)) continue;
+      const q = subject.pendingAskUserQuestion;
+      const count = q?.questions?.length ?? 0;
+      const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
+      const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
+      const dedupKey = toolUseId ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push({ key: dedupKey, agentId: subject.agentId, label, detail, count, title: describePendingInput(subject.kinds) });
+    }
+    return out;
+  }, [scoped, answeredToolUseIds, dismissedSubjectIds, titleByIssueId]);
+
+  // Keep the section mounted while any raw subject exists so AnimatePresence can
+  // animate the last answered/dismissed card out before the box collapses.
   if (scoped.length === 0) return null;
 
   return (
@@ -143,27 +183,28 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
         Needs you
       </div>
       <div className="flex flex-col gap-1">
-        {scoped.map((subject) => {
-          const q = subject.pendingAskUserQuestion;
-          const count = q?.questions?.length ?? 0;
-          const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
-          const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
-          return (
-            <button
-              key={subject.agentId}
+        <AnimatePresence initial={false}>
+          {rows.map((row) => (
+            <motion.button
+              key={row.key}
+              layout
+              initial={{ opacity: 0, height: 0, y: -4 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               type="button"
-              onClick={() => requestReopen(subject.agentId)}
-              className="flex w-full flex-col items-start gap-0.5 rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
-              title={describePendingInput(subject.kinds)}
+              onClick={() => requestReopen(row.agentId)}
+              className="flex w-full flex-col items-start gap-0.5 overflow-hidden rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+              title={row.title}
             >
               <span className="text-xs font-medium text-foreground">
-                {label}
-                {count > 1 ? ` · ${count} questions` : ''}
+                {row.label}
+                {row.count > 1 ? ` · ${row.count} questions` : ''}
               </span>
-              <span className="w-full truncate text-xs text-muted-foreground">{detail}</span>
-            </button>
-          );
-        })}
+              <span className="w-full truncate text-xs text-muted-foreground">{row.detail}</span>
+            </motion.button>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );
