@@ -40,7 +40,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
-import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue, promoteContinueToProject } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
@@ -205,6 +205,21 @@ export async function completePlanningArtifacts(options: {
     beadCount: created.length,
     planItemCount,
   });
+
+  // Promote the workspace continue (decisions, hazards, resumePoint) into the
+  // canonical project-side `.pan/continues/`. Without this the work-agent handoff
+  // reads an empty `decisions` array even though planning recorded them (PAN-1395).
+  try {
+    const destContinue = promoteContinueToProject(workspacePath, projectPath, upperIssueId);
+    if (destContinue) {
+      console.log(`[complete-planning] Promoted continue context to ${destContinue}`);
+    }
+  } catch (error) {
+    // Non-fatal: the spec + beads are the gating artifacts; a continue-copy failure
+    // must not block the handoff. Surface it so the drop-out is visible.
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`[complete-planning] Failed to promote continue context for ${upperIssueId} (non-fatal): ${reason}`);
+  }
 
   return { proposed, beadCount: created.length, beadsWarning: null };
 }

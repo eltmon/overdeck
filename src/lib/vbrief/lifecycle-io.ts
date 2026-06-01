@@ -422,6 +422,33 @@ export interface PromotedVBrief {
   canonicalFilename: string;
 }
 
+/**
+ * Promote the workspace continue file (`<workspace>/.pan/continue.json`) — which the
+ * planning agent populates with decisions, hazards, resumePoint, and beadsMapping —
+ * into the canonical project-side `.pan/continues/<issue-lowercase>.vbrief.json`.
+ *
+ * This is the ONLY place the planning agent's continue context crosses from the
+ * workspace into the project store. Both promotion paths (the sync
+ * `promoteVBriefToProposed` and the dashboard's async `completePlanningArtifacts`)
+ * MUST call this. PAN-1395 regressed precisely because the dashboard path wrote the
+ * spec + beads but skipped this step, so the work-agent handoff read an empty
+ * `decisions` array even though the planning agent had recorded them.
+ *
+ * Returns the destination path, or null when the workspace has no continue file.
+ */
+export function promoteContinueToProject(
+  workspacePath: string,
+  projectRoot: string,
+  issueId: string,
+): string | null {
+  const sourceContinue = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+  if (!existsSync(sourceContinue)) return null;
+  const destContinue = getContinueFilePath(projectRoot, issueId.toUpperCase());
+  mkdirSync(dirname(destContinue), { recursive: true });
+  copyFileSync(sourceContinue, destContinue);
+  return destContinue;
+}
+
 export function promoteVBriefToProposed(
   workspacePath: string,
   projectRoot: string,
@@ -442,13 +469,7 @@ export function promoteVBriefToProposed(
 
   const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
 
-  const sourceContinue = join(panDir, PAN_CONTINUE_FILENAME);
-  let destContinue: string | null = null;
-  if (existsSync(sourceContinue)) {
-    destContinue = getContinueFilePath(projectRoot, upperIssueId);
-    mkdirSync(dirname(destContinue), { recursive: true });
-    copyFileSync(sourceContinue, destContinue);
-  }
+  const destContinue = promoteContinueToProject(workspacePath, projectRoot, upperIssueId);
 
   invalidateVBriefIndex(projectRoot);
   return { destVBrief: promoted.path, destContinue, canonicalFilename };
