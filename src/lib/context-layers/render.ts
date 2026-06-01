@@ -30,7 +30,16 @@ export const REGION_END = '<!-- END PANOPTICON CONTEXT -->';
 export function applyManagedRegion(existing: string, managed: string): string {
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
-  const endIdx = existing.indexOf(REGION_END);
+  // Use the LAST end-marker, not the first. Layer content may legitimately
+  // contain the literal string `<!-- END PANOPTICON CONTEXT -->` in prose (e.g.
+  // global.md documents the markers). With `indexOf`, that inner mention is
+  // mistaken for the region terminator, so everything after it — including any
+  // previously-rendered copies — survives as "outside" content and a fresh copy
+  // is prepended on every sync. That grew CLAUDE.md by one full copy of the
+  // managed region per `pan sync` (observed: 19× / ~300KB). The real terminator
+  // is always appended last, so `lastIndexOf` lands on it — and this splice
+  // self-heals an already-bloated file in a single sync.
+  const endIdx = existing.lastIndexOf(REGION_END);
 
   if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
     const before = existing.slice(0, beginIdx);
@@ -57,7 +66,9 @@ export function hasManagedRegion(existing: string): boolean {
  */
 export function userContentOutsideRegion(existing: string): string {
   const beginIdx = existing.indexOf(REGION_BEGIN);
-  const endIdx = existing.indexOf(REGION_END);
+  // lastIndexOf for the same reason as applyManagedRegion: the managed content
+  // can contain a literal end-marker in prose; the true terminator is last.
+  const endIdx = existing.lastIndexOf(REGION_END);
   if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
     return (existing.slice(0, beginIdx) + existing.slice(endIdx + REGION_END.length)).trim();
   }
