@@ -3,6 +3,7 @@ import type { PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
 import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
+import { IssueStatusBand } from './IssueStatusBand'
 import { StatChips } from './HomePane/StatChips'
 import { Launcher } from './HomePane/Launcher'
 import { AgentDock } from './HomePane/AgentDock'
@@ -97,6 +98,7 @@ export function IssueOverview({
             iconLabel={title.charAt(0).toUpperCase()}
           />
           <StatChips createdAt={createdAt} conversationCount={issueConversations.length} />
+          <IssueStatusBand issueId={issueId} />
         </>
       }
       launcher={

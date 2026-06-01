@@ -333,8 +333,17 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   })) as DrawerPhaseTimelineStep[];
 }
 
-export function useDrawerData(): DrawerData {
-  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+/**
+ * useIssueData — the pure, parameterized core of useDrawerData. Computes the
+ * same issue projection (phaseTimeline, verificationGates, reviewSpecialists,
+ * beads, activity) for ANY issueId, WITHOUT touching the global `drawer` slice
+ * — so the Command Deck issue cockpit (S2) can reuse PhaseTimeline /
+ * VerificationGates / etc. without popping the legacy IssueDrawer overlay or
+ * rewriting the URL. `useDrawerData()` is now a thin wrapper that passes the
+ * drawer's selected issue. PAN-1520 / Command Deck remodel S2.
+ */
+export function useIssueData(issueIdArg: string | null): DrawerData {
+  const drawerIssueId = issueIdArg;
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
@@ -419,4 +428,13 @@ export function useDrawerData(): DrawerData {
       activityFull,
     };
   }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
+}
+
+/**
+ * useDrawerData — the legacy IssueDrawer's data hook. Thin wrapper over
+ * useIssueData that sources the issue id from the global `drawer` slice.
+ */
+export function useDrawerData(): DrawerData {
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+  return useIssueData(drawerIssueId);
 }
