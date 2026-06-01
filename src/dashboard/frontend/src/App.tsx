@@ -574,6 +574,7 @@ export default function App() {
   const [focusedAskUserQuestionId, setFocusedAskUserQuestionId] = useState<string | null>(null);
   const askUserQuestionReopenId = useAskUserQuestionUiStore((s) => s.reopenId);
   const askUserQuestionReopenNonce = useAskUserQuestionUiStore((s) => s.reopenNonce);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   useEffect(() => {
     if (!askUserQuestionReopenId) return;
     setDismissedAskUserQuestionAgentIds((prev) => {
@@ -686,9 +687,6 @@ export default function App() {
     }
   }, [confirmations, currentConfirmation]);
 
-  // Track which planning agents have already fired an INPUT toast to avoid spam
-  const notifiedPlanningInputRef = useRef<Set<string>>(new Set());
-
   // PAN-1520 — desktop-notification permission grant on first interaction.
   // Browsers require user gesture for `Notification.requestPermission()` in
   // many configurations; we attempt once and silently degrade to toast-only.
@@ -714,15 +712,22 @@ export default function App() {
   // only fires once.
   const notifiedPendingInputRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const announce = (id: string, title: string, body: string): void => {
+    // #1102 — clicking the toast or desktop notification re-opens the dialog
+    // for that subject (focus + un-dismiss), not just focuses the window.
+    const announce = (id: string, subjectId: string, title: string, body: string): void => {
       const key = id;
       if (notifiedPendingInputRef.current.has(key)) return;
       notifiedPendingInputRef.current.add(key);
-      toast.info(title, { description: body, duration: 12000 });
+      const reopen = (): void => requestAskUserQuestionReopen(subjectId);
+      toast.info(title, {
+        description: body,
+        duration: 12000,
+        action: { label: 'Answer', onClick: reopen },
+      });
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
           const n = new Notification(title, { body, tag: key });
-          n.onclick = (): void => { window.focus(); n.close(); };
+          n.onclick = (): void => { window.focus(); reopen(); n.close(); };
         } catch { /* ignore */ }
       }
     };
@@ -731,14 +736,15 @@ export default function App() {
       const toolUseId = a.pendingAskUserQuestion?.toolUseId;
       if (!toolUseId) continue;
       const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
-      announce(`agent::${a.id}::${toolUseId}`, `Agent ${a.id} is waiting on you`, body);
+      const label = (a.issueId ? issues.find((i) => i.id === a.issueId)?.title : undefined) ?? a.issueId ?? a.id;
+      announce(`agent::${a.id}::${toolUseId}`, a.id, `${label} is waiting on you`, body);
     }
     for (const c of convAskUserQuestionRows) {
       const toolUseId = c.pendingAskUserQuestion?.toolUseId;
       if (!toolUseId) continue;
       const body = c.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
       const label = c.title ?? c.name;
-      announce(`conv::${c.name}::${toolUseId}`, `Conversation "${label}" is waiting on you`, body);
+      announce(`conv::${c.name}::${toolUseId}`, c.name, `"${label}" is waiting on you`, body);
     }
 
     // Garbage-collect notification keys for AUQs that have cleared.
@@ -756,31 +762,10 @@ export default function App() {
     }
   }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
 
-  // Toast notification when a planning agent needs user input
-  useEffect(() => {
-    const planningAgentsNeedingInput = agents.filter(
-      (a) => a.role === 'plan' && a.hasPendingQuestion && a.status !== 'stopped'
-    );
-
-    for (const agent of planningAgentsNeedingInput) {
-      const key = `${agent.id}-input`;
-      if (!notifiedPlanningInputRef.current.has(key)) {
-        notifiedPlanningInputRef.current.add(key);
-        toast.info(`Planning agent needs input for ${agent.issueId || agent.id}`, {
-          description: 'The planning agent has a question for you. Open the Plan dialog to respond.',
-          duration: 10000,
-        });
-      }
-    }
-
-    for (const key of notifiedPlanningInputRef.current) {
-      const agentId = key.replace('-input', '');
-      const agent = agents.find((a) => a.id === agentId);
-      if (!agent || !agent.hasPendingQuestion || agent.status === 'stopped') {
-        notifiedPlanningInputRef.current.delete(key);
-      }
-    }
-  }, [agents]);
+  // (PAN-1520) The former planning-specific "needs input" toast was removed —
+  // the unified pending-input notifier above already covers planning agents
+  // (with the issue title and an Answer action), so it was double-firing with
+  // stale "open the Plan dialog" guidance.
 
   // PAN-1520 — answer an AskUserQuestion. Routes to the right endpoint based
   // on subject kind: agents go through /api/agents/:id/answer-question
