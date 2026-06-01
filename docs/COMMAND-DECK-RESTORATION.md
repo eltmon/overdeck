@@ -397,3 +397,16 @@ Progress notes appended below as slices land (commit hashes).
   PR + ActionStrip + cost-top-right) per the rethink mockup; then S3 hybrid tabs/pop-out, S4 project cockpit.
 
 - **S1 VERIFIED LIVE** (browser): clicking Work in the PAN-1242 rail tree opened its SessionPanel (branch chip + Conversation/Terminal toggle + real transcript), no unavailable-placeholder. The core tree→conversation interaction now works on main.
+
+- **Planning terminal toggle VERIFIED** (2026-06-01): clicking the live `planning-pan-1395`
+  agent in the rail opens its SessionPanel with both Conversation **and Terminal** toggles;
+  Terminal renders the live xterm PTY (no "unavailable" placeholder). The original
+  "no way to switch a planning agent to terminal view" complaint is resolved — it was a
+  side-effect of planning sessions not reaching the frontend (fixed by the AUQ-popup tmux
+  filter fix `360edc268`) + S1 session resolution. No code change needed for this item.
+
+- **#1520 awaiting-input subsystem (parallel workstream) landed**: shared indicator +
+  isAwaitingInput predicate, non-blocking minimizable AUQ dialog, title-not-id, unified
+  notification (#1102), and a multi-kind "Needs you" list that now covers PermissionRequest
+  too (`selectPendingInputSubjects`, `0a1703f07`). Activity-feed "Needs you" is the
+  cross-surface recovery affordance the remodel's Project Activity column needed.
