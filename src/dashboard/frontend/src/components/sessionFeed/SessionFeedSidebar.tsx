@@ -1,10 +1,11 @@
-import { History, MessageCircleQuestion, X } from 'lucide-react';
+import { History, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeedLabels';
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
-import { useDashboardStore, selectAgentsWithPendingAskUserQuestion, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectPendingInputSubjects, selectIssues } from '../../lib/store';
+import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
@@ -102,16 +103,18 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
 }
 
 /**
- * NeedsYouSection — pinned, always-visible list of agents with an outstanding
- * AskUserQuestion the operator can re-open by clicking. The durable counterpart
- * to the transient toast / desktop notification: even after the dialog is
- * dismissed with ESC, the question stays reachable here until it is actually
- * answered. Clicking an entry fires a reopen signal that App.tsx turns back into
- * the AskUserQuestion dialog. Scoped to `issueIds` (Project Activity) unless
- * `unscoped` (home Activity Feed). PAN-1395.
+ * NeedsYouSection — pinned, always-visible list of every subject blocked
+ * waiting on the operator across ALL surfaces (AskUserQuestion, plan-mode,
+ * session-resume, and PermissionRequest), not just AskUserQuestions. The
+ * durable counterpart to the transient toast / desktop notification: even after
+ * a dialog is dismissed, the item stays reachable here until it is actually
+ * resolved. Clicking re-opens/focuses the subject (App.tsx routes AUQ to its
+ * dialog; other kinds focus the subject so its own responder — PlanCard /
+ * ChannelPermissionDialog — is reachable). Scoped to `issueIds` (Project
+ * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
 function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[]; unscoped?: boolean }) {
-  const pendingAgents = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
+  const subjects = useDashboardStore(selectPendingInputSubjects);
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
 
@@ -126,38 +129,38 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
   }, [issues]);
 
   const scoped = useMemo(() => {
-    if (unscoped || !issueIds || issueIds.length === 0) return pendingAgents;
+    if (unscoped || !issueIds || issueIds.length === 0) return subjects;
     const wanted = new Set(issueIds.map((id) => id.toLowerCase()));
-    return pendingAgents.filter((a) => a.issueId && wanted.has(a.issueId.toLowerCase()));
-  }, [pendingAgents, issueIds, unscoped]);
+    return subjects.filter((s) => s.issueId && wanted.has(s.issueId.toLowerCase()));
+  }, [subjects, issueIds, unscoped]);
 
   if (scoped.length === 0) return null;
 
   return (
     <div className="border-b border-amber-500/30 bg-amber-500/5 px-2 py-2">
       <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-        <MessageCircleQuestion className="h-3.5 w-3.5" aria-hidden="true" />
+        <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
         Needs you
       </div>
       <div className="flex flex-col gap-1">
-        {scoped.map((agent) => {
-          const q = agent.pendingAskUserQuestion;
+        {scoped.map((subject) => {
+          const q = subject.pendingAskUserQuestion;
           const count = q?.questions?.length ?? 0;
-          const first = q?.questions?.[0]?.question ?? 'Waiting for your answer';
-          const label = (agent.issueId && titleByIssueId.get(agent.issueId)) || agent.issueId || agent.id;
+          const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
+          const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
           return (
             <button
-              key={agent.id}
+              key={subject.agentId}
               type="button"
-              onClick={() => requestReopen(agent.id)}
+              onClick={() => requestReopen(subject.agentId)}
               className="flex w-full flex-col items-start gap-0.5 rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
-              title="Re-open this question"
+              title={describePendingInput(subject.kinds)}
             >
               <span className="text-xs font-medium text-foreground">
                 {label}
                 {count > 1 ? ` · ${count} questions` : ''}
               </span>
-              <span className="w-full truncate text-xs text-muted-foreground">{first}</span>
+              <span className="w-full truncate text-xs text-muted-foreground">{detail}</span>
             </button>
           );
         })}
