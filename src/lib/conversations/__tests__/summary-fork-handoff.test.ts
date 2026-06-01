@@ -459,6 +459,10 @@ describe('authorHandoffExternal', () => {
     const callArgs = vi.mocked(mockedRunModelSummary).mock.calls[0];
     expect(callArgs?.[1]).toBe('claude-haiku-4-5');
     expect(callArgs?.[3]).toBe('claude-code');
+    // PAN-1582: the headless authoring session must allowlist the Write tool,
+    // otherwise `--permission-mode auto` stalls on a permission prompt it can
+    // never answer and the fork silently degrades to a summary.
+    expect(callArgs?.[4]).toEqual(['Write']);
     rmSync(home, { recursive: true, force: true });
   });
 

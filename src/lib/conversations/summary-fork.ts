@@ -280,7 +280,14 @@ export async function authorHandoffExternal(
   // the source of truth for the doc is the file on disk. Writing via tool
   // avoids stdout preamble leaks like "Here is the handoff document:" that
   // contaminated earlier attempts.
-  const stdout = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness));
+  //
+  // The authoring session is headless (`claude -p`), so the Write tool must be
+  // explicitly allowlisted — otherwise `--permission-mode auto` raises a
+  // permission prompt the session can never answer, the model emits "I need
+  // permission to write…" to stdout, no file is written, and the whole fork
+  // falls back to a plain summary with reason `handoff-validation` (PAN-1582).
+  // Pi runs in rpc mode and auto-executes tools, so the allowlist is a no-op there.
+  const stdout = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness, ['Write']));
   console.log(`[claude-invoke] purpose=handoff-author-external acknowledgement | model=${effectiveModel} | stdoutChars=${stdout.length} | stdoutPreview=${JSON.stringify(stdout.slice(0, 120))}`);
 
   let docText: string;

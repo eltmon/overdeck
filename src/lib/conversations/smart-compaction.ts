@@ -665,11 +665,12 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   } finally {
     await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
   }
-}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
+}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code', allowedTools?: string[]): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
   if (harness === 'pi') {
+    // Pi runs in rpc mode and auto-executes tools, so it needs no allowlist.
     const summary = await runPiModelSummary(prompt, useModel, timeoutMs);
     console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=pi | outputChars=${summary.length}`);
     return summary;
@@ -679,6 +680,11 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
     '-p',
     '--model', useModel,
     ...getClaudePermissionFlagsSync(),
+    // Plain summary generation uses no tools; callers that instruct the model
+    // to write a file (e.g. external handoff authoring) pass an allowlist so
+    // the tool is auto-approved instead of stalling on a permission prompt
+    // that headless `-p` mode can never answer.
+    ...(allowedTools && allowedTools.length > 0 ? ['--allowedTools', ...allowedTools] : []),
   ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
@@ -1074,9 +1080,10 @@ export function runModelSummary(
   model?: string,
   timeoutMs?: number,
   harness: RuntimeName = 'claude-code',
+  allowedTools?: string[],
 ): Effect.Effect<string, ProcessSpawnError> {
   return Effect.tryPromise({
-    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness),
+    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness, allowedTools),
     catch: (cause) =>
       new ProcessSpawnError({
         command: harness === 'pi' ? 'pi' : 'claude',
