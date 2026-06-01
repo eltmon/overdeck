@@ -104,6 +104,7 @@ import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { ensureNativeSqliteAbi } from '../lib/native-sqlite-guard.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
@@ -1399,6 +1400,10 @@ if (process.argv.length === 2) {
   // npx panopticon with no args → act as serve
   process.argv.push('serve');
 }
+
+// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
+// under one Node major, loaded under another) before any command opens the DB.
+ensureNativeSqliteAbi();
 
 // Parse and execute
 await program.parseAsync();
