@@ -42,13 +42,19 @@ export function registerReleaseCommands(program: Command): void {
     .command('stable')
     .description('Create a stable release commit and tag')
     .option('--version <version>', 'Stable semver version (x.y.z)')
-    .action((options: { version?: string }) => releaseCreateCommand('stable', options.version));
+    .option('--skip-tests', 'Skip the test suite in preflight (build + guards still run)')
+    .action((options: { version?: string; skipTests?: boolean }) =>
+      releaseCreateCommand('stable', options.version, { skipTests: options.skipTests })
+    );
 
   release
     .command('canary')
     .description('Create a canary release commit and tag')
     .option('--version <version>', 'Canary semver version (x.y.z-canary.n)')
-    .action((options: { version?: string }) => releaseCreateCommand('canary', options.version));
+    .option('--skip-tests', 'Skip the test suite in preflight (build + guards still run)')
+    .action((options: { version?: string; skipTests?: boolean }) =>
+      releaseCreateCommand('canary', options.version, { skipTests: options.skipTests })
+    );
 
   release
     .command('notes [from] [to]')
@@ -242,7 +248,7 @@ function ensureTagDoesNotExist(repoRoot: string, tagName: string): void {
   }
 }
 
-function runPreflight(repoRoot: string): PreflightResult[] {
+function runPreflight(repoRoot: string, opts: { skipTests?: boolean } = {}): PreflightResult[] {
   const results: PreflightResult[] = [];
 
   const branch = getCurrentBranch(repoRoot);
@@ -300,19 +306,27 @@ function runPreflight(repoRoot: string): PreflightResult[] {
     });
   }
 
-  try {
-    runStreaming('npm test', repoRoot);
+  if (opts.skipTests) {
     results.push({
       name: 'Tests',
       ok: true,
-      detail: 'npm test passed',
+      detail: 'skipped (--skip-tests)',
     });
-  } catch {
-    results.push({
-      name: 'Tests',
-      ok: false,
-      detail: 'npm test failed',
-    });
+  } else {
+    try {
+      runStreaming('npm test', repoRoot);
+      results.push({
+        name: 'Tests',
+        ok: true,
+        detail: 'npm test passed',
+      });
+    } catch {
+      results.push({
+        name: 'Tests',
+        ok: false,
+        detail: 'npm test failed',
+      });
+    }
   }
 
   try {
@@ -356,7 +370,11 @@ async function releaseCheckCommand(): Promise<void> {
   }
 }
 
-async function releaseCreateCommand(channel: ReleaseChannel, version?: string): Promise<void> {
+async function releaseCreateCommand(
+  channel: ReleaseChannel,
+  version?: string,
+  opts: { skipTests?: boolean } = {}
+): Promise<void> {
   const repoRoot = getRepoRoot();
   const currentVersion = getCurrentVersion();
   const previousTag = getLatestTag(repoRoot);
@@ -378,7 +396,11 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
   }
   console.log('');
 
-  const results = runPreflight(repoRoot);
+  const results = runPreflight(repoRoot, { skipTests: opts.skipTests });
+  for (const result of results) {
+    const marker = result.ok ? chalk.green('✓') : chalk.red('✗');
+    console.log(`${marker} ${result.name}: ${result.detail}`);
+  }
   const failed = results.filter((result) => !result.ok);
   if (failed.length > 0) {
     console.log(chalk.red('\nRelease preflight failed.'));
