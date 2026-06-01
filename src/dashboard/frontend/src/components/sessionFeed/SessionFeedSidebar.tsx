@@ -4,7 +4,7 @@ import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeed
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
-import { useDashboardStore, selectAgentsWithPendingAskUserQuestion } from '../../lib/store';
+import { useDashboardStore, selectAgentsWithPendingAskUserQuestion, selectIssues } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
@@ -112,7 +112,18 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  */
 function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[]; unscoped?: boolean }) {
   const pendingAgents = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
+  const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
+
+  // Resolve a friendly title per issue id so the entry reads like a human label
+  // (e.g. the issue title) rather than the raw id. PAN-1520.
+  const titleByIssueId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of issues as Array<{ id?: string; title?: string }>) {
+      if (i?.id && i.title) m.set(i.id, i.title);
+    }
+    return m;
+  }, [issues]);
 
   const scoped = useMemo(() => {
     if (unscoped || !issueIds || issueIds.length === 0) return pendingAgents;
@@ -133,7 +144,7 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
           const q = agent.pendingAskUserQuestion;
           const count = q?.questions?.length ?? 0;
           const first = q?.questions?.[0]?.question ?? 'Waiting for your answer';
-          const label = agent.issueId ?? agent.id;
+          const label = (agent.issueId && titleByIssueId.get(agent.issueId)) || agent.issueId || agent.id;
           return (
             <button
               key={agent.id}
