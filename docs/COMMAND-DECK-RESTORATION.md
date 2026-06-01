@@ -410,3 +410,15 @@ Progress notes appended below as slices land (commit hashes).
   notification (#1102), and a multi-kind "Needs you" list that now covers PermissionRequest
   too (`selectPendingInputSubjects`, `0a1703f07`). Activity-feed "Needs you" is the
   cross-surface recovery affordance the remodel's Project Activity column needed.
+
+- **S2 DONE** (2026-06-01, `5661c1d19` + `c712b4757` + `6dcf2a144`, frontend tsc clean, 127
+  drawer+Stage tests pass). Issue cockpit **status band** now renders above the IssueOverview
+  body: PhaseTimeline (6-step) + hybrid ActionStrip (the ~41-action phase-gated registry via
+  `IssueActionMenu mode="hybrid"`) + PR card (#num + diffstat tooltip) + cost-top-right +
+  VerificationGates (typecheck/lint/test/uat). Key refactor: extracted `useIssueData(issueId)`
+  as the pure parameterized core of `useDrawerData()` so the dormant drawer components render
+  ANY issue without touching the global `drawer` slice (no legacy IssueDrawer overlay / URL
+  rewrite). PhaseTimeline + DrawerVerificationGates gained an optional `issueId` prop.
+  PR + cost use the same robust query hooks as the body (`usePrQuery`, `useIssueCostsQuery`).
+  VERIFIED LIVE on PAN-1242: PR #1516 (open, +831/-21), $96.79 cost, gates typecheck/lint/test
+  pass + UAT pending. NEXT (S3): hybrid tabs + pop-out; then S4 project cockpit, S5 polish.
