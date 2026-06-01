@@ -577,6 +577,16 @@ export default function App() {
   const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   useEffect(() => {
     if (!askUserQuestionReopenId) return;
+    // Bug 3 (TIN-1): a notification's Open/Answer can be clicked AFTER the asking
+    // session stopped and its pending AUQ cleared (e.g. planning auto-completed).
+    // Un-dismiss + focus so the dialog reopens if the question is still live; if
+    // it's already resolved, tell the operator instead of silently no-opping.
+    const agentEntry = useDashboardStore.getState().agentsById[askUserQuestionReopenId];
+    // Only an agent subject (present in agentsById) can be confidently judged
+    // resolved here; conversation subjects are tracked via a separate poll, so
+    // never claim those are "no longer waiting".
+    const knownAgent = agentEntry != null;
+    const stillPending = agentEntry?.pendingAskUserQuestion != null;
     setDismissedAskUserQuestionAgentIds((prev) => {
       if (!prev.has(askUserQuestionReopenId)) return prev;
       const next = new Set(prev);
@@ -584,6 +594,11 @@ export default function App() {
       return next;
     });
     setFocusedAskUserQuestionId(askUserQuestionReopenId);
+    if (knownAgent && !stillPending) {
+      toast.info('That question is no longer waiting', {
+        description: 'The agent stopped or already received an answer.',
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askUserQuestionReopenNonce]);
 
