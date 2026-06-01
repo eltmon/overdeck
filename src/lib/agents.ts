@@ -2128,13 +2128,39 @@ export async function buildCavemanExports(
  * (DEFAULT_WORKHORSES / DEFAULT_ROLES) — anything that still raises here
  * is a real configuration bug the user must see.
  */
+/**
+ * Models that are known-broken for autonomous *work* agents and must never be
+ * used to spawn one, even if a project pins them in config. gpt-5.5 work agents
+ * wedge at launch (CLIProxy "System messages not allowed" via Claude Code; Pi
+ * init hangs) — observed live on TIN-1, which auto-spawned a gpt-5.5 work agent
+ * that sat at out=0/cost=$0. The conversational/planning paths are unaffected,
+ * so this gate is scoped to the work role only. See memory
+ * project_gpt55_work_agents_broken.
+ */
+const WORK_AGENT_BROKEN_MODELS = new Set(['gpt-5.5']);
+/** Safe fallback when a work agent's resolved model is work-broken. */
+const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
+
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
-  if (modelOverride) {
-    return modelOverride;
+  const resolved = modelOverride
+    ? modelOverride
+    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+
+  // Work-agent safety net: a config pin (or smart-selection) must not spawn a
+  // work agent on a model that is known to wedge for the work role. Fall back
+  // loudly rather than launch a dead agent. Only applies to the work role and
+  // only when the model wasn't an explicit, deliberate per-spawn override.
+  const role = options.role ?? 'work';
+  if (role === 'work' && !modelOverride && WORK_AGENT_BROKEN_MODELS.has(resolved)) {
+    console.warn(
+      `[determineModel] resolved work model "${resolved}" is known-broken for work agents; ` +
+      `falling back to "${WORK_AGENT_FALLBACK_MODEL}". Update roles.work.model in config to silence this.`,
+    );
+    return WORK_AGENT_FALLBACK_MODEL;
   }
 
-  return requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+  return resolved;
 }
 
 /**
