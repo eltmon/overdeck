@@ -625,6 +625,9 @@ export default function App() {
       id: a.id,
       issueId: a.issueId ?? null,
       kindLabel: 'Agent',
+      // PAN-1520 — prefer the issue title over the raw agent id (e.g.
+      // "planning-pan-1395") so the dialog/toast read like a human label.
+      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
       pendingAskUserQuestion: a.pendingAskUserQuestion,
       askedAt: a.pendingAskUserQuestion?.askedAt ?? '',
     })),
@@ -787,6 +790,8 @@ export default function App() {
     mutationFn: async ({ kind, id, answers, questions }: {
       kind: 'agent' | 'conv';
       id: string;
+      /** Friendly display label (issue/conversation title) for the toast. */
+      label?: string;
       answers: string[];
       questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
         ? T extends { questions: infer Q } ? Q : never : never;
@@ -837,7 +842,7 @@ export default function App() {
       return { subjectId: variables.id, toolUseId };
     },
     onSuccess: (_data, variables) => {
-      toast.success(`Answer delivered to ${variables.id}`);
+      toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`);
     },
     onError: (error: Error, _variables, context) => {
       if (context?.toolUseId) {
@@ -858,6 +863,7 @@ export default function App() {
     askUserQuestionAnswerMutation.mutate({
       kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
       id: subject.id,
+      label: subject.title?.trim() || subject.id,
       answers,
       questions: subject.pendingAskUserQuestion?.questions as never,
     });

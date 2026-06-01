@@ -7,6 +7,7 @@ import { ConversationPanel } from '../../chat/ConversationPanel';
 import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
+import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
@@ -282,6 +283,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     <div className={styles.sessionPanel}>
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
+        {session.awaitingInput && (
+          <AwaitingInputIndicator kinds={['askUserQuestion']} />
+        )}
         <SessionPanelBranchChip sessionId={session.sessionId} />
         <div className={styles.sessionPanelToggle}>
           {(hasJsonl || !isReviewSession) && (

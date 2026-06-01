@@ -15,7 +15,7 @@
  * `deliverAgentMessage` pipeline.
  */
 import { useState } from 'react'
-import { Loader2, MessageCircleQuestion } from 'lucide-react'
+import { Loader2, MessageCircleQuestion, Minus } from 'lucide-react'
 
 /**
  * PAN-1520 — minimal shape the dialog consumes. Works for either an
@@ -66,6 +66,9 @@ export function AskUserQuestionDialog({
 
   if (!isOpen || !agent || !pending || questions.length === 0) return null
 
+  // Prefer a human title (conversation title) over the raw id; keep the id as a
+  // secondary mono line. PAN-1520 — operators reported the bare conv-<ts> id.
+  const displayName = agent.title?.trim() || agent.id
   const allSelected = selections.length === questions.length && selections.every((s) => s.length > 0)
   const canSubmit = allSelected || customText.trim().length > 0
 
@@ -78,18 +81,33 @@ export function AskUserQuestionDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    // Clicking the backdrop minimizes (not answers) — the question stays
+    // recoverable via the "Needs you" list so navigation is never trapped.
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) onDismiss() }}
+    >
       <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-primary/30 bg-card shadow-2xl">
         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
           <div className="rounded-full bg-primary/15 p-2">
             <MessageCircleQuestion className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">{agent.kindLabel ?? 'Agent'} Question</h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-semibold text-foreground">{displayName}</h2>
             <p className="text-sm text-muted-foreground">
-              {agent.id} is waiting for an operator answer.
+              {agent.kindLabel ?? 'Agent'} is waiting for an operator answer.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={isSubmitting}
+            title="Minimize — keeps the question in the activity feed's “Needs you” list"
+            aria-label="Minimize"
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="space-y-4 px-5 py-4 max-h-[60vh] overflow-y-auto">
@@ -171,9 +189,10 @@ export function AskUserQuestionDialog({
             type="button"
             onClick={onDismiss}
             disabled={isSubmitting}
+            title="Keeps the question in the activity feed's “Needs you” list — click it there to reopen"
             className="rounded-md border border-border bg-popover px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-card disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Dismiss
+            Minimize
           </button>
           <button
             type="button"

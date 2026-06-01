@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { describePendingInput } from '../../lib/pendingInput';
 import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
@@ -199,18 +200,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
-          title={(() => {
-            const kinds = agent.pendingInputKinds ?? [];
-            if (kinds.length === 0) return 'Agent needs input';
-            const label: Record<string, string> = {
-              askUserQuestion: 'Question waiting',
-              permissionRequest: 'Permission pending',
-              exitPlanMode: 'Plan approval pending',
-              enterPlanMode: 'Plan being drafted',
-              sessionResume: 'Session resume waiting',
-            };
-            return kinds.map((k) => label[k] ?? k).join(', ');
-          })()}
+          title={describePendingInput(agent.pendingInputKinds)}
         />
       )}
     </motion.div>

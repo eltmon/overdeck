@@ -6,6 +6,7 @@ import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workin
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { describePendingInput } from '../../lib/pendingInput';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import styles from './styles/command-deck.module.css';
@@ -277,7 +278,7 @@ export function ConversationRow({
         // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Show the
         // same triangle-alert affordance as the permission case so operators
         // can spot the row from a distance.
-        <span title={`Waiting on your input (${(conv.pendingInputKinds ?? []).join(', ') || 'question'})`} style={{ display: 'contents' }}>
+        <span title={describePendingInput(conv.pendingInputKinds)} style={{ display: 'contents' }}>
           <TriangleAlert
             size={spinnerSize}
             className={styles.conversationPermissionAlert}
