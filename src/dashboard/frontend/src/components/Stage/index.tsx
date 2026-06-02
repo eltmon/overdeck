@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useCallback, useState, type ReactNode } from 'react'
 import {
   usePanesStore,
   selectPanesForWorkspace,
@@ -12,8 +12,24 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
 import { PaneTabMenu } from './PaneTabMenu'
+import { PaneLayoutView } from './PaneLayoutView'
+import {
+  leaf,
+  isSplit,
+  leafCount,
+  collectLeafIds,
+  hasLeaf,
+  splitAtLeaf,
+  removeLeaf,
+  pruneToValid,
+  replaceLeaf,
+  updateRatio,
+  isValidLayout,
+  type PaneLayout,
+  type SplitPath,
+} from '../../lib/paneLayout'
 import { ForkModal } from '../CommandDeck/ForkModal'
-import { Bot, Terminal as TerminalIcon, Globe, X } from 'lucide-react'
+import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { TerminalDrawer } from '../terminal/TerminalDrawer'
@@ -111,6 +127,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const setActivePane = usePanesStore((s) => s.setActivePane)
   const panes = usePanesStore(selectPanesForWorkspace(deckKey))
   const activePaneId = usePanesStore(selectActivePaneId(deckKey))
+  const activeId = activePaneId ?? ''
   const terminalOpen = useTerminalStateStore(
     (s) => selectThreadTerminalState(s.terminalStateByThreadId, deckKey).terminalOpen,
   )
@@ -212,9 +229,47 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [deckKey, openPane, conversations, resolveSession],
   )
 
+  // Pane layout (PAN-1591): a binary split tree arranging the deck's visible
+  // panes into arbitrary grids. A null / single-leaf layout means "no split" —
+  // the deck renders just the active pane. Persisted per project across reloads.
+  const layoutKey = `pan-layout:${deckKey}`
+  const [layout, setLayoutState] = useState<PaneLayout | null>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`pan-layout:${deckKey}`)
+      const parsed = raw ? (JSON.parse(raw) as unknown) : null
+      setLayoutState(isValidLayout(parsed) && leafCount(parsed) > 1 ? parsed : null)
+    } catch {
+      setLayoutState(null)
+    }
+  }, [deckKey])
+  const setLayout = useCallback(
+    (next: PaneLayout | null) => {
+      const effective = next && leafCount(next) > 1 ? next : null
+      setLayoutState(effective)
+      try {
+        if (effective) localStorage.setItem(layoutKey, JSON.stringify(effective))
+        else localStorage.removeItem(layoutKey)
+      } catch {
+        /* ignore */
+      }
+    },
+    [layoutKey],
+  )
+
+  // Selecting a tab focuses its pane. While split: if the pane is already a
+  // visible region, focus it; otherwise load it into the focused region (the
+  // tab "opens" in that group, editor-style).
   const handleSelectPane = useCallback(
-    (paneId: string) => setActivePane(deckKey, paneId),
-    [setActivePane, deckKey],
+    (paneId: string) => {
+      if (layout && leafCount(layout) > 1 && !hasLeaf(layout, paneId)) {
+        const leaves = collectLeafIds(layout)
+        const focus = leaves.includes(activeId) ? activeId : leaves[0]
+        if (focus) setLayout(replaceLeaf(layout, focus, paneId))
+      }
+      setActivePane(deckKey, paneId)
+    },
+    [layout, activeId, deckKey, setActivePane, setLayout],
   )
   const handleClosePane = useCallback(
     (paneId: string) => closePane(deckKey, paneId),
@@ -229,30 +284,6 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const [tabMenu, setTabMenu] = useState<{ conversationName: string; paneId: string; top: number; left: number } | null>(null)
   // Generic right-click menu for non-conversation tabs (issue/plan/docs/…).
   const [paneMenu, setPaneMenu] = useState<{ paneId: string; permanent: boolean; top: number; left: number } | null>(null)
-
-  // Side-by-side split (PAN-1591): an optional secondary pane pinned beside the
-  // active one. View-time state — not persisted; resets on reload. `splitRatio`
-  // is the primary pane's fraction of the row width.
-  const [secondaryPaneId, setSecondaryPaneId] = useState<string | null>(null)
-  const [splitRatio, setSplitRatio] = useState(0.6)
-  const paneAreaRef = useRef<HTMLDivElement>(null)
-  const onDividerDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    const el = paneAreaRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const onMove = (ev: MouseEvent) => {
-      setSplitRatio(Math.min(0.8, Math.max(0.2, (ev.clientX - rect.left) / rect.width)))
-    }
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      document.body.style.cursor = ''
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    document.body.style.cursor = 'col-resize'
-  }, [])
 
   const handlePaneContextMenu = useCallback(
     (pane: WorkspacePane, e: React.MouseEvent) => {
@@ -339,17 +370,73 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [renderHome, renderIssue, api, ctx],
   )
 
-  // The split's secondary pane — never the same as the active pane.
-  const secondaryPane =
-    secondaryPaneId && secondaryPaneId !== activePane?.paneId
-      ? displayPanes.find((p) => p.paneId === secondaryPaneId) ?? null
-      : null
-  // Drop the split when its pane is closed or becomes the active tab.
+  // ─── Pane layout derivations + actions (PAN-1591) ─────────────────────────
+  const splitActive = isSplit(layout)
+  const panesById = useMemo(() => new Map(displayPanes.map((p) => [p.paneId, p] as const)), [displayPanes])
+  const layoutLeafIds = useMemo(() => (layout ? collectLeafIds(layout) : []), [layout])
+  // The focused leaf follows the active tab when it's in the layout.
+  const focusedPaneId = splitActive
+    ? layoutLeafIds.includes(activeId)
+      ? activeId
+      : layoutLeafIds[0] ?? null
+    : null
+
+  // Heal the layout against the live pane set: a closed tab drops from the grid,
+  // collapsing to single-pane mode when ≤1 leaf survives.
   useEffect(() => {
-    if (secondaryPaneId && (secondaryPaneId === activePaneId || !displayPanes.some((p) => p.paneId === secondaryPaneId))) {
-      setSecondaryPaneId(null)
-    }
-  }, [secondaryPaneId, activePaneId, displayPanes])
+    if (!layout) return
+    const valid = new Set(displayPanes.map((p) => p.paneId))
+    const pruned = pruneToValid(layout, valid)
+    const before = collectLeafIds(layout).join(',')
+    const after = pruned ? collectLeafIds(pruned).join(',') : ''
+    if (before !== after) setLayout(pruned)
+  }, [layout, displayPanes, setLayout])
+
+  // Open `paneId` in a new split beside the focused pane (row = right, col =
+  // down). Starts a split from single-pane mode; no-op against an empty deck.
+  const openInSplit = useCallback(
+    (paneId: string, dir: 'row' | 'col') => {
+      if (layout && leafCount(layout) > 1) {
+        if (hasLeaf(layout, paneId)) {
+          setActivePane(deckKey, paneId)
+          return
+        }
+        const focus = layoutLeafIds.includes(activeId) ? activeId : layoutLeafIds[0]
+        if (!focus) return
+        setLayout(splitAtLeaf(layout, focus, paneId, dir))
+      } else {
+        if (!activeId || paneId === activeId) return
+        setLayout({ kind: 'split', dir, a: leaf(activeId), b: leaf(paneId), ratio: 0.5 })
+      }
+      setActivePane(deckKey, paneId)
+    },
+    [layout, layoutLeafIds, activeId, deckKey, setActivePane, setLayout],
+  )
+
+  // Close one region of the split (the tab itself stays open). Collapsing to a
+  // single leaf exits split mode and promotes the survivor to active.
+  const closeLeaf = useCallback(
+    (paneId: string) => {
+      if (!layout) return
+      const next = removeLeaf(layout, paneId)
+      if (next && leafCount(next) > 1) {
+        setLayout(next)
+        if (activeId === paneId) setActivePane(deckKey, collectLeafIds(next)[0])
+      } else {
+        const survivor = next ? collectLeafIds(next)[0] : activeId
+        setLayout(null)
+        if (survivor) setActivePane(deckKey, survivor)
+      }
+    },
+    [layout, activeId, deckKey, setActivePane, setLayout],
+  )
+
+  const onRatioChange = useCallback(
+    (path: SplitPath, ratio: number) => {
+      setLayout(layout ? updateRatio(layout, path, ratio) : null)
+    },
+    [layout, setLayout],
+  )
 
   // Re-resolve the right-clicked tab's conversation from the live list so the
   // menu reflects current state and self-dismisses if the conversation is gone.
@@ -366,35 +453,23 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         newActions={newActions}
         onPaneContextMenu={handlePaneContextMenu}
       />
-      <div className={styles.paneArea} ref={paneAreaRef}>
-        <div className={styles.splitPanel} style={{ flexGrow: secondaryPane ? splitRatio : 1, flexBasis: 0 }}>
-          <div className={styles.pane}>{activePane && renderPaneContent(activePane)}</div>
-        </div>
-        {secondaryPane && (
-          <>
-            <div
-              className={styles.splitDivider}
-              onMouseDown={onDividerDown}
-              role="separator"
-              aria-orientation="vertical"
-              title="Drag to resize"
-            />
-            <div className={styles.splitPanel} style={{ flexGrow: 1 - splitRatio, flexBasis: 0 }}>
-              <div className={styles.splitHeader}>
-                <span className={styles.splitHeaderLabel}>{secondaryPane.label}</span>
-                <button
-                  type="button"
-                  className={styles.splitHeaderClose}
-                  onClick={() => setSecondaryPaneId(null)}
-                  title="Close split"
-                  aria-label="Close split"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-              <div className={styles.pane}>{renderPaneContent(secondaryPane)}</div>
-            </div>
-          </>
+      <div className={styles.paneArea}>
+        {splitActive && layout ? (
+          <PaneLayoutView
+            node={layout}
+            path={[]}
+            panesById={panesById}
+            renderPaneContent={renderPaneContent}
+            focusedPaneId={focusedPaneId}
+            showHeaders
+            onFocus={(id) => setActivePane(deckKey, id)}
+            onCloseLeaf={closeLeaf}
+            onRatioChange={onRatioChange}
+          />
+        ) : (
+          <div className={styles.splitPanel} style={{ flexGrow: 1, flexBasis: 0 }}>
+            <div className={styles.pane}>{activePane && renderPaneContent(activePane)}</div>
+          </div>
         )}
       </div>
       {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
@@ -406,7 +481,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
           position={{ top: tabMenu.top, left: tabMenu.left }}
           onClose={() => setTabMenu(null)}
           onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
-          onOpenInSplit={() => setSecondaryPaneId(tabMenu.paneId)}
+          onOpenInSplit={() => openInSplit(tabMenu.paneId, 'row')}
+          onSplitDown={() => openInSplit(tabMenu.paneId, 'col')}
           onCloseOthers={() => {
             const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
             for (const p of panes) {
@@ -428,7 +504,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         <PaneTabMenu
           position={{ top: paneMenu.top, left: paneMenu.left }}
           onClose={() => setPaneMenu(null)}
-          onOpenInSplit={() => setSecondaryPaneId(paneMenu.paneId)}
+          onOpenInSplit={() => openInSplit(paneMenu.paneId, 'row')}
+          onSplitDown={() => openInSplit(paneMenu.paneId, 'col')}
           onCloseTab={paneMenu.permanent ? undefined : () => closePane(deckKey, paneMenu.paneId)}
         />
       )}

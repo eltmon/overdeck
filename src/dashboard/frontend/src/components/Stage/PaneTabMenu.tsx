@@ -1,14 +1,16 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Columns2, X } from 'lucide-react'
+import { Columns2, Rows2, X } from 'lucide-react'
 import menu from '../CommandDeck/styles/command-deck.module.css'
 
 interface PaneTabMenuProps {
   /** Viewport coordinates (fixed positioning) — typically the cursor. */
   position: { top: number; left: number }
   onClose: () => void
-  /** Open this pane in a side-by-side split (PAN-1591). */
+  /** Open this pane in a side-by-side (right) split (PAN-1591). */
   onOpenInSplit: () => void
+  /** Open this pane in a stacked (below) split. */
+  onSplitDown: () => void
   /** Close the tab — omitted for permanent panes (HOME). */
   onCloseTab?: () => void
 }
@@ -19,7 +21,7 @@ interface PaneTabMenuProps {
  * {@link ConversationActionMenu} instead. Reuses the command-deck menu styling
  * so both menus look identical. Portaled + fixed-positioned to escape clips.
  */
-export function PaneTabMenu({ position, onClose, onOpenInSplit, onCloseTab }: PaneTabMenuProps) {
+export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab }: PaneTabMenuProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     const dismiss = () => onClose()
@@ -39,7 +41,11 @@ export function PaneTabMenu({ position, onClose, onOpenInSplit, onCloseTab }: Pa
       <div role="menu" className={menu.headerMenu} style={{ position: 'fixed', top: position.top, left: position.left, right: 'auto' }}>
         <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onOpenInSplit(); onClose() }}>
           <Columns2 size={14} />
-          Open in split right
+          Split right
+        </button>
+        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onSplitDown(); onClose() }}>
+          <Rows2 size={14} />
+          Split down
         </button>
         {onCloseTab && (
           <>
