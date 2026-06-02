@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X, type LucideIcon } from 'lucide-react'
+import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import styles from './stage.module.css'
 
@@ -66,6 +66,28 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  // Track overflow so we can show ‹ › scroll buttons — the *visible* affordance
+  // that there are tabs off-screen (wheel-scroll alone gives no cue). Updated on
+  // scroll, container resize, and when the tab set changes.
+  const [overflow, setOverflow] = useState({ left: false, right: false })
+  useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const update = () => {
+      setOverflow({
+        left: el.scrollLeft > 2,
+        right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+      })
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => { el.removeEventListener('scroll', update); ro.disconnect() }
+  }, [panes.length])
+
+  const scrollTabs = (dir: -1 | 1) => barRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
+
   const openMenu = () => {
     const r = addBtnRef.current?.getBoundingClientRect()
     if (r) setMenuPos({ top: r.bottom + 2, left: r.left })
@@ -92,7 +114,18 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
   }, [menuOpen])
 
   return (
-    <div ref={barRef} className={styles.panebar} role="tablist" aria-label="Workspace panes">
+    <div className={styles.panebarWrap}>
+      {overflow.left && (
+        <button type="button" className={`${styles.tabScrollBtn} ${styles.tabScrollLeft}`} aria-label="Scroll tabs left" onClick={() => scrollTabs(-1)}>
+          <ChevronLeft size={16} />
+        </button>
+      )}
+      {overflow.right && (
+        <button type="button" className={`${styles.tabScrollBtn} ${styles.tabScrollRight}`} aria-label="Scroll tabs right" onClick={() => scrollTabs(1)}>
+          <ChevronRight size={16} />
+        </button>
+      )}
+      <div ref={barRef} className={styles.panebar} role="tablist" aria-label="Workspace panes">
       {panes.map((pane, index) => {
         const Icon = PANE_ICONS[pane.paneType] ?? Home
         const isActive = pane.paneId === activePaneId
@@ -188,6 +221,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
           </div>,
           document.body,
         )}
+      </div>
     </div>
   )
 })
