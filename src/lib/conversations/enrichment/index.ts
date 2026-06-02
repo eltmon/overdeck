@@ -18,6 +18,7 @@ import type { EnrichSessionOptions } from './enrich-session.js';
 import { getConversationsConfigSync } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
+import { isBackgroundFeatureEnabled } from '../../background-ai/features.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,13 @@ function selectSessionIdsForEnrichment(
 export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichResult> {
   const startTs = Date.now();
   const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0, estimatedCost: 0, actualCost: null, embedded: 0 };
+
+  // Background AI gate: low-cost mode (or the conversationEnrichment toggle)
+  // disables enrichment. Returns an empty (no-op) result.
+  if (!isBackgroundFeatureEnabled('conversationEnrichment')) {
+    result.durationMs = Date.now() - startTs;
+    return result;
+  }
 
   const tier = opts.tier ?? 1;
   const config = opts.config ?? getConversationsConfigSync();
@@ -229,7 +237,8 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
     }
   }
 
-  if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep) {
+  if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep
+      && isBackgroundFeatureEnabled('sessionEmbeddings')) {
     if (enrichedIds.length > 0) {
       const embedded = await embedSessions({ sessionIds: enrichedIds, config });
       result.embedded = embedded.embedded;

@@ -12,6 +12,8 @@
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { initEventStore, type StoredEvent } from '../event-store.js';
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
+import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
+import { recordBackgroundAiCost } from '../../../lib/background-ai/cost.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,16 @@ interface OpenAIChatCompletion {
   choices: Array<{
     message: { content: string };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+}
+
+interface SummarizerResult {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
 }
 
 // ─── Prompt ───────────────────────────────────────────────────────────────────
@@ -78,7 +90,7 @@ async function callSummarizer(
   model: string,
   apiKey: string,
   items: ActivityItem[]
-): Promise<string | null> {
+): Promise<SummarizerResult | null> {
   const body = {
     model,
     messages: [
@@ -111,7 +123,11 @@ async function callSummarizer(
     const data = (await res.json()) as OpenAIChatCompletion;
     const text = data.choices?.[0]?.message?.content?.trim() ?? '';
     if (!text || text === '<silence>') return null;
-    return text;
+    return {
+      text,
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
+    };
   } catch (err) {
     console.warn('[tts-summarizer] API call failed:', err);
     return null;
@@ -123,6 +139,8 @@ async function callSummarizer(
 async function flush(): Promise<void> {
   const { config } = loadConfigSync();
   if (!config.ttsSummarizer.enabled) return;
+  // Low-cost mode (or an explicit ttsSummarizer toggle) disables narration.
+  if (!isBackgroundFeatureEnabled('ttsSummarizer', config)) return;
 
   const items = state.buffer.splice(0);
   if (items.length === 0) return;
@@ -133,8 +151,16 @@ async function flush(): Promise<void> {
     return;
   }
 
-  const utterance = await callSummarizer(config.ttsSummarizer.model, apiKey, items);
-  if (!utterance) return;
+  const result = await callSummarizer(config.ttsSummarizer.model, apiKey, items);
+  if (!result) return;
+
+  // Record token spend so background narration is visible in the cost ledger.
+  recordBackgroundAiCost({
+    feature: 'ttsSummarizer',
+    provider: 'openai',
+    model: config.ttsSummarizer.model,
+    usage: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+  });
 
   // Priority: error-level items in batch → 0, warn → 1, otherwise 2
   const hasError = items.some(i => i.level === 'error');
@@ -143,7 +169,7 @@ async function flush(): Promise<void> {
 
   try {
     emitActivityTtsSync({
-      utterance,
+      utterance: result.text,
       priority,
       source: 'tts-summarizer',
       eventType: 'ttsSummary.generated',

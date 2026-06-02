@@ -29,6 +29,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
+import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
 
 /**
@@ -164,6 +165,11 @@ export interface ApiSettingsConfig {
     rollup_pending_threshold?: number;
     sidebar_refresh_interval_ms?: number;
     worker_concurrency?: number;
+  };
+  /** Background AI feature toggles + low-cost master switch (PAN-1583). */
+  background_ai?: {
+    cheap_mode?: boolean;
+    features?: Partial<Record<BackgroundAiFeature, boolean>>;
   };
   api_keys: {
     openai?: string;
@@ -588,6 +594,12 @@ export function loadSettingsApi(): ApiSettingsConfig {
       sidebar_refresh_interval_ms: memory.sidebarRefreshIntervalMs,
       worker_concurrency: memory.workerConcurrency,
     },
+    background_ai: {
+      // Defensive — older test mocks of loadConfig may not include `backgroundAi`;
+      // production loader always populates it via DEFAULT_CONFIG.
+      cheap_mode: config.backgroundAi?.cheapMode ?? false,
+      features: { ...defaultBackgroundAiFeatures(), ...config.backgroundAi?.features },
+    },
     tracker_keys: config.trackerKeys,
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
@@ -744,6 +756,12 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
           worker_concurrency: settings.memory.worker_concurrency,
         }
       : undefined,
+    background_ai: settings.background_ai
+      ? {
+          cheap_mode: settings.background_ai.cheap_mode,
+          features: settings.background_ai.features,
+        }
+      : undefined,
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
       ? {
@@ -813,6 +831,13 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     memory: {
       ...current.memory,
       ...updates.memory,
+    },
+    background_ai: {
+      cheap_mode: updates.background_ai?.cheap_mode ?? current.background_ai?.cheap_mode,
+      features: {
+        ...current.background_ai?.features,
+        ...updates.background_ai?.features,
+      },
     },
     tracker_keys: {
       ...current.tracker_keys,
