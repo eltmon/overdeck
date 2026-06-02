@@ -7,7 +7,6 @@ import { useDashboardStore } from '../lib/store';
 import type { Tab } from './Header';
 import type { Issue } from '../types';
 
-vi.mock('./CloisterStatusBar', () => ({ CloisterStatusBar: () => <div data-testid="cloister-status" /> }));
 vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
 vi.mock('./DeaconPauseToggle', () => ({
   DeaconPauseToggle: () => <button type="button">Pause Deacon</button>,

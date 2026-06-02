@@ -313,8 +313,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
           }`}
         >
           {isToggling
-            ? (status.running ? '...' : '...')
-            : (status.running ? 'Pause' : 'Start')}
+            ? '…'
+            : (status.running ? 'Stop Cloister' : 'Start Cloister')}
         </button>
 
         {/* Restart Sessions */}
