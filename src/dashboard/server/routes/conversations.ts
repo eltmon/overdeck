@@ -93,7 +93,17 @@ import {
   getProviderAuthMode,
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
-import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
+import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
+
+/** The configured conversation-title model (PAN-1589) — falls back to the
+ * module default when config is unavailable. */
+function configuredTitleModel(): string {
+  try {
+    return loadConfigSync().config.conversations.titleModel || CONVERSATION_TITLE_MODEL;
+  } catch {
+    return CONVERSATION_TITLE_MODEL;
+  }
+}
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
@@ -1280,7 +1290,7 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
 
   console.log(`[claude-invoke] purpose=conversation-title | model=${CONVERSATION_TITLE_MODEL} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
 
-  const sanitized = await summarizeFirstMessageTitle(firstMessage);
+  const sanitized = await summarizeFirstMessageTitle(firstMessage, configuredTitleModel());
   if (!sanitized) {
     console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
     return;
@@ -1383,7 +1393,7 @@ function scheduleTitleRefinement(conversationName: string): void {
       }
 
       console.log(`[claude-invoke] purpose=conversation-title-refine | model=${CONVERSATION_TITLE_MODEL} | conversation=${conversationName} | transcriptChars=${transcript.length}`);
-      const refined = await summarizeTranscriptTitle(transcript);
+      const refined = await summarizeTranscriptTitle(transcript, configuredTitleModel());
       if (!refined) {
         console.warn(`[title-refine] Model returned empty refined title for "${conversationName}"`);
         stop();
@@ -3659,7 +3669,7 @@ const postConversationRetitleRoute = HttpRouter.add(
         retitleInFlight.add(name);
         try {
           console.log(`[claude-invoke] purpose=conversation-retitle | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript);
+          const title = await summarizeTranscriptTitle(transcript, configuredTitleModel());
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }
@@ -3725,7 +3735,7 @@ const getConversationAboutRoute = HttpRouter.add(
 
         const transcript = serializeConversationTranscript(messages);
         console.log(`[claude-invoke] purpose=conversation-about | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-        const summary = await summarizeTranscriptAbout(transcript);
+        const summary = await summarizeTranscriptAbout(transcript, configuredTitleModel());
         if (!summary) {
           return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
         }

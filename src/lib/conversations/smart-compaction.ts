@@ -8,6 +8,29 @@ import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError, ProcessSpawnError } from '../errors.js';
+import { recordBackgroundAiCost } from '../background-ai/cost.js';
+import type { AIProvider } from '../cost.js';
+
+/** Record summary-fork/compaction spend from a `claude -p --output-format json`
+ * envelope. Best-effort; never throws into the caller (PAN-1589). */
+function recordSummaryForkCost(model: string, envelope: Record<string, unknown>): void {
+  const usage = (envelope['usage'] ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+  const m = model.toLowerCase();
+  const provider: AIProvider = m.includes('gpt') ? 'openai' : m.includes('gemini') ? 'google' : 'anthropic';
+  recordBackgroundAiCost({
+    feature: 'summaryFork',
+    provider,
+    model,
+    usage: {
+      inputTokens: num(usage['input_tokens']),
+      outputTokens: num(usage['output_tokens']),
+      cacheReadTokens: num(usage['cache_read_input_tokens']),
+      cacheWriteTokens: num(usage['cache_creation_input_tokens']),
+    },
+    costUsd: typeof envelope['total_cost_usd'] === 'number' ? (envelope['total_cost_usd'] as number) : undefined,
+  });
+}
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -678,6 +701,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
 
   const args = [
     '-p',
+    '--output-format', 'json',
     '--model', useModel,
     ...getClaudePermissionFlagsSync(),
     // Plain summary generation uses no tools; callers that instruct the model
@@ -732,9 +756,27 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
         reject(new Error(`Summary generation failed: ${detail}`));
         return;
       }
-      const summary = stdout.trim();
-      if (!summary) {
+      const raw = stdout.trim();
+      if (!raw) {
         console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty output"`);
+        reject(new Error(`Summary generation returned empty output`));
+        return;
+      }
+      // `--output-format json` returns { result, usage, total_cost_usd, ... }.
+      // Extract the summary text and record spend; fall back to raw stdout if
+      // the output isn't the expected JSON envelope (defensive — PAN-1589).
+      let summary = raw;
+      try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        if (parsed && typeof parsed['result'] === 'string') {
+          summary = (parsed['result'] as string).trim();
+          recordSummaryForkCost(useModel, parsed);
+        }
+      } catch {
+        // Not JSON — treat the raw stdout as the summary (older CLI / unexpected).
+      }
+      if (!summary) {
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty result"`);
         reject(new Error(`Summary generation returned empty output`));
         return;
       }

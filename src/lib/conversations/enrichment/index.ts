@@ -123,12 +123,12 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   const startTs = Date.now();
   const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0, estimatedCost: 0, actualCost: null, embedded: 0 };
 
-  // Background AI gate: low-cost mode (or the conversationEnrichment toggle)
-  // disables enrichment. Returns an empty (no-op) result.
-  if (!isBackgroundFeatureEnabled('conversationEnrichment')) {
-    result.durationMs = Date.now() - startTs;
-    return result;
-  }
+  // NOTE: enrichSessions is invoked only by explicit user action (the dashboard
+  // "enrich" job / RPC), never automatically — so low-cost mode does NOT gate it
+  // (silently no-op'ing an explicit click is bad UX). Low-cost mode gates the
+  // *automatic* paths: the auto-embed-on-deep branch below (sessionEmbeddings)
+  // and the genuinely-background callers (titles, memory, compaction, TTS).
+  // Cost is still recorded per enriched session for the Background AI cost view.
 
   const tier = opts.tier ?? 1;
   const config = opts.config ?? getConversationsConfigSync();

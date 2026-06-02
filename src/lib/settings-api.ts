@@ -189,6 +189,11 @@ export interface ApiSettingsConfig {
     };
   };
   tts?: ApiTtsConfig;
+  /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
+  tts_summarizer?: {
+    model?: ModelId;
+    enabled?: boolean;
+  };
   openrouter?: {
     favorites?: string[];
   };
@@ -574,6 +579,10 @@ export function loadSettingsApi(): ApiSettingsConfig {
       },
     },
     tts: toApiTtsConfig(config.tts),
+    tts_summarizer: {
+      model: config.ttsSummarizer?.model,
+      enabled: config.ttsSummarizer?.enabled,
+    },
     openrouter: {
       favorites: config.openrouterFavorites,
     },
@@ -733,7 +742,12 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     agents: settings.agents?.rtk !== undefined
       ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
       : undefined,
-    tts: sanitizeApiTtsConfig(settings.tts),
+    tts: settings.tts_summarizer
+      ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
+          ...(settings.tts_summarizer.model ? { model: settings.tts_summarizer.model } : {}),
+          ...(settings.tts_summarizer.enabled !== undefined ? { enabled: settings.tts_summarizer.enabled } : {}),
+        } }
+      : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
@@ -815,6 +829,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tts: {
       ...current.tts,
       ...sanitizeApiTtsConfig(updates.tts),
+    },
+    tts_summarizer: {
+      ...current.tts_summarizer,
+      ...updates.tts_summarizer,
     },
     openrouter: {
       ...current.openrouter,

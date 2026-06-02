@@ -20,6 +20,22 @@ import { embed } from './providers.js';
 import { getConversationsConfigSync } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
+import { recordBackgroundAiCost } from '../../background-ai/cost.js';
+
+/** Embedding price in USD per 1K tokens. Local providers (ollama) are free.
+ * Unknown models record 0 cost (tokens are still tracked). */
+function embeddingCostUsd(provider: EmbeddingProviderName, model: string, tokens: number): number {
+  if (provider === 'ollama') return 0;
+  const per1k: Record<string, number> = {
+    'text-embedding-3-small': 0.00002,
+    'text-embedding-3-large': 0.00013,
+    'text-embedding-ada-002': 0.0001,
+    'voyage-code-3': 0.00018,
+    'voyage-3': 0.00006,
+  };
+  const rate = per1k[model] ?? 0;
+  return (tokens / 1000) * rate;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -129,6 +145,7 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   let processed = 0;
   const total = sessionIds.length;
 
+  let embedTokens = 0; // accumulated across the pool for cost recording (PAN-1589)
   const tasks = sessionIds.map((sessionId) => async () => {
     const emitProgress = (success: boolean, error?: string) => {
       processed++;
@@ -169,6 +186,7 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
       }));
 
       insertEmbedding(session.id, model, embedResult.embedding);
+      embedTokens += embedResult.tokenCount ?? 0;
       result.embedded++;
       emitProgress(true);
     } catch (err) {
@@ -182,6 +200,20 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   });
 
   await Effect.runPromise(runWithPool(tasks, maxParallel));
+
+  // Record embedding token spend so session embeddings are visible in the cost
+  // ledger (PAN-1589). Provider maps onto the cost-event provider label.
+  if (embedTokens > 0) {
+    const costProvider = provider === 'voyage' ? 'custom' : provider === 'ollama' ? 'custom' : 'openai';
+    recordBackgroundAiCost({
+      feature: 'sessionEmbeddings',
+      provider: costProvider,
+      model,
+      usage: { inputTokens: embedTokens, outputTokens: 0 },
+      costUsd: embeddingCostUsd(provider, model, embedTokens),
+    });
+  }
+
   result.durationMs = Date.now() - startTs;
   return result;
 }
