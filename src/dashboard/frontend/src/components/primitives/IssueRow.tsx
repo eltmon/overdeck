@@ -44,8 +44,12 @@ export type IssueRowProps = {
 };
 
 const GRID_TEMPLATES = {
-  pipeline: '14px 78px 14px 1fr 220px 84px 30px',
-  'command-deck': '14px 78px 14px 1fr 220px 84px 26px',
+  // Title + agent columns are flexible (minmax) so the row fits narrow
+  // containers — e.g. the project cockpit pane (~470px) — instead of the fixed
+  // 220px agent forcing the title `1fr` to 0px and overlapping ("scramble").
+  // In wide containers (Pipeline/Kanban) they grow to roughly the old sizes.
+  pipeline: '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 30px',
+  'command-deck': '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 26px',
 } satisfies Record<IssueRowVariant, string>;
 
 const ROW_CLASSES = {
