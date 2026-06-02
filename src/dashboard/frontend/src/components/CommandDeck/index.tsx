@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Compass, Plus, ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { type IssueCostBreakdown } from './ProjectOverview';
@@ -159,6 +159,14 @@ export function CommandDeck({
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  // PAN-1591: the Awareness rail can be collapsed to reclaim pane width.
+  const [awarenessCollapsed, setAwarenessCollapsed] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('panopticon.ui.awarenessCollapsed') === 'true',
+  );
+  const toggleAwareness = useCallback((collapsed: boolean) => {
+    setAwarenessCollapsed(collapsed);
+    try { localStorage.setItem('panopticon.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
+  }, []);
   const [showBeads, setShowBeads] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [convsCollapsed, setConvsCollapsed] = useState(() => {
@@ -1234,14 +1242,28 @@ export function CommandDeck({
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
         {selectedProject && (
-          <div className={styles.activityColumn}>
-            <SessionFeedSidebar
-              embedded
-              heading="Awareness"
-              scopeSwitcher
-              projectIssueIds={isNoProject ? undefined : projectIssueIds}
-            />
-          </div>
+          awarenessCollapsed ? (
+            <button
+              type="button"
+              className={styles.activityColumnCollapsed}
+              onClick={() => toggleAwareness(false)}
+              title="Show Awareness"
+              aria-label="Show Awareness rail"
+            >
+              <ChevronLeft size={16} />
+              <span className={styles.activityCollapsedLabel}>Awareness</span>
+            </button>
+          ) : (
+            <div className={styles.activityColumn}>
+              <SessionFeedSidebar
+                embedded
+                heading="Awareness"
+                scopeSwitcher
+                projectIssueIds={isNoProject ? undefined : projectIssueIds}
+                onClose={() => toggleAwareness(true)}
+              />
+            </div>
+          )
         )}
       </div>
 
