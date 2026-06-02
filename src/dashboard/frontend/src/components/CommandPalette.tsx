@@ -53,10 +53,19 @@ interface PaletteAction {
   rank?: number;
 }
 
+export interface ConversationPaletteOpenRequest {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  byteOffset: number;
+  label: string;
+}
+
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: string, issueId?: string) => void;
+  onOpenConversationHit?: (hit: ConversationPaletteOpenRequest) => void | Promise<void>;
 }
 
 interface PanCommandEntry {
@@ -221,7 +230,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -492,6 +501,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
         })),
         keywords: ['conversation', hit.sessionId, hit.conversationId, hit.projectId, hit.role],
         onSelect: () => {
+          if (onOpenConversationHit) {
+            void onOpenConversationHit({
+              sessionId: hit.sessionId,
+              conversationId: hit.conversationId,
+              projectId: hit.projectId,
+              byteOffset: hit.byteOffset,
+              label,
+            });
+            return;
+          }
           toast.message(label, { description: hit.excerpt || meta || undefined });
         },
       });
@@ -499,7 +518,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     push(searchResults.memory, 'Memory', Brain);
     push(searchResults.summaries, 'Memory · Summaries', Sparkles);
     return out;
-  }, [searchResults, openIssue]);
+  }, [searchResults, openIssue, onOpenConversationHit]);
 
   // ─── Filter + group ───────────────────────────────────────────────────────
 

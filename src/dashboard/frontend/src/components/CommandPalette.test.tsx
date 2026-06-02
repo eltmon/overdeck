@@ -185,6 +185,35 @@ describe('CommandPalette conversation results', () => {
     const memoryHeading = screen.getByText('Memory');
     expect(conversationsHeading.compareDocumentPosition(memoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('opens a selected conversation hit with its byte offset', async () => {
+    const onOpenConversationHit = vi.fn();
+    render(
+      <CommandPalette
+        isOpen
+        onClose={vi.fn()}
+        onNavigate={vi.fn()}
+        onOpenConversationHit={onOpenConversationHit}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'needle' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    fireEvent.click(getOptionByValue('conv-session-a-42'));
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(onOpenConversationHit).toHaveBeenCalledWith({
+      sessionId: 'session-a',
+      conversationId: 'session-a',
+      projectId: 'panopticon-cli',
+      byteOffset: 42,
+      label: 'semantic transcript hit',
+    });
+  });
 });
 
 describe('CommandPalette navigation actions', () => {
