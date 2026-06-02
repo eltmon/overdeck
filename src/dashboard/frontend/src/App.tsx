@@ -40,7 +40,6 @@ import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
-import { BackgroundAiBanner } from './components/BackgroundAiBanner';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
@@ -1076,9 +1075,6 @@ export default function App() {
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <NoResumeBanner />
-
-        {/* Background AI off-by-default onboarding banner (PAN-1589) */}
-        <BackgroundAiBanner onConfigure={() => setActiveTab('settings')} />
 
         {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
         <DeaconPauseBanner />

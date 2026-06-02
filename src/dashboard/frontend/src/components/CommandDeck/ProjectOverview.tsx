@@ -125,6 +125,32 @@ function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSna
   );
 }
 
+/**
+ * Project lifetime spend (PAN-1589). `issueCosts` is a GLOBAL map (every issue
+ * across all projects, keyed by both `PAN-1` and a lowercased alias). We scope
+ * it to this project by the issue prefix(es) of its features, and sum ALL
+ * matching issues — including closed/historical ones, not just active features.
+ * Counting only the canonical (non-lowercased) keys avoids double-counting the
+ * alias entries. Shared by the cockpit Spend metric and the Home cost chip so
+ * the two always agree.
+ */
+export function projectTotalCost(
+  issueCosts: Record<string, number>,
+  features: { issueId: string }[],
+): number {
+  const prefixes = new Set(
+    features.map(f => f.issueId.split('-')[0]?.toUpperCase()).filter(Boolean),
+  );
+  if (prefixes.size === 0) return 0;
+  let sum = 0;
+  for (const [key, value] of Object.entries(issueCosts)) {
+    if (key !== key.toUpperCase()) continue; // skip lowercased aliases
+    const prefix = key.split('-')[0]?.toUpperCase();
+    if (prefix && prefixes.has(prefix)) sum += value;
+  }
+  return sum;
+}
+
 export function ProjectOverview({
   projectName,
   features,
@@ -135,7 +161,7 @@ export function ProjectOverview({
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
 
   const totalCost = useMemo(
-    () => features.reduce((sum, feature) => sum + (issueCosts[feature.issueId] ?? 0), 0),
+    () => projectTotalCost(issueCosts, features),
     [features, issueCosts],
   );
 
@@ -174,7 +200,7 @@ export function ProjectOverview({
       { id: 'work', eyebrow: 'Work running', value: activeAgentCount, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' },
       { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review phase', icon: <MetricIcon label="◆" />, signal: 'review' },
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ship phase', icon: <MetricIcon label="↑" />, signal: 'success' },
-      { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' },
+      { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: 'project total', icon: <MetricIcon label="$" />, signal: 'cost' },
     ];
   }, [activeAgentCount, bucketedFeatures, features.length, projectName, totalCost]);
 

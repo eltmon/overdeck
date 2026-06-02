@@ -489,6 +489,22 @@ export function SettingsPage() {
     }
   }, []);
 
+  // Deep-link: when another surface (e.g. the low-cost-mode status pill) opens
+  // Settings with a section intent, scroll there once on mount (PAN-1589).
+  useEffect(() => {
+    let intent: string | null = null;
+    try {
+      intent = sessionStorage.getItem('panopticon.settingsSection');
+      if (intent) sessionStorage.removeItem('panopticon.settingsSection');
+    } catch {
+      intent = null;
+    }
+    if (!intent) return;
+    // Defer to the next frame so the target section is mounted.
+    const t = setTimeout(() => scrollToSection(intent as string), 0);
+    return () => clearTimeout(t);
+  }, [scrollToSection]);
+
   // ── Conversations & Search (embedding) config ──────────────────────────────
   const [convConfig, setConvConfig] = useState<{
     embeddings: boolean;

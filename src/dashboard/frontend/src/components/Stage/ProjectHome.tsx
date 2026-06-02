@@ -11,7 +11,7 @@ import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
-import { ProjectOverview, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
+import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 
 export interface ProjectHomeProps {
@@ -67,21 +67,15 @@ export function ProjectHome({
     [conversations],
   )
 
-  // Project total spend (PAN-1589). issueCosts carries both the issueId and a
-  // lowercased alias for the same value, so dedupe by uppercased key before
-  // summing to avoid double-counting.
-  const totalCost = useMemo(() => {
-    if (!issueCosts) return undefined
-    const seen = new Set<string>()
-    let sum = 0
-    for (const [key, value] of Object.entries(issueCosts)) {
-      const norm = key.toUpperCase()
-      if (seen.has(norm)) continue
-      seen.add(norm)
-      sum += value
-    }
-    return sum
-  }, [issueCosts])
+  // Project total spend (PAN-1589) — scoped to this project's issue prefix(es)
+  // via the shared helper, so the chip matches the cockpit Spend metric exactly.
+  // Undefined when there are no features to derive the prefix from (sparse view).
+  const totalCost = useMemo(
+    () => (issueCosts && features && features.length > 0
+      ? projectTotalCost(issueCosts, features)
+      : undefined),
+    [issueCosts, features],
+  )
 
   // Navigate to the global costs page via the app's history-driven router.
   const openCosts = () => {
