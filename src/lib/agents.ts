@@ -2130,14 +2130,19 @@ export async function buildCavemanExports(
  */
 /**
  * Models that are known-broken for autonomous *work* agents and must never be
- * used to spawn one, even if a project pins them in config. gpt-5.5 work agents
- * wedge at launch (CLIProxy "System messages not allowed" via Claude Code; Pi
- * init hangs) — observed live on TIN-1, which auto-spawned a gpt-5.5 work agent
- * that sat at out=0/cost=$0. The conversational/planning paths are unaffected,
- * so this gate is scoped to the work role only. See memory
- * project_gpt55_work_agents_broken.
+ * used to spawn one, even if a project pins them in config. The gate falls back
+ * to WORK_AGENT_FALLBACK_MODEL (loudly) for the work role when the model wasn't
+ * an explicit per-spawn override.
+ *
+ * Empty as of PAN-1584: gpt-5.5 used to wedge at launch with CLIProxy "System
+ * messages are not allowed", which was a stale CLIProxyAPI binary (6.9.45)
+ * mis-translating Claude Code's request to the Codex backend. Upgrading the
+ * pinned CLIProxyAPI to v7.1.39 (+ a version-aware installer) fixed it; gpt-5.5
+ * work agents now launch clean under the claude-code harness. The mechanism is
+ * retained for any future known-broken model. (Pi-harness gpt-5.5 was not
+ * re-verified in this pass — re-add 'gpt-5.5' here if a Pi init hang resurfaces.)
  */
-const WORK_AGENT_BROKEN_MODELS = new Set(['gpt-5.5']);
+const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
 /** Safe fallback when a work agent's resolved model is work-broken. */
 const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
 
