@@ -669,254 +669,43 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 // it on top of the AgentRuntimeSnapshot stream.
 // ============================================================================
 
-/**
- * Status indicators in tmux output that mean the agent is actively working
- * (not idle). These appear in Claude Code's status line.
- */
-const ACTIVE_STATUS_PATTERNS = [
-  /computing/i,
-  /fermenting/i,
-  /thinking/i,
-  /reading/i,
-  /writing/i,
-  /editing/i,
-  /searching/i,
-  /running/i,
-  /executing/i,
-  /tool use/i,
-  /\bBash\b/,
-  /\bRead\b/,
-  /\bWrite\b/,
-  /\bEdit\b/,
-  /\bGrep\b/,
-  /\bGlob\b/,
-  /\bTask\b/,
-];
-
-/**
- * Check if agent tmux output indicates active work (not idle)
- * Checks the last 8 non-blank lines of pane output for status indicators.
- * Claude Code's live status bar (◆ Bash, ◆ Thinking, ⏵⏵) appears at the
- * bottom of the pane — only those lines are relevant, not the full visible
- * area which may contain completed tool calls like "● Bash(...)" from prior output.
- */
-/**
- * PAN-1249: Effect-typed implementation of `isAgentActiveInTmux`. Never fails
- * — capture errors collapse to `false`. The public Promise function is a
- * thin `Effect.runPromise` wrapper.
- */
-const isAgentActiveInTmuxProgram = (sessionName: string): Effect.Effect<boolean, never> =>
-  capturePane(sessionName, 5).pipe(
-    Effect.map((stdout) => {
-      if (!stdout.trim()) return false;
-
-      // Only scan the bottom of the pane where Claude Code's live status bar lives.
-      // Scanning the full visible area causes false positives: completed tool calls
-      // like "● Bash(npm run typecheck...)" are visible but the agent may be idle.
-      const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
-      const tail = lines.slice(-8).join('\n');
-
-      for (const pattern of ACTIVE_STATUS_PATTERNS) {
-        if (pattern.test(tail)) {
-          // Extended computation (Thinking/Fermenting) over threshold = stuck.
-          // Don't let stuck agents masquerade as active.
-          if (/thinking|fermenting/i.test(tail)) {
-            const thinkingMs = parseThinkingDuration(tail);
-            if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
-              return false; // Stuck, not active
-            }
-          }
-          return true;
-        }
-      }
-
-      return false;
-    }),
-    Effect.catch(() => Effect.succeed(false)),
-  );
-
-export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(isAgentActiveInTmuxProgram(sessionName));
-}
+// ACTIVE_STATUS_PATTERNS + isAgentActiveInTmux deleted in PAN-800 Phase 5.
+// They pane-scraped Claude Code's status line to guess "is this agent active",
+// including a parseThinkingDuration stuck heuristic. The hook-driven runtime
+// mirror (getAgentRuntimeStateSync → activity 'working'/'thinking'/'idle') is
+// the single source of truth now; capture-pane activity detection is gone.
+// isAgentActiveInTmux had no remaining callers at deletion time.
 
 // ============================================================================
 // Stuck Work Agent Detection
 // ============================================================================
 
 /**
- * Thinking duration threshold before an agent is considered stuck.
- * Claude Code shows "Thinking... (Xm Ys)" in tmux — if the duration
- * exceeds this threshold with no tool output, the agent is stalled.
- */
-const STUCK_THINKING_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
-
-/**
- * Cooldown between stuck-recovery attempts for the same agent.
- * Prevents spamming Ctrl+C or respawning in a loop.
- */
-const STUCK_RECOVERY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Track recovery attempts per agent: agentId -> { lastAttempt, attempts }
- */
-const stuckRecoveryState: Map<string, { lastAttempt: number; attempts: number }> = new Map();
-
-/**
- * Parse thinking duration from tmux output.
- * Claude Code renders: "Thinking… (Xm Ys · ...)" or "· Thinking… (Xm Ys · ...)"
- * Returns duration in milliseconds, or null if not currently thinking.
- */
-function parseThinkingDuration(tmuxOutput: string): number | null {
-  // Match Claude Code thinking/fermenting status phrases followed by a duration.
-  // Handles: "Thinking… (22m 41s", "Fermenting… (5m 10s"
-  const match = tmuxOutput.match(/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
-  if (!match) return null;
-
-  const minutes = match[1] ? parseInt(match[1], 10) : 0;
-  const seconds = parseInt(match[2], 10);
-  return (minutes * 60 + seconds) * 1000;
-}
-
-/**
- * Check for work agents stuck in extended thinking loops.
+ * checkStuckWorkAgents gutted in PAN-800 Phase 5.
  *
- * Detection: tmux shows "Thinking… (Xm Ys)" where duration > threshold.
- * Recovery strategy (escalating):
- *   1. First attempt: Send Escape key to try to cancel thinking
- *   2. Second attempt: Send Ctrl+C to interrupt
- *   3. Third attempt: Kill tmux session and respawn via launcher.sh
+ * The old implementation `capturePane`d every work agent and ran a
+ * `parseThinkingDuration` regex over the tmux status line to decide an agent
+ * was "stuck thinking", then escalated Escape → Ctrl-C → kill/respawn. That is
+ * exactly the capture-pane scraping PAN-798/PAN-800 eliminate, and it was
+ * brittle: it only recognised the "Thinking"/"Fermenting" spinner words (not
+ * "Quantumizing" et al.) and could not parse hour-scale durations.
+ *
+ * Stuck detection is now hook-based and lives in `checkStuckAgentRemediation`
+ * (stuck-remediation.ts), which reads the runtime mirror via
+ * `isAgentIdleForNudge` + `getAgentRuntimeStateSync` and escalates
+ * nudge → resume → troubled. PAN-1586 made `isAgentIdleForNudge` treat a stale
+ * 'active' mirror (Stop hook never fired) as idle, so a genuinely-stalled agent
+ * — regardless of spinner word or duration — is now caught there.
+ *
+ * The "exclude-from-context" dialog auto-dismiss that also lived here was a
+ * pane-scrape active intervention; like auto-suspend and lazy-detection it is
+ * out of scope for PAN-800 and tracked under PAN-188. The notification hook
+ * already surfaces that dialog as `waiting-on-human`.
+ *
+ * Retained as a no-op stub so the patrol-cycle wiring stays stable.
  */
 export async function checkStuckWorkAgents(): Promise<string[]> {
-  const actions: string[] = [];
-  const agents = listRunningAgentsSync();
-  // Specialist sessions (global or per-project) use the specialist tmux prefix.
-  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
-  const now = Date.now();
-
-  for (const agent of agents) {
-    if (!agent.tmuxActive) continue;
-
-    // Only check work agents, not specialists (specialists have their own health checks)
-    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialistSession(agent.id);
-    if (!isWorkAgent) continue;
-
-    // Check cooldown
-    const recovery = stuckRecoveryState.get(agent.id);
-    if (recovery && (now - recovery.lastAttempt) < STUCK_RECOVERY_COOLDOWN_MS) {
-      continue;
-    }
-
-    // Capture tmux output to check for stuck thinking
-    let tmuxOutput: string;
-    try {
-      tmuxOutput = await Effect.runPromise(capturePane(agent.id, 10));
-    } catch {
-      continue;
-    }
-
-    if (!tmuxOutput.trim()) continue;
-
-    // Detect agents stuck on Claude Code's "exclude from context" interactive dialog.
-    // This dialog fires when Claude Code wants to add a file to .claudeignore and waits
-    // for user input (Esc to cancel, Tab to amend). The notification-hook sets runtime
-    // state to 'waiting-on-human', but no automated recovery was wired up for this case.
-    const isExcludeDialog = tmuxOutput.includes('Do you want to make this edit to exclude')
-      || tmuxOutput.includes('Esc to cancel') && tmuxOutput.includes('Tab to amend');
-    if (isExcludeDialog) {
-      console.log(`[deacon] Work agent ${agent.id} stuck on exclude-from-context dialog — dismissing with Escape`);
-      try {
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
-        saveAgentRuntimeState(agent.id, { state: 'active' });
-        actions.push(`Stuck recovery: dismissed exclude-from-context dialog for ${agent.id}`);
-      } catch (err) {
-        console.error(`[deacon] Failed to send Escape to ${agent.id}:`, err);
-      }
-      continue;
-    }
-
-    // Parse thinking duration
-    const thinkingMs = parseThinkingDuration(tmuxOutput);
-    if (thinkingMs === null || thinkingMs < STUCK_THINKING_THRESHOLD_MS) {
-      // Not thinking, or thinking for an acceptable duration — clear recovery state
-      if (recovery && recovery.attempts > 0) {
-        stuckRecoveryState.delete(agent.id);
-      }
-      continue;
-    }
-
-    const thinkingMinutes = Math.round(thinkingMs / 60000);
-    const attempts = recovery?.attempts ?? 0;
-
-    // PAN-653: If the workspace is marked stuck (e.g. main diverged during approve),
-    // skip all recovery actions — Deacon must not respawn a stuck workspace.
-    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
-    const agentReviewStatus = getReviewStatusSync(agentIssueId);
-    if (agentReviewStatus?.stuck) {
-      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): workspace is stuck`);
-      continue;
-    }
-    if (agentReviewStatus?.deaconIgnored) {
-      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): deacon-ignored by operator`);
-      continue;
-    }
-
-    console.log(`[deacon] Work agent ${agent.id} stuck thinking for ${thinkingMinutes}m (attempt ${attempts + 1})`);
-
-    try {
-      if (attempts === 0) {
-        // First attempt: send Escape to cancel thinking
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
-        actions.push(`Stuck recovery: sent Escape to ${agent.id} (thinking ${thinkingMinutes}m)`);
-      } else if (attempts === 1) {
-        // Second attempt: send Ctrl+C to interrupt
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'C-c'])} 2>/dev/null || true`);
-        actions.push(`Stuck recovery: sent Ctrl+C to ${agent.id} (thinking ${thinkingMinutes}m)`);
-      } else {
-        // Third+ attempt: kill and respawn
-        const launcherPath = join(AGENTS_DIR, agent.id, 'launcher.sh');
-        const agentState = getAgentStateSync(agent.id);
-        const workspace = agentState?.workspace;
-
-        if (!existsSync(launcherPath) || !workspace) {
-          console.error(`[deacon] Cannot respawn ${agent.id}: missing launcher.sh or workspace`);
-          actions.push(`Stuck recovery failed for ${agent.id}: missing launcher or workspace`);
-          continue;
-        }
-
-        // Kill the stuck tmux session
-        await Effect.runPromise(killSession(agent.id)).catch(() => { /* no stale session */ });
-
-        // Small delay to let tmux clean up
-        await new Promise(r => setTimeout(r, 1000));
-
-        // Respawn in a new tmux session with the same launcher
-        // Kill stale session first to prevent "duplicate session" error (PAN-430)
-        await Effect.runPromise(killSession(agent.id)).catch(() => { /* no stale session */ });
-        await Effect.runPromise(createSession(agent.id, workspace, `bash ${launcherPath}`, {
-          env: BLANKED_PROVIDER_ENV,
-        }));
-
-        // Reset recovery state since we respawned fresh
-        stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
-
-        actions.push(`Stuck recovery: respawned ${agent.id} (was stuck thinking ${thinkingMinutes}m, attempt ${attempts + 1})`);
-        console.log(`[deacon] Respawned stuck work agent ${agent.id}`);
-        continue;
-      }
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[deacon] Stuck recovery failed for ${agent.id}:`, msg);
-      actions.push(`Stuck recovery error for ${agent.id}: ${msg}`);
-    }
-
-    // Track this recovery attempt
-    stuckRecoveryState.set(agent.id, {
-      lastAttempt: now,
-      attempts: attempts + 1,
-    });
-  }
-
-  return actions;
+  return [];
 }
 
 // ============================================================================
