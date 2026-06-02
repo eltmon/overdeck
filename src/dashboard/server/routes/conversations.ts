@@ -90,6 +90,7 @@ import {
   getProviderExportsForModel,
   getProviderEnvForModel,
   getProviderAuthMode,
+  getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
@@ -1596,13 +1597,24 @@ const getConversationsRoute = HttpRouter.add(
             // single-conversation GET /:id and the /:name/messages stream both
             // compute usage on-demand for the currently-open panel, which is
             // the only place the indicator is actually shown.
-            if (sessionAlive && convSf && existsSync(convSf)) {
-              try {
-                const summary = await summarizeConversationActivity(convSf);
-                isWorking = summary.isWorking;
-                currentTool = summary.currentTool;
-              } catch {
-                // JSONL parse failure — fall back to defaults
+            if (sessionAlive) {
+              // PAN-1596: prefer the hook-driven runtime mirror — conversations
+              // now emit activity to it. 'active' collapses working+thinking
+              // (busy); 'idle'/'waiting' are not busy. Falls back to the JSONL
+              // transcript scan for sessions whose hooks predate the auth fix
+              // and so have no mirror state yet.
+              const rt = getAgentRuntimeStateSync(conv.tmuxSession);
+              if (rt && rt.state !== 'uninitialized') {
+                isWorking = rt.state === 'active';
+                currentTool = rt.currentTool ?? null;
+              } else if (convSf && existsSync(convSf)) {
+                try {
+                  const summary = await summarizeConversationActivity(convSf);
+                  isWorking = summary.isWorking;
+                  currentTool = summary.currentTool;
+                } catch {
+                  // JSONL parse failure — fall back to defaults
+                }
               }
             }
 
