@@ -361,7 +361,7 @@ function buildStoppedAgentLifecycle(
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it or 'pan review reset --session ${agentOrIssueId}' before starting fresh.`;
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
   } else if (hasAgentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;

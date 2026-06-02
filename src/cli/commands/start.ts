@@ -98,6 +98,9 @@ interface IssueOptions {
   host?: boolean;
   yes?: boolean;
   force?: boolean;
+  /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
+   *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
+  fresh?: boolean;
 }
 
 /**
@@ -771,8 +774,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
+    // --fresh: drop the saved session pointer (non-destructive — JSONL transcripts
+    // are never touched) so the start below opens a brand-new Claude session. This
+    // is the one-step "restart fresh" path, e.g. switching a stopped agent's model
+    // where the saved session can't resume under different provider routing. Skip
+    // silently when there's no prior agent state (nothing to clear); resetSession
+    // refuses (and exits with guidance) if the agent is still running.
+    if (options.fresh && getAgentStateSync(`agent-${id.toLowerCase()}`)) {
+      const { resetSessionCommand } = await import('./reset-session.js');
+      await resetSessionCommand(id);
+    }
+
     // Refuse fresh start when a resumable session already exists.
-    // Users must choose resume or reset-session explicitly.
+    // Users must choose resume, `pan start --fresh`, or reset-session explicitly.
     try {
       assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
     } catch (error) {
