@@ -3,7 +3,6 @@ import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
-import MetricStrip, { type MetricStripTile } from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
@@ -37,10 +36,6 @@ const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
 
 type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>;
 type PipelineClassifierAgent = Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'>;
-
-function MetricIcon({ label }: { label: string }) {
-  return <span aria-hidden="true">{label}</span>;
-}
 
 function hasActiveWorkSession(feature: ProjectFeature): boolean {
   return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
@@ -188,18 +183,18 @@ export function ProjectOverview({
     return byPhase;
   }, [bucketedFeatures]);
 
-  const metricTiles = useMemo<MetricStripTile[]>(() => {
-    const reviewRunning = bucketedFeatures.filter(({ phase }) => phase === 'review').length;
+  const metrics = useMemo<HeroMetric[]>(() => {
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
+    const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.reviewStatus)).length;
 
     return [
-      { id: 'active', eyebrow: 'Active issues', value: features.length, sub: projectName, icon: <MetricIcon label="●" />, signal: 'info' },
-      { id: 'work', eyebrow: 'Work running', value: activeAgentCount, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' },
-      { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review phase', icon: <MetricIcon label="◆" />, signal: 'review' },
-      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ship phase', icon: <MetricIcon label="↑" />, signal: 'success' },
-      { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: 'project total', icon: <MetricIcon label="$" />, signal: 'cost' },
+      { label: 'Active issues', value: features.length, sub: 'in pipeline', tone: 'info' },
+      { label: 'Stuck', value: stuck, sub: stuck > 0 ? 'need attention' : 'all clear', tone: stuck > 0 ? 'destructive' : 'muted' },
+      { label: 'Agents', value: activeAgentCount, sub: 'running now', tone: 'success' },
+      { label: 'Ship-ready', value: readyToShip, sub: 'awaiting merge', tone: 'success' },
+      { label: 'Spend', value: formatCost(totalCost), sub: 'project total', tone: 'cost' },
     ];
-  }, [activeAgentCount, bucketedFeatures, features.length, projectName, totalCost]);
+  }, [activeAgentCount, bucketedFeatures, features.length, totalCost]);
 
   return (
     <section
@@ -212,7 +207,7 @@ export function ProjectOverview({
         overflow: 'auto',
       }}
     >
-      <HeroBillboard projectName={projectName} metricTiles={metricTiles} />
+      <HeroBillboard projectName={projectName} metrics={metrics} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {
@@ -234,34 +229,45 @@ export function ProjectOverview({
   );
 }
 
-function HeroBillboard({
-  projectName,
-  metricTiles,
-}: {
-  projectName: string;
-  metricTiles: MetricStripTile[];
-}) {
-  // One compact glance row — the project's headline metrics (active · work ·
-  // review · ship · spend) already live in `metricTiles`, so the old duplicate
-  // 4-card "Issues / Total cost / Active agents / Pipeline phases" grid is gone
-  // (it repeated the same numbers and ate ~150px). (PAN-1591 project-cockpit
-  // refinement, mirroring the issue cockpit's single-source metric strip.)
+type HeroTone = 'info' | 'success' | 'warning' | 'destructive' | 'cost' | 'muted';
+interface HeroMetric { label: string; value: ReactNode; sub?: string; tone: HeroTone }
+const HERO_TONE_COLOR: Record<HeroTone, string> = {
+  info: 'var(--info-foreground)',
+  success: 'var(--success-foreground)',
+  warning: 'var(--warning-foreground)',
+  destructive: 'var(--destructive-foreground)',
+  cost: 'var(--signal-cost-foreground)',
+  muted: 'var(--foreground)',
+};
+
+function HeroBillboard({ projectName, metrics }: { projectName: string; metrics: HeroMetric[] }) {
+  // Tight, container-responsive glance row. No outer card and an auto-fill grid
+  // (min 132px tiles) so it lays out by the PANE width — tiles never crush to
+  // ~100px and truncate their labels the way the fixed 5-column MetricStrip did
+  // in the narrow cockpit pane. (PAN-1591 project-cockpit refinement.)
   return (
-    <div
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        padding: 14,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-      }}
-    >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="flex items-baseline gap-2">
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
         <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
-      <MetricStrip tiles={metricTiles} columns={5} className="border-b-0 px-0 py-0" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8 }}>
+        {metrics.map((m) => (
+          <div
+            key={m.label}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '8px 11px',
+              background: 'color-mix(in srgb, white 1.5%, transparent)',
+            }}
+          >
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
+            <div style={{ marginTop: 2, fontSize: 18, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+            {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
