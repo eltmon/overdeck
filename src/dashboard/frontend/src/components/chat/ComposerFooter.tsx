@@ -175,7 +175,28 @@ export function ComposerFooter({
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
-  const [sending, setSending] = useState(false);
+  // `sending` is scoped per-conversation, not a single boolean. ComposerFooter
+  // is reused (not React-keyed) across conversation switches, so a plain
+  // `useState(false)` leaked the "Sending…" state into whichever conversation
+  // was mounted next, and an in-flight send that resolved after a switch would
+  // clear the wrong conversation. Keying by conversation.name — the same scheme
+  // drafts use — makes the indicator follow the conversation it belongs to.
+  // Entries are deleted (not set false) when a send settles so the map only
+  // ever holds conversations with a send genuinely in flight.
+  const [sendingByConversation, setSendingByConversation] = useState<Record<string, boolean>>({});
+  const setSendingFor = useCallback((conversationName: string, value: boolean) => {
+    setSendingByConversation((prev) => {
+      if (value) {
+        if (prev[conversationName]) return prev;
+        return { ...prev, [conversationName]: true };
+      }
+      if (!prev[conversationName]) return prev;
+      const next = { ...prev };
+      delete next[conversationName];
+      return next;
+    });
+  }, []);
+  const sending = sendingByConversation[conversation.name] ?? false;
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
@@ -309,8 +330,9 @@ export function ComposerFooter({
     setHarness(newHarness);
     saveStoredHarness(newHarness);
     if (conversation.sessionAlive) {
-      setSending(true);
-      void switchModel(conversation.name, model, agentId, newHarness)
+      const switchConversationName = conversation.name;
+      setSendingFor(switchConversationName, true);
+      void switchModel(switchConversationName, model, agentId, newHarness)
         .catch((err: unknown) => {
           console.error('[ComposerFooter] Failed to switch harness:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to switch harness');
@@ -318,26 +340,27 @@ export function ComposerFooter({
           setHarness(harness);
         })
         .finally(() => {
-          setSending(false);
+          setSendingFor(switchConversationName, false);
         });
     }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model, setSendingFor]);
 
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
     if (conversation.sessionAlive) {
-      setSending(true);
-      void switchModel(conversation.name, newModel, agentId, harness)
+      const switchConversationName = conversation.name;
+      setSendingFor(switchConversationName, true);
+      void switchModel(switchConversationName, newModel, agentId, harness)
         .catch((err: unknown) => {
           console.error('[ComposerFooter] Failed to switch model:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to switch model');
         })
         .finally(() => {
-          setSending(false);
+          setSendingFor(switchConversationName, false);
         });
     }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness]);
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, setSendingFor]);
 
   /**
    * Atomic model+harness swap. Used by the picker's auto-resolve flow when
@@ -350,8 +373,9 @@ export function ComposerFooter({
     setHarness(newHarness);
     saveStoredHarness(newHarness);
     if (conversation.sessionAlive) {
-      setSending(true);
-      void switchModel(conversation.name, newModel, agentId, newHarness)
+      const switchConversationName = conversation.name;
+      setSendingFor(switchConversationName, true);
+      void switchModel(switchConversationName, newModel, agentId, newHarness)
         .catch((err: unknown) => {
           console.error('[ComposerFooter] Failed to switch model+harness:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to switch model+harness');
@@ -360,10 +384,10 @@ export function ComposerFooter({
           setHarness(harness);
         })
         .finally(() => {
-          setSending(false);
+          setSendingFor(switchConversationName, false);
         });
     }
-  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model, setSendingFor]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
@@ -536,7 +560,7 @@ export function ComposerFooter({
     const uploadedImages = currentPendingImages.filter((image) => image.serverPath);
     if (!messageText && uploadedImages.length === 0) return;
 
-    setSending(true);
+    setSendingFor(submitConversationName, true);
     const imagePrefix = uploadedImages
       .map((image) => `@${image.serverPath}`)
       .join('\n');
@@ -584,11 +608,13 @@ export function ComposerFooter({
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
       onSendFailed?.(composedMessage);
     } finally {
-      setSending(false);
+      // Clear the originating conversation's sending state regardless of which
+      // conversation is now mounted — the send belonged to submitConversationName.
+      setSendingFor(submitConversationName, false);
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending]);
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending, setSendingFor]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -609,7 +635,9 @@ export function ComposerFooter({
     }
 
     setPendingImages([]);
-    setSending(false);
+    // Do NOT reset sending here. It is now keyed per-conversation, so a send
+    // in flight for the conversation you're switching back to must keep showing
+    // "Sending…". The send's own finally clears it by submitConversationName.
     setModel(conversation.model ?? getDefaultConversationModel());
     setHarness(conversation.harness ?? 'claude-code');
     // Do NOT clear the editor here. The inner LexicalComposer is keyed by
