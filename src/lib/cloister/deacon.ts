@@ -740,6 +740,46 @@ const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
 const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
 
 /**
+ * Context-window overflow is NOT a transient error. It surfaces as e.g.
+ * "API Error: 400 Your input exceeds the context window of this model." and
+ * nudging "continue" only re-sends the same oversized context for the same
+ * 400. The only recovery is to compact the conversation, then — once the
+ * agent is idle again — nudge it to resume from the compacted summary.
+ *
+ * This matters most for non-Anthropic models routed through CLIProxy
+ * (e.g. gpt-5.5): Claude Code's native auto-compact is keyed to a context
+ * window it can't determine for the proxied model, so it never fires and the
+ * backend's own limit produces a hard 400 instead.
+ */
+const CONTEXT_OVERFLOW_PATTERNS = [
+  'input exceeds the context window',
+  'exceeds the context window of this model',
+];
+
+/** Continuation nudge sent after a successful /compact. */
+const CONTEXT_OVERFLOW_CONTINUE_MSG =
+  'Your context was compacted to recover from a context-window overflow. ' +
+  'Continue from where you left off using the compacted summary and your ' +
+  'beads / continue.json — do NOT start over.';
+
+/** Let `/compact` finish (and the agent return to an idle prompt) before judging the result. */
+const CONTEXT_COMPACT_SETTLE_MS = 60_000;
+
+/** Give up compacting after this many attempts in one incident and escalate to stuck. */
+const MAX_CONTEXT_COMPACT_ATTEMPTS = 3;
+
+/**
+ * Per-session context-overflow recovery state. Present only while a /compact
+ * is in flight or being retried; deleted once the overflow clears (so a later
+ * overflow is a fresh incident) or on escalation. Kept separate from
+ * apiErrorRecoveryState so the transient-error path is untouched.
+ */
+export const contextOverflowRecoveryState: Map<
+  string,
+  { lastAttempt: number; attempts: number }
+> = new Map();
+
+/**
  * Check for agents (work agents, specialists, planning) that stopped due
  * to transient API errors.
  *
@@ -781,6 +821,86 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
     const hasPrompt = tmuxOutput.includes('❯');
     if (!hasPrompt) continue;
+
+    // ── Context-window overflow recovery (distinct from transient errors) ──
+    // A 400 "input exceeds the context window" cannot be retried by continuing.
+    // Recover by compacting; once the compaction has settled and the overflow
+    // is gone, nudge the agent to resume. A loop guard escalates to stuck if
+    // /compact never clears the overflow.
+    {
+      const issueId = sessionName.startsWith('agent-')
+        ? sessionName.replace('agent-', '').toUpperCase()
+        : null;
+      const overflowBlocked = (() => {
+        if (!issueId) return false;
+        const st = getReviewStatusSync(issueId);
+        return Boolean(st?.stuck || st?.deaconIgnored);
+      })();
+      const ov = contextOverflowRecoveryState.get(sessionName);
+      // Judge overflow from only the recent tail: the error sits adjacent to the
+      // idle prompt when an agent stops, and after a /compact redraw the old
+      // error scrolls past this window — so a settled /compact that cleared the
+      // overflow won't be misread as "still overflowing" from stale scrollback.
+      const recentOutput = tmuxOutput.split('\n').slice(-40).join('\n');
+      const hasOverflow = CONTEXT_OVERFLOW_PATTERNS.some(p => recentOutput.includes(p));
+
+      if (!overflowBlocked) {
+        if (ov && (now - ov.lastAttempt) < CONTEXT_COMPACT_SETTLE_MS) {
+          // A /compact is in flight — give it time to finish before judging.
+          continue;
+        }
+
+        if (ov && !hasOverflow) {
+          // The previous /compact cleared the overflow → resume the agent and
+          // close out this incident (a later overflow starts fresh).
+          try {
+            await Effect.runPromise(sendKeys(sessionName, CONTEXT_OVERFLOW_CONTINUE_MSG));
+            console.log(`[deacon] Agent ${sessionName} resumed after context-overflow compaction`);
+            actions.push(`Context overflow recovery: resumed ${sessionName} after compaction`);
+          } catch (err) {
+            console.error(`[deacon] Failed to resume ${sessionName} after compaction:`, err);
+          }
+          contextOverflowRecoveryState.delete(sessionName);
+          continue;
+        }
+
+        if (hasOverflow) {
+          // Fresh overflow, or a settled /compact that did NOT clear it.
+          const attempts = ov?.attempts ?? 0;
+          if (attempts >= MAX_CONTEXT_COMPACT_ATTEMPTS) {
+            // Loop guard: /compact isn't clearing the overflow — escalate.
+            if (issueId) {
+              markWorkspaceStuck(issueId, 'context_overflow', { compactAttempts: attempts });
+            }
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'error',
+              message: `${sessionName} stuck: context-window overflow persisted after ${attempts} /compact attempts`,
+              issueId: issueId ?? undefined,
+            });
+            console.error(`[deacon] Agent ${sessionName} stuck after ${attempts} context-overflow compaction attempts — escalating`);
+            contextOverflowRecoveryState.delete(sessionName);
+            continue;
+          }
+
+          try {
+            await Effect.runPromise(sendKeys(sessionName, '/compact'));
+            contextOverflowRecoveryState.set(sessionName, { lastAttempt: now, attempts: attempts + 1 });
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'warn',
+              message: `${sessionName} hit context-window overflow — compacting to recover (attempt ${attempts + 1})`,
+              issueId: issueId ?? undefined,
+            });
+            console.log(`[deacon] Agent ${sessionName} hit context-window overflow — sent /compact (attempt ${attempts + 1})`);
+            actions.push(`Context overflow recovery: compacting ${sessionName} (attempt ${attempts + 1})`);
+          } catch (err) {
+            console.error(`[deacon] Failed to send /compact to ${sessionName}:`, err);
+          }
+          continue;
+        }
+      }
+    }
 
     const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
     if (!hasApiError) continue;
