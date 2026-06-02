@@ -44,33 +44,49 @@ import { httpHandler } from './http-handler.js';
 const getCostsSummaryRoute = HttpRouter.add(
   'GET',
   '/api/costs/summary',
-  httpHandler(Effect.try({
-    try: () => {
-      const today = new Date().toISOString().split('T')[0];
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  httpHandler(Effect.gen(function* () {
+    // PAN-1597: optional `?project=<PREFIX>` scopes the windows to one project's
+    // issues (e.g. PAN-* ) so the project cockpit can show recent (today / 7d)
+    // spend instead of an all-time lifetime total.
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
+    const projectPrefix = (Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('project') : null)?.toUpperCase() ?? null;
 
-      const todayEntries = readEventsSync({ startDate: today });
-      const weekEntries = readEventsSync({ startDate: weekAgo });
-      const monthEntries = readEventsSync({ startDate: monthAgo });
+    return yield* Effect.try({
+      try: () => {
+        const today = new Date().toISOString().split('T')[0];
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const summarize = (entries: { cost?: number; input?: number; output?: number; model?: string }[]) => ({
-        totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
-        totalTokens: entries.reduce((sum, e) => sum + ((e.input || 0) + (e.output || 0)), 0),
-        entryCount: entries.length,
-        byModel: entries.reduce<Record<string, number>>((acc, e) => {
-          if (e.model) acc[e.model] = (acc[e.model] || 0) + (e.cost || 0);
-          return acc;
-        }, {}),
-      });
+        type Entry = { issueId?: string; cost?: number; input?: number; output?: number; model?: string };
+        const scope = (entries: Entry[]) =>
+          projectPrefix
+            ? entries.filter((e) => typeof e.issueId === 'string' && e.issueId.toUpperCase().startsWith(`${projectPrefix}-`))
+            : entries;
 
-      return jsonResponse({
-        today: summarize(todayEntries),
-        week: summarize(weekEntries),
-        month: summarize(monthEntries),
-      });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+        const todayEntries = scope(readEventsSync({ startDate: today }));
+        const weekEntries = scope(readEventsSync({ startDate: weekAgo }));
+        const monthEntries = scope(readEventsSync({ startDate: monthAgo }));
+
+        const summarize = (entries: Entry[]) => ({
+          totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
+          totalTokens: entries.reduce((sum, e) => sum + ((e.input || 0) + (e.output || 0)), 0),
+          entryCount: entries.length,
+          byModel: entries.reduce<Record<string, number>>((acc, e) => {
+            if (e.model) acc[e.model] = (acc[e.model] || 0) + (e.cost || 0);
+            return acc;
+          }, {}),
+        });
+
+        return jsonResponse({
+          project: projectPrefix,
+          today: summarize(todayEntries),
+          week: summarize(weekEntries),
+          month: summarize(monthEntries),
+        });
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
   })),
 );
 

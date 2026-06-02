@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
@@ -159,6 +160,28 @@ export function ProjectOverview({
     [features, issueCosts],
   );
 
+  // PAN-1597: recent (rolling 7-day) project spend — far more actionable than
+  // the lifetime total. Derive the single project prefix from the features and
+  // ask the windowed, project-scoped cost summary for it.
+  const projectPrefix = useMemo(() => {
+    const prefixes = new Set(
+      features.map((f) => f.issueId.split('-')[0]?.toUpperCase()).filter(Boolean),
+    );
+    return prefixes.size === 1 ? [...prefixes][0]! : null;
+  }, [features]);
+
+  const { data: recentCost } = useQuery<{ week?: { totalCost?: number } }>({
+    queryKey: ['project-recent-spend', projectPrefix],
+    queryFn: async () => {
+      const res = await fetch(`/api/costs/summary?project=${encodeURIComponent(projectPrefix!)}`);
+      if (!res.ok) throw new Error('Failed to fetch project spend');
+      return res.json();
+    },
+    enabled: !!projectPrefix,
+    refetchInterval: 60_000,
+  });
+  const recentSpend = recentCost?.week?.totalCost ?? null;
+
   const activeAgentCount = useMemo(
     () => features.filter(hasActiveAgentSignal).length,
     [features],
@@ -192,9 +215,11 @@ export function ProjectOverview({
       { label: 'Stuck', value: stuck, sub: stuck > 0 ? 'need attention' : 'all clear', tone: stuck > 0 ? 'destructive' : 'muted' },
       { label: 'Agents', value: activeAgentCount, sub: 'running now', tone: 'success' },
       { label: 'Ship-ready', value: readyToShip, sub: 'awaiting merge', tone: 'success' },
-      { label: 'Spend', value: formatCost(totalCost), sub: 'project total', tone: 'cost' },
+      recentSpend != null
+        ? { label: 'Spend', value: formatCost(recentSpend), sub: 'last 7 days', tone: 'cost' }
+        : { label: 'Spend', value: formatCost(totalCost), sub: 'project total', tone: 'cost' },
     ];
-  }, [activeAgentCount, bucketedFeatures, features.length, totalCost]);
+  }, [activeAgentCount, bucketedFeatures, features.length, totalCost, recentSpend]);
 
   return (
     <section
