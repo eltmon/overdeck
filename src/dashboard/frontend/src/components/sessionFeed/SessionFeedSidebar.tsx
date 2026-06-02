@@ -24,7 +24,18 @@ interface SessionFeedSidebarProps {
   heading?: string;
   /** Embedded as a deck column — fills its container, no close button. */
   embedded?: boolean;
+  /**
+   * PAN-1591: merged Awareness rail. When provided, render a Needs-you / Project
+   * / Global scope switcher that replaces the two separate feeds (Project
+   * Activity + global Activity Feed) with one column. `projectIssueIds` scopes
+   * the Project view to the active project's issues.
+   */
+  scopeSwitcher?: boolean;
+  projectIssueIds?: readonly string[];
 }
+
+type FeedScope = 'needs' | 'project' | 'global';
+const FEED_SCOPE_STORAGE_KEY = 'panopticon.ui.awarenessScope';
 
 const TABS: Array<{ id: SessionFeedTab; label: string }> = [
   { id: 'all', label: 'All' },
@@ -46,13 +57,28 @@ const EMPTY_STATES: Record<SessionFeedTab, string> = {
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false }: SessionFeedSidebarProps) {
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
+  const [scope, setScope] = useState<FeedScope>(readStoredScope);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(FEED_SCOPE_STORAGE_KEY, scope);
+  }, [scope]);
+
+  // Pending-input subjects drive the "Needs you" count badge on the scope switch.
+  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const needsCount = scopeSwitcher ? pendingSubjects.length : 0;
+
+  // Resolve the effective scope of the underlying feed. Without the switcher we
+  // honor the legacy issueIds/unscoped props verbatim (backward compatible).
+  const effIssueIds = scopeSwitcher ? (scope === 'project' ? projectIssueIds : undefined) : issueIds;
+  const effUnscoped = scopeSwitcher ? false : unscoped;
+  const showFeed = !scopeSwitcher || scope !== 'needs';
 
   return (
     <aside className={`flex h-full min-h-0 flex-col bg-background ${embedded ? 'w-full' : 'w-80 shrink-0 border-l border-border'}`} aria-label="Session activity feed">
@@ -73,32 +99,62 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         )}
       </header>
 
-      <NeedsYouSection issueIds={issueIds} unscoped={unscoped} />
+      {scopeSwitcher && (
+        <div role="tablist" aria-label="Awareness scope" className="grid grid-cols-3 gap-1 border-b border-border p-2">
+          {([
+            { id: 'needs', label: 'Needs you', badge: needsCount },
+            { id: 'project', label: 'Project', badge: 0 },
+            { id: 'global', label: 'Global', badge: 0 },
+          ] as const).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={scope === s.id}
+              className={scope === s.id
+                ? 'flex items-center justify-center gap-1.5 rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
+                : 'flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
+              onClick={() => setScope(s.id)}
+            >
+              {s.label}
+              {s.badge > 0 && (
+                <span className="rounded bg-amber-500/20 px-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{s.badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id
-              ? 'rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
-              : 'rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} showEmpty={scopeSwitcher && scope === 'needs'} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {isStubTab(activeTab) ? (
-          <StubTabEmptyState tab={activeTab} />
-        ) : (
-          <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={issueIds} unscoped={unscoped} />
-        )}
-      </div>
+      {showFeed && (
+        <>
+          <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id
+                  ? 'rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
+                  : 'rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {isStubTab(activeTab) ? (
+              <StubTabEmptyState tab={activeTab} />
+            ) : (
+              <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} />
+            )}
+          </div>
+        </>
+      )}
     </aside>
   );
 }
@@ -114,7 +170,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  * ChannelPermissionDialog — is reachable). Scoped to `issueIds` (Project
  * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
-function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[]; unscoped?: boolean }) {
+function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
   const subjects = useDashboardStore(selectPendingInputSubjects);
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
@@ -174,7 +230,16 @@ function NeedsYouSection({ issueIds, unscoped }: { issueIds?: readonly string[];
 
   // Keep the section mounted while any raw subject exists so AnimatePresence can
   // animate the last answered/dismissed card out before the box collapses.
-  if (scoped.length === 0) return null;
+  // In the dedicated "Needs you" scope (showEmpty) we render a calm all-clear
+  // instead of collapsing, so the tab never looks broken when nothing is blocked.
+  if (scoped.length === 0) {
+    if (!showEmpty) return null;
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+        Nothing needs you right now.
+      </div>
+    );
+  }
 
   return (
     <div className="border-b border-amber-500/30 bg-amber-500/5 px-2 py-2">
@@ -278,6 +343,12 @@ function readStoredTab(): SessionFeedTab {
   if (typeof window === 'undefined') return 'all';
   const value = window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY);
   return isSessionFeedTab(value) ? value : 'all';
+}
+
+function readStoredScope(): FeedScope {
+  if (typeof window === 'undefined') return 'project';
+  const value = window.localStorage.getItem(FEED_SCOPE_STORAGE_KEY);
+  return value === 'needs' || value === 'project' || value === 'global' ? value : 'project';
 }
 
 function isSessionFeedTab(value: string | null): value is SessionFeedTab {
