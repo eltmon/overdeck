@@ -33,6 +33,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, BACKGROUND_AI_FEATURE_META } from './types';
+import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -512,26 +513,33 @@ export function SettingsPage() {
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // Retry until the target section is actually in the DOM — on a fresh
+    // navigation the section may not be mounted on the first frame, which made
+    // the deep-link miss intermittently (PAN-1600).
+    let tries = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (tries++ < 40) setTimeout(tryScroll, 50);
+    };
+    tryScroll();
   }, []);
 
-  // Deep-link: when another surface (e.g. the low-cost-mode status pill) opens
-  // Settings with a section intent, scroll there once on mount (PAN-1589).
+  // Deep-link from other surfaces (e.g. the app-bar Low-cost mode pill). Handles
+  // both cases: navigated-then-mounted (consume the pending intent on mount) and
+  // already-open (react to the live event) — PAN-1600.
   useEffect(() => {
-    let intent: string | null = null;
-    try {
-      intent = sessionStorage.getItem('panopticon.settingsSection');
-      if (intent) sessionStorage.removeItem('panopticon.settingsSection');
-    } catch {
-      intent = null;
-    }
-    if (!intent) return;
-    // Defer to the next frame so the target section is mounted.
-    const t = setTimeout(() => scrollToSection(intent as string), 0);
-    return () => clearTimeout(t);
+    const pending = consumePendingSettingsSection();
+    if (pending) scrollToSection(pending);
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) scrollToSection(id);
+    };
+    window.addEventListener(SETTINGS_SECTION_EVENT, handler);
+    return () => window.removeEventListener(SETTINGS_SECTION_EVENT, handler);
   }, [scrollToSection]);
 
   // ── Conversations & Search (embedding) config ──────────────────────────────
@@ -1070,28 +1078,28 @@ export function SettingsPage() {
   // Render the model control for one background feature. Heterogeneous: chat
   // features use the chat-model select; memory uses provider+model; embeddings
   // use a dedicated provider+embedding-model picker; TTS edits its own model.
-  const backgroundModelControl = (key: BackgroundAiFeature, disabled: boolean) => {
+  const backgroundModelControl = (key: BackgroundAiFeature) => {
     const setConv = (patch: NonNullable<SettingsConfig['conversations']>) =>
       applyBackgroundModelPatch({ ...formData!, conversations: { ...formData!.conversations, ...patch } });
     switch (key) {
       case 'conversationTitles':
       case 'titleRefinement':
         return (
-          <select disabled={disabled} value={formData?.conversations?.title_model || 'claude-haiku-4-5'}
+          <select value={formData?.conversations?.title_model || 'claude-haiku-4-5'}
             onChange={(e) => setConv({ title_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
             {chatModelOptionEls}
           </select>
         );
       case 'summaryFork':
         return (
-          <select disabled={disabled} value={formData?.conversations?.compaction_model || 'claude-haiku-4-5'}
+          <select value={formData?.conversations?.compaction_model || 'claude-haiku-4-5'}
             onChange={(e) => setConv({ compaction_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
             {chatModelOptionEls}
           </select>
         );
       case 'conversationEnrichment':
         return (
-          <select disabled={disabled} value={formData?.conversations?.enrichment?.quick_model || ''}
+          <select value={formData?.conversations?.enrichment?.quick_model || ''}
             onChange={(e) => setConv({ enrichment: { ...formData?.conversations?.enrichment, quick_model: e.target.value || null } })}
             className={`${bgSelectClass} max-w-[180px]`}>
             <option value="">Auto (tier default)</option>
@@ -1105,11 +1113,11 @@ export function SettingsPage() {
           applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } });
         return (
           <div className="flex items-center gap-1">
-            <select disabled={disabled} value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
+            <select value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
               <option value="anthropic">Anthropic</option>
               <option value="cliproxy">cliproxy</option>
             </select>
-            <input disabled={disabled} type="text" value={formData?.memory?.model || ''}
+            <input type="text" value={formData?.memory?.model || ''}
               onChange={(e) => setMem({ model: e.target.value || undefined })}
               placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
               className="w-36 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary" />
@@ -1122,14 +1130,14 @@ export function SettingsPage() {
         const model = formData?.conversations?.embedding_model || models[0] || '';
         return (
           <div className="flex items-center gap-1">
-            <select disabled={disabled} value={provider}
+            <select value={provider}
               onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0] }); }}
               className={`${bgSelectClass} max-w-[100px]`}>
               <option value="openai">OpenAI</option>
               <option value="voyage">Voyage</option>
               <option value="ollama">Ollama</option>
             </select>
-            <select disabled={disabled} value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
+            <select value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
               {models.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
@@ -1137,7 +1145,7 @@ export function SettingsPage() {
       }
       case 'ttsSummarizer':
         return (
-          <select disabled={disabled} value={formData?.tts_summarizer?.model || 'gpt-5.4-mini'}
+          <select value={formData?.tts_summarizer?.model || 'gpt-5.4-mini'}
             onChange={(e) => applyBackgroundModelPatch({ ...formData!, tts_summarizer: { ...formData!.tts_summarizer, model: e.target.value as ModelId } })}
             className={`${bgSelectClass} max-w-[180px]`}>
             {chatModelOptionEls}
@@ -2362,15 +2370,21 @@ export function SettingsPage() {
             return (
               <div
                 key={feature.key}
-                className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg transition-colors ${
-                  cheapMode ? 'opacity-50' : 'hover:bg-muted/30'
-                }`}
+                className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg transition-colors hover:bg-muted/30"
               >
                 <div className="min-w-0">
-                  <span className="text-sm font-medium text-foreground">{feature.label}</span>
+                  <span className={`text-sm font-medium ${effectiveOn ? 'text-foreground' : 'text-muted-foreground'}`}>{feature.label}</span>
+                  {!effectiveOn && (
+                    <span
+                      className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                      title="This feature is off, so it isn't running — but you can still change its model below; the new model takes effect when you enable it (or turn off low-cost mode)."
+                    >
+                      not active
+                    </span>
+                  )}
                   <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
                   <div className="mt-1.5 flex items-center gap-2">
-                    {backgroundModelControl(feature.key, cheapMode)}
+                    {backgroundModelControl(feature.key)}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -2402,8 +2416,11 @@ export function SettingsPage() {
           })}
         </div>
         <p className="text-[11px] text-muted-foreground mt-3 px-4">
-          24h figures are actual recorded spend per feature. Models shared between rows (e.g. titles
-          + refinement, memory extraction + query expansion) edit the same setting.
+          You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the
+          choice is saved and takes effect when the feature runs, but a model shown under a
+          <span className="mx-1 rounded bg-muted px-1 py-0.5 font-medium">not active</span>
+          feature isn't being used yet. 24h figures are actual recorded spend. Models shared between
+          rows (titles + refinement, memory extraction + query expansion) edit the same setting.
         </p>
       </section>
 

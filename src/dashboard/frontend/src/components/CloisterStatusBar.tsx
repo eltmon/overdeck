@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw, Gauge } from 'lucide-react';
+import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
@@ -31,9 +31,6 @@ interface DashboardSettings {
     cheap_mode?: boolean;
   };
 }
-
-/** sessionStorage key the Settings page reads to scroll to a section on open. */
-export const SETTINGS_SECTION_INTENT_KEY = 'panopticon.settingsSection';
 
 interface TtsHealthStatus {
   ok: boolean;
@@ -140,16 +137,6 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     retry: false,
   });
   const ttsEnabled = settings?.tts?.enabled === true;
-  const lowCostMode = settings?.background_ai?.cheap_mode === true;
-
-  const openBackgroundAiSettings = useCallback(() => {
-    try {
-      sessionStorage.setItem(SETTINGS_SECTION_INTENT_KEY, 'background-ai');
-    } catch {
-      // sessionStorage unavailable (private mode) — fall through to plain open.
-    }
-    onOpenSettings?.();
-  }, [onOpenSettings]);
 
   const { data: ttsHealth, isError: ttsHealthFailed } = useQuery({
     queryKey: ['tts-health'],
@@ -232,7 +219,20 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   };
 
   if (!status) {
-    return null;
+    // Cloister status unavailable (e.g. the status fetch 401'd). Still render the
+    // settings gear so the user always has a way into Settings — previously the
+    // whole bar (gear included) vanished on any fetch failure (PAN-1600).
+    return (
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onOpenSettings}
+          className="p-1 rounded text-xs bg-popover text-foreground hover:bg-card transition-colors"
+          title="Open Settings"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
   }
 
   const hasWarnings = status.summary.warning > 0 || status.summary.stuck > 0;
@@ -285,19 +285,6 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         <span title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`}>
           <AlertTriangle className="w-3.5 h-3.5 text-warning" />
         </span>
-      )}
-
-      {lowCostMode && (
-        <button
-          type="button"
-          data-testid="low-cost-mode-pill"
-          onClick={openBackgroundAiSettings}
-          className="flex items-center gap-1 rounded bg-popover px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-card hover:text-foreground transition-colors"
-          title="Background AI is off (low-cost mode). Click to configure which features run."
-        >
-          <Gauge className="h-3 w-3" />
-          Low-cost mode
-        </button>
       )}
 
       {ttsEnabled && (

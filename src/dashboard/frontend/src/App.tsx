@@ -40,6 +40,7 @@ import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
+import { LowCostModePill } from './components/LowCostModePill';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
@@ -1214,6 +1215,7 @@ export default function App() {
               </span>
             )}
             <StoppedAgentsBanner variant="pill" />
+            <LowCostModePill onOpenSettings={() => setActiveTab('settings')} />
             <SystemHealthPill />
             {/* The Command Deck has the always-on Awareness rail, so the global
                 feed toggle only appears on other pages (PAN-1591). */}
