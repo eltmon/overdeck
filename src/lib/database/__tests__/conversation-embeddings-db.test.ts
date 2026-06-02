@@ -1,18 +1,44 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { openEmbeddingsDb, dimensionsForModel } from '../conversation-embeddings-db.js';
-import type { EmbeddingsDbHandle } from '../conversation-embeddings-db.js';
+import type { ChunkInsert, EmbeddingsDbHandle } from '../conversation-embeddings-db.js';
+
+const require = createRequire(import.meta.url);
+const BetterSqlite3 = require('better-sqlite3');
+const sqliteVec = require('sqlite-vec') as { getLoadablePath: () => string };
 
 let tmpDir: string | undefined;
 let handle: EmbeddingsDbHandle | undefined;
 
 function makeTmpDir(): string {
-  tmpDir = join(tmpdir(), `pan-embeddings-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  tmpDir = mkdtempSync(join(tmpdir(), 'pan-embeddings-'));
   mkdirSync(tmpDir, { recursive: true });
   return tmpDir;
+}
+
+function makeChunk(overrides: Partial<ChunkInsert> = {}): ChunkInsert {
+  return {
+    sessionId: 'session-abc',
+    projectId: 'panopticon-cli',
+    role: 'assistant',
+    ts: '2026-06-02T00:00:00.000Z',
+    byteOffset: 0,
+    charLength: 17,
+    text: 'Hello world chunk',
+    tokenCount: 3,
+    indexedAt: '2026-06-02T00:00:01.000Z',
+    ...overrides,
+  };
+}
+
+function openRawDb(dbPath: string): any {
+  const db = new BetterSqlite3(dbPath);
+  db.loadExtension(sqliteVec.getLoadablePath());
+  return db;
 }
 
 afterEach(() => {
@@ -42,22 +68,30 @@ describe('conversation-embeddings-db', () => {
     });
 
     it('returns available=false for a path that cannot be created', () => {
-      // /proc is read-only on Linux — open should fail gracefully
-      handle = openEmbeddingsDb('/proc/this-cannot-exist/embeddings.db', 8);
+      const dir = makeTmpDir();
+      const notADirectory = join(dir, 'not-a-directory');
+      writeFileSync(notADirectory, 'file blocks directory creation');
+
+      handle = openEmbeddingsDb(join(notADirectory, 'embeddings.db'), 8);
       expect(handle.available).toBe(false);
-      expect(handle.unavailableReason).toBeTruthy();
+      expect(handle.unavailableReason).toMatch(/failed to open db/i);
+    });
+
+    it('returns available=false when sqlite-vec cannot be loaded', () => {
+      const dir = makeTmpDir();
+      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8, { sqliteVecPath: join(dir, 'missing-vec0.so') });
+      expect(handle.available).toBe(false);
+      expect(handle.unavailableReason).toMatch(/sqlite-vec extension failed to load/i);
     });
 
     it('returns available=false and meaningful reason when dimension mismatches existing DB', () => {
       const dir = makeTmpDir();
       const dbPath = join(dir, 'embeddings.db');
 
-      // Create with dim=8
       const first = openEmbeddingsDb(dbPath, 8);
       expect(first.available).toBe(true);
       first.close();
 
-      // Reopen with a different dim
       handle = openEmbeddingsDb(dbPath, 16);
       expect(handle.available).toBe(false);
       expect(handle.unavailableReason).toMatch(/dimension mismatch/i);
@@ -68,6 +102,7 @@ describe('conversation-embeddings-db', () => {
       const dbPath = join(dir, 'embeddings.db');
 
       const first = openEmbeddingsDb(dbPath, 8);
+      expect(first.available).toBe(true);
       first.close();
 
       handle = openEmbeddingsDb(dbPath, 8);
@@ -76,23 +111,37 @@ describe('conversation-embeddings-db', () => {
   });
 
   describe('schema', () => {
-    it('creates chunk_index, chunks_fts, chunks_vec, file_cursors, db_config tables', () => {
+    it('creates chunks, chunks_fts, chunks_vec, file_cursors, and db_config tables', () => {
       const dir = makeTmpDir();
-      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
+      const dbPath = join(dir, 'embeddings.db');
+      handle = openEmbeddingsDb(dbPath, 8);
       expect(handle.available).toBe(true);
+      handle.close();
+      handle = undefined;
+
+      const db = openRawDb(dbPath);
+      try {
+        const names = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual table')`).all().map((row: { name: string }) => row.name);
+        expect(names).toEqual(expect.arrayContaining(['chunks', 'chunks_fts', 'chunks_vec', 'file_cursors', 'db_config']));
+      } finally {
+        db.close();
+      }
     });
 
     it('stores the configured dimensions in db_config', () => {
-      // Verified indirectly: if dimensions mismatch on reopen, db_config must have stored them
       const dir = makeTmpDir();
       const dbPath = join(dir, 'embeddings.db');
-      const first = openEmbeddingsDb(dbPath, 4);
-      expect(first.available).toBe(true);
-      first.close();
+      handle = openEmbeddingsDb(dbPath, 4);
+      expect(handle.available).toBe(true);
+      handle.close();
+      handle = undefined;
 
-      const mismatch = openEmbeddingsDb(dbPath, 8);
-      expect(mismatch.available).toBe(false);
-      mismatch.close();
+      const db = openRawDb(dbPath);
+      try {
+        expect(db.prepare(`SELECT value FROM db_config WHERE key = 'dimensions'`).get()).toEqual({ value: '4' });
+      } finally {
+        db.close();
+      }
     });
   });
 
@@ -100,38 +149,70 @@ describe('conversation-embeddings-db', () => {
     it('inserts a chunk and returns a positive rowid', () => {
       const dir = makeTmpDir();
       handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const rowid = handle.upsertChunk({
-        sessionId: 'session-abc',
-        byteOffset: 0,
-        text: 'Hello world chunk',
-        tokenCount: 3,
-        indexedAt: new Date().toISOString(),
-      });
+      const rowid = handle.upsertChunk(makeChunk());
       expect(rowid).toBeGreaterThan(0);
     });
 
-    it('returns the same rowid on conflict (idempotent upsert)', () => {
+    it('stores chunker record fields in the chunks table', () => {
       const dir = makeTmpDir();
-      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const chunk = {
-        sessionId: 'session-abc',
-        byteOffset: 0,
-        text: 'First content',
-        tokenCount: 2,
-        indexedAt: new Date().toISOString(),
-      };
+      const dbPath = join(dir, 'embeddings.db');
+      handle = openEmbeddingsDb(dbPath, 8);
+      const rowid = handle.upsertChunk(makeChunk({
+        sessionId: 'session-fields',
+        projectId: 'project-fields',
+        role: 'user',
+        ts: '2026-06-02T01:02:03.000Z',
+        byteOffset: 128,
+        charLength: 42,
+        text: 'field check text',
+        tokenCount: 4,
+      }));
+      handle.close();
+      handle = undefined;
+
+      const db = openRawDb(dbPath);
+      try {
+        expect(db.prepare(`SELECT session_id, project_id, role, ts, byte_offset, char_length, text, token_count FROM chunks WHERE rowid = ?`).get(rowid)).toEqual({
+          session_id: 'session-fields',
+          project_id: 'project-fields',
+          role: 'user',
+          ts: '2026-06-02T01:02:03.000Z',
+          byte_offset: 128,
+          char_length: 42,
+          text: 'field check text',
+          token_count: 4,
+        });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('returns the same rowid and does not duplicate on conflict', () => {
+      const dir = makeTmpDir();
+      const dbPath = join(dir, 'embeddings.db');
+      handle = openEmbeddingsDb(dbPath, 8);
+      const chunk = makeChunk({ sessionId: 'session-abc', byteOffset: 0, text: 'First content', tokenCount: 2 });
       const rowid1 = handle.upsertChunk(chunk);
-      const rowid2 = handle.upsertChunk({ ...chunk, text: 'Updated content' });
+      const rowid2 = handle.upsertChunk({ ...chunk, text: 'Updated content', charLength: 15 });
       expect(rowid1).toBe(rowid2);
+      handle.close();
+      handle = undefined;
+
+      const db = openRawDb(dbPath);
+      try {
+        expect(db.prepare(`SELECT count(*) AS count FROM chunks WHERE session_id = ? AND byte_offset = ?`).get('session-abc', 0)).toEqual({ count: 1 });
+        expect(db.prepare(`SELECT text FROM chunks WHERE rowid = ?`).get(rowid1)).toEqual({ text: 'Updated content' });
+      } finally {
+        db.close();
+      }
     });
 
     it('assigns distinct rowids for different (sessionId, byteOffset) pairs', () => {
       const dir = makeTmpDir();
       handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const ts = new Date().toISOString();
-      const r1 = handle.upsertChunk({ sessionId: 'sess', byteOffset: 0, text: 'chunk A', tokenCount: 2, indexedAt: ts });
-      const r2 = handle.upsertChunk({ sessionId: 'sess', byteOffset: 100, text: 'chunk B', tokenCount: 2, indexedAt: ts });
-      const r3 = handle.upsertChunk({ sessionId: 'sess2', byteOffset: 0, text: 'chunk C', tokenCount: 2, indexedAt: ts });
+      const r1 = handle.upsertChunk(makeChunk({ sessionId: 'sess', byteOffset: 0, text: 'chunk A' }));
+      const r2 = handle.upsertChunk(makeChunk({ sessionId: 'sess', byteOffset: 100, text: 'chunk B' }));
+      const r3 = handle.upsertChunk(makeChunk({ sessionId: 'sess2', byteOffset: 0, text: 'chunk C' }));
       expect(new Set([r1, r2, r3]).size).toBe(3);
     });
   });
@@ -140,31 +221,23 @@ describe('conversation-embeddings-db', () => {
     it('stores a Float32Array embedding for a chunk rowid', () => {
       const dir = makeTmpDir();
       handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const rowid = handle.upsertChunk({
-        sessionId: 'sess',
-        byteOffset: 0,
-        text: 'content',
-        tokenCount: 1,
-        indexedAt: new Date().toISOString(),
-      });
-      // Should not throw
-      handle.upsertEmbedding(rowid, new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]));
+      const rowid = handle.upsertChunk(makeChunk());
+      expect(() => handle?.upsertEmbedding(rowid, new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]))).not.toThrow();
     });
 
     it('overwrites the embedding on a second call for the same rowid (idempotent)', () => {
       const dir = makeTmpDir();
       handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const rowid = handle.upsertChunk({
-        sessionId: 'sess',
-        byteOffset: 0,
-        text: 'content',
-        tokenCount: 1,
-        indexedAt: new Date().toISOString(),
-      });
-      const emb = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]);
-      handle.upsertEmbedding(rowid, emb);
-      // Should not throw on second call
-      handle.upsertEmbedding(rowid, new Float32Array(8).fill(0.5));
+      const rowid = handle.upsertChunk(makeChunk());
+      handle.upsertEmbedding(rowid, new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]));
+      expect(() => handle?.upsertEmbedding(rowid, new Float32Array(8).fill(0.5))).not.toThrow();
+    });
+
+    it('rejects vectors with the wrong dimension', () => {
+      const dir = makeTmpDir();
+      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
+      const rowid = handle.upsertChunk(makeChunk());
+      expect(() => handle?.upsertEmbedding(rowid, new Float32Array(7))).toThrow(/dimension mismatch/i);
     });
   });
 
@@ -203,20 +276,26 @@ describe('conversation-embeddings-db', () => {
   describe('deleteSession', () => {
     it('removes all chunks and embeddings for a session without affecting others', () => {
       const dir = makeTmpDir();
-      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
-      const ts = new Date().toISOString();
+      const dbPath = join(dir, 'embeddings.db');
+      handle = openEmbeddingsDb(dbPath, 8);
 
-      const r1 = handle.upsertChunk({ sessionId: 'keep', byteOffset: 0, text: 'keep this', tokenCount: 2, indexedAt: ts });
+      const r1 = handle.upsertChunk(makeChunk({ sessionId: 'keep', byteOffset: 0, text: 'keep this' }));
       handle.upsertEmbedding(r1, new Float32Array(8).fill(0.1));
 
-      const r2 = handle.upsertChunk({ sessionId: 'delete-me', byteOffset: 0, text: 'delete this', tokenCount: 2, indexedAt: ts });
+      const r2 = handle.upsertChunk(makeChunk({ sessionId: 'delete-me', byteOffset: 0, text: 'delete this' }));
       handle.upsertEmbedding(r2, new Float32Array(8).fill(0.2));
 
       handle.deleteSession('delete-me');
+      handle.close();
+      handle = undefined;
 
-      // 'keep' chunk cursor still works normally
-      handle.setCursor('/keep.jsonl', 512);
-      expect(handle.getCursor('/keep.jsonl')).toBe(512);
+      const db = openRawDb(dbPath);
+      try {
+        expect(db.prepare(`SELECT count(*) AS count FROM chunks WHERE session_id = 'keep'`).get()).toEqual({ count: 1 });
+        expect(db.prepare(`SELECT count(*) AS count FROM chunks WHERE session_id = 'delete-me'`).get()).toEqual({ count: 0 });
+      } finally {
+        db.close();
+      }
     });
   });
 

@@ -2,19 +2,16 @@
  * Conversation Embeddings Sidecar Database (PAN-1395)
  *
  * Manages ~/.panopticon/conversations/embeddings.db:
+ *   - chunks source table keyed by (session_id, byte_offset)
  *   - FTS5 virtual table for BM25 keyword search
  *   - sqlite-vec vec0 virtual table for cosine ANN search
- *   - chunk_index master table (session_id + byte_offset keyed, rowid shared
- *     with FTS and vec tables for RRF fusion)
  *   - file_cursors for idempotent incremental indexing
  *
  * Only safe to call from the Node 22 dashboard server — uses better-sqlite3
  * and sqlite-vec native extensions, both incompatible with Bun.
  *
  * Fail-closed: if sqlite-vec cannot be loaded, open() returns { available: false }
- * and no embeddings or vector search are performed. FTS-only search may still
- * work in this degraded mode (future), but for now the whole feature gates on
- * availability.
+ * and no embeddings or vector search are performed.
  */
 
 import type Database from 'better-sqlite3';
@@ -28,7 +25,11 @@ const _require = createRequire(import.meta.url);
 
 export interface ChunkInsert {
   sessionId: string;
+  projectId: string;
+  role: string;
+  ts?: string | null;
   byteOffset: number;
+  charLength: number;
   text: string;
   tokenCount: number;
   indexedAt: string;
@@ -37,7 +38,11 @@ export interface ChunkInsert {
 export interface ChunkRow {
   rowid: number;
   sessionId: string;
+  projectId: string;
+  role: string;
+  ts: string | null;
   byteOffset: number;
+  charLength: number;
   text: string;
   tokenCount: number;
   indexedAt: string;
@@ -76,100 +81,124 @@ export interface EmbeddingsDbHandle {
   close(): void;
 }
 
+export interface OpenEmbeddingsDbOptions {
+  /** Test hook: override the sqlite-vec loadable extension path. */
+  sqliteVecPath?: string;
+}
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const SCHEMA_VERSION = 1;
 
-function initSchema(db: Database.Database, dimensions: number): void {
-  const version = db.pragma('user_version', { simple: true }) as number;
-  if (version >= SCHEMA_VERSION) return;
+function tableExists(db: Database.Database, tableName: string): boolean {
+  const row = db
+    .prepare(`SELECT 1 FROM sqlite_master WHERE type IN ('table', 'virtual table') AND name = ?`)
+    .get(tableName) as { 1: number } | undefined;
+  return row !== undefined;
+}
 
+function getConfigValue(db: Database.Database, key: string): string | undefined {
+  if (!tableExists(db, 'db_config')) return undefined;
+  return (db.prepare('SELECT value FROM db_config WHERE key = ?').get(key) as { value: string } | undefined)?.value;
+}
+
+function initSchema(db: Database.Database, dimensions: number): void {
   db.exec(`
     -- Source of truth: one row per indexed chunk, rowid shared with FTS + vec
-    CREATE TABLE IF NOT EXISTS chunk_index (
-      rowid     INTEGER PRIMARY KEY AUTOINCREMENT,
+    CREATE TABLE IF NOT EXISTS chunks (
+      rowid       INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id  TEXT    NOT NULL,
+      project_id  TEXT    NOT NULL,
+      role        TEXT    NOT NULL,
+      ts          TEXT,
       byte_offset INTEGER NOT NULL,
+      char_length INTEGER NOT NULL,
       text        TEXT    NOT NULL,
       token_count INTEGER NOT NULL DEFAULT 0,
       indexed_at  TEXT    NOT NULL,
       UNIQUE(session_id, byte_offset)
     );
 
-    -- FTS5 for BM25 keyword search; content= avoids duplicating text
+    -- FTS5 for BM25 keyword search; content= keeps text stored in chunks
     CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
       text,
-      content=chunk_index,
-      content_rowid=rowid,
+      content='chunks',
+      content_rowid='rowid',
       tokenize='porter ascii'
     );
 
-    -- Triggers to keep chunks_fts in sync with chunk_index
-    CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunk_index BEGIN
+    -- Triggers to keep chunks_fts in sync with chunks
+    CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
       INSERT INTO chunks_fts(rowid, text) VALUES (new.rowid, new.text);
     END;
-    CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunk_index BEGIN
+    CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
       INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
       INSERT INTO chunks_fts(rowid, text) VALUES (new.rowid, new.text);
     END;
-    CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunk_index BEGIN
+    CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
       INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
     END;
 
     -- Incremental indexing cursors (one row per JSONL file)
     CREATE TABLE IF NOT EXISTS file_cursors (
-      file_path  TEXT PRIMARY KEY,
+      file_path   TEXT PRIMARY KEY,
       byte_offset INTEGER NOT NULL DEFAULT 0,
       updated_at  TEXT NOT NULL
     );
 
-    -- DB metadata (dimensions, model, etc.)
+    -- DB metadata (dimensions, schema version, etc.)
     CREATE TABLE IF NOT EXISTS db_config (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
   `);
 
-  // vec0 dimension is baked into the CREATE TABLE statement
+  // vec0 dimensions are baked into the CREATE TABLE statement.
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
-      rowid INTEGER PRIMARY KEY,
       embedding float[${dimensions}]
     );
   `);
 
-  db.exec(`INSERT OR IGNORE INTO db_config(key, value) VALUES ('dimensions', '${dimensions}')`);
-  db.exec(`INSERT OR IGNORE INTO db_config(key, value) VALUES ('schema_version', '${SCHEMA_VERSION}')`);
+  db.prepare(`INSERT OR IGNORE INTO db_config(key, value) VALUES (?, ?)`).run('dimensions', String(dimensions));
+  db.prepare(`INSERT OR REPLACE INTO db_config(key, value) VALUES (?, ?)`).run('schema_version', String(SCHEMA_VERSION));
 
-  db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  const version = db.pragma('user_version', { simple: true }) as number;
+  if (version < SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
 // ─── Prepared statement cache ─────────────────────────────────────────────────
 
 interface Stmts {
   upsertChunk: Database.Statement;
+  deleteEmbeddingByRowid: Database.Statement;
   upsertEmbedding: Database.Statement;
   getCursor: Database.Statement;
   setCursor: Database.Statement;
   deleteChunksBySession: Database.Statement;
   deleteEmbeddingsBySession: Database.Statement;
-  getDbConfig: Database.Statement;
 }
 
 function prepareStmts(db: Database.Database): Stmts {
   return {
     upsertChunk: db.prepare(`
-      INSERT INTO chunk_index(session_id, byte_offset, text, token_count, indexed_at)
-      VALUES (@sessionId, @byteOffset, @text, @tokenCount, @indexedAt)
+      INSERT INTO chunks(session_id, project_id, role, ts, byte_offset, char_length, text, token_count, indexed_at)
+      VALUES (@sessionId, @projectId, @role, @ts, @byteOffset, @charLength, @text, @tokenCount, @indexedAt)
       ON CONFLICT(session_id, byte_offset) DO UPDATE SET
-        text       = excluded.text,
-        token_count = excluded.token_count,
-        indexed_at  = excluded.indexed_at
+        project_id   = excluded.project_id,
+        role         = excluded.role,
+        ts           = excluded.ts,
+        char_length  = excluded.char_length,
+        text         = excluded.text,
+        token_count  = excluded.token_count,
+        indexed_at   = excluded.indexed_at
       RETURNING rowid
     `),
+    deleteEmbeddingByRowid: db.prepare(`
+      DELETE FROM chunks_vec WHERE rowid = CAST(? AS INTEGER)
+    `),
     upsertEmbedding: db.prepare(`
-      INSERT INTO chunks_vec(rowid, embedding) VALUES (?, ?)
-      ON CONFLICT(rowid) DO UPDATE SET embedding = excluded.embedding
+      INSERT INTO chunks_vec(rowid, embedding) VALUES (CAST(? AS INTEGER), ?)
     `),
     getCursor: db.prepare(`
       SELECT byte_offset FROM file_cursors WHERE file_path = ?
@@ -180,14 +209,13 @@ function prepareStmts(db: Database.Database): Stmts {
       ON CONFLICT(file_path) DO UPDATE SET byte_offset = excluded.byte_offset, updated_at = excluded.updated_at
     `),
     deleteChunksBySession: db.prepare(`
-      DELETE FROM chunk_index WHERE session_id = ?
+      DELETE FROM chunks WHERE session_id = ?
     `),
     deleteEmbeddingsBySession: db.prepare(`
       DELETE FROM chunks_vec WHERE rowid IN (
-        SELECT rowid FROM chunk_index WHERE session_id = ?
+        SELECT rowid FROM chunks WHERE session_id = ?
       )
     `),
-    getDbConfig: db.prepare(`SELECT value FROM db_config WHERE key = ?`),
   };
 }
 
@@ -199,7 +227,11 @@ function prepareStmts(db: Database.Database): Stmts {
  * @param dbPath   Absolute path to the embeddings.db file.
  * @param dimensions  Embedding vector size (must match what was used to create the DB).
  */
-export function openEmbeddingsDb(dbPath: string, dimensions: number): EmbeddingsDbHandle {
+export function openEmbeddingsDb(
+  dbPath: string,
+  dimensions: number,
+  options: OpenEmbeddingsDbOptions = {},
+): EmbeddingsDbHandle {
   const unavailable = (reason: string): EmbeddingsDbHandle => ({
     available: false,
     unavailableReason: reason,
@@ -212,9 +244,12 @@ export function openEmbeddingsDb(dbPath: string, dimensions: number): Embeddings
     close: () => {},
   });
 
+  if (!Number.isInteger(dimensions) || dimensions <= 0) {
+    return unavailable(`Invalid embedding dimensions: ${dimensions}`);
+  }
+
   let db: Database.Database;
   try {
-    // Ensure directory exists
     const dir = dirname(dbPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
@@ -225,9 +260,9 @@ export function openEmbeddingsDb(dbPath: string, dimensions: number): Embeddings
   }
 
   try {
-    // sqlite-vec must be loaded before FTS5 schema that references vec0
+    // sqlite-vec must be loaded before creating/querying vec0 virtual tables.
     const { getLoadablePath } = _require('sqlite-vec') as { getLoadablePath: () => string };
-    db.loadExtension(getLoadablePath());
+    db.loadExtension(options.sqliteVecPath ?? getLoadablePath());
   } catch (err) {
     db.close();
     return unavailable(`sqlite-vec extension failed to load: ${err instanceof Error ? err.message : String(err)}`);
@@ -238,8 +273,7 @@ export function openEmbeddingsDb(dbPath: string, dimensions: number): Embeddings
     db.pragma('synchronous = NORMAL');
     db.pragma('foreign_keys = ON');
 
-    // Check if DB was created with a different dimension
-    const existingDims = (db.prepare('SELECT value FROM db_config WHERE key = ?').get('dimensions') as { value: string } | undefined)?.value;
+    const existingDims = getConfigValue(db, 'dimensions');
     if (existingDims !== undefined && parseInt(existingDims, 10) !== dimensions) {
       db.close();
       return unavailable(
@@ -260,12 +294,16 @@ export function openEmbeddingsDb(dbPath: string, dimensions: number): Embeddings
     dimensions,
 
     upsertChunk(chunk: ChunkInsert): number {
-      const row = stmts.upsertChunk.get(chunk) as { rowid: number };
+      const row = stmts.upsertChunk.get({ ...chunk, ts: chunk.ts ?? null }) as { rowid: number };
       return row.rowid;
     },
 
     upsertEmbedding(rowid: number, embedding: Float32Array): void {
-      stmts.upsertEmbedding.run(rowid, embedding);
+      if (embedding.length !== dimensions) {
+        throw new Error(`Embedding dimension mismatch: expected ${dimensions}, received ${embedding.length}`);
+      }
+      stmts.deleteEmbeddingByRowid.run(rowid);
+      stmts.upsertEmbedding.run(rowid, Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength));
     },
 
     getCursor(filePath: string): number {
