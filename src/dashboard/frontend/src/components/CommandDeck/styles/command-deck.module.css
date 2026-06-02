@@ -678,6 +678,13 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  /* Fill the pane explicitly. The Stage `.pane` is `flex: 1; overflow: auto`
+     (a block container, not a flex column), so `flex: 1` alone collapses the
+     panel to its header height — which gave the terminal 0 height (blank) and
+     left the conversation with no bounded scroll area (no scroll-to-bottom).
+     ConversationPanel's `.conversationTerminal` fills via `height: 100%`; match
+     it so agent/session panes behave like regular conversation panes. */
+  height: 100%;
   overflow: hidden;
 }
 
