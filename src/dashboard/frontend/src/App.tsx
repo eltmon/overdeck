@@ -1217,16 +1217,20 @@ export default function App() {
               </span>
             )}
             <SystemHealthPill />
-            <button
-              type="button"
-              aria-label="Toggle activity feed"
-              aria-pressed={isSessionFeedSidebarOpen}
-              title="Activity Feed"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-            >
-              <History className="h-4 w-4" aria-hidden="true" />
-            </button>
+            {/* The Command Deck has the always-on Awareness rail, so the global
+                feed toggle only appears on other pages (PAN-1591). */}
+            {activeTab !== 'command-deck' && (
+              <button
+                type="button"
+                aria-label="Toggle activity feed"
+                aria-pressed={isSessionFeedSidebarOpen}
+                title="Activity Feed"
+                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+              >
+                <History className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1371,7 +1375,9 @@ export default function App() {
           </BootstrapGate>
         )}
         </main>
-        {isSessionFeedSidebarOpen && (
+        {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
+            this global feed, so don't double it up there. */}
+        {isSessionFeedSidebarOpen && activeTab !== 'command-deck' && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
         </div>
