@@ -66,4 +66,17 @@ describe('conversation ranker', () => {
       { text: ' after', match: false },
     ]);
   });
+
+  it('returns fused search hits with excerpt match flags', async () => {
+    const store = {
+      searchBm25: vi.fn(() => [row(10, 'alpha exact match'), row(20, 'semantic alpha neighbor')]),
+      searchVector: vi.fn(() => [row(20, 'semantic alpha neighbor'), row(30, 'distant alpha')]),
+    };
+
+    const hits = await rankConversationSearch({ query: 'alpha', store, provider: provider(), limit: 3, rrfK: 1 });
+
+    expect(hits.map((hit) => hit.rowid)).toEqual([20, 10, 30]);
+    expect(hits[0]?.excerptSegments).toContainEqual({ text: 'alpha', match: true });
+    expect(hits[1]?.excerpt).toBe('⦇alpha⦈ exact match');
+  });
 });
