@@ -67,6 +67,28 @@ export function ProjectHome({
     [conversations],
   )
 
+  // Project total spend (PAN-1589). issueCosts carries both the issueId and a
+  // lowercased alias for the same value, so dedupe by uppercased key before
+  // summing to avoid double-counting.
+  const totalCost = useMemo(() => {
+    if (!issueCosts) return undefined
+    const seen = new Set<string>()
+    let sum = 0
+    for (const [key, value] of Object.entries(issueCosts)) {
+      const norm = key.toUpperCase()
+      if (seen.has(norm)) continue
+      seen.add(norm)
+      sum += value
+    }
+    return sum
+  }, [issueCosts])
+
+  // Navigate to the global costs page via the app's history-driven router.
+  const openCosts = () => {
+    window.history.pushState({ tab: 'costs' }, '', '/costs')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
   const onAgentSelected = async (id: string) => {
     writeLastUsedAgent(api.deckKey, id)
     const conversationName = await onCreateConversation?.(id)
@@ -121,7 +143,11 @@ export function ProjectHome({
       header={
         <>
           <WorkspaceHeader variant="project" name={projectName} branch={branch} />
-          <StatChips conversationCount={conversations.length} />
+          <StatChips
+            conversationCount={conversations.length}
+            costUsd={totalCost}
+            onCostClick={openCosts}
+          />
         </>
       }
       launcher={launcher}

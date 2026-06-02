@@ -109,6 +109,7 @@ export type BackgroundAiFeature =
 
 export interface BackgroundAiConfig {
   cheap_mode?: boolean;
+  onboarded?: boolean;
   features?: Partial<Record<BackgroundAiFeature, boolean>>;
 }
 

@@ -169,6 +169,7 @@ export interface ApiSettingsConfig {
   /** Background AI feature toggles + low-cost master switch (PAN-1583). */
   background_ai?: {
     cheap_mode?: boolean;
+    onboarded?: boolean;
     features?: Partial<Record<BackgroundAiFeature, boolean>>;
   };
   api_keys: {
@@ -597,7 +598,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
     background_ai: {
       // Defensive — older test mocks of loadConfig may not include `backgroundAi`;
       // production loader always populates it via DEFAULT_CONFIG.
-      cheap_mode: config.backgroundAi?.cheapMode ?? false,
+      cheap_mode: config.backgroundAi?.cheapMode ?? true,
+      onboarded: config.backgroundAi?.onboarded ?? false,
       features: { ...defaultBackgroundAiFeatures(), ...config.backgroundAi?.features },
     },
     tracker_keys: config.trackerKeys,
@@ -759,6 +761,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     background_ai: settings.background_ai
       ? {
           cheap_mode: settings.background_ai.cheap_mode,
+          onboarded: settings.background_ai.onboarded,
           features: settings.background_ai.features,
         }
       : undefined,
@@ -834,6 +837,7 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     },
     background_ai: {
       cheap_mode: updates.background_ai?.cheap_mode ?? current.background_ai?.cheap_mode,
+      onboarded: updates.background_ai?.onboarded ?? current.background_ai?.onboarded,
       features: {
         ...current.background_ai?.features,
         ...updates.background_ai?.features,

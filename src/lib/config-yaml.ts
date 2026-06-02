@@ -89,9 +89,14 @@ export interface MemoryConfig {
  * optional background AI feature is disabled in one click, regardless of its
  * individual `features.<key>` toggle. Individual toggles let the user enable or
  * disable each background AI feature independently when cheap mode is off.
+ *
+ * `cheap_mode` defaults ON (PAN-1589): background AI is off until the user
+ * opts in. `onboarded` records that the user has seen the explanatory banner
+ * (or acted on it), so it is shown at most once.
  */
 export interface BackgroundAiConfig {
   cheap_mode?: boolean;
+  onboarded?: boolean;
   features?: Partial<Record<BackgroundAiFeature, boolean>>;
 }
 
@@ -719,6 +724,8 @@ export interface NormalizedConfig {
   backgroundAi: {
     /** Low-cost master switch: when true, all optional background AI is off. */
     cheapMode: boolean;
+    /** Whether the user has seen/acted on the off-by-default banner (PAN-1589). */
+    onboarded: boolean;
     /** Per-feature enablement, consulted by `isBackgroundFeatureEnabled`. */
     features: Record<BackgroundAiFeature, boolean>;
   };
@@ -948,7 +955,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     workerConcurrency: 4,
   },
   backgroundAi: {
-    cheapMode: false,
+    // PAN-1589: off by default — background AI stays gated until the user opts in.
+    cheapMode: true,
+    onboarded: false,
     features: defaultBackgroundAiFeatures(),
   },
   compliance: {
@@ -1592,6 +1601,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     backgroundAi: {
       cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
+      onboarded: DEFAULT_CONFIG.backgroundAi.onboarded,
       features: { ...DEFAULT_CONFIG.backgroundAi.features },
     },
     compliance: {
@@ -2017,6 +2027,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.background_ai) {
       if (typeof config.background_ai.cheap_mode === 'boolean') {
         result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
+      }
+      if (typeof config.background_ai.onboarded === 'boolean') {
+        result.backgroundAi.onboarded = config.background_ai.onboarded;
       }
       if (config.background_ai.features) {
         for (const feature of BACKGROUND_AI_FEATURES) {
