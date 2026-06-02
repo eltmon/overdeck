@@ -24,6 +24,8 @@ import { spawn } from 'node:child_process';
 import type { ChatMessage } from '@panctl/contracts';
 import { buildChildEnvSync } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
+import { recordBackgroundAiCost } from '../background-ai/cost.js';
+import type { BackgroundAiFeature } from '../background-ai/registry.js';
 
 /** Haiku — fast/cheap, used for every conversation title and about-summary. */
 export const CONVERSATION_TITLE_MODEL = 'claude-haiku-4-5-20251001';
@@ -106,6 +108,7 @@ async function invokeClaudeStructured(
   prompt: string,
   schema: Record<string, unknown>,
   timeoutMs = 30_000,
+  feature: BackgroundAiFeature = 'conversationTitles',
 ): Promise<Record<string, unknown>> {
   const providerEnv = await getProviderEnvForModel(model);
   const childEnv = { ...buildChildEnvSync(), ...providerEnv };
@@ -150,10 +153,46 @@ async function invokeClaudeStructured(
 
   // Claude CLI returns { structured_output: {...}, ... } or the bare object.
   const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
+
+  // Record token spend so background title/about generation is visible in the
+  // cost ledger. The `claude -p` JSON envelope carries usage + total_cost_usd.
+  recordTitleCost(feature, model, parsed);
+
   const structured = parsed['structured_output'];
   return structured && typeof structured === 'object'
     ? (structured as Record<string, unknown>)
     : parsed;
+}
+
+/**
+ * Record the token spend of a `claude -p` title/about call from its JSON
+ * envelope. Prefers the CLI-reported `total_cost_usd`; falls back to deriving
+ * cost from token usage via the pricing table. Best-effort — never throws.
+ */
+function recordTitleCost(
+  feature: BackgroundAiFeature,
+  model: string,
+  envelope: Record<string, unknown>,
+): void {
+  const usage = (envelope['usage'] ?? {}) as Record<string, unknown>;
+  const inputTokens = typeof usage['input_tokens'] === 'number' ? usage['input_tokens'] : 0;
+  const outputTokens = typeof usage['output_tokens'] === 'number' ? usage['output_tokens'] : 0;
+  const cacheRead = typeof usage['cache_read_input_tokens'] === 'number' ? usage['cache_read_input_tokens'] : 0;
+  const cacheWrite = typeof usage['cache_creation_input_tokens'] === 'number' ? usage['cache_creation_input_tokens'] : 0;
+  const totalCostUsd = typeof envelope['total_cost_usd'] === 'number' ? envelope['total_cost_usd'] : undefined;
+
+  recordBackgroundAiCost({
+    feature,
+    provider: 'anthropic',
+    model,
+    usage: {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+    },
+    costUsd: totalCostUsd,
+  });
 }
 
 /** Generate a 3-8 word title from the opening user message (conversation-creation path). */
@@ -187,7 +226,7 @@ export async function summarizeTranscriptTitle(
     'Conversation:',
     transcript,
   ].join('\n');
-  const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA);
+  const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA, 30_000, 'titleRefinement');
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');
 }
 

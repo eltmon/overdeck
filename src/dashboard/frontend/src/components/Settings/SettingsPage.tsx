@@ -30,8 +30,9 @@ import {
   ShieldCheck,
   Volume2,
   Mic,
+  Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig } from './types';
+import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -412,6 +413,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },
+  { id: 'background-ai', label: 'Background AI', icon: Gauge },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'tts', label: 'TTS', icon: Volume2 },
   { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
@@ -977,6 +979,23 @@ export function SettingsPage() {
     value: string,
   ) => {
     updateMemorySettings({ [key]: value === '' ? undefined : Number(value) });
+  };
+
+  // Background AI toggles persist immediately (one-click low-cost mode).
+  const updateBackgroundAi = (patch: BackgroundAiConfig) => {
+    if (!formData) return;
+    const next: SettingsConfig = {
+      ...formData,
+      background_ai: {
+        cheap_mode: patch.cheap_mode ?? formData.background_ai?.cheap_mode ?? false,
+        features: {
+          ...formData.background_ai?.features,
+          ...patch.features,
+        },
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
   };
 
   const handleClaudeCodeChannelsToggle = (enabled: boolean) => {
@@ -2145,6 +2164,79 @@ export function SettingsPage() {
               className="w-28 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
             />
           </div>
+        </div>
+      </section>
+
+      {/* Background AI */}
+      <section id="background-ai" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Gauge className="w-4 h-4 text-muted-foreground" />
+          Background AI
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Automatic, behind-the-scenes model calls Panopticon makes on your behalf — conversation
+          titles, memory extraction, enrichment, narration. Token spend for these is recorded in the
+          cost ledger under <code className="font-mono">background:&lt;feature&gt;</code>.
+        </p>
+        <div className="space-y-1">
+          {/* Low-cost master switch */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-muted/30 border border-border">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Low-cost mode</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                One-click switch that turns off every background AI feature below. Individual toggles
+                resume when this is off.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.background_ai?.cheap_mode ?? false}
+              aria-label="Toggle low-cost mode"
+              onClick={() => updateBackgroundAi({ cheap_mode: !(formData.background_ai?.cheap_mode ?? false) })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                (formData.background_ai?.cheap_mode ?? false) ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                (formData.background_ai?.cheap_mode ?? false) ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+
+          {BACKGROUND_AI_FEATURE_META.map((feature) => {
+            const cheapMode = formData.background_ai?.cheap_mode ?? false;
+            const featureOn = formData.background_ai?.features?.[feature.key] ?? true;
+            const effectiveOn = !cheapMode && featureOn;
+            return (
+              <div
+                key={feature.key}
+                className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg transition-colors ${
+                  cheapMode ? 'opacity-50' : 'hover:bg-muted/30'
+                }`}
+              >
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">{feature.label}</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={effectiveOn}
+                  aria-label={`Toggle ${feature.label}`}
+                  disabled={cheapMode}
+                  onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
+                    effectiveOn ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    effectiveOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  }`} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
 

@@ -96,6 +96,38 @@ export interface MemorySettingsConfig {
   worker_concurrency?: number;
 }
 
+/** Background AI feature keys (mirrors src/lib/background-ai/registry.ts). */
+export type BackgroundAiFeature =
+  | 'conversationTitles'
+  | 'titleRefinement'
+  | 'memoryExtraction'
+  | 'memoryQueryExpansion'
+  | 'conversationEnrichment'
+  | 'sessionEmbeddings'
+  | 'summaryFork'
+  | 'ttsSummarizer';
+
+export interface BackgroundAiConfig {
+  cheap_mode?: boolean;
+  features?: Partial<Record<BackgroundAiFeature, boolean>>;
+}
+
+/** UI metadata for each background AI feature toggle. */
+export const BACKGROUND_AI_FEATURE_META: ReadonlyArray<{
+  key: BackgroundAiFeature;
+  label: string;
+  description: string;
+}> = [
+  { key: 'conversationTitles', label: 'Conversation titles', description: 'Generate a title for a new conversation from its first message.' },
+  { key: 'titleRefinement', label: 'Title refinement', description: 'Refine a conversation title once the first assistant reply arrives.' },
+  { key: 'memoryExtraction', label: 'Memory extraction', description: 'Extract structured observations from running agent transcripts.' },
+  { key: 'memoryQueryExpansion', label: 'Memory query expansion', description: 'Expand memory search queries into related terms for better recall.' },
+  { key: 'conversationEnrichment', label: 'Conversation enrichment', description: 'Summarize and tag discovered sessions for search and display.' },
+  { key: 'sessionEmbeddings', label: 'Session embeddings', description: 'Build embedding vectors for semantic conversation search.' },
+  { key: 'summaryFork', label: 'Summary fork / compaction', description: 'Summarize a transcript on compaction or handoff fallback.' },
+  { key: 'ttsSummarizer', label: 'TTS activity narration', description: 'Summarize recent activity into spoken narration utterances.' },
+];
+
 export interface SettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
@@ -107,6 +139,7 @@ export interface SettingsConfig {
     };
   };
   memory?: MemorySettingsConfig;
+  background_ai?: BackgroundAiConfig;
   openrouter?: {
     favorites?: string[];
   };

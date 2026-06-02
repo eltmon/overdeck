@@ -94,6 +94,7 @@ import {
 } from '../../../lib/agents.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
+import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
@@ -1268,6 +1269,10 @@ export async function spawnConversationSession(
  * For an explicit, whole-conversation re-title see the retitle route below.
  */
 async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
+  // Background AI gate: low-cost mode (or the conversationTitles toggle) skips
+  // automatic title generation. Manual retitle (below) is unaffected.
+  if (!isBackgroundFeatureEnabled('conversationTitles')) return;
+
   const conv = getConversationByName(conversationName);
   if (!conv || !canReplaceTitle(conv)) {
     return;
@@ -1310,6 +1315,9 @@ const refinementScheduled = new Set<string>();
  * conversations will simply keep the first-message title.
  */
 function scheduleTitleRefinement(conversationName: string): void {
+  // Background AI gate: low-cost mode (or the titleRefinement toggle) skips the
+  // whole-transcript refinement pass.
+  if (!isBackgroundFeatureEnabled('titleRefinement')) return;
   if (refinementScheduled.has(conversationName)) return;
   refinementScheduled.add(conversationName);
 
