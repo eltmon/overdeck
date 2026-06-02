@@ -14,6 +14,13 @@ export interface ChatMessage {
   sequence?: number;
 }
 
+/** A user message whose send POST failed — held in the retry outbox. */
+export interface FailedMessage {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface WorkLogEntry {
   id: string;
   createdAt: string;

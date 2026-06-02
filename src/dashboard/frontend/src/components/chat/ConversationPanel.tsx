@@ -14,6 +14,12 @@ import { toContextWindowSnapshot } from '../../lib/contextWindow';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import {
+  useComposerStore,
+  useConversationOptimistic,
+  useConversationOptimisticBaseCount,
+  useConversationFailed,
+} from '../../lib/composerStore';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
@@ -1012,18 +1018,24 @@ interface ConversationViewProps {
   workingPhase?: WorkingPhase;
 }
 
-export interface FailedMessage {
-  id: string;
-  text: string;
-  createdAt: string;
-}
+export type { FailedMessage } from './chat-types';
 
 function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
-  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
-  const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
-  // Track count so we know when the server caught up
-  const prevServerCountRef = useRef(0);
+  // Optimistic sent messages and the failed-send retry outbox live in the
+  // module-level composerStore, keyed by conversation name. ConversationView is
+  // unmounted on every conversation switch (PAN-1591 renders only the active
+  // pane), so component-local state would lose an in-flight optimistic message
+  // and — worse — silently drop the failed-send outbox, costing the user their
+  // retry. The store keeps both with the conversation they belong to.
+  const optimisticMessages = useConversationOptimistic(conversation.name);
+  const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
+  const failedMessages = useConversationFailed(conversation.name);
+  const addOptimistic = useComposerStore((s) => s.addOptimistic);
+  const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
+  const failSend = useComposerStore((s) => s.failSend);
+  const addFailed = useComposerStore((s) => s.addFailed);
+  const removeFailed = useComposerStore((s) => s.removeFailed);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1057,35 +1069,22 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   // Drop optimistic messages once the server has returned at least as many messages
   // as we had before plus the optimistic ones (the real message has arrived).
-  const expectedCount = prevServerCountRef.current + optimisticMessages.length;
+  const expectedCount = optimisticBaseCount + optimisticMessages.length;
   const serverCaughtUp = serverMessages.length >= expectedCount && optimisticMessages.length > 0;
   const messages = serverCaughtUp ? serverMessages : [...serverMessages, ...optimisticMessages];
 
   const handleMessageSent = useCallback((text: string) => {
-    prevServerCountRef.current = serverMessages.length;
-    const optimistic: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      role: 'user',
-      text,
-      createdAt: new Date().toISOString(),
-    };
-    setOptimisticMessages([optimistic]);
-  }, [serverMessages.length]);
+    addOptimistic(conversation.name, text, serverMessages.length);
+  }, [addOptimistic, conversation.name, serverMessages.length]);
 
-  // Called by ComposerFooter when POST fails — move optimistic to failed outbox
+  // Called by ComposerFooter when POST fails — move optimistic to failed outbox.
   const handleSendFailed = useCallback((text: string) => {
-    setOptimisticMessages([]);
-    const failed: FailedMessage = {
-      id: `failed-${Date.now()}`,
-      text,
-      createdAt: new Date().toISOString(),
-    };
-    setFailedMessages(prev => [...prev, failed]);
-  }, []);
+    failSend(conversation.name, text);
+  }, [failSend, conversation.name]);
 
   const handleRetryFailed = useCallback(async (failedId: string, text: string) => {
     // Remove from failed list and re-send
-    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
+    removeFailed(conversation.name, failedId);
     try {
       const endpoint = agentId
         ? `/api/agents/${encodeURIComponent(agentId)}/message`
@@ -1101,28 +1100,22 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       }
     } catch {
       // Re-add to failed list on retry failure
-      const failed: FailedMessage = {
-        id: `failed-${Date.now()}`,
-        text,
-        createdAt: new Date().toISOString(),
-      };
-      setFailedMessages(prev => [...prev, failed]);
+      addFailed(conversation.name, text);
     }
-  }, [conversation.name, agentId]);
+  }, [conversation.name, agentId, removeFailed, addFailed]);
 
   const handleDiscardFailed = useCallback((failedId: string) => {
-    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
-  }, []);
+    removeFailed(conversation.name, failedId);
+  }, [removeFailed, conversation.name]);
 
-  // Clear failed messages when switching conversations
-  useEffect(() => {
-    setFailedMessages([]);
-  }, [conversation.name]);
+  // Failed messages are NOT cleared on conversation switch — they persist in the
+  // store keyed per-conversation so the retry outbox survives navigating away
+  // and back (the whole point of moving them out of component-local state).
 
-  // Clean up optimistic messages in an effect once the server catches up
+  // Clean up optimistic messages once the server catches up.
   useEffect(() => {
-    if (serverCaughtUp) setOptimisticMessages([]);
-  }, [serverCaughtUp]);
+    if (serverCaughtUp) clearOptimistic(conversation.name);
+  }, [serverCaughtUp, clearOptimistic, conversation.name]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';

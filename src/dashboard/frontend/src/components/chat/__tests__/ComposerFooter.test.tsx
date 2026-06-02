@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
+import { resetComposerStore } from '../../../lib/composerStore';
 
 const { editorState, mockFocus, mockToastError, mockSaveStoredModel } = vi.hoisted(() => ({
   editorState: { text: '' },
@@ -96,6 +97,7 @@ const secondConversation = {
 describe('ComposerFooter image attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetComposerStore();
     editorState.text = '';
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('image-1');
     vi.stubGlobal('fetch', vi.fn());
@@ -352,7 +354,12 @@ describe('ComposerFooter image attachments', () => {
     expect(editorState.text).toBe('half-written message');
   });
 
-  it('deletes uploaded images when the composer unmounts before send', async () => {
+  it('keeps pasted images (and their server upload) across a full unmount/remount', async () => {
+    // PAN-1591's pane splits unmount the composer on every conversation switch.
+    // Pasted images live in the module-level composerStore, so unmounting must
+    // NOT delete the server upload, and remounting the same conversation must
+    // show the image again — the durability contract that makes images behave
+    // like drafts.
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
@@ -395,16 +402,64 @@ describe('ComposerFooter image attachments', () => {
       expect(screen.getByText('Uploaded')).toBeInTheDocument();
     });
 
+    // Unmount == switching to another pane. The image must survive, not delete.
     view.unmount();
 
+    // Remount the same conversation == switching back. The image is still there.
+    render(<ComposerFooter conversation={conversation} />);
+    expect(await screen.findByText('abandon.png')).toBeInTheDocument();
+
+    const deleteCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/delete-image'));
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('keeps the Sending state across unmount/remount and never leaks it to another conversation', async () => {
+    // The user's report: send a message, switch away and back, and "Sending…"
+    // is gone. PAN-1591 unmounts the composer on switch, so a component-local
+    // flag could not survive. Sourcing it from the per-conversation composerStore
+    // makes it survive a remount of the same conversation — and stay isolated
+    // from any other conversation.
+    const fetchMock = vi.mocked(fetch);
+    let resolveSend: (() => void) | null = null;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/message')) {
+        return new Promise<Response>((resolve) => {
+          resolveSend = () => resolve(new Response('{}', { status: 200 }));
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const view = render(<ComposerFooter conversation={conversation} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hi there' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    // Send is in flight → the composer is disabled.
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/conversations/test-conv/delete-image',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-abandoned.png' }),
-        }),
-      );
+      expect(screen.getByTestId('composer-editor')).toBeDisabled();
+    });
+
+    // Switch away and back (full unmount/remount): still sending.
+    view.unmount();
+    const back = render(<ComposerFooter conversation={conversation} />);
+    expect(screen.getByTestId('composer-editor')).toBeDisabled();
+    back.unmount();
+
+    // A different conversation must NOT inherit the sending state.
+    render(<ComposerFooter conversation={secondConversation} />);
+    expect(screen.getByTestId('composer-editor')).not.toBeDisabled();
+
+    // Let the in-flight send settle so it doesn't leak into the next test.
+    resolveSend?.();
+    await waitFor(() => {
+      expect(screen.getByTestId('composer-editor')).not.toBeDisabled();
     });
   });
 
