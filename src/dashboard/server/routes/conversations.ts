@@ -81,10 +81,9 @@ import {
   killSession,
   createSession,
   setOption,
-  waitForClaudePrompt,
   listSessionNames,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -1029,6 +1028,12 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
+
+  // PAN-1596: clear any stale ready.json before launch so waitForReadySignal()
+  // (reattach/fork readiness) only observes the session-start signal from THIS
+  // launch. The conversation's session-start hook rewrites it when the new
+  // Claude session reaches the prompt.
+  clearReadySignal(tmuxSession);
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
@@ -2096,7 +2101,7 @@ const postConversationResumeRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(conv.tmuxSession);
           } else {
-            await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 30000)).catch(() => false);
+            await waitForReadySignal(conv.tmuxSession, 30);
           }
 
           markConversationActive(name);
@@ -2252,7 +2257,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           if (harness === 'pi') {
             await waitForPiTuiReady(tmuxSession);
           } else {
-            await Effect.runPromise(waitForClaudePrompt(tmuxSession, 30000)).catch(() => false);
+            await waitForReadySignal(tmuxSession, 30);
           }
 
           markConversationActive(name);
@@ -2908,7 +2913,7 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
   } else {
-    const ready = await Effect.runPromise(waitForClaudePrompt(conv.tmuxSession, 60000)).catch(() => false);
+    const ready = await waitForReadySignal(conv.tmuxSession, 60);
     if (!ready) {
       console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
     }

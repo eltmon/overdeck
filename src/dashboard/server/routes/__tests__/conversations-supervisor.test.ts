@@ -16,6 +16,8 @@ vi.mock('../../../../lib/agents.js', () => {
     deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
     writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
     dismissDevChannelsDialog: dismissDevChannelsDialogMock,
+    clearReadySignal: vi.fn(),
+    waitForReadySignal: vi.fn().mockResolvedValue(true),
     getAgentRuntimeBaseCommand: vi.fn().mockResolvedValue('claude --model claude-sonnet-4-6'),
     getProviderExportsForModel: vi.fn().mockResolvedValue(''),
     getProviderEnvForModel: vi.fn().mockResolvedValue({}),

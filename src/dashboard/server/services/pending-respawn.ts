@@ -8,7 +8,7 @@
  *                                    // ws-terminal closes clients with 1000
  *     await spawnConversationSession(...)   // new tmux session with same name
  *     await waitForTmuxSession(name)
- *     await waitForClaudePrompt(name, 30000)   // up to 30s
+ *     await waitForReadySignal(name, 30)        // up to 30s
  *
  * The terminal frontend (`XTerminal.tsx`) reconnects on close 1000 with
  * exponential backoff (1s, 2s, 4s, 8s, 16s). Every reconnect re-enters
@@ -58,7 +58,7 @@ const POLL_INTERVAL_MS = 200;
  * session still isn't there — at that point the absence is real.
  *
  * `timeoutMs` should comfortably exceed the longest respawn window. The
- * dominant cost is `waitForClaudePrompt`'s 30s ceiling in the conversation
+ * dominant cost is `waitForReadySignal`'s 30s ceiling in the conversation
  * routes, so 35s is the right default for those callers.
  */
 export async function waitForSessionRespawn(

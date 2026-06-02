@@ -28,7 +28,7 @@ import { buildChildEnvWithoutTmuxSync } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 
 // Worst-case respawn window for switch-model / resume / restart-all is
-// dominated by `waitForClaudePrompt`'s 30s ceiling. 35s gives a comfortable
+// dominated by `waitForReadySignal`'s 30s ceiling. 35s gives a comfortable
 // margin for the surrounding kill + spawn + tmux-up overhead.
 const RESPAWN_WAIT_MS = 35_000;
 

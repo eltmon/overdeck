@@ -625,7 +625,7 @@ function getReadySignalPath(agentId: string): string {
 /**
  * Clear ready signal before spawning (clean slate)
  */
-function clearReadySignal(agentId: string): void {
+export function clearReadySignal(agentId: string): void {
   const readyPath = getReadySignalPath(agentId);
   if (existsSync(readyPath)) {
     try {
@@ -649,7 +649,7 @@ function clearReadySignal(agentId: string): void {
  *
  * Returns true if the ready signal arrives within the timeout, false otherwise.
  */
-async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
+export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
   for (let i = 0; i < timeoutSeconds; i++) {
@@ -677,17 +677,16 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
  * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
  * elapses. Returns true if idle was observed.
  *
- * PAN-1594: this is the hook-derived "is the agent idle right now" check that
- * replaces the tmux pane-scrape `waitForClaudePrompt` for AGENT sessions (which
- * run the panopticon hooks and feed the runtime mirror). It has no dependency on
- * tmux output or permission mode. NOTE: conversation sessions (`conv-*`) launch
- * the default Claude Code command WITHOUT panopticon hooks, so they never feed
- * the mirror — they still use `waitForClaudePrompt` (pane `❯`) and are not
- * candidates for this signal until they are hook-instrumented.
+ * PAN-1594/1596: this is the hook-derived "is the agent idle right now" check.
+ * It replaced the tmux pane-scrape `waitForClaudePrompt` (since removed). Works
+ * for any hook-instrumented session — agents AND conversations (`conv-*`), which
+ * feed the runtime mirror once their heartbeat POSTs authenticate (PAN-1596). No
+ * dependency on tmux output or permission mode.
  *
  * Distinct from waitForReadySignal: that answers the one-time "has this
- * (re)launched session reached the prompt" (ready.json gate); this answers "is
- * the running agent idle at the prompt right now".
+ * (re)launched session reached the prompt" (ready.json gate, used by the
+ * conversation reattach/fork paths); this answers "is the running agent idle at
+ * the prompt right now".
  */
 export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
