@@ -34,6 +34,9 @@ export interface PaneBarProps {
   newActions?: NewPaneAction[]
   /** Right-click on a tab → host opens the conversation action menu at cursor. */
   onPaneContextMenu?: (pane: WorkspacePane, e: React.MouseEvent) => void
+  /** Drag a tab → host shows pane drop zones for split-by-drag (PAN-1591). */
+  onTabDragStart?: (paneId: PaneId) => void
+  onTabDragEnd?: () => void
 }
 
 /**
@@ -42,7 +45,7 @@ export interface PaneBarProps {
  * ⌘N hint for the first nine panes, and exposes close (×, non-HOME only) and
  * add (+) affordances via callbacks.
  */
-export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd }: PaneBarProps) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -138,7 +141,14 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             role="tab"
             tabIndex={0}
             aria-selected={isActive}
+            draggable
             className={`${styles.panetab} ${isActive ? styles.active : ''}`}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('application/x-pane-id', pane.paneId)
+              onTabDragStart?.(pane.paneId)
+            }}
+            onDragEnd={() => onTabDragEnd?.()}
             onClick={() => onSelect(pane.paneId)}
             onAuxClick={(e) => {
               // Middle-click closes the tab (standard browser/editor convention).

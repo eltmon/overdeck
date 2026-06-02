@@ -438,6 +438,37 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [layout, setLayout],
   )
 
+  // Split-by-drag (PAN-1591): which tab is mid-drag (enables drop zones), and
+  // where it lands. The base layout is the current grid, or a single leaf of the
+  // active pane when not yet split (so a drag creates the first split).
+  const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null)
+  const onDropTab = useCallback(
+    (targetPaneId: string, draggedId: string, zone: 'left' | 'right' | 'top' | 'bottom' | 'center') => {
+      const base = layout ?? (activePane ? leaf(activePane.paneId) : null)
+      if (!base) return
+      if (zone === 'center') {
+        if (draggedId === targetPaneId) return
+        if (hasLeaf(base, draggedId)) {
+          setActivePane(deckKey, draggedId)
+          return
+        }
+        setLayout(replaceLeaf(base, targetPaneId, draggedId))
+        setActivePane(deckKey, draggedId)
+        return
+      }
+      if (draggedId === targetPaneId) return // can't split a region against itself
+      const dir = zone === 'left' || zone === 'right' ? 'row' : 'col'
+      const before = zone === 'left' || zone === 'top'
+      // Move semantics: if the dragged pane is already a region elsewhere, lift it
+      // out first so it doesn't appear twice.
+      const working = hasLeaf(base, draggedId) ? removeLeaf(base, draggedId) ?? base : base
+      setLayout(splitAtLeaf(working, targetPaneId, draggedId, dir, before))
+      setActivePane(deckKey, draggedId)
+    },
+    [layout, activePane, deckKey, setActivePane, setLayout],
+  )
+  const effectiveLayout = layout ?? (activePane ? leaf(activePane.paneId) : null)
+
   // Re-resolve the right-clicked tab's conversation from the live list so the
   // menu reflects current state and self-dismisses if the conversation is gone.
   const tabMenuConv = tabMenu ? conversations.find((c) => c.name === tabMenu.conversationName) ?? null : null
@@ -452,24 +483,24 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         onAdd={handleAddPane}
         newActions={newActions}
         onPaneContextMenu={handlePaneContextMenu}
+        onTabDragStart={setDraggingPaneId}
+        onTabDragEnd={() => setDraggingPaneId(null)}
       />
       <div className={styles.paneArea}>
-        {splitActive && layout ? (
+        {effectiveLayout && (
           <PaneLayoutView
-            node={layout}
+            node={effectiveLayout}
             path={[]}
             panesById={panesById}
             renderPaneContent={renderPaneContent}
             focusedPaneId={focusedPaneId}
-            showHeaders
+            showHeaders={splitActive}
+            draggingPaneId={draggingPaneId}
             onFocus={(id) => setActivePane(deckKey, id)}
             onCloseLeaf={closeLeaf}
             onRatioChange={onRatioChange}
+            onDropTab={onDropTab}
           />
-        ) : (
-          <div className={styles.splitPanel} style={{ flexGrow: 1, flexBasis: 0 }}>
-            <div className={styles.pane}>{activePane && renderPaneContent(activePane)}</div>
-          </div>
         )}
       </div>
       {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}

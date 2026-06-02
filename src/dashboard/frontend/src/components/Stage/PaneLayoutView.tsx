@@ -1,8 +1,11 @@
-import { useCallback, useRef, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import type { WorkspacePane } from '../../lib/panesStore'
 import type { PaneLayout, SplitPath } from '../../lib/paneLayout'
 import styles from './stage.module.css'
+
+/** Where a dragged tab would land relative to a pane region. */
+export type DropZone = 'left' | 'right' | 'top' | 'bottom' | 'center'
 
 export interface PaneLayoutViewProps {
   node: PaneLayout
@@ -15,19 +18,53 @@ export interface PaneLayoutViewProps {
   focusedPaneId: string | null
   /** Render per-leaf headers (label + close). Off when there's a single pane. */
   showHeaders: boolean
+  /** The pane currently being dragged from the tab bar, or null. Enables drop zones. */
+  draggingPaneId: string | null
   onFocus: (paneId: string) => void
   onCloseLeaf: (paneId: string) => void
   onRatioChange: (path: SplitPath, ratio: number) => void
+  onDropTab: (targetPaneId: string, draggedPaneId: string, zone: DropZone) => void
+}
+
+/** Pick the drop zone from the pointer position within a region. */
+function zoneFromPointer(rect: DOMRect, clientX: number, clientY: number): DropZone {
+  const fx = (clientX - rect.left) / rect.width
+  const fy = (clientY - rect.top) / rect.height
+  const dist: Record<Exclude<DropZone, 'center'>, number> = { left: fx, right: 1 - fx, top: fy, bottom: 1 - fy }
+  let nearest: Exclude<DropZone, 'center'> = 'left'
+  for (const k of Object.keys(dist) as Array<Exclude<DropZone, 'center'>>) {
+    if (dist[k] < dist[nearest]) nearest = k
+  }
+  // Pointer well inside the region → drop into the center (replace/move here).
+  return dist[nearest] > 0.3 ? 'center' : nearest
+}
+
+/** Absolute style for the highlight covering the half a drop would occupy. */
+function zoneStyle(zone: DropZone): React.CSSProperties {
+  switch (zone) {
+    case 'left':
+      return { left: 0, top: 0, width: '50%', height: '100%' }
+    case 'right':
+      return { left: '50%', top: 0, width: '50%', height: '100%' }
+    case 'top':
+      return { left: 0, top: 0, width: '100%', height: '50%' }
+    case 'bottom':
+      return { left: 0, top: '50%', width: '100%', height: '50%' }
+    case 'center':
+      return { inset: 0 }
+  }
 }
 
 /**
  * Recursively renders a {@link PaneLayout} tree. Leaves show pane content (with
  * a focus header when the deck is split); splits lay their two children out
- * along the split direction with a draggable divider between them.
+ * along the split direction with a draggable divider between them. While a tab
+ * is being dragged, each leaf shows edge drop zones for split-by-drag.
  */
 export function PaneLayoutView(props: PaneLayoutViewProps) {
-  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, onFocus, onCloseLeaf, onRatioChange } = props
+  const { node, path, panesById, renderPaneContent, focusedPaneId, showHeaders, draggingPaneId, onFocus, onCloseLeaf, onRatioChange, onDropTab } = props
   const containerRef = useRef<HTMLDivElement>(null)
+  const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
 
   const onDividerDown = useCallback(
     (e: React.MouseEvent) => {
@@ -55,11 +92,12 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
   if (node.kind === 'leaf') {
     const pane = panesById.get(node.paneId)
     const focused = focusedPaneId === node.paneId
+    const paneId = node.paneId
     return (
       <div
         className={styles.splitPanel}
         style={{ minWidth: 0, minHeight: 0 }}
-        onMouseDownCapture={() => onFocus(node.paneId)}
+        onMouseDownCapture={() => onFocus(paneId)}
       >
         {showHeaders && (
           <div className={`${styles.splitHeader} ${focused ? styles.splitHeaderFocused : ''}`}>
@@ -67,7 +105,7 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
             <button
               type="button"
               className={styles.splitHeaderClose}
-              onClick={(e) => { e.stopPropagation(); onCloseLeaf(node.paneId) }}
+              onClick={(e) => { e.stopPropagation(); onCloseLeaf(paneId) }}
               title="Close pane"
               aria-label="Close pane"
             >
@@ -75,7 +113,33 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
             </button>
           </div>
         )}
-        <div className={styles.pane}>{pane ? renderPaneContent(pane) : null}</div>
+        <div className={styles.pane} style={{ position: 'relative' }}>
+          {pane ? renderPaneContent(pane) : null}
+          {draggingPaneId && (
+            <div
+              className={styles.dropOverlay}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setHoverZone(zoneFromPointer(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY))
+              }}
+              onDragLeave={(e) => {
+                // Ignore leaves into child nodes (the indicator div).
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return
+                setHoverZone(null)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const dragged = e.dataTransfer.getData('application/x-pane-id') || draggingPaneId
+                const zone = hoverZone ?? zoneFromPointer(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY)
+                setHoverZone(null)
+                if (dragged) onDropTab(paneId, dragged, zone)
+              }}
+            >
+              {hoverZone && <div className={styles.dropIndicator} style={zoneStyle(hoverZone)} />}
+            </div>
+          )}
+        </div>
       </div>
     )
   }
