@@ -46,7 +46,25 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   const menuOpen = menuPos !== null
+
+  // The tab strip scrolls horizontally on overflow, but its scrollbar is hidden
+  // (a visible one bonks the tab height). Translate a vertical mouse wheel into
+  // horizontal scroll so a plain mouse — not just a trackpad — can reach
+  // overflowed tabs. Native non-passive listener so preventDefault sticks.
+  useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return // already horizontal
+      el.scrollLeft += e.deltaY
+      e.preventDefault()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
   const openMenu = () => {
     const r = addBtnRef.current?.getBoundingClientRect()
@@ -74,7 +92,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
   }, [menuOpen])
 
   return (
-    <div className={styles.panebar} role="tablist" aria-label="Workspace panes">
+    <div ref={barRef} className={styles.panebar} role="tablist" aria-label="Workspace panes">
       {panes.map((pane, index) => {
         const Icon = PANE_ICONS[pane.paneType] ?? Home
         const isActive = pane.paneId === activePaneId
@@ -89,6 +107,13 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
             aria-selected={isActive}
             className={`${styles.panetab} ${isActive ? styles.active : ''}`}
             onClick={() => onSelect(pane.paneId)}
+            onAuxClick={(e) => {
+              // Middle-click closes the tab (standard browser/editor convention).
+              if (e.button === 1 && closable) {
+                e.preventDefault()
+                onClose(pane.paneId)
+              }
+            }}
             onContextMenu={(e) => onPaneContextMenu?.(pane, e)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
