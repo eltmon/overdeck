@@ -4,12 +4,11 @@ import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
 import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
 import { IssueStatusBand } from './IssueStatusBand'
-import { StatChips } from './HomePane/StatChips'
 import { Launcher } from './HomePane/Launcher'
 import { AgentDock } from './HomePane/AgentDock'
 import { ActionDock } from './HomePane/ActionDock'
 import { Timeline } from './HomePane/Timeline'
-import { HomePaneSections } from './HomePane/HomePaneSections'
+import { IssueCockpitBody } from './cockpit/IssueCockpitBody'
 import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
@@ -45,7 +44,6 @@ export function IssueOverview({
   issueId,
   title,
   branch,
-  createdAt,
   agentId,
   conversations = [],
   onCreateConversation,
@@ -97,7 +95,6 @@ export function IssueOverview({
             branch={branch ?? `feature/${issueId.toLowerCase()}`}
             iconLabel={title.charAt(0).toUpperCase()}
           />
-          <StatChips createdAt={createdAt} conversationCount={issueConversations.length} />
           <IssueStatusBand issueId={issueId} />
         </>
       }
@@ -126,7 +123,7 @@ export function IssueOverview({
           }}
         />
       }
-      detail={<HomePaneSections issueId={issueId} />}
+      detail={<IssueCockpitBody issueId={issueId} />}
     />
   )
 }
