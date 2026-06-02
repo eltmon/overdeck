@@ -330,6 +330,20 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
           position={{ top: tabMenu.top, left: tabMenu.left }}
           onClose={() => setTabMenu(null)}
           onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
+          onCloseOthers={() => {
+            const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+            for (const p of panes) {
+              if (p.paneId !== tabMenu.paneId && !p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
+            }
+          }}
+          onCloseRight={() => {
+            const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+            const idx = panes.findIndex((p) => p.paneId === tabMenu.paneId)
+            if (idx < 0) return
+            for (const p of panes.slice(idx + 1)) {
+              if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
+            }
+          }}
         />
       )}
 

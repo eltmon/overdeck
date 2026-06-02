@@ -15,6 +15,9 @@ interface ConversationActionMenuProps {
   onClose: () => void;
   /** When provided, adds a "Close tab" item and closes the tab after archiving. */
   onCloseTab?: () => void;
+  /** Tab conveniences (PAN-1591) — only present when invoked from a pane tab. */
+  onCloseOthers?: () => void;
+  onCloseRight?: () => void;
 }
 
 /**
@@ -23,7 +26,7 @@ interface ConversationActionMenuProps {
  * a workspace tab. Portaled to <body> and fixed-positioned at `position` so it
  * escapes any overflow clip. Inline rename happens inside the menu itself.
  */
-export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab }: ConversationActionMenuProps) {
+export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab, onCloseOthers, onCloseRight }: ConversationActionMenuProps) {
   const confirm = useConfirm();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(conversation.title ?? conversation.name);
@@ -156,6 +159,34 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 : <Sparkles size={14} />}
               Regenerate title
             </button>
+
+            {/* Tab conveniences (PAN-1591): pop out + multi-close. Only rendered
+                when this menu was opened from a pane tab (onCloseTab present). */}
+            {onCloseTab && (
+              <>
+                <div className={styles.headerMenuDivider} />
+                <button
+                  role="menuitem"
+                  className={styles.headerMenuItem}
+                  onClick={() => { window.open(`/conv/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040'); onClose(); }}
+                >
+                  <ExternalLink size={14} />
+                  Pop out to window
+                </button>
+                {onCloseOthers && (
+                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseOthers(); onClose(); }}>
+                    <X size={14} />
+                    Close other tabs
+                  </button>
+                )}
+                {onCloseRight && (
+                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseRight(); onClose(); }}>
+                    <X size={14} />
+                    Close tabs to the right
+                  </button>
+                )}
+              </>
+            )}
 
             <div className={styles.headerMenuDivider} />
             {conversation.claudeSessionId && (
