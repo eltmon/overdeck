@@ -8,7 +8,7 @@ import { Launcher } from './HomePane/Launcher'
 import { AgentDock } from './HomePane/AgentDock'
 import { ActionDock } from './HomePane/ActionDock'
 import { Timeline } from './HomePane/Timeline'
-import { HomePaneSections } from './HomePane/HomePaneSections'
+import { IssueCockpitBody } from './cockpit/IssueCockpitBody'
 import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
@@ -123,7 +123,7 @@ export function IssueOverview({
           }}
         />
       }
-      detail={<HomePaneSections issueId={issueId} />}
+      detail={<IssueCockpitBody issueId={issueId} />}
     />
   )
 }
