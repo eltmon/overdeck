@@ -31,6 +31,24 @@ TS=$(date -Iseconds)
 
 pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
 
+# PAN-1594: write the ready.json readiness signal that waitForReadySignal()
+# consumes. Claude-side counterpart to the Pi extension's handleSessionStart
+# writer (packages/pi-extension/src/index.ts). Closes the PAN-759 gap where the
+# hook emitted the idle event but never wrote the file, which forced
+# waitForReadySignal onto a tmux pane-scrape fallback coupled to permission-mode
+# footer text. clearReadySignal() removes this file before every (re)launch, so
+# its presence means "this session reached the prompt".
+READY_DIR="${PANOPTICON_HOME:-$HOME/.panopticon}/agents/$AGENT_ID"
+mkdir -p "$READY_DIR" 2>/dev/null
+if command -v jq >/dev/null 2>&1; then
+  jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
+    '{ready: true, agentId: $agentId, sessionId: (if $sid == "" then null else $sid end), reason: "session-start", timestamp: $ts}' \
+    > "$READY_DIR/ready.json" 2>/dev/null || true
+else
+  printf '{"ready":true,"agentId":"%s","sessionId":"%s","reason":"session-start","timestamp":"%s"}\n' \
+    "$AGENT_ID" "$CLAUDE_SESSION_ID" "$TS" > "$READY_DIR/ready.json" 2>/dev/null || true
+fi
+
 if [ -n "$MODEL" ]; then
   if command -v jq >/dev/null 2>&1; then
     BODY=$(jq -n --arg model "$MODEL" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \

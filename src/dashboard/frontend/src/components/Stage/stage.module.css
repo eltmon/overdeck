@@ -490,6 +490,44 @@
   font-size: 13px;
 }
 
+/* Relative wrapper so the ‹ › scroll buttons can overlay the tab strip's edges
+   without scrolling along with the tabs (they live outside the scroll box). */
+.panebarWrap {
+  position: relative;
+  flex: 0 0 43px;
+}
+
+/* Edge scroll buttons — only rendered when tabs overflow (PAN-1591). The
+   gradient fades the underlying tabs so the arrow reads as "more this way". */
+.tabScrollBtn {
+  position: absolute;
+  top: 6px;
+  bottom: 1px;
+  z-index: 4;
+  display: flex;
+  width: 34px;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: color 0.12s;
+}
+.tabScrollBtn:hover {
+  color: var(--foreground);
+}
+.tabScrollLeft {
+  left: 0;
+  justify-content: flex-start;
+  padding-left: 4px;
+  background: linear-gradient(to right, var(--card) 62%, transparent);
+}
+.tabScrollRight {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: 4px;
+  background: linear-gradient(to left, var(--card) 62%, transparent);
+}
+
 .panebar {
   display: flex;
   align-items: stretch;

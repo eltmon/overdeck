@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -38,7 +38,7 @@ import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
-import { DeaconPauseBanner } from './components/DeaconPauseToggle';
+import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
@@ -46,7 +46,7 @@ import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
-import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw, Search } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
@@ -568,6 +568,11 @@ export default function App() {
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  // Live agent count for the app-bar status pill (PAN-1591).
+  const runningAgentCount = useMemo(
+    () => agents.filter((a) => ['running', 'active', 'starting', 'thinking', 'working'].includes(a.status)).length,
+    [agents],
+  );
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
   const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
   const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
@@ -1076,11 +1081,8 @@ export default function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <NoResumeBanner />
 
-        {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
-        <DeaconPauseBanner />
-
-        {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
-        <StoppedAgentsBanner />
+        {/* Deacon-frozen state and stopped-agents are now compact pills in the
+            app bar (PAN-1591), not persistent full-width banners. */}
         <OrphanTestAgentsSurface />
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
@@ -1176,19 +1178,57 @@ export default function App() {
           </div>
         )}
 
-        <div className="relative border-b border-border bg-background px-3 py-1 shrink-0">
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              aria-label="Toggle activity feed"
-              aria-pressed={isSessionFeedSidebarOpen}
-              title="Activity Feed"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-            >
-              <History className="h-4 w-4" aria-hidden="true" />
-            </button>
+        {/* App bar (PAN-1591) — project crumb · centered search · status pills.
+            Replaces the persistent deacon/mem chrome with a compact strip. */}
+        <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+          {/* left: active-project crumb */}
+          <div className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
+            {selectedProjectKey ? (
+              <>
+                <span className="h-3.5 w-3.5 rounded-[4px] bg-primary/40" aria-hidden="true" />
+                {selectedProjectKey}
+              </>
+            ) : (
+              <span className="text-muted-foreground">All projects</span>
+            )}
+          </div>
+
+          {/* center: search (project-scoped placeholder — wired to global search today) */}
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            className="mx-auto flex w-full max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
+            title="Search"
+          >
+            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{selectedProjectKey ? `Search ${selectedProjectKey}…` : 'Search issues, conversations, commands…'}</span>
+            <kbd className="ml-auto rounded border border-border px-1.5 text-[11px]">/</kbd>
+          </button>
+
+          {/* right: status pills */}
+          <div className="flex shrink-0 items-center gap-2">
+            <DeaconPauseToggle compact />
+            {runningAgentCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{runningAgentCount} agent{runningAgentCount === 1 ? '' : 's'}
+              </span>
+            )}
+            <StoppedAgentsBanner variant="pill" />
             <SystemHealthPill />
+            {/* The Command Deck has the always-on Awareness rail, so the global
+                feed toggle only appears on other pages (PAN-1591). */}
+            {activeTab !== 'command-deck' && (
+              <button
+                type="button"
+                aria-label="Toggle activity feed"
+                aria-pressed={isSessionFeedSidebarOpen}
+                title="Activity Feed"
+                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+              >
+                <History className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1333,7 +1373,9 @@ export default function App() {
           </BootstrapGate>
         )}
         </main>
-        {isSessionFeedSidebarOpen && (
+        {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
+            this global feed, so don't double it up there. */}
+        {isSessionFeedSidebarOpen && activeTab !== 'command-deck' && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
         </div>

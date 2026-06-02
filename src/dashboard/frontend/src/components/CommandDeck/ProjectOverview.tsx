@@ -6,7 +6,6 @@ import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import MetricStrip, { type MetricStripTile } from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
-import { LiveCounter } from './LiveCounter';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import type { Agent, Issue, CanonicalState } from '../../types';
 
@@ -189,8 +188,6 @@ export function ProjectOverview({
     return byPhase;
   }, [bucketedFeatures]);
 
-  const activePhaseCount = PIPELINE_PHASES.filter(phase => (bucketedByPhase.get(phase)?.length ?? 0) > 0).length;
-
   const metricTiles = useMemo<MetricStripTile[]>(() => {
     const reviewRunning = bucketedFeatures.filter(({ phase }) => phase === 'review').length;
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
@@ -210,20 +207,12 @@ export function ProjectOverview({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
-        padding: 20,
-        minHeight: '100%',
+        gap: 14,
+        padding: 16,
         overflow: 'auto',
       }}
     >
-      <HeroBillboard
-        projectName={projectName}
-        issueCount={features.length}
-        totalCost={totalCost}
-        activeAgentCount={activeAgentCount}
-        activePhaseCount={activePhaseCount}
-        metricTiles={metricTiles}
-      />
+      <HeroBillboard projectName={projectName} metricTiles={metricTiles} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {
@@ -247,74 +236,32 @@ export function ProjectOverview({
 
 function HeroBillboard({
   projectName,
-  issueCount,
-  totalCost,
-  activeAgentCount,
-  activePhaseCount,
   metricTiles,
 }: {
   projectName: string;
-  issueCount: number;
-  totalCost: number;
-  activeAgentCount: number;
-  activePhaseCount: number;
   metricTiles: MetricStripTile[];
 }) {
+  // One compact glance row — the project's headline metrics (active · work ·
+  // review · ship · spend) already live in `metricTiles`, so the old duplicate
+  // 4-card "Issues / Total cost / Active agents / Pipeline phases" grid is gone
+  // (it repeated the same numbers and ate ~150px). (PAN-1591 project-cockpit
+  // refinement, mirroring the issue cockpit's single-source metric strip.)
   return (
     <div
       style={{
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent)',
         border: '1px solid var(--border)',
         borderRadius: 16,
-        padding: 20,
+        padding: 14,
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
+        gap: 12,
       }}
     >
-      <div>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 700,
-            color: 'var(--foreground)',
-          }}
-        >
-          {projectName}
-        </h2>
-        <p
-          style={{
-            margin: '6px 0 0',
-            fontSize: 12,
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          Project pipeline overview
-        </p>
+      <div className="flex items-baseline gap-2">
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
-
-      <MetricStrip
-        tiles={metricTiles}
-        columns={5}
-        className="border-b-0 px-0 py-0"
-      />
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <StatCard label="Issues" value={issueCount.toString()} />
-        <StatCard
-          label="Total cost"
-          value={<LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
-        />
-        <StatCard label="Active agents" value={activeAgentCount.toString()} />
-        <StatCard label="Pipeline phases" value={activePhaseCount.toString()} />
-      </div>
+      <MetricStrip tiles={metricTiles} columns={5} className="border-b-0 px-0 py-0" />
     </div>
   );
 }
@@ -622,36 +569,3 @@ function subStatus(entry: BucketedFeature): string | undefined {
   return undefined;
 }
 
-function StatCard({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 12,
-        padding: 12,
-        background: 'color-mix(in srgb, var(--card) 88%, transparent)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          color: 'var(--muted-foreground)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'var(--foreground)',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

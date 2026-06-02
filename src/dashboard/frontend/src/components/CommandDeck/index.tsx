@@ -1230,15 +1230,17 @@ export function CommandDeck({
           )}
         </div>
 
-        {/* Project Activity — project-scoped session feed (PAN-1561, column 4).
-            The No-project bucket shows activity with no associated issue. */}
+        {/* Awareness rail (PAN-1591) — the merged feed: one column with a
+            Needs-you / Project / Global scope switcher, replacing the separate
+            Project Activity + global Activity Feed columns. */}
         {selectedProject && (
           <div className={styles.activityColumn}>
-            {isNoProject ? (
-              <SessionFeedSidebar embedded heading="Activity" unscoped />
-            ) : (
-              <SessionFeedSidebar embedded heading="Project Activity" issueIds={projectIssueIds} />
-            )}
+            <SessionFeedSidebar
+              embedded
+              heading="Awareness"
+              scopeSwitcher
+              projectIssueIds={isNoProject ? undefined : projectIssueIds}
+            />
           </div>
         )}
       </div>

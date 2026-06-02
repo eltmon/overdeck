@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, packageRoot } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -638,9 +638,16 @@ function clearReadySignal(agentId: string): void {
 
 /**
  * Wait for agent to be ready (async - non-blocking).
- * Primary: ready.json written by SessionStart hook.
- * Fallback: tmux pane shows Claude's interactive prompt indicator.
- * Returns true if ready signal received, false if timeout.
+ *
+ * Hook-driven (PAN-1594): readiness is signaled by `ready.json`, written by the
+ * session-start hook (Claude) / Pi extension when the session reaches the
+ * prompt, and cleared by clearReadySignal() before each (re)launch — so its
+ * presence means the *current* session is ready for input. There is no tmux
+ * pane-scrape fallback and no dependency on permission mode (the old fallback
+ * matched the bypass-permissions footer `⏵⏵` / `bypass permissions on`, which
+ * silently broke readiness for every non-bypass agent).
+ *
+ * Returns true if the ready signal arrives within the timeout, false otherwise.
  */
 async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
@@ -650,28 +657,45 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
 
     if (existsSync(readyPath)) {
       try {
-        const content = readFileSync(readyPath, 'utf-8');
-        const signal = JSON.parse(content);
-        if (signal.ready === true) {
+        const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
+        // Accept both the Claude hook shape ({ ready: true, ... }) and the Pi
+        // extension shape ({ agentId, sessionId, ... } with no `ready` field).
+        if (signal && typeof signal === 'object' && signal.ready !== false) {
           return true;
         }
       } catch {
-        // File exists but invalid - keep waiting
+        // File exists but mid-write / invalid — keep waiting.
       }
     }
-
-    // Fallback: check tmux pane for Claude's interactive prompt indicator.
-    // ready.json is currently not written by any hook (PAN-759), so this is the
-    // primary detection path for resumed/fresh-started agents.
-    try {
-      const pane = await Effect.runPromise(capturePane(agentId, 200));
-      if (pane.includes('bypass permissions on') || pane.includes('⏵⏵')) {
-        return true;
-      }
-    } catch { /* non-fatal — session may not exist yet */ }
   }
 
   return false;
+}
+
+/**
+ * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
+ * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
+ * elapses. Returns true if idle was observed.
+ *
+ * PAN-1594: this is the hook-derived "is the agent idle right now" check that
+ * replaces the tmux pane-scrape `waitForClaudePrompt` for AGENT sessions (which
+ * run the panopticon hooks and feed the runtime mirror). It has no dependency on
+ * tmux output or permission mode. NOTE: conversation sessions (`conv-*`) launch
+ * the default Claude Code command WITHOUT panopticon hooks, so they never feed
+ * the mirror — they still use `waitForClaudePrompt` (pane `❯`) and are not
+ * candidates for this signal until they are hook-instrumented.
+ *
+ * Distinct from waitForReadySignal: that answers the one-time "has this
+ * (re)launched session reached the prompt" (ready.json gate); this answers "is
+ * the running agent idle at the prompt right now".
+ */
+export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (getAgentRuntimeStateSync(agentId)?.state === 'idle') return true;
+    await new Promise(r => setTimeout(r, 250));
+  } while (Date.now() < deadline);
+  return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
 export interface AgentState {
@@ -2727,6 +2751,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     preTrustDirectory(workspace);
   } catch { /* non-fatal */ }
 
+  // PAN-1594: clear any stale ready.json before launch so waitForReadySignal()
+  // only observes the session-start signal from THIS launch.
+  clearReadySignal(agentId);
+
   await Effect.runPromise(createSession(agentId, workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV,
@@ -2751,21 +2779,9 @@ if (prompt) {
         console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
     } else if (shouldDeliverPromptViaTmux) {
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-        if (!(await Effect.runPromise(sessionExists(agentId)))) {
-          console.error(`[${agentId}] Tmux session died before becoming ready`);
-          break;
-        }
-        try {
-          const pane = await Effect.runPromise(capturePane(agentId, 200));
-          if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-            ready = true;
-            break;
-          }
-        } catch { /* non-fatal */ }
-      }
+      // PAN-1594: wait for the hook-written ready.json (session-start hook),
+      // not a tmux pane-scrape. No dependency on permission-mode footer text.
+      const ready = await waitForReadySignal(agentId, 30);
       if (ready) {
         await new Promise<void>((resolve) => setTimeout(resolve, 500));
         await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
@@ -3086,28 +3102,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
-    // Wait for tmux session to exist and Claude to show its prompt
-    let ready = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 1000));
-      if (!(await Effect.runPromise(sessionExists(agentId)))) {
-        console.error(`[${agentId}] Tmux session died before becoming ready`);
-        break;
-      }
-      // Try reading ready signal first (fastest path)
-      if (existsSync(join(getAgentDir(agentId), 'ready'))) {
-        ready = true;
-        break;
-      }
-      // Fallback: check tmux output for Claude's prompt indicator
-      try {
-        const pane = await Effect.runPromise(capturePane(agentId, 200));
-        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-          ready = true;
-          break;
-        }
-      } catch { /* non-fatal */ }
-    }
+    // PAN-1594: wait for the hook-written ready.json (session-start hook),
+    // not a tmux pane-scrape. No dependency on permission-mode footer text.
+    const ready = await waitForReadySignal(agentId, 30);
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
@@ -3738,11 +3735,12 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
-  // Wait for Claude prompt to be ready before sending — reduces dropped Enter
-  // when Claude Code is still initializing or rendering warning banners.
-  const promptReady = await Effect.runPromise(waitForClaudePrompt(normalizedId, 5000));
+  // Wait for the agent to be idle at the prompt before sending — reduces dropped
+  // Enter when Claude Code is still rendering. PAN-1594: hook-driven (runtime
+  // mirror 'idle' via Stop/SessionStart hook), not a tmux pane-scrape.
+  const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
-    console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
+    console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
   const deliveryMethod = agentState?.deliveryMethod;

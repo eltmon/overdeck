@@ -33,7 +33,15 @@ vi.mock('../tmux.js', () => ({
   listPaneValues: vi.fn(() => Effect.succeed([])),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
-  waitForClaudePrompt: vi.fn(() => Effect.succeed(true)),
+}));
+
+// PAN-1594: messageAgent's pre-send readiness check is now hook-driven
+// (waitForAgentIdle → runtime mirror 'idle'), not a tmux pane-scrape. Present
+// the agent as idle so delivery proceeds immediately instead of waiting out the
+// 5s readiness timeout.
+vi.mock('../agent-runtime-mirror.js', () => ({
+  getRuntimeSnapshot: vi.fn(() => Effect.succeed({ activity: 'idle', lastActivity: new Date().toISOString() })),
+  isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(false)),
 }));
 
 vi.mock('../paths.js', async (importOriginal) => {

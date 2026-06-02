@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Top bar / tabs rethink — mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --background:#080b10; --foreground:#e5e7eb; --card:#0c1018;
+    --accent:color-mix(in srgb, white 8%, transparent);
+    --muted:color-mix(in srgb, white 4%, transparent); --muted-foreground:#9ca3af;
+    --border:color-mix(in srgb, white 6%, transparent);
+    --border-strong:color-mix(in srgb, white 12%, transparent);
+    --primary:#6366f1; --destructive:#f87171; --destructive-fg:#fca5a5;
+    --info:#3b82f6; --info-fg:#60a5fa; --success:#10b981; --success-fg:#34d399;
+    --warning:#f59e0b; --warning-fg:#fbbf24; --review:#a855f7; --review-fg:#c084fc;
+    --cost:#06b6d4; --cost-fg:#22d3ee; --radius-sm:6px;
+    --mono:"SF Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;}
+  .wrap{padding:18px 22px;}
+  h1{font-family:"Space Grotesk";font-size:16px;margin:0;}
+  .eyebrow{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);}
+  .muted{color:var(--muted-foreground);}
+  .mono{font-family:var(--mono);}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted-foreground);margin:6px 0 16px;}
+  .legend b{color:var(--foreground);}
+  .app{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);box-shadow:0 8px 30px rgba(0,0,0,.4);}
+
+  /* ── ROW 1: slim app bar ───────────────────────── */
+  .appbar{display:flex;align-items:center;gap:12px;height:46px;padding:0 12px;background:var(--card);border-bottom:1px solid var(--border);}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-family:"Space Grotesk";}
+  .brand .logo{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary),var(--review));}
+  .projsel{display:flex;align-items:center;gap:6px;border:1px solid var(--border-strong);border-radius:8px;padding:5px 9px;font-size:12.5px;cursor:pointer;}
+  .projsel .mark{width:14px;height:14px;border-radius:4px;background:color-mix(in srgb,var(--primary) 25%,transparent);}
+  .search{flex:1;max-width:380px;display:flex;align-items:center;gap:8px;border:1px solid var(--border-strong);border-radius:8px;padding:6px 10px;color:var(--muted-foreground);font-size:12px;}
+  .search .k{margin-left:auto;font-size:10px;border:1px solid var(--border-strong);border-radius:4px;padding:0 5px;}
+  .spacer{flex:1;}
+  /* consolidated status cluster */
+  .status{display:flex;align-items:center;gap:7px;}
+  .spill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-strong);border-radius:999px;padding:4px 10px;font-size:11.5px;cursor:pointer;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .spill.warn{border-color:color-mix(in srgb,var(--warning) 45%,transparent);color:var(--warning-fg);background:color-mix(in srgb,var(--warning) 8%,transparent);}
+  .iconbtn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);cursor:pointer;}
+
+  /* ── ROW 2: full-width tab strip ───────────────── */
+  .tabstrip{display:flex;align-items:stretch;gap:0;height:42px;padding:6px 8px 0;background:var(--card);box-shadow:inset 0 -1px 0 0 var(--border);overflow-x:auto;}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 13px;height:36px;font-size:12.5px;color:var(--muted-foreground);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;cursor:pointer;flex:0 0 auto;}
+  .tab .ti{display:inline-flex;opacity:.8;}
+  .tab .kbd{font-size:10px;border:1px solid var(--border-strong);border-radius:4px;padding:0 4px;color:var(--muted-foreground);}
+  .tab .x{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);font-size:12px;}
+  .tab.active{color:var(--foreground);background:var(--background);border-color:var(--border);position:relative;z-index:1;}
+  .tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--background);}
+  .tab.pinned{flex:0 0 auto;padding:0 9px;}
+  .addbtn{flex:0 0 auto;width:32px;display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);cursor:pointer;font-size:18px;align-self:center;}
+  .modelchip{flex:0 0 auto;margin-left:auto;display:flex;align-items:center;gap:6px;align-self:center;border:1px solid var(--border-strong);border-radius:8px;padding:4px 9px;font-size:11.5px;color:var(--muted-foreground);cursor:pointer;}
+
+  /* ── work area (schematic) ─────────────────────── */
+  .work{display:grid;grid-template-columns:230px 1fr 56px;height:230px;}
+  .rail{border-right:1px solid var(--border);background:color-mix(in srgb,white 1%,transparent);padding:10px;}
+  .rail.right{border-right:none;border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:12px;}
+  .railhead{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-foreground);margin-bottom:8px;}
+  .ph{height:9px;border-radius:4px;background:var(--muted);margin-bottom:8px;}
+  .pane{padding:16px;display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);font-size:12px;background:var(--background);}
+  .railicon{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);}
+
+  .note{font-size:11.5px;color:var(--muted-foreground);margin-top:14px;line-height:1.6;}
+  .note b{color:var(--foreground);}
+  .cap{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-foreground);border:1px dashed var(--border-strong);border-radius:6px;padding:2px 7px;display:inline-block;}
+  .row-label{font-size:10px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.08em;padding:4px 12px 2px;background:var(--card);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+    <h1>Top bar / tabs — rethink</h1><span class="cap">mockup</span>
+  </div>
+  <div class="legend">
+    <span><b>Goal</b> give tabs a full-width row of their own</span>
+    <span><b>Move</b> verbose deacon/mem/stopped chrome → compact status pills</span>
+    <span><b>Collapse</b> side rails so the pane + tabs get the width</span>
+  </div>
+
+  <div class="app">
+
+    <!-- ROW 1 — slim app bar -->
+    <div class="row-label">Row 1 · app bar — identity · search · consolidated status</div>
+    <div class="appbar">
+      <div class="brand"><span class="logo"></span>Panopticon</div>
+      <div class="projsel"><span class="mark"></span>panopticon-cli <span class="muted">▾</span></div>
+      <div class="search">⌕ Search or run a command <span class="k">/</span></div>
+      <div class="spacer"></div>
+      <div class="status">
+        <span class="spill warn"><span class="dot" style="background:var(--warning);"></span>Deacon frozen</span>
+        <span class="spill"><span class="dot" style="background:var(--success);"></span>3 agents</span>
+        <span class="spill"><span class="dot" style="background:var(--destructive);"></span>1 stopped</span>
+        <span class="spill">28% mem</span>
+      </div>
+      <div class="iconbtn" title="Activity feed">☷</div>
+      <div class="iconbtn" title="Theme">◐</div>
+    </div>
+
+    <!-- ROW 2 — full-width tab strip -->
+    <div class="row-label">Row 2 · full-width tab strip — scrolls on overflow · ⌘1–9 · middle-click close · right-click ▸ pop out</div>
+    <div class="tabstrip">
+      <div class="tab pinned active" title="Home"><span class="ti">⌂</span><span class="kbd">⌘1</span></div>
+      <div class="tab"><span class="ti">◉</span>PAN-1242 cockpit <span class="kbd">⌘2</span><span class="x">×</span></div>
+      <div class="tab"><span class="ti">⌥</span>Fix CLAUDE.md bloat and programmatic cleanup <span class="kbd">⌘3</span><span class="x">×</span></div>
+      <div class="tab"><span class="ti">▣</span>Terminal · agent-pan-1395 <span class="kbd">⌘4</span><span class="x">×</span></div>
+      <div class="tab"><span class="ti">◉</span>PAN-1574 cockpit <span class="kbd">⌘5</span><span class="x">×</span></div>
+      <div class="tab"><span class="ti">⌥</span>Review · kimi-k2.6 <span class="kbd">⌘6</span><span class="x">×</span></div>
+      <div class="tab"><span class="ti">◫</span>Files · feature/pan-1395 <span class="x">×</span></div>
+      <div class="addbtn" title="New tab (⌘T)">+</div>
+      <div class="modelchip">⚙ Claude Opus 4.8 <span class="muted">▾</span></div>
+    </div>
+
+    <!-- work area schematic -->
+    <div class="work">
+      <div class="rail">
+        <div class="railhead">Conversations · Issues</div>
+        <div class="ph" style="width:90%"></div><div class="ph" style="width:70%"></div>
+        <div class="ph" style="width:82%"></div><div class="ph" style="width:60%"></div>
+        <div class="ph" style="width:75%"></div><div class="ph" style="width:88%"></div>
+        <div class="railhead" style="margin-top:12px;">▸ collapsible</div>
+      </div>
+      <div class="pane">▣ active tab's pane — now full width between the rails</div>
+      <div class="rail right">
+        <div class="railicon" title="Project Activity">⊟</div>
+        <div class="railicon" title="Activity Feed">☷</div>
+        <div class="eyebrow" style="writing-mode:vertical-rl;margin-top:6px;">collapsed rails</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>What changes vs today</b><br>
+    1. The <b>tabs get the entire window width</b> (their own row) instead of sharing a strip with the model picker, deck label, and history icon.<br>
+    2. The verbose <b>“Deacon is frozen / 1 stopped / Restart All / normal XX% mem”</b> banner collapses into <b>compact status pills</b> on the app bar — click a pill to expand its actions (Resume Deacon, Restart all, etc.).<br>
+    3. <b>Project switcher</b> moves to the app bar (left), so it’s always visible and the deck doesn’t need its own “Command Deck” label row.<br>
+    4. <b>Project Activity</b> + <b>Activity Feed</b> become <b>collapsible right-rail toggles</b> (icons), reclaiming horizontal space for the pane + tabs.<br>
+    5. The <b>model picker</b> tucks to the right of the tab strip (it only affects new spawns), or into the “+” menu.<br>
+    <span class="muted">Tabs remain <b>project-scoped</b> — switching the project switcher swaps the whole tab set.</span>
+  </div>
+</div>
+</body>
+</html>
