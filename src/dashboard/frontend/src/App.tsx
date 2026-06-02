@@ -50,6 +50,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
+import { usePanesStore } from './lib/panesStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -529,10 +530,24 @@ export default function App() {
     window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
   }, []);
 
-  // PAN-1561: open a project's deck from the sidebar rail.
+  // PAN-1561: open a project's deck from the sidebar rail. Land on the project's
+  // HOME pane (the S4 cockpit) rather than whatever tab the deck last had active
+  // — the panes store remembers per-workspace, so it would otherwise restore a
+  // stale conversation and the click would appear to "do nothing". A conversation
+  // deep-link overrides this immediately afterward (openConversationTabIn runs
+  // after onSelectProject), so deep-links still land on their conversation.
   const handleSelectProject = useCallback((projectName: string | null) => {
     setSelectedProjectKey(projectName);
-    if (projectName) setActiveTab('command-deck');
+    if (projectName) {
+      setActiveTab('command-deck');
+      // ensureHome hydrates/creates the workspace and replaces the store object,
+      // so re-read getState() afterward — the pre-ensureHome snapshot can be
+      // empty on a project's first access (its panes aren't hydrated yet).
+      usePanesStore.getState().ensureHome(projectName);
+      const fresh = usePanesStore.getState();
+      const home = (fresh.panesByWorkspace[projectName] ?? []).find((p) => p.paneType === 'home');
+      if (home) fresh.setActivePane(projectName, home.paneId);
+    }
   }, [setActiveTab]);
 
   // Handle browser back/forward
