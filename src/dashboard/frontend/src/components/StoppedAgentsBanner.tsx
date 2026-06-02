@@ -13,7 +13,7 @@ interface RestartResult {
   error?: string;
 }
 
-export function StoppedAgentsBanner() {
+export function StoppedAgentsBanner({ variant = 'banner' }: { variant?: 'banner' | 'pill' } = {}) {
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
@@ -82,6 +82,18 @@ export function StoppedAgentsBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [results, setResults] = useState<RestartResult[] | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const pillRef = useRef<HTMLDivElement>(null);
+
+  // Close the pill popover on outside click.
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!pillRef.current?.contains(e.target as Node)) setPopoverOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [popoverOpen]);
 
   const handleRestartAll = useCallback(async () => {
     if (restarting) return;
@@ -149,6 +161,59 @@ export function StoppedAgentsBanner() {
     setResults(null);
     setDismissed(false);
   }, []);
+
+  const succeededCount = results?.filter((r) => r.success).length ?? 0;
+  const failedCount = results?.filter((r) => !r.success).length ?? 0;
+
+  // ── Pill variant (PAN-1591 app bar) ──────────────────────────────────────
+  if (variant === 'pill') {
+    if (stoppedAgents.length === 0) return null;
+    return (
+      <div className="relative" ref={pillRef}>
+        <button
+          type="button"
+          onClick={() => setPopoverOpen((o) => !o)}
+          aria-expanded={popoverOpen}
+          className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning-foreground transition-colors hover:bg-warning/20"
+          data-testid="stopped-agents-pill"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+          {stoppedAgents.length} stopped
+        </button>
+        {popoverOpen && (
+          <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-lg border border-border bg-card p-3 shadow-xl">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-warning-foreground">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
+            </div>
+            <div className="mb-3 max-h-40 overflow-y-auto">
+              {stoppedAgents.map((a) => (
+                <div key={a.id} className="flex items-center justify-between py-0.5 text-xs">
+                  <span className="font-mono text-foreground">{a.issueId || a.id}</span>
+                  {a.role && <span className="text-muted-foreground">{a.role}</span>}
+                </div>
+              ))}
+            </div>
+            {results && (
+              <div className="mb-2 text-xs">
+                {succeededCount > 0 && <span className="text-success">✓ {succeededCount} restarted</span>}
+                {failedCount > 0 && <span className="ml-2 text-destructive">✕ {failedCount} failed</span>}
+              </div>
+            )}
+            <button
+              onClick={handleRestartAll}
+              disabled={restarting}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              data-testid="pill-restart-all"
+            >
+              {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              {restarting ? 'Restarting…' : 'Restart all'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (dismissed || stoppedAgents.length === 0) {
     // Show a subtle "show again" button if dismissed and stopped agents exist

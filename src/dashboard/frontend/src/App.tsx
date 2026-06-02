@@ -1081,11 +1081,8 @@ export default function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <NoResumeBanner />
 
-        {/* Deacon-frozen state is now a compact pill in the app bar (PAN-1591),
-            not a persistent full-width banner. */}
-
-        {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
-        <StoppedAgentsBanner />
+        {/* Deacon-frozen state and stopped-agents are now compact pills in the
+            app bar (PAN-1591), not persistent full-width banners. */}
         <OrphanTestAgentsSurface />
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
@@ -1216,6 +1213,7 @@ export default function App() {
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{runningAgentCount} agent{runningAgentCount === 1 ? '' : 's'}
               </span>
             )}
+            <StoppedAgentsBanner variant="pill" />
             <SystemHealthPill />
             {/* The Command Deck has the always-on Awareness rail, so the global
                 feed toggle only appears on other pages (PAN-1591). */}
