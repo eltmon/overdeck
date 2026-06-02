@@ -87,7 +87,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from an issue ID search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'PAN-42' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'PAN-42' } });
     selectPaletteResult(screen.getAllByText('PAN-42')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -97,7 +97,7 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a branch search result for the owning issue', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'feature/pan-42-command' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'feature/pan-42-command' } });
     selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
@@ -107,11 +107,83 @@ describe('CommandPalette issue results', () => {
   it('opens the drawer from a title fragment search result', () => {
     renderCommandPalette();
 
-    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), { target: { value: 'Alpha command' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha command' } });
     selectPaletteResult(getOptionByValue('issue-PAN-42'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-42', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-42&tab=overview');
+  });
+});
+
+describe('CommandPalette conversation results', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/palette/search')) {
+        return {
+          ok: true,
+          json: async () => ({
+            observations: [],
+            conversations: [{
+              sessionId: 'session-a',
+              conversationId: 'session-a',
+              projectId: 'panopticon-cli',
+              role: 'assistant',
+              ts: '2026-06-02T01:00:00.000Z',
+              byteOffset: 42,
+              displayContent: 'semantic transcript hit',
+              excerpt: 'before ⦇needle⦈ after',
+              excerptSegments: [
+                { text: 'before ', match: false },
+                { text: 'needle', match: true },
+                { text: ' after', match: false },
+              ],
+              rank: 1,
+            }],
+            memory: [{
+              kind: 'memory',
+              id: 'mem-a',
+              projectId: 'panopticon-cli',
+              workspaceId: '',
+              issueId: '',
+              timestamp: '2026-06-02T01:00:00.000Z',
+              displayContent: 'memory hit',
+              excerpt: 'memory excerpt',
+              excerptSegments: [{ kind: 'text', value: 'memory excerpt' }],
+              tags: [],
+              docType: 'memory',
+              rank: 1,
+            }],
+            summaries: [],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({ commands: [] }) };
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('renders conversations above memory with excerpt highlights', async () => {
+    renderCommandPalette();
+
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'needle' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(screen.getByText('Conversations')).toBeInTheDocument();
+    expect(screen.getByText('semantic transcript hit')).toBeInTheDocument();
+    expect(screen.getByText('needle')).toBeInTheDocument();
+
+    const conversationsHeading = screen.getByText('Conversations');
+    const memoryHeading = screen.getByText('Memory');
+    expect(conversationsHeading.compareDocumentPosition(memoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -124,7 +196,7 @@ describe('CommandPalette navigation actions', () => {
     const user = userEvent.setup();
     const { onNavigate } = renderPalette();
 
-    await user.type(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), 'flywheel');
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'flywheel');
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
     const flywheelOption = getOptionByValue('pan-flywheel');
@@ -141,7 +213,7 @@ describe('CommandPalette navigation actions', () => {
     const user = userEvent.setup();
     const { onNavigate } = renderPalette();
 
-    await user.type(screen.getByPlaceholderText('Search commands, issues, memory, observations…'), 'context');
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'context');
 
     expect(screen.getByText('Navigation')).toBeInTheDocument();
     const contextOption = getOptionByValue('open-context');
