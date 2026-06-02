@@ -123,6 +123,7 @@
     "ai": "^6.0.180",
     "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
+    "chokidar": "^5.0.0",
     "commander": "^12.1.0",
     "conf": "^12.0.0",
     "effect": "4.0.0-beta.73",

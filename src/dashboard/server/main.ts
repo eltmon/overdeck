@@ -45,6 +45,7 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 
 declare const Bun: unknown;
 
@@ -397,6 +398,11 @@ void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message
 startTranscriptPoller();
 console.log('[panopticon] Memory transcript poller started');
 
+const conversationSearchWatcher = startConversationSearchWatcher();
+console.log(conversationSearchWatcher
+  ? '[panopticon] Conversation search watcher started'
+  : '[panopticon] Conversation search watcher skipped (conversationSearch.enabled=false)');
+
 void (async () => {
   const store = await initEventStore();
   store.subscribe((event) => {
@@ -438,7 +444,10 @@ const emitShutdownActivity = () => {
     });
   } catch { /* non-fatal */ }
 };
-const handleShutdownSignal = (signal: NodeJS.Signals) => {
+let shuttingDown = false;
+const handleShutdownSignal = async (signal: NodeJS.Signals) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
   clearInterval(attachmentCleanupTimer);
@@ -450,12 +459,13 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopTranscriptPoller();
+  await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeMemoryFtsDatabases();
   process.exit(0);
 };
-process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
-process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
-process.once('SIGHUP', () => handleShutdownSignal('SIGHUP'));
+process.once('SIGTERM', () => void handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => void handleShutdownSignal('SIGINT'));
+process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
