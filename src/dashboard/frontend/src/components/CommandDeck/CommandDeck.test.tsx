@@ -52,8 +52,10 @@ vi.mock('../Stage', () => ({
 }));
 
 vi.mock('../sessionFeed/SessionFeedSidebar', () => ({
+  // PAN-1591: the merged Awareness rail passes the project's issues via
+  // `projectIssueIds` (scopeSwitcher mode); keep `issueIds` as a fallback.
   SessionFeedSidebar: (props: any) => (
-    <div data-testid="activity-feed" data-issues={(props.issueIds ?? []).join(',')} />
+    <div data-testid="activity-feed" data-issues={(props.projectIssueIds ?? props.issueIds ?? []).join(',')} />
   ),
 }));
 
