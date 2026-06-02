@@ -46,6 +46,7 @@ function fakeDb(): EmbeddingsDbHandle & { chunks: ChunkInsert[]; cursors: Map<st
     setCursor: (filePath, byteOffset) => { cursors.set(filePath, byteOffset); },
     searchBm25: vi.fn(),
     searchVector: vi.fn(),
+    getStats: vi.fn(() => ({ chunkCount: chunks.length, indexedFileCount: cursors.size, lastIndexedAt: null })),
     deleteSession: vi.fn(),
     close: vi.fn(),
   };

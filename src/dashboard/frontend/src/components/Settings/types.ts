@@ -128,6 +128,14 @@ export const BACKGROUND_AI_FEATURE_META: ReadonlyArray<{
   { key: 'ttsSummarizer', label: 'TTS activity narration', description: 'Summarize recent activity into spoken narration utterances.' },
 ];
 
+export interface ConversationSearchConfig {
+  enabled?: boolean;
+  provider?: 'openai';
+  model?: string;
+  apiKeyRef?: string;
+  dbPath?: string;
+}
+
 export interface SettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
@@ -148,6 +156,7 @@ export interface SettingsConfig {
     favorites?: string[];
   };
   tracker_keys?: TrackerKeysConfig;
+  conversationSearch?: ConversationSearchConfig;
   tts?: TtsConfig;
   deprecation_warnings?: DeprecationWarning[];
   tmux?: {

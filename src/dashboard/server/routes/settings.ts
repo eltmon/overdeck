@@ -37,6 +37,10 @@ import {
 } from '../../../lib/claude-settings-overlay.js';
 import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
+import { syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
+import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
+import { fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -675,6 +679,41 @@ const postValidateApiKeyRoute = HttpRouter.add(
   })),
 );
 
+// ─── Routes: Conversation search status / reindex ─────────────────────────────
+
+const getConversationSearchStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/status',
+  httpHandler(Effect.try({
+    try: () => {
+      const config = getConversationSearchConfigSync();
+      const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
+      try {
+        const stats = db.getStats();
+        return jsonResponse({
+          enabled: config.enabled,
+          available: db.available,
+          unavailableReason: db.unavailableReason,
+          dbPath: config.dbPath,
+          ...stats,
+        });
+      } finally {
+        db.close();
+      }
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
+);
+
+const postConversationSearchReindexRoute = HttpRouter.add(
+  'POST',
+  '/api/settings/conversation-search/reindex',
+  httpHandler(Effect.promise(async () => {
+    const result = await fullReindexConversationSearch();
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Route: PUT /api/settings ─────────────────────────────────────────────────
 
 const putSettingsRoute = HttpRouter.add(
@@ -693,6 +732,7 @@ const putSettingsRoute = HttpRouter.add(
         await Effect.runPromise(saveSettingsApi(newSettings));
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
+        await syncConversationSearchWatcher();
         return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
@@ -875,6 +915,8 @@ export const settingsRouteLayer = Layer.mergeAll(
   getOpenAIAuthRoute,
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
+  getConversationSearchStatusRoute,
+  postConversationSearchReindexRoute,
   putSettingsRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,

@@ -52,6 +52,12 @@ export interface ChunkSearchRow extends ChunkRow {
   score: number;
 }
 
+export interface EmbeddingsDbStats {
+  chunkCount: number;
+  indexedFileCount: number;
+  lastIndexedAt: string | null;
+}
+
 export interface EmbeddingsDbHandle {
   /** Whether sqlite-vec loaded and schema init succeeded */
   available: boolean;
@@ -83,6 +89,9 @@ export interface EmbeddingsDbHandle {
 
   /** Cosine/ANN vector search over indexed embeddings. */
   searchVector(embedding: Float32Array, limit: number): ChunkSearchRow[];
+
+  /** Sidecar indexing stats for settings/status surfaces. */
+  getStats(): EmbeddingsDbStats;
 
   /** Remove all chunks and embeddings for a session (used when a session is deleted). */
   deleteSession(sessionId: string): void;
@@ -282,6 +291,7 @@ export function openEmbeddingsDb(
     setCursor: () => {},
     searchBm25: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
     searchVector: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
+    getStats: () => ({ chunkCount: 0, indexedFileCount: 0, lastIndexedAt: null }),
     deleteSession: () => {},
     close: () => {},
   });
@@ -381,6 +391,16 @@ export function openEmbeddingsDb(
         ORDER BY v.distance ASC
       `).all(vector, limit) as DbChunkSearchRow[];
       return rows.map(mapSearchRow);
+    },
+
+    getStats(): EmbeddingsDbStats {
+      const chunks = db.prepare(`SELECT count(*) AS chunkCount, max(indexed_at) AS lastIndexedAt FROM chunks`).get() as { chunkCount: number; lastIndexedAt: string | null };
+      const cursors = db.prepare(`SELECT count(*) AS indexedFileCount FROM file_cursors WHERE byte_offset > 0`).get() as { indexedFileCount: number };
+      return {
+        chunkCount: chunks.chunkCount,
+        indexedFileCount: cursors.indexedFileCount,
+        lastIndexedAt: chunks.lastIndexedAt,
+      };
     },
 
     deleteSession(sessionId: string): void {

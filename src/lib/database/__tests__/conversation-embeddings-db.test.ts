@@ -273,6 +273,22 @@ describe('conversation-embeddings-db', () => {
     });
   });
 
+  describe('getStats', () => {
+    it('returns chunk count, indexed file count, and latest indexed timestamp', () => {
+      const dir = makeTmpDir();
+      handle = openEmbeddingsDb(join(dir, 'embeddings.db'), 8);
+      handle.upsertChunk(makeChunk({ sessionId: 'stats-a', byteOffset: 0, indexedAt: '2026-06-02T01:00:00.000Z' }));
+      handle.upsertChunk(makeChunk({ sessionId: 'stats-b', byteOffset: 0, indexedAt: '2026-06-02T02:00:00.000Z' }));
+      handle.setCursor('/tmp/session-a.jsonl', 100);
+
+      expect(handle.getStats()).toEqual({
+        chunkCount: 2,
+        indexedFileCount: 1,
+        lastIndexedAt: '2026-06-02T02:00:00.000Z',
+      });
+    });
+  });
+
   describe('deleteSession', () => {
     it('removes all chunks and embeddings for a session without affecting others', () => {
       const dir = makeTmpDir();
