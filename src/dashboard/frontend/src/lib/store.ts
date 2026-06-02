@@ -318,8 +318,16 @@ export const selectPendingInputSubjects = deriveMemo<
       if (agentPerms.length > 0 && !kinds.includes('permissionRequest')) {
         kinds.push('permissionRequest')
       }
-      // The enrichment superset bool covers pane/runtime waits with no kind.
-      const waiting = kinds.length > 0 || a.hasPendingQuestion === true
+      // PAN-1591 — "Needs you" must be ACTIONABLE. Require a concrete pending
+      // surface (askUserQuestion / plan-mode / sessionResume / permissionRequest);
+      // do NOT trust the fuzzy `hasPendingQuestion` superset bool here. That bool
+      // is set by generic pane/runtime/fallback detections (reason 'other') that
+      // add no kind, no count, and no answerable payload — e.g. a stopped agent
+      // whose `resolution: needs_input` lingers forever, or a live pane-scan
+      // false-positive. Those surfaced phantom "Waiting on your input" rows that
+      // said "no longer waiting" the moment you clicked them. An actionable wait
+      // always carries a kind, so `kinds.length > 0` is the precise signal.
+      const waiting = kinds.length > 0
       if (!waiting) continue
       const since =
         a.pendingAskUserQuestion?.askedAt ??
