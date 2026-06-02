@@ -11,7 +11,7 @@ import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
-import { ProjectOverview, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
+import { ProjectOverview, projectTotalCost, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
 import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 
 export interface ProjectHomeProps {
@@ -67,6 +67,22 @@ export function ProjectHome({
     [conversations],
   )
 
+  // Project total spend (PAN-1589) — scoped to this project's issue prefix(es)
+  // via the shared helper, so the chip matches the cockpit Spend metric exactly.
+  // Undefined when there are no features to derive the prefix from (sparse view).
+  const totalCost = useMemo(
+    () => (issueCosts && features && features.length > 0
+      ? projectTotalCost(issueCosts, features)
+      : undefined),
+    [issueCosts, features],
+  )
+
+  // Navigate to the global costs page via the app's history-driven router.
+  const openCosts = () => {
+    window.history.pushState({ tab: 'costs' }, '', '/costs')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
   const onAgentSelected = async (id: string) => {
     writeLastUsedAgent(api.deckKey, id)
     const conversationName = await onCreateConversation?.(id)
@@ -121,7 +137,11 @@ export function ProjectHome({
       header={
         <>
           <WorkspaceHeader variant="project" name={projectName} branch={branch} />
-          <StatChips conversationCount={conversations.length} />
+          <StatChips
+            conversationCount={conversations.length}
+            costUsd={totalCost}
+            onCostClick={openCosts}
+          />
         </>
       }
       launcher={launcher}

@@ -140,6 +140,10 @@ export interface SettingsConfig {
   };
   memory?: MemorySettingsConfig;
   background_ai?: BackgroundAiConfig;
+  tts_summarizer?: {
+    model?: ModelId;
+    enabled?: boolean;
+  };
   openrouter?: {
     favorites?: string[];
   };

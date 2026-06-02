@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { StatChips, deriveHomeStats } from './StatChips'
 
 const NOW = 1_700_000_000_000 // fixed clock for deterministic age
@@ -54,5 +54,19 @@ describe('StatChips', () => {
     const row = screen.getByTestId('home-stats')
     expect(row).toHaveTextContent('+0')
     expect(row).toHaveTextContent('0 files')
+  })
+
+  it('renders no cost chip when costUsd is absent', () => {
+    render(<StatChips now={NOW} conversationCount={1} />)
+    expect(screen.queryByTestId('home-cost-chip')).toBeNull()
+  })
+
+  it('renders a formatted cost chip and fires onCostClick (PAN-1589)', () => {
+    const onCostClick = vi.fn()
+    render(<StatChips now={NOW} conversationCount={1} costUsd={42.5} onCostClick={onCostClick} />)
+    const chip = screen.getByTestId('home-cost-chip')
+    expect(chip).toHaveTextContent('$42.50')
+    fireEvent.click(chip)
+    expect(onCostClick).toHaveBeenCalledTimes(1)
   })
 })

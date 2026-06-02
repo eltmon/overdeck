@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, BACKGROUND_AI_FEATURE_META } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -406,6 +406,25 @@ const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; plac
   { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
 ];
 
+/** Cost-ledger source tag per background feature (matches the backend tags). */
+const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
+  conversationTitles: 'background:conversationTitles',
+  titleRefinement: 'background:titleRefinement',
+  memoryExtraction: 'memory-extraction',
+  memoryQueryExpansion: 'background:memoryQueryExpansion',
+  conversationEnrichment: 'background:conversationEnrichment',
+  sessionEmbeddings: 'background:sessionEmbeddings',
+  summaryFork: 'background:summaryFork',
+  ttsSummarizer: 'background:ttsSummarizer',
+};
+
+/** Known embedding models per provider for the embeddings picker (PAN-1589). */
+const EMBEDDING_MODELS_BY_PROVIDER: Record<string, string[]> = {
+  openai: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'],
+  voyage: ['voyage-code-3', 'voyage-3'],
+  ollama: ['nomic-embed-text', 'mxbai-embed-large'],
+};
+
 const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
@@ -436,6 +455,16 @@ export function SettingsPage() {
     queryKey: ['tts-health'],
     queryFn: fetchTtsHealth,
     refetchInterval: 10_000,
+  });
+  // Last-24h spend per background-AI source, for the Background AI section (PAN-1589).
+  const { data: backgroundCost } = useQuery({
+    queryKey: ['costs-background'],
+    queryFn: async (): Promise<{ hours: number; bySource: Record<string, number> }> => {
+      const res = await fetch('/api/costs/background');
+      if (!res.ok) return { hours: 24, bySource: {} };
+      return res.json();
+    },
+    refetchInterval: 60_000,
   });
   const ttsVoicesQuery = useQuery({
     queryKey: ['tts-voices'],
@@ -488,6 +517,22 @@ export function SettingsPage() {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, []);
+
+  // Deep-link: when another surface (e.g. the low-cost-mode status pill) opens
+  // Settings with a section intent, scroll there once on mount (PAN-1589).
+  useEffect(() => {
+    let intent: string | null = null;
+    try {
+      intent = sessionStorage.getItem('panopticon.settingsSection');
+      if (intent) sessionStorage.removeItem('panopticon.settingsSection');
+    } catch {
+      intent = null;
+    }
+    if (!intent) return;
+    // Defer to the next frame so the target section is mounted.
+    const t = setTimeout(() => scrollToSection(intent as string), 0);
+    return () => clearTimeout(t);
+  }, [scrollToSection]);
 
   // ── Conversations & Search (embedding) config ──────────────────────────────
   const [convConfig, setConvConfig] = useState<{
@@ -996,6 +1041,108 @@ export function SettingsPage() {
     };
     setFormData(next);
     saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+  };
+
+  // Apply an arbitrary settings patch and persist immediately (used by the
+  // per-feature model pickers in the Background AI section — PAN-1589).
+  const applyBackgroundModelPatch = (next: SettingsConfig) => {
+    setFormData(next);
+    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+  };
+
+  // Shared chat-model <option> list (same catalog as the Conversations selects).
+  const chatModelOptionEls = useMemo(() => [
+    ...Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
+      providerDef.models.map((model) => (
+        <option key={model.id} value={model.id}>{providerDef.name} — {model.name}</option>
+      )),
+    ),
+    ...openRouterFavoriteModels.map((model) => (
+      <option key={model.id} value={model.id}>OpenRouter — {model.name}</option>
+    )),
+  ], [openRouterFavoriteModels]);
+
+  const bgSelectClass = 'bg-background border border-border rounded-md px-2 py-1 text-[11px] text-foreground focus:ring-1 focus:ring-primary';
+
+  // Render the model control for one background feature. Heterogeneous: chat
+  // features use the chat-model select; memory uses provider+model; embeddings
+  // use a dedicated provider+embedding-model picker; TTS edits its own model.
+  const backgroundModelControl = (key: BackgroundAiFeature, disabled: boolean) => {
+    const setConv = (patch: NonNullable<SettingsConfig['conversations']>) =>
+      applyBackgroundModelPatch({ ...formData!, conversations: { ...formData!.conversations, ...patch } });
+    switch (key) {
+      case 'conversationTitles':
+      case 'titleRefinement':
+        return (
+          <select disabled={disabled} value={formData?.conversations?.title_model || 'claude-haiku-4-5'}
+            onChange={(e) => setConv({ title_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
+            {chatModelOptionEls}
+          </select>
+        );
+      case 'summaryFork':
+        return (
+          <select disabled={disabled} value={formData?.conversations?.compaction_model || 'claude-haiku-4-5'}
+            onChange={(e) => setConv({ compaction_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
+            {chatModelOptionEls}
+          </select>
+        );
+      case 'conversationEnrichment':
+        return (
+          <select disabled={disabled} value={formData?.conversations?.enrichment?.quick_model || ''}
+            onChange={(e) => setConv({ enrichment: { ...formData?.conversations?.enrichment, quick_model: e.target.value || null } })}
+            className={`${bgSelectClass} max-w-[180px]`}>
+            <option value="">Auto (tier default)</option>
+            {chatModelOptionEls}
+          </select>
+        );
+      case 'memoryExtraction':
+      case 'memoryQueryExpansion': {
+        const provider = formData?.memory?.provider || 'anthropic';
+        const setMem = (patch: NonNullable<SettingsConfig['memory']>) =>
+          applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } });
+        return (
+          <div className="flex items-center gap-1">
+            <select disabled={disabled} value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
+              <option value="anthropic">Anthropic</option>
+              <option value="cliproxy">cliproxy</option>
+            </select>
+            <input disabled={disabled} type="text" value={formData?.memory?.model || ''}
+              onChange={(e) => setMem({ model: e.target.value || undefined })}
+              placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
+              className="w-36 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary" />
+          </div>
+        );
+      }
+      case 'sessionEmbeddings': {
+        const provider = formData?.conversations?.embedding_provider || 'openai';
+        const models = EMBEDDING_MODELS_BY_PROVIDER[provider] ?? [];
+        const model = formData?.conversations?.embedding_model || models[0] || '';
+        return (
+          <div className="flex items-center gap-1">
+            <select disabled={disabled} value={provider}
+              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0] }); }}
+              className={`${bgSelectClass} max-w-[100px]`}>
+              <option value="openai">OpenAI</option>
+              <option value="voyage">Voyage</option>
+              <option value="ollama">Ollama</option>
+            </select>
+            <select disabled={disabled} value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        );
+      }
+      case 'ttsSummarizer':
+        return (
+          <select disabled={disabled} value={formData?.tts_summarizer?.model || 'gpt-5.4-mini'}
+            onChange={(e) => applyBackgroundModelPatch({ ...formData!, tts_summarizer: { ...formData!.tts_summarizer, model: e.target.value as ModelId } })}
+            className={`${bgSelectClass} max-w-[180px]`}>
+            {chatModelOptionEls}
+          </select>
+        );
+      default:
+        return null;
+    }
   };
 
   const handleClaudeCodeChannelsToggle = (enabled: boolean) => {
@@ -2208,6 +2355,7 @@ export function SettingsPage() {
             const cheapMode = formData.background_ai?.cheap_mode ?? false;
             const featureOn = formData.background_ai?.features?.[feature.key] ?? true;
             const effectiveOn = !cheapMode && featureOn;
+            const cost24h = backgroundCost?.bySource?.[BG_FEATURE_COST_SOURCE[feature.key]];
             return (
               <div
                 key={feature.key}
@@ -2218,26 +2366,42 @@ export function SettingsPage() {
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-foreground">{feature.label}</span>
                   <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {backgroundModelControl(feature.key, cheapMode)}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={effectiveOn}
-                  aria-label={`Toggle ${feature.label}`}
-                  disabled={cheapMode}
-                  onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-                    effectiveOn ? 'bg-primary' : 'bg-muted'
-                  }`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                    effectiveOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                  }`} />
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span
+                    className="font-mono tabular-nums text-[11px] text-muted-foreground w-16 text-right"
+                    title="Spend over the last 24 hours"
+                  >
+                    {typeof cost24h === 'number' ? `$${cost24h.toFixed(2)}` : '—'}
+                    <span className="block text-[9px] uppercase tracking-wide text-muted-foreground/60">24h</span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={effectiveOn}
+                    aria-label={`Toggle ${feature.label}`}
+                    disabled={cheapMode}
+                    onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
+                      effectiveOn ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      effectiveOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`} />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
+        <p className="text-[11px] text-muted-foreground mt-3 px-4">
+          24h figures are actual recorded spend per feature. Models shared between rows (e.g. titles
+          + refinement, memory extraction + query expansion) edit the same setting.
+        </p>
       </section>
 
       {/* Terminal */}

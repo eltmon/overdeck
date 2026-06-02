@@ -89,6 +89,10 @@ export interface MemoryConfig {
  * optional background AI feature is disabled in one click, regardless of its
  * individual `features.<key>` toggle. Individual toggles let the user enable or
  * disable each background AI feature independently when cheap mode is off.
+ *
+ * `cheap_mode` defaults ON (PAN-1589): background AI is off until the user
+ * opts in. While it is on, the dashboard status bar shows a "Low-cost mode"
+ * pill linking to this config section.
  */
 export interface BackgroundAiConfig {
   cheap_mode?: boolean;
@@ -948,7 +952,8 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     workerConcurrency: 4,
   },
   backgroundAi: {
-    cheapMode: false,
+    // PAN-1589: off by default — background AI stays gated until the user opts in.
+    cheapMode: true,
     features: defaultBackgroundAiFeatures(),
   },
   compliance: {

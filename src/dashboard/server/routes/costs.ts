@@ -34,6 +34,7 @@ import {
   getModelRollup,
   getAgentRollup,
   getCavemanExperimentData,
+  getBackgroundCostBySource,
 } from '../../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
@@ -326,11 +327,29 @@ const getCostsExperimentsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/costs/background ────────────────────────────────────────
+// Last-24h spend per background-AI source (PAN-1589). `?hours=` overrides.
+
+const getCostsBackgroundRoute = HttpRouter.add(
+  'GET',
+  '/api/costs/background',
+  httpHandler(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const url = new URL(request.url, 'http://localhost');
+      const hoursParam = Number(url.searchParams.get('hours'));
+      const hours = Number.isFinite(hoursParam) && hoursParam > 0 ? hoursParam : 24;
+      return jsonResponse({ hours, bySource: getBackgroundCostBySource(hours) });
+    }),
+  ),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const costsRouteLayer = Layer.mergeAll(
   getCostsSummaryRoute,
   getCostsByIssueRoute,
+  getCostsBackgroundRoute,
   postCostsRebuildRoute,
   postCostsDeduplicateRoute,
   getCostsStreamRoute,

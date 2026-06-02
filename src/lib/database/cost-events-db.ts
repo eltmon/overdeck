@@ -217,6 +217,29 @@ export function queryMemoryExtractionCostUsd(opts: {
   return result;
 }
 
+/**
+ * Sum cost over the last N hours grouped by `source_file`, restricted to
+ * background AI sources (`background:*` and the legacy `memory-extraction`
+ * tag). Returns a map of source → USD. Used by the Background AI settings
+ * section to show each feature's recent spend (PAN-1589).
+ */
+export function getBackgroundCostBySource(hours = 24): Record<string, number> {
+  const db = getDatabase();
+  const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+  const rows = db.prepare(`
+    SELECT source_file AS source, COALESCE(SUM(cost), 0) AS cost
+    FROM cost_events
+    WHERE ts >= ?
+      AND (source_file LIKE 'background:%' OR source_file = 'memory-extraction')
+    GROUP BY source_file
+  `).all(since) as Array<{ source: string | null; cost: number }>;
+  const out: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.source) out[row.source] = row.cost ?? 0;
+  }
+  return out;
+}
+
 export function queryCostEvents(opts: {
   issueId?: string;
   agentId?: string;

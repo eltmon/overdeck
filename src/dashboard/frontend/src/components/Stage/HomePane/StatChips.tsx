@@ -1,4 +1,4 @@
-import { Clock, ArrowLeftRight, FileText, MessageSquare } from 'lucide-react'
+import { Clock, ArrowLeftRight, FileText, MessageSquare, DollarSign } from 'lucide-react'
 import styles from '../stage.module.css'
 
 export interface HomeStatsInput {
@@ -47,13 +47,19 @@ export function deriveHomeStats(input: HomeStatsInput): HomeStats {
   }
 }
 
+export interface StatChipsProps extends HomeStatsInput {
+  /** Project/workspace total spend in USD. When provided, a cost chip renders. */
+  costUsd?: number
+  /** Click handler for the cost chip (e.g. navigate to the costs page). */
+  onCostClick?: () => void
+}
+
 /**
  * StatChips — the HomePane stat row (PAN-1549): workspace age, diff size,
- * changed-files count, and conversation count. Pure presentation composed from
- * read-model data passed by the Stage mount point. Chip click-through to panes
- * is wired in a later bead.
+ * changed-files count, conversation count, and (PAN-1589) total spend. Pure
+ * presentation composed from read-model data passed by the Stage mount point.
  */
-export function StatChips(props: HomeStatsInput) {
+export function StatChips(props: StatChipsProps) {
   const stats = deriveHomeStats(props)
   return (
     <div className={styles.stats} data-testid="home-stats">
@@ -70,6 +76,23 @@ export function StatChips(props: HomeStatsInput) {
       <span className={styles.chip}>
         <MessageSquare size={13} /> {stats.conversationCount} convos
       </span>
+      {props.costUsd != null && (
+        props.onCostClick ? (
+          <button
+            type="button"
+            className={styles.chip}
+            onClick={props.onCostClick}
+            title="View cost breakdown"
+            data-testid="home-cost-chip"
+          >
+            <DollarSign size={13} /> ${props.costUsd.toFixed(2)}
+          </button>
+        ) : (
+          <span className={styles.chip} data-testid="home-cost-chip">
+            <DollarSign size={13} /> ${props.costUsd.toFixed(2)}
+          </span>
+        )
+      )}
     </div>
   )
 }
