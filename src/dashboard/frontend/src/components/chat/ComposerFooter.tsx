@@ -88,6 +88,14 @@ async function deleteConversationImage(
 
 interface PendingImage {
   id: string;
+  /**
+   * The conversation this image was pasted/dropped into. Stamped at enqueue
+   * time so async upload callbacks attribute the result to the right
+   * conversation even if the user has since switched away — and so the
+   * per-conversation image map (mirroring drafts) keeps images with the
+   * conversation they belong to.
+   */
+  conversationName: string;
   file: File;
   previewUrl: string;
   serverPath: string | null;
@@ -200,9 +208,15 @@ export function ComposerFooter({
   const [text, setText] = useState('');
   const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
   const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  // Pending images are scoped per-conversation — keyed by conversation.name, the
+  // same scheme drafts use — so a screenshot pasted into one conversation
+  // survives switching away and back instead of being discarded. ComposerFooter
+  // is reused (not React-keyed) across switches, so a flat array would belong to
+  // whichever conversation happens to be mounted. The ref mirrors the map for
+  // synchronous reads inside async upload callbacks.
+  const [pendingImagesByConversation, setPendingImagesByConversation] = useState<Record<string, PendingImage[]>>({});
+  const pendingImagesRef = useRef<Record<string, PendingImage[]>>({});
   const editorRef = useRef<LexicalEditor | null>(null);
-  const pendingImagesRef = useRef<PendingImage[]>([]);
   const removedImageIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
   const previousConversationNameRef = useRef(conversation.name);
@@ -219,37 +233,52 @@ export function ComposerFooter({
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
 
+  // The images rendered in the strip — just this conversation's slice of the map.
+  const pendingImages = pendingImagesByConversation[conversation.name] ?? [];
+
+  // Single mutation primitive for the per-conversation image map. Keeps the ref
+  // in sync (for synchronous reads in async callbacks) and prunes empty entries
+  // so the map only holds conversations that actually have pending images.
+  const setConversationImages = useCallback((
+    conversationName: string,
+    updater: (prev: PendingImage[]) => PendingImage[],
+  ) => {
+    setPendingImagesByConversation((prevMap) => {
+      const next = updater(prevMap[conversationName] ?? []);
+      const nextMap = { ...prevMap };
+      if (next.length === 0) delete nextMap[conversationName];
+      else nextMap[conversationName] = next;
+      pendingImagesRef.current = nextMap;
+      return nextMap;
+    });
+  }, []);
+
   const deleteUploadedImage = useCallback((conversationName: string, path: string) => {
     void deleteConversationImage(conversationName, path).catch((err: unknown) => {
       console.error('[ComposerFooter] Failed to delete image:', err);
     });
   }, []);
 
-  const updatePendingImage = useCallback((id: string, updates: Partial<PendingImage>) => {
-    setPendingImages((images) => {
-      const next = images.map((image) => (image.id === id ? { ...image, ...updates } : image));
-      pendingImagesRef.current = next;
-      return next;
-    });
-  }, []);
+  const updatePendingImage = useCallback((conversationName: string, id: string, updates: Partial<PendingImage>) => {
+    setConversationImages(conversationName, (images) =>
+      images.map((image) => (image.id === id ? { ...image, ...updates } : image)),
+    );
+  }, [setConversationImages]);
 
   const removePendingImage = useCallback((id: string) => {
+    // The remove button only renders for the active conversation's images, so
+    // the synchronous current-conversation ref is the owning conversation.
+    const conversationName = currentConversationNameRef.current;
     removedImageIdsRef.current.add(id);
-    const image = pendingImagesRef.current.find((candidate) => candidate.id === id);
+    const image = (pendingImagesRef.current[conversationName] ?? []).find((candidate) => candidate.id === id);
     if (image) {
       revokePreviewUrl(image.previewUrl);
       if (image.serverPath) {
-        // Use the synchronous ref to avoid deleting from the wrong
-        // conversation if a switch happened between render and click.
-        deleteUploadedImage(currentConversationNameRef.current, image.serverPath);
+        deleteUploadedImage(conversationName, image.serverPath);
       }
     }
-    setPendingImages((images) => {
-      const next = images.filter((candidate) => candidate.id !== id);
-      pendingImagesRef.current = next;
-      return next;
-    });
-  }, [deleteUploadedImage]);
+    setConversationImages(conversationName, (images) => images.filter((candidate) => candidate.id !== id));
+  }, [deleteUploadedImage, setConversationImages]);
 
   const processUploadQueue = useCallback(() => {
     while (
@@ -258,24 +287,19 @@ export function ComposerFooter({
     ) {
       const image = uploadQueueRef.current.shift()!;
       activeUploadsRef.current++;
-      // Capture the ref synchronously at upload start so the callback
-      // always targets the conversation that was active when the upload
-      // began, avoiding stale-closure races on rapid conversation switches.
-      const ownerConversationName = currentConversationNameRef.current;
-      void uploadConversationImage(ownerConversationName, image.file).then(
+      // The image carries its owning conversation (stamped at enqueue), so the
+      // upload always targets and attaches to the right conversation even if the
+      // user switched away while it was in flight.
+      void uploadConversationImage(image.conversationName, image.file).then(
         (serverPath) => {
           activeUploadsRef.current--;
           try {
-            // Use the synchronously-updated ref so we detect conversation
-            // switches immediately, not after the useEffect fires.
-            if (
-              removedImageIdsRef.current.has(image.id)
-              || !mountedRef.current
-              || ownerConversationName !== currentConversationNameRef.current
-            ) {
-              deleteUploadedImage(ownerConversationName, serverPath);
+            // Orphaned only if the user removed it or the composer unmounted —
+            // a conversation switch no longer orphans it, since images persist.
+            if (removedImageIdsRef.current.has(image.id) || !mountedRef.current) {
+              deleteUploadedImage(image.conversationName, serverPath);
             } else {
-              updatePendingImage(image.id, { serverPath, error: null });
+              updatePendingImage(image.conversationName, image.id, { serverPath, error: null });
             }
           } finally {
             processUploadQueue();
@@ -288,7 +312,7 @@ export function ComposerFooter({
               return;
             }
             const message = err instanceof Error ? err.message : 'Failed to upload image';
-            updatePendingImage(image.id, { error: message });
+            updatePendingImage(image.conversationName, image.id, { error: message });
           } finally {
             processUploadQueue();
           }
@@ -301,23 +325,21 @@ export function ComposerFooter({
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
+    const conversationName = currentConversationNameRef.current;
     const newImages = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
+      conversationName,
       file,
       previewUrl: URL.createObjectURL(file),
       serverPath: null,
       error: null,
     } satisfies PendingImage));
 
-    setPendingImages((images) => {
-      const next = [...images, ...newImages];
-      pendingImagesRef.current = next;
-      return next;
-    });
+    setConversationImages(conversationName, (images) => [...images, ...newImages]);
 
     uploadQueueRef.current.push(...newImages);
     processUploadQueue();
-  }, [processUploadQueue]);
+  }, [processUploadQueue, setConversationImages]);
 
   // Changing harness is a runtime switch — the new harness wraps a different
   // binary (claude vs pi). Just updating local state would diverge the UI from
@@ -543,8 +565,9 @@ export function ComposerFooter({
     const submitConversationName = conversation.name;
 
     // Re-read pending images before any async work — if uploads are still in
-    // progress we must return early without switching model or sending.
-    const currentPendingImages = pendingImagesRef.current;
+    // progress we must return early without switching model or sending. Read
+    // this conversation's slice of the per-conversation map.
+    const currentPendingImages = pendingImagesRef.current[submitConversationName] ?? [];
     const uploadingImages = currentPendingImages.filter((image) => !image.serverPath && !image.error);
     if (uploadingImages.length > 0) {
       toast.error('Please wait for image uploads to finish');
@@ -573,13 +596,10 @@ export function ComposerFooter({
         await switchModel(submitConversationName, model, agentId, harness);
       }
 
-      // Abort if conversation switched during the async model switch — the
-      // switch useEffect will have already cleared pending images and deleted
-      // uploads for the old conversation.
+      // Abort if conversation switched during the async model switch. Leave the
+      // pasted images in their owning conversation (they persist now) so they
+      // survive for a retry when the user returns — do not revoke or delete.
       if (submitConversationName !== currentConversationNameRef.current) {
-        for (const image of currentPendingImages) {
-          revokePreviewUrl(image.previewUrl);
-        }
         return;
       }
 
@@ -588,20 +608,25 @@ export function ComposerFooter({
 
       await sendConversationMessage(submitConversationName, composedMessage, agentId);
 
-      // Only clear state if conversation is still the same (avoid clearing the
-      // new conversation's composer if user switched while send was in flight)
+      // The send consumed this conversation's images — revoke their previews and
+      // drop them from the map. Target submitConversationName explicitly so the
+      // right conversation is cleared even if the user switched while the send
+      // was in flight.
+      for (const image of currentPendingImages) {
+        revokePreviewUrl(image.previewUrl);
+      }
+      // Do NOT clear removedImageIdsRef here — in-flight upload callbacks still
+      // need it to decide whether to delete orphaned server uploads.
+      setConversationImages(submitConversationName, () => []);
+
+      // Only clear the editor if still on the same conversation, to avoid wiping
+      // the new conversation's draft if the user switched while the send was in
+      // flight.
       if (submitConversationName === currentConversationNameRef.current) {
         editor.update(() => {
           $getRoot().clear();
         });
         setText('');
-        for (const image of currentPendingImages) {
-          revokePreviewUrl(image.previewUrl);
-        }
-        pendingImagesRef.current = [];
-        // Do NOT clear removedImageIdsRef here — in-flight upload callbacks
-        // still need it to decide whether to delete orphaned server uploads.
-        setPendingImages([]);
       }
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
@@ -614,7 +639,7 @@ export function ComposerFooter({
       // Refocus editor
       editor.focus();
     }
-  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending, setSendingFor]);
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending, setSendingFor, setConversationImages]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -623,18 +648,12 @@ export function ComposerFooter({
     }
 
     previousConversationNameRef.current = conversation.name;
-    const images = pendingImagesRef.current;
-    pendingImagesRef.current = [];
-    uploadQueueRef.current = [];
-    removedImageIdsRef.current.clear();
-    for (const image of images) {
-      revokePreviewUrl(image.previewUrl);
-      if (image.serverPath) {
-        deleteUploadedImage(previousConversationName, image.serverPath);
-      }
-    }
-
-    setPendingImages([]);
+    // Do NOT clear or delete pending images here. They are keyed
+    // per-conversation and persist across switches (like drafts), so a
+    // screenshot pasted into one conversation survives navigating away and
+    // back. In-flight uploads stay queued and attach to their owning
+    // conversation. Images are cleaned up only on send (their conversation) or
+    // on full unmount of the composer.
     // Do NOT reset sending here. It is now keyed per-conversation, so a send
     // in flight for the conversation you're switching back to must keep showing
     // "Sending…". The send's own finally clears it by submitConversationName.
@@ -651,20 +670,23 @@ export function ComposerFooter({
     // conversation's draft, since OnChangePlugin does not fire for the seeded
     // initial editor state.
     setText(loadDraft(conversation.name));
-  }, [conversation.name, conversation.model, deleteUploadedImage]);
+  }, [conversation.name, conversation.model]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      const images = pendingImagesRef.current;
-      const conversationName = previousConversationNameRef.current;
-      pendingImagesRef.current = [];
+      // On full unmount, unsent pasted images across all conversations are
+      // scratch state — revoke their previews and delete their server uploads.
+      const imagesByConversation = pendingImagesRef.current;
+      pendingImagesRef.current = {};
       removedImageIdsRef.current.clear();
-      for (const image of images) {
-        revokePreviewUrl(image.previewUrl);
-        if (image.serverPath) {
-          deleteUploadedImage(conversationName, image.serverPath);
+      for (const [conversationName, images] of Object.entries(imagesByConversation)) {
+        for (const image of images) {
+          revokePreviewUrl(image.previewUrl);
+          if (image.serverPath) {
+            deleteUploadedImage(conversationName, image.serverPath);
+          }
         }
       }
     };

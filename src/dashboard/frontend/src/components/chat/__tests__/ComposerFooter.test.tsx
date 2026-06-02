@@ -271,7 +271,12 @@ describe('ComposerFooter image attachments', () => {
     expect(screen.queryByText('remove-me.png')).not.toBeInTheDocument();
   });
 
-  it('deletes uploaded images when the conversation prop changes without remounting', async () => {
+  it('persists pasted images per-conversation across switches without remounting', async () => {
+    // Images are keyed per-conversation (like drafts). Switching away must
+    // hide — not discard — the pasted image: no delete-image call fires, and
+    // switching back reveals it again. ComposerFooter is reused across
+    // conversation switches (no remount), so this exercises the persistence
+    // contract directly.
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
@@ -314,18 +319,17 @@ describe('ComposerFooter image attachments', () => {
       expect(screen.getByText('Uploaded')).toBeInTheDocument();
     });
 
+    // Switch to another conversation — the image is hidden, not deleted.
     view.rerender(<ComposerFooter conversation={secondConversation} />);
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/conversations/test-conv/delete-image',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-switched.png' }),
-        }),
-      );
-    });
     expect(screen.queryByText('switch-me.png')).not.toBeInTheDocument();
+
+    // Switch back — the image is still there, having survived the round-trip.
+    view.rerender(<ComposerFooter conversation={conversation} />);
+    expect(await screen.findByText('switch-me.png')).toBeInTheDocument();
+
+    // No delete-image request was ever made for either conversation.
+    const deleteCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/delete-image'));
+    expect(deleteCalls).toHaveLength(0);
   });
 
   it('preserves the editor draft when the conversation prop changes without remounting (deck reuse)', () => {
