@@ -1,11 +1,9 @@
 /**
  * PAN-382: Inspection checkpoint system.
  *
- * Tracks commit SHAs where inspections passed, scoping subsequent
- * inspection diffs to only the changes since the last checkpoint.
- *
- * First inspection: diff from branch base (main...HEAD)
- * Subsequent: diff from last checkpoint SHA to HEAD
+ * Tracks commit SHAs where inspections passed. The active inspection diff is
+ * scoped to the parent of HEAD because the work role contract is one bead per
+ * commit; checkpoints remain the durable record after a pass.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -96,22 +94,15 @@ export function saveCheckpoint(
   writeFileSync(getCheckpointPath(projectKey, issueId), JSON.stringify(data, null, 2));
 
   return checkpoint;
-}async function getDiffBasePromise(projectKey: string, issueId: string, workspacePath: string): Promise<string> {
-  const lastCheckpoint = getLastCheckpoint(projectKey, issueId);
-
-  if (lastCheckpoint) {
-    return lastCheckpoint.commitSha;
-  }
-
-  // No checkpoint — use the merge-base with main
+}async function getDiffBasePromise(_projectKey: string, _issueId: string, workspacePath: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git merge-base main HEAD', {
+    const { stdout } = await execAsync('git rev-parse HEAD^', {
       cwd: workspacePath,
       encoding: 'utf-8',
     });
     return stdout.trim();
   } catch {
-    // Fallback to 'main' if merge-base fails
+    // Fallback to 'main' if the branch has no parent commit.
     return 'main';
   }
 }async function getDiffStatsPromise(workspacePath: string, diffBase: string): Promise<string> {
@@ -143,15 +134,13 @@ export function saveCheckpoint(
  * `'main'` if `git merge-base` fails, matching the Promise version's behavior.
  */
 export function getDiffBase(
-  projectKey: string,
-  issueId: string,
+  _projectKey: string,
+  _issueId: string,
   workspacePath: string,
 ): Effect.Effect<string> {
-  const last = getLastCheckpoint(projectKey, issueId);
-  if (last) return Effect.succeed(last.commitSha);
   return Effect.tryPromise({
-    try: () => execAsync('git merge-base main HEAD', { cwd: workspacePath, encoding: 'utf-8' }),
-    catch: (cause) => new GitError({ command: ['git', 'merge-base', 'main', 'HEAD'], stderr: String(cause), exitCode: -1, cause }),
+    try: () => execAsync('git rev-parse HEAD^', { cwd: workspacePath, encoding: 'utf-8' }),
+    catch: (cause) => new GitError({ command: ['git', 'rev-parse', 'HEAD^'], stderr: String(cause), exitCode: -1, cause }),
   }).pipe(
     Effect.map(({ stdout }) => stdout.trim()),
     Effect.orElseSucceed(() => 'main'),
