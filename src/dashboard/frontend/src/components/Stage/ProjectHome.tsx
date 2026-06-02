@@ -11,6 +11,8 @@ import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
 import type { StageApi } from './types'
+import { ProjectOverview, type IssueCostBreakdown } from '../CommandDeck/ProjectOverview'
+import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 
 export interface ProjectHomeProps {
   /** Project key/name shown as `# <projectName>`. */
@@ -22,6 +24,16 @@ export interface ProjectHomeProps {
   /** Create a conversation for this project, returning the new conversation's
    * name so the deck can open an agent tab on it. */
   onCreateConversation?: (agentId: string) => Promise<string | undefined>
+  /** Project issues/features — when present, the project cockpit (hero metrics,
+   * stuck callout, pipeline swimlanes, cost cards) renders as the primary body
+   * (S4). Absent during load / for the no-project deck → sparse fallback. */
+  features?: ProjectFeature[]
+  /** Aggregated cost per issueId (and lowercased alias) for the cockpit cards. */
+  issueCosts?: Record<string, number>
+  /** Per-issue cost breakdown (by-model / by-stage) for the hover popover. */
+  issueCostDetails?: Record<string, IssueCostBreakdown>
+  /** Open an issue's cockpit tab when its card is clicked in a swimlane. */
+  onSelectFeature?: (feature: ProjectFeature) => void
   api: StageApi
 }
 
@@ -38,6 +50,10 @@ export function ProjectHome({
   branch = 'main',
   conversations = [],
   onCreateConversation,
+  features,
+  issueCosts,
+  issueCostDetails,
+  onSelectFeature,
   api,
 }: ProjectHomeProps) {
   const timelineConversations: TimelineConversation[] = useMemo(
@@ -57,6 +73,47 @@ export function ProjectHome({
     if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
   }
 
+  const launcher = (
+    <Launcher
+      lastUsedAgentId={readLastUsedAgent(api.deckKey)}
+      onSelect={(intent, query) =>
+        dispatchLauncherIntent(intent, query, {
+          openAgent: (i) => onAgentSelected(i.id),
+          openTerminal: () => api.openTypedPane('terminal'),
+          openWeb: (_q, url) =>
+            api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),
+          onAgentRun: (id) => writeLastUsedAgent(api.deckKey, id),
+        })
+      }
+    />
+  )
+
+  // S4 cockpit mode — when the project's issues are loaded, the rich
+  // ProjectOverview (hero metrics · stuck callout · pipeline swimlanes · cost
+  // cards) is the primary body, with the scoped Launcher above it. Agent-spawn,
+  // terminal, and web live in the Launcher; conversations live in the left rail,
+  // so the docks/Timeline aren't duplicated here. Clicking an issue card opens
+  // its cockpit tab. Falls back to the sparse launch composition during load.
+  if (features && features.length > 0 && onSelectFeature) {
+    return (
+      <HomePane
+        workspaceId={api.deckKey}
+        openPane={api.openPane}
+        header={<WorkspaceHeader variant="project" name={projectName} branch={branch} />}
+        launcher={launcher}
+        detail={
+          <ProjectOverview
+            projectName={projectName}
+            features={features}
+            issueCosts={issueCosts ?? {}}
+            issueCostDetails={issueCostDetails}
+            onSelectFeature={onSelectFeature}
+          />
+        }
+      />
+    )
+  }
+
   return (
     <HomePane
       workspaceId={api.deckKey}
@@ -67,20 +124,7 @@ export function ProjectHome({
           <StatChips conversationCount={conversations.length} />
         </>
       }
-      launcher={
-        <Launcher
-          lastUsedAgentId={readLastUsedAgent(api.deckKey)}
-          onSelect={(intent, query) =>
-            dispatchLauncherIntent(intent, query, {
-              openAgent: (i) => onAgentSelected(i.id),
-              openTerminal: () => api.openTypedPane('terminal'),
-              openWeb: (_q, url) =>
-                api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),
-              onAgentRun: (id) => writeLastUsedAgent(api.deckKey, id),
-            })
-          }
-        />
-      }
+      launcher={launcher}
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
       actionDock={
         // Project scope: only project-appropriate actions. Files/Commits/Plan/

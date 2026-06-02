@@ -359,7 +359,7 @@ export function CommandDeck({
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
   // Map aggregated costs per issue for the project tree sidebar and project overview.
-  const { issueCosts } = useMemo(() => {
+  const { issueCosts, issueCostDetails } = useMemo(() => {
     const costs: Record<string, number> = {};
     const detailsByIssue: Record<string, IssueCostBreakdown> = {};
 
@@ -1197,6 +1197,10 @@ export function CommandDeck({
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
+                  features={selectedProjectData?.features}
+                  issueCosts={issueCosts}
+                  issueCostDetails={issueCostDetails}
+                  onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
                   api={api}
                 />
               )}

@@ -430,4 +430,25 @@ Progress notes appended below as slices land (commit hashes).
   rewrite). PhaseTimeline + DrawerVerificationGates gained an optional `issueId` prop.
   PR + cost use the same robust query hooks as the body (`usePrQuery`, `useIssueCostsQuery`).
   VERIFIED LIVE on PAN-1242: PR #1516 (open, +831/-21), $96.79 cost, gates typecheck/lint/test
-  pass + UAT pending. NEXT (S3): hybrid tabs + pop-out; then S4 project cockpit, S5 polish.
+  pass + UAT pending.
+
+- **S2.5 DONE** (2026-06-01, mislabelled `(S3)` in subjects: `e3e2b73be` `86140084d` `f1378770a`
+  `a9a74bd58` `b76d07ce4`). Issue cockpit **body** re-refined into glance→scan→dig: glance band
+  (blocker spotlight + single-source metric strip), scan cards + dig tabs (dedup/reorder/restore),
+  cards sourced from authoritative APIs (beads/activity/gates), dead OverviewTab + HomePaneSections
+  removed. Mockup `docs/design/command-deck-issue-cockpit-v2.html`.
+
+- **S4 DONE (first cut)** (2026-06-02, frontend tsc clean). Re-mounted the dormant
+  `ProjectOverview` (hero metrics · stuck callout · pipeline-by-phase swimlanes · per-issue cost
+  cards with by-model/by-stage hover) as the **primary body of `ProjectHome`**, with the scoped
+  Launcher above it — the project cockpit, mirroring the issue cockpit's glance/scan/dig. Wiring:
+  `CommandDeck/index.tsx` now surfaces the already-computed `issueCostDetails` and threads
+  `features`/`issueCosts`/`issueCostDetails`/`onSelectFeature` into `renderHome`'s `<ProjectHome>`;
+  `ProjectHome` renders `<ProjectOverview>` in cockpit mode (features present) and keeps the sparse
+  launch composition as a load/no-project fallback. Issue-card click adapts `feature →
+  handleSelectFeature(feature.issueId)`, the same proven path the rail uses → opens the issue
+  cockpit tab. VERIFIED LIVE on panopticon-cli: swimlanes (Ship/Review/Work/Plan) render with
+  status badges + agent dots; clicking PAN-1242's card opened its full issue cockpit tab.
+  Mockup `docs/design/command-deck-project-cockpit-v2.html`.
+  NEXT — S4 refinement (mockup-alignment): right-column Cost+Fleet card layout, dig tabs
+  (Conversations/Board/Costs/Activity), dedup StatChips. Then S3 (hybrid tabs + pop-out) + S5.
