@@ -373,15 +373,24 @@ every commit must `npm run typecheck` clean; keep the dashboard building (Vite H
 "When there are options, make them selectable and keep all options available."
 
 Slices (in dependency order):
-- [ ] **S1 · Agent reachability (foundation).** `Stage` `resolveAgentPane` resolves sessions
+- [x] **S1 · Agent reachability (foundation).** `Stage` `resolveAgentPane` resolves sessions
   (not just conversations) via a new `resolveSession` prop; clicking an agent in the rail tree
   opens its conversation as an `agent` pane (SessionPanel). Fixes the broken tree-click AND the
   double-click side-effect. Files: Stage/index.tsx, Stage/types.ts, CommandDeck/index.tsx.
-- [ ] **S2 · Issue cockpit Stage tab.** Status band (WorkspaceHeader + PhaseTimeline + ActionStrip
+- [x] **S2 · Issue cockpit Stage tab.** Status band (WorkspaceHeader + PhaseTimeline + ActionStrip
   + cost-top-right + VerificationGates + PR) above the body; body = overview (issue) / agent convo.
   Re-mount dormant ZoneCOverviewTabs/* + drawer/* (PhaseTimeline, VerificationGates, ReviewSpecialists).
+- [x] **S2.5 · Issue cockpit BODY redesign (glance/scan/dig).** The body the status band sits above
+  was itself re-refined into the glance→scan→dig progressive-disclosure model: glance band
+  (blocker spotlight + single-source metric strip), scan cards + dig tabs (dedup/reorder/restore),
+  all cards sourced from authoritative APIs (beads/activity/gates), dead OverviewTab + HomePaneSections
+  removed. Mockup `docs/design/command-deck-issue-cockpit-v2.html`. NOTE: these landed mislabelled `(S3)`
+  in commit subjects (e3e2b73be, 86140084d, f1378770a, a9a74bd58, b76d07ce4) — they are the issue-cockpit
+  body, NOT the hybrid-tabs slice below.
 - [ ] **S3 · Hybrid tabs + pop-out.** A default (body follows rail) + ⌘/dbl-click → own tab; pane pop-out.
+  *(still pending — not what the mislabelled `(S3)` commits did.)*
 - [ ] **S4 · Project cockpit Home.** Re-mount ProjectOverview as ProjectHome body (hero/stuck/swimlanes/cost).
+  Mirrors the issue cockpit's glance/scan/dig. Mockup `docs/design/command-deck-project-cockpit-v2.html`.
 - [ ] **S5 · Polish/options.** View toggles where options exist; keep global Pipeline/Board lenses.
 
 Progress notes appended below as slices land (commit hashes).
