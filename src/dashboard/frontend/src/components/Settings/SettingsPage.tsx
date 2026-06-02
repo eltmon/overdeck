@@ -765,6 +765,21 @@ export function SettingsPage() {
     if (ttsSaveDebounceRef.current) clearTimeout(ttsSaveDebounceRef.current);
   }, []);
 
+  // Shared chat-model <option> list (same catalog as the Conversations selects).
+  // MUST be declared before the early returns below — it's a hook (PAN-1597 fix:
+  // a misplaced useMemo here caused React error #310 / hooks-order violation that
+  // crashed the entire Settings page).
+  const chatModelOptionEls = useMemo(() => [
+    ...Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
+      providerDef.models.map((model) => (
+        <option key={model.id} value={model.id}>{providerDef.name} — {model.name}</option>
+      )),
+    ),
+    ...openRouterFavoriteModels.map((model) => (
+      <option key={model.id} value={model.id}>OpenRouter — {model.name}</option>
+    )),
+  ], [openRouterFavoriteModels]);
+
   if (isLoading || voiceSettingsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1049,18 +1064,6 @@ export function SettingsPage() {
     setFormData(next);
     saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
   };
-
-  // Shared chat-model <option> list (same catalog as the Conversations selects).
-  const chatModelOptionEls = useMemo(() => [
-    ...Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
-      providerDef.models.map((model) => (
-        <option key={model.id} value={model.id}>{providerDef.name} — {model.name}</option>
-      )),
-    ),
-    ...openRouterFavoriteModels.map((model) => (
-      <option key={model.id} value={model.id}>OpenRouter — {model.name}</option>
-    )),
-  ], [openRouterFavoriteModels]);
 
   const bgSelectClass = 'bg-background border border-border rounded-md px-2 py-1 text-[11px] text-foreground focus:ring-1 focus:ring-primary';
 
