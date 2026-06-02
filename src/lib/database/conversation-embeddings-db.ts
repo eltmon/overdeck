@@ -48,6 +48,10 @@ export interface ChunkRow {
   indexedAt: string;
 }
 
+export interface ChunkSearchRow extends ChunkRow {
+  score: number;
+}
+
 export interface EmbeddingsDbHandle {
   /** Whether sqlite-vec loaded and schema init succeeded */
   available: boolean;
@@ -73,6 +77,12 @@ export interface EmbeddingsDbHandle {
 
   /** Persists the byte-offset cursor for a file path. */
   setCursor(filePath: string, byteOffset: number): void;
+
+  /** BM25 keyword search over indexed chunk text. */
+  searchBm25(query: string, limit: number): ChunkSearchRow[];
+
+  /** Cosine/ANN vector search over indexed embeddings. */
+  searchVector(embedding: Float32Array, limit: number): ChunkSearchRow[];
 
   /** Remove all chunks and embeddings for a session (used when a session is deleted). */
   deleteSession(sessionId: string): void;
@@ -219,6 +229,36 @@ function prepareStmts(db: Database.Database): Stmts {
   };
 }
 
+interface DbChunkSearchRow {
+  rowid: number;
+  session_id: string;
+  project_id: string;
+  role: string;
+  ts: string | null;
+  byte_offset: number;
+  char_length: number;
+  text: string;
+  token_count: number;
+  indexed_at: string;
+  score: number;
+}
+
+function mapSearchRow(row: DbChunkSearchRow): ChunkSearchRow {
+  return {
+    rowid: row.rowid,
+    sessionId: row.session_id,
+    projectId: row.project_id,
+    role: row.role,
+    ts: row.ts,
+    byteOffset: row.byte_offset,
+    charLength: row.char_length,
+    text: row.text,
+    tokenCount: row.token_count,
+    indexedAt: row.indexed_at,
+    score: row.score,
+  };
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
@@ -240,6 +280,8 @@ export function openEmbeddingsDb(
     upsertEmbedding: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
     getCursor: () => 0,
     setCursor: () => {},
+    searchBm25: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
+    searchVector: () => { throw new Error(`EmbeddingsDb unavailable: ${reason}`); },
     deleteSession: () => {},
     close: () => {},
   });
@@ -313,6 +355,33 @@ export function openEmbeddingsDb(
 
     setCursor(filePath: string, byteOffset: number): void {
       stmts.setCursor.run(filePath, byteOffset, new Date().toISOString());
+    },
+
+    searchBm25(query: string, limit: number): ChunkSearchRow[] {
+      const rows = db.prepare(`
+        SELECT c.rowid, c.session_id, c.project_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
+               bm25(chunks_fts) AS score
+        FROM chunks_fts
+        JOIN chunks c ON c.rowid = chunks_fts.rowid
+        WHERE chunks_fts MATCH ?
+        ORDER BY bm25(chunks_fts) ASC
+        LIMIT ?
+      `).all(query, limit) as DbChunkSearchRow[];
+      return rows.map(mapSearchRow);
+    },
+
+    searchVector(embedding: Float32Array, limit: number): ChunkSearchRow[] {
+      const vector = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+      const rows = db.prepare(`
+        SELECT c.rowid, c.session_id, c.project_id, c.role, c.ts, c.byte_offset, c.char_length, c.text, c.token_count, c.indexed_at,
+               v.distance AS score
+        FROM chunks_vec v
+        JOIN chunks c ON c.rowid = v.rowid
+        WHERE v.embedding MATCH ?
+        ORDER BY v.distance ASC
+        LIMIT ?
+      `).all(vector, limit) as DbChunkSearchRow[];
+      return rows.map(mapSearchRow);
     },
 
     deleteSession(sessionId: string): void {

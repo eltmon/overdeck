@@ -20,6 +20,10 @@ import { jsonResponse } from '../http-helpers.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
+import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
+import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
 
 // ─── Pan command catalog ──────────────────────────────────────────────────────
 //
@@ -185,6 +189,61 @@ function splitTags(value: string): string[] {
   return value.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
 
+export interface PaletteConversationHit {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  role: string;
+  ts: string | null;
+  byteOffset: number;
+  displayContent: string;
+  excerpt: string;
+  excerptSegments: Array<{ text: string; match: boolean }>;
+  rank: number;
+}
+
+function toPaletteConversationHit(hit: ConversationSearchHit): PaletteConversationHit {
+  return {
+    sessionId: hit.sessionId,
+    conversationId: hit.sessionId,
+    projectId: hit.projectId,
+    role: hit.role,
+    ts: hit.ts,
+    byteOffset: hit.byteOffset,
+    displayContent: hit.text.slice(0, 240),
+    excerpt: hit.excerpt,
+    excerptSegments: hit.excerptSegments,
+    rank: hit.rank,
+  };
+}
+
+async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
+  const config = getConversationSearchConfigSync();
+  if (!config.enabled) return [];
+
+  const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
+  if (!db.available) return [];
+
+  try {
+    const provider = createConversationEmbeddingProvider({ config });
+    const hits = await rankConversationSearch({
+      query: rawQuery,
+      limit,
+      store: {
+        searchBm25: (_query, candidateLimit) => db.searchBm25(matchQuery, candidateLimit),
+        searchVector: (embedding, candidateLimit) => db.searchVector(embedding, candidateLimit),
+      },
+      provider,
+    });
+    return hits.map(toPaletteConversationHit);
+  } catch (error) {
+    console.error('[palette] conversation search failed:', error);
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
 async function searchProjectMemory(
   projectId: string,
   matchQuery: string,
@@ -246,19 +305,19 @@ const getPaletteCommandsRoute = HttpRouter.add(
 // ─── Route: GET /api/palette/search?q=&limit= ─────────────────────────────────
 
 async function runPaletteSearch(rawQuery: string, limit: number) {
-  if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [] };
+  if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   const matchQuery = buildMatchQuery(rawQuery);
-  if (!matchQuery) return { memory: [], observations: [], summaries: [] };
+  if (!matchQuery) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   let projects: string[] = [];
   try {
     projects = listProjectsSync().map((p) => p.key);
   } catch (error) {
     console.error('[palette] failed to list projects:', error);
-    return { memory: [], observations: [], summaries: [] };
+    return { memory: [], observations: [], summaries: [], conversations: [] };
   }
-  if (projects.length === 0) return { memory: [], observations: [], summaries: [] };
+  if (projects.length === 0) return { memory: [], observations: [], summaries: [], conversations: await searchConversations(rawQuery, matchQuery, limit) };
 
   const perProject = Math.max(5, Math.ceil((limit * 2) / projects.length));
   const nested = await Promise.all(
@@ -274,10 +333,12 @@ async function runPaletteSearch(rawQuery: string, limit: number) {
     else if (hit.kind === 'summary') summaries.push(hit);
     else memory.push(hit);
   }
+  const conversations = await searchConversations(rawQuery, matchQuery, limit);
   return {
     memory: memory.slice(0, limit),
     observations: observations.slice(0, limit),
     summaries: summaries.slice(0, limit),
+    conversations,
   };
 }
 
