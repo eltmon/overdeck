@@ -124,6 +124,7 @@ import {
   type ParseState,
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
+import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
@@ -2534,6 +2535,46 @@ const getConversationMessagesRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/conversations/:name/message-locator ─────────────────────
+
+const getConversationMessageLocatorRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/message-locator',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const url = new URL(request.url, 'http://localhost');
+    const rawByteOffset = url.searchParams.get('byteOffset');
+    const byteOffset = rawByteOffset === null ? NaN : Number(rawByteOffset);
+    if (!Number.isInteger(byteOffset) || byteOffset < 0) {
+      return jsonResponse({ error: 'byteOffset must be a non-negative integer' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+
+        const sessionFile = await resolveSessionFile(conv);
+        if (!sessionFile) return jsonResponse({ error: 'Conversation transcript not found' }, { status: 404 });
+
+        const locator = await resolveConversationMessageLocator(sessionFile, byteOffset);
+        if (!locator) return jsonResponse({ error: 'Message not found for byteOffset' }, { status: 404 });
+        return jsonResponse(locator);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] resolve message locator failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: POST /api/conversations/:name/upload-image ───────────────────────
 
 const postConversationUploadImageRoute = HttpRouter.add(
@@ -3970,6 +4011,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationArchiveRoute,
   postConversationUnarchiveRoute,
   getConversationMessagesRoute,
+  getConversationMessageLocatorRoute,
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
