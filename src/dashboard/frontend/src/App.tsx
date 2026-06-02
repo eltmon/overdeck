@@ -1198,7 +1198,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="mx-auto flex w-full max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
+            className="mx-auto flex w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
             title="Search"
           >
             <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
