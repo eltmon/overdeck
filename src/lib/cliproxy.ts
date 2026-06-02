@@ -46,7 +46,7 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v6.10.9';
+const CLIPROXY_RELEASE_VERSION = 'v7.1.39';
 
 export function getCliproxyDir(): string {
   return join(PANOPTICON_HOME, 'cliproxy');
@@ -436,6 +436,50 @@ export function isCliproxyInstalled(): boolean {
   }
 }
 
+/** The pinned release version without the leading "v" (e.g. "7.1.39"). */
+function expectedCliproxyVersion(): string {
+  return CLIPROXY_RELEASE_VERSION.replace(/^v/, '');
+}
+
+/** Parse "CLIProxyAPI Version: 7.1.39, Commit: ..." → "7.1.39". */
+function parseCliproxyVersion(output: string): string | null {
+  const m = output.match(/Version:\s*v?(\d+\.\d+\.\d+)/i);
+  return m ? m[1] : null;
+}
+
+/**
+ * True only when the binary is present AND its reported version matches the
+ * pinned `CLIPROXY_RELEASE_VERSION`. This is what gates (re)install: a presence-
+ * only check meant bumping the pin never upgraded an existing binary, freezing
+ * machines on whatever shipped first (PAN-1584 — stuck on 6.9.45, which breaks
+ * gpt-5.5 work agents via a Codex "System messages are not allowed" rejection).
+ * An unreadable version is treated as out-of-date so we re-pull rather than
+ * trust a mystery binary.
+ */
+function isCliproxyUpToDateSync(): boolean {
+  if (!isCliproxyInstalled()) return false;
+  try {
+    const out = execSync(`"${getCliproxyBinary()}" --version`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5_000,
+    }).toString();
+    return parseCliproxyVersion(out) === expectedCliproxyVersion();
+  } catch {
+    return false;
+  }
+}
+
+/** Async variant of isCliproxyUpToDateSync — safe for the event loop. */
+async function isCliproxyUpToDateTask(): Promise<boolean> {
+  if (!isCliproxyInstalled()) return false;
+  try {
+    const { stdout } = await execAsync(`"${getCliproxyBinary()}" --version`, { timeout: 5_000 });
+    return parseCliproxyVersion(stdout) === expectedCliproxyVersion();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Download + extract the cliproxy binary into ~/.panopticon/bin/cliproxy.
  * Uses curl + tar because that's already a hard dep of pan install. Throws
@@ -443,7 +487,7 @@ export function isCliproxyInstalled(): boolean {
  */
 export function installCliproxySync(force = false): void {
   ensureDirs();
-  if (!force && isCliproxyInstalled()) return;
+  if (!force && isCliproxyUpToDateSync()) return;
 
   const asset = detectPlatformAsset();
   if (!asset) {
@@ -481,7 +525,7 @@ export function installCliproxySync(force = false): void {
  */
 async function installCliproxyTask(force = false): Promise<void> {
   ensureDirs();
-  if (!force && isCliproxyInstalled()) return;
+  if (!force && await isCliproxyUpToDateTask()) return;
 
   const asset = detectPlatformAsset();
   if (!asset) {
@@ -563,7 +607,10 @@ export function startCliproxySync(): void {
 
   if (isCliproxyRunningSync()) return;
 
-  if (!isCliproxyInstalled()) {
+  // Upgrade in place when the on-disk binary doesn't match the pinned version,
+  // not just when it's missing — otherwise a version bump never reaches an
+  // existing install (PAN-1584).
+  if (!isCliproxyUpToDateSync()) {
     installCliproxySync();
   }
 
@@ -677,7 +724,8 @@ async function startCliproxyTask(): Promise<void> {
 
   if (await isCliproxyRunningTask()) return;
 
-  if (!isCliproxyInstalled()) {
+  // Upgrade in place on version mismatch, not just when missing (PAN-1584).
+  if (!await isCliproxyUpToDateTask()) {
     await installCliproxyTask();
   }
 
