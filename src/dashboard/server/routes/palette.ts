@@ -304,7 +304,7 @@ const getPaletteCommandsRoute = HttpRouter.add(
 
 // ─── Route: GET /api/palette/search?q=&limit= ─────────────────────────────────
 
-async function runPaletteSearch(rawQuery: string, limit: number) {
+export async function runPaletteSearch(rawQuery: string, limit: number) {
   if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   const matchQuery = buildMatchQuery(rawQuery);

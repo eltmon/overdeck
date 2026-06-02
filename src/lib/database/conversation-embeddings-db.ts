@@ -377,9 +377,8 @@ export function openEmbeddingsDb(
                v.distance AS score
         FROM chunks_vec v
         JOIN chunks c ON c.rowid = v.rowid
-        WHERE v.embedding MATCH ?
+        WHERE v.embedding MATCH ? AND k = ?
         ORDER BY v.distance ASC
-        LIMIT ?
       `).all(vector, limit) as DbChunkSearchRow[];
       return rows.map(mapSearchRow);
     },
