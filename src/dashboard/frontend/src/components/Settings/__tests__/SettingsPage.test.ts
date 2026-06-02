@@ -105,7 +105,9 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
     expect(SETTINGS_PAGE_SOURCE).toContain('API key env var');
     expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
-    expect(SETTINGS_PAGE_SOURCE).toContain('Reindex all conversations');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
+    expect(SETTINGS_PAGE_SOURCE).toContain('window.confirm');
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {

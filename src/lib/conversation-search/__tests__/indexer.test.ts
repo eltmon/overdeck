@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { indexConversationFile } from '../indexer.js';
+import { estimateFullReindexConversationSearchCost, indexConversationFile } from '../indexer.js';
 import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversation-embeddings-db.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
@@ -112,5 +112,27 @@ describe('conversation search indexer', () => {
 
     expect(result.disabled).toBe(true);
     expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('estimates full reindex cost without embedding chunks', async () => {
+    const dir = makeTmpDir();
+    const projectDir = join(dir, 'projects', 'panopticon-cli');
+    const filePath = join(projectDir, 'session-d.jsonl');
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(filePath, line(message('assistant', 'cost estimate text')));
+    const provider = fakeProvider();
+    vi.mocked(provider.estimateCost).mockReturnValue({
+      provider: 'openai',
+      model: 'text-embedding-3-small',
+      tokenCount: 4,
+      pricePerMillionTokens: 0.02,
+      estimatedUsd: 0.00000008,
+    });
+
+    const estimate = await estimateFullReindexConversationSearchCost({ config: config(), roots: [join(dir, 'projects')], provider });
+
+    expect(provider.embed).not.toHaveBeenCalled();
+    expect(provider.estimateCost).toHaveBeenCalledWith(['cost estimate text']);
+    expect(estimate).toMatchObject({ filesScanned: 1, chunksEstimated: 1, disabled: false, estimatedUsd: 0.00000008 });
   });
 });

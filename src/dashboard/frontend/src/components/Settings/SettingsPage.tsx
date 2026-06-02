@@ -111,6 +111,24 @@ async function fetchConversationSearchStatus(): Promise<ConversationSearchStatus
   return res.json();
 }
 
+interface ConversationSearchCostEstimate {
+  provider: 'openai';
+  model: string;
+  tokenCount: number;
+  pricePerMillionTokens: number;
+  estimatedUsd: number;
+  filesScanned: number;
+  chunksEstimated: number;
+  disabled: boolean;
+  unavailableReason?: string;
+}
+
+async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
+  const res = await fetch('/api/settings/conversation-search/reindex-estimate');
+  if (!res.ok) throw new Error('Failed to estimate reindex cost');
+  return res.json();
+}
+
 async function reindexConversationSearch(): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
   const res = await fetch('/api/settings/conversation-search/reindex', { method: 'POST' });
   if (!res.ok) throw new Error('Failed to reindex conversations');
@@ -591,6 +609,8 @@ export function SettingsPage() {
   const [convConfigSaving, setConvConfigSaving] = useState(false);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [testingEmbedding, setTestingEmbedding] = useState(false);
+  const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
+  const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -767,6 +787,29 @@ export function SettingsPage() {
       toast.error(`Failed to reindex conversations: ${error.message}`);
     },
   });
+
+  const handleConversationSearchReindex = async () => {
+    setEstimatingConversationSearch(true);
+    try {
+      const estimate = await estimateConversationSearchReindex();
+      setConversationSearchEstimate(estimate);
+      if (estimate.disabled) {
+        toast.warning(estimate.unavailableReason ?? 'Conversation search is disabled');
+        return;
+      }
+      if (estimate.estimatedUsd > 1) {
+        const confirmed = window.confirm(
+          `Reindexing is estimated to cost $${estimate.estimatedUsd.toFixed(2)} (${estimate.tokenCount.toLocaleString()} tokens). Continue?`,
+        );
+        if (!confirmed) return;
+      }
+      conversationSearchReindexMutation.mutate();
+    } catch (error) {
+      toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setEstimatingConversationSearch(false);
+    }
+  };
 
   const ttsStartMutation = useMutation({
     mutationFn: startTtsDaemonRequest,
@@ -2152,15 +2195,21 @@ export function SettingsPage() {
                 {conversationSearchStatus && !conversationSearchStatus.available && (
                   <span className="ml-2 text-destructive">{conversationSearchStatus.unavailableReason}</span>
                 )}
+                {conversationSearchEstimate && !conversationSearchEstimate.disabled && (
+                  <span className="block mt-1">
+                    Estimated reindex cost: <span className="text-foreground">${conversationSearchEstimate.estimatedUsd.toFixed(4)}</span>
+                    {' '}({conversationSearchEstimate.tokenCount.toLocaleString()} tokens · {conversationSearchEstimate.chunksEstimated} chunks)
+                  </span>
+                )}
               </div>
               <button
                 type="button"
-                onClick={() => conversationSearchReindexMutation.mutate()}
-                disabled={!conversationSearchEnabled || conversationSearchReindexMutation.isPending}
+                onClick={() => void handleConversationSearchReindex()}
+                disabled={!conversationSearchEnabled || estimatingConversationSearch || conversationSearchReindexMutation.isPending}
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
               >
-                {conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                Reindex all conversations
+                {estimatingConversationSearch || conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Estimate & reindex all conversations
               </button>
             </div>
           </div>

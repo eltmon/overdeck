@@ -5,7 +5,7 @@ import { basename, join } from 'node:path';
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../database/conversation-embeddings-db.js';
 import { chunkConversationJsonl, type ConversationChunkRecord } from './chunker.js';
-import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from './embedding-provider.js';
+import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
 export interface ConversationIndexerOptions {
   config?: NormalizedConversationSearchConfig;
@@ -83,6 +83,37 @@ export async function fullReindexConversationSearch(
     if (!options.db) db.close();
   }
   return indexConversationSearch(options);
+}
+
+export interface ConversationReindexCostEstimate extends ConversationEmbeddingCostEstimate {
+  filesScanned: number;
+  chunksEstimated: number;
+  disabled: boolean;
+  unavailableReason?: string;
+}
+
+export async function estimateFullReindexConversationSearchCost(
+  options: ConversationIndexerOptions = {},
+): Promise<ConversationReindexCostEstimate> {
+  const config = options.config ?? getConversationSearchConfigSync();
+  const provider = options.provider ?? createConversationEmbeddingProvider({ config });
+  if (!config.enabled) {
+    return { ...provider.estimateCost([]), filesScanned: 0, chunksEstimated: 0, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+  }
+
+  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
+  const texts: string[] = [];
+  for (const filePath of files) {
+    for await (const chunk of chunkConversationJsonl({
+      filePath,
+      sessionId: sessionIdFromPath(filePath),
+      projectId: projectIdFromPath(filePath),
+      fromOffset: 0,
+    })) {
+      texts.push(chunk.text);
+    }
+  }
+  return { ...provider.estimateCost(texts), filesScanned: files.length, chunksEstimated: texts.length, disabled: false };
 }
 
 export async function indexConversationFile(

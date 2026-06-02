@@ -40,7 +40,7 @@ import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
-import { fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
+import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -705,6 +705,15 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   })),
 );
 
+const getConversationSearchReindexEstimateRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/reindex-estimate',
+  httpHandler(Effect.promise(async () => {
+    const estimate = await estimateFullReindexConversationSearchCost();
+    return jsonResponse(estimate);
+  })),
+);
+
 const postConversationSearchReindexRoute = HttpRouter.add(
   'POST',
   '/api/settings/conversation-search/reindex',
@@ -916,6 +925,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
   getConversationSearchStatusRoute,
+  getConversationSearchReindexEstimateRoute,
   postConversationSearchReindexRoute,
   putSettingsRoute,
   getOpenRouterModelsRoute,
