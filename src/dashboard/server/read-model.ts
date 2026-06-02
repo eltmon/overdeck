@@ -227,6 +227,43 @@ const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending",
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
+
+/** Pending-input fields carried by an agent snapshot (PAN-1591). */
+type PendingInputFields = Pick<
+  AgentSnapshot,
+  | 'hasPendingQuestion'
+  | 'pendingQuestionCount'
+  | 'pendingQuestionPrompt'
+  | 'pendingQuestionReason'
+  | 'pendingInputCount'
+  | 'pendingInputKinds'
+  | 'pendingAskUserQuestion'
+>;
+
+/**
+ * PAN-1591 — a non-running agent cannot be awaiting interactive input. The
+ * enrichment poller only emits for live agents, so a `hasPendingQuestion: true`
+ * computed while the agent was last alive lingers in the cache forever; the
+ * `agent.status_changed` reducer already strips it on a RUNTIME stop, but the
+ * bootstrap projection of an agent that was ALREADY stopped at server start
+ * never did — surfacing phantom "Waiting on your input" rows that report "no
+ * longer waiting" on click. This applies the same rule at projection time:
+ * clear every pending-input field unless the agent is running/starting.
+ */
+export function projectPendingInput(status: AgentStatus, src: PendingInputFields): PendingInputFields {
+  if (status !== 'running' && status !== 'starting') {
+    return {
+      hasPendingQuestion: undefined,
+      pendingQuestionCount: undefined,
+      pendingQuestionPrompt: undefined,
+      pendingQuestionReason: undefined,
+      pendingInputCount: undefined,
+      pendingInputKinds: undefined,
+      pendingAskUserQuestion: undefined,
+    };
+  }
+  return src;
+}
 export function toRole(v: unknown): Role | undefined {
   return v && VALID_ROLES.has(v as Role) ? v as Role : undefined;
 }
@@ -562,10 +599,17 @@ export const ReadModelServiceLive = Layer.effect(
               lastFailureReason: a.lastFailureReason,
               lastFailureNextRetryAt: a.lastFailureNextRetryAt,
               runtimeState: cachedAgent?.runtimeState,
-              hasPendingQuestion: cachedAgent?.hasPendingQuestion,
-              pendingQuestionCount: cachedAgent?.pendingQuestionCount,
-              pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
-              pendingQuestionReason: cachedAgent?.pendingQuestionReason,
+              // PAN-1591 — clear pending-input for non-live agents (the spread of
+              // `...cachedAgent` above carries stale fields; this overrides them).
+              ...projectPendingInput(toAgentStatus(reconciled), {
+                hasPendingQuestion: cachedAgent?.hasPendingQuestion,
+                pendingQuestionCount: cachedAgent?.pendingQuestionCount,
+                pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
+                pendingQuestionReason: cachedAgent?.pendingQuestionReason,
+                pendingInputCount: cachedAgent?.pendingInputCount,
+                pendingInputKinds: cachedAgent?.pendingInputKinds,
+                pendingAskUserQuestion: cachedAgent?.pendingAskUserQuestion,
+              }),
               resolution: cachedAgent?.resolution,
               resolutionCount: cachedAgent?.resolutionCount,
             };
@@ -647,6 +691,19 @@ export const ReadModelServiceLive = Layer.effect(
           const completedNormally =
             existsSync(join(agentDir, 'completed')) ||
             existsSync(join(agentDir, 'completed.processed'));
+          // Reconcile on-disk status with live tmux state (hoisted so the
+          // pending-input projection below can gate on the final status).
+          const reconciledStatus = (() => {
+            let reconciled = a.status as AgentStatus | string;
+            if (a.tmuxActive && a.status === 'stopped') {
+              reconciled = 'running';
+              logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
+            } else if (!a.tmuxActive && a.status === 'running') {
+              reconciled = 'stopped';
+              logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
+            }
+            return toAgentStatus(reconciled);
+          })();
           agentsById[a.id] = {
             id: a.id,
             issueId: a.issueId,
@@ -657,20 +714,7 @@ export const ReadModelServiceLive = Layer.effect(
             // every agent to claude-code.
             runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
             model: a.model || undefined,
-            // Reconcile on-disk status with live tmux state:
-            // - tmux active but state.json says 'stopped' → actually running (resumed outside API)
-            // - tmux inactive but state.json says 'running' → actually stopped (reboot/crash)
-            status: (() => {
-              let reconciled = a.status as AgentStatus | string;
-              if (a.tmuxActive && a.status === 'stopped') {
-                reconciled = 'running';
-                logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
-              } else if (!a.tmuxActive && a.status === 'running') {
-                reconciled = 'stopped';
-                logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
-              }
-              return toAgentStatus(reconciled);
-            })(),
+            status: reconciledStatus,
             startedAt: a.startedAt || undefined,
             lastActivity: a.lastActivity || undefined,
             branch: a.branch || undefined,
@@ -689,15 +733,17 @@ export const ReadModelServiceLive = Layer.effect(
             lastFailureReason: a.lastFailureReason,
             lastFailureNextRetryAt: a.lastFailureNextRetryAt,
             runtimeState: completedNormally ? 'completed' : undefined,
-            // Enrichment fields (PAN-440)
-            hasPendingQuestion: enrichment?.hasPendingQuestion,
-            pendingQuestionCount: enrichment?.pendingQuestionCount,
-            pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
-            pendingQuestionReason: enrichment?.pendingQuestionReason,
-            // PAN-1520 — unified pending-input surfaces
-            pendingInputCount: enrichment?.pendingInputCount,
-            pendingInputKinds: enrichment?.pendingInputKinds,
-            pendingAskUserQuestion: enrichment?.pendingAskUserQuestion,
+            // Enrichment fields (PAN-440) — pending-input gated on liveness
+            // (PAN-1591): a stopped agent's cached hasPendingQuestion is stale.
+            ...projectPendingInput(reconciledStatus, {
+              hasPendingQuestion: enrichment?.hasPendingQuestion,
+              pendingQuestionCount: enrichment?.pendingQuestionCount,
+              pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
+              pendingQuestionReason: enrichment?.pendingQuestionReason,
+              pendingInputCount: enrichment?.pendingInputCount,
+              pendingInputKinds: enrichment?.pendingInputKinds,
+              pendingAskUserQuestion: enrichment?.pendingAskUserQuestion,
+            }),
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
             resolutionCount: enrichment?.resolutionCount,
           };
