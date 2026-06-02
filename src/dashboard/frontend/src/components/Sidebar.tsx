@@ -10,7 +10,6 @@ import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { FreshnessIndicator } from './FreshnessIndicator';
-import { DeaconPauseToggle } from './DeaconPauseToggle';
 import { useTheme } from '../hooks/useTheme';
 import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
@@ -571,7 +570,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                   </kbd>
                 </button>
                 <div className="ml-auto flex items-center gap-1">
-                  <DeaconPauseToggle />
+                  {/* Deacon Freeze/Resume moved to the top app bar (PAN-1607). */}
                   {isDev && (
                     <button
                       onClick={() => rebuildMutation.mutate()}
@@ -636,7 +635,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                     : <Hammer className="w-3.5 h-3.5" />}
                 </button>
               )}
-              <DeaconPauseToggle compact />
               <button
                 onClick={toggleTheme}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

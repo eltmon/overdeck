@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
+import { getInternalTokenSync } from '../../lib/internal-token.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -461,13 +462,23 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   await startSidecars();
 
   // ── URLs ───────────────────────────────────────────────────────────────────
+  // The dashboard mints its session from a one-time #panopticon_token=<internal
+  // token> in the URL hash (consumeDashboardBootstrapToken). Without it the
+  // browser can't authenticate and every gated API call 401s, so surface the
+  // Frontend URL WITH the token (PAN-1607).
+  const internalToken = getInternalTokenSync();
+  const authFragment = internalToken ? `#panopticon_token=${encodeURIComponent(internalToken)}` : '';
+  const frontendBase = config.traefikEnabled
+    ? `https://${config.traefikDomain}`
+    : `http://localhost:${config.dashboardPort}`;
+  const apiBase = config.traefikEnabled
+    ? `https://${config.traefikDomain}/api`
+    : `http://localhost:${config.dashboardApiPort}`;
   console.log('');
-  if (config.traefikEnabled) {
-    console.log(`  Frontend: ${chalk.cyan(`https://${config.traefikDomain}`)}`);
-    console.log(`  API:      ${chalk.cyan(`https://${config.traefikDomain}/api`)}`);
-  } else {
-    console.log(`  Frontend: ${chalk.cyan(`http://localhost:${config.dashboardPort}`)}`);
-    console.log(`  API:      ${chalk.cyan(`http://localhost:${config.dashboardApiPort}`)}`);
+  console.log(`  Frontend: ${chalk.cyan(`${frontendBase}${authFragment}`)}`);
+  console.log(`  API:      ${chalk.cyan(apiBase)}`);
+  if (authFragment) {
+    console.log(chalk.dim('  ↑ open the Frontend link — it carries a one-time auth token that signs the dashboard in.'));
   }
   console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
