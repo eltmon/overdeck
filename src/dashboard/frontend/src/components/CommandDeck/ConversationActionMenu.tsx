@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2 } from 'lucide-react';
+import { Star, Pencil, Sparkles, Share2, GitBranchPlus, Download, Copy, Check, Square, Archive, X, FileText, ExternalLink, Loader2, Columns2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
@@ -18,6 +18,8 @@ interface ConversationActionMenuProps {
   /** Tab conveniences (PAN-1591) — only present when invoked from a pane tab. */
   onCloseOthers?: () => void;
   onCloseRight?: () => void;
+  /** Open this tab in a side-by-side split (PAN-1591). */
+  onOpenInSplit?: () => void;
 }
 
 /**
@@ -26,7 +28,7 @@ interface ConversationActionMenuProps {
  * a workspace tab. Portaled to <body> and fixed-positioned at `position` so it
  * escapes any overflow clip. Inline rename happens inside the menu itself.
  */
-export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab, onCloseOthers, onCloseRight }: ConversationActionMenuProps) {
+export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab, onCloseOthers, onCloseRight, onOpenInSplit }: ConversationActionMenuProps) {
   const confirm = useConfirm();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(conversation.title ?? conversation.name);
@@ -165,6 +167,12 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
             {onCloseTab && (
               <>
                 <div className={styles.headerMenuDivider} />
+                {onOpenInSplit && (
+                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onOpenInSplit(); onClose(); }}>
+                    <Columns2 size={14} />
+                    Open in split right
+                  </button>
+                )}
                 <button
                   role="menuitem"
                   className={styles.headerMenuItem}

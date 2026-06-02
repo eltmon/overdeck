@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useCallback, useRef, useState, type ReactNode } from 'react'
 import {
   usePanesStore,
   selectPanesForWorkspace,
@@ -11,8 +11,9 @@ import type { Conversation } from '../CommandDeck/ConversationList'
 import type { SessionNode as SessionNodeType } from '@panctl/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
+import { PaneTabMenu } from './PaneTabMenu'
 import { ForkModal } from '../CommandDeck/ForkModal'
-import { Bot, Terminal as TerminalIcon, Globe } from 'lucide-react'
+import { Bot, Terminal as TerminalIcon, Globe, X } from 'lucide-react'
 import { PaneBar, type NewPaneAction } from './PaneBar'
 import { useStageShortcuts } from './useStageShortcuts'
 import { TerminalDrawer } from '../terminal/TerminalDrawer'
@@ -226,17 +227,44 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // so the menu re-resolves live state (e.g. favorite toggles) on each render.
   const convMutations = useConversationMutations(null, () => {})
   const [tabMenu, setTabMenu] = useState<{ conversationName: string; paneId: string; top: number; left: number } | null>(null)
+  // Generic right-click menu for non-conversation tabs (issue/plan/docs/…).
+  const [paneMenu, setPaneMenu] = useState<{ paneId: string; permanent: boolean; top: number; left: number } | null>(null)
+
+  // Side-by-side split (PAN-1591): an optional secondary pane pinned beside the
+  // active one. View-time state — not persisted; resets on reload. `splitRatio`
+  // is the primary pane's fraction of the row width.
+  const [secondaryPaneId, setSecondaryPaneId] = useState<string | null>(null)
+  const [splitRatio, setSplitRatio] = useState(0.6)
+  const paneAreaRef = useRef<HTMLDivElement>(null)
+  const onDividerDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const el = paneAreaRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const onMove = (ev: MouseEvent) => {
+      setSplitRatio(Math.min(0.8, Math.max(0.2, (ev.clientX - rect.left) / rect.width)))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    document.body.style.cursor = 'col-resize'
+  }, [])
+
   const handlePaneContextMenu = useCallback(
     (pane: WorkspacePane, e: React.MouseEvent) => {
-      if (pane.paneType !== 'agent' || !pane.conversationId) return
-      if (!conversations.some((c) => c.name === pane.conversationId)) return
       e.preventDefault()
-      setTabMenu({
-        conversationName: pane.conversationId,
-        paneId: pane.paneId,
-        top: Math.min(e.clientY, window.innerHeight - 360),
-        left: Math.min(e.clientX, window.innerWidth - 240),
-      })
+      const top = Math.min(e.clientY, window.innerHeight - 360)
+      const left = Math.min(e.clientX, window.innerWidth - 240)
+      // Conversation/agent tabs get the rich menu; everything else the generic one.
+      if (pane.paneType === 'agent' && pane.conversationId && conversations.some((c) => c.name === pane.conversationId)) {
+        setTabMenu({ conversationName: pane.conversationId, paneId: pane.paneId, top, left })
+      } else {
+        setPaneMenu({ paneId: pane.paneId, permanent: pane.paneType === 'home' || !!pane.isPermanent, top, left })
+      }
     },
     [conversations],
   )
@@ -298,6 +326,31 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
 
   const activePane = displayPanes.find((p) => p.paneId === activePaneId) ?? displayPanes[0] ?? null
 
+  // Compose any pane to its content. Home/issue need caller data (render props);
+  // everything else dispatches through renderPane. Shared by the active pane and
+  // the split's secondary pane.
+  const renderPaneContent = useCallback(
+    (pane: WorkspacePane): ReactNode =>
+      pane.paneType === 'home'
+        ? renderHome(api)
+        : pane.paneType === 'issue'
+          ? renderIssue(pane.issueId ?? '', api)
+          : renderPane(pane, ctx),
+    [renderHome, renderIssue, api, ctx],
+  )
+
+  // The split's secondary pane — never the same as the active pane.
+  const secondaryPane =
+    secondaryPaneId && secondaryPaneId !== activePane?.paneId
+      ? displayPanes.find((p) => p.paneId === secondaryPaneId) ?? null
+      : null
+  // Drop the split when its pane is closed or becomes the active tab.
+  useEffect(() => {
+    if (secondaryPaneId && (secondaryPaneId === activePaneId || !displayPanes.some((p) => p.paneId === secondaryPaneId))) {
+      setSecondaryPaneId(null)
+    }
+  }, [secondaryPaneId, activePaneId, displayPanes])
+
   // Re-resolve the right-clicked tab's conversation from the live list so the
   // menu reflects current state and self-dismisses if the conversation is gone.
   const tabMenuConv = tabMenu ? conversations.find((c) => c.name === tabMenu.conversationName) ?? null : null
@@ -313,13 +366,36 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         newActions={newActions}
         onPaneContextMenu={handlePaneContextMenu}
       />
-      <div className={styles.pane}>
-        {activePane &&
-          (activePane.paneType === 'home'
-            ? renderHome(api)
-            : activePane.paneType === 'issue'
-              ? renderIssue(activePane.issueId ?? '', api)
-              : renderPane(activePane, ctx))}
+      <div className={styles.paneArea} ref={paneAreaRef}>
+        <div className={styles.splitPanel} style={{ flexGrow: secondaryPane ? splitRatio : 1, flexBasis: 0 }}>
+          <div className={styles.pane}>{activePane && renderPaneContent(activePane)}</div>
+        </div>
+        {secondaryPane && (
+          <>
+            <div
+              className={styles.splitDivider}
+              onMouseDown={onDividerDown}
+              role="separator"
+              aria-orientation="vertical"
+              title="Drag to resize"
+            />
+            <div className={styles.splitPanel} style={{ flexGrow: 1 - splitRatio, flexBasis: 0 }}>
+              <div className={styles.splitHeader}>
+                <span className={styles.splitHeaderLabel}>{secondaryPane.label}</span>
+                <button
+                  type="button"
+                  className={styles.splitHeaderClose}
+                  onClick={() => setSecondaryPaneId(null)}
+                  title="Close split"
+                  aria-label="Close split"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className={styles.pane}>{renderPaneContent(secondaryPane)}</div>
+            </div>
+          </>
+        )}
       </div>
       {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
 
@@ -330,6 +406,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
           position={{ top: tabMenu.top, left: tabMenu.left }}
           onClose={() => setTabMenu(null)}
           onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
+          onOpenInSplit={() => setSecondaryPaneId(tabMenu.paneId)}
           onCloseOthers={() => {
             const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
             for (const p of panes) {
@@ -344,6 +421,15 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
               if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
             }
           }}
+        />
+      )}
+
+      {paneMenu && (
+        <PaneTabMenu
+          position={{ top: paneMenu.top, left: paneMenu.left }}
+          onClose={() => setPaneMenu(null)}
+          onOpenInSplit={() => setSecondaryPaneId(paneMenu.paneId)}
+          onCloseTab={paneMenu.permanent ? undefined : () => closePane(deckKey, paneMenu.paneId)}
         />
       )}
 
