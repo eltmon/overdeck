@@ -9,7 +9,6 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { fetchConversations } from './CommandDeck/ConversationList';
-import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { DeaconPauseToggle } from './DeaconPauseToggle';
 import { useTheme } from '../hooks/useTheme';
@@ -554,7 +553,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           {!collapsed && (
             <div className="px-3 py-2 space-y-1">
               <div className="flex items-center gap-2">
-                <CloisterStatusBar onOpenSettings={() => onTabChange('settings')} />
+                {/* Cloister system controls moved to the top app-bar SystemMenu (PAN-1605). */}
                 <div className="ml-auto">
                   <FreshnessIndicator />
                 </div>
