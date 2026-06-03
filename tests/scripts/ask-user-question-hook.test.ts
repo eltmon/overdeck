@@ -91,7 +91,7 @@ describe('ask-user-question-hook (PAN-1520)', () => {
     }
     expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
     expect(parsed.hookSpecificOutput?.permissionDecision).toBe('deny')
-    expect(parsed.hookSpecificOutput?.permissionDecisionReason).toMatch(/silent.corruption/i)
+    expect(parsed.hookSpecificOutput?.permissionDecisionReason).toMatch(/surfaced to the operator/i)
     expect(parsed.hookSpecificOutput?.additionalContext).toContain('How do we stop the spam?')
     expect(parsed.hookSpecificOutput?.additionalContext).toContain('pan close 1203 (proper close-out)')
     expect(parsed.hookSpecificOutput?.additionalContext).toContain('Flip autoAdvance: false')

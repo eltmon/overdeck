@@ -79,7 +79,7 @@ describe('SearchModal', () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Search issues...'), {
+    fireEvent.change(screen.getByPlaceholderText('Search all issues…'), {
       target: { value: 'PAN' },
     });
 
@@ -104,7 +104,7 @@ describe('SearchModal', () => {
       />
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Search issues...'), {
+    fireEvent.change(screen.getByPlaceholderText('Search all issues…'), {
       target: { value: 'PAN' },
     });
 

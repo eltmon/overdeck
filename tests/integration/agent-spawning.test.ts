@@ -418,6 +418,15 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     });
 
     it('launches review sub-roles as interactive sessions, not headless print mode (PAN-1557)', async () => {
+      // PAN-1594: claude-code prompt delivery now waits for the hook-written
+      // ready.json. Write it during createSession so waitForReadySignal resolves
+      // immediately instead of polling for 30s (mirrors the Pi-FIFO test below).
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.createSession).mockImplementation((agentId: string) => Effect.sync(() => {
+        const agentDir = getAgentDir(agentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      }));
       await spawnRun('PAN-SUBREVIEW-1', 'review', {
         workspace: '/tmp/test-workspace',
         subRole: 'security',
@@ -437,6 +446,14 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     });
 
     it('review sub-role launcher carries no signal block — Stop-hook owns REVIEWER_READY (PAN-1557)', async () => {
+      // PAN-1594: write ready.json during createSession so the claude-code
+      // prompt-delivery wait resolves immediately instead of polling for 30s.
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.createSession).mockImplementation((agentId: string) => Effect.sync(() => {
+        const agentDir = getAgentDir(agentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      }));
       await spawnRun('PAN-SUBSIGNAL-1', 'review', {
         workspace: '/tmp/test-workspace',
         subRole: 'correctness',

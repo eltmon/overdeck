@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryObservation } from '@panctl/contracts';
 import {
   buildQueryExpansionCacheKey,
@@ -10,6 +10,14 @@ import {
   expandMemoryQuery,
   type QueryExpansionCall,
 } from '../../../src/lib/memory/query-expansion.js';
+
+// Background AI is off-by-default since PAN-1589 (cheapMode). These unit tests
+// exercise the query-expansion mechanics, which only run when the feature gate
+// is on — force it on so we test the logic rather than the gate.
+vi.mock('../../../src/lib/background-ai/features.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/background-ai/features.js')>();
+  return { ...actual, isBackgroundFeatureEnabled: () => true };
+});
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;

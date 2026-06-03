@@ -25,7 +25,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'plan',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
@@ -49,7 +49,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'work',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
@@ -121,7 +121,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'test',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();

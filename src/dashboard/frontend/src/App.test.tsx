@@ -93,7 +93,9 @@ vi.mock('./components/skeletons/PipelineSkeleton', () => ({ PipelineSkeleton: ()
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, History: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
+// lucide-react icons are lightweight SVG components that render fine in jsdom,
+// so we don't mock them — the enumerated mock used to drift every time the app
+// bar gained an icon (PAN-1593 added Search/Snowflake/SlidersHorizontal).
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({
   Toaster: () => null,

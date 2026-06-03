@@ -40,7 +40,7 @@ describe('IssueRow', () => {
     expect(row).toHaveAttribute('data-priority', 'high');
     expect(row).toHaveAttribute('data-variant', 'pipeline');
     expect(row).toHaveClass('grid', 'gap-[14px]', 'py-[10px]', 'pl-[18px]', 'pr-[22px]', 'before:bg-warning');
-    expect(row.getAttribute('style')).toContain('grid-template-columns: 14px 78px 14px 1fr 220px 84px 30px;');
+    expect(row.getAttribute('style')).toContain('grid-template-columns: 14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 30px;');
 
     expect(row.querySelector('[data-component="phase-glyph"]')).toHaveAttribute('data-phase', 'ship');
     expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
@@ -76,7 +76,7 @@ describe('IssueRow', () => {
 
     expect(row).toHaveAttribute('data-variant', 'command-deck');
     expect(row).toHaveClass('gap-[12px]', 'py-[9px]', 'pl-[18px]', 'pr-[22px]', 'before:bg-transparent');
-    expect(row.getAttribute('style')).toContain('grid-template-columns: 14px 78px 14px 1fr 220px 84px 26px;');
+    expect(row.getAttribute('style')).toContain('grid-template-columns: 14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 26px;');
     expect(ledger).toHaveClass('opacity-55');
     expect(within(ledger).getAllByText('—')).toHaveLength(2);
     expect(screen.getByText('Unassigned')).toHaveClass('italic', 'text-muted-foreground');

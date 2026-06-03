@@ -7,7 +7,6 @@ bug-fix
 check-merged
 clear-writing
 cliproxy
-code-review
 code-review-performance
 code-review-security
 conv-lookup
@@ -97,3 +96,4 @@ work-complete
 workspace-add-repo
 workspace-status
 write-spec
+write-vbrief
