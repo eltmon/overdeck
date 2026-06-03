@@ -96,7 +96,7 @@ export function PaneLayoutView(props: PaneLayoutViewProps) {
     return (
       <div
         className={styles.splitPanel}
-        style={{ minWidth: 0, minHeight: 0 }}
+        style={{ flex: '1 1 0', minWidth: 0, minHeight: 0 }}
         onMouseDownCapture={() => onFocus(paneId)}
       >
         {showHeaders && (
