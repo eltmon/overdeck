@@ -387,6 +387,9 @@ export default function App() {
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // Issue prefix of the deck's selected project, reported by CommandDeck — scopes
+  // the app-bar search to that project (PAN-1593).
+  const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
@@ -1256,6 +1259,7 @@ export default function App() {
                 onConversationViewModeChange={setConversationViewMode}
                 selectedProject={selectedProjectKey}
                 onSelectProject={setSelectedProjectKey}
+                onProjectPrefixChange={setSearchProjectPrefix}
               />
             </div>
           )}
@@ -1422,6 +1426,7 @@ export default function App() {
         onSelectIssue={handleSelectIssueFromSearch}
         cycleFilter="current"
         includeCompletedFilter={false}
+        projectPrefix={activeTab === 'command-deck' ? searchProjectPrefix : null}
       />
 
       {/* Command Palette — Cmd+K / Ctrl+K */}

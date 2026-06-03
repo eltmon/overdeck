@@ -143,6 +143,9 @@ interface CommandDeckProps {
   /** PAN-1561: switch the active project (e.g. when a conversation resolves to
    * a different project than the one currently shown). */
   onSelectProject?: (projectName: string | null) => void;
+  /** PAN-1593: report the selected project's issue prefix (e.g. "PAN") so the
+   * app-bar search can scope to it. Null when no single prefix is resolvable. */
+  onProjectPrefixChange?: (prefix: string | null) => void;
 }
 
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
@@ -155,6 +158,7 @@ export function CommandDeck({
   onConvIdChange,
   selectedProject = null,
   onSelectProject,
+  onProjectPrefixChange,
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
@@ -1012,6 +1016,19 @@ export function CommandDeck({
     () => (selectedProjectData?.features ?? []).map(f => f.issueId),
     [selectedProjectData],
   );
+
+  // PAN-1593: the selected project's single issue prefix (e.g. "PAN"), derived
+  // from its issue ids — the same signal ProjectOverview uses. Reported up so the
+  // app-bar search can scope to this project. Null when ambiguous/empty.
+  const selectedProjectPrefix = useMemo(() => {
+    const prefixes = new Set(
+      projectIssueIds.map((id) => id.split('-')[0]?.toUpperCase()).filter(Boolean),
+    );
+    return prefixes.size === 1 ? [...prefixes][0]! : null;
+  }, [projectIssueIds]);
+  useEffect(() => {
+    onProjectPrefixChange?.(selectedProjectPrefix);
+  }, [selectedProjectPrefix, onProjectPrefixChange]);
 
   // Resolve the per-issue data an issue tab's IssueOverview needs.
   const resolveIssue = useCallback(

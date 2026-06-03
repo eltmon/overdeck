@@ -6,6 +6,8 @@ export interface SearchFilters {
   sources: Set<IssueSource>;
   includeCompleted: boolean;
   deepSearch: boolean;
+  /** When set, restrict results to issues with this identifier prefix (PAN-1593). */
+  projectPrefix?: string | null;
 }
 
 export interface SearchResult {
@@ -78,6 +80,12 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
       // Apply source filter
       if (filters.sources.size > 0 && issue.source && !filters.sources.has(issue.source)) {
         continue;
+      }
+
+      // Apply project scope (PAN-1593) — issue prefix (PAN/MIN/…) must match.
+      if (filters.projectPrefix) {
+        const prefix = issue.identifier.split('-')[0]?.toUpperCase();
+        if (prefix !== filters.projectPrefix) continue;
       }
 
       // Always search completed issues — if they're visible on the board,
