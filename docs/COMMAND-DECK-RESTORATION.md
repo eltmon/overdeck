@@ -1,11 +1,23 @@
 # Command Deck Restoration & Unification — Living Design Doc
 
-> **Status:** Working design doc, in progress (started 2026-05-31). Drives a
-> redesign of the dashboard's contextual views (project / issue / session).
-> **Not** product docs — this is an engineering design artifact we iterate on.
+> **Status: DELIVERED** (shipped in v0.18.0 → v0.19.0, 2026-06-01/02, PAN-1591
+> and follow-ups). This is the design artifact that drove the redesign, retained
+> as the rationale/record. **Not** product docs — for the user-facing description
+> of the shipped UI see `concepts.mdx` / `introduction.mdx`.
 >
-> **Sequence:** archaeology → this outline → HTML mockups → iterate → implement.
-> No implementation has started.
+> **What shipped:** full-height project sidebar + app bar (project crumb,
+> project-scoped search [PAN-1593], status pills) + full-width tab strip
+> (scroll / overflow arrows / middle-click / pop-out / **split panes** /
+> close-all) + merged **Awareness rail** (Needs-you / Project / Global,
+> collapsible); the **issue cockpit** (blocker spotlight → phase timeline →
+> single-source metric strip → Review / Code / Plan / Cost / Workspace / Agent /
+> Activity scan cards → dig tabs incl. restored History); the **project Home
+> cockpit** (tight hero, Stuck tile, recent 7-day spend [PAN-1597]); role-named
+> pipeline tabs; and the phantom "Needs-you" / single-pane-collapse /
+> stopped-agent pending-input fixes.
+>
+> **Sequence (completed):** archaeology → this outline → HTML mockups
+> (`docs/design/command-deck-*-v2/v4.html`) → iterate → implement → release.
 
 ## 0. Why this exists
 

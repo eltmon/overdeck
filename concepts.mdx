@@ -9,13 +9,14 @@ Learn the fundamental concepts that power Panopticon.
 
 ## Command Deck
 
-The live development surface where you and your agents work together. Command Deck is organized into three zones that update in real time:
+The live development surface where you and your agents work together. A full-height **project sidebar** on the left owns project selection; everything to its right is scoped to the project you pick and updates in real time:
 
-- **Issue Header** — always visible. Shows issue identity, pipeline stage, live cost tracking, activity sparkline, and quality gate rollup.
-- **Agent Context** — changes when you select an agent session. Displays the agent's role, status, current tool, thinking/waiting state, round history, and per-session costs.
-- **Conversation + Composer** — the primary working area. Shows the full conversation timeline with composer when an agent is selected, or a tabbed dashboard when viewing the issue itself.
+- **App bar** — the project crumb, a project-scoped search, and status pills at a glance (Deacon health, running-agent count, stopped agents). No more persistent banners — attention items surface as compact pills.
+- **Tab strip** — every issue, agent, and conversation you open becomes a tab. Scroll on overflow, middle-click to close, right-click to pop out to a window or close others, and **split the view** (drag a tab to a pane's edge) to watch two panes side by side.
+- **Pane body** — the working area. A project's **Home cockpit** (issue swimlanes, recent spend, a stuck count), an **issue cockpit** (blocker spotlight → phase timeline → single-source metric strip → scan cards → dig tabs), or an agent's live conversation and terminal.
+- **Awareness rail** — one right-hand rail with **Needs-you / Project / Global** scopes, so anything waiting on your input is always a glance away. Collapse it when you want the extra width.
 
-Everything is alive — no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse, round dividers slide in.
+Everything is alive — no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
 
 ### What You Can Do From Command Deck
 

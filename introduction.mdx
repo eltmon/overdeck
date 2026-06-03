@@ -27,13 +27,14 @@ IDEs were built for humans who type code. Panopticon is built for humans who **d
 
 ## Command Deck
 
-Command Deck is the live development surface where you and your agents work together. Three zones update in real time — no refresh buttons, no polling. Every domain event triggers small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse, round dividers slide in. You can watch agents work.
+Command Deck is the live development surface where you and your agents work together. A full-height project sidebar owns project selection; everything to its right is scoped to that project and updates in real time — no refresh buttons, no polling. Every domain event triggers small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse. You can watch agents work.
 
-| Zone | What You See |
-|:-----|:-------------|
-| **Issue Header** | Issue identity, pipeline stage, live cost tracking, activity sparkline, quality gate rollup |
-| **Agent Context** | Selected agent's role, status, current tool, thinking/waiting state, round history, per-session costs |
-| **Conversation + Composer** | Full conversation timeline with composer, or a tabbed dashboard when viewing the issue itself |
+| Region | What You See |
+|:-------|:-------------|
+| **App bar** | Project crumb, project-scoped search, and status pills — Deacon health, running-agent count, stopped agents |
+| **Tab strip** | One tab per issue / agent / conversation; scroll, pop out, close, or split the view side by side |
+| **Pane body** | The project's Home cockpit, an issue cockpit (blocker spotlight → metric strip → scan cards → dig tabs), or an agent's live conversation + terminal |
+| **Awareness rail** | A single Needs-you / Project / Global rail — anything waiting on your input, one glance away (collapsible) |
 
 ### What You Can Do
 
