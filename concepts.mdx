@@ -3,6 +3,8 @@ title: Core Concepts
 description: Understanding the key concepts behind Panopticon's architecture
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Core Concepts
 
 Learn the fundamental concepts that power Panopticon.
@@ -17,6 +19,14 @@ The live development surface where you and your agents work together. A full-hei
 - **Awareness rail** — one right-hand rail with **Needs-you / Project / Global** scopes, so anything waiting on your input is always a glance away. Collapse it when you want the extra width.
 
 Everything is alive — no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse.
+
+<ThemedImage
+  light="/images/command-deck/issue-cockpit-light.png"
+  dark="/images/command-deck/issue-cockpit-dark.png"
+  alt="The issue cockpit — blocker spotlight, phase timeline, and single-source metric strip"
+/>
+
+The **issue cockpit** above leads with a *blocker spotlight* (why the issue is stuck and the actions to unblock it, or "ready to merge"), then a phase timeline and a single-source metric strip (cost · diff · PR · sessions · last activity), with scan cards and dig tabs below.
 
 ### What You Can Do From Command Deck
 
