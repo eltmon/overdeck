@@ -1197,6 +1197,7 @@ export function CommandDeck({
               conversations={conversations}
               resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
+              onActiveConversationChange={setSelectedConversation}
               terminalCwd={
                 registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
               }

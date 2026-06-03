@@ -18,6 +18,8 @@ interface ConversationActionMenuProps {
   /** Tab conveniences (PAN-1591) — only present when invoked from a pane tab. */
   onCloseOthers?: () => void;
   onCloseRight?: () => void;
+  /** Close every closable tab (HOME stays). */
+  onCloseAll?: () => void;
   /** Open this tab in a side-by-side (right) split (PAN-1591). */
   onOpenInSplit?: () => void;
   /** Open this tab in a stacked (below) split. */
@@ -30,7 +32,7 @@ interface ConversationActionMenuProps {
  * a workspace tab. Portaled to <body> and fixed-positioned at `position` so it
  * escapes any overflow clip. Inline rename happens inside the menu itself.
  */
-export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab, onCloseOthers, onCloseRight, onOpenInSplit, onSplitDown }: ConversationActionMenuProps) {
+export function ConversationActionMenu({ conversation, mutations, position, onClose, onCloseTab, onCloseOthers, onCloseRight, onCloseAll, onOpenInSplit, onSplitDown }: ConversationActionMenuProps) {
   const confirm = useConfirm();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(conversation.title ?? conversation.name);
@@ -199,6 +201,12 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                   <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseRight(); onClose(); }}>
                     <X size={14} />
                     Close tabs to the right
+                  </button>
+                )}
+                {onCloseAll && (
+                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseAll(); onClose(); }}>
+                    <X size={14} />
+                    Close all tabs
                   </button>
                 )}
               </>

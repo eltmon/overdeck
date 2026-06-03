@@ -310,10 +310,14 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     set((state) => ({
       byConversation: mutateSlice(state.byConversation, conversationName, (s) => ({
         ...s,
-        optimisticBaseCount: serverBaseCount,
+        // Only anchor the baseline when starting a fresh optimistic batch. A
+        // second send while the first is still in flight must APPEND, not
+        // replace — otherwise the first "Sending…" bubble vanishes (PAN-1591).
+        optimisticBaseCount: s.optimistic.length === 0 ? serverBaseCount : s.optimisticBaseCount,
         optimistic: [
+          ...s.optimistic,
           {
-            id: `optimistic-${Date.now()}`,
+            id: `optimistic-${Date.now()}-${s.optimistic.length}`,
             role: 'user',
             text,
             createdAt: new Date().toISOString(),

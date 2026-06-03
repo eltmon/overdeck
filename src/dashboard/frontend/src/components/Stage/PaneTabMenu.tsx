@@ -13,6 +13,8 @@ interface PaneTabMenuProps {
   onSplitDown: () => void
   /** Close the tab — omitted for permanent panes (HOME). */
   onCloseTab?: () => void
+  /** Close every closable tab (HOME stays). */
+  onCloseAll: () => void
 }
 
 /**
@@ -21,7 +23,7 @@ interface PaneTabMenuProps {
  * {@link ConversationActionMenu} instead. Reuses the command-deck menu styling
  * so both menus look identical. Portaled + fixed-positioned to escape clips.
  */
-export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab }: PaneTabMenuProps) {
+export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab, onCloseAll }: PaneTabMenuProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     const dismiss = () => onClose()
@@ -47,15 +49,17 @@ export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onC
           <Rows2 size={14} />
           Split down
         </button>
+        <div className={menu.headerMenuDivider} />
         {onCloseTab && (
-          <>
-            <div className={menu.headerMenuDivider} />
-            <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseTab(); onClose() }}>
-              <X size={14} />
-              Close tab
-            </button>
-          </>
+          <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseTab(); onClose() }}>
+            <X size={14} />
+            Close tab
+          </button>
         )}
+        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseAll(); onClose() }}>
+          <X size={14} />
+          Close all tabs
+        </button>
       </div>
     </>,
     document.body,

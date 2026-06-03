@@ -91,6 +91,14 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
 
   const scrollTabs = (dir: -1 | 1) => barRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
 
+  // Reveal the active tab when it changes (PAN-1591). Clicking a conversation
+  // focuses its tab, but if the strip overflows that tab can be scrolled
+  // off-screen — so the click looked like a no-op. Scroll it into view.
+  const activeTabRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+  }, [activePaneId])
+
   const openMenu = () => {
     const r = addBtnRef.current?.getBoundingClientRect()
     if (r) setMenuPos({ top: r.bottom + 2, left: r.left })
@@ -138,6 +146,7 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
         return (
           <div
             key={pane.paneId}
+            ref={isActive ? activeTabRef : undefined}
             role="tab"
             tabIndex={0}
             aria-selected={isActive}

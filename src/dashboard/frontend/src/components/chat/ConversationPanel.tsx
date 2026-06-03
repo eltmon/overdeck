@@ -1067,11 +1067,19 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  // Drop optimistic messages once the server has returned at least as many messages
-  // as we had before plus the optimistic ones (the real message has arrived).
-  const expectedCount = optimisticBaseCount + optimisticMessages.length;
-  const serverCaughtUp = serverMessages.length >= expectedCount && optimisticMessages.length > 0;
-  const messages = serverCaughtUp ? serverMessages : [...serverMessages, ...optimisticMessages];
+  // Reconcile optimistic messages against what the server has actually echoed.
+  // Count only USER turns added since the send baseline — an optimistic bubble is
+  // "absorbed" when its real user message comes back, NOT merely when the total
+  // message count grows. Counting all messages let a concurrent assistant turn
+  // prematurely clear the "Sending…" bubble before the user's own message echoed,
+  // so it sometimes disappeared entirely until the next poll (PAN-1591).
+  const echoedUserCount = serverMessages
+    .slice(optimisticBaseCount)
+    .filter((m) => m.role === 'user').length;
+  const absorbedCount = Math.min(optimisticMessages.length, echoedUserCount);
+  const visibleOptimistic = optimisticMessages.slice(absorbedCount);
+  const serverCaughtUp = optimisticMessages.length > 0 && visibleOptimistic.length === 0;
+  const messages = [...serverMessages, ...visibleOptimistic];
 
   const handleMessageSent = useCallback((text: string) => {
     addOptimistic(conversation.name, text, serverMessages.length);

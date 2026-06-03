@@ -63,6 +63,8 @@ export interface StageProps {
   renderHome: (api: StageApi) => ReactNode
   /** Render an `issue` tab's body for the given issue id. */
   renderIssue: (issueId: string, api: StageApi) => ReactNode
+  /** Fired when the active tab is a conversation, so the rail can highlight it. */
+  onActiveConversationChange?: (conversationId: string) => void
 }
 
 const PANE_LABELS: Record<PaneType, string> = {
@@ -120,7 +122,7 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
  * are composed by the caller via `renderHome` / `renderIssue` (they need the
  * project's / issue's data); every other pane dispatches through `renderPane`.
  */
-export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd, onCreateConversation, renderHome, renderIssue }: StageProps) {
+export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd, onCreateConversation, renderHome, renderIssue, onActiveConversationChange }: StageProps) {
   const ensureHome = usePanesStore((s) => s.ensureHome)
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
@@ -469,6 +471,23 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   )
   const effectiveLayout = layout ?? (activePane ? leaf(activePane.paneId) : null)
 
+  // Close every closable tab (HOME/permanent panes stay). Also clears any split.
+  const closeAllPanes = useCallback(() => {
+    const all = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+    for (const p of all) {
+      if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
+    }
+    setLayout(null)
+  }, [deckKey, closePane, setLayout])
+
+  // Reverse sync (PAN-1591): when the active tab is a conversation, highlight it
+  // in the rail so the deck and the conversation list stay in lockstep.
+  useEffect(() => {
+    if (activePane?.paneType === 'agent' && activePane.conversationId) {
+      onActiveConversationChange?.(activePane.conversationId)
+    }
+  }, [activePane?.paneId, activePane?.paneType, activePane?.conversationId, onActiveConversationChange])
+
   // Re-resolve the right-clicked tab's conversation from the live list so the
   // menu reflects current state and self-dismisses if the conversation is gone.
   const tabMenuConv = tabMenu ? conversations.find((c) => c.name === tabMenu.conversationName) ?? null : null
@@ -528,6 +547,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
               if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
             }
           }}
+          onCloseAll={closeAllPanes}
         />
       )}
 
@@ -538,6 +558,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
           onOpenInSplit={() => openInSplit(paneMenu.paneId, 'row')}
           onSplitDown={() => openInSplit(paneMenu.paneId, 'col')}
           onCloseTab={paneMenu.permanent ? undefined : () => closePane(deckKey, paneMenu.paneId)}
+          onCloseAll={closeAllPanes}
         />
       )}
 
