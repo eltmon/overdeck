@@ -408,9 +408,10 @@ async function ensureConfigFileAsync(geminiApiKey?: string | null): Promise<void
   await writeFile(configPath, config);
 }
 
-function detectPlatformAsset(): { archive: string; } | null {
-  const platform = process.platform;
-  const arch = process.arch;
+export function detectPlatformAsset(
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): { archive: string; } | null {
   const version = CLIPROXY_RELEASE_VERSION.replace(/^v/, '');
   let os: string | null = null;
   let cpu: string | null = null;
@@ -419,7 +420,7 @@ function detectPlatformAsset(): { archive: string; } | null {
   else if (platform === 'darwin') os = 'darwin';
 
   if (arch === 'x64') cpu = 'amd64';
-  else if (arch === 'arm64') cpu = 'arm64';
+  else if (arch === 'arm64') cpu = 'aarch64';
 
   if (!os || !cpu) return null;
   return { archive: `CLIProxyAPI_${version}_${os}_${cpu}.tar.gz` };
@@ -502,7 +503,7 @@ export function installCliproxySync(force = false): void {
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const archivePath = join(tmpDir, asset.archive);
 
-  execSync(`curl -sSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
+  execSync(`curl -fsSL -o "${archivePath}" "${url}"`, { stdio: 'pipe' });
   execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
 
   // Release archives extract a binary named "cli-proxy-api" at the root of the tar
@@ -540,7 +541,7 @@ async function installCliproxyTask(force = false): Promise<void> {
   if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
   const archivePath = join(tmpDir, asset.archive);
 
-  await execAsync(`curl -sSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
+  await execAsync(`curl -fsSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
   await execAsync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
 
   const extracted = join(tmpDir, 'cli-proxy-api');
