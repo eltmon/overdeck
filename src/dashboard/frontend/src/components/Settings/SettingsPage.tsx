@@ -513,19 +513,29 @@ export function SettingsPage() {
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
-    // Retry until the target section is actually in the DOM — on a fresh
-    // navigation the section may not be mounted on the first frame, which made
-    // the deep-link miss intermittently (PAN-1600).
+    // Two problems to handle: (1) on a fresh navigation the section may not be
+    // mounted on the first frame; (2) sections above the target (model lists,
+    // TTS voice library, memory) load async and reflow the page for ~1.5s AFTER
+    // the first scroll — a single smooth scroll then undershoots by hundreds of
+    // px and lands short of the section (PAN-1600 follow-up). So keep re-aligning
+    // until scrolling no longer moves the section, i.e. it's aligned and the
+    // page has stopped reflowing.
     let tries = 0;
-    const tryScroll = () => {
+    let stable = 0;
+    const step = () => {
       const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!el) {
+        if (tries++ < 40) setTimeout(step, 50);
         return;
       }
-      if (tries++ < 40) setTimeout(tryScroll, 50);
+      const before = Math.round(el.getBoundingClientRect().top);
+      el.scrollIntoView({ behavior: tries === 0 ? 'smooth' : 'auto', block: 'start' });
+      const after = Math.round(el.getBoundingClientRect().top);
+      // Aligned + settled once an instant re-scroll no longer moves the section.
+      stable = tries > 0 && Math.abs(after - before) <= 2 ? stable + 1 : 0;
+      if (stable < 2 && tries++ < 60) setTimeout(step, 120);
     };
-    tryScroll();
+    step();
   }, []);
 
   // Deep-link from other surfaces (e.g. the app-bar Low-cost mode pill). Handles
