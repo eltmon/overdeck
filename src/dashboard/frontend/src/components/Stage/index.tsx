@@ -343,6 +343,20 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         .filter((p) => p.paneType !== 'terminal')
         .map((p) => {
           if (p.paneType !== 'agent') return p
+          // Session-backed pipeline panes (Work/Review/reviewer sub-roles/…) carry
+          // `agentId`, not `conversationId`. Name them by role + issue, resolved
+          // live from the session tree — never fall through to "Chat". Computed at
+          // render; nothing is persisted (PAN-1591).
+          if (p.agentId && !p.conversationId) {
+            const role = resolveSession?.(p.agentId)?.role ?? resolveSession?.(p.agentId)?.type
+            const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : null
+            const label = roleLabel
+              ? p.issueId
+                ? `${roleLabel} · ${p.issueId.toUpperCase()}`
+                : roleLabel
+              : p.label // creation label is already role-derived — keep it, don't clobber
+            return label === p.label ? p : { ...p, label }
+          }
           const conv = conversations.find((c) => c.name === p.conversationId)
           const title = conv?.title?.trim()
           // The server seeds untitled chats with the literal title "New
@@ -354,7 +368,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
             : title
           return label === p.label ? p : { ...p, label }
         }),
-    [panes, conversations],
+    [panes, conversations, resolveSession],
   )
 
   const activePane = displayPanes.find((p) => p.paneId === activePaneId) ?? displayPanes[0] ?? null
