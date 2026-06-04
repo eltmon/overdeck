@@ -131,6 +131,7 @@ import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
+import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -4492,6 +4493,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
     actions.push(...stashJanitorActions);
     for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
+  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
+  // shared dolt remote, and there is no single Panopticon write site to hook —
+  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
+  // debounced, skips missing files, and no-ops when nothing changed.
+  for (const { config: projectConfig } of listProjectsSync()) {
+    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
   }
 
   // Periodic agent state cleanup (PAN-154)

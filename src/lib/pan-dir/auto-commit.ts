@@ -131,6 +131,30 @@ export function queueAutoCommit(opts: {
 }
 
 /**
+ * PAN-1441: queue an auto-commit of the host-main beads export files.
+ *
+ * Unlike the .pan/* writers, there is no single Panopticon write site for these:
+ * `.beads/issues.jsonl` and `.beads/export-state.json` drift on `main` as a
+ * side-effect of the `bd` binary re-exporting after dolt syncs (other machines /
+ * workspaces pushing to the shared dolt remote). So this is called from the
+ * deacon's periodic patrol as a drift sweep rather than wired to a write site.
+ *
+ * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
+ * the janitor never stages — and propagates — a transient empty-DB deletion (the
+ * PAN-1158 hazard). queueAutoCommit is main-only, debounced, and a no-op when
+ * nothing changed.
+ */
+export function queueBeadsAutoCommit(projectRoot: string): void {
+  const candidates = [
+    join(projectRoot, '.beads', 'issues.jsonl'),
+    join(projectRoot, '.beads', 'export-state.json'),
+  ];
+  const paths = candidates.filter((p) => existsSync(p));
+  if (paths.length === 0) return;
+  queueAutoCommit({ projectRoot, paths, subject: 'chore(beads): sync beads state on main' });
+}
+
+/**
  * Force a flush of any pending commits for `projectRoot`. Returns an Effect that
  * resolves after the commit attempt (success or no-op).
  */
