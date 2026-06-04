@@ -1,0 +1,734 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1450: Audit — 6+ recent fixes shipped without the regression tests their AC promised. Add the 7 missing tests, complete PAN-1173's transparently-deferred bonus AC across 9 CLI commands, add a substrate check in the requirements-reviewer role prompt so this pattern fails CI in the future, and audit state.json role population for specialist agents.",
+    "updated": "2026-05-25T16:31:28.584Z"
+  },
+  "plan": {
+    "id": "pan-1450",
+    "title": "Audit: 6+ recent fixes shipped without the regression tests their AC promised",
+    "status": "proposed",
+    "uid": "d7283d2f-4862-4ffe-9a4d-adb6ceb75ec2",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:30:00.000Z",
+    "updated": "2026-05-25T16:31:28.584Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1450",
+        "label": "PAN-1450",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1326",
+        "label": "PAN-1326",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1256",
+        "label": "PAN-1256",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1257",
+        "label": "PAN-1257",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1175",
+        "label": "PAN-1175",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1173",
+        "label": "PAN-1173",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1168",
+        "label": "PAN-1168",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1111",
+        "label": "PAN-1111",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1217",
+        "label": "PAN-1217 (scope classification)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "regression-tests",
+      "test-debt",
+      "audit-followup",
+      "substrate-check",
+      "quality-gate"
+    ],
+    "narratives": {
+      "Problem": "Seven recent fixes (PAN-1326, PAN-1256, PAN-1257, PAN-1175, PAN-1173, PAN-1168, PAN-1111) shipped correct code but skipped the regression tests their issue ACs explicitly promised. Each individual fix is fine; the gap is that future refactors can silently revert any of them and CI will not catch the regression. PAN-1326 is the most damning case: it was itself filed as a regression-prevention follow-up to PAN-1316 and then shipped without its promised tests. PAN-1111 is the second most damning: it shipped a test that mocks execAsync rejections instead of simulating real Dolt corruption — mock theater that does not exercise the recovery code path. PAN-1173 also has a transparent deferral: the fix only landed for `pan show`, while kill/pause/unpause/untroubled/reopen/close/inspect/open/review-restart all retain the same bug class. The recurring pattern (Test plan skipped) is what allows agent close-out to mark a regression-prevention issue complete without the regression test that defines its completion criterion.",
+      "Proposal": "Three parallel tracks. (1) Add the missing test for each of the seven cited issues — real tests, not mock theater. For PAN-1111 this means a tests/integration/ test that runs the real bd binary against a corrupted manifest. (2) Complete PAN-1173's transparently-deferred bonus AC by applying resolveBareNumericIdSync to the nine remaining CLI commands. (3) Install a substrate-level guard in the requirements-reviewer role prompt: when an AC mentions test / regression test / unit test and the PR diff contains no new or modified *.test.ts files, classify the AC as in_pr_scope Missing and emit a blocking finding. Backstopped by an audit of state.json role population so the PAN-1257 fix is verifiably wired end-to-end. No close-out hook is added; the review-time guard is sufficient and uses the scope-classification machinery shipped in PAN-1217."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose alternative (b) for the substrate check: encode the rule in roles/review-requirements.md (per-AC heuristic), not in src/lib/close-out.ts. Skip close-out hook.",
+        "rationale": "Catches the gap during review (before merge) rather than at close-out (after merge). Uses the existing per-AC scope-classification surface shipped in PAN-1217 — zero new TypeScript code, prompt-only change. Close-out as a backstop is a future refinement, not a substitute."
+      },
+      {
+        "summary": "PAN-1111 fix: add a NEW real-corruption integration test, do not replace the existing mocked test.",
+        "rationale": "The existing mocked test (src/lib/vbrief/__tests__/create-beads.test.ts:219) exercises the wrapper's retry-and-init recovery orchestration — that has unit-test value distinct from real DB recovery. The integration test exercises the real bd binary's auto-recovery. Two non-overlapping concerns; both belong in the suite."
+      },
+      {
+        "summary": "PAN-1173 follow-through is ONE bead with nine command-level sub-items, not nine independent beads.",
+        "rationale": "The change is mechanically identical (resolve bare number first, then continue with existing logic). One bead lets the reviewer compare the nine call sites in one pass; nine beads would force context-switching and duplicate the test harness setup nine times. Acceptance criteria stay independently verifiable as sub-items."
+      },
+      {
+        "summary": "Export classifyAgentKind from src/dashboard/server/services/system-health-service.ts for direct unit testing.",
+        "rationale": "Currently a local helper at line 169. Exporting is additive, zero-risk, and required to satisfy PAN-1257's per-role test without testing through the entire system-health-service surface. Mark with a `// PAN-1257 regression test surface` comment so future readers understand why it's exported."
+      },
+      {
+        "summary": "The PAN-1257 audit bead has no required code change. If audit finds specialist writers missing role, the bead files a separate issue; it does not silently patch.",
+        "rationale": "Matches the issue's AC literally: 'file a separate issue if not.' Encoding a code change here would conflate audit with fix, which is exactly the failure mode this whole issue is correcting."
+      },
+      {
+        "summary": "PAN-1256 test uses vi.useFakeTimers + vi.setSystemTime; no real wall-clock waits. If recoverOrphanedAgents end-to-end is too heavy to mock, extract a pure helper for the grace decision and test that.",
+        "rationale": "WORK_LAUNCHER_GRACE_MS is 120 seconds. Real waits violate the fake-timers-for-retry-tests rule and OOM parallel runs. Extraction into a pure helper is an acceptable refactor if direct testing proves impractical; the work agent decides at implementation time."
+      },
+      {
+        "summary": "All beads have requiresInspection: false. None lay a foundation other beads depend on.",
+        "rationale": "Every bead is a leaf: an added test, a mechanical rollout across nine files, a doc update, an audit. No bead's structure constrains another bead's structure. Inspection's value is in catching judgment-call defects on foundation beads; applying it here would burn cycles on rubber-stamping mechanical changes."
+      }
+    ],
+    "items": [
+      {
+        "id": "test-1326-kill-stack-teardown",
+        "title": "PAN-1326: Add regression test for `pan kill` workspace Docker stack teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/cli/commands/__tests__/operator-interventions.test.ts (or add a co-located test file) with two cases covering the PAN-1326 fix in src/cli/commands/kill.ts:76-91. (a) `pan kill <ship-specialist-agent-id>` resolves the workspace via state.issueId (NOT the agent's own state.workspace) and calls stopWorkspaceDocker against that resolved path. (b) `pan kill <work-agent-id>` (regression case for PAN-1316) also tears down the workspace stack. Both cases should mock resolveProjectFromIssueSync, findWorkspacePath, and stopWorkspaceDocker, and assert (1) stopWorkspaceDocker was called exactly once, (2) it was called with the workspace path findWorkspacePath returned for state.issueId, (3) the success branch logs the docker steps."
+        },
+        "subItems": [
+          {
+            "id": "test-1326-kill-stack-teardown.ac1",
+            "title": "New test asserts that killing a ship-specialist agent invokes stopWorkspaceDocker against the workspace resolved from state.issueId (not state.workspace).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1326-kill-stack-teardown.ac2",
+            "title": "New regression test asserts that killing a work agent (the PAN-1316 case) also invokes stopWorkspaceDocker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1326-kill-stack-teardown.ac3",
+            "title": "Tests run under the existing `npm test` invocation without changing pool config or maxForks.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1326-kill-stack-teardown.ac4",
+            "title": "`grep -rn 'PAN-1326' src/ --include='*.test.ts'` returns at least one hit after the change (the test file references the issue in a comment or describe label).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1256-starting-grace-window",
+        "title": "PAN-1256: Add regression test for recoverOrphanedAgents starting-status grace window",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new test file under src/lib/cloister/__tests__/ (suggested: recover-orphaned-agents-grace.test.ts) covering src/lib/cloister/deacon.ts:5073-5087. Use vi.useFakeTimers() + vi.setSystemTime() to control Date.now(). Construct a fixture state.json with status='starting' and stub startedAt to a known ISO timestamp; verify (a) within WORK_LAUNCHER_GRACE_MS (120s) the agent is NOT marked stopped, (b) past 120s with no tmux session the agent IS marked stopped, (c) status='running' with no tmux is still marked stopped immediately (no grace — regression guard so the fix doesn't accidentally extend grace to running). If mocking recoverOrphanedAgents end-to-end is impractical, extract a pure helper `isStartingWithinGrace(state, now, graceMs)` into a new src/lib/cloister/agent-grace.ts module and test that directly. Either approach is acceptable; choose the path with the smaller mock surface."
+        },
+        "subItems": [
+          {
+            "id": "test-1256-starting-grace-window.ac1",
+            "title": "Test (a): status='starting' + startedAt within 120s grace window → agent state is NOT mutated to 'stopped'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1256-starting-grace-window.ac2",
+            "title": "Test (b): status='starting' + startedAt past 120s grace → agent IS marked stopped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1256-starting-grace-window.ac3",
+            "title": "Test (c): status='running' + no tmux session → marked stopped immediately, regardless of startedAt (regression guard against grace creeping into running status).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1256-starting-grace-window.ac4",
+            "title": "Tests use vi.useFakeTimers/vi.setSystemTime — zero real wall-clock waits. afterEach restores real timers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1256-starting-grace-window.ac5",
+            "title": "If a pure helper was extracted, the helper's home is src/lib/cloister/ (not src/lib/) and the deacon.ts call site delegates to it (no behavioral change in production).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1257-classify-agent-kind",
+        "title": "PAN-1257: Export and test classifyAgentKind for every role value",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Export classifyAgentKind from src/dashboard/server/services/system-health-service.ts:169 (currently a local helper). Add src/dashboard/server/services/__tests__/system-health-service-classify.test.ts that exercises the function for every realistic input: agentId='agent-foo' with role values { 'work', 'review', 'review-correctness', 'review-security', 'test', 'ship', undefined, null }; plus legacy prefixes 'planning-foo' and 'specialist-foo'. Document the actual production behavior for `role: null` honestly — the test asserts what classifyAgentKind currently returns, not what it should ideally return. If the null case diverges from the intent of the PAN-1257 fix, the audit bead (audit-1257-role-population) is the right place to surface that, not this test."
+        },
+        "subItems": [
+          {
+            "id": "test-1257-classify-agent-kind.ac1",
+            "title": "classifyAgentKind is exported from src/dashboard/server/services/system-health-service.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1257-classify-agent-kind.ac2",
+            "title": "New test file covers each role value: 'work', 'review', 'review-correctness', 'review-security', 'test', 'ship', undefined, null — at minimum one assertion per role.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1257-classify-agent-kind.ac3",
+            "title": "Legacy-prefix cases ('planning-*' → 'planning'; 'specialist-*' → 'specialist') are also covered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1257-classify-agent-kind.ac4",
+            "title": "Test for `role: null` asserts what the function actually does today (do not paper over with a behavior change in this bead).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1175-resolve-parent-feature-branch",
+        "title": "PAN-1175: Add regression test for resolveParentFeatureBranch host-context resolution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/server/routes/__tests__/swarm.test.ts with a focused describe('resolveParentFeatureBranch (PAN-1175 regression)') block. resolveParentFeatureBranch is currently a local async function in src/dashboard/server/routes/swarm.ts:2016. Either (a) export it from swarm.ts for direct testing, OR (b) test it via createSlotWorktree's branch-resolution path with mocked git output. Prefer (a) for clarity. Cases: (i) localList contains 'feature/pan-123' → returns 'feature/pan-123', (ii) only remoteList contains 'origin/feature/pan-123' → returns 'feature/pan-123', (iii) localList contains numeric-suffix-only 'feature/123' → returns 'feature/123', (iv) neither list contains a candidate → throws with the documented error message naming both candidates. The point is to prove the function works against host-context (bare main, not in a workspace) — which is the entire reason for PAN-1175."
+        },
+        "subItems": [
+          {
+            "id": "test-1175-resolve-parent-feature-branch.ac1",
+            "title": "resolveParentFeatureBranch is reachable from the test (either exported or covered indirectly via createSlotWorktree with mocked git).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1175-resolve-parent-feature-branch.ac2",
+            "title": "Test covers: legacy 'feature/<issue>' lookup, numeric 'feature/<num>' fallback, and the throw-with-helpful-message path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1175-resolve-parent-feature-branch.ac3",
+            "title": "No test does `git branch --show-current` (or otherwise depends on the project path's checked-out branch) — proving the host-context fix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1173-resolve-bare-numeric-id",
+        "title": "PAN-1173: Add unit tests for resolveBareNumericIdSync",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend tests/lib/issue-id.test.ts with a new describe('resolveBareNumericIdSync (PAN-1173 regression)') block. Use mkdtempSync to create a temp dir, populate agent-state subdirectories with valid state.json files, and pass the temp dir as the panopticonHome argument. Cases: (a) no matching agent dir → returns null, (b) multiple matching agent dirs (e.g., PAN-3 and MIN-3 both present, both with valid state.json) → returns null (ambiguous), (c) exactly one matching agent dir → returns the fully-prefixed ID from state.json, (d) input is already prefixed (PAN-3, agent-pan-3, F29698) → delegates to resolveIssueIdSync and returns the canonical ID without filesystem probing, (e) input is bare digits but no AGENTS_DIR exists → returns null (no throw)."
+        },
+        "subItems": [
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac1",
+            "title": "Test (a) zero-match returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac2",
+            "title": "Test (b) multiple-match returns null (ambiguous case).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac3",
+            "title": "Test (c) single-match returns the fully-prefixed ID from state.json.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac4",
+            "title": "Test (d) already-prefixed input delegates to resolveIssueIdSync without touching the filesystem.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac5",
+            "title": "Test (e) missing AGENTS_DIR returns null without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1173-resolve-bare-numeric-id.ac6",
+            "title": "Tests use a per-test tmp dir (mkdtempSync) and clean up in afterEach; no test mutates the real ~/.panopticon/agents/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1168-nous-models-probe",
+        "title": "PAN-1168: Add regression test for Nous /v1/models probe path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add src/lib/__tests__/provider-health.test.ts (new file). Mock global.fetch (vi.stubGlobal('fetch', ...)). Cases: (a) provider.name === 'nous' → fetch is called with method='GET' against `${baseUrl}/v1/models` (NOT against /v1/messages), and the response 200 yields { ok: true }, (b) provider.name === 'nous' + 401 response → returns the auth-failure classification, (c) provider.name === 'anthropic' (or any non-nous) → fetch is called with method='POST' against the messages endpoint (regression guard: the /v1/models swap MUST be Nous-only). Mock ensureOpenAICompatibleProxyRunning to resolve immediately. Use vi.useFakeTimers/vi.useRealTimers boilerplate per the fake-timers-for-retry-tests rule (doProbe uses setTimeout for the abort controller)."
+        },
+        "subItems": [
+          {
+            "id": "test-1168-nous-models-probe.ac1",
+            "title": "Test (a): Nous probe issues GET against /v1/models, not POST against /v1/messages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1168-nous-models-probe.ac2",
+            "title": "Test (b): Nous probe classifies a 401 response as auth failure (or matches the existing classifyError semantics).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1168-nous-models-probe.ac3",
+            "title": "Test (c): Non-Nous providers still use POST /v1/messages — regression guard against accidentally extending /v1/models to all providers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1168-nous-models-probe.ac4",
+            "title": "Test file uses vi.useFakeTimers in beforeEach and vi.useRealTimers in afterEach (per fake-timers-for-retry-tests rule).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1168-nous-models-probe.ac5",
+            "title": "ensureOpenAICompatibleProxyRunning is mocked — tests do NOT start the real proxy sidecar.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-1111-real-corruption-integration",
+        "title": "PAN-1111: Add REAL DB-corruption integration test (replace mock theater)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add tests/integration/beads-real-corruption.test.ts. Skip the test if the bd binary is not on PATH (test.skipIf). Inside: (1) mkdtempSync a temp project, (2) shell out to real bd init --prefix tst, (3) corrupt the Dolt manifest — pick the lowest-effort reproducible corruption: deleting or truncating one of the .beads/dolt/*manifest* files. (4) Call createBeadsFromVBrief() against the workspace with a tiny in-memory vBRIEF, (5) assert success: result.success === true, result.created length matches plan.items length, no spurious bd init was invoked (the workspace already had a .beads/ — recovery must reuse it). DO NOT modify the existing mocked test in src/lib/vbrief/__tests__/create-beads.test.ts — it exercises the wrapper's retry orchestration, which has independent value. ALSO verify (separately within the same test, with a second describe block if cleaner): the AC #7 5-cycle bake. Run the create/ping/list cycle five times in a row against the same recovered workspace; assert no cycle re-triggers bd doctor --fix (i.e., corruption was actually fixed on cycle 1, not papered over). If the 5-cycle bake reveals that the wrapper still invokes bd doctor --fix on every cycle, document that finding in the test failure message and let the test fail — the bake's job is to surface that exact behavior."
+        },
+        "subItems": [
+          {
+            "id": "test-1111-real-corruption-integration.ac1",
+            "title": "New file tests/integration/beads-real-corruption.test.ts exists and is picked up by the existing vitest include glob.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac2",
+            "title": "Test gates on `commandExistsSync('bd')` (or equivalent) via test.skipIf — no flake when bd is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac3",
+            "title": "Test uses the REAL bd binary (no execAsync mock) and a REAL temp .beads/ directory, then corrupts a real manifest file before exercising createBeadsFromVBrief.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac4",
+            "title": "Success path asserts result.success === true and result.created.length === plan.items.length.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac5",
+            "title": "5-cycle bake: same workspace + same plan, run create/ping/list five times; assert bd doctor --fix is invoked AT MOST ONCE across the five cycles (recovery is sticky, not per-cycle).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac6",
+            "title": "Existing mocked test at src/lib/vbrief/__tests__/create-beads.test.ts:219 is NOT removed — both tests coexist with non-overlapping concerns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-1111-real-corruption-integration.ac7",
+            "title": "Temp directory is cleaned up in afterAll/afterEach so the test leaves no residue under tests/integration/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-1173-bare-numeric-rollout",
+        "title": "PAN-1173 follow-through: Apply resolveBareNumericIdSync to 9 remaining CLI commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "PAN-1173 only fixed `pan show`. Same bug class still afflicts kill, pause, unpause, untroubled, reopen, close, inspect, open, and review-restart — each calls either resolveIssueIdSync (which doesn't resolve bare numbers) or resolveProjectFromIssueSync directly with raw input. For each of the nine commands: (1) Import resolveBareNumericIdSync from src/lib/issue-id.js. (2) Call it as the FIRST line of the command body. (3) Mirror src/cli/commands/show.ts:55-62: if it returns null, print 'Could not resolve issue ID `<input>`' with the dim hint about prefixed IDs, then return (or process.exit(1) for commands that already do). (4) Pass the resolved fully-prefixed ID to the existing resolveIssueIdSync / resolveProjectFromIssueSync calls. Add a single test file (suggested: src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts) that, for each of the nine commands, mocks resolveBareNumericIdSync to return 'PAN-9999' for input '9999' and asserts the command proceeds with 'PAN-9999'. Also assert the null-return error path for at least three commands (spot check, not exhaustive)."
+        },
+        "subItems": [
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac1",
+            "title": "src/cli/commands/kill.ts: bare numeric input resolves via resolveBareNumericIdSync before stopAgentSync runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac2",
+            "title": "src/cli/commands/pause.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac3",
+            "title": "src/cli/commands/unpause.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac4",
+            "title": "src/cli/commands/untroubled.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac5",
+            "title": "src/cli/commands/reopen.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac6",
+            "title": "src/cli/commands/close.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac7",
+            "title": "src/cli/commands/inspect.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac8",
+            "title": "src/cli/commands/open.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac9",
+            "title": "src/cli/commands/review-restart.ts: bare numeric input resolves via resolveBareNumericIdSync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac10",
+            "title": "Each affected command guards the null-return from resolveBareNumericIdSync and emits the same 'Could not resolve issue ID' error message used by show.ts (consistency).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac11",
+            "title": "New test file confirms bare-numeric acceptance for all nine commands (one test per command, minimum).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-1173-bare-numeric-rollout.ac12",
+            "title": "Fully-prefixed input (PAN-1234, agent-pan-1234, F29698) still works identically to today across all nine commands — additive change, no regression.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "substrate-reviewer-promised-tests",
+        "title": "Substrate: Encode 'promised test not delivered → in_pr_scope blocker' rule in roles/review-requirements.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit roles/review-requirements.md to add an explicit promised-tests rule under the existing 'Per-AC scope classification' section. The rule: when an acceptance criterion's text contains 'test', 'regression test', 'unit test', or otherwise explicitly promises test coverage AS PART OF the acceptance criterion, that AC's scope bucket is in_pr_scope when the PR changed any code the AC describes. If the PR diff contains zero new or modified *.test.ts files that exercise the named code path, the AC MUST be marked Missing and emit a `!` (blocking) finding. This OVERRIDES the existing 'when in doubt, prefer whole_feature_scope' guidance — a promised test is not whole-feature scope, it is a PR-scope deliverable. Add a worked example referencing PAN-1326 / PAN-1450 (the audit that surfaced the pattern). Do NOT add a close-out-time check; the review-time guard is sufficient. ALSO sync the same rule into sync-sources/agents/pan-review-agent.md if that file is the upstream source of truth (verify with: `grep -rln 'review-requirements' sync-sources/` first); if it's not synced from there, leave it alone."
+        },
+        "subItems": [
+          {
+            "id": "substrate-reviewer-promised-tests.ac1",
+            "title": "roles/review-requirements.md contains a new explicit rule: AC text mentioning 'test'/'regression test'/'unit test' + zero new/modified *.test.ts files in PR diff → in_pr_scope Missing, severity `!`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-reviewer-promised-tests.ac2",
+            "title": "The new rule documents that it overrides 'when in doubt prefer whole_feature_scope' for the test-promise case.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-reviewer-promised-tests.ac3",
+            "title": "A worked example cites PAN-1326 (or PAN-1450) so the rule has a concrete anchor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-reviewer-promised-tests.ac4",
+            "title": "No close-out-time check is added (src/lib/close-out.ts is unchanged in this bead).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "substrate-reviewer-promised-tests.ac5",
+            "title": "If sync-sources/agents/pan-review-agent.md mirrors the role prompt (verify first), it is updated in the same commit to keep the two in sync.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-1257-role-population",
+        "title": "PAN-1257 audit: Confirm state.json role field is populated for specialist agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Read-only audit. Enumerate every code path that creates a NEW state.json (saveAgentStateSync, saveAgentState, and any direct file writes under ~/.panopticon/agents/). For each spawn path that creates a specialist agent (review-correctness, review-security, ship, test, review.*), confirm the initial state.json write includes a `role` field with the correct string (not null, not undefined, not 'work'). Document findings in a brief audit note at .pan/audit-1257.md within the workspace (this is workspace-local, not a tracked source file — fine to leave there). If gaps are found, file a separate GitHub issue 'role field missing from state.json for <specific role>' with the specific code path(s) and proposed fix. The bead completes whether the audit finds gaps or not — a clean audit is also a deliverable. Do NOT silently patch any writer in this bead."
+        },
+        "subItems": [
+          {
+            "id": "audit-1257-role-population.ac1",
+            "title": "Audit enumerates every code path that initially writes a state.json for a specialist agent (review-correctness, review-security, ship, test, review.*).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-1257-role-population.ac2",
+            "title": "Audit note written to .pan/audit-1257.md (workspace-local) listing each writer and whether it populates role correctly.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-1257-role-population.ac3",
+            "title": "If gaps found: a separate issue is filed (with a link captured in the audit note). If no gaps: audit note explicitly states 'no gaps found, all specialist spawn paths populate role'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-1257-role-population.ac4",
+            "title": "No silent patches: this bead does NOT modify any state.json writer or saveAgentState call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1450-audit-6-recent-fixes-shipped-without-the-regression-tests-their-ac-promised.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

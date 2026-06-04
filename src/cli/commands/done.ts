@@ -285,8 +285,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           console.error(line);
         }
         console.error('');
-        console.error(chalk.dim(`  Fix these issues, then run 'pan done ${issueId}' again.`));
-        console.error(chalk.dim('  Use --force to skip checks.'));
+        // PAN-1531: explicit three-option resolution for dirty worktrees.
+        // No silent stashing — the agent (or operator) picks one and reruns.
+        console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
+        console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>"'));
+        console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (destructive; type the command yourself)'));
+        console.error(chalk.dim('    3. Stash:   git stash push -u -m "salvageable:' + issueId + ':$(date -Iseconds):<description>"'));
+        console.error('');
+        console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
+        console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
         console.error('');
         process.exit(1);
         return;

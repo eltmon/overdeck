@@ -1,0 +1,83 @@
+#!/bin/bash
+# ~/.panopticon/bin/auto-approve-hook
+#
+# PreToolUse hook that returns permissionDecision: "allow" — but ONLY for the
+# fully-autonomous, headless pipeline agents that have no human to answer Claude
+# Code's "Do you want to proceed?" prompt. Without this, an unapproved tool call
+# hangs the session forever (PAN-1024's "Interrupted · What should Claude do
+# instead?" loop). This is the replacement for launching those agents with
+# --dangerously-skip-permissions, which Auto-mode (compliance) users forbid.
+#
+# SCOPE (by PANOPTICON_AGENT_ID prefix):
+#   agent-*    → AUTO-APPROVE. Work / review / test / ship pipeline agents run
+#                unattended; a prompt would hang them.
+#   flywheel-* → AUTO-APPROVE. The Fix-All Flywheel orchestrator
+#                (PANOPTICON_AGENT_ID=flywheel-orchestrator) is fully headless —
+#                a prompt hangs the entire run. It does NOT use an agent-* id.
+#   strike-* / inspect-* → AUTO-APPROVE. Headless strike (implement+merge) and
+#                per-bead inspect agents, same autonomy as a work agent.
+#   planning-* → AUTO-APPROVE. A planning agent must not be MORE restrictive than
+#                a work agent (which is auto-approved) or a conversation (which
+#                runs under bypass) — otherwise it is the only thing in the system
+#                that stalls on Claude Code's native command gates (e.g. the
+#                "compound command contains cd with output redirection" prompt).
+#                Planning's interactivity is the AskUserQuestion DIALOG (decisions
+#                surface to the operator via ask-user-question-hook), NOT per-command
+#                approval. So its routine research is auto-approved like a work agent.
+#   conv-*     → NOT auto-approved here. Conversations have a human at the dashboard
+#                terminal, and today launch under bypass (see PAN-1572 follow-up).
+#   (unset)    → NOT auto-approved. A human's own plain `claude` session keeps
+#                normal prompts.
+#
+# This hook is wired in the GLOBAL settings.json (frontmatter PreToolUse hooks'
+# permissionDecision is NOT honored by Claude Code — only settings.json hooks can
+# decide permission), so the prefix check above is what keeps it from leaking
+# into interactive/human sessions.
+#
+# AskUserQuestion is also skipped so ask-user-question-hook's deny stands.
+#
+# Never breaks Claude Code: on any error it stays silent (exit 0), which falls
+# back to the normal permission flow rather than forcing a decision.
+
+set +e
+
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+TOOL_NAME=""
+if command -v jq >/dev/null 2>&1; then
+  TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+fi
+
+echo "[$(date -Iseconds)] auto-approve-hook: AGENT=${PANOPTICON_AGENT_ID:-unset} tool=${TOOL_NAME:-unknown}" \
+  >> "$LOG_DIR/auto-approve.log" 2>/dev/null || true
+
+# Panopticon pipeline agents (work + planning). Conversations (human present,
+# currently bypass) and plain human sessions (unset) keep normal prompts.
+case "${PANOPTICON_AGENT_ID:-}" in
+  agent-*|planning-*|flywheel-*|strike-*|inspect-*) : ;;
+  *) exit 0 ;;
+esac
+
+# Let ask-user-question-hook own AskUserQuestion (its deny summons the dialog).
+if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
+  exit 0
+fi
+
+REASON='Panopticon autonomous pipeline agent auto-approve: headless agent-* sessions replace --dangerously-skip-permissions with this scoped PreToolUse allow hook.'
+
+if command -v jq >/dev/null 2>&1; then
+  jq -n --arg reason "$REASON" '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "allow",
+      permissionDecisionReason: $reason
+    }
+  }'
+else
+  printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"Panopticon autonomous pipeline agent auto-approve"}}'
+fi
+
+exit 0

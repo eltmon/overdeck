@@ -525,33 +525,13 @@ export function detectTerminalApiErrorSync(paneOutput: string): TerminalApiError
     }
   }
   return null;
-}async function waitForClaudePromptPromise(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
-  const start = Date.now();
-  const poll = 500;
-  let consecutivePromptPolls = 0;
-
-  while (Date.now() - start < timeoutMs) {
-    if (!await Effect.runPromise(sessionExists(sessionName))) return false;
-
-    const output = await Effect.runPromise(capturePane(sessionName, 10));
-    const lines = output.split('\n').filter(l => l.trim());
-    // Use lines.some() instead of lastLine — the status bar/footer is often the
-    // last line, so checking only lastLine misses the prompt. (feature/pan-704)
-    const hasPromptLine = lines.some(line => line.includes('❯'));
-
-    if (hasPromptLine) {
-      consecutivePromptPolls += 1;
-      if (consecutivePromptPolls >= 2 && await Effect.runPromise(sessionExists(sessionName))) {
-        return true;
-      }
-    } else {
-      consecutivePromptPolls = 0;
-    }
-
-    await new Promise(r => setTimeout(r, poll));
-  }
-  return false;
 }
+
+// waitForClaudePromptPromise / waitForClaudePrompt removed in PAN-1596.
+// Readiness is hook-driven now: ready.json (waitForReadySignal) for post-launch
+// readiness and the runtime mirror 'idle' (waitForAgentIdle) for live idleness,
+// both in agents.ts. The old `❯` pane-scrape was non-deterministic and is no
+// longer used by any caller.
 
 /**
  * Verify that a message sent to Claude was actually received and processing started.
@@ -872,15 +852,6 @@ export const detectTerminalApiError = (
   paneOutput: string,
 ): Effect.Effect<TerminalApiError | null> =>
   Effect.sync(() => detectTerminalApiErrorSync(paneOutput));
-
-export const waitForClaudePrompt = (
-  sessionName: string,
-  timeoutMs: number = 15000,
-): Effect.Effect<boolean, TmuxError> =>
-  Effect.tryPromise({
-    try: () => waitForClaudePromptPromise(sessionName, timeoutMs),
-    catch: (cause) => toTmuxError('wait-claude-prompt', cause),
-  });
 
 export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   listSessions().pipe(

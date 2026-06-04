@@ -368,6 +368,15 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
 
     // Command gate (default)
 
+    // PAN-666: substitute {{...}} placeholders into the gate command before
+    // resolving it for any execution path. This is what lets a test gate opt into
+    // changed-file scoping via `vitest run --changed {{CHANGED_BASE}}` so it runs
+    // only the tests affected by the PR and skips pre-existing failures in files
+    // the change never touched.
+    const command = opts.placeholders
+      ? replacePlaceholdersSync(gate.command, opts.placeholders)
+      : gate.command;
+
     // For remote workspaces, build and validate the SSH command BEFORE entering
     // the try/catch so validation errors propagate as real errors (not gate failures).
     const isRemote = opts.isRemote && opts.vmName;
@@ -378,14 +387,14 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       if (!/^[a-zA-Z0-9/_\-.]+$/.test(cwd)) {
         throw new Error(`Gate "${name}" path resolves to unsafe characters for SSH: ${cwd}`);
       }
-      // Validate gate.command doesn't contain double quotes — a " in the command would
+      // Validate the command doesn't contain double quotes — a " in the command would
       // end the SSH double-quoted string and allow local command injection:
       //   ssh host "cd /path && legit; injected"  ← breaks when command contains "
-      if (gate.command.includes('"')) {
+      if (command.includes('"')) {
         throw new Error(`Gate "${name}" command contains double quotes which are unsafe in SSH context`);
       }
       const flyAppName = loadConfigSync().remote?.fly?.app ?? 'pan-workspaces';
-      resolvedCommand = `fly ssh console -a ${flyAppName} -C "cd ${cwd} && ${gate.command}"`;
+      resolvedCommand = `fly ssh console -a ${flyAppName} -C "cd ${cwd} && ${command}"`;
     } else if (gate.container && gate.container_name) {
       // Run inside Docker container — resolve container name from placeholders
       let containerName = gate.container_name;
@@ -400,7 +409,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       const envFlags = gate.env
         ? Object.entries(gate.env).map(([k, v]) => `-e ${k}="${v}"`).join(' ')
         : '';
-      resolvedCommand = `docker exec ${envFlags} -w "${containerWorkdir}" "${containerName}" ${gate.command}`;
+      resolvedCommand = `docker exec ${envFlags} -w "${containerWorkdir}" "${containerName}" ${command}`;
       console.log(`[quality-gate] Running in container: ${containerName} (workdir: ${containerWorkdir})`);
     } else {
       // Wrap the local gate in `nice -n 19 sh -c '<cmd>'` so a CPU-bound
@@ -408,9 +417,9 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
       // its parent — when it does, the event-loop tick check reports
       // 600ms+ "stalls" that are really just scheduler delay.
       if (process.platform === 'win32') {
-        resolvedCommand = gate.command;
+        resolvedCommand = command;
       } else {
-        const escaped = gate.command.replace(/'/g, `'\\''`);
+        const escaped = command.replace(/'/g, `'\\''`);
         resolvedCommand = `nice -n 19 sh -c '${escaped}'`;
       }
     }

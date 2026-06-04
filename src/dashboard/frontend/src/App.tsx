@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -8,6 +8,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
+import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
@@ -37,17 +38,21 @@ import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
-import { DeaconPauseBanner } from './components/DeaconPauseToggle';
+import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
+import { LowCostModePill } from './components/LowCostModePill';
+import { SystemMenu } from './components/SystemMenu';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from './components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
-import { AlertTriangle, CheckCircle2, History, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw, Search } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgents, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
+import { usePanesStore } from './lib/panesStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -346,6 +351,9 @@ export default function App() {
   // Conversation deep-link state (/conv/:id?view=terminal&views=161:terminal)
   const initialConversationRoute = getConversationRouteState();
   const [selectedConvId, setSelectedConvIdState] = useState<string | null>(() => initialConversationRoute.convId);
+  // PAN-1561: the project whose deck is shown in the Command Deck, driven by the
+  // sidebar's Projects rail.
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null);
   const [conversationViewMode, setConversationViewModeState] = useState<ConversationViewMode>(
     () => initialConversationRoute.viewMode,
   );
@@ -379,11 +387,15 @@ export default function App() {
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // Issue prefix of the deck's selected project, reported by CommandDeck — scopes
+  // the app-bar search to that project (PAN-1593).
+  const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
-  const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
+  const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+  const drawerOpen = drawerIssueId !== null;
   const openIssue = useDashboardStore((state) => state.openIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
@@ -523,6 +535,26 @@ export default function App() {
     window.localStorage.setItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY, String(open));
   }, []);
 
+  // PAN-1561: open a project's deck from the sidebar rail. Land on the project's
+  // HOME pane (the S4 cockpit) rather than whatever tab the deck last had active
+  // — the panes store remembers per-workspace, so it would otherwise restore a
+  // stale conversation and the click would appear to "do nothing". A conversation
+  // deep-link overrides this immediately afterward (openConversationTabIn runs
+  // after onSelectProject), so deep-links still land on their conversation.
+  const handleSelectProject = useCallback((projectName: string | null) => {
+    setSelectedProjectKey(projectName);
+    if (projectName) {
+      setActiveTab('command-deck');
+      // ensureHome hydrates/creates the workspace and replaces the store object,
+      // so re-read getState() afterward — the pre-ensureHome snapshot can be
+      // empty on a project's first access (its panes aren't hydrated yet).
+      usePanesStore.getState().ensureHome(projectName);
+      const fresh = usePanesStore.getState();
+      const home = (fresh.panesByWorkspace[projectName] ?? []).find((p) => p.paneType === 'home');
+      if (home) fresh.setActivePane(projectName, home.paneId);
+    }
+  }, [setActiveTab]);
+
   // Handle browser back/forward
   useEffect(() => {
     const onPopState = () => {
@@ -541,9 +573,58 @@ export default function App() {
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  // Live agent count for the app-bar status pill (PAN-1591).
+  const runningAgentCount = useMemo(
+    () => agents.filter((a) => ['running', 'active', 'starting', 'thinking', 'working'].includes(a.status)).length,
+    [agents],
+  );
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
+  const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
   const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
     useState<Set<string>>(new Set());
+  // PAN-1520 / PAN-1563 — AUQs the operator already answered (so the dialog hides
+  // immediately, before the next enrichment poll clears the field) and subjects
+  // dismissed without answering. These live in the shared askUserQuestionUiStore
+  // so the "Needs you" sidebar honors them too — otherwise an answered card
+  // lingered there after the dialog closed.
+  const optimisticallyAnsweredAskUserQuestionIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
+  const dismissedAskUserQuestionAgentIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
+  const markAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.markAnswered);
+  const unmarkAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.unmarkAnswered);
+  const markAskUserQuestionDismissed = useAskUserQuestionUiStore((s) => s.markDismissed);
+  const undismissAskUserQuestion = useAskUserQuestionUiStore((s) => s.undismiss);
+  const reconcileAnsweredAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileAnswered);
+  const reconcileDismissedAskUserQuestions = useAskUserQuestionUiStore((s) => s.reconcileDismissed);
+
+  // PAN-1395 — a subject the operator explicitly asked to re-open from the
+  // Activity Feed / Project Activity "Needs you" list. Prioritised over the
+  // default oldest-first selection (so clicking a specific question shows THAT
+  // one) and un-dismissed (so an ESC-dismissed question becomes reachable again).
+  const [focusedAskUserQuestionId, setFocusedAskUserQuestionId] = useState<string | null>(null);
+  const askUserQuestionReopenId = useAskUserQuestionUiStore((s) => s.reopenId);
+  const askUserQuestionReopenNonce = useAskUserQuestionUiStore((s) => s.reopenNonce);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
+  useEffect(() => {
+    if (!askUserQuestionReopenId) return;
+    // Bug 3 (TIN-1): a notification's Open/Answer can be clicked AFTER the asking
+    // session stopped and its pending AUQ cleared (e.g. planning auto-completed).
+    // Un-dismiss + focus so the dialog reopens if the question is still live; if
+    // it's already resolved, tell the operator instead of silently no-opping.
+    const agentEntry = useDashboardStore.getState().agentsById[askUserQuestionReopenId];
+    // Only an agent subject (present in agentsById) can be confidently judged
+    // resolved here; conversation subjects are tracked via a separate poll, so
+    // never claim those are "no longer waiting".
+    const knownAgent = agentEntry != null;
+    const stillPending = agentEntry?.pendingAskUserQuestion != null;
+    undismissAskUserQuestion(askUserQuestionReopenId);
+    setFocusedAskUserQuestionId(askUserQuestionReopenId);
+    if (knownAgent && !stillPending) {
+      toast.info('That question is no longer waiting', {
+        description: 'The agent stopped or already received an answer.',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askUserQuestionReopenNonce]);
 
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
@@ -553,6 +634,67 @@ export default function App() {
   const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
+
+  // PAN-1520 — poll conversations for pending AskUserQuestion. Cheaper than a
+  // dedicated WS event for now; the list endpoint already returns the field.
+  type ConvAskUserQuestionRow = {
+    name: string;
+    title?: string | null;
+    issueId?: string | null;
+    pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
+  };
+  const { data: convAskUserQuestionRows = [] } = useQuery({
+    queryKey: ['conv-ask-user-question'],
+    queryFn: async (): Promise<ConvAskUserQuestionRow[]> => {
+      const res = await fetch('/api/conversations?limit=1000');
+      if (!res.ok) return [];
+      const rows: ConvAskUserQuestionRow[] = await res.json();
+      return rows.filter((r) => r.pendingAskUserQuestion != null);
+    },
+    refetchInterval: 4000,
+    refetchIntervalInBackground: true,
+  });
+
+  // PAN-1520 — surface the oldest unresolved AskUserQuestion from either an
+  // agent or a conversation. Filter out:
+  //   - questions the operator just optimistically answered (by toolUseId)
+  //   - subjects the operator dismissed without answering
+  const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
+    ...agentsWithAskUserQuestion.map((a) => ({
+      kind: 'agent' as const,
+      id: a.id,
+      issueId: a.issueId ?? null,
+      kindLabel: 'Agent',
+      // PAN-1520 — prefer the issue title over the raw agent id (e.g.
+      // "planning-pan-1395") so the dialog/toast read like a human label.
+      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      pendingAskUserQuestion: a.pendingAskUserQuestion,
+      askedAt: a.pendingAskUserQuestion?.askedAt ?? '',
+    })),
+    ...convAskUserQuestionRows.map((c) => ({
+      kind: 'conv' as const,
+      id: c.name,
+      issueId: c.issueId ?? null,
+      kindLabel: 'Conversation',
+      title: c.title ?? null,
+      pendingAskUserQuestion: c.pendingAskUserQuestion,
+      askedAt: c.pendingAskUserQuestion?.askedAt ?? '',
+    })),
+  ];
+  askUserQuestionSubjects.sort((a, b) => (a.askedAt === b.askedAt ? a.id.localeCompare(b.id) : a.askedAt.localeCompare(b.askedAt)));
+  const visibleAskUserQuestionSubjects = askUserQuestionSubjects.filter((s) => {
+    const toolUseId = s.pendingAskUserQuestion?.toolUseId;
+    if (!toolUseId) return false;
+    if (optimisticallyAnsweredAskUserQuestionIds.has(toolUseId)) return false;
+    if (dismissedAskUserQuestionAgentIds.has(s.id)) return false;
+    return true;
+  });
+  const currentAskUserQuestionSubject =
+    (focusedAskUserQuestionId
+      ? visibleAskUserQuestionSubjects.find((s) => s.id === focusedAskUserQuestionId)
+      : undefined) ??
+    visibleAskUserQuestionSubjects[0] ??
+    null;
 
   useEffect(() => {
     setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
@@ -584,34 +726,189 @@ export default function App() {
     }
   }, [confirmations, currentConfirmation]);
 
-  // Track which planning agents have already fired an INPUT toast to avoid spam
-  const notifiedPlanningInputRef = useRef<Set<string>>(new Set());
-
-  // Toast notification when a planning agent needs user input
+  // PAN-1520 — desktop-notification permission grant on first interaction.
+  // Browsers require user gesture for `Notification.requestPermission()` in
+  // many configurations; we attempt once and silently degrade to toast-only.
   useEffect(() => {
-    const planningAgentsNeedingInput = agents.filter(
-      (a) => a.role === 'plan' && a.hasPendingQuestion && a.status !== 'stopped'
-    );
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      // Don't auto-prompt — wait for the first user gesture. We piggyback on
+      // the existing pointerdown handler so this never fires on hostile pages.
+      const ask = (): void => {
+        Notification.requestPermission().catch(() => { /* ignore */ });
+        window.removeEventListener('pointerdown', ask);
+      };
+      window.addEventListener('pointerdown', ask, { once: true });
+      return (): void => { window.removeEventListener('pointerdown', ask); };
+    }
+    return undefined;
+  }, []);
 
-    for (const agent of planningAgentsNeedingInput) {
-      const key = `${agent.id}-input`;
-      if (!notifiedPlanningInputRef.current.has(key)) {
-        notifiedPlanningInputRef.current.add(key);
-        toast.info(`Planning agent needs input for ${agent.issueId || agent.id}`, {
-          description: 'The planning agent has a question for you. Open the Plan dialog to respond.',
-          duration: 10000,
+  // PAN-1520 — fire a desktop notification (+ in-app toast) when a subject
+  // (agent OR conversation) transitions into a "needs operator input" state.
+  // We track unique (subjectId, toolUseId) tuples in a ref so a single AUQ
+  // only fires once.
+  const notifiedPendingInputRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // #1102 — clicking the toast or desktop notification re-opens the dialog
+    // for that subject (focus + un-dismiss), not just focuses the window.
+    const announce = (id: string, subjectId: string, title: string, body: string): void => {
+      const key = id;
+      if (notifiedPendingInputRef.current.has(key)) return;
+      notifiedPendingInputRef.current.add(key);
+      const reopen = (): void => requestAskUserQuestionReopen(subjectId);
+      toast.info(title, {
+        description: body,
+        duration: 12000,
+        action: { label: 'Answer', onClick: reopen },
+      });
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const n = new Notification(title, { body, tag: key });
+          n.onclick = (): void => { window.focus(); reopen(); n.close(); };
+        } catch { /* ignore */ }
+      }
+    };
+
+    for (const a of agentsWithAskUserQuestion) {
+      const toolUseId = a.pendingAskUserQuestion?.toolUseId;
+      if (!toolUseId) continue;
+      const body = a.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
+      const label = (a.issueId ? issues.find((i) => i.id === a.issueId)?.title : undefined) ?? a.issueId ?? a.id;
+      announce(`agent::${a.id}::${toolUseId}`, a.id, `${label} is waiting on you`, body);
+    }
+    for (const c of convAskUserQuestionRows) {
+      const toolUseId = c.pendingAskUserQuestion?.toolUseId;
+      if (!toolUseId) continue;
+      const body = c.pendingAskUserQuestion?.questions?.[0]?.question ?? 'AskUserQuestion is open.';
+      const label = c.title ?? c.name;
+      announce(`conv::${c.name}::${toolUseId}`, c.name, `"${label}" is waiting on you`, body);
+    }
+
+    // Garbage-collect notification keys for AUQs that have cleared.
+    const liveKeys = new Set<string>();
+    for (const a of agentsWithAskUserQuestion) {
+      const id = a.pendingAskUserQuestion?.toolUseId;
+      if (id) liveKeys.add(`agent::${a.id}::${id}`);
+    }
+    for (const c of convAskUserQuestionRows) {
+      const id = c.pendingAskUserQuestion?.toolUseId;
+      if (id) liveKeys.add(`conv::${c.name}::${id}`);
+    }
+    for (const k of notifiedPendingInputRef.current) {
+      if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
+    }
+  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
+
+  // (PAN-1520) The former planning-specific "needs input" toast was removed —
+  // the unified pending-input notifier above already covers planning agents
+  // (with the issue title and an Answer action), so it was double-firing with
+  // stale "open the Plan dialog" guidance.
+
+  // PAN-1520 — answer an AskUserQuestion. Routes to the right endpoint based
+  // on subject kind: agents go through /api/agents/:id/answer-question
+  // (formats a "Q/A" message and delivers via deliverAgentMessage); conv
+  // sessions use the regular POST /api/conversations/:name/message channel.
+  const askUserQuestionAnswerMutation = useMutation({
+    mutationFn: async ({ kind, id, answers, questions }: {
+      kind: 'agent' | 'conv';
+      id: string;
+      /** Friendly display label (issue/conversation title) for the toast. */
+      label?: string;
+      answers: string[];
+      questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
+        ? T extends { questions: infer Q } ? Q : never : never;
+    }) => {
+      if (kind === 'agent') {
+        const res = await fetch(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers }),
         });
+        if (!res.ok) {
+          let message = `Failed to deliver answer (${res.status})`;
+          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+          throw new Error(message);
+        }
+        return res.json();
       }
-    }
+      // conv: compose the Q/A message ourselves and post via the regular
+      // message channel — that's the path conversation input already uses.
+      const lines: string[] = [];
+      const qArr = (questions ?? []) as ReadonlyArray<{ question: string }>;
+      for (let i = 0; i < answers.length && i < qArr.length; i++) {
+        const q = qArr[i]?.question ?? `Question ${i + 1}`;
+        lines.push(`Q: ${q}\nA: ${answers[i]}`);
+      }
+      const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
+      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: composed }),
+      });
+      if (!res.ok) {
+        let message = `Failed to deliver answer (${res.status})`;
+        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onMutate: (variables) => {
+      const toolUseId = currentAskUserQuestionSubject?.pendingAskUserQuestion?.toolUseId;
+      if (toolUseId) {
+        markAskUserQuestionAnswered(toolUseId);
+      }
+      return { subjectId: variables.id, toolUseId };
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(`Answer delivered to ${variables.label?.trim() || variables.id}`);
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.toolUseId) {
+        unmarkAskUserQuestionAnswered(context.toolUseId);
+      }
+      toast.error(`Failed to deliver answer: ${error.message}`);
+    },
+  });
 
-    for (const key of notifiedPlanningInputRef.current) {
-      const agentId = key.replace('-input', '');
-      const agent = agents.find((a) => a.id === agentId);
-      if (!agent || !agent.hasPendingQuestion || agent.status === 'stopped') {
-        notifiedPlanningInputRef.current.delete(key);
-      }
-    }
-  }, [agents]);
+  const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
+    if (!currentAskUserQuestionSubject) return;
+    const subject = currentAskUserQuestionSubject;
+    askUserQuestionAnswerMutation.mutate({
+      kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
+      id: subject.id,
+      label: subject.title?.trim() || subject.id,
+      answers,
+      questions: subject.pendingAskUserQuestion?.questions as never,
+    });
+  }, [askUserQuestionAnswerMutation, currentAskUserQuestionSubject]);
+
+  const handleDismissAskUserQuestion = useCallback(() => {
+    if (!currentAskUserQuestionSubject) return;
+    markAskUserQuestionDismissed(currentAskUserQuestionSubject.id);
+  }, [currentAskUserQuestionSubject, markAskUserQuestionDismissed]);
+
+  // PAN-1520 — purge optimistic state for AUQs that have actually cleared
+  // server-side, and re-allow dismissed subjects whose tool-use id has
+  // changed. Cleans up across both agent and conv sources.
+  useEffect(() => {
+    const liveAgentToolUseIds = agentsWithAskUserQuestion
+      .map((a) => a.pendingAskUserQuestion?.toolUseId)
+      .filter((id): id is string => typeof id === 'string');
+    const liveConvToolUseIds = convAskUserQuestionRows
+      .map((c) => c.pendingAskUserQuestion?.toolUseId)
+      .filter((id): id is string => typeof id === 'string');
+    const liveToolUseIds = new Set<string>([...liveAgentToolUseIds, ...liveConvToolUseIds]);
+    reconcileAnsweredAskUserQuestions(liveToolUseIds);
+    const liveSubjectIds = new Set<string>([
+      ...agentsWithAskUserQuestion.map((a) => a.id),
+      ...convAskUserQuestionRows.map((c) => c.name),
+    ]);
+    reconcileDismissedAskUserQuestions(liveSubjectIds);
+    // PAN-1395 — drop the focus once its subject is no longer pending.
+    setFocusedAskUserQuestionId((prev) => (prev && liveSubjectIds.has(prev) ? prev : null));
+  }, [agentsWithAskUserQuestion, convAskUserQuestionRows, reconcileAnsweredAskUserQuestions, reconcileDismissedAskUserQuestions]);
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({
@@ -781,17 +1078,16 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSearchOpen={() => setIsSearchOpen(true)}
+        selectedProject={selectedProjectKey}
+        onSelectProject={handleSelectProject}
       />
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <NoResumeBanner />
 
-        {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
-        <DeaconPauseBanner />
-
-        {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
-        <StoppedAgentsBanner />
+        {/* Deacon-frozen state and stopped-agents are now compact pills in the
+            app bar (PAN-1591), not persistent full-width banners. */}
         <OrphanTestAgentsSurface />
 
         {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
@@ -887,19 +1183,59 @@ export default function App() {
           </div>
         )}
 
-        <div className="relative border-b border-border bg-background px-3 py-1 shrink-0">
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              aria-label="Toggle activity feed"
-              aria-pressed={isSessionFeedSidebarOpen}
-              title="Activity Feed"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
-            >
-              <History className="h-4 w-4" aria-hidden="true" />
-            </button>
+        {/* App bar (PAN-1591) — project crumb · centered search · status pills.
+            Replaces the persistent deacon/mem chrome with a compact strip. */}
+        <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background px-3">
+          {/* left: active-project crumb */}
+          <div className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
+            {selectedProjectKey ? (
+              <>
+                <span className="h-3.5 w-3.5 rounded-[4px] bg-primary/40" aria-hidden="true" />
+                {selectedProjectKey}
+              </>
+            ) : (
+              <span className="text-muted-foreground">All projects</span>
+            )}
+          </div>
+
+          {/* center: search (project-scoped placeholder — wired to global search today) */}
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            className="mx-auto flex w-full min-w-0 max-w-md items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
+            title="Search"
+          >
+            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{selectedProjectKey ? `Search ${selectedProjectKey}…` : 'Search issues, conversations, commands…'}</span>
+            <kbd className="ml-auto rounded border border-border px-1.5 text-[11px]">/</kbd>
+          </button>
+
+          {/* right: status pills */}
+          <div className="flex shrink-0 items-center gap-2">
+            <DeaconPauseToggle compact />
+            {runningAgentCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-600 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{runningAgentCount} agent{runningAgentCount === 1 ? '' : 's'}
+              </span>
+            )}
+            <StoppedAgentsBanner variant="pill" />
+            <LowCostModePill onOpenSettings={() => setActiveTab('settings')} />
             <SystemHealthPill />
+            <SystemMenu onOpenSettings={() => setActiveTab('settings')} />
+            {/* The Command Deck has the always-on Awareness rail, so the global
+                feed toggle only appears on other pages (PAN-1591). */}
+            {activeTab !== 'command-deck' && (
+              <button
+                type="button"
+                aria-label="Toggle activity feed"
+                aria-pressed={isSessionFeedSidebarOpen}
+                title="Activity Feed"
+                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                onClick={() => setSessionFeedSidebarOpen(!isSessionFeedSidebarOpen)}
+              >
+                <History className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -921,6 +1257,9 @@ export default function App() {
                 conversationViewMode={conversationViewMode}
                 onConvIdChange={setSelectedConvId}
                 onConversationViewModeChange={setConversationViewMode}
+                selectedProject={selectedProjectKey}
+                onSelectProject={setSelectedProjectKey}
+                onProjectPrefixChange={setSearchProjectPrefix}
               />
             </div>
           )}
@@ -1042,7 +1381,9 @@ export default function App() {
           </BootstrapGate>
         )}
         </main>
-        {isSessionFeedSidebarOpen && (
+        {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
+            this global feed, so don't double it up there. */}
+        {isSessionFeedSidebarOpen && activeTab !== 'command-deck' && (
           <SessionFeedSidebar onClose={() => setSessionFeedSidebarOpen(false)} />
         )}
         </div>
@@ -1057,6 +1398,16 @@ export default function App() {
         isSubmitting={channelPermissionResponseMutation.isPending}
         onAllow={handleAllowChannelPermission}
         onDeny={handleDenyChannelPermission}
+      />
+
+      {/* PAN-1520 — AskUserQuestion interactive dialog (covers both work
+          agents and conversation sessions — same modal, same code path). */}
+      <AskUserQuestionDialog
+        subject={currentAskUserQuestionSubject}
+        isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
+        isSubmitting={askUserQuestionAnswerMutation.isPending}
+        onSubmit={handleSubmitAskUserQuestion}
+        onDismiss={handleDismissAskUserQuestion}
       />
 
       {/* Confirmation Dialog */}
@@ -1075,6 +1426,7 @@ export default function App() {
         onSelectIssue={handleSelectIssueFromSearch}
         cycleFilter="current"
         includeCompletedFilter={false}
+        projectPrefix={activeTab === 'command-deck' ? searchProjectPrefix : null}
       />
 
       {/* Command Palette — Cmd+K / Ctrl+K */}

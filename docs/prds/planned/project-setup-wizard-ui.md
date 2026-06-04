@@ -1,8 +1,25 @@
 # Project Setup Wizard — Dashboard UI
 
-> **Companion to:** [`project-setup-wizard.md`](./project-setup-wizard.md) (PAN-574, merged)
+> **Companion to:** [`project-setup-wizard.md`](./project-setup-wizard.md) (PAN-574)
 >
-> The wizard CLI shipped, but Phase 4 ("Dashboard Integration") was waved at and never built. This PRD specifies the full-blown UI: what the dashboard surface looks like, how it drives the same wizard pipeline as the CLI, and how the Setup Agent is presented as a first-class agent inside the dashboard.
+> This PRD specifies the full-blown dashboard surface for project setup: what it looks like, how it drives the setup pipeline, the ways a user can create a new project (including the sidebar `+`), and how the Setup Agent is presented as a first-class agent inside the dashboard.
+
+---
+
+## ⚠️ Status correction (2026-05-30 staleness pass)
+
+This PRD was originally written as a "Phase 4 / dashboard front-end" companion to a CLI wizard that was assumed shipped. **That assumption is wrong.** An audit of what PAN-574 actually merged found:
+
+- **PAN-574 (PR #588) shipped documentation only** — 10 files, all `.mdx`/`.md` (`configuration/setup-wizard.mdx`, `meta-repos.mdx`, `progressive-polyrepo.mdx`, updates to `projects.mdx`/`issue-trackers.mdx`/`INDEX.md`). The docs describe a wizard, templates, and a Setup Agent that **do not exist in code**.
+- **There is no `pan setup` command.** The only `setupCommand` in the tree is `src/cli/commands/remote/setup.ts` (Fly remote setup, unrelated). `src/cli/commands/setup/` contains only `hooks.ts` and `safe-settings.ts`.
+- **There is no `src/lib/setup/`**, no detection module, no template archetypes (`simple-app` / `monorepo` / `polyrepo` / `progressive-polyrepo` do not exist as templates), and **no Setup Agent** (`setup-agent` kind / `spawnSetupSession` appear nowhere in `src/`).
+- **Project creation today is just `pan project add <path>`** (the path must already exist on disk) plus `pan project init` (writes an example `projects.yaml`). See `src/cli/commands/project.ts`.
+
+**Consequences for this PRD:**
+
+1. The work is **entirely net-new**, not an extraction. "Phase 1 — Backend extraction" is renamed **"Phase 1 — Build the setup pipeline"** — we build `src/lib/setup/` from scratch. The existing `configuration/setup-wizard.mdx` doc serves as a behavioral spec, but no code backs it yet.
+2. To make the already-shipped docs honest, this issue **also delivers a thin `pan setup` CLI** that wraps the new `src/lib/setup/` pipeline (the docs already tell users it exists). CLI and dashboard remain two front-ends over one pipeline.
+3. The permission model has changed since the doc was written — the Setup Agent spawns under **`--permission-mode auto`** by default, not `--dangerously-skip-permissions` (see Architecture → Setup Agent).
 
 ---
 
@@ -23,11 +40,13 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 ## Goals
 
 1. **First-run flow that doesn't require the CLI.** A user who opens the dashboard with no projects configured sees a welcome screen with a "Set up your first project" button that opens the wizard inline.
-2. **Full feature parity with `pan setup`.** Every prompt, every detection step, every template choice, every Setup Agent invocation is reachable from the dashboard. CLI and UI are two front-ends for the same backend pipeline.
-3. **The Setup Agent is a first-class agent.** It appears in the agent list, has a terminal panel, streams progress events through the existing RPC, and supports the same lifecycle controls (stop, restart, view logs) as planning agents.
-4. **Project management lives in the dashboard.** A "Projects" page lists every configured project, shows health, lets the user edit config visually, re-run setup, and remove projects.
-5. **Edits round-trip safely.** Anything edited in the UI writes valid YAML to `~/.panopticon/projects.yaml` with the same schema validation the CLI uses. Anything edited in YAML is reflected in the UI on next load.
-6. **Dogfoodable.** We can use the dashboard wizard to onboard a new project end-to-end without ever opening a terminal.
+2. **Multiple, obvious entry points to create a project.** The wizard is reachable from (a) the first-run welcome, (b) a **`+` button on the PROJECTS header in the left sidebar** (the primary, always-visible affordance), (c) a "+ New project" tile on the `/projects` list page, and (d) the CLI (`pan setup`). All four open the same wizard / drive the same pipeline.
+3. **Every way of pointing at code is supported.** A new project can be created from any of four sources: an existing git repo on disk, a plain folder on disk (not yet a repo), a remote repo to clone (GitHub / GitLab / arbitrary git URL), or a brand-new project where the wizard creates the folder and — highly recommended — initializes a git repo (and optionally creates+pushes a remote).
+4. **Full feature parity across front-ends.** Every prompt, every detection step, every template choice, every Setup Agent invocation is reachable from both the dashboard and `pan setup`. CLI and UI are two front-ends for the same backend pipeline.
+5. **The Setup Agent is a first-class agent.** It appears in the agent list, has a terminal panel, streams progress events through the existing RPC, and supports the same lifecycle controls (stop, restart, view logs) as planning agents.
+6. **Project management lives in the dashboard.** A "Projects" page lists every configured project, shows health, lets the user edit config visually, re-run setup, and remove projects.
+7. **Edits round-trip safely.** Anything edited in the UI writes valid YAML to `~/.panopticon/projects.yaml` with the same schema validation the CLI uses. Anything edited in YAML is reflected in the UI on next load.
+8. **Dogfoodable.** We can use the dashboard wizard to onboard a new project end-to-end — including cloning a remote repo or creating a brand-new one — without ever opening a terminal.
 
 ## Non-goals
 
@@ -46,10 +65,25 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 
 **Acceptance:** Dashboard with no projects configured shows a welcome screen with a single primary action ("Set up your first project") that opens the wizard. The wizard walks me through detection, template selection, tracker, meta repo, and review. On save, the dashboard transitions to the normal kanban view scoped to my new project.
 
-### US-2 — Second project (existing user)
-*As a user who already has Panopticon running for one project, I want to add another from the dashboard.*
+### US-2 — Second project (existing user) via the sidebar `+`
+*As a user who already has Panopticon running for one project, I want to add another straight from the sidebar without hunting through menus.*
 
-**Acceptance:** A "Projects" entry in the global navigation opens a project list. A "+ New project" button opens the same wizard. On save, the project switcher in the header shows both projects.
+**Acceptance:** The left-sidebar **PROJECTS section header shows a `+` button**. Clicking it opens the wizard (`/projects/new`). The same wizard is also reachable from a "+ New project" tile on the `/projects` list page. On save, the project appears in the sidebar tree and the project switcher.
+
+### US-2b — Create from an existing repo or folder on disk
+*As a user, I want to point the wizard at code already on my machine — whether it's a git repo or just a folder.*
+
+**Acceptance:** The wizard's Source step offers "Existing repo or folder on this computer" with a folder picker. If the chosen path (or its subdirectories) contains git repos, they're detected and pre-filled. If it's a plain folder with no `.git`, the wizard still proceeds and offers to `git init` it during setup (recommended, not forced).
+
+### US-2c — Clone a remote repo (GitHub / GitLab / git URL)
+*As a user onboarding a project whose code lives on GitHub but isn't on my machine yet, I want the wizard to clone it for me.*
+
+**Acceptance:** The Source step offers "Clone from a remote". I paste a GitHub/GitLab URL (or `owner/repo` shorthand) or pick from my `gh`-authenticated repos, choose a destination directory, and the wizard clones it (streaming progress), then runs detection on the clone. Auth uses the existing `gh`/git credentials on the host; no new credential store.
+
+### US-2d — Brand-new project (create folder + repo)
+*As a user starting something from scratch, I want Panopticon to create the project folder and set up git for me.*
+
+**Acceptance:** The Source step offers "Start a brand-new project". I name it and pick a parent directory; the wizard creates the folder, **strongly recommends and defaults to `git init` + an initial commit**, and optionally creates a remote (GitHub via `gh repo create`, or a URL I provide) and pushes. Declining the repo is allowed but the UI nudges toward creating one.
 
 ### US-3 — Watch the Setup Agent work
 *As a user running the wizard with a 30-repo polyrepo, I want to see the Setup Agent's progress in real time.*
@@ -87,19 +121,23 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 
 ### High-level shape
 
-The wizard backend is the thing the CLI already calls. We extract it from `src/cli/commands/setup.ts` into a reusable service, expose it over the existing Effect RPC layer, and add a React wizard component that drives it.
+The setup backend does not exist yet (see Status correction). We **build** `src/lib/setup/` as a reusable service, expose it over the existing Effect RPC layer for the dashboard, and add a thin `pan setup` CLI that wraps the same lib so the already-shipped docs become accurate. Neither front-end reaches into the other; both call the lib.
 
 ```
 ┌──────────────────────────┐         ┌──────────────────────────┐
-│  CLI (pan setup)         │         │  Dashboard (wizard UI)   │
-│  src/cli/commands/setup  │         │  WizardFlow.tsx          │
+│  CLI (pan setup) — NEW   │         │  Dashboard (wizard UI)   │
+│  src/cli/commands/       │         │  WizardFlow.tsx          │
+│    setup-wizard.ts       │         │                          │
 └──────────┬───────────────┘         └──────────┬───────────────┘
            │                                    │
            │  same in-process API               │  Effect RPC
-           │  (function call)                   │  (PanRpcGroup.setup.*)
+           │  (function call)                   │  (SetupRpcGroup.*)
            ▼                                    ▼
         ┌─────────────────────────────────────────────┐
-        │  src/lib/setup/  (extracted from CLI)       │
+        │  src/lib/setup/  (NET-NEW, built here)      │
+        │   • source.ts        — resolve repo source  │
+        │   • clone.ts         — clone remote repo    │
+        │   • init-repo.ts     — git init + remote    │
         │   • detect.ts        — repo scanning        │
         │   • templates.ts     — template loading     │
         │   • config-builder.ts— state → YAML         │
@@ -111,7 +149,20 @@ The wizard backend is the thing the CLI already calls. We extract it from `src/c
                  ~/.panopticon/projects.yaml
 ```
 
-The CLI keeps its `inquirer`-style prompts but delegates every business operation to `src/lib/setup/`. The dashboard never reaches into `src/cli/`; both call the lib.
+The CLI wrapper uses `inquirer`-style prompts but delegates every business operation to `src/lib/setup/`. The dashboard never reaches into `src/cli/`; both call the lib. Because no CLI logic exists to preserve, the "byte-identical YAML" invariant is enforced from day one rather than after an extraction.
+
+### Repo source resolution
+
+Every project starts by resolving a **source** into a local project directory before detection runs. `src/lib/setup/source.ts` defines four kinds:
+
+| Source kind | Input | Action before detection |
+|---|---|---|
+| `existing-repo` | a path on disk that is (or contains) git repos | none — detection runs in place |
+| `existing-folder` | a path on disk with no `.git` | proceed; offer `git init` during the Repo step (recommended) |
+| `clone-remote` | a GitHub/GitLab/git URL or `owner/repo` shorthand + destination dir | `clone.ts` clones via the host's `git`/`gh` credentials (streaming progress), then detection runs on the clone |
+| `new-project` | a project name + parent dir | `init-repo.ts` creates the folder; defaults to `git init` + initial commit; optionally `gh repo create` (or a provided remote URL) + push |
+
+Source resolution is a distinct, streamable concern (clone can take a while) and is the first real step of the wizard. `clone.ts` and `init-repo.ts` are async-only (no `execSync` — server-reachable) and shell out to `git`/`gh` via `execAsync`/`spawn`.
 
 ### Why RPC, not REST
 
@@ -119,6 +170,9 @@ Every other dashboard server feature uses Effect RPC over `/ws/rpc`. Wizard step
 
 | Procedure | Type | Purpose |
 |---|---|---|
+| `resolveSource` | unary | Validate a chosen source (path / URL / new-project name) and report what will happen (clone, init, detect-in-place). |
+| `cloneRemote` | streaming | Clone a remote repo to a destination dir. Streams clone progress. Cancellable. |
+| `scaffoldProject` | streaming | Create a brand-new project: mkdir, optional `git init` + initial commit, optional `gh repo create` + push. Streams progress. |
 | `detectRepos` | unary | Scan a directory, return `DetectedRepo[]`. |
 | `listTemplates` | unary | Return all available templates with metadata for card rendering. |
 | `previewConfig` | unary | Take wizard state, return YAML preview as a string for the Review step. |
@@ -134,26 +188,31 @@ Every other dashboard server feature uses Effect RPC over `/ws/rpc`. Wizard step
 
 All schemas live in `packages/contracts/src/setup.ts` so the CLI can also import them — useful for keeping the CLI's in-memory state shape aligned with the wire format.
 
-### Backend extraction
+### Backend pipeline (net-new)
 
-Today, `src/cli/commands/setup.ts` is one big file with `inquirer` calls interleaved with detection and config writing. We split it:
+There is no existing `src/cli/commands/setup.ts` to extract from — `pan setup` was never implemented (only its docs shipped). We build the lib from scratch:
 
 ```
 src/lib/setup/
+├── source.ts              # resolveSource() — classify existing-repo/folder/clone/new
+├── clone.ts               # cloneRemote() — git/gh clone, async-only, streamed
+├── init-repo.ts           # scaffoldProject() — mkdir + git init + optional remote
 ├── detect.ts              # detectRepos(), branch detection, language detection
 ├── templates.ts           # loadTemplate(), listTemplates(), applyTemplate()
 ├── config-builder.ts      # stateToYaml(), validateState(), mergeAnswers()
-├── spawn-setup-session.ts # spawnSetupSession() — exists per original PRD
+├── spawn-setup-session.ts # spawnSetupSession() — Setup Agent tmux launcher
 ├── setup-agent-events.ts  # event types streamed from setup agent
 ├── write-config.ts        # atomic writes to projects.yaml
 └── index.ts               # exports
 ```
 
-`src/cli/commands/setup.ts` becomes a thin wrapper: `inquirer` for prompts, calls into `src/lib/setup/` for everything else.
+A new `src/cli/commands/setup-wizard.ts` (registered as `pan setup`) is a thin wrapper: `inquirer` for prompts, calls into `src/lib/setup/` for everything else. The existing `pan project add` continues to work (it becomes the "register a path I already prepared" fast-path; `pan setup` is the guided flow).
+
+**Async-only constraint.** Because these modules are called from the dashboard server (which must never block the event loop), all filesystem and git operations use `fs/promises` and `execAsync`/`spawn` — never sync FS or `execSync`. This is a hard rule for the whole lib, not just the parts the server touches, so there is one code path.
 
 ### Setup Agent as a first-class agent
 
-The Setup Agent already runs in a tmux session (per the original PRD: "modeled on planning agent"). What's missing is dashboard plumbing. We treat it exactly like a planning agent:
+The Setup Agent is modeled on the planning agent: a Claude Code session in a tmux session on the `panopticon` socket. It does not exist yet — we build it here alongside the dashboard plumbing. It is spawned through the standard launcher, which means it inherits the project-wide permission model: **`--permission-mode auto` by default** (Claude Code's built-in classifier blocks destructive ops), with `--dangerously-skip-permissions --permission-mode bypassPermissions` only when the user has opted into `bypass` (`PAN_YOLO=true` or `claude.permissionMode: bypass`). See `src/lib/claude-permissions.ts` — the wizard must **not** hardcode a permission flag; it goes through the same resolution path as every other agent. We treat it exactly like a planning agent:
 
 1. **Agent record.** When the wizard spawns the Setup Agent, a row is inserted in the agents table with `kind: 'setup-agent'`. The dashboard's `AgentList.tsx` already iterates over agent kinds; we add a filter chip for "Setup".
 2. **Terminal streaming.** The Setup Agent's tmux session is reachable at `/ws/terminal?session=<setup-session-name>` via the existing raw WebSocket terminal endpoint (`ws-terminal.ts`). No new code path — the wizard component just opens an `XTerminal` pointed at the right session name.
@@ -170,9 +229,10 @@ Three new surfaces:
 2. **`/projects/new`** — Wizard entry point. Multi-step inline form, not a modal (the wizard is too tall and the Setup Agent step needs the full canvas).
 3. **`/projects/:projectKey`** — Project detail page. Tabs: Overview, Configuration, Repos, Quality Gates, Setup History, Danger Zone.
 
-We also wire a fourth surface:
+We also wire two more entry points:
 
 4. **First-run welcome** at `/` when zero projects exist. A simple full-screen card that points to `/projects/new`. This is an empty-state, not a separate route — the existing root route just renders this when `useProjectStore().projects.length === 0`.
+5. **Sidebar `+` button.** The left sidebar (`src/dashboard/frontend/src/components/CommandDeck/index.tsx`) renders a collapsible PROJECTS/Issues section with a `sectionHeader` (around line 1061). We add a small `+` icon button to that header — the always-visible, primary affordance for creating a project. It mirrors the existing `handleNewProjectConversation` `+`-style pattern and navigates to `/projects/new`. Clicking the `+` must not toggle the section collapse (stop propagation on the header's `onClick`).
 
 ### Wizard state model
 
@@ -224,7 +284,7 @@ The wizard is a single full-page route at `/projects/new` with a fixed left rail
 ├──────────┬───────────────────────────────────────────────────────┤
 │ Steps    │  Step content                                          │
 │          │                                                        │
-│ ✓ Loc.   │  Project Type Detection                                │
+│ ✓ Src.   │  Project Type Detection                                │
 │ ✓ Type   │  ────────────────────                                  │
 │ ● Tmpl   │  Found 31 git repositories under /home/eltmon/Projects│
 │   Repos  │  /HS                                                   │
@@ -244,7 +304,7 @@ The wizard is a single full-page route at `/projects/new` with a fixed left rail
 
 | # | Name | Notes |
 |---|---|---|
-| 1 | **Location** | File-system path picker. Defaults to `~/Projects/<basename>`. Browse-folder dialog uses the existing native folder picker (we already have this for workspace paths). On Next, calls `detectRepos` and shows a progress spinner. |
+| 1 | **Source** | Choose how to bring in the code, then resolve it to a local path. Four radio options: **(a) Existing repo or folder on this computer** — folder picker (reuses the native picker we already have for workspace paths); **(b) Clone from a remote** — text field for a GitHub/GitLab URL or `owner/repo` shorthand, optional pick-from-`gh`-repos list, plus a destination dir; **(c) Start a brand-new project** — name + parent dir, with a checked-by-default "Initialize a git repo" toggle and an optional "Create remote (GitHub via `gh`, or paste a URL) and push"; **(d)** the path defaults to `~/Projects/<basename>`. On Next: for clone, calls `cloneRemote` (streaming progress); for new-project, calls `scaffoldProject` (streaming progress); then all kinds call `detectRepos` and show a spinner. A plain folder with no `.git` is allowed and surfaces a "this folder isn't a git repo yet — initialize one? (recommended)" prompt carried into Step 4. |
 | 2 | **Type** | Shows detection result. User can override the detected type. Each type has a one-line "best for" caption. |
 | 3 | **Template** | Card grid of templates returned by `listTemplates`. Each card: name, description, "recommended" badge if matching detection heuristics. Selecting a card loads the template's prompt schema for Step 4. |
 | 4 | **Repos** | Shows detected repos in a sortable table: name, path, default branch, language, has-tests, has-CI. Inline editable per row. "Group repos" button opens a side panel where the user can drag repos into named groups (groups become `repo-groups.yaml`). |
@@ -318,7 +378,7 @@ The existing `AgentList.tsx` filters agents by kind. We add a `setup-agent` kind
 2. Dashboard loads. `getSnapshot` RPC returns zero projects.
 3. Root route renders the first-run welcome.
 4. User clicks "Set up a project". Router pushes `/projects/new`.
-5. Wizard mounts with `currentStep: 'location'` and a default path of `~/Projects`.
+5. Wizard mounts with `currentStep: 'source'`, source kind defaulting to "Existing repo or folder", path defaulting to `~/Projects`.
 6. User picks a directory, clicks Next. `detectRepos` RPC runs, shows a spinner. Result populates `wizardStore.detection`.
 7. Wizard advances to Step 2, shows detected type. User accepts.
 8. Step 3: Template grid. User picks `polyrepo`.
@@ -329,9 +389,25 @@ The existing `AgentList.tsx` filters agents by kind. We add a `setup-agent` kind
 13. Step 8: Save. `commitProject` RPC writes `projects.yaml`, copies accepted files into the meta repo, emits `ProjectAdded`.
 14. Dashboard navigates to `/projects/myproject`. Project switcher in the header shows the new project. Kanban is empty until the user files an issue.
 
-### Flow B — Adding a second project
+### Flow B — Adding a second project (sidebar `+`)
 
-Same as Flow A but starts from `/projects` instead of the welcome screen, and the project switcher shows both projects at the end.
+User clicks the **`+` on the sidebar PROJECTS header** (or the "+ New project" tile on `/projects`). Router pushes `/projects/new`. The rest is identical to Flow A. The project switcher and sidebar tree show both projects at the end.
+
+### Flow B2 — Clone a remote repo
+
+1. User opens the wizard, Step 1 Source, picks "Clone from a remote".
+2. User pastes `eltmon/krux` (or a full GitHub/GitLab URL) and accepts the default destination `~/Projects/krux`.
+3. On Next, `cloneRemote` streams clone progress into the step (line-by-line `git clone` output). Auth uses the host's existing `gh`/git credentials.
+4. On clone success, `detectRepos` runs on the clone and the wizard advances to Step 2 with detection pre-filled.
+5. Remainder identical to Flow A.
+
+### Flow B3 — Brand-new project with repo init
+
+1. User picks "Start a brand-new project", names it `widget`, parent dir `~/Projects`. "Initialize a git repo" is checked by default.
+2. User also checks "Create GitHub remote and push" (uses `gh repo create`).
+3. On Next, `scaffoldProject` streams: `mkdir ~/Projects/widget` → `git init` → initial commit → `gh repo create eltmon/widget --source . --push`.
+4. `detectRepos` runs (finds the freshly-initialized repo), wizard advances. Remainder identical to Flow A.
+5. If the user had *unchecked* git init, the wizard still proceeds but Step 4 shows a persistent "this project has no git repo — agents need one to create feature branches" warning.
 
 ### Flow C — Editing branch config
 
@@ -366,13 +442,14 @@ Same as Flow A but starts from `/projects` instead of the welcome screen, and th
 
 Phased so each phase ships value, but per CLAUDE.md "deliver complete features," all phases are required for the issue to close.
 
-### Phase 1 — Backend extraction
+### Phase 1 — Build the setup pipeline (net-new)
 
-- Create `src/lib/setup/` modules by extracting from `src/cli/commands/setup.ts`.
-- Add `SetupRpcGroup` schemas to `packages/contracts/src/setup.ts`.
+- Create `src/lib/setup/` modules from scratch: `source.ts`, `clone.ts`, `init-repo.ts`, `detect.ts`, `templates.ts`, `config-builder.ts`, `write-config.ts` (Setup Agent lands in Phase 4). All async-only — `fs/promises` + `execAsync`/`spawn`, no sync FS, no `execSync`.
+- Define the template archetypes that the docs already describe but that don't exist yet: `simple-app`, `monorepo`, `polyrepo`, `progressive-polyrepo`.
+- Add `SetupRpcGroup` schemas to `packages/contracts/src/setup.ts` (including `resolveSource`, `cloneRemote`, `scaffoldProject`).
 - Implement RPC handlers in `src/dashboard/server/routes/setup.ts`.
-- Wire CLI to use the lib (no behavior change for CLI users).
-- Tests: every lib module has unit tests; CLI smoke test still passes.
+- Build the new `pan setup` CLI (`src/cli/commands/setup-wizard.ts`) as a thin wrapper over the lib, so the shipped `configuration/setup-wizard.mdx` docs become accurate. Register it in `src/cli/index.ts`.
+- Tests: every lib module has unit tests; clone/scaffold tested against temp dirs; CLI smoke test for `pan setup`.
 
 ### Phase 2 — Project list & detail pages (no wizard yet)
 
@@ -386,8 +463,10 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 
 - Add `/projects/new` route with `WizardFlow.tsx`.
 - Implement steps 1–5, 7, 8 (everything except the Setup Agent step).
+- **Step 1 Source** with all four kinds: existing-repo/folder picker, clone-from-remote (streams `cloneRemote`), brand-new project (streams `scaffoldProject`, git-init checked by default).
+- **Sidebar `+` entry point** on the CommandDeck PROJECTS header → `/projects/new` (stop propagation so it doesn't toggle collapse). Plus the "+ New project" tile on `/projects`.
 - `wizardStore` with localStorage persistence.
-- Detection step uses `detectRepos` streaming RPC.
+- Detection step uses `detectRepos`; clone/scaffold use their streaming RPCs.
 - Review step uses `previewConfig` and renders Monaco read-only.
 - Commit step uses `commitProject`.
 
@@ -422,8 +501,12 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 |---|---|
 | `packages/contracts/src/setup.ts` | RPC schemas: `SetupRpcGroup`, `SetupState`, `DetectedRepo`, `Template`, `SetupAgentEvent`, `GeneratedFile`. |
 | `src/lib/setup/index.ts` | Public exports of the lib. |
-| `src/lib/setup/detect.ts` | Repo scanning extracted from CLI. |
-| `src/lib/setup/templates.ts` | Template loading extracted from CLI. |
+| `src/lib/setup/source.ts` | Resolve a chosen source (existing-repo/folder/clone/new) into a local path + planned actions. |
+| `src/lib/setup/clone.ts` | `cloneRemote()` — clone a GitHub/GitLab/git-URL repo via async `git`/`gh`. |
+| `src/lib/setup/init-repo.ts` | `scaffoldProject()` — create folder, `git init`, initial commit, optional `gh repo create` + push. |
+| `src/cli/commands/setup-wizard.ts` | New `pan setup` command — thin `inquirer` wrapper over `src/lib/setup/`. Makes the shipped docs true. |
+| `src/lib/setup/detect.ts` | Repo scanning (net-new). |
+| `src/lib/setup/templates.ts` | Template loading + the `simple-app`/`monorepo`/`polyrepo`/`progressive-polyrepo` archetypes (net-new). |
 | `src/lib/setup/config-builder.ts` | State → YAML, validation, merging. |
 | `src/lib/setup/write-config.ts` | Atomic write of `projects.yaml`. |
 | `src/lib/setup/setup-agent-events.ts` | Event types and JSONL parser for the Setup Agent's progress stream. |
@@ -433,7 +516,7 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 | `src/dashboard/frontend/src/pages/ProjectDetailPage.tsx` | `/projects/:projectKey` route. |
 | `src/dashboard/frontend/src/pages/WizardPage.tsx` | `/projects/new` route. |
 | `src/dashboard/frontend/src/components/wizard/WizardFlow.tsx` | Step orchestration shell. |
-| `src/dashboard/frontend/src/components/wizard/StepLocation.tsx` | Step 1. |
+| `src/dashboard/frontend/src/components/wizard/StepSource.tsx` | Step 1 — source kind selector (existing repo/folder, clone remote, brand-new) + location/clone-progress/scaffold-progress UI. |
 | `src/dashboard/frontend/src/components/wizard/StepType.tsx` | Step 2. |
 | `src/dashboard/frontend/src/components/wizard/StepTemplate.tsx` | Step 3. |
 | `src/dashboard/frontend/src/components/wizard/StepRepos.tsx` | Step 4. |
@@ -453,7 +536,8 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 | `src/dashboard/frontend/src/components/welcome/FirstRunWelcome.tsx` | Empty-state welcome card. |
 | `src/dashboard/frontend/src/stores/wizardStore.ts` | Zustand store for wizard state. |
 | `src/dashboard/frontend/src/stores/projectStore.ts` | Zustand store for project list / current project. |
-| `tests/lib/setup/detect.test.ts` | Detection tests (already in original PRD; extend). |
+| `tests/lib/setup/detect.test.ts` | Detection tests. |
+| `tests/lib/setup/source.test.ts` | Source resolution: classify path/URL/new, clone into temp dir, scaffold + git-init into temp dir. |
 | `tests/lib/setup/config-builder.test.ts` | YAML round-trip tests. |
 | `tests/lib/setup/write-config.test.ts` | Atomic write tests. |
 | `tests/dashboard/server/routes/setup.test.ts` | RPC handler integration tests. |
@@ -465,9 +549,10 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 
 | File | Changes |
 |---|---|
-| `src/cli/commands/setup.ts` | Replace inline business logic with calls to `src/lib/setup/`. Behavior unchanged. |
-| `src/cli/commands/project.ts` | Already deprecated by original PRD; ensure it just delegates. |
-| `src/lib/agents.ts` | Add `setup-agent` to recognized kinds (already in original PRD; verify shipped). |
+| `src/cli/index.ts` | Register the new `pan setup` command (it does not exist today). |
+| `src/cli/commands/project.ts` | Keep `pan project add` working as the "register an already-prepared path" fast-path; have it share `write-config.ts` with the lib so YAML output is identical. |
+| `src/dashboard/frontend/src/components/CommandDeck/index.tsx` | Add a `+` button to the PROJECTS/Issues `sectionHeader` (~line 1061) that navigates to `/projects/new`; stop propagation so it doesn't toggle collapse. |
+| `src/lib/agents.ts` | Add `setup-agent` to recognized kinds (net-new — does not exist today). |
 | `src/dashboard/server/server.ts` | Register `SetupRpcGroup` and the new `routes/setup.ts`. |
 | `src/dashboard/server/services/index.ts` | Register the setup-agent-events watcher service. |
 | `src/dashboard/frontend/src/EventRouter.tsx` | Handle `SetupAgentEvent` and `ProjectAdded` / `ProjectUpdated` / `ProjectRemoved` domain events. |
@@ -500,6 +585,10 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 
 ### End-to-end (Playwright)
 - **Zero-project onboarding.** Tear down `~/.panopticon/projects.yaml`, open the dashboard, click through the welcome → wizard → save flow, assert the project appears in the list.
+- **Sidebar `+` entry point.** With one project already, click the `+` on the PROJECTS sidebar header, assert it routes to `/projects/new` without toggling section collapse.
+- **Clone source.** In Step 1, choose "Clone from a remote", point at a local bare-repo fixture (no network), assert clone progress streams and detection runs on the clone.
+- **Brand-new project.** Choose "Start a brand-new project" into a temp dir with git-init checked, complete the wizard, assert the directory exists, `git log` has the initial commit, and the project is registered.
+- **Folder-without-git warning.** Brand-new project with git-init unchecked, assert the Repo step shows the no-git warning and the project still saves.
 - **Add second project.** With one project already, open `/projects/new`, complete the wizard, verify both projects are visible.
 - **Edit branch.** Open project detail → Configuration → change `pr_target` → save → reload page → assert persisted.
 - **Re-detect adds repos.** Pre-create a project pointing at a directory, add a new repo to the directory, click Re-detect, accept diff, verify config updated.
@@ -512,7 +601,7 @@ Per CLAUDE.md, every UI change is verified with Playwright. Every flow above MUS
 
 ## Open Questions
 
-1. **Where does the Setup Agent's Claude Code session actually run?** The CLI version runs it in a tmux session on the user's machine via `--dangerously-skip-permissions`. The dashboard version should do the same — we don't want to invent a second execution model. Confirm the spawn path in the existing `spawn-setup-session.ts` is reusable as-is from a server-side RPC handler, not just from the CLI process. *(Probable answer: yes, since `pan up` runs on the same host.)*
+1. **Where does the Setup Agent's Claude Code session actually run?** It runs in a tmux session on the `panopticon` socket on the user's machine, spawned through the standard launcher so it inherits the resolved permission model — **`--permission-mode auto` by default**, `bypass` only on explicit opt-in (`src/lib/claude-permissions.ts`). The wizard must not invent its own permission flag or a second execution model. There is no `spawn-setup-session.ts` today; we build it in Phase 4 modeled on the planning-agent launcher, and it must be callable from a server-side RPC handler (the dashboard server and `pan up` run on the same host, so a host-local tmux spawn is fine — Docker workspaces are out of scope, matching the PTY-supervisor exclusion).
 2. **Multi-user dashboards.** Today, the dashboard assumes one local user. When a setup wizard is in progress, should we lock `projects.yaml` against other dashboard sessions / CLI invocations? *(Probable answer: optimistic, last-write-wins, with a "config changed externally" toast on conflict — same as we'd do for any file-backed config.)*
 3. **Template authoring UX.** Do we want a "create custom template" UI in this PRD, or is "edit YAML in your meta repo" the answer? *(Recommended: out of scope. Add a `templates/` browser later.)*
 4. **Dashboard project switcher placement.** It currently doesn't exist. Header dropdown vs. left rail vs. command palette? *(Recommended: header dropdown to match every other tool in this category.)*
@@ -531,9 +620,11 @@ Per CLAUDE.md, every UI change is verified with Playwright. Every flow above MUS
 ## Success Criteria
 
 - A new user can install Panopticon, open the dashboard, and have a fully configured project without ever opening a terminal.
-- Every CLI prompt has a UI equivalent.
-- The Setup Agent appears as a normal agent and inherits all existing agent infrastructure.
+- A project can be created via all four entry points: first-run welcome, sidebar `+`, `/projects` "+ New project" tile, and `pan setup`.
+- A project can be created from all four sources: an existing repo on disk, a plain folder on disk, a cloned remote (GitHub/GitLab/URL), and a brand-new project where the wizard creates the folder and initializes git (and optionally a remote).
+- A brand-new project ends up with a git repo by default (the recommended path), and a folder-without-git surfaces a clear warning rather than silently producing a project agents can't branch in.
+- `pan setup` exists and drives the same pipeline as the dashboard — the shipped `setup-wizard.mdx` docs are now accurate.
+- The Setup Agent appears as a normal agent, inherits all existing agent infrastructure, and runs under the resolved permission mode (`auto` by default), never a hardcoded flag.
 - `projects.yaml` files written by the CLI and the dashboard are byte-identical given the same state.
 - Editing a project's branch config in the UI takes effect on the next workspace creation.
 - All Playwright tests above pass.
-- The original wizard PRD's Phase 4 is closed out with a pointer to this one.

@@ -1,0 +1,238 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T16:35:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1326: PAN-1316 follow-up: stopWorkspaceDocker resolves wrong workspace for specialist agents",
+    "updated": "2026-05-25T16:27:25.292Z"
+  },
+  "plan": {
+    "id": "pan-1326",
+    "title": "PAN-1316 follow-up: stopWorkspaceDocker resolves wrong workspace for specialist agents",
+    "status": "proposed",
+    "uid": "b5fc8a72-3e9c-4d1e-a86b-7d3a9c2e51b4",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-25T16:35:00.000Z",
+    "updated": "2026-05-25T16:27:25.292Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1326",
+        "label": "PAN-1326",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/1317",
+        "label": "PR #1317 (PAN-1316)",
+        "type": "pr"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/commit/bd7d00787",
+        "label": "bd7d00787 — fix commit on this branch",
+        "type": "commit"
+      }
+    ],
+    "tags": [
+      "tests",
+      "regression",
+      "docker",
+      "specialists",
+      "kill",
+      "follow-up"
+    ],
+    "narratives": {
+      "Problem": "PR #1317 (PAN-1316) wired stopWorkspaceDocker into POST /api/agents/:id/stop and `pan kill` by reading state.workspace + state.issueId from the agent's own state. That works for work agents (they own the workspace) but not for specialists (review/test/ship), whose state.workspace either points at the orchestrator's workspace or is absent — so killing a specialist silently failed to tear down the right workspace stack. The fix at commit bd7d00787 on this branch now resolves the workspace from the issue via resolveProjectFromIssue + findWorkspacePath (mirroring postMergeLifecycle). The issue was reopened because the test plan from the original issue (specialist kill test, work-agent regression test, manual dashboard stop verification) was never executed — the implementation path is present but unproven by automated tests.",
+      "Proposal": "Add three artifacts that prove the fix and lock down the regression: (1) a new src/cli/commands/__tests__/kill.test.ts covering specialist (no state.workspace) and work (state.workspace differs from resolver output) kill paths, asserting findWorkspacePath + stopWorkspaceDocker call arguments; (2) extend src/dashboard/server/routes/__tests__/agents-lifecycle-event.test.ts with the equivalent assertions for the HTTP stop handler (matching the route's dynamic-import specifiers in the vi.mock declarations); (3) add docs/manual-tests/PAN-1326.md as a reproducible playbook for the human verifier — kill a ship specialist via the dashboard and confirm docker ps no longer shows that issue's stack. No production code changes — the fix already shipped."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Created a new kill.test.ts file rather than extending another CLI test.",
+        "rationale": "No kill.test.ts exists today and the new tests assert a focused contract (docker teardown call args). A dedicated file keeps that contract auditable and discoverable."
+      },
+      {
+        "summary": "Extended the existing agents-lifecycle-event.test.ts for the route case rather than creating a sibling test file.",
+        "rationale": "That file already provides the createAgentStopHandler runner, the EventStoreService stub, and the node:fs/promises mock — reusing it minimizes test scaffolding duplication and keeps related agent-stop assertions co-located."
+      },
+      {
+        "summary": "Assert on stopWorkspaceDocker mock call arguments instead of console output or DockerCleanupResult.containersFound.",
+        "rationale": "The contract being verified is 'we resolved the right workspace path from the issue and passed it to stopWorkspaceDocker' — that's the smallest verifiable surface that catches a regression. Side-effect assertions (console logs, container counts) leak implementation detail and can pass even when the resolver is wrong if existsSync happens to return false."
+      },
+      {
+        "summary": "Work-agent regression case sets state.workspace to a clearly different path from findWorkspacePath's mocked return.",
+        "rationale": "If the test used the same value for both, it would pass even if the code reverted to reading state.workspace. Forcing them to diverge proves the new code-path is what's running."
+      },
+      {
+        "summary": "Captured manual dashboard-stop verification as a docs/manual-tests/PAN-1326.md recipe rather than driving Playwright from the work agent.",
+        "rationale": "An autonomous agent cannot reliably drive the dashboard UI against a live docker stack (workspace must be running, real containers must exist). The unit test in bead 2 provides the code-level equivalent; the recipe gives the human verifier a fixed playbook with expected docker ps before/after evidence for sign-off."
+      },
+      {
+        "summary": "Three beads (not one larger 'add all tests' bead, not five micro-beads per assertion).",
+        "rationale": "Each surface (CLI command, HTTP handler, manual recipe) has its own mock setup and test file. Splitting further would create duplicate-setup beads; combining would make a single bead touch three different files with three different scaffoldings."
+      },
+      {
+        "summary": "No requiresInspection on any bead.",
+        "rationale": "Each bead is a mechanically simple test/doc addition with no downstream foundation impact. The fix it covers is already merged on the branch; later beads do not depend on the test scaffolding shape. Typecheck/lint/verification gate will catch a malformed test trivially."
+      }
+    ],
+    "items": [
+      {
+        "id": "kill-cli-test",
+        "title": "Add kill.test.ts covering specialist and work-agent docker teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1326",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/__tests__/kill.test.ts. Mock '../../../lib/agents.js' (stopAgent, getAgentState), '../../../lib/tmux.js' (sessionExists), '../../../lib/remote/index.js' (isRemoteAvailable -> { available: false }), '../../../lib/workspace-manager.js' (stopWorkspaceDocker), '../../../lib/projects.js' (resolveProjectFromIssue), and '../../../lib/lifecycle/archive-planning.js' (findWorkspacePath). Follow the close.test.ts vi.hoisted + vi.mock + late-import pattern so killCommand binds to the mocks. Stub process.exit to prevent test-process abort. Cover three behaviors as acceptance subItems below. Tests must run under the default `npm test` config and pass without using real timers (no retries / no backoff are exercised here, so vi.useFakeTimers is not required, but no real setTimeout/sleep calls either)."
+        },
+        "subItems": [
+          {
+            "id": "kill-cli-test.ac1",
+            "title": "Specialist case: getAgentState returns { issueId: 'PAN-1052', role: 'ship', workspace: undefined }. killCommand('agent-pan-1052-ship', {}) calls findWorkspacePath(projectPath, 'pan-1052') and stopWorkspaceDocker(<findWorkspacePath's return value>, 'pan-1052'). state.workspace's absence does NOT skip docker teardown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kill-cli-test.ac2",
+            "title": "Work-agent regression case: getAgentState returns { issueId: 'PAN-1052', role: 'work', workspace: '/orchestrator/wrong/path' }. findWorkspacePath is mocked to return '/resolved/by/issue/path'. killCommand calls stopWorkspaceDocker with '/resolved/by/issue/path' (the resolver's output), NOT '/orchestrator/wrong/path' (state.workspace). Asserts on the mock's call arguments, not on side effects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kill-cli-test.ac3",
+            "title": "Guard case: getAgentState returns { issueId: undefined, ... }. stopWorkspaceDocker is NOT called at all (the issueId guard short-circuits the resolver chain). findWorkspacePath also not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kill-cli-test.ac4",
+            "title": "`npm test -- kill.test.ts` passes locally. No real setTimeout / sleep calls. process.exit is stubbed so failures surface as expect failures, not test-process aborts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-route-test",
+        "title": "Extend agents-lifecycle-event.test.ts with route-level docker teardown assertions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T16:35:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1326",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/server/routes/__tests__/agents-lifecycle-event.test.ts with a new describe block exercising the docker-teardown branch added in commit bd7d00787. Add vi.mock declarations for the SAME specifier strings the route uses inside its dynamic imports — '../../../lib/projects.js' and '../../../lib/lifecycle/archive-planning.js' — and for '../../../../lib/workspace-manager.js' (stopWorkspaceDocker). Add subItem assertions matching the three behaviors below. Reuse the existing runAgentStopHandler helper. The dynamic `await import(...)` inside the route's Effect.promise resolves through vitest's module registry, so static vi.mock declarations DO intercept it as long as the specifiers match exactly."
+        },
+        "subItems": [
+          {
+            "id": "stop-route-test.ac1",
+            "title": "Specialist case: getAgentStateAsync resolves to { issueId: 'PAN-1052', role: 'ship', workspace: undefined }. Running the stop handler calls resolveProjectFromIssue('PAN-1052'), findWorkspacePath(projectPath, 'pan-1052'), and stopWorkspaceDocker(<findWorkspacePath's return>, 'pan-1052'). state.workspace's absence does NOT skip docker teardown.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-route-test.ac2",
+            "title": "Work-agent regression case: getAgentStateAsync resolves to { issueId: 'PAN-1052', role: 'work', workspace: '/orchestrator/wrong/path' }. findWorkspacePath returns '/resolved/by/issue/path'. The handler calls stopWorkspaceDocker with '/resolved/by/issue/path', NOT '/orchestrator/wrong/path'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-route-test.ac3",
+            "title": "Guard case: getAgentStateAsync resolves to { issueId: undefined, ... }. stopWorkspaceDocker is NOT called. findWorkspacePath is NOT called either.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-route-test.ac4",
+            "title": "`npm test -- agents-lifecycle-event.test.ts` passes. Existing PAN-1221 F1 lifecycle-event assertions still pass (no regression on the prior test cases).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "manual-verification-doc",
+        "title": "Add docs/manual-tests/PAN-1326.md — dashboard stop verification recipe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T16:35:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1326",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create docs/manual-tests/PAN-1326.md as a reproducible playbook the human verifier can run after merge. Capture: prerequisites (a running workspace with docker containers, e.g. start a workspace via `pan start <issueId>` and confirm `docker ps` shows the panopticon-feature-<id>-{frontend,dev} containers); steps (open dashboard, identify a ship/test specialist agent for that issue OR start one if needed, click the stop button); expected before/after evidence (`docker ps` shows containers before, absent after; dashboard logs show `[agents] ✓ Stopped Docker stack for <agentId>`); failure mode to watch for (containers still visible after stop → regression). Reference commit bd7d00787 and the PAN-1326 issue body's test plan. Keep it under ~80 lines."
+        },
+        "subItems": [
+          {
+            "id": "manual-verification-doc.ac1",
+            "title": "File docs/manual-tests/PAN-1326.md exists, is committed, and is linked from the PR description.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manual-verification-doc.ac2",
+            "title": "Recipe includes: prerequisites, numbered steps, expected before/after `docker ps` evidence, and a 'how to spot a regression' note pointing at the original symptom (specialist kill leaves containers running).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manual-verification-doc.ac3",
+            "title": "Doc references commit bd7d00787 (the fix) and the original issue test-plan item 'Manual: kill a ship specialist via dashboard, confirm `docker ps` no longer shows that issue's stack'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "kill-cli-test",
+        "to": "stop-route-test",
+        "type": "informs"
+      },
+      {
+        "from": "stop-route-test",
+        "to": "manual-verification-doc",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1326-pan-1316-follow-up-stopworkspacedocker-resolves-wrong-workspace-for-specialist-agents.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

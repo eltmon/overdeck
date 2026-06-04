@@ -14,7 +14,7 @@ import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
 import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
-import { setupHooksCommand } from '../setup/hooks.js';
+import { hooksStatusCommand, parseHookHarness, setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from './tldr-handler.js';
 import { hookCommand } from './fpp-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
@@ -43,16 +43,25 @@ export function registerAdminCommands(program: Command): void {
   // pan admin config — configuration management
   registerConfigCommand(admin);
 
-  // pan admin hooks — Claude Code hooks management
+  // pan admin hooks — harness hook management
   const hooks = admin
     .command('hooks')
-    .description('Manage Claude Code heartbeat hooks');
+    .description('Manage heartbeat hooks');
 
   hooks
     .command('install')
-    .description('Configure heartbeat hooks in settings.json')
+    .description('Configure heartbeat hooks for Claude Code and/or Pi')
     .option('--dry-run', 'Preview the proposed settings.json diff without writing')
-    .action((opts: { dryRun?: boolean }) => setupHooksCommand({ dryRun: opts.dryRun }));
+    .option('--harness <harness>', 'Target harness: claude-code, pi, or both')
+    .action((opts: { dryRun?: boolean; harness?: string }) => setupHooksCommand({
+      dryRun: opts.dryRun,
+      harness: parseHookHarness(opts.harness),
+    }));
+
+  hooks
+    .command('status')
+    .description('Show installed hook harness support')
+    .action(() => hooksStatusCommand());
 
   // pan admin tldr — TLDR daemon management
   admin

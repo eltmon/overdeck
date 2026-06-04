@@ -1,0 +1,39 @@
+import type { ReactNode } from 'react'
+import type { WorkspaceId, PaneSpec } from '../../../lib/panesStore'
+import styles from '../stage.module.css'
+
+export interface HomePaneProps {
+  workspaceId: WorkspaceId
+  /** Open + activate another pane (used by docks, launcher, timeline). */
+  openPane: (spec: PaneSpec) => void
+  // Section content slots — filled by later beads (workspace-header, launcher,
+  // agent-dock, action-dock, timeline, homepane-sections). Optional so the
+  // scaffold renders standalone until those beads land.
+  header?: ReactNode
+  launcher?: ReactNode
+  agentDock?: ReactNode
+  actionDock?: ReactNode
+  timeline?: ReactNode
+  detail?: ReactNode
+}
+
+/** Section render order — matches the pan-1549 mockup top-to-bottom. */
+const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'timeline', 'detail'] as const
+
+/**
+ * HomePane — the permanent paneType='home' body (PAN-1549). This bead lays out
+ * the section scaffold (WorkspaceHeader, Launcher, AgentDock, ActionDock,
+ * Timeline, detail) in a constrained content column. The sections themselves
+ * are populated by later beads; each renders into its named slot here.
+ */
+export function HomePane(props: HomePaneProps) {
+  return (
+    <div className={styles.home}>
+      {SECTIONS.map((name) => (
+        <section key={name} data-section={name} className={styles.homeSection}>
+          {props[name]}
+        </section>
+      ))}
+    </div>
+  )
+}

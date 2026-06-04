@@ -23,11 +23,14 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
+  type RoleEffort,
+  ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
+import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
+import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
 
 /**
  * Deprecation warning in API format
@@ -163,6 +166,11 @@ export interface ApiSettingsConfig {
     sidebar_refresh_interval_ms?: number;
     worker_concurrency?: number;
   };
+  /** Background AI feature toggles + low-cost master switch (PAN-1583). */
+  background_ai?: {
+    cheap_mode?: boolean;
+    features?: Partial<Record<BackgroundAiFeature, boolean>>;
+  };
   api_keys: {
     openai?: string;
     voyage?: string;
@@ -181,6 +189,11 @@ export interface ApiSettingsConfig {
     };
   };
   tts?: ApiTtsConfig;
+  /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
+  tts_summarizer?: {
+    model?: ModelId;
+    enabled?: boolean;
+  };
   openrouter?: {
     favorites?: string[];
   };
@@ -380,8 +393,8 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   }
 
   const effort = roleConfig.effort;
-  if (effort !== undefined && effort !== 'low' && effort !== 'medium' && effort !== 'high') {
-    errors.push(`${fieldPath}.effort must be low, medium, or high`);
+  if (effort !== undefined && !ROLE_EFFORTS.includes(effort as RoleEffort)) {
+    errors.push(`${fieldPath}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
   }
 
   const maxAgents = roleConfig.maxAgents;
@@ -393,6 +406,17 @@ function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknow
   if (scope !== undefined && scope !== 'pan-only' && scope !== 'all-tracked-projects') {
     errors.push(`${fieldPath}.scope must be pan-only or all-tracked-projects`);
   }
+}
+
+/** Resolve a role/sub-role model ref (possibly a workhorse: slot) to a concrete model id. */
+function resolveModelRefToId(ref: unknown, workhorses: WorkhorsesConfig): ModelId | undefined {
+  if (typeof ref !== 'string' || ref.length === 0 || ref === PARENT_MODEL_REF) return undefined;
+  if (isWorkhorseRef(ref)) {
+    const resolved = workhorses[workhorseSlotFromRef(ref) as WorkhorseSlot];
+    if (!resolved || isWorkhorseRef(resolved)) return undefined;
+    return resolveModelIdSync(resolved);
+  }
+  return resolveModelIdSync(ref);
 }
 
 function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
@@ -430,6 +454,21 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
 
         validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
         validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
+
+        // Model-aware effort: reject levels the role's resolved model doesn't accept.
+        const effort = rawRoleConfig.effort;
+        if (typeof effort === 'string' && ROLE_EFFORTS.includes(effort as RoleEffort)) {
+          const modelRef = rawRoleConfig.model ?? DEFAULT_ROLES[role]?.model;
+          const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
+          if (resolvedModel) {
+            const supported = getModelEffortLevelsSync(resolvedModel);
+            if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              errors.push(
+                `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+              );
+            }
+          }
+        }
 
         if (rawRoleConfig.sub !== undefined) {
           if (!isRecord(rawRoleConfig.sub)) {
@@ -540,6 +579,10 @@ export function loadSettingsApi(): ApiSettingsConfig {
       },
     },
     tts: toApiTtsConfig(config.tts),
+    tts_summarizer: {
+      model: config.ttsSummarizer?.model,
+      enabled: config.ttsSummarizer?.enabled,
+    },
     openrouter: {
       favorites: config.openrouterFavorites,
     },
@@ -559,6 +602,12 @@ export function loadSettingsApi(): ApiSettingsConfig {
       rollup_pending_threshold: memory.rollupPendingThreshold,
       sidebar_refresh_interval_ms: memory.sidebarRefreshIntervalMs,
       worker_concurrency: memory.workerConcurrency,
+    },
+    background_ai: {
+      // Defensive — older test mocks of loadConfig may not include `backgroundAi`;
+      // production loader always populates it via DEFAULT_CONFIG.
+      cheap_mode: config.backgroundAi?.cheapMode ?? true,
+      features: { ...defaultBackgroundAiFeatures(), ...config.backgroundAi?.features },
     },
     tracker_keys: config.trackerKeys,
     experimental: {
@@ -693,7 +742,12 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     agents: settings.agents?.rtk !== undefined
       ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
       : undefined,
-    tts: sanitizeApiTtsConfig(settings.tts),
+    tts: settings.tts_summarizer
+      ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
+          ...(settings.tts_summarizer.model ? { model: settings.tts_summarizer.model } : {}),
+          ...(settings.tts_summarizer.enabled !== undefined ? { enabled: settings.tts_summarizer.enabled } : {}),
+        } }
+      : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
@@ -714,6 +768,12 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
           rollup_pending_threshold: settings.memory.rollup_pending_threshold,
           sidebar_refresh_interval_ms: settings.memory.sidebar_refresh_interval_ms,
           worker_concurrency: settings.memory.worker_concurrency,
+        }
+      : undefined,
+    background_ai: settings.background_ai
+      ? {
+          cheap_mode: settings.background_ai.cheap_mode,
+          features: settings.background_ai.features,
         }
       : undefined,
     tracker_keys: settings.tracker_keys,
@@ -770,6 +830,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
       ...current.tts,
       ...sanitizeApiTtsConfig(updates.tts),
     },
+    tts_summarizer: {
+      ...current.tts_summarizer,
+      ...updates.tts_summarizer,
+    },
     openrouter: {
       ...current.openrouter,
       ...updates.openrouter,
@@ -785,6 +849,13 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     memory: {
       ...current.memory,
       ...updates.memory,
+    },
+    background_ai: {
+      cheap_mode: updates.background_ai?.cheap_mode ?? current.background_ai?.cheap_mode,
+      features: {
+        ...current.background_ai?.features,
+        ...updates.background_ai?.features,
+      },
     },
     tracker_keys: {
       ...current.tracker_keys,

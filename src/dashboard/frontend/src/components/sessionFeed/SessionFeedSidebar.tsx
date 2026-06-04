@@ -1,18 +1,41 @@
-import { History, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { History, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeedLabels';
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
+import { useDashboardStore, selectPendingInputSubjects, selectIssues } from '../../lib/store';
+import { describePendingInput } from '../../lib/pendingInput';
+import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
 export const SESSION_FEED_TAB_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarTab';
 
 interface SessionFeedSidebarProps {
-  onClose: () => void;
+  onClose?: () => void;
   onSelect?: (entry: SessionFeedEntry) => void;
   now?: Date;
+  /** PAN-1561: project-scoped mode — filter the feed to these issue ids. */
+  issueIds?: readonly string[];
+  /** PAN-1561: No-project mode — show only activity with no associated issue. */
+  unscoped?: boolean;
+  /** Heading text (defaults to "Activity Feed"). */
+  heading?: string;
+  /** Embedded as a deck column — fills its container, no close button. */
+  embedded?: boolean;
+  /**
+   * PAN-1591: merged Awareness rail. When provided, render a Needs-you / Project
+   * / Global scope switcher that replaces the two separate feeds (Project
+   * Activity + global Activity Feed) with one column. `projectIssueIds` scopes
+   * the Project view to the active project's issues.
+   */
+  scopeSwitcher?: boolean;
+  projectIssueIds?: readonly string[];
 }
+
+type FeedScope = 'needs' | 'project' | 'global';
+const FEED_SCOPE_STORAGE_KEY = 'panopticon.ui.awarenessScope';
 
 const TABS: Array<{ id: SessionFeedTab; label: string }> = [
   { id: 'all', label: 'All' },
@@ -34,56 +57,221 @@ const EMPTY_STATES: Record<SessionFeedTab, string> = {
 
 let loggedGitNavigationNoop = false;
 
-export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date() }: SessionFeedSidebarProps) {
+export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, now = new Date(), issueIds, unscoped, heading = 'Activity Feed', embedded = false, scopeSwitcher = false, projectIssueIds }: SessionFeedSidebarProps) {
   const [activeTab, setActiveTab] = useState<SessionFeedTab>(readStoredTab);
+  const [scope, setScope] = useState<FeedScope>(readStoredScope);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SESSION_FEED_TAB_STORAGE_KEY, activeTab);
   }, [activeTab]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(FEED_SCOPE_STORAGE_KEY, scope);
+  }, [scope]);
+
+  // Pending-input subjects drive the "Needs you" count badge on the scope switch.
+  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const needsCount = scopeSwitcher ? pendingSubjects.length : 0;
+
+  // Resolve the effective scope of the underlying feed. Without the switcher we
+  // honor the legacy issueIds/unscoped props verbatim (backward compatible).
+  const effIssueIds = scopeSwitcher ? (scope === 'project' ? projectIssueIds : undefined) : issueIds;
+  const effUnscoped = scopeSwitcher ? false : unscoped;
+  const showFeed = !scopeSwitcher || scope !== 'needs';
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-border bg-background" aria-label="Session activity feed">
+    <aside className={`flex h-full min-h-0 flex-col bg-background ${embedded ? 'w-full' : 'w-80 shrink-0 border-l border-border'}`} aria-label="Session activity feed">
       <header className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <History className="h-4 w-4" aria-hidden="true" />
-          Activity Feed
+          {heading}
         </div>
-        <button
-          type="button"
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          aria-label="Close activity feed"
-          onClick={onClose}
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Close activity feed"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
       </header>
 
-      <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id
-              ? 'rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
-              : 'rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {scopeSwitcher && (
+        <div role="tablist" aria-label="Awareness scope" className="grid grid-cols-3 gap-1 border-b border-border p-2">
+          {([
+            { id: 'needs', label: 'Needs you', badge: needsCount },
+            { id: 'project', label: 'Project', badge: 0 },
+            { id: 'global', label: 'Global', badge: 0 },
+          ] as const).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={scope === s.id}
+              className={scope === s.id
+                ? 'flex items-center justify-center gap-1.5 rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
+                : 'flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
+              onClick={() => setScope(s.id)}
+            >
+              {s.label}
+              {s.badge > 0 && (
+                <span className="rounded bg-amber-500/20 px-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{s.badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {isStubTab(activeTab) ? (
-          <StubTabEmptyState tab={activeTab} />
-        ) : (
-          <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} />
-        )}
-      </div>
+      <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} showEmpty={scopeSwitcher && scope === 'needs'} />
+
+      {showFeed && (
+        <>
+          <div role="tablist" aria-label="Session feed tabs" className="grid grid-cols-3 gap-1 border-b border-border p-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id
+                  ? 'rounded-md bg-accent px-2 py-1 text-xs font-medium text-foreground'
+                  : 'rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground'}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {isStubTab(activeTab) ? (
+              <StubTabEmptyState tab={activeTab} />
+            ) : (
+              <FeedTabContent tab={activeTab} onSelect={onSelect} now={now} issueIds={effIssueIds} unscoped={effUnscoped} />
+            )}
+          </div>
+        </>
+      )}
     </aside>
+  );
+}
+
+/**
+ * NeedsYouSection — pinned, always-visible list of every subject blocked
+ * waiting on the operator across ALL surfaces (AskUserQuestion, plan-mode,
+ * session-resume, and PermissionRequest), not just AskUserQuestions. The
+ * durable counterpart to the transient toast / desktop notification: even after
+ * a dialog is dismissed, the item stays reachable here until it is actually
+ * resolved. Clicking re-opens/focuses the subject (App.tsx routes AUQ to its
+ * dialog; other kinds focus the subject so its own responder — PlanCard /
+ * ChannelPermissionDialog — is reachable). Scoped to `issueIds` (Project
+ * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
+ */
+function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
+  const subjects = useDashboardStore(selectPendingInputSubjects);
+  const issues = useDashboardStore(selectIssues);
+  const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
+  // PAN-1563 — honor the same answered/dismissed state the dialog uses so an
+  // answered or dismissed item disappears from here too, not just the modal.
+  const answeredToolUseIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
+  const dismissedSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
+
+  // Resolve a friendly title per issue id so the entry reads like a human label
+  // (e.g. the issue title) rather than the raw id. PAN-1520.
+  const titleByIssueId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of issues as Array<{ id?: string; title?: string }>) {
+      if (i?.id && i.title) m.set(i.id, i.title);
+    }
+    return m;
+  }, [issues]);
+
+  const scoped = useMemo(() => {
+    if (unscoped || !issueIds || issueIds.length === 0) return subjects;
+    const wanted = new Set(issueIds.map((id) => id.toLowerCase()));
+    return subjects.filter((s) => s.issueId && wanted.has(s.issueId.toLowerCase()));
+  }, [subjects, issueIds, unscoped]);
+
+  // PAN-1563 — build the visible rows: drop answered/dismissed subjects, then
+  // collapse duplicates. Several agents on one issue (e.g. the review convoy:
+  // correctness/security/performance/requirements) each surface a subject that
+  // renders identically ("PAN-1190 · Waiting on your input"), so the operator
+  // saw the same card N times. A distinct AskUserQuestion has its own toolUseId
+  // and survives; otherwise we dedupe on the displayed label+detail so genuinely
+  // different prompts are kept but indistinguishable rows collapse to one.
+  const rows = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{
+      key: string;
+      agentId: string;
+      label: string;
+      detail: string;
+      count: number;
+      title: string;
+    }> = [];
+    for (const subject of scoped) {
+      const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
+      if (toolUseId && answeredToolUseIds.has(toolUseId)) continue;
+      if (dismissedSubjectIds.has(subject.agentId)) continue;
+      const q = subject.pendingAskUserQuestion;
+      const count = q?.questions?.length ?? 0;
+      const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
+      const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
+      const dedupKey = toolUseId ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push({ key: dedupKey, agentId: subject.agentId, label, detail, count, title: describePendingInput(subject.kinds) });
+    }
+    return out;
+  }, [scoped, answeredToolUseIds, dismissedSubjectIds, titleByIssueId]);
+
+  // Keep the section mounted while any raw subject exists so AnimatePresence can
+  // animate the last answered/dismissed card out before the box collapses.
+  // In the dedicated "Needs you" scope (showEmpty) we render a calm all-clear
+  // instead of collapsing, so the tab never looks broken when nothing is blocked.
+  if (scoped.length === 0) {
+    if (!showEmpty) return null;
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+        Nothing needs you right now.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-b border-amber-500/30 bg-amber-500/5 px-2 py-2">
+      <div className="mb-1 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+        <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+        Needs you
+      </div>
+      <div className="flex flex-col gap-1">
+        <AnimatePresence initial={false}>
+          {rows.map((row) => (
+            <motion.button
+              key={row.key}
+              layout
+              initial={{ opacity: 0, height: 0, y: -4 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              type="button"
+              onClick={() => requestReopen(row.agentId)}
+              className="flex w-full flex-col items-start gap-0.5 overflow-hidden rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+              title={row.title}
+            >
+              <span className="text-xs font-medium text-foreground">
+                {row.label}
+                {row.count > 1 ? ` · ${row.count} questions` : ''}
+              </span>
+              <span className="w-full truncate text-xs text-muted-foreground">{row.detail}</span>
+            </motion.button>
+          ))}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
 
@@ -91,13 +279,29 @@ type WiredSessionFeedTab = Exclude<SessionFeedTab, 'files' | 'comments'>;
 
 type StubSessionFeedTab = Extract<SessionFeedTab, 'files' | 'comments'>;
 
-function FeedTabContent({ tab, onSelect, now }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date }) {
+function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: WiredSessionFeedTab; onSelect: (entry: SessionFeedEntry) => void; now: Date; issueIds?: readonly string[]; unscoped?: boolean }) {
   const feed = useMergedFeed(tab);
-  const groups = useMemo(
-    () => groupByContiguousLabel(feed.entries, (entry) => formatBucketLabel(entry.timestamp, now)),
-    [feed.entries, now],
+  // PAN-1561 scoping: `unscoped` keeps only entries with no issue (the No-project
+  // bucket); otherwise `issueIds` keeps entries for those issues (case-insensitive).
+  const idSet = useMemo(
+    () => (issueIds ? new Set(issueIds.map((id) => id.toLowerCase())) : null),
+    [issueIds],
   );
-  const isEmpty = tab === 'all' ? feed.allEntries.length === 0 : feed.entries.length === 0;
+  const scope = useMemo(() => {
+    const keep = (e: SessionFeedEntry) =>
+      unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+    return {
+      entries: unscoped || idSet ? feed.entries.filter(keep) : feed.entries,
+      allEntries: unscoped || idSet ? feed.allEntries.filter(keep) : feed.allEntries,
+    };
+  }, [feed.entries, feed.allEntries, idSet, unscoped]);
+  const scopedEntries = scope.entries;
+  const scopedAll = scope.allEntries;
+  const groups = useMemo(
+    () => groupByContiguousLabel(scopedEntries, (entry) => formatBucketLabel(entry.timestamp, now)),
+    [scopedEntries, now],
+  );
+  const isEmpty = tab === 'all' ? scopedAll.length === 0 : scopedEntries.length === 0;
 
   if (feed.error) return <p className="text-xs text-destructive">{feed.error.message}</p>;
   if (feed.isLoading) return <p className="text-xs text-muted-foreground">Loading activity…</p>;
@@ -139,6 +343,12 @@ function readStoredTab(): SessionFeedTab {
   if (typeof window === 'undefined') return 'all';
   const value = window.localStorage.getItem(SESSION_FEED_TAB_STORAGE_KEY);
   return isSessionFeedTab(value) ? value : 'all';
+}
+
+function readStoredScope(): FeedScope {
+  if (typeof window === 'undefined') return 'project';
+  const value = window.localStorage.getItem(FEED_SCOPE_STORAGE_KEY);
+  return value === 'needs' || value === 'project' || value === 'global' ? value : 'project';
 }
 
 function isSessionFeedTab(value: string | null): value is SessionFeedTab {

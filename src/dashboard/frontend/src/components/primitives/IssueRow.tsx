@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
+import { trackerIssueUrl } from '../../lib/issueLinks';
 import PhaseGlyph, { type PhaseGlyphPhase } from './PhaseGlyph';
 
 export type IssueRowVariant = 'pipeline' | 'command-deck';
@@ -27,6 +28,9 @@ export type IssueRowAssignee = {
 
 export type IssueRowProps = {
   issueId: string;
+  /** Canonical tracker URL (e.g. the issue's Linear/GitHub `url`). When omitted,
+   *  a GitHub URL is derived from the issue id for known GitHub-tracked prefixes. */
+  trackerUrl?: string;
   phase: PhaseGlyphPhase;
   priority: IssueRowPriority;
   title: ReactNode;
@@ -44,8 +48,12 @@ export type IssueRowProps = {
 };
 
 const GRID_TEMPLATES = {
-  pipeline: '14px 78px 14px 1fr 220px 84px 30px',
-  'command-deck': '14px 78px 14px 1fr 220px 84px 26px',
+  // Title + agent columns are flexible (minmax) so the row fits narrow
+  // containers — e.g. the project cockpit pane (~470px) — instead of the fixed
+  // 220px agent forcing the title `1fr` to 0px and overlapping ("scramble").
+  // In wide containers (Pipeline/Kanban) they grow to roughly the old sizes.
+  pipeline: '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 30px',
+  'command-deck': '14px 78px 14px minmax(96px, 1.6fr) minmax(0, 220px) minmax(0, 84px) 26px',
 } satisfies Record<IssueRowVariant, string>;
 
 const ROW_CLASSES = {
@@ -84,6 +92,7 @@ function avatarInitials(name: string) {
 
 export default function IssueRow({
   issueId,
+  trackerUrl,
   phase,
   priority,
   title,
@@ -138,9 +147,26 @@ export default function IssueRow({
       }}
     >
       <span aria-hidden="true" />
-      <span className="truncate font-mono text-[11px] leading-none tracking-[0.02em] text-muted-foreground">
-        {issueId}
-      </span>
+      {(() => {
+        const href = trackerIssueUrl(issueId, trackerUrl);
+        const cls = 'truncate font-mono text-[11px] leading-none tracking-[0.02em] text-muted-foreground';
+        // PAN-1610: the issue id links straight to the full issue on its tracker.
+        // stopPropagation so it doesn't also trigger the row's in-dashboard open.
+        return href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Open ${issueId} on its tracker`}
+            onClick={(event) => event.stopPropagation()}
+            className={cn(cls, 'hover:text-foreground hover:underline')}
+          >
+            {issueId}
+          </a>
+        ) : (
+          <span className={cls}>{issueId}</span>
+        );
+      })()}
       <PhaseGlyph phase={phase} />
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-[8px]">

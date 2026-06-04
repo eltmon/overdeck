@@ -10,6 +10,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Folder, GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
 import { XTerminal } from './XTerminal';
 import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
@@ -24,6 +25,20 @@ async function fetchAgentConversation(agentId: string): Promise<Conversation | n
   const res = await fetch(`/api/conversations/${encodeURIComponent(agentId)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch conversation for ${agentId}`);
+  return res.json();
+}
+
+interface AgentGitInfo {
+  actualBranch: string | null;
+  branchDrifted: boolean;
+  workspaceMissing: boolean;
+  expectedBranch: string | null;
+  workspacePath?: string | null;
+}
+
+async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/git-info`);
+  if (!res.ok) return null;
   return res.json();
 }
 
@@ -106,6 +121,19 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     },
   });
 
+  // PAN-1523: work agents have no conversation row to enrich, so the panel
+  // queries a dedicated /api/agents/:id/git-info endpoint. Specialists fall
+  // back to the conversation row's branch/isWorktree fields (cwd-derived).
+  const { data: agentGitInfo } = useQuery({
+    queryKey: ['agent-git-info', agentId],
+    queryFn: () => fetchAgentGitInfo(agentId),
+    enabled: !!agentId && !specialist,
+    // The underlying git enricher caches for 30s and invalidates on HEAD
+    // mtime change. No need to poll harder than that from the client.
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
   // If the row hasn't appeared yet (brief race after spawn, or pre-fix
   // orchestrator agents that were spawned before this code shipped), fall
   // back to a presence signal that's stronger than `agent.status`: the
@@ -148,11 +176,82 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
       : `${specialist.projectKey} / ${specialist.type.replace('review-', 'review: ')}`
     : agentId;
 
+  // PAN-1523: derive branch/worktree state for the header chip.
+  //
+  // Two data paths:
+  //   - Specialist  → backed by the conversation row (cwd-derived branch +
+  //                   isWorktree from the conversation enricher).
+  //   - Work agent  → backed by /api/agents/:id/git-info because work agents
+  //                   don't have a public conversation row.
+  //
+  // The expected branch for both is feature/<lowercased-issue-id> — for a
+  // specialist we parse it out of the session name, for a work agent the
+  // git-info endpoint returns it.
+  const expectedAgentBranch = useMemo(() => {
+    if (agentGitInfo?.expectedBranch) return agentGitInfo.expectedBranch;
+    const expectedIssueId = specialist?.issueId ?? workAgentIssueId;
+    return expectedIssueId ? `feature/${expectedIssueId.toLowerCase()}` : null;
+  }, [agentGitInfo, specialist, workAgentIssueId]);
+
+  const actualAgentBranch = specialist
+    ? (realConversation?.branch ?? null)
+    : (agentGitInfo?.actualBranch ?? null);
+  const agentCwd = specialist
+    ? (realConversation?.cwd ?? null)
+    : (agentGitInfo?.workspacePath ?? null);
+  const isAgentWorktree = specialist
+    ? (realConversation?.isWorktree ?? false)
+    // Work-agent workspaces are always secondary worktrees of the project repo.
+    : Boolean(agentGitInfo?.actualBranch);
+  const agentBranchDrifted = specialist
+    ? Boolean(
+        expectedAgentBranch && actualAgentBranch && expectedAgentBranch !== actualAgentBranch,
+      )
+    : Boolean(agentGitInfo?.branchDrifted);
+  const agentWorkspaceMissing = specialist
+    ? Boolean(
+        realConversation && realConversation.cwd && !actualAgentBranch && expectedAgentBranch !== null,
+      )
+    : Boolean(agentGitInfo?.workspaceMissing);
+
   return (
     <div className="bg-card rounded-lg h-full flex flex-col">
       {/* Header */}
       <div className="px-4 py-2 border-b border-border flex items-center gap-2 flex-shrink-0">
         <span className="font-medium text-foreground text-sm flex-1 truncate">{label}</span>
+        {(actualAgentBranch || agentWorkspaceMissing) && (
+          <span
+            className={`${styles.terminalBranchBar} ${
+              agentWorkspaceMissing
+                ? styles.terminalBranchBarMissing
+                : agentBranchDrifted
+                  ? styles.terminalBranchBarDrift
+                  : ''
+            }`}
+            title={
+              agentWorkspaceMissing
+                ? `Workspace missing on disk: ${agentCwd ?? '(unknown path)'}`
+                : agentBranchDrifted
+                  ? `Expected ${expectedAgentBranch}, on ${actualAgentBranch} · ${agentCwd ?? ''}`
+                  : `${isAgentWorktree ? 'Worktree' : 'Local'} · ${agentCwd ?? ''}`
+            }
+          >
+            {agentWorkspaceMissing ? (
+              <>
+                <AlertCircle size={12} />
+                <span className={styles.terminalBranchBarMode}>Worktree missing</span>
+              </>
+            ) : (
+              <>
+                {agentBranchDrifted ? <TriangleAlert size={12} /> : isAgentWorktree ? <GitFork size={12} /> : <Folder size={12} />}
+                <span className={styles.terminalBranchBarMode}>
+                  {agentBranchDrifted ? 'Drifted' : isAgentWorktree ? 'Worktree' : 'Local'}
+                </span>
+                <span className={styles.terminalBranchBarText}>{actualAgentBranch}</span>
+              </>
+            )}
+          </span>
+        )}
         <div className={styles.viewToggle}>
           <button
             className={`${styles.viewToggleBtn} ${viewMode === 'activity' ? styles.viewToggleBtnActive : ''}`}

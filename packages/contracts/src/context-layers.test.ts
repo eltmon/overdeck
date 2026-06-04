@@ -65,9 +65,32 @@ describe("context dashboard contracts", () => {
           editable: true,
         },
       ],
+      targets: [
+        {
+          harness: "claude-code",
+          layerKind: "global",
+          label: "Claude Code · global",
+          path: "/home/user/.claude/CLAUDE.md",
+          exists: true,
+          hasManagedRegion: true,
+          hasUserContent: true,
+        },
+        {
+          harness: "pi",
+          layerKind: "project",
+          projectKey: "panopticon-cli",
+          label: "panopticon-cli · AGENTS.md",
+          path: "/repo/panopticon-cli/AGENTS.md",
+          exists: false,
+          hasManagedRegion: false,
+          hasUserContent: false,
+        },
+      ],
     })
 
     expect(parsed.layers.map((layer) => layer.kind)).toEqual(["global", "project", "workspace"])
+    expect(parsed.targets.map((target) => target.harness)).toEqual(["claude-code", "pi"])
+    expect(parsed.targets[0].hasUserContent).toBe(true)
   })
 
   it("names harness previews with shared harness values and fullPrompt", () => {

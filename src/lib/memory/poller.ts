@@ -200,6 +200,7 @@ export class TranscriptPoller {
       fromOffset,
       toOffset: fileStat.size,
       identity: entry.identity,
+      harness: entry.harness,
       trigger: 'poller',
     });
     const durableOffset = isSuccessfulExtractionResult(extractionResult) ? fileStat.size : fromOffset;

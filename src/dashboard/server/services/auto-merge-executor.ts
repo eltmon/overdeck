@@ -5,6 +5,7 @@ import {
   markBlocked,
   markFailed,
   markMerged,
+  requeueToPending,
   transitionToMerging,
   type PendingAutoMerge,
 } from '../../../lib/database/pending-auto-merges-db.js';
@@ -29,10 +30,13 @@ export interface AutoMergeExecutorDeps {
   markBlocked?: (id: number, reason: string) => boolean;
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
+  requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
   mergeIssue?: (issueId: string) => Promise<MergeResult>;
   announceFailure?: (issueId: string, reason: string) => void;
   log?: (message: string) => void;
 }
+
+const REQUEUE_BACKOFF_MS = 60_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
@@ -104,7 +108,18 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         if (result.mergeStatus === 'merged') {
           (deps.markMerged ?? markMerged)(entry.id);
         } else {
-          log(`[auto-merge] merge accepted for ${entry.issueId} with non-terminal status ${result.mergeStatus ?? 'unknown'}`);
+          // Reviewer P1: triggerMerge() returns success=true with mergeStatus='queued'
+          // when another merge is already in progress. The row was just transitioned
+          // to 'merging'; without recovery it stays there forever (cancel breaks, no
+          // completion record). Revert to 'pending' with a short backoff so the next
+          // tick re-evaluates eligibility and retries.
+          const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
+          const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);
+          if (requeued) {
+            log(`[auto-merge] merge for ${entry.issueId} accepted as ${result.mergeStatus ?? 'queued'}; requeued for ${retryAt}`);
+          } else {
+            log(`[auto-merge] failed to requeue ${entry.issueId} (#${entry.id}) after non-terminal status ${result.mergeStatus ?? 'queued'}`);
+          }
         }
         continue;
       }

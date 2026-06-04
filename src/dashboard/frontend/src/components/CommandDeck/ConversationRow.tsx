@@ -1,13 +1,30 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, ExternalLink, Share2, MoreVertical } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { describePendingInput } from '../../lib/pendingInput';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import styles from './styles/command-deck.module.css';
+
+/** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
+/** Trim model IDs to a readable label, e.g. "claude-opus-4-8" → "opus-4-8". */
+function shortModel(model: string): string {
+  return model
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '')
+    .replace(/-latest$/, '');
+}
 
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
 
@@ -72,9 +89,37 @@ export function ConversationRow({
   const editInputRef = useRef<HTMLInputElement>(null);
   const draftTitleRef = useRef('');
   const committingRef = useRef(false);
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuBtnRef = useRef<HTMLSpanElement>(null);
   const confirm = useConfirm();
   const now = useNow(60_000);
+
+  const openMenu = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    const rect = menuBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      // Right-align the menu under the trigger; clamp to the viewport.
+      setMenuPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - 220) });
+    }
+    setMenuOpen(true);
+  }, []);
+
+  // Close the menu on Escape, scroll, or resize — a portaled menu can't track
+  // its trigger once the list scrolls, so dismiss rather than float orphaned.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismiss = () => setMenuOpen(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [menuOpen]);
 
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
   const isAwaitingPermission = useDashboardStore((s) => s.conversationsAwaitingPermissionByName?.[conv.name] ?? false);
@@ -84,8 +129,7 @@ export function ConversationRow({
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
 
-  const startEditing = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const beginRename = useCallback(() => {
     committingRef.current = false;
     const initial = conv.title ?? conv.name;
     draftTitleRef.current = initial;
@@ -132,30 +176,70 @@ export function ConversationRow({
     }
   }, [conv.handoffTargetConvId]);
 
-  const handleArchiveClick = useCallback(async (e: React.MouseEvent | React.KeyboardEvent) => {
-    e.stopPropagation();
-    if (conv.isFavorited) {
-      const ok = await confirm({
-        title: 'Archive favorited conversation',
-        message: `"${conv.title ?? conv.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
-        confirmLabel: 'Archive',
-        cancelLabel: 'Cancel',
-        variant: 'destructive',
-      });
-      if (ok) mutations.archive(conv.name);
-    } else {
-      setConfirmArchive(true);
-    }
+  const handleArchiveClick = useCallback(async () => {
+    const ok = await confirm({
+      title: conv.isFavorited ? 'Archive favorited conversation' : 'Archive conversation',
+      message: conv.isFavorited
+        ? `"${conv.title ?? conv.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`
+        : `Archive "${conv.title ?? conv.name}"? This ends the session and moves it to the archive.`,
+      confirmLabel: 'Archive',
+      cancelLabel: 'Cancel',
+      variant: 'destructive',
+    });
+    if (ok) mutations.archive(conv.name);
   }, [conv.isFavorited, conv.title, conv.name, confirm, mutations]);
 
   const itemClass = isNested
     ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''}`
     : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''}`;
 
+  // Fork / spawn status badges — shared by both row variants.
+  const forkBadges = (
+    <>
+      {conv.forkStatus && conv.forkStatus !== 'failed' && (
+        <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
+          <Loader2 size={10} className={styles.conversationWorkingSpinner} />
+          <span>{conv.forkStatus === 'summarizing' ? 'Summarizing...' : conv.forkStatus === 'spawning' ? 'Spawning...' : 'Injecting...'}</span>
+        </span>
+      )}
+      {conv.forkStatus === 'failed' && (
+        <span className={styles.conversationForkFailed} title={conv.forkError || 'Fork failed'}>
+          <AlertCircle size={10} />
+          <span>Failed</span>
+        </span>
+      )}
+      {conv.spawnError && (
+        <span className={styles.conversationForkFailed} title={conv.spawnError}>
+          <AlertCircle size={10} />
+          <span>Spawn failed</span>
+        </span>
+      )}
+      {conv.forkFallbackReason && !conv.forkStatus && (
+        <span
+          className={styles.conversationForkFailed}
+          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.panopticon/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+        >
+          <TriangleAlert size={10} />
+          <span>Fallback: {conv.forkFallbackReason}</span>
+        </span>
+      )}
+    </>
+  );
+
   return (
+    <>
     <button
       className={itemClass}
       onClick={() => onSelect(conv.name)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMenuPos({
+          top: Math.min(e.clientY, window.innerHeight - 320),
+          left: Math.min(e.clientX, window.innerWidth - 230),
+        });
+        setMenuOpen(true);
+      }}
       title={conv.name}
     >
       {/* Stop button */}
@@ -198,6 +282,17 @@ export function ConversationRow({
             aria-label={`Waiting for permission in ${conv.name}`}
           />
         </span>
+      ) : (conv.pendingInputCount ?? 0) > 0 ? (
+        // PAN-1520 — conv has an open AskUserQuestion/plan-mode/etc. Show the
+        // same triangle-alert affordance as the permission case so operators
+        // can spot the row from a distance.
+        <span title={describePendingInput(conv.pendingInputKinds)} style={{ display: 'contents' }}>
+          <TriangleAlert
+            size={spinnerSize}
+            className={styles.conversationPermissionAlert}
+            aria-label={`Conversation ${conv.name} is awaiting input`}
+          />
+        </span>
       ) : conv.isWorking ? (
         <WorkingSpinner
           size={spinnerSize}
@@ -215,7 +310,7 @@ export function ConversationRow({
         />
       )}
 
-      {/* Title / inline editor */}
+      {/* Title + metadata */}
       {editingName ? (
         <input
           ref={editInputRef}
@@ -231,145 +326,86 @@ export function ConversationRow({
           onBlur={() => commitRename()}
           aria-label={`Rename ${conv.name}`}
         />
+      ) : isNested ? (
+        // Nested project-tree rows stay single-line and ultra-compact.
+        <>
+          <span className={`${styles.projectConvLabel} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          {conv.branch && (
+            <span
+              className={styles.conversationBranchChip}
+              title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+              aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+            >
+              {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+              <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+            </span>
+          )}
+          {forkBadges}
+        </>
       ) : (
-        <span className={isNested ? styles.projectConvLabel : styles.conversationName}>
-          {conv.title ?? conv.name}
+        // Flat list rows: title on line 1, muted metadata on line 2.
+        <span className={styles.conversationMain}>
+          <span className={`${styles.conversationName} ${mutations.isRetitlePending(conv.name) ? styles.titleRegenerating : ''}`}>{conv.title ?? conv.name}</span>
+          <span className={styles.conversationMetaLine}>
+            {conv.branch && (
+              <span
+                className={styles.conversationBranchChip}
+                title={`${conv.isWorktree ? 'Worktree' : 'Local'} · ${conv.branch} · ${conv.cwd}`}
+                aria-label={`Branch ${conv.branch} (${conv.isWorktree ? 'worktree' : 'local'})`}
+              >
+                {conv.isWorktree ? <GitFork size={10} /> : <GitBranch size={10} />}
+                <span className={styles.conversationBranchChipText}>{conv.branch}</span>
+              </span>
+            )}
+            {conv.lastAttachedAt && (
+              <>
+                {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
+                <time
+                  dateTime={conv.lastAttachedAt}
+                  title={new Date(conv.lastAttachedAt).toLocaleString()}
+                >
+                  {formatRelativeTime(conv.lastAttachedAt, now)}
+                </time>
+              </>
+            )}
+            {conv.totalCost !== undefined && conv.totalCost > 0 && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title="Total cost (cache-discount aware)">{conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}</span>
+              </>
+            )}
+            {conv.totalTokens !== undefined && conv.totalTokens > 0 && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
+              </>
+            )}
+            {conv.model && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
+              </>
+            )}
+            {forkBadges}
+          </span>
         </span>
       )}
 
-      {/* Fork status badges */}
-      {conv.forkStatus && conv.forkStatus !== 'failed' && (
-        <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
-          <Loader2 size={10} className={styles.conversationWorkingSpinner} />
-          <span>{conv.forkStatus === 'summarizing' ? 'Summarizing...' : conv.forkStatus === 'spawning' ? 'Spawning...' : 'Injecting...'}</span>
-        </span>
-      )}
-      {conv.forkStatus === 'failed' && (
-        <span className={styles.conversationForkFailed} title={conv.forkError || 'Fork failed'}>
-          <AlertCircle size={10} />
-          <span>Failed</span>
-        </span>
-      )}
-      {conv.spawnError && (
-        <span className={styles.conversationForkFailed} title={conv.spawnError}>
-          <AlertCircle size={10} />
-          <span>Spawn failed</span>
-        </span>
-      )}
-
-      {/* Timestamp */}
-      {conv.lastAttachedAt && (
-        <time
-          className={styles.conversationTime}
-          dateTime={conv.lastAttachedAt}
-          title={new Date(conv.lastAttachedAt).toLocaleString()}
-          aria-label={`Last accessed ${formatRelativeTime(conv.lastAttachedAt, now)}`}
-        >
-          {formatRelativeTime(conv.lastAttachedAt, now)}
-        </time>
-      )}
-
-      {/* Cost */}
-      {conv.totalCost !== undefined && conv.totalCost > 0 && (
-        <span className={styles.featureCost}>
-          {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
-        </span>
-      )}
-
-      {/* Action group — collapses when row is not hovered */}
-      <span className={styles.conversationActions}>
+      {/* Overflow actions (⋮) — replaces the inline icon swarm */}
+      {!editingName && (
         <span
+          ref={menuBtnRef}
           role="button"
           tabIndex={0}
-          className={styles.conversationEditBtn}
-          onClick={startEditing}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') startEditing(e as unknown as React.MouseEvent); }}
-          title="Rename conversation"
-          aria-label={`Rename ${conv.name}`}
+          className={styles.conversationKebabBtn}
+          onClick={openMenu}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openMenu(e); }}
+          title="More actions"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={`More actions for ${conv.title ?? conv.name}`}
         >
-          <Pencil size={iconSize} />
-        </span>
-        {conv.handoffDocPath && (
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationSummaryForkBtn}
-            onClick={openHandoffDoc}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openHandoffDoc(e); }}
-            title="Handoff doc"
-            aria-label={`Open handoff doc for ${conv.title ?? conv.name}`}
-          >
-            <FileText size={iconSize} />
-          </span>
-        )}
-        {conv.handoffTargetConvId && (
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationSummaryForkBtn}
-            onClick={openHandoffTarget}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') openHandoffTarget(e); }}
-            title="Open handoff target"
-            aria-label={`Open handoff target for ${conv.title ?? conv.name}`}
-          >
-            <ExternalLink size={iconSize} />
-          </span>
-        )}
-        {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && (
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationSummaryForkBtn}
-            onClick={e => { e.stopPropagation(); mutations.openForkModal(conv); }}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); mutations.openForkModal(conv); } }}
-            title="Create summary fork"
-            aria-label={`Create summary fork of ${conv.title ?? conv.name}`}
-          >
-            <GitBranchPlus size={iconSize} />
-          </span>
-        )}
-        {!confirmArchive && (
-          <span
-            role="button"
-            tabIndex={0}
-            className={styles.conversationArchiveBtn}
-            onClick={handleArchiveClick}
-            onKeyDown={async (e) => { if (e.key === 'Enter' || e.key === ' ') await handleArchiveClick(e); }}
-            title="Archive conversation"
-            aria-label={`Archive ${conv.name}`}
-          >
-            <Archive size={iconSize} />
-          </span>
-        )}
-        <span
-          role="button"
-          tabIndex={0}
-          className={styles.conversationCopyBtn}
-          onClick={handleCopyLink}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleCopyLink(e as unknown as React.MouseEvent); } }}
-          title="Copy link to conversation"
-          aria-label={`Copy link to ${conv.name}`}
-        >
-          {copiedId ? <Check size={iconSize} /> : <Copy size={iconSize} />}
-        </span>
-      </span>
-
-      {/* Inline archive confirm */}
-      {confirmArchive && (
-        <span className={styles.archiveConfirmInline} onClick={e => e.stopPropagation()}>
-          <span className={styles.archiveConfirmLabelInline}>Archive?</span>
-          <button
-            className={styles.archiveConfirmYesInline}
-            onClick={e => { e.stopPropagation(); setConfirmArchive(false); mutations.archive(conv.name); }}
-          >
-            Yes
-          </button>
-          <button
-            className={styles.archiveConfirmNoInline}
-            onClick={e => { e.stopPropagation(); setConfirmArchive(false); }}
-          >
-            No
-          </button>
+          <MoreVertical size={iconSize} />
         </span>
       )}
 
@@ -395,5 +431,98 @@ export function ConversationRow({
         <Star size={iconSize} style={{ fill: conv.isFavorited ? 'currentColor' : 'none' }} />
       </span>
     </button>
+
+    {/* Overflow menu — portaled to body so it isn't nested inside the row
+        button and doesn't clip against the scrolling conversation list. */}
+    {menuOpen && menuPos && createPortal(
+      <>
+        <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
+        <div
+          role="menu"
+          className={styles.headerMenu}
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
+        >
+          <button
+            role="menuitem"
+            className={styles.headerMenuItem}
+            onClick={() => { beginRename(); setMenuOpen(false); }}
+          >
+            <Pencil size={14} />
+            Rename
+          </button>
+          <button
+            role="menuitem"
+            className={styles.headerMenuItem}
+            onClick={() => { mutations.retitle(conv.name); setMenuOpen(false); }}
+            disabled={mutations.isRetitlePending(conv.name)}
+          >
+            {mutations.isRetitlePending(conv.name)
+              ? <Loader2 size={14} className={styles.conversationWorkingSpinner} />
+              : <Sparkles size={14} />}
+            Regenerate title
+          </button>
+          {conv.claudeSessionId && !conv.forkStatus && (
+            <button
+              role="menuitem"
+              className={styles.headerMenuItem}
+              onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}
+            >
+              <Share2 size={14} />
+              Hand off to new conversation
+            </button>
+          )}
+          {conv.claudeSessionId && !conv.forkStatus && (
+            <button
+              role="menuitem"
+              className={styles.headerMenuItem}
+              onClick={() => { mutations.openForkModal(conv); setMenuOpen(false); }}
+            >
+              <GitBranchPlus size={14} />
+              Create summary fork
+            </button>
+          )}
+          {conv.handoffDocPath && (
+            <button
+              role="menuitem"
+              className={styles.headerMenuItem}
+              onClick={(e) => { openHandoffDoc(e); setMenuOpen(false); }}
+            >
+              <FileText size={14} />
+              Open handoff doc
+            </button>
+          )}
+          {conv.handoffTargetConvId && (
+            <button
+              role="menuitem"
+              className={styles.headerMenuItem}
+              onClick={(e) => { openHandoffTarget(e); setMenuOpen(false); }}
+            >
+              <ExternalLink size={14} />
+              Open handoff target
+            </button>
+          )}
+          <div className={styles.headerMenuDivider} />
+          <button
+            role="menuitem"
+            className={styles.headerMenuItem}
+            onClick={(e) => { handleCopyLink(e); setMenuOpen(false); }}
+          >
+            {copiedId ? <Check size={14} /> : <Copy size={14} />}
+            Copy link
+          </button>
+          <div className={styles.headerMenuDivider} />
+          <button
+            role="menuitem"
+            className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+            onClick={() => { setMenuOpen(false); void handleArchiveClick(); }}
+          >
+            <Archive size={14} />
+            Archive
+          </button>
+        </div>
+      </>,
+      document.body,
+    )}
+    </>
   );
 }

@@ -306,7 +306,9 @@ describe('flywheel CLI commands', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('SWARM items: 2/3'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PRs merged: 4'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Awaiting UAT: 5'));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 1/8'));
+    // PAN-1528: agentsActive is now overlaid with the live work-agent count
+    // from disk. The test panopticonHome has no agents, so the count is 0.
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 0/8'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('RAM: 1024 MiB used / 4096 MiB total'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Last tick: 2026-05-18T12:00:00.000Z'));
     expect(process.exitCode).toBeUndefined();
@@ -319,7 +321,11 @@ describe('flywheel CLI commands', () => {
     await flywheelStatusCommand({ json: true });
 
     const output = logSpy.mock.calls[0][0] as string;
-    expect(JSON.parse(output)).toEqual(validStatus);
+    // PAN-1528: agentsActive overlaid with live count (0 in test home).
+    expect(JSON.parse(output)).toEqual({
+      ...validStatus,
+      system: { ...validStatus.system, agentsActive: 0 },
+    });
   });
 
   it('prints a seven-row stats table with the default 30-day window', async () => {

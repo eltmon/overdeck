@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Command Deck · Stage interaction options (A vs B)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f; --kimi:#7c3aed;
+    --running:#16a34a; --thinking:#9333ea; --waiting:#d97706; --idle:#9ca3af; --failed:#dc2626; --done:#16a34a;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.5;padding:28px 22px 70px;}
+  .page{max-width:1240px;margin:0 auto;}
+  h1{font-size:21px;margin:0 0 4px;} h2{font-size:16px;margin:26px 0 6px;}
+  .opt-h{display:flex;align-items:center;gap:10px;margin:28px 0 8px;}
+  .badge{font-size:11px;font-weight:800;color:#fff;background:var(--primary);border-radius:6px;padding:3px 9px;}
+  .badge.b{background:#0ea5e9;}
+  .sub{color:var(--muted);margin:0 0 8px;font-size:13px;} code{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:9px 13px;margin:8px 0;font-size:12.5px;}
+
+  .shell{display:flex;height:470px;border:1px solid var(--border-strong);border-radius:11px;overflow:hidden;background:var(--background);box-shadow:0 5px 22px rgba(0,0,0,.09);}
+  /* outer sidebar (slim) */
+  .osb{width:54px;flex:0 0 54px;background:#0c1018;color:#cbd5e1;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:9px;font-size:8px;}
+  .osb .ic{width:30px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9aa6b2;}
+  .osb .ic.on{background:rgba(79,70,229,.35);color:#fff;}
+  .osb .sep{width:24px;height:1px;background:#26303f;margin:2px 0;}
+  .osb .lab{font-size:7px;color:#5b6675;text-transform:uppercase;letter-spacing:.04em;}
+  /* rail */
+  .rail{width:218px;flex:0 0 218px;background:var(--surface);border-right:1px solid var(--border);overflow:auto;font-size:12px;}
+  .rail-h{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;padding:9px 11px 5px;display:flex;justify-content:space-between;}
+  .ritem{display:flex;align-items:center;gap:7px;padding:4px 11px;color:var(--foreground);}
+  .ritem.conv{color:var(--muted);} .ritem.sel{background:var(--primary-tint);color:var(--primary);font-weight:700;}
+  .ritem.sub{padding-left:26px;color:var(--muted);} .ritem.iss{font-weight:600;}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;} .dot.run{background:var(--running);} .dot.err{background:var(--failed);} .dot.stop{background:#cbd5e1;} .dot.wait{background:var(--waiting);} .dot.think{background:var(--thinking);}
+  .ic{font-size:11px;width:13px;text-align:center;color:var(--muted);}
+  .st{margin-left:auto;font-size:9px;font-weight:600;text-transform:uppercase;}
+  /* stage */
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .panebar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:5px 7px 0;height:36px;flex:0 0 36px;}
+  .ptab{display:flex;align-items:center;gap:6px;padding:0 10px;height:31px;font-size:11.5px;color:var(--muted);border:1px solid transparent;border-radius:7px 7px 0 0;white-space:nowrap;}
+  .ptab.on{background:var(--background);color:var(--foreground);font-weight:700;border-color:var(--border);position:relative;top:1px;}
+  .ptab .kbd{font-size:8.5px;color:#9ca3af;border:1px solid var(--border);border-radius:3px;padding:0 3px;} .ptab .x{color:#bbb;font-size:12px;}
+  .padd{display:flex;align-items:center;justify-content:center;width:24px;height:31px;color:#9ca3af;font-size:15px;}
+  .sbody{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+
+  /* status band (cockpit header) */
+  .band{padding:9px 13px;border-bottom:1px solid var(--border);background:#fff;}
+  .b1{display:flex;align-items:center;gap:9px;}
+  .b1 .id{font-weight:700;font-size:14px;} .b1 .ti{color:var(--muted);font-size:12px;}
+  .phase{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--waiting);background:rgba(217,119,6,.12);border-radius:5px;padding:1px 7px;}
+  .cost{margin-left:auto;text-align:right;} .cost .v{font-weight:700;font-size:14px;} .cost .l{font-size:8.5px;text-transform:uppercase;color:#9ca3af;}
+  .b2{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap;font-size:10.5px;}
+  .pchip{display:inline-flex;align-items:center;gap:4px;color:var(--muted);}
+  .gate{display:inline-flex;align-items:center;gap:3px;font-size:10px;}
+  .gi{width:11px;height:11px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:7px;color:#fff;}
+  .pr{font-family:"SF Mono",monospace;font-size:10px;} .add{color:var(--running);} .del{color:var(--failed);}
+  .acts{display:flex;gap:6px;margin-top:8px;}
+  .act{font-size:10.5px;font-weight:600;color:#fff;background:var(--primary);border-radius:6px;padding:4px 9px;} .act.sec{color:var(--foreground);background:#fff;border:1px solid var(--border-strong);} .act.dis{color:#9ca3af;background:#fff;border:1px solid var(--border);} .act.gh{color:var(--muted);background:#fff;border:1px dashed var(--border-strong);}
+
+  /* thin issue-context strip (option B agent tab) */
+  .ctxstrip{display:flex;align-items:center;gap:8px;padding:6px 13px;background:var(--primary-tint);border-bottom:1px solid var(--border);font-size:11px;}
+  .ctxstrip .back{color:var(--primary);font-weight:600;}
+
+  /* conversation body */
+  .cvh{display:flex;align-items:center;gap:8px;padding:7px 13px;border-bottom:1px solid var(--border);}
+  .rb{font-size:9.5px;font-weight:700;text-transform:uppercase;color:#fff;border-radius:5px;padding:2px 7px;}
+  .vt{margin-left:auto;display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .vt b{font-size:10px;color:var(--muted);padding:3px 8px;background:#fff;} .vt b.on{color:var(--primary);background:var(--primary-tint);}
+  .cv{flex:1;overflow:auto;padding:11px 13px;}
+  .turn{display:flex;gap:8px;margin-bottom:11px;}
+  .av{width:20px;height:20px;border-radius:5px;flex:0 0 20px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;}
+  .who{font-size:9.5px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;} .txt{font-size:12px;}
+  .find{border:1px solid var(--failed);background:rgba(220,38,38,.06);border-radius:6px;padding:6px 8px;margin-top:4px;font-size:11px;} .find .h{font-size:9px;font-weight:700;color:var(--failed);text-transform:uppercase;}
+  .composer{border-top:1px solid var(--border);background:var(--surface);padding:7px 13px;} .cbox{border:1.4px solid var(--primary-border);border-radius:9px;background:#fff;padding:6px 10px;color:#9ca3af;font-size:12px;}
+  /* overview body (issue-clicked, option) */
+  .ov{flex:1;overflow:auto;padding:12px 14px;} .ovcard{border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;background:#fff;font-size:12px;} .ovcard .l{font-size:9px;text-transform:uppercase;color:#9ca3af;margin-bottom:4px;}
+  /* right project activity (slim) */
+  .ract{width:150px;flex:0 0 150px;border-left:1px solid var(--border);background:var(--surface);padding:9px;font-size:10.5px;color:var(--muted);}
+  .ract .h{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:7px;}
+  .ract .ev{padding:5px 0;border-bottom:1px solid var(--border);} .scoped{color:var(--primary);font-weight:700;}
+
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:8px;background:#fff;border-radius:8px;overflow:hidden;} th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--border);vertical-align:top;} th{background:var(--surface-2);font-size:10.5px;text-transform:uppercase;color:var(--muted);} tr:last-child td{border-bottom:none;}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Stage interaction — two options, in your real 4-column shell</h1>
+  <p class="sub">Left rail + outer sidebar are <b>unchanged</b> (they already exist). The only difference is what the
+  <b>Stage</b> does when you click an issue/agent in the tree. Same scenario in both: PAN-1242 selected, then its
+  <b>Security reviewer</b> picked.</p>
+
+  <!-- ============ OPTION A ============ -->
+  <div class="opt-h"><span class="badge">OPTION A</span><h2 style="margin:0;border:0">One issue tab — body follows the rail</h2></div>
+  <p class="sub">Clicking the issue opens <b>one</b> tab (<code>PAN-1242</code>). The status band stays pinned; the body
+  below it swaps as you click agents in the tree. Double-click an agent to pop it out as its own tab.</p>
+  <div class="shell">
+    <div class="osb"><div class="ic">⌂</div><div class="ic">✦</div><div class="sep"></div><div class="lab">proj</div><div class="ic on">P</div><div class="ic">m</div><div class="sep"></div><div class="lab">lens</div><div class="ic">▦</div><div class="ic">⌗</div><div class="ic">🤖</div><div class="ic">⊟</div></div>
+    <div class="rail">
+      <div class="rail-h">Conversations <span>35</span></div>
+      <div class="ritem conv"><span class="dot run"></span> Claude Code</div>
+      <div class="ritem conv"><span class="dot stop"></span> Codex</div>
+      <div class="rail-h">Issues <span>6</span></div>
+      <div class="ritem iss"><span class="ic">▾</span><span class="dot wait"></span> PAN-1242 <span class="st" style="color:var(--waiting)">review</span></div>
+      <div class="ritem sub"><span class="ic">⌨</span> Work <span class="st stop" style="color:#cbd5e1">stopped</span></div>
+      <div class="ritem sub"><span class="ic">⊕</span> Review <span class="st" style="color:var(--failed)">error</span></div>
+      <div class="ritem sub sel" style="padding-left:38px"><span class="ic">⛉</span> Security <span class="st" style="color:var(--failed)">2 find</span></div>
+      <div class="ritem sub" style="padding-left:38px"><span class="ic">✓</span> Correctness <span class="st" style="color:var(--done)">ok</span></div>
+      <div class="ritem sub" style="padding-left:38px"><span class="ic">◷</span> Performance <span class="st" style="color:var(--thinking)">run</span></div>
+      <div class="ritem sub"><span class="ic">⏏</span> Ship</div>
+      <div class="ritem iss" style="margin-top:4px"><span class="ic">▸</span><span class="dot run"></span> PAN-1395</div>
+    </div>
+    <div class="stage">
+      <div class="panebar">
+        <div class="ptab"><span style="color:#0d9488">⌂</span> Home <span class="kbd">⌘1</span></div>
+        <div class="ptab on"><span class="dot wait"></span> PAN-1242 <span class="kbd">⌘2</span> <span class="x">×</span></div>
+        <div class="padd">+</div>
+      </div>
+      <div class="sbody">
+        <!-- status band -->
+        <div class="band">
+          <div class="b1"><span class="id">PAN-1242</span><span class="ti">Board view follow-up — footer button</span><span class="phase">◐ Review</span>
+            <span class="cost"><div class="v">$4.20</div><div class="l">review $2.8 · work $1.0</div></span></div>
+          <div class="b2"><span class="pchip">▸▸▸◐○○</span>
+            <span class="gate"><span class="gi" style="background:var(--done)">✓</span>type</span><span class="gate"><span class="gi" style="background:var(--done)">✓</span>lint</span><span class="gate"><span class="gi" style="background:var(--failed)">✗</span>test</span><span class="gate"><span class="gi" style="background:var(--idle)">○</span>uat</span>
+            <span class="pr">· PR #1430 <span class="add">+312</span>/<span class="del">−47</span> changes-req</span></div>
+          <div class="acts"><span class="act">▸ Review &amp; Test</span><span class="act sec">✎ Tell</span><span class="act dis">⌦ Merge</span><span class="act gh">⋮</span></div>
+        </div>
+        <!-- conversation (body = selected agent) -->
+        <div class="cvh"><span class="rb" style="background:var(--kimi)">⛉ Security reviewer</span><span style="font-size:11px;color:var(--muted)">kimi · round 2</span>
+          <span class="vt"><b class="on">Conversation</b><b>Findings</b><b>Terminal</b></span></div>
+        <div class="cv">
+          <div class="turn"><div class="av" style="background:var(--kimi)">K</div><div><div class="who">Security · kimi</div><div class="txt">Two issues in the footer-button path:</div>
+            <div class="find"><div class="h">High · unsanitized title → XSS</div></div><div class="find"><div class="h">Med · missing authz on POST /column</div></div></div></div>
+        </div>
+        <div class="composer"><div class="cbox">Reply to the Security reviewer…  &nbsp;·&nbsp; ⊙ kimi ▾  📎  ➤</div></div>
+      </div>
+    </div>
+    <div class="ract"><div class="h">Project Activity <span class="scoped">· PAN-1242</span></div>
+      <div class="ev">test gate failed (3)</div><div class="ev">perf reviewer started</div><div class="ev">correctness approved</div>
+      <div style="margin-top:6px;color:#bbb;font-size:9px">(Q3: scoped to issue)</div></div>
+  </div>
+  <div class="callout"><b>Feels like:</b> an inbox. Always in one issue's context; the tree is your "message list," the body
+  is the open item. Fewest tabs. Trade-off: to compare two agents you must double-click to pop one out.</div>
+
+  <!-- ============ OPTION B ============ -->
+  <div class="opt-h"><span class="badge b">OPTION B</span><h2 style="margin:0;border:0">A tab per agent (+ the issue tab)</h2></div>
+  <p class="sub">Clicking an agent opens its <b>own</b> Stage tab (a conversation with a thin issue-context strip). Open
+  Work + Security + Review at once and ⌘-switch. The issue tab itself shows the overview.</p>
+  <div class="shell">
+    <div class="osb"><div class="ic">⌂</div><div class="ic">✦</div><div class="sep"></div><div class="lab">proj</div><div class="ic on">P</div><div class="ic">m</div><div class="sep"></div><div class="lab">lens</div><div class="ic">▦</div><div class="ic">⌗</div><div class="ic">🤖</div><div class="ic">⊟</div></div>
+    <div class="rail">
+      <div class="rail-h">Conversations <span>35</span></div>
+      <div class="ritem conv"><span class="dot run"></span> Claude Code</div>
+      <div class="rail-h">Issues <span>6</span></div>
+      <div class="ritem iss"><span class="ic">▾</span><span class="dot wait"></span> PAN-1242 <span class="st" style="color:var(--waiting)">review</span></div>
+      <div class="ritem sub"><span class="ic">⌨</span> Work <span class="st stop" style="color:#cbd5e1">stopped</span></div>
+      <div class="ritem sub"><span class="ic">⊕</span> Review <span class="st" style="color:var(--failed)">error</span></div>
+      <div class="ritem sub sel" style="padding-left:38px"><span class="ic">⛉</span> Security <span class="st" style="color:var(--failed)">2 find</span></div>
+      <div class="ritem sub" style="padding-left:38px"><span class="ic">✓</span> Correctness <span class="st" style="color:var(--done)">ok</span></div>
+      <div class="ritem sub" style="padding-left:38px"><span class="ic">◷</span> Performance <span class="st" style="color:var(--thinking)">run</span></div>
+      <div class="ritem sub"><span class="ic">⏏</span> Ship</div>
+    </div>
+    <div class="stage">
+      <div class="panebar">
+        <div class="ptab"><span style="color:#0d9488">⌂</span> Home <span class="kbd">⌘1</span></div>
+        <div class="ptab"><span class="dot wait"></span> PAN-1242 <span class="kbd">⌘2</span> <span class="x">×</span></div>
+        <div class="ptab"><span class="ic" style="color:#fff">⌨</span> Work <span class="kbd">⌘3</span> <span class="x">×</span></div>
+        <div class="ptab on"><span style="color:var(--kimi)">⛉</span> Security <span class="kbd">⌘4</span> <span class="x">×</span></div>
+        <div class="padd">+</div>
+      </div>
+      <div class="sbody">
+        <!-- thin issue-context strip instead of full band -->
+        <div class="ctxstrip"><span class="back">‹ PAN-1242</span><span class="phase">◐ Review</span><span style="color:var(--muted)">gates 2/3 · PR #1430</span><span style="margin-left:auto;color:var(--muted)">$4.20</span></div>
+        <div class="cvh"><span class="rb" style="background:var(--kimi)">⛉ Security reviewer</span><span style="font-size:11px;color:var(--muted)">kimi · round 2</span>
+          <span class="vt"><b class="on">Conversation</b><b>Findings</b><b>Terminal</b></span></div>
+        <div class="cv">
+          <div class="turn"><div class="av" style="background:var(--kimi)">K</div><div><div class="who">Security · kimi</div><div class="txt">Two issues in the footer-button path:</div>
+            <div class="find"><div class="h">High · unsanitized title → XSS</div></div><div class="find"><div class="h">Med · missing authz on POST /column</div></div></div></div>
+        </div>
+        <div class="composer"><div class="cbox">Reply to the Security reviewer…  &nbsp;·&nbsp; ⊙ kimi ▾  📎  ➤</div></div>
+      </div>
+    </div>
+    <div class="ract"><div class="h">Project Activity</div>
+      <div class="ev">test gate failed (3)</div><div class="ev">perf reviewer started</div><div class="ev">correctness approved</div>
+      <div style="margin-top:6px;color:#bbb;font-size:9px">(Q3: project-wide)</div></div>
+  </div>
+  <div class="callout"><b>Feels like:</b> an IDE with file tabs. Several agents open at once, ⌘-switch between Work and Security.
+  The full status band lives on the <code>PAN-1242</code> tab; agent tabs get only a thin context strip. Trade-off: tabs
+  multiply fast across issues.</div>
+
+  <!-- Q2 sub-option -->
+  <h2 style="margin-top:30px">Q2 — what the <i>issue</i> tab body shows (click the issue row itself, no agent)</h2>
+  <div class="callout" style="border-left-color:#0ea5e9">Independent of A/B. Two choices for the <code>PAN-1242</code> tab body
+  when no agent is selected:
+  <b>(2a) Overview</b> — gates · reviewers ×4 · PR · cost · recent activity (a dashboard of the issue), or
+  <b>(2b) Auto-land</b> — jump straight to the most-relevant agent's conversation (e.g. the running/blocked one), skipping an overview.
+  My hunch: <b>2a overview</b> for the issue row, conversation when you pick an agent — so the issue row answers "where's
+  this at?" and agents answer "what did it say?"</div>
+
+  <h2 style="margin-top:24px">Pick by feel</h2>
+  <table>
+    <thead><tr><th style="width:18%">Question</th><th style="width:41%">Option A</th><th>Option B</th></tr></thead>
+    <tbody>
+      <tr><td><b>Q1 tabs</b></td><td>One issue tab; body follows rail; double-click pops out</td><td>Tab per agent + issue tab; ⌘-switch; compare in parallel</td></tr>
+      <tr><td><b>mental model</b></td><td>Inbox (list + reading pane)</td><td>IDE (file tabs)</td></tr>
+      <tr><td><b>clutter</b></td><td>minimal — 1 tab/issue</td><td>grows — N tabs/agents</td></tr>
+      <tr><td><b>parallel</b></td><td>pop-out when needed</td><td>native</td></tr>
+      <tr><td><b>status band</b></td><td>always pinned above body</td><td>full band on issue tab; thin strip on agent tabs</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Tell me which <i>feels</i> right (or a hybrid — e.g. A by default, but ⌘-click an agent = open-in-new-tab like B),
+  plus your Q2 lean. Then I'll build the chosen one out in full detail and we move to Project.</p>
+
+</div>
+</body>
+</html>

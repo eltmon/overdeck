@@ -87,6 +87,7 @@ interface ResolvedFlywheelRoleConfig {
   harness: 'claude-code' | 'pi';
   model: string;
   effort: RoleEffort;
+  minAgents: number;
   maxAgents: number;
   scope: FlywheelScope;
   autoPickupBacklog: boolean;
@@ -257,7 +258,8 @@ function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
     harness: flywheel?.harness ?? 'claude-code',
     model: resolveModel('flywheel', undefined, config),
     effort: flywheel?.effort ?? 'high',
-    maxAgents: flywheel?.maxAgents ?? 8,
+    minAgents: flywheel?.minAgents ?? 20,
+    maxAgents: flywheel?.maxAgents ?? 30,
     scope: flywheel?.scope ?? 'pan-only',
     autoPickupBacklog: isFlywheelAutoPickupBacklog(),
     requireUatBeforeMerge: isFlywheelRequireUatBeforeMerge(),
@@ -366,6 +368,7 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
     autoPickupBacklog: roleConfig.autoPickupBacklog,
@@ -756,6 +759,7 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
     autoPickupBacklog: roleConfig.autoPickupBacklog,

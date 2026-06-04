@@ -33,8 +33,10 @@ export interface ParseResult {
   byteOffset: number;
   /** True when the last assistant message has no completedAt and file was modified recently. */
   streaming: boolean;
-  /** Total estimated cost in USD computed from assistant message usage data. */
+  /** Total estimated cost in USD computed from assistant message usage data (cache-discount aware). */
   totalCost: number;
+  /** Total token throughput (input + output + cache read + cache write) across assistant messages. */
+  totalTokens: number;
   /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
   pendingToolUse: Map<string, WorkLogEntry>;
   /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
@@ -245,6 +247,7 @@ export async function parseConversationMessages(
       byteOffset: 0,
       streaming: false,
       totalCost: 0,
+      totalTokens: 0,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
@@ -308,6 +311,7 @@ export async function parseConversationMessages(
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   let totalCost = 0;
+  let totalTokens = 0;
 
   // Pending assistant message being assembled from content blocks
   let pendingAssistant: ChatMessage | null = null;
@@ -442,16 +446,23 @@ export async function parseConversationMessages(
       const msg = entry.message;
       const content = Array.isArray(msg.content) ? msg.content : [];
 
-      // Accumulate cost from usage data
-      if (msg.usage && msg.model) {
-        const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
-        if (pricing) {
-          totalCost += calculateCostSync({
-            inputTokens: msg.usage.input_tokens ?? 0,
-            outputTokens: msg.usage.output_tokens ?? 0,
-            cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
-            cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
-          }, pricing);
+      // Accumulate cost and token throughput from usage data
+      if (msg.usage) {
+        totalTokens +=
+          (msg.usage.input_tokens ?? 0) +
+          (msg.usage.output_tokens ?? 0) +
+          (msg.usage.cache_read_input_tokens ?? 0) +
+          (msg.usage.cache_creation_input_tokens ?? 0);
+        if (msg.model) {
+          const pricing = getPricingSync(providerFromModel(msg.model), msg.model);
+          if (pricing) {
+            totalCost += calculateCostSync({
+              inputTokens: msg.usage.input_tokens ?? 0,
+              outputTokens: msg.usage.output_tokens ?? 0,
+              cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+            }, pricing);
+          }
         }
       }
 
@@ -774,6 +785,7 @@ export async function parseConversationMessages(
     byteOffset: newByteOffset,
     streaming,
     totalCost,
+    totalTokens,
     pendingToolUse,
     unresolvedResults,
     lastSequence: sequence,
@@ -1031,11 +1043,27 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
 }
 
 /**
- * Parse a JSONL session file starting from the last compact boundary.
+ * Compute "how full is the context window right now?" from the JSONL.
  *
- * Returns only messages from the current context window — everything after
- * the most recent compaction. For sessions that have never been compacted,
- * returns all messages.
+ * Approach (matches Claude Code's terminal indicator):
+ *   1. Find the last compact boundary so we only count tokens in the current
+ *      window (post-compaction). For never-compacted sessions, scan the whole
+ *      file.
+ *   2. Find the last assistant message after the boundary with `usage` data.
+ *   3. Sum `input_tokens + cache_read_input_tokens + cache_creation_input_tokens`
+ *      from that message — those are the tokens the model actually saw on
+ *      its most recent turn, i.e. the live context size.
+ *   4. Compare against the model's context window. If observed input ever
+ *      exceeded the model's default (e.g. Claude Code 1M extended-context
+ *      mode for Opus / Sonnet), promote the effective window to 1M.
+ *
+ * Previous implementation used `fileBytes / 4` as a token estimate. That
+ * counts every byte of every tool result, MCP payload, and cached file
+ * content in the JSONL, which routinely overshoots actual `input_tokens` by
+ * 4-10x. Removed.
+ *
+ * Returns null when we can't compute a meaningful value (unknown model, no
+ * assistant messages with usage yet, stat failure).
  */
 export async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null> {
   const normalizedModel = model?.trim();
@@ -1050,16 +1078,122 @@ export async function computeContextUsage(sessionFile: string, model: string | n
   const boundaryOffset = await findLastCompactBoundary(sessionFile);
   const fileStats = await stat(sessionFile);
   const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
-  // Pressure gauge only: bytes/4 is a rough provider-agnostic token heuristic.
-  const estimatedTokens = Math.ceil(activeBytes / 4);
-  const percentUsed = Math.min(100, Math.max(0, (estimatedTokens / capability.contextWindow) * 100));
+
+  const usageSummary = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
+  if (!usageSummary) {
+    // No assistant message with usage yet — return zeros against the
+    // declared window so the meter renders an empty ring instead of nothing.
+    return {
+      activeBytes,
+      estimatedTokens: 0,
+      contextWindow: capability.contextWindow,
+      percentUsed: 0,
+    };
+  }
+
+  // input + cache_read + cache_creation = total context the model received
+  // on the last turn. output_tokens is the next-turn input from the model's
+  // perspective, but for "how full is my window NOW?" the input side is the
+  // honest answer — Claude Code's terminal uses the same convention.
+  const liveContextTokens =
+    usageSummary.lastInputTokens +
+    usageSummary.lastCacheReadTokens +
+    usageSummary.lastCacheCreationTokens;
+
+  // 1M-context detection. Claude Code's extended-context mode (the
+  // `context-1m-2025-08-07` beta) lets Opus / Sonnet see up to 1,000,000
+  // tokens. We can't read the request headers, but if we've ever seen the
+  // model accept more than its default window we know extended context is
+  // active. Round up to the next plausible tier rather than guessing.
+  const observedCeiling = Math.max(usageSummary.maxObservedInputTokens, liveContextTokens);
+  const effectiveContextWindow =
+    observedCeiling > capability.contextWindow
+      ? Math.max(1_000_000, capability.contextWindow)
+      : capability.contextWindow;
+
+  const percentUsed = Math.min(
+    100,
+    Math.max(0, (liveContextTokens / effectiveContextWindow) * 100),
+  );
 
   return {
     activeBytes,
-    estimatedTokens,
-    contextWindow: capability.contextWindow,
+    estimatedTokens: liveContextTokens,
+    contextWindow: effectiveContextWindow,
     percentUsed,
+    lastInputTokens: usageSummary.lastInputTokens,
+    lastCacheReadTokens: usageSummary.lastCacheReadTokens,
+    lastCacheCreationTokens: usageSummary.lastCacheCreationTokens,
+    maxObservedInputTokens: usageSummary.maxObservedInputTokens,
+    lastModel: usageSummary.lastModel,
+    lastTurnAt: usageSummary.lastTimestamp,
   };
+}
+
+interface LatestAssistantUsage {
+  lastInputTokens: number;
+  lastCacheReadTokens: number;
+  lastCacheCreationTokens: number;
+  maxObservedInputTokens: number;
+  lastModel: string | null;
+  lastTimestamp: string | null;
+}
+
+/**
+ * Stream the JSONL between `boundaryOffset` and EOF, returning usage data
+ * from the most recent assistant message + the highest input_tokens ever
+ * observed (used for 1M-context detection).
+ *
+ * Async, line-buffered. Skips malformed lines silently.
+ */
+async function readLatestAssistantUsage(
+  sessionFile: string,
+  boundaryOffset: number,
+  activeBytes: number,
+): Promise<LatestAssistantUsage | null> {
+  if (activeBytes <= 0) return null;
+  const fh = await open(sessionFile, 'r');
+  try {
+    const buffer = Buffer.alloc(activeBytes);
+    await fh.read(buffer, 0, activeBytes, boundaryOffset);
+    const lines = buffer.toString('utf-8').split('\n');
+
+    let result: LatestAssistantUsage | null = null;
+    let maxObservedInputTokens = 0;
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let entry: JsonlEntry;
+      try {
+        entry = JSON.parse(line.replace(/\r$/, '')) as JsonlEntry;
+      } catch {
+        continue;
+      }
+      if (entry.type !== 'assistant' || !entry.message?.usage) continue;
+      const u = entry.message.usage;
+      const input = u.input_tokens ?? 0;
+      const cacheRead = u.cache_read_input_tokens ?? 0;
+      const cacheCreate = u.cache_creation_input_tokens ?? 0;
+      // Track ceiling across the whole window so a one-off >200k turn flips
+      // us to 1M-mode even if the latest turn dropped back down.
+      const turnInput = input + cacheRead + cacheCreate;
+      if (turnInput > maxObservedInputTokens) maxObservedInputTokens = turnInput;
+      // Always replace — we want the *last* one in file order.
+      result = {
+        lastInputTokens: input,
+        lastCacheReadTokens: cacheRead,
+        lastCacheCreationTokens: cacheCreate,
+        maxObservedInputTokens,
+        lastModel: entry.message.model ?? null,
+        lastTimestamp: entry.timestamp ?? null,
+      };
+    }
+
+    if (result) result.maxObservedInputTokens = maxObservedInputTokens;
+    return result;
+  } finally {
+    await fh.close();
+  }
 }
 
 export async function parseFromLastCompactBoundary(

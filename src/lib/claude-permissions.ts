@@ -24,14 +24,7 @@ import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 const YOLO_TRUE = new Set(['1', 'true', 'yes', 'y', 'on']);
 const YOLO_FALSE = new Set(['0', 'false', 'no', 'n', 'off']);
 
-/**
- * The exact CLI flag string for "skip every permission prompt". This is the
- * ONLY place in the codebase the literal token should appear; the lint guard
- * (`scripts/lint-permissions.sh`) enforces that. Other modules that need to
- * test for, append, or message about this flag must import this constant.
- */
-export const DSP_FLAG = '--dangerously-skip-permissions';
-/** Matching --permission-mode value for {@link DSP_FLAG}. */
+/** The `--permission-mode` value for bypass mode. */
 export const BYPASS_PERMISSION_MODE = 'bypassPermissions';
 
 /** Read PAN_YOLO from the current process env. Returns the implied mode, or undefined if unset/unparseable. */
@@ -49,6 +42,25 @@ export function readYoloEnv(env: NodeJS.ProcessEnv = process.env): ClaudePermiss
  * (typically from the --yolo CLI flag, already converted to a ClaudePermissionMode).
  * PAN_YOLO env var takes precedence over the explicit override so a parent process
  * can force a mode for any child pan invocation.
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * AUDIT TRAP — read this before concluding "we don't use --dangerously-skip-permissions".
+ * ──────────────────────────────────────────────────────────────────────────
+ * Grepping the source for `--dangerously-skip-permissions` and finding it only
+ * here (gated, lint-enforced) does NOT mean DSP is off. Whether DSP is passed is
+ * decided at RUNTIME by this resolver, whose inputs are, in order:
+ *   1. `PAN_YOLO` env on the *launching* process (e.g. the dashboard server) — not your shell
+ *   2. an explicit `--yolo` flag
+ *   3. `config.claude.permissionMode` in `~/.panopticon/config.yaml`
+ *   4. default `auto`
+ * So a perfectly clean codebase still launches every agent with DSP if the
+ * effective config value is `bypass`. To verify DSP is actually off, check the
+ * RESOLVED value (`resolvePermissionModeSync()` / the rendered config / the
+ * server's env), NOT just the source. And remember: a running `claude` process
+ * keeps the flags it was launched with — after flipping the config to `auto`,
+ * already-running agents/conversations still show `--dangerously-skip-permissions`
+ * in their cmdline until they are respawned. (This exact gap — code clean,
+ * config `bypass` — is how DSP survived a code-only audit. See PAN settings-desync bug.)
  */
 export function resolvePermissionModeSync(explicit?: ClaudePermissionMode): ClaudePermissionMode {
   const fromEnv = readYoloEnv();
@@ -67,7 +79,7 @@ export function getClaudePermissionFlagsSync(mode?: ClaudePermissionMode): strin
   if (resolved === 'auto') {
     return ['--permission-mode', 'auto'];
   }
-  return [DSP_FLAG, '--permission-mode', BYPASS_PERMISSION_MODE];
+  return ['--permission-mode', BYPASS_PERMISSION_MODE];
 }
 
 /** Permission CLI flags as a single space-joined string for shell-style command construction. */
@@ -76,19 +88,13 @@ export function getClaudePermissionFlagsStringSync(mode?: ClaudePermissionMode):
 }
 
 /**
- * Bypass prefix injected ahead of `--agent` when the resolved mode is `bypass`.
- *
- * `--agent` short-circuits the standalone permission flags (the agent's
- * frontmatter owns permissionMode), so callers that build command strings
- * with `--agent` need a separate, mode-aware way to add DSP. Centralizing
- * the literal here means `--dangerously-skip-permissions` only appears as
- * a string in this module — the lint guard (`scripts/lint-permissions.sh`)
- * relies on that property. Returns `' --dangerously-skip-permissions'`
- * (with leading space) when bypass, `''` otherwise.
+ * Bypass prefix injected ahead of `--agent`. The bypass CLI flag was removed,
+ * so there is no longer a flag to inject — `--agent` agents rely on their
+ * roles/<role>.md frontmatter permissionMode. Always returns `''`; kept as a
+ * stable call site so the launch builders that consume it need no change.
  */
-export function bypassPrefixForAgentFlagSync(mode?: ClaudePermissionMode): string {
-  const resolved = mode ?? resolvePermissionModeSync();
-  return resolved === 'bypass' ? ` ${DSP_FLAG}` : '';
+export function bypassPrefixForAgentFlagSync(_mode?: ClaudePermissionMode): string {
+  return '';
 }
 
 /**

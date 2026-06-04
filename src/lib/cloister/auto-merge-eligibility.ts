@@ -62,11 +62,28 @@ export async function isAutoMergeEligible(
   }
 
   const prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+
+  // Reviewer P1: tighten to positive "green and mergeable" instead of "not known
+  // failed". The previous predicate accepted pending checks, draft PRs,
+  // closed-unmerged PRs, and mergeable=false — at best noisy GitHub rejections,
+  // at worst merging before CI finishes.
+  if (prState.merged) {
+    return { eligible: false, reason: 'PR is already merged' };
+  }
+  if (prState.state === 'CLOSED') {
+    return { eligible: false, reason: 'PR is closed' };
+  }
+  if (prState.draft) {
+    return { eligible: false, reason: 'PR is a draft' };
+  }
   if (prState.checksFailed) {
     return { eligible: false, reason: `CI checks failing on PR HEAD ${prState.headSha}` };
   }
-  if (prState.merged) {
-    return { eligible: false, reason: 'PR is already merged' };
+  if (prState.checksPending) {
+    return { eligible: false, reason: `CI checks still pending on PR HEAD ${prState.headSha}` };
+  }
+  if (prState.mergeable === false) {
+    return { eligible: false, reason: `PR is not mergeable${prState.mergeableState ? ` (state=${prState.mergeableState})` : ''}` };
   }
 
   const labels = await (deps.getIssueLabels ?? getIssueLabels)(issueId);

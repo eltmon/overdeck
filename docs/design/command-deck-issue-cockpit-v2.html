@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit v2 — mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --background:#080b10; --foreground:#e5e7eb;
+    --card:#0c1018; --card-foreground:#e5e7eb;
+    --accent:color-mix(in srgb, white 8%, transparent);
+    --muted:color-mix(in srgb, white 4%, transparent);
+    --muted-foreground:#9ca3af;
+    --border:color-mix(in srgb, white 6%, transparent);
+    --border-strong:color-mix(in srgb, white 11%, transparent);
+    --primary:#6366f1;
+    --destructive:#f87171; --destructive-fg:#fca5a5;
+    --info:#3b82f6; --info-fg:#60a5fa;
+    --success:#10b981; --success-fg:#34d399;
+    --warning:#f59e0b; --warning-fg:#fbbf24;
+    --review:#a855f7; --review-fg:#c084fc;
+    --cost:#06b6d4; --cost-fg:#22d3ee;
+    --radius:0.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --mono:"SF Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--background);color:var(--foreground);
+    font-family:"DM Sans",system-ui,sans-serif;font-size:13px;line-height:1.45;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px;}
+  h1,h2,h3,h4{font-family:"Space Grotesk",system-ui,sans-serif;margin:0;}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .eyebrow{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);}
+  .muted{color:var(--muted-foreground);}
+  a{color:var(--info-fg);text-decoration:none;}
+  .card{border:1px solid var(--border);background:var(--card);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.25);}
+  .pad{padding:16px;}
+  .row{display:flex;align-items:center;}
+  .gap6{gap:6px;}.gap8{gap:8px;}.gap10{gap:10px;}.gap12{gap:12px;}
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);
+    padding:2px 8px;font-size:11px;color:var(--muted-foreground);}
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-sm);padding:2px 7px;
+    font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;border:1px solid transparent;}
+  .tone-ok{color:var(--success-fg);background:color-mix(in srgb,var(--success) 9%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent);}
+  .tone-bad{color:var(--destructive-fg);background:color-mix(in srgb,var(--destructive) 9%,transparent);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);}
+  .tone-wait{color:var(--warning-fg);background:color-mix(in srgb,var(--warning) 9%,transparent);border-color:color-mix(in srgb,var(--warning) 32%,transparent);}
+  .tone-info{color:var(--info-fg);background:color-mix(in srgb,var(--info) 9%,transparent);border-color:color-mix(in srgb,var(--info) 32%,transparent);}
+  .tone-review{color:var(--review-fg);background:color-mix(in srgb,var(--review) 9%,transparent);border-color:color-mix(in srgb,var(--review) 32%,transparent);}
+  .tone-cost{color:var(--cost-fg);background:color-mix(in srgb,var(--cost) 9%,transparent);border-color:color-mix(in srgb,var(--cost) 32%,transparent);}
+  .tone-muted{color:var(--muted-foreground);background:var(--muted);border-color:var(--border-strong);}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);
+    background:transparent;color:var(--foreground);padding:6px 11px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:var(--accent);}
+  .btn-primary{background:var(--primary);border-color:transparent;color:#fff;}
+  .btn-ghost{border-color:transparent;color:var(--muted-foreground);}
+  .btn-danger{color:var(--destructive-fg);border-color:color-mix(in srgb,var(--destructive) 40%,transparent);}
+  .sec-h{display:flex;align-items:center;gap:8px;font-family:"Space Grotesk";font-weight:600;font-size:13px;margin-bottom:12px;}
+  .sec-h .eyebrow{font-family:"DM Sans";}
+
+  /* ---- GLANCE BAND ---- */
+  .band{position:relative;overflow:hidden;}
+  .band .accent{position:absolute;left:0;top:0;bottom:0;width:3px;}
+  .identity{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .ititle{font-size:18px;font-weight:600;line-height:1.25;}
+  .imeta{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap;}
+
+  /* spotlight blocker banner */
+  .spotlight{display:flex;align-items:flex-start;gap:11px;border-radius:14px;padding:12px 13px;margin-top:14px;
+    border:1px solid color-mix(in srgb,var(--destructive) 35%,transparent);
+    background:color-mix(in srgb,var(--destructive) 7%,transparent);}
+  .spotlight .ic{flex:0 0 auto;color:var(--destructive-fg);margin-top:1px;}
+  .spotlight .body{flex:1;min-width:0;}
+  .spotlight .stitle{font-weight:600;color:var(--destructive-fg);font-size:12.5px;}
+  .spotlight .stext{color:var(--foreground);opacity:.85;font-size:12px;margin-top:2px;}
+  .spotlight .acts{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;}
+
+  /* phase timeline */
+  .ptl{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin-top:16px;}
+  .pstep{position:relative;padding:0 4px;text-align:left;}
+  .pstep .bar{height:3px;border-radius:2px;background:var(--border-strong);margin-bottom:8px;}
+  .pstep.done .bar{background:var(--success);}
+  .pstep.current .bar{background:var(--warning);box-shadow:0 0 0 1px color-mix(in srgb,var(--warning) 40%,transparent);}
+  .pstep .plabel{font-size:11px;font-weight:600;}
+  .pstep.upcoming .plabel{color:var(--muted-foreground);}
+  .pstep .pwhen{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);}
+  .pstep .psub{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-top:1px;}
+
+  /* metric strip */
+  .mstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px;}
+  .mtile{border:1px solid var(--border);border-radius:14px;padding:11px 13px;background:color-mix(in srgb,white 1.5%,transparent);}
+  .mtile .mlab{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);}
+  .mtile .mval{font-size:19px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:3px;display:flex;align-items:baseline;gap:6px;}
+  .mtile .msub{font-size:10px;color:var(--muted-foreground);margin-top:1px;}
+  .pos{color:var(--success-fg);}.neg{color:var(--destructive-fg);}
+
+  /* action strip */
+  .actstrip{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;}
+  .actstrip .spacer{flex:1;}
+
+  /* composer */
+  .composer{display:flex;align-items:center;gap:10px;border:1px solid var(--border-strong);border-radius:14px;
+    padding:9px 12px;margin:14px 0 18px;background:color-mix(in srgb,white 1.5%,transparent);}
+  .composer input{flex:1;background:transparent;border:none;outline:none;color:var(--foreground);font-family:inherit;font-size:13px;}
+  .composer input::placeholder{color:var(--muted-foreground);}
+  .qbtns{display:flex;gap:5px;}
+
+  /* scan grid */
+  .scan{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;}
+  .col{display:flex;flex-direction:column;gap:14px;}
+
+  /* pipeline stepper */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .step{border:1px solid var(--border);border-radius:12px;padding:9px 10px;}
+  .step .sn{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);}
+  .step .ss{font-size:12px;font-weight:600;margin-top:3px;display:flex;align-items:center;gap:5px;}
+  .gates{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .gate{text-align:center;border:1px solid var(--border);border-radius:12px;padding:8px 4px;}
+  .gate .gv{font-size:11px;font-weight:600;}
+  .gate .gn{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin-top:2px;}
+  .revgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;}
+  .rev{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:10px;padding:7px 10px;}
+  .rev .rn{font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  .finding{margin-top:11px;border-left:2px solid color-mix(in srgb,var(--destructive) 55%,transparent);
+    padding:8px 11px;background:color-mix(in srgb,var(--destructive) 5%,transparent);border-radius:0 10px 10px 0;font-size:12px;}
+
+  /* code card */
+  .filelist{margin-top:10px;display:flex;flex-direction:column;gap:4px;}
+  .file{display:flex;align-items:center;gap:8px;font-size:11.5px;font-family:var(--mono);padding:3px 0;}
+  .fstat{width:14px;text-align:center;font-weight:700;}
+  .fa{color:var(--success-fg);}.fm{color:var(--warning-fg);}.fd{color:var(--destructive-fg);}
+
+  /* plan card */
+  .plansum{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
+  .beads{margin-top:10px;display:flex;flex-direction:column;gap:5px;}
+  .bead{display:flex;align-items:center;gap:9px;font-size:12px;padding:4px 0;}
+  .bmark{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .bac{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);margin-left:auto;}
+
+  /* cost card */
+  .costrows{display:flex;flex-direction:column;gap:7px;margin-top:6px;}
+  .crow{display:flex;align-items:center;gap:9px;font-size:12px;}
+  .cbar{height:6px;border-radius:3px;background:var(--cost);opacity:.8;}
+  .ctotal{font-size:24px;font-weight:600;font-family:var(--mono);}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:36px;margin-top:10px;}
+  .spark i{flex:1;background:color-mix(in srgb,var(--cost) 55%,transparent);border-radius:2px 2px 0 0;}
+
+  /* workspace */
+  .kv{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{color:var(--muted-foreground);}
+
+  /* activity */
+  .acts2{display:flex;flex-direction:column;gap:2px;}
+  .act{display:flex;align-items:center;gap:9px;font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--border);}
+  .act:last-child{border-bottom:none;}
+
+  /* dig tabs */
+  .digbar{display:flex;gap:4px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+  .tab{padding:6px 11px;border-radius:var(--radius-sm);font-size:12px;color:var(--muted-foreground);cursor:pointer;border:1px solid transparent;}
+  .tab:hover{background:var(--accent);}
+  .tab.active{color:var(--foreground);background:var(--accent);border-color:var(--border-strong);}
+  .layer-note{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-foreground);
+    border:1px dashed var(--border-strong);border-radius:6px;padding:2px 7px;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted-foreground);margin:6px 0 18px;}
+  .legend b{color:var(--foreground);font-weight:600;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="row gap12" style="margin-bottom:6px;">
+    <h1 style="font-size:16px;">Issue Cockpit v2</h1>
+    <span class="layer-note">mockup · PAN-1242 live data</span>
+  </div>
+  <div class="legend">
+    <span><b>GLANCE</b> = always on, answers “what state &amp; what next”</span>
+    <span><b>SCAN</b> = curated cards, ordered by importance</span>
+    <span><b>DIG</b> = deliberate open (tabs)</span>
+  </div>
+
+  <!-- ============ GLANCE BAND ============ -->
+  <div class="card band pad" style="border-color:var(--border-strong);">
+    <div class="accent" style="background:var(--review);"></div>
+
+    <!-- identity -->
+    <div class="identity">
+      <div>
+        <div class="row gap10">
+          <span style="width:22px;height:22px;border-radius:7px;background:color-mix(in srgb,var(--review) 18%,transparent);
+            display:flex;align-items:center;justify-content:center;color:var(--review-fg);font-weight:700;font-size:12px;">B</span>
+          <h2 class="ititle">Board view follow-up — + New issue column footer button</h2>
+        </div>
+        <div class="imeta">
+          <span class="chip mono">PAN-1242</span>
+          <span class="chip">⎇ feature/pan-1242</span>
+          <a class="chip" href="#">↗ #1516</a>
+          <span class="muted" style="font-size:11px;">deferred from PAN-1229</span>
+        </div>
+      </div>
+      <span class="pill tone-review" style="font-size:11px;padding:3px 9px;">● Review · blocked</span>
+    </div>
+
+    <!-- spotlight: the single most important thing -->
+    <div class="spotlight">
+      <div class="ic">⚠</div>
+      <div class="body">
+        <div class="stitle">Review blocked — security finding</div>
+        <div class="stext">“<span class="mono">POST /api/issues</span> bypasses the dashboard mutation guard and can create
+          external issues without auth or CSRF validation.”</div>
+        <div class="acts">
+          <button class="btn btn-danger">View finding</button>
+          <button class="btn">Send to agent</button>
+          <button class="btn btn-ghost">Restart review</button>
+        </div>
+      </div>
+      <span class="pill tone-muted">cycle 1/10</span>
+    </div>
+
+    <!-- phase timeline -->
+    <div class="ptl">
+      <div class="pstep done"><div class="bar"></div><div class="plabel">Triaged</div><div class="pwhen">05/20</div><div class="psub">issue</div></div>
+      <div class="pstep done"><div class="bar"></div><div class="plabel">Planned</div><div class="pwhen">05/26</div><div class="psub">plan</div></div>
+      <div class="pstep done"><div class="bar"></div><div class="plabel">Implemented</div><div class="pwhen">05/26</div><div class="psub">work</div></div>
+      <div class="pstep current"><div class="bar"></div><div class="plabel">Reviewed</div><div class="pwhen">05/26</div><div class="psub">review</div></div>
+      <div class="pstep upcoming"><div class="bar"></div><div class="plabel">Shipping</div><div class="pwhen">—</div><div class="psub">ship</div></div>
+      <div class="pstep upcoming"><div class="bar"></div><div class="plabel">Merged</div><div class="pwhen">—</div><div class="psub">done</div></div>
+    </div>
+
+    <!-- metric strip (single source of truth — dedups cost/PR/diff scattered below) -->
+    <div class="mstrip">
+      <div class="mtile"><div class="mlab">Cost to date</div><div class="mval">$96.79</div><div class="msub">6.5M in · 440k out</div></div>
+      <div class="mtile"><div class="mlab">Diff</div><div class="mval"><span class="pos">+831</span><span class="neg">−21</span></div><div class="msub">6 files changed</div></div>
+      <div class="mtile"><div class="mlab">Pull request</div><div class="mval" style="font-size:15px;">#1516</div><div class="msub">open · 1 PR</div></div>
+      <div class="mtile"><div class="mlab">Sessions</div><div class="mval">8</div><div class="msub">0 active agents</div></div>
+      <div class="mtile"><div class="mlab">Last activity</div><div class="mval" style="font-size:15px;">167h</div><div class="msub">ago · 12 days old</div></div>
+    </div>
+
+    <!-- action strip -->
+    <div class="actstrip">
+      <button class="btn btn-primary">Open</button>
+      <button class="btn">Request review</button>
+      <button class="btn">Recover</button>
+      <button class="btn">Sync main</button>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost">⋯ More actions</button>
+    </div>
+  </div>
+
+  <!-- composer (spawn-and-send) -->
+  <div class="composer">
+    <span class="muted">⌕</span>
+    <input placeholder="Ask, run, or search… — spawns a work agent &amp; sends" />
+    <div class="qbtns">
+      <button class="btn btn-ghost">Claude Code ▾</button>
+      <button class="btn btn-ghost">Terminal</button>
+      <button class="btn btn-ghost">Files</button>
+      <button class="btn btn-ghost">Diff</button>
+    </div>
+  </div>
+
+  <!-- ============ SCAN ============ -->
+  <div class="scan">
+
+    <!-- LEFT: the work -->
+    <div class="col">
+
+      <!-- Review & Verification (merges pipeline + gates + reviewers + finding) -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--review);"></span>Review &amp; Verification
+          <span class="eyebrow" style="margin-left:auto;">stale · 6d ago</span></div>
+        <div class="steps">
+          <div class="step"><div class="sn">Build gate</div><div class="ss"><span class="dot" style="background:var(--success);"></span>Passed</div></div>
+          <div class="step"><div class="sn">Review</div><div class="ss"><span class="dot" style="background:var(--destructive);"></span>Blocked</div></div>
+          <div class="step"><div class="sn">Tests</div><div class="ss"><span class="dot" style="background:var(--warning);"></span>Pending</div></div>
+          <div class="step"><div class="sn">Merge</div><div class="ss"><span class="dot" style="background:var(--muted-foreground);"></span>Pending</div></div>
+        </div>
+        <div class="gates">
+          <div class="gate"><div class="gv" style="color:var(--success-fg);">pass</div><div class="gn">typecheck</div></div>
+          <div class="gate"><div class="gv" style="color:var(--success-fg);">pass</div><div class="gn">lint</div></div>
+          <div class="gate"><div class="gv" style="color:var(--success-fg);">pass</div><div class="gn">test</div></div>
+          <div class="gate"><div class="gv" style="color:var(--warning-fg);">pending</div><div class="gn">uat</div></div>
+        </div>
+        <div class="revgrid">
+          <div class="rev"><span class="rn">correctness</span><span class="pill tone-muted">no rounds</span></div>
+          <div class="rev"><span class="rn">security</span><span class="pill tone-bad">blocked</span></div>
+          <div class="rev"><span class="rn">performance</span><span class="pill tone-muted">no rounds</span></div>
+          <div class="rev"><span class="rn">requirements</span><span class="pill tone-muted">no rounds</span></div>
+        </div>
+        <div class="finding">
+          <b style="color:var(--destructive-fg);">security ✗</b> — POST /api/issues bypasses the dashboard mutation guard…
+          <a href="#" style="margin-left:4px;">full finding ↗</a>
+        </div>
+        <div class="row gap8" style="margin-top:11px;">
+          <button class="btn">Review &amp; Test</button>
+          <button class="btn btn-ghost">Previous attempts (5)</button>
+        </div>
+      </div>
+
+      <!-- Code -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--info);"></span>Code
+          <span class="pill tone-info" style="margin-left:auto;">#1516 OPEN</span></div>
+        <div class="row gap12">
+          <div class="mono" style="font-size:14px;"><span class="pos">+831</span> <span class="neg">−21</span></div>
+          <span class="muted">·</span><span>6 files</span><span class="muted">·</span><span>0 commits</span>
+          <span class="spacer" style="flex:1;"></span>
+          <button class="btn">View diff ↗</button>
+        </div>
+        <div class="filelist">
+          <div class="file"><span class="fstat fm">M</span> src/dashboard/server/routes/issues.ts <span class="bac">+142 −8</span></div>
+          <div class="file"><span class="fstat fa">A</span> src/dashboard/frontend/.../NewIssueDialog.tsx <span class="bac">+318</span></div>
+          <div class="file"><span class="fstat fm">M</span> src/dashboard/frontend/.../KanbanBoard.tsx <span class="bac">+47 −13</span></div>
+          <div class="file muted"><span class="fstat">…</span> 3 more files</div>
+        </div>
+      </div>
+
+      <!-- Plan -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--review);"></span>Plan
+          <span class="eyebrow" style="margin-left:auto;">vBRIEF · 7 beads</span></div>
+        <div class="plansum">
+          <span>Critical path · <b>4 steps</b> · 5 edges · <span class="muted">0/25 AC</span></span>
+          <button class="btn btn-ghost">Expand DAG ▾</button>
+        </div>
+        <div class="beads">
+          <div class="bead"><span class="bmark" style="background:var(--muted-foreground);"></span>Add POST /api/issues endpoint<span class="bac">0/5 AC</span></div>
+          <div class="bead"><span class="bmark" style="background:var(--muted-foreground);"></span>Build NewIssueDialog component<span class="bac">0/5 AC</span></div>
+          <div class="bead"><span class="bmark" style="background:var(--muted-foreground);"></span>Replace KanbanBoard TODO with footer button<span class="bac">0/6 AC</span></div>
+          <div class="bead muted"><span class="bmark" style="background:var(--border-strong);"></span>+ 4 more beads<span class="bac">0/9 AC</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: the context -->
+    <div class="col">
+
+      <!-- Cost -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--cost);"></span>Cost</div>
+        <div class="row" style="justify-content:space-between;align-items:baseline;">
+          <div class="ctotal" style="color:var(--cost-fg);">$96.79</div>
+          <div class="muted" style="font-size:11px;">6.53M in · 440.2k out</div>
+        </div>
+        <div class="costrows">
+          <div class="crow"><span style="width:96px;">gpt-5.5</span><span class="cbar" style="width:118px;"></span><span class="mono" style="margin-left:auto;">$94.13</span></div>
+          <div class="crow"><span style="width:96px;">claude-opus-4-7</span><span class="cbar" style="width:6px;"></span><span class="mono" style="margin-left:auto;">$2.66</span></div>
+        </div>
+        <div class="eyebrow" style="margin-top:12px;">by stage</div>
+        <div class="crow" style="margin-top:5px;"><span style="width:96px;">implementation</span><span class="cbar" style="width:118px;"></span><span class="mono" style="margin-left:auto;">$96.79</span></div>
+        <div class="spark">
+          <i style="height:40%;"></i><i style="height:65%;"></i><i style="height:30%;"></i><i style="height:80%;"></i>
+          <i style="height:55%;"></i><i style="height:70%;"></i><i style="height:45%;"></i><i style="height:90%;"></i>
+        </div>
+        <div class="eyebrow" style="margin-top:4px;">trend · 8 billed sessions</div>
+      </div>
+
+      <!-- Workspace -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--info);"></span>Workspace</div>
+        <div class="kv"><span class="k">Path</span><span class="mono" style="font-size:11px;">…/workspaces/feature-pan-1242</span></div>
+        <div class="kv"><span class="k">Services</span><span><a href="#">Frontend ↗</a> · <a href="#">API ↗</a></span></div>
+        <div class="kv"><span class="k">Containers</span><span class="muted">none running</span></div>
+        <div class="kv"><span class="k">Attach</span><span class="mono" style="font-size:11px;">tmux … ⧉</span></div>
+        <div class="row gap6" style="margin-top:11px;">
+          <button class="btn">Sync main</button>
+          <button class="btn">Open in Cursor</button>
+          <button class="btn btn-ghost">Containerize</button>
+        </div>
+      </div>
+
+      <!-- Agent -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--success);"></span>Agent</div>
+        <div class="row" style="justify-content:space-between;">
+          <span class="muted">No active agent · last was <span class="mono">work · gpt-5.5</span></span>
+          <button class="btn btn-primary">Spawn Work</button>
+        </div>
+      </div>
+
+      <!-- Activity (live rail) -->
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--warning);"></span>Activity
+          <a href="#" class="eyebrow" style="margin-left:auto;">full feed ↗</a></div>
+        <div class="acts2">
+          <div class="act"><span class="dot" style="background:var(--review);"></span>requirements · specialist <span class="muted" style="margin-left:auto;">stopped</span></div>
+          <div class="act"><span class="dot" style="background:var(--review);"></span>security · specialist <span class="muted" style="margin-left:auto;">stopped</span></div>
+          <div class="act"><span class="dot" style="background:var(--success);"></span>review · specialist <span class="muted" style="margin-left:auto;">completed</span></div>
+          <div class="act"><span class="dot" style="background:var(--success);"></span>ship · specialist <span class="muted" style="margin-left:auto;">completed</span></div>
+          <div class="act"><span class="dot" style="background:var(--info);"></span>work · gpt-5.5 <span class="muted" style="margin-left:auto;">stopped</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DIG ============ -->
+  <div class="digbar">
+    <span class="layer-note" style="align-self:center;margin-right:4px;">DIG</span>
+    <span class="tab active">Discussions</span>
+    <span class="tab">PRD</span>
+    <span class="tab">STATE</span>
+    <span class="tab">vBRIEF</span>
+    <span class="tab">Beads</span>
+    <span class="tab">PR Diff</span>
+    <span class="tab">Costs</span>
+    <span class="tab">Artifacts</span>
+    <span class="tab">History</span>
+    <span class="tab">Activity</span>
+  </div>
+
+</div>
+</body>
+</html>

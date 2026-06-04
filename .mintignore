@@ -34,7 +34,6 @@ dev/
 dev-skills/
 dist/
 docker/
-graphify-out/
 infra/
 marketing/
 node_modules/

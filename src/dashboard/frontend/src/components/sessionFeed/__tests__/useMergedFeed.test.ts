@@ -5,6 +5,7 @@ import { filterSessionFeedEntriesForTab, mergeSessionFeedEntries, useMergedFeed 
 const hookSources = vi.hoisted(() => ({
   conversations: { entries: [] as SessionFeedEntry[], isLoading: false, error: null as Error | null },
   observations: [] as SessionFeedEntry[],
+  activityEntries: [] as SessionFeedEntry[],
   git: { entries: [] as SessionFeedEntry[], isLoading: false, error: null as Error | null },
 }));
 
@@ -18,6 +19,10 @@ vi.mock('../useConversationFeed', () => ({
 
 vi.mock('../useObservationFeed', () => ({
   useObservationFeed: () => hookSources.observations,
+}));
+
+vi.mock('../useActivityEntryFeed', () => ({
+  useActivityEntryFeed: () => hookSources.activityEntries,
 }));
 
 vi.mock('../useGitFeed', () => ({

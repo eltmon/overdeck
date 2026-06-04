@@ -20,9 +20,85 @@
         }
       })();
     </script>
+    <style>
+      /* Pre-mount paint: keep the document dark/light per theme so a reload
+         during a server restart never flashes a blank page (PAN-1580). The
+         #pan-boot shell lives inside #root and is replaced the instant React
+         mounts, so the restart window shows a "Connecting…" state, not blank. */
+      html { background: #ffffff; }
+      html.dark { background: #080b10; }
+      body { margin: 0; }
+      #pan-boot {
+        position: fixed; inset: 0;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        font-family: 'DM Sans', system-ui, sans-serif; font-size: 14px;
+        color: #6b7280; background: inherit;
+      }
+      html.dark #pan-boot { color: #8b93a1; }
+      #pan-boot .pan-spinner {
+        width: 16px; height: 16px;
+        border: 2px solid currentColor; border-top-color: transparent;
+        border-radius: 50%; animation: pan-spin 0.8s linear infinite;
+      }
+      @keyframes pan-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="pan-boot"><span class="pan-spinner"></span>Connecting to the dashboard…</div>
+    </div>
+    <script>
+      /* Boot watchdog (PAN-1580): the app's own restart recovery lives inside
+         the JS bundle — useless while that bundle is the thing failing to load
+         during a server restart. This bundle-independent watchdog waits for the
+         server to come back and reloads once, so a restart self-recovers instead
+         of sitting on "Connecting…" until a manual refresh. It stands down the
+         instant main.tsx sets window.__panMounted. */
+      (function () {
+        var acting = false;
+        function setMsg(text) {
+          var boot = document.getElementById('pan-boot');
+          if (boot && boot.lastChild && boot.lastChild.nodeType === 3) boot.lastChild.textContent = text;
+        }
+        // Poll until BOTH a fresh index.html AND the bundle it references are
+        // actually serveable, then reload exactly once. Verifying the bundle
+        // before reloading means the reload can never land on a stuck page — it
+        // simply waits out the server restart (or an in-progress rebuild) and
+        // recovers cleanly. No give-up state, no reload loop.
+        function whenServeableThenReload(n) {
+          if (window.__panMounted) return;
+          fetch('/', { cache: 'no-store' })
+            .then(function (r) {
+              if (!r.ok) throw 0;
+              return r.text();
+            })
+            .then(function (html) {
+              var m = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/);
+              if (!m) { window.location.reload(); return; } // can't locate bundle; just reload
+              return fetch(m[1], { method: 'HEAD', cache: 'no-store' }).then(function (b) {
+                if (b.ok) window.location.reload(); else throw 0;
+              });
+            })
+            .catch(function () {
+              setTimeout(function () { whenServeableThenReload(n + 1); }, Math.min(500 + n * 250, 3000));
+            });
+        }
+        function recover() {
+          if (acting || window.__panMounted) return;
+          acting = true;
+          setMsg('Reconnecting to the dashboard…');
+          whenServeableThenReload(0);
+        }
+        // Recover ONLY on a precise signal: the entry module/stylesheet failing
+        // to LOAD (the real "assets 404 during a server restart" event), which
+        // surfaces as a capture-phase window error on the element. No blanket
+        // timeout — a slow-but-fine mount must never trigger a reload.
+        window.addEventListener('error', function (e) {
+          var t = e && e.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) recover();
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

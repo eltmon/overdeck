@@ -248,6 +248,67 @@ export async function listFlywheelRuns(options: FlywheelRunListOptions = {}): Pr
   return summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
+/**
+ * Count live work agents by walking ~/.panopticon/agents/.
+ *
+ * PAN-1528: `agentsActive` is initialized to 1 (the orchestrator) and never
+ * updated by any code path. The flywheel's "capacity gauge" was a fiction —
+ * `pan flywheel status` was observed showing 23/30 while only 2 actual work
+ * agents existed. This recomputes the count from disk at status-read time so
+ * both the CLI and dashboard views always reflect ground truth.
+ *
+ * Counts directories whose state.json reports `status: 'running'` AND
+ * `role: 'work'`. That signal already excludes pipeline specialists
+ * (role: review/test/ship), planning agents (role: plan), and the flywheel
+ * orchestrator itself (role: flywheel), regardless of directory naming.
+ */
+function resolveAgentsDir(options: FlywheelRunStateOptions = {}): string {
+  // Mirror getFlywheelHome's resolution so tests using `panopticonHome`
+  // overrides isolate cleanly.
+  const home = options.panopticonHome ?? process.env['PANOPTICON_HOME'] ?? join(homedir(), '.panopticon');
+  return join(home, 'agents');
+}
+
+async function countLiveWorkAgents(options: FlywheelRunStateOptions = {}): Promise<number> {
+  const agentsDir = resolveAgentsDir(options);
+  let entries: Dirent[];
+  try {
+    entries = await readdir(agentsDir, { withFileTypes: true });
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return 0;
+    throw error;
+  }
+
+  let count = 0;
+  await Promise.all(entries.map(async (entry) => {
+    if (!entry.isDirectory()) return;
+    // Fast pre-filter: planning- dirs are never work agents; skip without
+    // opening state.json.
+    if (!entry.name.startsWith('agent-')) return;
+    const stateFile = join(agentsDir, entry.name, 'state.json');
+    try {
+      const raw = await readFile(stateFile, 'utf-8');
+      const state = JSON.parse(raw) as { status?: string; role?: string };
+      if (state.status === 'running' && state.role === 'work') count += 1;
+    } catch {
+      // missing/malformed state.json — skip
+    }
+  }));
+  return count;
+}
+
+function withLiveAgentsActive(latest: FlywheelStatus, liveCount: number): FlywheelStatus {
+  if (latest.system.agentsActive === liveCount) return latest;
+  return {
+    ...latest,
+    system: {
+      ...latest.system,
+      agentsActive: liveCount,
+    },
+  };
+}
+
 export async function getFlywheelRunDetail(runId: string, options: FlywheelRunStateOptions = {}): Promise<FlywheelRunDetail | null> {
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
@@ -255,11 +316,14 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelRunSt
   const status = await deriveRunStatus(runDir, runId);
   const reportPath = join(runDir, 'report.md');
   const openedPrPath = join(runDir, 'opened-pr.json');
+  // PAN-1528: overlay the live work-agent count so the field reflects reality
+  // rather than the orchestrator's stale initial value.
+  const liveCount = await countLiveWorkAgents(options);
   return {
     id: runId,
     startedAt: latest.startedAt,
     status,
-    latest,
+    latest: withLiveAgentsActive(latest, liveCount),
     paths: {
       latest: join(runDir, 'latest.json'),
       ...((await fileExists(reportPath)) ? { report: reportPath } : {}),

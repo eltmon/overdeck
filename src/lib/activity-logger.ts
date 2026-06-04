@@ -14,7 +14,6 @@
 
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
-import { getEventStore } from '../dashboard/server/event-store.js';
 import type { DomainEvent } from '@panctl/contracts';
 import type { Role } from './agents.js';
 
@@ -29,7 +28,10 @@ export type ActivitySource =
   | 'test-specialist'
   | 'merge-agent'
   | 'tts-summarizer'
-  | 'deploy-script';
+  | 'deploy-script'
+  | 'plan-finalize'
+  | 'complete-planning'
+  | 'start-agent';
 
 export interface EmitActivityOptions {
   source: ActivitySource;
@@ -56,6 +58,42 @@ export interface EmitTtsOptions {
   eventType?: string;
 }
 
+interface ActivityEventStore {
+  append(event: Omit<DomainEvent, 'sequence'>): number;
+  appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+}
+
+let activityEventStoreProvider: (() => ActivityEventStore) | null = null;
+
+export function setActivityEventStoreProvider(provider: (() => ActivityEventStore) | null): void {
+  activityEventStoreProvider = provider;
+}
+
+function getActivityEventStore(): ActivityEventStore | null {
+  if (!activityEventStoreProvider) return null;
+  try {
+    return activityEventStoreProvider();
+  } catch {
+    return null;
+  }
+}
+
+function appendActivityEventAsync(event: Omit<DomainEvent, 'sequence'>): void {
+  const store = getActivityEventStore();
+  if (!store) return;
+  void store.appendAsync(event).catch(() => undefined);
+}
+
+function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
+  const store = getActivityEventStore();
+  if (!store) return;
+  try {
+    store.append(event);
+  } catch {
+    // Non-fatal — event store may not be initialized during early boot
+  }
+}
+
 /**
  * Emit an activity.entry domain event to the SQLite event store.
  * Non-blocking — throws silently if event store is not yet initialized.
@@ -64,24 +102,18 @@ export interface EmitTtsOptions {
  * WebSocket subscribers so the ActivityPanel updates in real-time.
  */
 export function emitActivityEntrySync(options: EmitActivityOptions): void {
-  try {
-    const store = getEventStore();
-    const entry = {
-      type: 'activity.entry' as const,
-      timestamp: new Date().toISOString(),
-      payload: {
-        id: randomUUID(),
-        source: options.source,
-        level: options.level,
-        message: options.message,
-        details: options.details,
-        issueId: options.issueId,
-      },
-    };
-    void store.appendAsync(entry).catch(() => undefined);
-  } catch {
-    // Non-fatal — event store may not be initialized during early boot
-  }
+  appendActivityEventAsync({
+    type: 'activity.entry' as const,
+    timestamp: new Date().toISOString(),
+    payload: {
+      id: randomUUID(),
+      source: options.source,
+      level: options.level,
+      message: options.message,
+      details: options.details,
+      issueId: options.issueId,
+    },
+  });
 }
 
 /**
@@ -89,25 +121,19 @@ export function emitActivityEntrySync(options: EmitActivityOptions): void {
  * Use for fine-grained visibility into agent lifecycle, plan changes, pipeline transitions.
  */
 export function emitActivityDetailedSync(options: EmitDetailedOptions): void {
-  try {
-    const store = getEventStore();
-    const entry = {
-      type: 'activity.detailed' as const,
-      timestamp: new Date().toISOString(),
-      payload: {
-        id: randomUUID(),
-        source: options.source,
-        level: options.level,
-        message: options.message,
-        details: options.details,
-        issueId: options.issueId,
-        triggeringEvent: options.triggeringEvent,
-      },
-    };
-    void store.appendAsync(entry).catch(() => undefined);
-  } catch {
-    // Non-fatal
-  }
+  appendActivityEventAsync({
+    type: 'activity.detailed' as const,
+    timestamp: new Date().toISOString(),
+    payload: {
+      id: randomUUID(),
+      source: options.source,
+      level: options.level,
+      message: options.message,
+      details: options.details,
+      issueId: options.issueId,
+      triggeringEvent: options.triggeringEvent,
+    },
+  });
 }
 
 function normalizeForSpeech(utterance: string): string {
@@ -121,24 +147,18 @@ function normalizeForSpeech(utterance: string): string {
  * Keep utterances short (<140 chars), human-friendly, and speakable.
  */
 export function emitActivityTtsSync(options: EmitTtsOptions): void {
-  try {
-    const store = getEventStore();
-    const entry = {
-      type: 'activity.tts' as const,
-      timestamp: new Date().toISOString(),
-      payload: {
-        id: randomUUID(),
-        utterance: normalizeForSpeech(options.utterance),
-        priority: options.priority ?? 2,
-        issueId: options.issueId,
-        source: options.source,
-        eventType: options.eventType,
-      },
-    };
-    void store.appendAsync(entry).catch(() => undefined);
-  } catch {
-    // Non-fatal
-  }
+  appendActivityEventAsync({
+    type: 'activity.tts' as const,
+    timestamp: new Date().toISOString(),
+    payload: {
+      id: randomUUID(),
+      utterance: normalizeForSpeech(options.utterance),
+      priority: options.priority ?? 2,
+      issueId: options.issueId,
+      source: options.source,
+      eventType: options.eventType,
+    },
+  });
 }
 
 /**
@@ -156,7 +176,6 @@ export function emitDashboardLifecycleSync(
   },
 ): void {
   try {
-    const store = getEventStore();
     let event: Omit<DomainEvent, 'sequence'>;
 
     if (status === 'started') {
@@ -191,7 +210,7 @@ export function emitDashboardLifecycleSync(
       };
     }
 
-    store.append(event);
+    appendActivityEvent(event);
   } catch {
     // Non-fatal
   }

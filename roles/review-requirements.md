@@ -54,6 +54,12 @@ Scope detection heuristic:
 - AC behavior is part of the feature but its code lives entirely outside the PR diff → `whole_feature_scope`
 - AC describes a system property that exists pre-PR → `pre_existing`
 
+Promised-test override:
+
+- If an AC, vBRIEF item, bead claim, or issue requirement explicitly mentions `test`, `regression test`, or `unit test`, and the PR diff contains zero new or modified `*.test.ts` files for the named subsystem, classify that requirement as `in_pr_scope` Missing with severity `!`.
+- This promised-test rule overrides the general "when in doubt prefer `whole_feature_scope`" heuristic. A promised regression test is a deliverable in the PR under review, not an advisory whole-feature concern.
+- Example: PAN-1326 promised a regression test for `pan kill` Docker stack teardown. If a PR changed kill/teardown behavior or claimed the bead but added no relevant `*.test.ts` coverage, report an `in_pr_scope` `!` finding rather than downgrading it to `whole_feature_scope`.
+
 When in doubt between `in_pr_scope` and `whole_feature_scope`, prefer `whole_feature_scope` — the synthesis agent will fold those into the scope note for operator review rather than silently dropping them. Over-tagging `in_pr_scope` is what produces the 100+-AC blocker waves that have been thrashing reviews.
 
 Severity promotion rules:

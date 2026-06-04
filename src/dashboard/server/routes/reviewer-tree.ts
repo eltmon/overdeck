@@ -388,11 +388,18 @@ export async function buildReviewerNodes(
       //   - dead with round metadata → use archived round status
       //   - dead without round metadata but has JSONL → completed (ran but no round artifact)
       //   - dead without round metadata or JSONL → parent status fallback
+      // PAN-1048 sub-reviewers are subagents with no tmux session, so we can't
+      // read liveness from tmux. Their report (.md) landing in the latest
+      // review-run dir is the authoritative "done" signal — prefer it over the
+      // orchestrator status, which would otherwise leave a finished reviewer
+      // showing "running" (with no terminal) until the parent synthesizer exits.
       const rawStatus = hasApiError
         ? 'error'
         : (isLive && !isZombie)
           ? 'running'
-          : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status));
+          : (latestRunOutputExists
+              ? 'completed'
+              : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status)));
       const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {

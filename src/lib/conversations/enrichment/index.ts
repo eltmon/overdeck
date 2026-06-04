@@ -18,6 +18,7 @@ import type { EnrichSessionOptions } from './enrich-session.js';
 import { getConversationsConfigSync } from '../../config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
+import { isBackgroundFeatureEnabled } from '../../background-ai/features.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,13 @@ function selectSessionIdsForEnrichment(
 export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichResult> {
   const startTs = Date.now();
   const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0, estimatedCost: 0, actualCost: null, embedded: 0 };
+
+  // NOTE: enrichSessions is invoked only by explicit user action (the dashboard
+  // "enrich" job / RPC), never automatically — so low-cost mode does NOT gate it
+  // (silently no-op'ing an explicit click is bad UX). Low-cost mode gates the
+  // *automatic* paths: the auto-embed-on-deep branch below (sessionEmbeddings)
+  // and the genuinely-background callers (titles, memory, compaction, TTS).
+  // Cost is still recorded per enriched session for the Background AI cost view.
 
   const tier = opts.tier ?? 1;
   const config = opts.config ?? getConversationsConfigSync();
@@ -229,7 +237,8 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
     }
   }
 
-  if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep) {
+  if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep
+      && isBackgroundFeatureEnabled('sessionEmbeddings')) {
     if (enrichedIds.length > 0) {
       const embedded = await embedSessions({ sessionIds: enrichedIds, config });
       result.embedded = embedded.embedded;

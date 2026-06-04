@@ -182,7 +182,8 @@ describe('ConversationList rename flow', () => {
 
   it('shows an edit input with the current title when the pencil button is clicked', () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     expect(input).toBeInTheDocument();
     expect(input).toHaveValue('My Test Conversation');
@@ -190,7 +191,8 @@ describe('ConversationList rename flow', () => {
 
   it('commits rename via Enter key', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: 'Renamed Title' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -207,7 +209,8 @@ describe('ConversationList rename flow', () => {
 
   it('closes the input after pressing Enter', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => {
@@ -217,7 +220,8 @@ describe('ConversationList rename flow', () => {
 
   it('cancels rename via Escape key', () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: 'Discarded' } });
     fireEvent.keyDown(input, { key: 'Escape' });
@@ -230,7 +234,8 @@ describe('ConversationList rename flow', () => {
 
   it('commits rename on blur', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: 'Blurred Title' } });
     fireEvent.blur(input);
@@ -247,7 +252,8 @@ describe('ConversationList rename flow', () => {
 
   it('does not call API when title is empty', () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: '' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -259,7 +265,8 @@ describe('ConversationList rename flow', () => {
 
   it('does not call API when title is whitespace only', () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -271,7 +278,8 @@ describe('ConversationList rename flow', () => {
 
   it('does not call API when title is unchanged', () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     // title is already 'My Test Conversation', don't change it
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -283,7 +291,8 @@ describe('ConversationList rename flow', () => {
 
   it('prevents double-commit when Enter is followed by blur', async () => {
     renderList();
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input, { target: { value: 'Once Only' } });
 
@@ -308,7 +317,8 @@ describe('ConversationList rename flow', () => {
     renderList();
 
     // First rename
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input1 = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input1, { target: { value: 'First Rename' } });
     fireEvent.keyDown(input1, { key: 'Enter' });
@@ -318,7 +328,8 @@ describe('ConversationList rename flow', () => {
     });
 
     // Second rename — the guard must have been reset when startEditing was called
-    fireEvent.click(screen.getByTitle('Rename conversation'));
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input2 = screen.getByRole('textbox', { name: 'Rename test-conv' });
     fireEvent.change(input2, { target: { value: 'Second Rename' } });
     fireEvent.keyDown(input2, { key: 'Enter' });

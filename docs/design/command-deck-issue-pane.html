@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Command Deck · Issue HomePane — kitchen sink (rev 2)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f;
+    --running:#16a34a; --thinking:#9333ea; --waiting:#d97706; --idle:#9ca3af; --failed:#dc2626; --done:#16a34a;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+    --glance:#0d9488; --scan:#4f46e5; --dig:#6b7280;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.5;padding:32px 24px 80px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;} h2{font-size:16px;margin:30px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;} code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;}
+  .lay{display:inline-block;font-size:9.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 6px;font-family:"SF Mono",monospace;vertical-align:middle;}
+  .lay.g{background:var(--glance);} .lay.s{background:var(--scan);} .lay.d{background:var(--dig);}
+
+  .deck{display:flex;height:1180px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);}
+  /* Navigator */
+  .navigator{width:188px;flex:0 0 188px;background:var(--surface);border-right:1px solid var(--border);padding:12px 9px;font-size:12px;color:var(--muted);}
+  .nav-h{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:12px 4px 6px;}
+  .nav-item{padding:5px 7px;border-radius:6px;display:flex;align-items:center;gap:7px;color:var(--foreground);}
+  .nav-item.sel{background:var(--primary-tint);color:var(--primary);font-weight:600;}
+  .nav-item.sub{padding-left:16px;color:var(--muted);font-weight:400;}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;} .dot.run{background:var(--running);} .dot.wait{background:var(--waiting);} .dot.fail{background:var(--failed);}
+  .sq{width:12px;height:12px;border-radius:4px;flex:0 0 12px;display:inline-block;}
+  /* Stage / PaneBar */
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .panebar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:6px 8px 0;height:40px;flex:0 0 40px;}
+  .panetab{display:flex;align-items:center;gap:6px;padding:0 11px;height:34px;font-size:12px;color:var(--muted);border:1px solid transparent;border-radius:8px 8px 0 0;white-space:nowrap;}
+  .panetab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .panetab .kbd{font-size:9px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .panetab-add{display:flex;align-items:center;justify-content:center;width:28px;height:34px;color:#9ca3af;font-size:17px;}
+  .pane{flex:1;overflow:auto;padding:0;background:var(--background);}
+  .home{padding:16px 22px 30px;}
+
+  /* section band */
+  .band{position:relative;border:1.4px dashed transparent;border-radius:10px;padding:12px 12px 10px;margin:0 0 12px;}
+  .band.g{border-color:var(--glance);background:rgba(13,148,136,.025);}
+  .band.s{border-color:var(--scan);background:rgba(79,70,229,.02);}
+  .band.d{border-color:var(--dig);background:rgba(107,114,128,.03);}
+  .band-h{position:absolute;top:-9px;left:10px;font-size:9.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 7px;font-family:"SF Mono",monospace;}
+  .band.g .band-h{background:var(--glance);} .band.s .band-h{background:var(--scan);} .band.d .band-h{background:var(--dig);}
+
+  /* WorkspaceHeader */
+  .ws-title{display:flex;align-items:center;gap:11px;}
+  .ws-title .icon{width:28px;height:28px;border-radius:7px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;}
+  .ws-title h3{font-size:19px;margin:0;font-weight:700;} .ws-title .id{color:var(--muted);font-weight:600;font-size:14px;margin-right:6px;}
+  .ws-sub{color:var(--muted);font-size:12.5px;margin:6px 0 10px;display:flex;gap:11px;align-items:center;flex-wrap:wrap;}
+  .phaseglyph{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--waiting);background:rgba(217,119,6,.12);border-radius:6px;padding:2px 8px;}
+  .stats{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:4px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--foreground);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;} .chip .mut{color:var(--muted);}
+
+  /* PhaseTimeline (6) */
+  .ptl{display:flex;align-items:center;margin:12px 0 4px;}
+  .pstep{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);}
+  .pstep .b{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;background:var(--idle);}
+  .pstep.done .b{background:var(--done);} .pstep.cur .b{background:var(--waiting);} .pstep.cur{color:var(--foreground);font-weight:700;}
+  .pstep .ln{width:20px;height:2px;background:var(--border);margin:0 5px;}
+
+  /* ActionStrip */
+  .acts{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .act{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;background:var(--primary);border-radius:8px;padding:7px 13px;}
+  .act.secondary{color:var(--foreground);background:#fff;border:1px solid var(--border-strong);}
+  .act.disabled{color:#9ca3af;background:#fff;border:1px solid var(--border);}
+  .act.ghost{color:var(--muted);background:#fff;border:1px dashed var(--border-strong);font-weight:500;}
+
+  /* grid cards */
+  .grid{display:grid;gap:10px;}
+  .g2{grid-template-columns:1fr 1fr;} .g3{grid-template-columns:repeat(3,1fr);} .g4{grid-template-columns:repeat(4,1fr);}
+  .card{border:1px solid var(--border);border-radius:9px;padding:10px 11px;background:#fff;}
+  .card .lab{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .card .val{font-size:13px;font-weight:600;color:var(--foreground);}
+  .card .sub{font-size:11px;color:var(--muted);margin-top:3px;}
+  .gate{display:flex;align-items:center;gap:6px;font-size:12px;margin:3px 0;}
+  .gi{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;}
+  .rv{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--border);}
+  .rv:last-child{border-bottom:none;}
+  .rv .d{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--foreground);background:#fff;border:1px solid var(--border-strong);border-radius:8px;padding:6px 11px;}
+  .pill.tool{font-weight:500;} .pill.ghost{font-weight:500;color:var(--muted);border-style:dashed;} .pill .car{color:#9ca3af;font-size:9px;} .pill .d{width:8px;height:8px;border-radius:50%;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .spark{height:22px;display:flex;align-items:flex-end;gap:2px;}
+  .spark i{width:5px;background:var(--primary);border-radius:1px;display:inline-block;}
+  .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:4px;} .bar i{display:block;height:100%;background:var(--primary);}
+
+  /* launcher */
+  .launch{display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);border-radius:11px;padding:9px 13px;background:#fff;}
+  .launch .ph{color:#9ca3af;flex:1;font-size:13px;} .launch .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+
+  /* PR card */
+  .pr{display:flex;align-items:center;gap:12px;}
+  .pr .num{font-size:13px;font-weight:700;color:var(--primary);} .pr .state{font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:var(--running);border-radius:5px;padding:2px 7px;}
+  .pr .diff{font-family:"SF Mono",monospace;font-size:12px;} .pr .add{color:var(--running);} .pr .del{color:var(--failed);}
+
+  /* timeline */
+  .conv{border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:7px;background:#fff;}
+  .conv-h{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;} .conv-h .ago{margin-left:auto;text-transform:none;}
+  .conv .msg{font-size:12px;color:var(--foreground);opacity:.85;}
+
+  /* collapsibles */
+  .csec{border-top:1px solid var(--border);} .csec .head{display:flex;align-items:center;gap:7px;padding:9px 2px;font-size:12.5px;font-weight:600;color:var(--muted);} .csec .chev{color:#bbb;} .csec .real{margin-left:auto;font-size:9.5px;font-weight:600;color:var(--running);}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--border);vertical-align:top;} th{background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);} tr:last-child td{border-bottom:none;} td code{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Command Deck · Issue <code>HomePane</code> — kitchen sink <span style="font-size:13px;color:var(--muted);font-weight:400">(rev 2 · review-phase issue · everything in)</span></h1>
+  <p class="sub">Per your call: throw it all in, surface the obviously-important, scale back later. Shown on a
+  <b>review-phase</b> issue so PR / reviewers / gates / tests populate. Bands tag the disclosure layer:
+  <span class="lay g">GLANCE</span> <span class="lay s">SCAN</span> <span class="lay d">DIG</span>. Every surface here was
+  verified <b>real, live-data-backed</b> (§12) except the dropped hardcoded quick-links.</p>
+
+  <div class="callout"><b>How to read this:</b> nothing is collapsed — you're seeing the full menu so you can tell me
+  what's low-value. In the shipped version, GLANCE stays always-on, SCAN is the default body, and the DIG band
+  becomes opened panes (Plan/Docs/Commits/Artifacts) + collapsed sections.</div>
+
+  <div class="deck">
+    <!-- Navigator -->
+    <div class="navigator">
+      <div class="nav-h" style="margin-top:2px;">Projects</div>
+      <div class="nav-item sel"><span class="sq" style="background:var(--claude)"></span> panopticon</div>
+      <div class="nav-h">Workspaces</div>
+      <div class="nav-item sel"><span class="dot wait"></span> PAN-1242</div>
+      <div class="nav-item sub"><span class="dot fail"></span> Review · kimi</div>
+      <div class="nav-item sub"><span class="dot" style="background:#cbd5e1"></span> Work · gpt-5.5</div>
+      <div class="nav-item"><span class="dot run"></span> PAN-1395</div>
+      <div class="nav-h">Conversations</div>
+      <div class="nav-item sub"><span class="dot run"></span> Claude Code</div>
+    </div>
+
+    <!-- Stage -->
+    <div class="stage">
+      <div class="panebar">
+        <div class="panetab active"><span class="sq" style="background:var(--primary);width:11px;height:11px"></span> PAN-1242 <span class="kbd">⌘1</span></div>
+        <div class="panetab"><span class="dot fail"></span> Review <span class="kbd">⌘2</span></div>
+        <div class="panetab">▤ Plan <span class="kbd">⌘3</span></div>
+        <div class="panetab-add">+</div>
+      </div>
+
+      <div class="pane"><div class="home">
+
+        <!-- ============ GLANCE ============ -->
+        <div class="band g">
+          <span class="band-h">GLANCE · WorkspaceHeader · PhaseTimeline · ActionStrip</span>
+          <div class="ws-title"><span class="icon">P</span><h3><span class="id">PAN-1242</span>Board view follow-up — New-issue column footer button</h3></div>
+          <div class="ws-sub"><span>⎇ feature/pan-1242</span><span class="phaseglyph">◐ In Review</span></div>
+          <div class="stats">
+            <span class="chip">💲 <b>$4.20</b></span>
+            <span class="chip">⏱ <span class="mut">12d old</span></span>
+            <span class="chip">💬 8 convos</span>
+            <span class="chip">⇄ PR #1430 <span class="add" style="color:var(--running)">+312</span>/<span style="color:var(--failed)">−47</span></span>
+            <span class="chip">📄 6 files</span>
+          </div>
+          <!-- PhaseTimeline (6) -->
+          <div class="ptl">
+            <div class="pstep done"><span class="b">✓</span> Triaged</div><span class="ln"></span>
+            <div class="pstep done"><span class="b">✓</span> Planned</div><span class="ln"></span>
+            <div class="pstep done"><span class="b">✓</span> Implemented</div><span class="ln"></span>
+            <div class="pstep cur"><span class="b">◐</span> Reviewed</div><span class="ln"></span>
+            <div class="pstep"><span class="b">○</span> Shipping</div><span class="ln"></span>
+            <div class="pstep"><span class="b">○</span> Merged</div>
+          </div>
+          <!-- ActionStrip (phase-gated; primary inline, rest overflow) -->
+          <div class="acts">
+            <span class="act">▸ Review &amp; Test</span>
+            <span class="act secondary">✎ Tell…</span>
+            <span class="act secondary">↺ Recover review</span>
+            <span class="act disabled">⌦ Merge <span style="font-size:9px">(blocked)</span></span>
+            <span class="act ghost">⋮ 41 actions</span>
+          </div>
+        </div>
+
+        <!-- ============ SCAN ============ -->
+        <div class="band s">
+          <span class="band-h">SCAN · status at a scan</span>
+
+          <!-- gates + reviewers + PR -->
+          <div class="grid g3" style="margin-bottom:10px;">
+            <div class="card"><div class="lab">⛉ Verification gates <span style="color:var(--waiting);font-weight:700">cycle 2/3</span></div>
+              <div class="gate"><span class="gi" style="background:var(--done)">✓</span> typecheck</div>
+              <div class="gate"><span class="gi" style="background:var(--done)">✓</span> lint</div>
+              <div class="gate"><span class="gi" style="background:var(--failed)">✗</span> test <span class="sub" style="margin:0 0 0 4px">3 failing</span></div>
+              <div class="gate"><span class="gi" style="background:var(--idle)">○</span> uat</div>
+            </div>
+            <div class="card"><div class="lab">⚖ Reviewers</div>
+              <div class="rv"><span><span class="d" style="background:var(--done)"></span>correctness</span><span style="color:var(--done)">approved</span></div>
+              <div class="rv"><span><span class="d" style="background:var(--failed)"></span>security</span><span style="color:var(--failed)">2 findings</span></div>
+              <div class="rv"><span><span class="d" style="background:var(--thinking)"></span>performance</span><span class="mut">running</span></div>
+              <div class="rv"><span><span class="d" style="background:var(--idle)"></span>requirements</span><span class="mut">pending</span></div>
+            </div>
+            <div class="card"><div class="lab">⇄ Pull request</div>
+              <div class="pr"><span class="num">#1430</span><span class="state">open</span></div>
+              <div class="sub" style="margin-top:5px">Board view follow-up</div>
+              <div class="row" style="margin-top:5px"><span class="diff"><span class="add">+312</span> <span class="del">−47</span></span><span class="sub">· 6 files · changes requested</span></div>
+              <div class="sub" style="color:var(--primary);margin-top:5px">View diff ↗ → CommitsPane</div>
+            </div>
+          </div>
+
+          <!-- agents + cost -->
+          <div class="grid g2" style="margin-bottom:10px;">
+            <div class="card"><div class="lab">🤖 AgentDock — this issue's agents → AgentPane</div>
+              <div class="row">
+                <span class="pill"><span class="d" style="background:var(--failed)"></span> Review · kimi <span class="car">▾</span></span>
+                <span class="pill"><span class="d" style="background:#cbd5e1"></span> Work · gpt-5.5 <span class="car">▾</span></span>
+                <span class="pill ghost">+ Agent</span>
+              </div>
+            </div>
+            <div class="card"><div class="lab">💲 Cost <span class="mut" style="font-weight:400">$4.20 · by model / stage</span></div>
+              <div class="row" style="justify-content:space-between"><span class="sub">opus $2.1 · kimi $1.4 · gpt $0.7</span>
+                <span class="spark"><i style="height:6px"></i><i style="height:11px"></i><i style="height:8px"></i><i style="height:16px"></i><i style="height:13px"></i><i style="height:20px"></i></span></div>
+              <div class="sub" style="margin-top:4px">review $2.8 · work $1.0 · plan $0.4 &nbsp; <span style="color:var(--primary)">full breakdown ↗</span></div>
+            </div>
+          </div>
+
+          <!-- workspace section -->
+          <div class="card" style="margin-bottom:10px;"><div class="lab">⊟ Workspace</div>
+            <div class="row" style="justify-content:space-between">
+              <span class="sub"><code>workspaces/feature-pan-1242</code></span>
+              <span class="row"><span class="pill tool" style="padding:4px 9px"><span class="d" style="background:var(--running)"></span> web ▶</span>
+              <span class="pill tool" style="padding:4px 9px"><span class="d" style="background:var(--running)"></span> db ▶</span>
+              <span class="pill tool" style="padding:4px 9px">⧉ attach</span>
+              <span class="pill tool" style="padding:4px 9px">⟳ sync main</span>
+              <span class="pill tool" style="padding:4px 9px">↗ web · api</span></span>
+            </div>
+          </div>
+
+          <!-- launcher -->
+          <div class="launch" style="margin-bottom:10px;"><span>⌘</span><span class="ph">Ask an agent, run a command, open the web…</span><span class="run">↵ Run</span></div>
+
+          <!-- timeline / activity -->
+          <div class="grid g2">
+            <div><div class="lab" style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Timeline (threads)</div>
+              <div class="conv"><div class="conv-h"><span class="sq" style="background:#e07b39;width:11px;height:11px"></span> Review · kimi <span class="ago">4m ago</span></div><div class="msg">🤖 security flagged 2 findings; correctness approved.</div></div>
+              <div class="conv"><div class="conv-h"><span class="sq" style="background:#64748b;width:11px;height:11px"></span> You <span class="ago">1h ago</span></div><div class="msg">👤 Re-run review after the footer-button fix.</div></div>
+            </div>
+            <div><div class="lab" style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">ActivityRail (live)</div>
+              <div class="card" style="font-size:11.5px;line-height:1.7"><div><span class="d" style="background:var(--failed);width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px"></span>test gate failed (3)</div><div><span class="d" style="background:var(--thinking);width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px"></span>performance reviewer started</div><div><span class="d" style="background:var(--done);width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px"></span>correctness approved</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ DIG ============ -->
+        <div class="band d">
+          <span class="band-h">DIG · ActionDock opens panes · collapsed deep sections</span>
+          <div class="row" style="margin-bottom:8px">
+            <span class="pill tool">▤ Plan <span class="car">vBRIEF·DAG·Beads</span></span>
+            <span class="pill tool">📄 Docs <span class="car">PRD·STATE·INFERENCE</span></span>
+            <span class="pill tool">⎇ Commits <span class="car">PR·diff</span></span>
+            <span class="pill tool">📦 Artifacts</span>
+            <span class="pill tool">▢ Terminal</span>
+            <span class="pill tool">📁 Files</span>
+            <span class="pill tool">🌐 Web</span>
+          </div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Status history (state transitions) <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Reviewer round cards (full verdict/findings/cost per round) <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Full cost breakdown + sparkline <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Discussions (Linear + GitHub) <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Activity feed (full) <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> Memory summary · generate <span class="real">REAL</span></div></div>
+          <div class="csec"><div class="head"><span class="chev">▸</span> IssueComposer — spawn &amp; send (message issue w/ no live agent) <span class="real">REAL</span></div></div>
+        </div>
+
+      </div></div>
+    </div>
+  </div>
+
+  <h2>Layer assignment (everything's real except where noted) — tell me what to cut</h2>
+  <table>
+    <thead><tr><th style="width:14%">Layer</th><th style="width:43%">Surfaces</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><span class="lay g">GLANCE</span></td><td>WorkspaceHeader (id·title·branch·phase·cost·PR·files) · <b>PhaseTimeline</b> (6) · <b>ActionStrip</b> (phase-primary + 41-overflow)</td><td>always on; the cockpit</td></tr>
+      <tr><td><span class="lay s">SCAN</span></td><td><b>VerificationGates</b> · <b>Reviewers</b> ×4 · <b>PR</b> card · <b>AgentDock</b> · <b>Cost</b> mini+sparkline · <b>WorkspaceSection</b> (containers/services/attach/sync) · Launcher · Timeline · <b>ActivityRail</b></td><td>default body; candidates to demote if low-value to you</td></tr>
+      <tr><td><span class="lay d">DIG</span></td><td>ActionDock → PlanPane (vBRIEF·DAG·Beads) / DocsPane (PRD·STATE·INFERENCE) / CommitsPane / Artifacts / Terminal / Files / Web · status-history · full reviewer rounds · full cost · Discussions · full Activity · memory-summary · IssueComposer</td><td>opened panes + collapsed sections</td></tr>
+      <tr><td><span class="lay d" style="background:#b45309">DROP</span></td><td>OverviewTab quick-links chips</td><td>only hardcoded/no-data surface found</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Scale-back candidates I'd flag myself: PhaseTimeline vs PipelineStepper overlap (pick one as primary); ActivityRail vs Timeline overlap; the 7-tile workspace detail (containers/services) may be SCAN-heavy → could fold to a single "Workspace" dig pane.</p>
+
+</div>
+</body>
+</html>

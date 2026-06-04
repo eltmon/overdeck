@@ -1,5 +1,6 @@
 import { cn } from '../../lib/utils';
-import { useDrawerData, type DrawerVerificationGateStatus } from './useDrawerData';
+import { useIssueData, type DrawerVerificationGateStatus } from './useDrawerData';
+import { useDashboardStore } from '../../lib/store';
 
 const GATE_TONE_CLASSES = {
   passed: 'drawer-gate-border-pass text-success-foreground',
@@ -9,8 +10,9 @@ const GATE_TONE_CLASSES = {
   pending: 'badge-border-muted text-muted-foreground',
 } satisfies Record<DrawerVerificationGateStatus, string>;
 
-export default function DrawerVerificationGates() {
-  const { verificationGates } = useDrawerData();
+export default function DrawerVerificationGates({ issueId }: { issueId?: string } = {}) {
+  const drawerIssueId = useDashboardStore((s) => s.drawer.issueId);
+  const { verificationGates } = useIssueData(issueId ?? drawerIssueId);
 
   return (
     <section data-component="drawer-verification-gates" data-testid="drawer-verification-gates" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">

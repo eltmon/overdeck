@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project Cockpit v2 — mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --background:#080b10; --foreground:#e5e7eb;
+    --card:#0c1018;
+    --accent:color-mix(in srgb, white 8%, transparent);
+    --muted:color-mix(in srgb, white 4%, transparent);
+    --muted-foreground:#9ca3af;
+    --border:color-mix(in srgb, white 6%, transparent);
+    --border-strong:color-mix(in srgb, white 11%, transparent);
+    --primary:#6366f1;
+    --destructive:#f87171; --destructive-fg:#fca5a5;
+    --info:#3b82f6; --info-fg:#60a5fa;
+    --success:#10b981; --success-fg:#34d399;
+    --warning:#f59e0b; --warning-fg:#fbbf24;
+    --review:#a855f7; --review-fg:#c084fc;
+    --cost:#06b6d4; --cost-fg:#22d3ee;
+    --radius-sm:6px;
+    --mono:"SF Mono","SFMono-Regular",Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px;}
+  h1,h2,h3{font-family:"Space Grotesk",system-ui,sans-serif;margin:0;}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .eyebrow{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);}
+  .muted{color:var(--muted-foreground);}
+  a{color:var(--info-fg);text-decoration:none;}
+  .card{border:1px solid var(--border);background:var(--card);border-radius:18px;}
+  .pad{padding:16px;}
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);padding:2px 8px;font-size:11px;color:var(--muted-foreground);}
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-sm);padding:2px 7px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;border:1px solid transparent;}
+  .tone-ok{color:var(--success-fg);background:color-mix(in srgb,var(--success) 9%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent);}
+  .tone-bad{color:var(--destructive-fg);background:color-mix(in srgb,var(--destructive) 9%,transparent);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);}
+  .tone-wait{color:var(--warning-fg);background:color-mix(in srgb,var(--warning) 9%,transparent);border-color:color-mix(in srgb,var(--warning) 32%,transparent);}
+  .tone-info{color:var(--info-fg);background:color-mix(in srgb,var(--info) 9%,transparent);border-color:color-mix(in srgb,var(--info) 32%,transparent);}
+  .tone-review{color:var(--review-fg);background:color-mix(in srgb,var(--review) 9%,transparent);border-color:color-mix(in srgb,var(--review) 32%,transparent);}
+  .tone-muted{color:var(--muted-foreground);background:var(--muted);border-color:var(--border-strong);}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:transparent;color:var(--foreground);padding:6px 11px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:var(--accent);}
+  .btn-ghost{border-color:transparent;color:var(--muted-foreground);}
+  .btn-danger{color:var(--destructive-fg);border-color:color-mix(in srgb,var(--destructive) 40%,transparent);}
+  .sec-h{display:flex;align-items:center;gap:8px;font-family:"Space Grotesk";font-weight:600;font-size:13px;margin-bottom:12px;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+
+  /* header */
+  .phead{display:flex;align-items:center;gap:10px;}
+  .picon{width:24px;height:24px;border-radius:8px;background:color-mix(in srgb,var(--primary) 20%,transparent);display:flex;align-items:center;justify-content:center;color:#c7d2fe;font-weight:700;font-size:12px;}
+  .ptitle{font-size:19px;font-weight:600;}
+
+  /* stuck spotlight */
+  .spotlight{display:flex;align-items:flex-start;gap:11px;border-radius:14px;padding:12px 13px;margin-top:14px;border:1px solid color-mix(in srgb,var(--destructive) 35%,transparent);background:color-mix(in srgb,var(--destructive) 7%,transparent);}
+  .spotlight .ic{color:var(--destructive-fg);margin-top:1px;}
+  .stuckrow{display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);}
+  .stuckrow:last-child{border-bottom:none;}
+
+  /* metric strip */
+  .mstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px;}
+  .mtile{border:1px solid var(--border);border-radius:14px;padding:11px 13px;background:color-mix(in srgb,white 1.5%,transparent);}
+  .mtile .mlab{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);}
+  .mtile .mval{font-size:20px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:3px;}
+  .mtile .msub{font-size:10px;color:var(--muted-foreground);margin-top:1px;}
+
+  /* composer */
+  .composer{display:flex;align-items:center;gap:10px;border:1px solid var(--border-strong);border-radius:14px;padding:9px 12px;margin:14px 0 18px;background:color-mix(in srgb,white 1.5%,transparent);}
+  .composer input{flex:1;background:transparent;border:none;outline:none;color:var(--foreground);font-family:inherit;font-size:13px;}
+  .composer input::placeholder{color:var(--muted-foreground);}
+
+  /* swimlanes */
+  .lane{margin-bottom:14px;}
+  .lane-h{display:flex;align-items:center;gap:9px;padding:7px 2px;position:sticky;top:0;background:var(--background);}
+  .lane-h .cnt{margin-left:auto;font-size:11px;color:var(--muted-foreground);}
+  .lane-bar{height:2px;border-radius:2px;flex:0 0 14px;}
+  .irow{display:grid;grid-template-columns:64px 1fr auto auto;align-items:center;gap:12px;border:1px solid var(--border);border-radius:12px;padding:9px 12px;margin-bottom:6px;cursor:pointer;background:var(--card);}
+  .irow:hover{border-color:var(--border-strong);background:color-mix(in srgb,white 2%,transparent);}
+  .irow .iid{font-family:var(--mono);font-size:11px;color:var(--muted-foreground);}
+  .irow .ititle{font-size:12.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .irow .iagent{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);}
+  .irow .icost{font-family:var(--mono);font-size:11px;color:var(--muted-foreground);min-width:54px;text-align:right;}
+  .accent{width:2px;align-self:stretch;border-radius:2px;}
+
+  /* cost card */
+  .ctotal{font-size:24px;font-weight:600;font-family:var(--mono);}
+  .crow{display:flex;align-items:center;gap:9px;font-size:12px;margin-top:7px;}
+  .cbar{height:6px;border-radius:3px;background:var(--cost);opacity:.8;}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:34px;margin-top:10px;}
+  .spark i{flex:1;background:color-mix(in srgb,var(--cost) 55%,transparent);border-radius:2px 2px 0 0;}
+
+  /* dig tabs */
+  .digbar{display:flex;gap:4px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+  .tab{padding:6px 11px;border-radius:var(--radius-sm);font-size:12px;color:var(--muted-foreground);cursor:pointer;border:1px solid transparent;}
+  .tab.active{color:var(--foreground);background:var(--accent);border-color:var(--border-strong);}
+  .layer-note{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-foreground);border:1px dashed var(--border-strong);border-radius:6px;padding:2px 7px;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted-foreground);margin:6px 0 18px;}
+  .legend b{color:var(--foreground);font-weight:600;}
+  .scan{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+    <h1 style="font-size:16px;">Project Cockpit v2</h1>
+    <span class="layer-note">mockup · panopticon-cli live data</span>
+  </div>
+  <div class="legend">
+    <span><b>GLANCE</b> = what's flowing, what's stuck, what's it costing</span>
+    <span><b>SCAN</b> = the pipeline by phase</span>
+    <span><b>DIG</b> = deliberate open (tabs)</span>
+  </div>
+
+  <!-- GLANCE BAND -->
+  <div class="card pad" style="border-color:var(--border-strong);">
+    <div class="phead">
+      <span class="picon">P</span>
+      <h2 class="ptitle">panopticon-cli</h2>
+      <span class="chip mono">main</span>
+      <span class="muted" style="font-size:11px;margin-left:auto;">141 issues · 50 conversations</span>
+    </div>
+
+    <!-- stuck spotlight -->
+    <div class="spotlight">
+      <div class="ic">⚠</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;color:var(--destructive-fg);font-size:12.5px;">2 issues stuck — need you</div>
+        <div style="margin-top:6px;">
+          <div class="stuckrow"><span class="mono" style="color:var(--muted-foreground);">PAN-1242</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Board view follow-up — + New issue column footer</span><span class="pill tone-bad">review blocked</span></div>
+          <div class="stuckrow"><span class="mono" style="color:var(--muted-foreground);">PAN-1450</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Stack-health probe flaps on cold container start</span><span class="pill tone-bad">verify failed</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- metric strip -->
+    <div class="mstrip">
+      <div class="mtile"><div class="mlab">Active issues</div><div class="mval">5</div><div class="msub">in the pipeline</div></div>
+      <div class="mtile"><div class="mlab">Total cost</div><div class="mval" style="color:var(--cost-fg);">$4,360</div><div class="msub">141 issues · all-time</div></div>
+      <div class="mtile"><div class="mlab">Active agents</div><div class="mval">1</div><div class="msub">working now</div></div>
+      <div class="mtile"><div class="mlab">Stuck</div><div class="mval" style="color:var(--destructive-fg);">2</div><div class="msub">need attention</div></div>
+      <div class="mtile"><div class="mlab">Ship-ready</div><div class="mval" style="color:var(--success-fg);">1</div><div class="msub">awaiting merge</div></div>
+    </div>
+  </div>
+
+  <!-- composer -->
+  <div class="composer">
+    <span class="muted">⌕</span>
+    <input placeholder="Ask, run, or search this project… — spawns an agent &amp; sends" />
+    <button class="btn btn-ghost">Claude Code ▾</button>
+    <button class="btn btn-ghost">Terminal</button>
+    <button class="btn btn-ghost">Web</button>
+  </div>
+
+  <!-- SCAN -->
+  <div class="scan">
+    <!-- LEFT: pipeline swimlanes -->
+    <div>
+      <div class="lane">
+        <div class="lane-h"><span class="lane-bar" style="background:var(--success);"></span><span class="dot" style="background:var(--success);"></span><span style="font-weight:600;font-size:12px;">Ship</span><span class="cnt">1</span></div>
+        <div class="irow"><span class="accent" style="background:var(--success);"></span><span class="iid">PAN-1419</span><span><div class="ititle">Verifying-on-main label cleanup</div><div class="iagent">ship · done</div></span><span class="pill tone-ok">ready to merge</span><span class="icost">$31.20</span></div>
+      </div>
+      <div class="lane">
+        <div class="lane-h"><span class="lane-bar" style="background:var(--review);"></span><span class="dot" style="background:var(--review);"></span><span style="font-weight:600;font-size:12px;">Review</span><span class="cnt">2</span></div>
+        <div class="irow"><span class="accent" style="background:var(--destructive);"></span><span class="iid">PAN-1242</span><span><div class="ititle">Board view follow-up — + New issue column footer</div><div class="iagent">review · blocked · cycle 1/10</div></span><span class="pill tone-bad">changes requested</span><span class="icost">$96.79</span></div>
+        <div class="irow"><span class="accent" style="background:var(--review);"></span><span class="iid">PAN-1574</span><span><div class="ititle">Codex as a first-class harness</div><div class="iagent">review · running</div></span><span class="pill tone-review">review running</span><span class="icost">$58.40</span></div>
+      </div>
+      <div class="lane">
+        <div class="lane-h"><span class="lane-bar" style="background:var(--info);"></span><span class="dot" style="background:var(--info);"></span><span style="font-weight:600;font-size:12px;">Work</span><span class="cnt">1</span></div>
+        <div class="irow"><span class="accent" style="background:var(--info);"></span><span class="iid">PAN-1395</span><span><div class="ititle">Ctrl+K palette: semantic conversation search</div><div class="iagent">work · gpt-5.5 · running</div></span><span class="pill tone-info">work running</span><span class="icost">$12.05</span></div>
+      </div>
+      <div class="lane">
+        <div class="lane-h"><span class="lane-bar" style="background:var(--warning);"></span><span class="dot" style="background:var(--warning);"></span><span style="font-weight:600;font-size:12px;">Plan</span><span class="cnt">1</span></div>
+        <div class="irow"><span class="accent" style="background:var(--warning);"></span><span class="iid">PAN-1450</span><span><div class="ititle">Stack-health probe flaps on cold container start</div><div class="iagent">plan · idle</div></span><span class="pill tone-bad">verify failed</span><span class="icost">$4.10</span></div>
+      </div>
+      <div class="lane">
+        <div class="lane-h"><span class="lane-bar" style="background:var(--muted-foreground);"></span><span class="dot" style="background:var(--muted-foreground);"></span><span style="font-weight:600;font-size:12px;">Todo</span><span class="cnt">9</span></div>
+        <div class="irow"><span class="accent" style="background:var(--muted-foreground);"></span><span class="iid">PAN-1584</span><span><div class="ititle">gpt-5.5 work agents wedge: CLIProxyAPI version drift</div><div class="iagent">no agent</div></span><span class="pill tone-muted">todo</span><span class="icost">—</span></div>
+        <div class="irow"><span class="accent" style="background:var(--muted-foreground);"></span><span class="iid">PAN-1580</span><span><div class="ititle">Dashboard shows a blank page on server restart</div><div class="iagent">no agent</div></span><span class="pill tone-muted">todo</span><span class="icost">—</span></div>
+        <div style="text-align:center;padding:6px;color:var(--muted-foreground);font-size:11px;">+ 7 more todo</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: project cost -->
+    <div>
+      <div class="card pad">
+        <div class="sec-h"><span class="dot" style="background:var(--cost);"></span>Cost</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+          <div class="ctotal" style="color:var(--cost-fg);">$4,360</div>
+          <div class="muted" style="font-size:11px;">all-time · 141 issues</div>
+        </div>
+        <div class="eyebrow" style="margin-top:12px;">by model</div>
+        <div class="crow"><span style="width:96px;">gpt-5.5</span><span class="cbar" style="width:120px;"></span><span class="mono" style="margin-left:auto;">$2,940</span></div>
+        <div class="crow"><span style="width:96px;">claude-opus</span><span class="cbar" style="width:52px;"></span><span class="mono" style="margin-left:auto;">$1,120</span></div>
+        <div class="crow"><span style="width:96px;">claude-sonnet</span><span class="cbar" style="width:14px;"></span><span class="mono" style="margin-left:auto;">$300</span></div>
+        <div class="eyebrow" style="margin-top:12px;">by stage</div>
+        <div class="crow"><span style="width:96px;">implementation</span><span class="cbar" style="width:120px;"></span><span class="mono" style="margin-left:auto;">$2,600</span></div>
+        <div class="crow"><span style="width:96px;">review</span><span class="cbar" style="width:40px;"></span><span class="mono" style="margin-left:auto;">$880</span></div>
+        <div class="crow"><span style="width:96px;">planning</span><span class="cbar" style="width:28px;"></span><span class="mono" style="margin-left:auto;">$610</span></div>
+        <div class="spark">
+          <i style="height:30%;"></i><i style="height:55%;"></i><i style="height:40%;"></i><i style="height:70%;"></i>
+          <i style="height:50%;"></i><i style="height:85%;"></i><i style="height:60%;"></i>
+        </div>
+        <div class="eyebrow" style="margin-top:4px;">7-day trend</div>
+      </div>
+
+      <div class="card pad" style="margin-top:14px;">
+        <div class="sec-h"><span class="dot" style="background:var(--success);"></span>Fleet</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+          <span class="muted">Active agents</span><span>1 · <span class="mono">gpt-5.5</span></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-top:6px;">
+          <span class="muted">Conversations</span><span>50</span>
+        </div>
+        <button class="btn" style="margin-top:10px;">Start an agent</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIG -->
+  <div class="digbar">
+    <span class="layer-note" style="align-self:center;margin-right:4px;">DIG</span>
+    <span class="tab active">Conversations</span>
+    <span class="tab">Board</span>
+    <span class="tab">Costs</span>
+    <span class="tab">Activity</span>
+  </div>
+
+</div>
+</body>
+</html>

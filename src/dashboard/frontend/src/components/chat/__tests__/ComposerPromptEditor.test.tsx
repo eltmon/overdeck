@@ -169,6 +169,46 @@ describe('ComposerPromptEditor', () => {
     );
   });
 
+  describe('draft persistence', () => {
+    // Regression guard: React effect cleanups do NOT run on a page-level
+    // teardown (hard reload, tab close, dev-mode HMR full-page reload), so the
+    // unmount flush alone is not enough. The composer must also flush the draft
+    // on `pagehide`, or text typed within the debounce window is lost when the
+    // page reloads out from under the editor.
+    it('flushes the draft to localStorage on pagehide (page teardown)', () => {
+      vi.useFakeTimers();
+      try {
+        render(
+          <ComposerPromptEditor
+            conversationName="test-conversation"
+            onCommandKeyDown={mockOnCommandKeyDown}
+          />,
+        );
+
+        // User types — updates the editor's latest-text ref. The 300ms
+        // debounce is now pending but has NOT yet written to localStorage.
+        act(() => {
+          mockLexicalText = 'unsaved message';
+          onChangePluginCallback?.({}, mockEditor, new Set());
+        });
+        localStorageMock.setItem.mockClear();
+
+        // Page teardown fires before the debounce — only a synchronous
+        // pagehide flush can save the draft here.
+        act(() => {
+          window.dispatchEvent(new Event('pagehide'));
+        });
+
+        expect(localStorageMock.setItem).toHaveBeenCalledWith(
+          'conv-draft:test-conversation',
+          'unsaved message',
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('slash menu', () => {
     it('does not show slash menu by default', () => {
       render(

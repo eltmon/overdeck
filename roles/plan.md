@@ -4,7 +4,7 @@ description: Panopticon planning role — researches the issue, writes the vBRIE
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.plan.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
-permissionMode: bypassPermissions
+permissionMode: default
 effort: high
 hooks:
   PreToolUse:
@@ -46,6 +46,24 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
 
 `pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`, commit it on main, push, transition the issue to Planned, and terminate this planning session. You do not write to `.pan/specs/` directly. The legacy Done button still exists for humans running planning manually with `--no-promote`. See docs/VBRIEF.md for the four-artifact model.
+
+## Edge semantics for the executor
+
+The work agent treats **absence of a `blocks` / `blockedBy` edge** between two ready items as **permission to run them in parallel via subagents** (Claude Code's `Agent` tool, etc.). A spurious edge silently forces serialization that was never intended.
+
+Add an edge between items A and B **only** when there is a real dependency:
+
+- **Output → input:** A produces a value, file, or commit that B consumes.
+- **Shared mutation:** A and B both modify the same file or shared state.
+- **Ordering requirement:** A must reach a particular state before B can start (e.g. schema migration before query change).
+
+Do **not** add edges for:
+
+- Narrative flow ("this feels like it should come second")
+- Readability ("the diff is cleaner if X lands first")
+- Defensive sequencing ("just in case")
+
+If two items are independent, leave them unconnected. The work agent reads the DAG and decides on fan-out based on its current context — model availability, file overlap, item size, and whether subagent startup is worth amortizing for the size of the task.
 
 ## Process
 

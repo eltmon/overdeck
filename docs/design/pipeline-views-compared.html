@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Panopticon · the 4 pipeline / board lenses, compared</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08);
+    --claude:#e07b39; --codex:#10a37f;
+    --ship:#16a34a; --review:#d97706; --verifying:#0ea5e9; --work:#4f46e5; --plan:#9333ea; --todo:#9ca3af;
+    --running:#16a34a; --failed:#dc2626; --done:#16a34a; --idle:#9ca3af;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.5;padding:28px 22px 70px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;} .sub{color:var(--muted);margin:0 0 8px;font-size:13px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;}
+  .lens{background:#fff;border:1px solid var(--border);border-radius:12px;padding:0;margin:18px 0;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.06);}
+  .lens-h{display:flex;align-items:baseline;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .lens-h .n{font-size:16px;font-weight:700;} .lens-h .cmp{font-size:11px;color:var(--muted);font-family:"SF Mono",monospace;}
+  .lens-h .scope{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#fff;border-radius:6px;padding:3px 9px;}
+  .scope.global{background:#0ea5e9;} .scope.project{background:var(--primary);} .scope.issue{background:#9333ea;}
+  .lens-body{padding:14px 16px;}
+  .cap{font-size:12.5px;color:var(--muted);padding:0 16px 14px;}
+  .cap b{color:var(--foreground);}
+
+  /* swimlanes (pipeline) */
+  .lanes{display:flex;gap:9px;overflow:auto;}
+  .lane{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:7px;}
+  .lane-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;gap:5px;margin-bottom:7px;}
+  .lane-h .ct{margin-left:auto;font-size:9px;color:#9ca3af;font-weight:600;}
+  .ld{width:8px;height:8px;border-radius:50%;}
+  .icard{background:#fff;border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:6px;font-size:11px;}
+  .icard .id{font-weight:700;color:var(--primary);font-size:10.5px;} .icard .ti{color:var(--foreground);display:block;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .icard .meta{display:flex;gap:5px;align-items:center;color:var(--muted);font-size:9.5px;}
+  .vb{font-size:8px;font-weight:700;text-transform:uppercase;color:#fff;border-radius:4px;padding:1px 5px;}
+  .proj-tag{font-size:8.5px;color:var(--muted);background:var(--surface-2);border-radius:4px;padding:1px 5px;}
+  .cost{font-family:"SF Mono",monospace;color:var(--ship);}
+
+  /* hero billboard (project overview) */
+  .hero{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+  .tile{border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:#fff;}
+  .tile .v{font-size:20px;font-weight:700;} .tile .l{font-size:9.5px;text-transform:uppercase;color:#9ca3af;letter-spacing:.04em;}
+  .stuck{border:1px solid var(--failed);background:rgba(220,38,38,.05);border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:12px;}
+  .stuck .h{font-size:10px;font-weight:700;color:var(--failed);text-transform:uppercase;margin-bottom:5px;}
+
+  /* kanban columns */
+  .kbo{display:flex;gap:9px;overflow:auto;}
+  .kcol{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:7px;}
+  .kcol-h{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:7px;display:flex;}
+  .kcol-h .ct{margin-left:auto;color:#9ca3af;}
+  .kcard{background:#fff;border:1px solid var(--border);border-left:3px solid var(--idle);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:11px;}
+  .kcard.p1{border-left-color:var(--failed);} .kcard.p2{border-left-color:var(--review);}
+  .kcard .ti{color:var(--foreground);} .kcard .lb{display:inline-block;font-size:8.5px;background:var(--surface-2);border-radius:4px;padding:1px 5px;color:var(--muted);margin-top:3px;}
+
+  /* per-issue gate stepper */
+  .gates{display:flex;align-items:center;gap:0;}
+  .gst{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;color:var(--muted);min-width:96px;}
+  .gst .b{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;background:var(--idle);}
+  .gst.done .b{background:var(--done);} .gst.cur .b{background:var(--review);} .gst.fail .b{background:var(--failed);} .gst.cur,.gst.fail{color:var(--foreground);font-weight:700;}
+  .gln{flex:1;height:2px;background:var(--border);min-width:30px;}
+  .gst .note{font-size:9.5px;color:var(--muted);}
+
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:10px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--border);vertical-align:top;} th{background:var(--surface-2);font-size:10.5px;text-transform:uppercase;color:var(--muted);} tr:last-child td{border-bottom:none;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:9px 13px;margin:8px 0;font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Four ways to look at the same work</h1>
+  <p class="sub">Panopticon has four pipeline/board "lenses." They render the <b>same issues</b>, organized differently,
+  for different questions. (Doc-quality reference — also resolves the "which pipeline is which" confusion.)</p>
+
+  <div class="callout"><b>Two axes that distinguish them:</b> <b>scope</b> (all projects · one project · one issue) and
+  <b>organized by</b> (lifecycle <i>phase</i> · tracker <i>status</i> · per-issue <i>gates</i>). Keep all four — you reach
+  for a different one depending on what you're trying to understand.</div>
+
+  <!-- ===== 1. PipelineView ===== -->
+  <div class="lens">
+    <div class="lens-h"><span class="n">1 · Pipeline</span><span class="cmp">PipelineView · live</span><span class="scope global">all projects</span></div>
+    <div class="lens-body">
+      <div class="lanes">
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--ship)"></span>Ship<span class="ct">1</span></div>
+          <div class="icard"><span class="id">MIN-663</span><span class="ti">Habit streak repair</span><div class="meta"><span class="proj-tag">myn</span><span class="vb" style="background:var(--ship)">ready</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--review)"></span>Review<span class="ct">2</span></div>
+          <div class="icard"><span class="id">PAN-1242</span><span class="ti">Board footer button</span><div class="meta"><span class="proj-tag">pan</span><span class="vb" style="background:var(--review)">review</span></div></div>
+          <div class="icard"><span class="id">PAN-1450</span><span class="ti">Audit recent fixes</span><div class="meta"><span class="proj-tag">pan</span><span class="vb" style="background:var(--review)">review</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--verifying)"></span>Verifying<span class="ct">0</span></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--work)"></span>Work<span class="ct">1</span></div>
+          <div class="icard"><span class="id">AUR-12</span><span class="ti">Voice latency</span><div class="meta"><span class="proj-tag">auricle</span><span class="vb" style="background:var(--work)">work</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--plan)"></span>Plan<span class="ct">1</span></div>
+          <div class="icard"><span class="id">PAN-1395</span><span class="ti">Ctrl+K search</span><div class="meta"><span class="proj-tag">pan</span><span class="vb" style="background:var(--plan)">plan</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--todo)"></span>Todo<span class="ct">12</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Scope:</b> every project. <b>Organized by:</b> lifecycle phase. <b>Best for:</b> "across <i>everything</i>,
+    what's flowing and where are the bottlenecks?" — the air-traffic-control view. Filter by phase/project/blocked.</div>
+  </div>
+
+  <!-- ===== 2. ProjectOverview ===== -->
+  <div class="lens">
+    <div class="lens-h"><span class="n">2 · Project Overview</span><span class="cmp">ProjectOverview · DORMANT (the one to revive)</span><span class="scope project">one project</span></div>
+    <div class="lens-body">
+      <div class="hero">
+        <div class="tile"><div class="v">6</div><div class="l">issues</div></div>
+        <div class="tile"><div class="v cost" style="color:var(--ship)">$47.10</div><div class="l">total cost</div></div>
+        <div class="tile"><div class="v">2</div><div class="l">active agents</div></div>
+        <div class="tile"><div class="v">3</div><div class="l">active phases</div></div>
+      </div>
+      <div class="stuck"><div class="h">⚠ Stuck / blocked · 1</div>
+        <span style="color:var(--primary);font-weight:700">PAN-1242</span> — security review blocked (2 findings) · test gate failing</div>
+      <div class="lanes">
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--ship)"></span>Ship<span class="ct">0</span></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--review)"></span>Review<span class="ct">2</span></div>
+          <div class="icard"><span class="id">PAN-1242</span><span class="ti">Board footer button</span><div class="meta"><span class="cost">$4.20</span><span class="vb" style="background:var(--review)">review</span></div></div>
+          <div class="icard"><span class="id">PAN-1450</span><span class="ti">Audit recent fixes</span><div class="meta"><span class="cost">$6.80</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--work)"></span>Work<span class="ct">0</span></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--plan)"></span>Plan<span class="ct">1</span></div>
+          <div class="icard"><span class="id">PAN-1395</span><span class="ti">Ctrl+K search</span><div class="meta"><span class="cost">$0.93</span></div></div></div>
+        <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--todo)"></span>Todo<span class="ct">3</span></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Scope:</b> the selected project. <b>Organized by:</b> phase, <i>plus</i> hero metrics + a stuck/blocked
+    callout + per-issue <b>cost</b> cards. <b>Best for:</b> "where's <i>this</i> project at, what's on fire, what's it costing?"
+    — the recommended <b>project landing</b>. This is the rich view that exists in code but isn't currently mounted.</div>
+  </div>
+
+  <!-- ===== 3. KanbanBoard ===== -->
+  <div class="lens">
+    <div class="lens-h"><span class="n">3 · Board</span><span class="cmp">KanbanBoard · live</span><span class="scope global">all projects</span></div>
+    <div class="lens-body">
+      <div class="kbo">
+        <div class="kcol"><div class="kcol-h">Backlog<span class="ct">8</span></div>
+          <div class="kcard"><div class="ti">Refactor cost cache</div><span class="lb">tech-debt</span></div></div>
+        <div class="kcol"><div class="kcol-h">Todo<span class="ct">3</span></div>
+          <div class="kcard p2"><div class="ti">PAN-1316 dark mode</div><span class="lb">ui</span></div></div>
+        <div class="kcol"><div class="kcol-h">In Progress<span class="ct">2</span></div>
+          <div class="kcard p1"><div class="ti">PAN-1395 Ctrl+K</div><span class="lb">enhancement</span></div></div>
+        <div class="kcol"><div class="kcol-h">In Review<span class="ct">2</span></div>
+          <div class="kcard p1"><div class="ti">PAN-1242 footer btn</div><span class="lb">review</span></div></div>
+        <div class="kcol"><div class="kcol-h">Done<span class="ct">31</span></div>
+          <div class="kcard"><div class="ti">PAN-1531 stash kinds</div></div></div>
+      </div>
+    </div>
+    <div class="cap"><b>Scope:</b> every project. <b>Organized by:</b> tracker status (backlog→done), <b>drag-drop</b> to move.
+    <b>Best for:</b> triage &amp; status management — "what's the state of the backlog, drag things between columns."
+    Distinct from Pipeline: status (where it sits) vs. phase (what the agents are doing).</div>
+  </div>
+
+  <!-- ===== 4. ReviewPipelineSection ===== -->
+  <div class="lens">
+    <div class="lens-h"><span class="n">4 · Review pipeline</span><span class="cmp">ReviewPipelineSection · live (in the issue cockpit)</span><span class="scope issue">one issue</span></div>
+    <div class="lens-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">PAN-1242 — the ship gauntlet</div>
+      <div class="gates">
+        <div class="gst done"><span class="b">✓</span>Build gate<span class="note">passed</span></div>
+        <div class="gln" style="background:var(--done)"></div>
+        <div class="gst fail"><span class="b">✗</span>Review<span class="note">security blocked</span></div>
+        <div class="gln"></div>
+        <div class="gst cur"><span class="b">◐</span>Tests<span class="note">cycle 2/3 · 3 failing</span></div>
+        <div class="gln"></div>
+        <div class="gst"><span class="b">○</span>Merge<span class="note">waiting</span></div>
+      </div>
+    </div>
+    <div class="cap"><b>Scope:</b> a single issue. <b>Organized by:</b> the four ship gates (Build→Review→Test→Merge).
+    <b>Best for:</b> "where is <i>this one issue</i> in the merge gauntlet, and what's blocking it?" Lives <b>inside the
+    issue cockpit</b> (it's the PipelineStepper in our issue mockup) — not a standalone board.</div>
+  </div>
+
+  <h2 style="font-size:16px;margin-top:26px">When to reach for which</h2>
+  <table>
+    <thead><tr><th style="width:16%">Lens</th><th style="width:13%">Scope</th><th style="width:17%">Organized by</th><th>The question it answers</th><th style="width:12%">Status</th></tr></thead>
+    <tbody>
+      <tr><td><b>1 Pipeline</b></td><td>all projects</td><td>lifecycle phase</td><td>"Across everything, what's flowing / stuck?" (air traffic control)</td><td>live</td></tr>
+      <tr><td><b>2 Project Overview</b></td><td>one project</td><td>phase + metrics + cost</td><td>"Where's THIS project at, what's on fire, what's it costing?"</td><td><b>dormant → revive as project landing</b></td></tr>
+      <tr><td><b>3 Board</b></td><td>all projects</td><td>tracker status (drag-drop)</td><td>"Triage the backlog; move issues between states."</td><td>live</td></tr>
+      <tr><td><b>4 Review pipeline</b></td><td>one issue</td><td>ship gates</td><td>"Where is this one issue in the merge gauntlet?"</td><td>live (in cockpit)</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Pipeline (1) and Project Overview (2) are the same swimlane idea at different scopes — (2) just adds the
+  hero/stuck/cost layer. Board (3) is the only fundamentally different organizing axis (status, not phase). Review (4)
+  is per-issue. <b>Keep all four</b> — they're complementary lenses, exactly as you said.</p>
+
+</div>
+</body>
+</html>

@@ -119,6 +119,20 @@ export const ContextUsage = Schema.Struct({
   estimatedTokens: Schema.Number,
   contextWindow: Schema.Number,
   percentUsed: Schema.Number,
+  /**
+   * Optional breakdown of the last assistant turn — surfaced by the click
+   * popover on the ContextWindowMeter so users can see WHY the meter says
+   * what it does. Computed by `computeContextUsage()` from JSONL `usage`.
+   */
+  lastInputTokens: Schema.optional(Schema.Number),
+  lastCacheReadTokens: Schema.optional(Schema.Number),
+  lastCacheCreationTokens: Schema.optional(Schema.Number),
+  /** Highest input_tokens ever observed in this window — triggers 1M detection. */
+  maxObservedInputTokens: Schema.optional(Schema.Number),
+  /** Model the most recent assistant turn ran under (from JSONL). */
+  lastModel: Schema.optional(Schema.NullOr(Schema.String)),
+  /** ISO timestamp of the most recent assistant turn. */
+  lastTurnAt: Schema.optional(Schema.NullOr(Schema.String)),
 })
 export type ContextUsage = typeof ContextUsage.Type
 
@@ -162,6 +176,8 @@ export interface ConversationResponse {
   workLog: WorkLogEntry[];
   streaming: boolean;
   totalCost: number;
+  /** Total token throughput (input + output + cache read + cache write). */
+  totalTokens?: number;
   byteOffset: number;
   proposedPlan?: ProposedPlan;
   compactBoundaries?: CompactBoundary[];
@@ -396,7 +412,14 @@ export const ShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
 
 /** 19. Get available (installed) editors (PAN-966) */
 export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
-  success: Schema.Struct({ editors: Schema.Array(EditorIdSchema) }),
+  success: Schema.Struct({
+    editors: Schema.Array(EditorIdSchema),
+    /**
+     * Default cwd to open when no project/workspace is selected — the
+     * "devroot" fallback. `~/Projects` if it exists, else `$HOME`.
+     */
+    defaultCwd: Schema.String,
+  }),
   error: PanRpcError,
 })
 

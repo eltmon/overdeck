@@ -3,6 +3,7 @@ import { getHarness } from '@panctl/contracts';
 
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAgentProblemStatus } from '../../lib/pipeline-state';
+import { isAwaitingInput } from '../../lib/pendingInput';
 import { useDashboardStore, selectAgentOutput } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import { AgentTellForm } from '../AgentTellForm';
@@ -25,7 +26,7 @@ function verbBadgeForAgent(agent: Agent): VerbBadgeProps {
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, new Date()), className: 'text-[9px]' };
   }
-  if (agent.hasPendingQuestion) return { variant: 'INPUT', className: 'text-[9px]' };
+  if (isAwaitingInput(agent)) return { variant: 'INPUT', className: 'text-[9px]' };
   if (agent.role === 'plan') return { variant: 'PLANNING', className: 'text-[9px]' };
   if (agent.role === 'review' || agent.role === 'test') return { variant: 'REVIEW RUNNING', className: 'text-[9px]' };
   if (agent.role === 'ship') return { variant: 'SHIP RUNNING', className: 'text-[9px]' };

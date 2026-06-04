@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ComposerFooter } from '../ComposerFooter';
+import { resetComposerStore } from '../../../lib/composerStore';
 
 const { editorState, mockFocus, mockToastError, mockSaveStoredModel } = vi.hoisted(() => ({
   editorState: { text: '' },
@@ -19,6 +20,7 @@ vi.mock('lexical', () => ({
 }));
 
 vi.mock('../ComposerPromptEditor', () => ({
+  loadDraft: () => '',
   ComposerPromptEditor: ({ editorRef, onChange, disabled, onPaste }: { editorRef: { current: unknown }; onChange: (value: string) => void; disabled: boolean; onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void }) => {
     editorRef.current = {
       read: (callback: () => void) => callback(),
@@ -95,6 +97,7 @@ const secondConversation = {
 describe('ComposerFooter image attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetComposerStore();
     editorState.text = '';
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('image-1');
     vi.stubGlobal('fetch', vi.fn());
@@ -148,6 +151,7 @@ describe('ComposerFooter image attachments', () => {
       clipboardData: {
         items: [
           {
+            kind: 'file',
             type: 'image/png',
             getAsFile: () => file,
           },
@@ -246,7 +250,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -269,7 +273,12 @@ describe('ComposerFooter image attachments', () => {
     expect(screen.queryByText('remove-me.png')).not.toBeInTheDocument();
   });
 
-  it('deletes uploaded images when the conversation prop changes without remounting', async () => {
+  it('persists pasted images per-conversation across switches without remounting', async () => {
+    // Images are keyed per-conversation (like drafts). Switching away must
+    // hide — not discard — the pasted image: no delete-image call fires, and
+    // switching back reveals it again. ComposerFooter is reused across
+    // conversation switches (no remount), so this exercises the persistence
+    // contract directly.
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
@@ -303,7 +312,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -312,21 +321,45 @@ describe('ComposerFooter image attachments', () => {
       expect(screen.getByText('Uploaded')).toBeInTheDocument();
     });
 
+    // Switch to another conversation — the image is hidden, not deleted.
     view.rerender(<ComposerFooter conversation={secondConversation} />);
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/conversations/test-conv/delete-image',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-switched.png' }),
-        }),
-      );
-    });
     expect(screen.queryByText('switch-me.png')).not.toBeInTheDocument();
+
+    // Switch back — the image is still there, having survived the round-trip.
+    view.rerender(<ComposerFooter conversation={conversation} />);
+    expect(await screen.findByText('switch-me.png')).toBeInTheDocument();
+
+    // No delete-image request was ever made for either conversation.
+    const deleteCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/delete-image'));
+    expect(deleteCalls).toHaveLength(0);
   });
 
-  it('deletes uploaded images when the composer unmounts before send', async () => {
+  it('preserves the editor draft when the conversation prop changes without remounting (deck reuse)', () => {
+    // Regression: drafts vanished on navigate-away-and-back. The project-scoped
+    // deck reuses ComposerFooter across conversation switches, so the
+    // conversation-change effect fires after the keyed LexicalComposer has
+    // remounted and reloaded the new conversation's draft. Calling
+    // $getRoot().clear() in that effect wiped the just-loaded draft AND the
+    // resulting onChange('') deleted it from localStorage. The effect must not
+    // touch the editor content on a switch.
+    const view = render(<ComposerFooter conversation={conversation} />);
+
+    fireEvent.change(screen.getByTestId('composer-editor'), {
+      target: { value: 'half-written message' },
+    });
+    expect(editorState.text).toBe('half-written message');
+
+    view.rerender(<ComposerFooter conversation={secondConversation} />);
+
+    expect(editorState.text).toBe('half-written message');
+  });
+
+  it('keeps pasted images (and their server upload) across a full unmount/remount', async () => {
+    // PAN-1591's pane splits unmount the composer on every conversation switch.
+    // Pasted images live in the module-level composerStore, so unmounting must
+    // NOT delete the server upload, and remounting the same conversation must
+    // show the image again — the durability contract that makes images behave
+    // like drafts.
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
@@ -360,7 +393,7 @@ describe('ComposerFooter image attachments', () => {
 
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -369,16 +402,64 @@ describe('ComposerFooter image attachments', () => {
       expect(screen.getByText('Uploaded')).toBeInTheDocument();
     });
 
+    // Unmount == switching to another pane. The image must survive, not delete.
     view.unmount();
 
+    // Remount the same conversation == switching back. The image is still there.
+    render(<ComposerFooter conversation={conversation} />);
+    expect(await screen.findByText('abandon.png')).toBeInTheDocument();
+
+    const deleteCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('/delete-image'));
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('keeps the Sending state across unmount/remount and never leaks it to another conversation', async () => {
+    // The user's report: send a message, switch away and back, and "Sending…"
+    // is gone. PAN-1591 unmounts the composer on switch, so a component-local
+    // flag could not survive. Sourcing it from the per-conversation composerStore
+    // makes it survive a remount of the same conversation — and stay isolated
+    // from any other conversation.
+    const fetchMock = vi.mocked(fetch);
+    let resolveSend: (() => void) | null = null;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/message')) {
+        return new Promise<Response>((resolve) => {
+          resolveSend = () => resolve(new Response('{}', { status: 200 }));
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const view = render(<ComposerFooter conversation={conversation} />);
+    fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hi there' } });
+    fireEvent.click(screen.getByTitle('Send message (Enter)'));
+
+    // Send is in flight → the composer is disabled.
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/conversations/test-conv/delete-image',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-abandoned.png' }),
-        }),
-      );
+      expect(screen.getByTestId('composer-editor')).toBeDisabled();
+    });
+
+    // Switch away and back (full unmount/remount): still sending.
+    view.unmount();
+    const back = render(<ComposerFooter conversation={conversation} />);
+    expect(screen.getByTestId('composer-editor')).toBeDisabled();
+    back.unmount();
+
+    // A different conversation must NOT inherit the sending state.
+    render(<ComposerFooter conversation={secondConversation} />);
+    expect(screen.getByTestId('composer-editor')).not.toBeDisabled();
+
+    // Let the in-flight send settle so it doesn't leak into the next test.
+    resolveSend?.();
+    await waitFor(() => {
+      expect(screen.getByTestId('composer-editor')).not.toBeDisabled();
     });
   });
 
@@ -418,7 +499,7 @@ describe('ComposerFooter image attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 
@@ -451,6 +532,83 @@ describe('ComposerFooter image attachments', () => {
     });
   });
 
+  it('only enqueues one image when Chromium surfaces it in both .files and .items', async () => {
+    // Regression for the "Ctrl+V pastes two copies" bug: Chromium often
+    // populates BOTH clipboardData.files AND clipboardData.items (kind:'file')
+    // for a single image paste. The two File objects can have differing
+    // `lastModified` values (microsecond-apart synth), so name|size|lastModified
+    // dedup is unreliable. The handler must prefer .files and ignore .items
+    // when .files already has entries.
+    const fetchMock = vi.mocked(fetch);
+    let uploadCalls = 0;
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/upload-image')) {
+        uploadCalls += 1;
+        return new Response(JSON.stringify({ path: `/tmp/panopticon-paste-${uploadCalls}.png` }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    // Two File objects with same content/name but a different lastModified —
+    // the previous dedup key would treat these as distinct images.
+    const fileA = new File(['png-bytes'], 'image.png', { type: 'image/png', lastModified: 1_700_000_000_000 });
+    const fileB = new File(['png-bytes'], 'image.png', { type: 'image/png', lastModified: 1_700_000_000_001 });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        files: [fileA],
+        items: [
+          { kind: 'file', type: 'image/png', getAsFile: () => fileB },
+        ],
+        types: ['Files', 'image/png'],
+      },
+    });
+
+    await waitFor(() => {
+      expect(uploadCalls).toBe(1);
+    });
+    // Exactly one image card should be visible.
+    expect(screen.getAllByText('image.png')).toHaveLength(1);
+  });
+
+  it('falls back to .items when .files is empty (Wayland screenshot-tool paste)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ path: '/tmp/panopticon-paste-wayland.png' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    render(<ComposerFooter conversation={conversation} />);
+
+    const file = new File(['png-bytes'], 'wayland.png', { type: 'image/png' });
+
+    fireEvent.paste(screen.getByTestId('composer-editor'), {
+      clipboardData: {
+        files: [],
+        items: [
+          { kind: 'file', type: 'image/png', getAsFile: () => file },
+        ],
+        types: ['image/png'],
+      },
+    });
+
+    expect(await screen.findByText('wayland.png')).toBeInTheDocument();
+  });
+
   it('blocks send when any pending image upload has failed', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementation(async (input) => {
@@ -481,7 +639,7 @@ describe('ComposerFooter image attachments', () => {
     fireEvent.change(screen.getByTestId('composer-editor'), { target: { value: 'hello world' } });
     fireEvent.paste(screen.getByTestId('composer-editor'), {
       clipboardData: {
-        items: [{ type: 'image/png', getAsFile: () => file }],
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
       },
     });
 

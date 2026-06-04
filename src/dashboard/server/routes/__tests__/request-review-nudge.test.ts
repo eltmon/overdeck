@@ -234,6 +234,19 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 
+  it('prefers the full issue-id workspace over a numeric legacy workspace', async () => {
+    getReviewStatusMock.mockReturnValue({ reviewStatus: 'pending' });
+
+    await postRequestReview('PAN-1417');
+
+    expect(execBehaviorMock.mock.calls.some(([, options]) =>
+      (options as { cwd?: string } | undefined)?.cwd === '/tmp/panopticon/workspaces/feature-pan-1417',
+    )).toBe(true);
+    expect(execBehaviorMock.mock.calls.some(([, options]) =>
+      (options as { cwd?: string } | undefined)?.cwd === '/tmp/panopticon/workspaces/feature-1417',
+    )).toBe(false);
+  });
+
   it('re-emits test.passed with canonical issue ID without workspace lookup when nudged after review and tests passed', async () => {
     getReviewStatusMock.mockReturnValue(passedStatus());
 

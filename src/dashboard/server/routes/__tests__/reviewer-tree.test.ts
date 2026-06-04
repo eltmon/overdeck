@@ -251,6 +251,35 @@ describe('buildReviewerNodes (PAN-830)', () => {
     expect(security.roundMetadata).toBeUndefined();
   });
 
+  it('marks a finished sub-reviewer completed once its report lands, not the orchestrator status', async () => {
+    // PAN-1048 sub-reviewers are subagents with no tmux. A finished one must
+    // not inherit the orchestrator's "running" status (which left it showing
+    // "working" with no terminal). The report .md is the authoritative signal.
+    const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+    const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+    await mkdir(reviewRunDir, { recursive: true });
+    await writeFile(join(reviewRunDir, 'correctness.md'), '# correctness review');
+
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath,
+      tmuxSessionNames: new Set(), // no tmux — subagent
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'running', // orchestrator still synthesizing
+      agentsDirOverride: agentsDir,
+    });
+
+    // Report landed → done ('completed' normalizes to 'stopped'), terminal gone.
+    const correctness = nodes.find(n => n.role === 'correctness')!;
+    expect(correctness.status).toBe('stopped');
+    expect(correctness.presence).toBe('ended');
+
+    // A role whose report has NOT landed still reflects the orchestrator status.
+    const security = nodes.find(n => n.role === 'security')!;
+    expect(security.status).toBe('running');
+  });
+
   it('reads synthesis round metadata separately for the parent review node', async () => {
     const synthesis = getReviewerSessionName('synthesis', PROJECT_KEY, ISSUE_ID);
     await mkdir(join(agentsDir, synthesis), { recursive: true });

@@ -8,6 +8,29 @@ import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError, ProcessSpawnError } from '../errors.js';
+import { recordBackgroundAiCost } from '../background-ai/cost.js';
+import type { AIProvider } from '../cost.js';
+
+/** Record summary-fork/compaction spend from a `claude -p --output-format json`
+ * envelope. Best-effort; never throws into the caller (PAN-1589). */
+function recordSummaryForkCost(model: string, envelope: Record<string, unknown>): void {
+  const usage = (envelope['usage'] ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+  const m = model.toLowerCase();
+  const provider: AIProvider = m.includes('gpt') ? 'openai' : m.includes('gemini') ? 'google' : 'anthropic';
+  recordBackgroundAiCost({
+    feature: 'summaryFork',
+    provider,
+    model,
+    usage: {
+      inputTokens: num(usage['input_tokens']),
+      outputTokens: num(usage['output_tokens']),
+      cacheReadTokens: num(usage['cache_read_input_tokens']),
+      cacheWriteTokens: num(usage['cache_creation_input_tokens']),
+    },
+    costUsd: typeof envelope['total_cost_usd'] === 'number' ? (envelope['total_cost_usd'] as number) : undefined,
+  });
+}
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -53,7 +76,7 @@ interface CutPointResult {
 // Entry parsing
 // ============================================================================
 
-async function parseEntries(jsonlPath: string): Promise<any[]> {
+export async function parseEntries(jsonlPath: string): Promise<any[]> {
   const content = await readFile(jsonlPath, 'utf-8');
   const entries: any[] = [];
   for (const line of content.split('\n')) {
@@ -421,7 +444,7 @@ function serializeEntry(entry: any, includeThinking: boolean = true): string | u
   return undefined;
 }
 
-function serializeConversation(entries: any[], includeThinking: boolean = true): string {
+export function serializeConversation(entries: any[], includeThinking: boolean = true): string {
   const parts: string[] = [];
   for (const entry of entries) {
     const serialized = serializeEntry(entry, includeThinking);
@@ -665,11 +688,12 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   } finally {
     await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
   }
-}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
+}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code', allowedTools?: string[]): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
   if (harness === 'pi') {
+    // Pi runs in rpc mode and auto-executes tools, so it needs no allowlist.
     const summary = await runPiModelSummary(prompt, useModel, timeoutMs);
     console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=pi | outputChars=${summary.length}`);
     return summary;
@@ -677,8 +701,14 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
 
   const args = [
     '-p',
+    '--output-format', 'json',
     '--model', useModel,
     ...getClaudePermissionFlagsSync(),
+    // Plain summary generation uses no tools; callers that instruct the model
+    // to write a file (e.g. external handoff authoring) pass an allowlist so
+    // the tool is auto-approved instead of stalling on a permission prompt
+    // that headless `-p` mode can never answer.
+    ...(allowedTools && allowedTools.length > 0 ? ['--allowedTools', ...allowedTools] : []),
   ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
@@ -726,9 +756,27 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
         reject(new Error(`Summary generation failed: ${detail}`));
         return;
       }
-      const summary = stdout.trim();
-      if (!summary) {
+      const raw = stdout.trim();
+      if (!raw) {
         console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty output"`);
+        reject(new Error(`Summary generation returned empty output`));
+        return;
+      }
+      // `--output-format json` returns { result, usage, total_cost_usd, ... }.
+      // Extract the summary text and record spend; fall back to raw stdout if
+      // the output isn't the expected JSON envelope (defensive — PAN-1589).
+      let summary = raw;
+      try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        if (parsed && typeof parsed['result'] === 'string') {
+          summary = (parsed['result'] as string).trim();
+          recordSummaryForkCost(useModel, parsed);
+        }
+      } catch {
+        // Not JSON — treat the raw stdout as the summary (older CLI / unexpected).
+      }
+      if (!summary) {
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty result"`);
         reject(new Error(`Summary generation returned empty output`));
         return;
       }
@@ -792,6 +840,8 @@ async function generateTurnPrefixSummary(
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
+  'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
+  'claude-opus-4-7': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window
 };
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
@@ -847,7 +897,74 @@ async function generateChunkedSummary(
   }
 
   return running ?? '';
-}async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
+}
+
+/**
+ * Split already-serialized transcript text into chunks that fit the summarizer
+ * model's context budget. Splits on turn boundaries (the canonical serialized
+ * form separates turns with a blank line) so a chunk never cuts mid-turn unless
+ * a single turn is itself larger than the budget.
+ */
+function chunkSerializedTextByBudget(text: string, budgetChars: number): string[] {
+  if (text.length <= budgetChars) return text.trim() ? [text] : [];
+  const turns = text.split('\n\n');
+  const chunks: string[] = [];
+  let current = '';
+  for (const turn of turns) {
+    const candidate = current ? `${current}\n\n${turn}` : turn;
+    if (candidate.length > budgetChars && current) {
+      chunks.push(current);
+      current = turn;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current.trim()) chunks.push(current);
+  return chunks;
+}
+
+/**
+ * Harness-agnostic chunk-and-merge summarizer. Takes transcript text already
+ * serialized by a ConversationTranscriptAdapter (so it works for any harness)
+ * and runs the same incremental summary prompt the Claude-Code entry path uses,
+ * carrying a running <previous-summary> forward across chunks. Returns the
+ * final structured summary string.
+ *
+ * `harness` selects the summarizer LLM backend (claude-code or pi) and is
+ * independent of which harness produced the transcript.
+ */
+export async function summarizeSerializedText(
+  serialized: string,
+  options: {
+    model?: string;
+    richMode?: boolean;
+    timeoutMs?: number;
+    harness?: RuntimeName;
+  } = {},
+): Promise<string> {
+  const model = options.model;
+  const richMode = options.richMode ?? false;
+  const timeoutMs = options.timeoutMs ?? FORK_SUMMARY_TIMEOUT_MS;
+  const harness = options.harness ?? 'claude-code';
+
+  const budget = getChunkBudgetChars(model);
+  const chunks = chunkSerializedTextByBudget(serialized, budget);
+  if (chunks.length === 0) return '';
+
+  let running: string | undefined;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    if (!chunk.trim()) continue;
+    console.log(
+      `[smart-compaction] Summarizing serialized chunk ${i + 1}/${chunks.length} ` +
+      `(${chunk.length} chars) with ${model ?? DEFAULT_SUMMARY_MODEL}`,
+    );
+    running = await generateSummaryFromPrompt(chunk, running, model, richMode, timeoutMs, harness);
+  }
+  return running ?? '';
+}
+
+async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
   const entries = await parseEntries(options.jsonlPath);
   if (entries.length === 0) {
     throw new Error(`Session file is empty: ${options.jsonlPath}`);
@@ -1005,9 +1122,10 @@ export function runModelSummary(
   model?: string,
   timeoutMs?: number,
   harness: RuntimeName = 'claude-code',
+  allowedTools?: string[],
 ): Effect.Effect<string, ProcessSpawnError> {
   return Effect.tryPromise({
-    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness),
+    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness, allowedTools),
     catch: (cause) =>
       new ProcessSpawnError({
         command: harness === 'pi' ? 'pi' : 'claude',

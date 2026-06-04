@@ -1,0 +1,135 @@
+---
+title: Auto-Merge
+description: Opt-in scheduled auto-merge for solo Panopticon workflows
+---
+
+# Auto-Merge
+
+When the Flywheel orchestrator is trusted to ship work without a human clicking
+MERGE, you can flip a single toggle and Panopticon will schedule eligible PRs
+for merge with a short cooldown window. During the cooldown an audible
+announcement fires, a cancellable banner appears in the dashboard, and the
+merge runs through the exact same code path as the MERGE button when the
+cooldown expires.
+
+<Warning>
+**Solo Panopticon workflows only.** Auto-merge moves the merge-consent decision
+from per-PR click to a configuration toggle. That trade is appropriate when the
+operator is the only human in the loop. In a shared Panopticon instance it
+shifts consent away from the person who would normally click MERGE — not
+appropriate for team workflows.
+</Warning>
+
+## Enabling
+
+Auto-merge is gated by one persisted toggle in the dashboard's
+`app_settings` store:
+
+```bash
+# turn auto-merge on
+pan flywheel config --set flywheel.require_uat_before_merge=false
+
+# turn it back off
+pan flywheel config --set flywheel.require_uat_before_merge=true
+
+# inspect current state
+pan flywheel config --get
+```
+
+The same toggle is exposed in the dashboard's Flywheel header as a checkbox.
+The default is `true` (auto-merge OFF — operator UAT required before merge).
+
+When the toggle is `false`, the Flywheel orchestrator may schedule auto-merge
+for any issue that satisfies the eligibility predicate.
+
+## Eligibility
+
+A PR is eligible for auto-merge only when **all** of these are true:
+
+- `readyForMerge` is `true` (review, test, and ship roles all passed)
+- The PR is open (not closed, not draft, not already merged)
+- GitHub reports all CI checks as completed and passing
+  (no `checksFailed` and no `checksPending`)
+- GitHub reports the PR as `mergeable` (no merge conflicts, branch protection
+  satisfied)
+- None of the **blocker labels** are present on the issue:
+  - `needs-design`
+  - `needs-discussion`
+  - `do-not-merge`
+
+Eligibility is re-checked when the cooldown expires. A PR that became
+ineligible during the cooldown (e.g. someone added a `do-not-merge` label
+while the timer was running) gets surfaced as a blocked entry instead of
+merged.
+
+## Cooldown
+
+Cooldown is fixed at **5 minutes** of wall-clock time from when the
+orchestrator schedules the merge to when the executor fires. The countdown is
+persisted in SQLite, so it survives dashboard restarts — if the dashboard
+sleeps through the deadline, the executor still picks the entry up on the
+next tick and re-validates eligibility before firing.
+
+The cooldown is not configurable today; it's a deliberate single-knob value
+that gives the operator a predictable cancel window.
+
+## Cancelling
+
+Three ways to cancel an in-flight auto-merge during its cooldown:
+
+1. The dashboard's pending-auto-merges banner has a Cancel button.
+2. `DELETE /api/flywheel/auto-merge/:id` against the dashboard.
+3. The CLI:
+
+   ```bash
+   pan merge cancel PAN-123
+   ```
+
+   This calls the DELETE endpoint, removes the entry from the pending list,
+   and emits an `auto-merge cancelled for PAN-123` TTS announcement so the
+   operator knows the abort took effect.
+
+Cancellation only succeeds during the cooldown window, before the executor
+has transitioned the row to `merging`. Once the executor has started running
+the merge there is nothing to cancel — at that point it's the same code path
+as clicking MERGE.
+
+## Queue interaction
+
+The dashboard runs at most one merge at a time per project. If two
+auto-merges become due at the same instant, the second is requeued with a
+short backoff (`scheduledMergeAt` bumped by 60 seconds, status reverted to
+`pending`) so the next executor tick re-evaluates eligibility and tries
+again. Stale `merging` rows are prevented by this requeue path; the executor
+never leaves a row stuck mid-flight when `triggerMerge()` returns a
+non-terminal status.
+
+## Inspecting state
+
+```bash
+# Pending entries currently in cooldown
+curl http://localhost:3011/api/flywheel/auto-merge/pending
+
+# Rows that failed or were blocked during the executor tick
+curl http://localhost:3011/api/flywheel/auto-merge/problems
+```
+
+The dashboard's Flywheel page surfaces both lists with countdown and cancel
+controls.
+
+## Failure handling
+
+When the executor fires and the merge fails (e.g. surface-level rebase
+conflict raised at merge time), the row is moved to `failed` with the failure
+reason captured, a TTS announcement plays, and the orchestrator surfaces the
+entry as an `investigate` suggestion in its next tick snapshot. The operator
+can then either fix the underlying problem and reschedule, or cancel the
+failed entry to clear it.
+
+## Related
+
+- `pan flywheel config` — read/write the two flywheel autonomy toggles
+- `pan merge cancel <id>` — cancel a pending auto-merge
+- `roles/flywheel.md` — the orchestrator's contract; references the toggle
+  when deciding whether to call the scheduler vs. emitting a `merge`
+  suggestion for human action.

@@ -20,6 +20,7 @@ export interface WebhookPayload {
     mergeable_state?: string;
     draft?: boolean;
     state?: string;
+    merged?: boolean;
   };
   check_suite?: {
     status?: string;
@@ -326,6 +327,29 @@ async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumb
   if (!issueId) return;
 
   const repo = payload.repository!.full_name;
+
+  // PAN-1513: fire postMergeLifecycle when GitHub reports the PR closed+merged.
+  // Without this, admin-merges (gh pr merge --admin) and any merge that doesn't
+  // route through Panopticon's own merge flow leave work agents, strikes, tmux
+  // sessions, and worktrees orphaned. postMergeLifecycle has its own
+  // single-flight guard (specialists.ts L116) and _completedPostMerge marker,
+  // so duplicate webhook deliveries are idempotent.
+  if (payload.action === 'closed' && pr.merged === true) {
+    try {
+      const { postMergeLifecycle } = await import('./cloister/merge-agent.js');
+      const { resolveProjectFromIssueSync } = await import('./projects.js');
+      const project = resolveProjectFromIssueSync(issueId);
+      if (project) {
+        const branchName = pr.head.ref;
+        postMergeLifecycle(issueId, project.projectPath, branchName).catch(err =>
+          console.warn(`[webhook] postMergeLifecycle failed for ${issueId} (${branchName}): ${err?.message ?? err}`),
+        );
+      }
+    } catch (err: any) {
+      console.warn(`[webhook] Failed to dispatch postMergeLifecycle for ${issueId}: ${err?.message ?? err}`);
+    }
+  }
+
   // For synchronize/opened/reopened the head SHA may have changed — skip SHA
   // validation so the handler can refresh prHeadSha and recompute blockers.
   const headMayHaveMoved = ['synchronize', 'opened', 'reopened'].includes(payload.action ?? '');

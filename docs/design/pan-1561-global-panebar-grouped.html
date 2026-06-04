@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Global PaneBar — Variant B (grouped + overflow + quick-switch)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f; --running:#16a34a;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+
+    /* per-WORKSPACE accents */
+    --ws-1549:#4f46e5; --ws-1547:#0ea5e9; --ws-myn:#16a34a; --ws-aur:#d946ef; --ws-global:#94a3b8;
+
+    --c-shell:#6b7280; --c-bar:#0ea5e9; --c-pane:#4f46e5; --c-home:#0d9488; --c-tool:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-size:14px;line-height:1.55;padding:32px 24px 80px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;}
+  td code{color:var(--primary);}
+
+  /* ---------- window frame ---------- */
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:12px;overflow:visible;background:var(--background);
+    box-shadow:0 6px 30px rgba(0,0,0,.10);display:flex;flex-direction:column;height:640px;}
+  .win-inner{display:flex;flex-direction:column;flex:1;border-radius:12px;overflow:hidden;}
+
+  .tag{position:absolute;z-index:6;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:#fff;
+    padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:"SF Mono",ui-monospace,Menlo,monospace;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-bar{background:var(--c-bar);} .t-shell{background:var(--c-shell);} .t-pane{background:var(--c-pane);}
+  .t-home{background:var(--c-home);} .t-tool{background:var(--c-tool);}
+  .region{position:relative;}
+  .ol-bar{outline:2px dashed var(--c-bar);outline-offset:-2px;}
+
+  /* ---- the grouped PaneBar ---- */
+  .panebar{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);
+    background:var(--surface);padding:0 10px;height:48px;flex:0 0 48px;position:relative;}
+  .switcher{display:flex;align-items:center;gap:8px;padding:6px 11px;height:32px;border:1px solid var(--border-strong);
+    border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:var(--foreground);white-space:nowrap;flex:0 0 auto;}
+  .switcher .logo{width:16px;height:16px;border-radius:4px;background:var(--primary);display:inline-block;}
+  .switcher .car{color:#9ca3af;font-size:10px;}
+
+  .groups{display:flex;align-items:stretch;gap:7px;flex:1;min-width:0;overflow:hidden;height:48px;padding-top:9px;}
+
+  /* a workspace cluster */
+  .grp{display:flex;align-items:flex-end;border-radius:9px 9px 0 0;padding:0 4px 0 0;position:relative;
+    background:color-mix(in srgb, var(--accent) 7%, transparent);}
+  .grp-head{display:flex;align-items:center;gap:6px;height:34px;padding:0 9px;font-size:11.5px;font-weight:700;
+    color:var(--accent);white-space:nowrap;cursor:default;}
+  .grp-head .wsdot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .grp-head .type{font-family:"SF Mono",monospace;font-weight:600;font-size:11px;opacity:.85;}
+  .grp-head .car{color:var(--accent);opacity:.7;font-size:10px;}
+  .grp-head .cnt{background:var(--accent);color:#fff;border-radius:999px;font-size:10px;font-weight:700;
+    padding:0 6px;line-height:15px;min-width:16px;text-align:center;}
+
+  .gtabs{display:flex;align-items:flex-end;gap:0;height:43px;}
+  .gtab{display:flex;align-items:center;gap:6px;padding:0 10px;height:34px;font-size:12px;color:var(--muted);
+    border:1px solid transparent;border-bottom:none;cursor:default;border-radius:7px 7px 0 0;white-space:nowrap;max-width:160px;}
+  .gtab .ic{font-size:12.5px;opacity:.85;}
+  .gtab .x{color:#c4c4c4;font-size:12px;}
+  .gtab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .gtab.active::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--accent);}
+
+  /* collapsed cluster — just the head as a chip */
+  .grp.collapsed{align-items:center;padding:0;}
+  .grp.collapsed .grp-head{height:32px;border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius:8px;margin-bottom:0;background:#fff;}
+
+  .overflow{display:flex;align-items:center;gap:6px;height:32px;padding:0 11px;border:1px dashed var(--border-strong);
+    border-radius:8px;color:var(--muted);font-size:11.5px;white-space:nowrap;flex:0 0 auto;align-self:center;}
+  .bar-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex:0 0 auto;}
+  .qswitch{display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border:1px solid var(--primary-border);
+    background:var(--primary-tint);border-radius:8px;color:var(--primary);font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .qswitch .kbd{font-family:"SF Mono",monospace;font-size:10px;border:1px solid var(--primary-border);border-radius:4px;padding:0 4px;}
+
+  /* ---- quick-switcher popover (⌘P) ---- */
+  .qpop{position:absolute;z-index:8;top:54px;right:14px;width:340px;background:#fff;border:1px solid var(--border-strong);
+    border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.22);overflow:hidden;}
+  .qpop .qin{display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);}
+  .qpop .qin .cur{color:var(--foreground);}
+  .qrow{display:flex;align-items:center;gap:10px;padding:8px 13px;font-size:12.5px;border-bottom:1px solid var(--border);}
+  .qrow:last-child{border-bottom:none;}
+  .qrow.sel{background:var(--primary-tint);}
+  .qrow .ic{width:18px;text-align:center;}
+  .qrow .lab{flex:1;color:var(--foreground);}
+  .qrow .meta{display:flex;align-items:center;gap:6px;color:#9ca3af;font-size:10.5px;font-family:"SF Mono",monospace;}
+  .qrow .meta i{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  /* ---- body: rail + pane ---- */
+  .body{display:flex;flex:1;min-height:0;}
+  .rail{width:54px;flex:0 0 54px;background:var(--surface);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;}
+  .rail .ri{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted);}
+  .rail .ri.active{background:var(--primary-tint);color:var(--primary);} .rail .sep{flex:1;}
+
+  .pane{flex:1;overflow:auto;padding:24px 30px;position:relative;background:var(--background);min-width:0;}
+  .home{max-width:680px;}
+  .ws-title{display:flex;align-items:center;gap:12px;}
+  .ws-title .icon{width:30px;height:30px;border-radius:8px;background:var(--ws-1549);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .ws-title h3{font-size:24px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .crumb{color:#9ca3af;font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;margin:7px 0 16px;}
+  .crumb .type{font-family:"SF Mono",monospace;color:var(--ws-1549);font-weight:600;}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:999px;padding:4px 11px;}
+  .chip .mut{color:var(--muted);}
+  .launch-bar{display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);border-radius:12px;
+    padding:11px 14px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);margin-bottom:18px;}
+  .launch-bar .typed{flex:1;color:var(--muted);} .launch-bar .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  .dock{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0;}
+  .pillb{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--foreground);
+    background:#fff;border:1px solid var(--border-strong);border-radius:9px;padding:7px 12px;}
+  .pillb.ghost{font-weight:500;color:var(--muted);border-style:dashed;} .pillb.tool{font-weight:500;}
+  .sq{width:13px;height:13px;border-radius:4px;display:inline-block;} .car{color:#9ca3af;font-size:10px;}
+
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;} .legend .desc .was{color:var(--muted);font-style:italic;}
+  .callout{margin-top:14px;border:1px solid var(--primary-border);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;}
+  .callout b{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Global PaneBar — <span style="color:var(--primary)">Variant B</span></h1>
+  <p class="sub">Same outermost global bar as <a class="pill-link" href="pan-1561-global-panebar.html">Variant&nbsp;A</a>, but with the three things that keep a cross-workspace bar navigable at volume: <b>workspace grouping</b> (collapsible clusters), <b>overflow</b>, and a <b>⌘P quick-switcher</b>. Group headers preview the <code>#type</code> tag idea. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Grouped, with overflow + quick-switch</h2>
+  <p class="sub">20 open panes read as a handful of <b>workspace clusters</b>, each headed by its <code>WS · #type · count</code>. Collapse a cluster to a chip; overflow folds the rest; ⌘P fuzzy-finds any pane instantly.</p>
+
+  <div class="frame-wrap">
+    <div class="win">
+      <div class="win-inner">
+
+      <!-- grouped global panebar -->
+      <div class="panebar region ol-bar">
+        <span class="tag t-bar" style="top:-2px;left:230px;">Global PaneBar — grouped by workspace</span>
+
+        <div class="switcher">
+          <span class="logo"></span> panopticon <span class="car">▾</span>
+        </div>
+
+        <div class="groups">
+
+          <!-- expanded, active cluster -->
+          <div class="grp region" style="--accent:var(--ws-1549)">
+            <span class="tag t-shell" style="top:-22px;left:0;">cluster (expanded) · <code>#feature</code></span>
+            <div class="grp-head"><span class="wsdot"></span> PAN-1549 <span class="type">#feature</span> <span class="car">▾</span></div>
+            <div class="gtabs">
+              <div class="gtab active"><span class="ic">⌂</span> Home</div>
+              <div class="gtab"><span class="ic">🤖</span> Claude <span class="x">×</span></div>
+              <div class="gtab"><span class="ic">▢</span> Terminal <span class="x">×</span></div>
+            </div>
+          </div>
+
+          <!-- collapsed clusters -->
+          <div class="grp collapsed" style="--accent:var(--ws-1547)">
+            <div class="grp-head"><span class="wsdot"></span> PAN-1547 <span class="type">#feature</span> <span class="cnt">4</span> <span class="car">▸</span></div>
+          </div>
+          <div class="grp collapsed" style="--accent:var(--ws-myn)">
+            <div class="grp-head"><span class="wsdot"></span> MYN-204 <span class="type">#bug</span> <span class="cnt">2</span> <span class="car">▸</span></div>
+          </div>
+          <div class="grp collapsed" style="--accent:var(--ws-aur)">
+            <div class="grp-head"><span class="wsdot"></span> AUR-88 <span class="type">#explore</span> <span class="cnt">3</span> <span class="car">▸</span></div>
+          </div>
+
+          <div class="overflow region">
+            <span class="tag t-shell" style="top:-22px;left:0;">overflow</span>
+            ⋯ +2 more
+          </div>
+        </div>
+
+        <div class="bar-right region">
+          <span class="tag t-bar" style="top:-22px;right:0;">quick-switch</span>
+          <div class="qswitch">⌘P  Switch… <span class="kbd">⌘P</span></div>
+        </div>
+      </div>
+
+      <!-- quick-switcher popover -->
+      <div class="qpop region">
+        <span class="tag t-bar" style="top:-22px;right:0;">⌘P — fuzzy-find any pane across every workspace</span>
+        <div class="qin">🔎 <span class="cur">term</span><span style="opacity:.4">|</span></div>
+        <div class="qrow sel"><span class="ic">▢</span><span class="lab">Terminal</span><span class="meta"><i style="background:var(--ws-1549)"></i>PAN-1549 #feature</span></div>
+        <div class="qrow"><span class="ic">▢</span><span class="lab">Terminal · build watch</span><span class="meta"><i style="background:var(--ws-1547)"></i>PAN-1547 #feature</span></div>
+        <div class="qrow"><span class="ic">▢</span><span class="lab">Terminal · pytest</span><span class="meta"><i style="background:var(--ws-myn)"></i>MYN-204 #bug</span></div>
+        <div class="qrow"><span class="ic">📋</span><span class="lab">vBRIEF</span><span class="meta"><i style="background:var(--ws-1547)"></i>PAN-1547 #feature</span></div>
+      </div>
+
+      <!-- body -->
+      <div class="body">
+        <div class="rail">
+          <div class="ri">⌂</div>
+          <div class="ri active">▤</div>
+          <div class="ri">▦</div>
+          <div class="ri">⎇</div>
+          <div class="ri">🤖</div>
+          <div class="sep"></div>
+          <div class="ri">⚙</div>
+        </div>
+
+        <div class="pane region">
+          <span class="tag t-pane" style="top:4px;right:8px;">Active Pane · HomePane <small>(PAN-1549)</small></span>
+          <div class="home">
+            <div class="ws-title"><span class="icon">P</span><h3>Hoist PaneBar to top level</h3></div>
+            <div class="crumb">panopticon · PAN-1549 <span class="type">#feature</span> · <span>⎇ feature/pan-1549</span></div>
+            <div class="stats">
+              <span class="chip">⏱ 2 days</span>
+              <span class="chip">⇄ <span style="color:var(--running)">+412</span> <span class="mut">−38</span></span>
+              <span class="chip">📄 9 files</span>
+              <span class="chip">💬 3 convos</span>
+            </div>
+            <div class="launch-bar"><span>⌘</span><span class="typed">spawn a tab into this workspace…</span><span class="run">↵ Run</span></div>
+            <div class="dock">
+              <span class="pillb"><span class="sq" style="background:var(--claude)"></span> Claude Code <span class="car">▾</span></span>
+              <span class="pillb"><span class="sq" style="background:var(--codex)"></span> Codex <span class="car">▾</span></span>
+              <span class="pillb ghost">+ More Agents</span>
+            </div>
+            <div class="dock">
+              <span class="pillb tool">▢ Terminal</span>
+              <span class="pillb tool">📄 Files</span>
+              <span class="pillb tool">🌐 Web</span>
+              <span class="pillb tool">⎇ Commits</span>
+              <span class="pillb tool ghost">+ Actions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Why this beats a flat strip at volume:</b> Variant&nbsp;A's flat bar is great at 2–3 workspaces and cramped past ~10 tabs. Grouping makes 20 panes read as <b>4 clusters</b>; collapse + overflow keep the bar short; ⌘P makes tab count irrelevant for <i>reaching</i> anything. The <code>#type</code> tag (<code>#feature</code> / <code>#bug</code> / <code>#explore</code>) adds a second axis you can scan and, later, filter by.
+  </div>
+
+  <h2>2 · Variant A vs Variant B</h2>
+  <table>
+    <thead><tr><th style="width:22%">Aspect</th><th style="width:39%">A · flat global bar</th><th>B · grouped + overflow + ⌘P</th></tr></thead>
+    <tbody>
+      <tr><td>2–3 workspaces</td><td>excellent — minimal chrome</td><td>excellent — clusters barely noticeable</td></tr>
+      <tr><td>10+ workspaces</td><td>cramped — long horizontal scan</td><td><b>stays compact</b> — collapse + overflow</td></tr>
+      <tr><td>Tell workspaces apart</td><td>color dot per tab</td><td>color + cluster bracket + <code>#type</code></td></tr>
+      <tr><td>Reach an off-screen pane</td><td>scroll the bar</td><td>⌘P fuzzy-find (count-independent)</td></tr>
+      <tr><td>Visual complexity</td><td>lower</td><td>slightly higher (clusters)</td></tr>
+      <tr><td>Best for</td><td>focused, few things open</td><td>orchestrating many agents at once</td></tr>
+    </tbody>
+  </table>
+
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-bar)">Cluster</span><span class="desc"><b>Workspace cluster</b> — tabs of one workspace, headed by <code>WS · #type · count</code>; collapsible.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-shell)">Overflow</span><span class="desc"><b>Overflow</b> — folds the least-recent clusters into <code>⋯ +N more</code>.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-bar)">⌘P</span><span class="desc"><b>Quick-switcher</b> — fuzzy-find any pane by name / workspace / <code>#type</code>.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-pane)">#type</div></span><span class="desc"><b>#type tag</b> — lightweight workspace category (Subspace thread-type idea).</span></div>
+  </div>
+
+  <p class="legend-note">Issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. Variant A: <a class="pill-link" href="pan-1561-global-panebar.html">pan-1561-global-panebar.html</a> · PAN-1549 original: <a class="pill-link" href="pan-1549-workspace-panes.html">pan-1549-workspace-panes.html</a>.</p>
+
+</div>
+</body>
+</html>

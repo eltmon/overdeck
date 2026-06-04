@@ -129,10 +129,11 @@ describe('auto-merge executor', () => {
     expect(markFailed).not.toHaveBeenCalled();
   });
 
-  it('leaves queued merge results non-terminal without recording a failure', async () => {
+  it('requeues queued merge results to pending without recording a failure', async () => {
     const markMerged = vi.fn();
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
+    const requeueToPending = vi.fn().mockReturnValue(true);
     const log = vi.fn();
 
     await tickAutoMergeExecutor({
@@ -145,13 +146,19 @@ describe('auto-merge executor', () => {
       markMerged,
       markFailed,
       announceFailure,
+      requeueToPending,
       log,
     });
 
+    const retryAt = new Date(NOW.getTime() + 60_000).toISOString();
     expect(markMerged).not.toHaveBeenCalled();
     expect(markFailed).not.toHaveBeenCalled();
+    expect(requeueToPending).toHaveBeenCalledWith(1, retryAt);
     expect(announceFailure).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledWith('[auto-merge] merge accepted for PAN-1486 with non-terminal status queued');
+    expect(requeueToPending).toHaveBeenCalledWith(1, expect.any(String));
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('[auto-merge] merge for PAN-1486 accepted as queued; requeued for'),
+    );
   });
 
   it('marks failed merges as failed and announces the failure', async () => {

@@ -1,12 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
-import MetricStrip, { type MetricStripTile } from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
-import { LiveCounter } from './LiveCounter';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import type { Agent, Issue, CanonicalState } from '../../types';
 
@@ -38,10 +37,6 @@ const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
 
 type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>;
 type PipelineClassifierAgent = Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'>;
-
-function MetricIcon({ label }: { label: string }) {
-  return <span aria-hidden="true">{label}</span>;
-}
 
 function hasActiveWorkSession(feature: ProjectFeature): boolean {
   return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
@@ -125,6 +120,32 @@ function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSna
   );
 }
 
+/**
+ * Project lifetime spend (PAN-1589). `issueCosts` is a GLOBAL map (every issue
+ * across all projects, keyed by both `PAN-1` and a lowercased alias). We scope
+ * it to this project by the issue prefix(es) of its features, and sum ALL
+ * matching issues — including closed/historical ones, not just active features.
+ * Counting only the canonical (non-lowercased) keys avoids double-counting the
+ * alias entries. Shared by the cockpit Spend metric and the Home cost chip so
+ * the two always agree.
+ */
+export function projectTotalCost(
+  issueCosts: Record<string, number>,
+  features: { issueId: string }[],
+): number {
+  const prefixes = new Set(
+    features.map(f => f.issueId.split('-')[0]?.toUpperCase()).filter(Boolean),
+  );
+  if (prefixes.size === 0) return 0;
+  let sum = 0;
+  for (const [key, value] of Object.entries(issueCosts)) {
+    if (key !== key.toUpperCase()) continue; // skip lowercased aliases
+    const prefix = key.split('-')[0]?.toUpperCase();
+    if (prefix && prefixes.has(prefix)) sum += value;
+  }
+  return sum;
+}
+
 export function ProjectOverview({
   projectName,
   features,
@@ -135,9 +156,31 @@ export function ProjectOverview({
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
 
   const totalCost = useMemo(
-    () => features.reduce((sum, feature) => sum + (issueCosts[feature.issueId] ?? 0), 0),
+    () => projectTotalCost(issueCosts, features),
     [features, issueCosts],
   );
+
+  // PAN-1597: recent (rolling 7-day) project spend — far more actionable than
+  // the lifetime total. Derive the single project prefix from the features and
+  // ask the windowed, project-scoped cost summary for it.
+  const projectPrefix = useMemo(() => {
+    const prefixes = new Set(
+      features.map((f) => f.issueId.split('-')[0]?.toUpperCase()).filter(Boolean),
+    );
+    return prefixes.size === 1 ? [...prefixes][0]! : null;
+  }, [features]);
+
+  const { data: recentCost } = useQuery<{ week?: { totalCost?: number } }>({
+    queryKey: ['project-recent-spend', projectPrefix],
+    queryFn: async () => {
+      const res = await fetch(`/api/costs/summary?project=${encodeURIComponent(projectPrefix!)}`);
+      if (!res.ok) throw new Error('Failed to fetch project spend');
+      return res.json();
+    },
+    enabled: !!projectPrefix,
+    refetchInterval: 60_000,
+  });
+  const recentSpend = recentCost?.week?.totalCost ?? null;
 
   const activeAgentCount = useMemo(
     () => features.filter(hasActiveAgentSignal).length,
@@ -163,20 +206,20 @@ export function ProjectOverview({
     return byPhase;
   }, [bucketedFeatures]);
 
-  const activePhaseCount = PIPELINE_PHASES.filter(phase => (bucketedByPhase.get(phase)?.length ?? 0) > 0).length;
-
-  const metricTiles = useMemo<MetricStripTile[]>(() => {
-    const reviewRunning = bucketedFeatures.filter(({ phase }) => phase === 'review').length;
+  const metrics = useMemo<HeroMetric[]>(() => {
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
+    const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.reviewStatus)).length;
 
     return [
-      { id: 'active', eyebrow: 'Active issues', value: features.length, sub: projectName, icon: <MetricIcon label="●" />, signal: 'info' },
-      { id: 'work', eyebrow: 'Work running', value: activeAgentCount, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' },
-      { id: 'review', eyebrow: 'Review running', value: reviewRunning, sub: 'review phase', icon: <MetricIcon label="◆" />, signal: 'review' },
-      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ship phase', icon: <MetricIcon label="↑" />, signal: 'success' },
-      { id: 'spend', eyebrow: 'Spend', value: formatCost(totalCost), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' },
+      { label: 'Active issues', value: features.length, sub: 'in pipeline', tone: 'info' },
+      { label: 'Stuck', value: stuck, sub: stuck > 0 ? 'need attention' : 'all clear', tone: stuck > 0 ? 'destructive' : 'muted' },
+      { label: 'Agents', value: activeAgentCount, sub: 'running now', tone: 'success' },
+      { label: 'Ship-ready', value: readyToShip, sub: 'awaiting merge', tone: 'success' },
+      recentSpend != null
+        ? { label: 'Spend', value: formatCost(recentSpend), sub: 'last 7 days', tone: 'cost' }
+        : { label: 'Spend', value: formatCost(totalCost), sub: 'project total', tone: 'cost' },
     ];
-  }, [activeAgentCount, bucketedFeatures, features.length, projectName, totalCost]);
+  }, [activeAgentCount, bucketedFeatures, features.length, totalCost, recentSpend]);
 
   return (
     <section
@@ -184,20 +227,12 @@ export function ProjectOverview({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
-        padding: 20,
-        minHeight: '100%',
+        gap: 14,
+        padding: 16,
         overflow: 'auto',
       }}
     >
-      <HeroBillboard
-        projectName={projectName}
-        issueCount={features.length}
-        totalCost={totalCost}
-        activeAgentCount={activeAgentCount}
-        activePhaseCount={activePhaseCount}
-        metricTiles={metricTiles}
-      />
+      <HeroBillboard projectName={projectName} metrics={metrics} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {
@@ -219,75 +254,44 @@ export function ProjectOverview({
   );
 }
 
-function HeroBillboard({
-  projectName,
-  issueCount,
-  totalCost,
-  activeAgentCount,
-  activePhaseCount,
-  metricTiles,
-}: {
-  projectName: string;
-  issueCount: number;
-  totalCost: number;
-  activeAgentCount: number;
-  activePhaseCount: number;
-  metricTiles: MetricStripTile[];
-}) {
+type HeroTone = 'info' | 'success' | 'warning' | 'destructive' | 'cost' | 'muted';
+interface HeroMetric { label: string; value: ReactNode; sub?: string; tone: HeroTone }
+const HERO_TONE_COLOR: Record<HeroTone, string> = {
+  info: 'var(--info-foreground)',
+  success: 'var(--success-foreground)',
+  warning: 'var(--warning-foreground)',
+  destructive: 'var(--destructive-foreground)',
+  cost: 'var(--signal-cost-foreground)',
+  muted: 'var(--foreground)',
+};
+
+function HeroBillboard({ projectName, metrics }: { projectName: string; metrics: HeroMetric[] }) {
+  // Tight, container-responsive glance row. No outer card and an auto-fill grid
+  // (min 132px tiles) so it lays out by the PANE width — tiles never crush to
+  // ~100px and truncate their labels the way the fixed 5-column MetricStrip did
+  // in the narrow cockpit pane. (PAN-1591 project-cockpit refinement.)
   return (
-    <div
-      style={{
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent)',
-        border: '1px solid var(--border)',
-        borderRadius: 16,
-        padding: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}
-    >
-      <div>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 700,
-            color: 'var(--foreground)',
-          }}
-        >
-          {projectName}
-        </h2>
-        <p
-          style={{
-            margin: '6px 0 0',
-            fontSize: 12,
-            color: 'var(--muted-foreground)',
-          }}
-        >
-          Project pipeline overview
-        </p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="flex items-baseline gap-2">
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
-
-      <MetricStrip
-        tiles={metricTiles}
-        columns={5}
-        className="border-b-0 px-0 py-0"
-      />
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <StatCard label="Issues" value={issueCount.toString()} />
-        <StatCard
-          label="Total cost"
-          value={<LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
-        />
-        <StatCard label="Active agents" value={activeAgentCount.toString()} />
-        <StatCard label="Pipeline phases" value={activePhaseCount.toString()} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8 }}>
+        {metrics.map((m) => (
+          <div
+            key={m.label}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '8px 11px',
+              background: 'color-mix(in srgb, white 1.5%, transparent)',
+            }}
+          >
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)' }}>{m.label}</div>
+            <div style={{ marginTop: 2, fontSize: 18, fontWeight: 600, fontFamily: '"SF Mono", Consolas, monospace', fontVariantNumeric: 'tabular-nums', color: HERO_TONE_COLOR[m.tone] }}>{m.value}</div>
+            {m.sub && <div style={{ marginTop: 1, fontSize: 10, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.sub}</div>}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -596,36 +600,3 @@ function subStatus(entry: BucketedFeature): string | undefined {
   return undefined;
 }
 
-function StatCard({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div
-      style={{
-        border: '1px solid var(--border)',
-        borderRadius: 12,
-        padding: 12,
-        background: 'color-mix(in srgb, var(--card) 88%, transparent)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          color: 'var(--muted-foreground)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'var(--foreground)',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

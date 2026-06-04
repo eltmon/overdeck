@@ -196,6 +196,51 @@ and should be re-checked before any decision.
   reference for per-session skill curation; generous free tier; clean headless
   JSONL stream.
 
+### GitHub Copilot CLI — Not supported (candidate)
+
+- **Vendor / model:** GitHub (Microsoft). Runs the *same agentic harness as the
+  Copilot coding agent*. Defaults to **Claude Sonnet 4.5**; `/model` switches to
+  Claude Sonnet 4, GPT-5, GPT-5 mini, GPT-4.1 (the latter two free of premium
+  requests on paid plans). **BYOK** custom models supported. Model access is
+  bundled through the Copilot subscription, not direct provider keys.
+- **OSS / license:** **Proprietary.** The CLI ships as a closed binary via
+  `npm i -g @github/copilot`. The public `github/copilot-cli` repo is install
+  scripts (Shell) + issue tracker + docs only — its `LICENSE.md` resolves to
+  `NOASSERTION` ("Other"), and it is **not** the agent source. Node.js 22+.
+  v1.0.40 (2026-05, ~4 days before survey). Also installable via
+  `curl … gh.io/copilot-install`, Homebrew (`copilot-cli`), WinGet.
+- **Auth:** GitHub Copilot subscription (Pro / Pro+ / Business / Enterprise) via
+  GitHub OAuth — no separate provider API keys. This is GitHub's own model
+  bundling, so the Pi-style "subscription + Anthropic model" ToS bar does **not**
+  apply (the Claude access is sold *as* Copilot).
+- **Extensibility:**
+  - **Skills — yes** (since 2025-12-18), `SKILL.md`, Claude Code-compatible
+    frontmatter. Discovery: `~/.copilot/skills/`, **`~/.agents/skills/`**, plus
+    project skills; `/skills reload` re-scans mid-session. Does **not** read
+    `.claude/skills/` natively — but Panopticon already writes the open
+    `~/.agents/skills/` tree, so portability holds.
+  - **Custom agents** — `.agent.md` files in `.github/agents/` (repo) and
+    `~/.copilot/agents/` (user, wins on name conflict), selected via `--agent`.
+    Ships built-in **Explore / Ask / Task** agents.
+  - **AGENTS.md — yes**, native and layered (root + cwd +
+    `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`); merges with
+    `.github/copilot-instructions.md` when both exist.
+  - **MCP — yes**; ships with the GitHub MCP server pre-configured.
+- **Headless / RPC:** `copilot --prompt "…"` non-interactive; `--agent <name>`;
+  `--allow-all` / `--yolo` for unattended tool use; `--resume` / `--continue`.
+  **⚠ No documented JSON or stream-json output** — interactive terminal text
+  only. This is the load-bearing gap for Panopticon, which parses a
+  machine-readable event/cost stream to drive readiness, heartbeat, and spend.
+- **Why a candidate:** same harness as the Copilot coding agent, native
+  AGENTS.md + `SKILL.md` + MCP, and it *defaults to Claude Sonnet 4.5* — a
+  Copilot-subscription user could run a first-party GitHub agent loop on Claude
+  without an Anthropic subscription. **Why not yet:** proprietary closed binary,
+  GitHub-subscription-locked auth, and — most importantly — no machine-readable
+  headless output, which makes cost/heartbeat parsing expensive to drive
+  compared with Codex (`exec --json`) or Gemini (`stream-json`). Re-verify the
+  headless surface (`copilot help`) before any decision — a JSON mode landing
+  would materially change the calculus.
+
 ### Cursor CLI (`cursor-agent`) — Not supported
 
 - **Vendor / model:** Anysphere. Multi-provider — Anthropic, OpenAI, Gemini,
@@ -389,6 +434,7 @@ and should be re-checked before any decision.
 | **Pi** | MIT | TS | ✅ | ✅ | ✅ | ❌ (by design) | ✅ (RPC) | `--skill` flag | **Supported** |
 | **Codex CLI** | Apache-2.0 | Rust | ✅ | ✅ | ✅ native | ✅ (+is a server) | ✅ | Profiles | Candidate |
 | **Gemini CLI** | Apache-2.0 | TS | ✅ | ✅ | Opt-in | ✅ | ✅ | ⭐ `/skills enable` | Candidate |
+| **Copilot CLI** | Proprietary | — | ✅ | ❌ (`~/.agents`) | ✅ native | ✅ | ❌ ⚠ | `.agent.md` | Candidate |
 | **Cursor CLI** | Proprietary | — | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
 | **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |
 | **Amp** | Proprietary | — | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
@@ -441,8 +487,11 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 5. **Headless quality varies and gates orchestration.** Codex, Gemini CLI,
    Cursor, and Amp have first-class JSON/stream interfaces. Aider has none.
-   Crush's is underdocumented. A harness without a machine-readable interface is
-   expensive for Panopticon to drive.
+   Crush's is underdocumented. **Copilot CLI has a non-interactive `--prompt`
+   mode but no documented machine-readable output** — a real gate, since
+   Panopticon parses an event/cost stream to drive readiness, heartbeat, and
+   spend. A harness without a machine-readable interface is expensive for
+   Panopticon to drive, regardless of how good its model access is.
 
 6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license, Pi's
    canonical package name, OpenCode/Crush licenses and headless schemas, Cline's
@@ -459,6 +508,9 @@ Primary documentation consulted (May 2026):
 - Codex CLI — [openai/codex](https://github.com/openai/codex),
   [developers.openai.com/codex](https://developers.openai.com/codex/cli)
 - Gemini CLI — [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
+- Copilot CLI — [github/copilot-cli](https://github.com/github/copilot-cli),
+  [docs.github.com/copilot/concepts/agents/about-copilot-cli](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli),
+  [Agent Skills changelog (2025-12-18)](https://github.blog/changelog/2025-12-18-github-copilot-now-supports-agent-skills/)
 - Cursor — [cursor.com/docs/cli](https://cursor.com/docs/cli/overview)
 - Warp — [docs.warp.dev/agent-platform](https://docs.warp.dev/agent-platform/)
 - Amp — [ampcode.com/manual](https://ampcode.com/manual)

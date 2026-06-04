@@ -25,6 +25,10 @@
  *   --height <n>       Viewport height (default: 900)
  *   --wait <ms>        Settle delay after load before capture (default: 1800)
  *   --wait-for <css>   Wait for this selector to appear before capturing
+ *   --eval <js>        Run this JS in the page after load, before the settle delay
+ *                      (e.g. an async IIFE that selects a project + opens a tab so
+ *                      a cockpit/close-up view can be captured). Awaited if it
+ *                      returns a promise.
  *   --scale <n>        Device scale factor for crisp output (default: 2)
  *
  * The dashboard stores its theme in localStorage under 'panopticon.ui.theme'.
@@ -48,6 +52,7 @@ function parseArgs(argv) {
     height: 900,
     wait: 1800,
     waitFor: null,
+    evalScript: null,
     scale: 2,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -60,6 +65,7 @@ function parseArgs(argv) {
       case '--height': opts.height = Number(argv[++i]); break;
       case '--wait': opts.wait = Number(argv[++i]); break;
       case '--wait-for': opts.waitFor = argv[++i]; break;
+      case '--eval': opts.evalScript = argv[++i]; break;
       case '--scale': opts.scale = Number(argv[++i]); break;
       default:
         if (arg.startsWith('--')) {
@@ -95,6 +101,10 @@ async function captureTheme(browser, theme, opts) {
   await page.goto(url, { waitUntil: 'load', timeout: 30_000 });
   if (opts.waitFor) {
     await page.waitForSelector(opts.waitFor, { timeout: 15_000 });
+  }
+  if (opts.evalScript) {
+    // The script may be an async IIFE; page.evaluate awaits a returned promise.
+    await page.evaluate(opts.evalScript);
   }
   if (opts.wait) {
     await page.waitForTimeout(opts.wait);

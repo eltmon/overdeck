@@ -224,6 +224,11 @@ export interface CloseOutConfig {
   auto_delay_minutes: number;
 }
 
+export interface OrphanProposedReconcilerConfig {
+  enabled: boolean;
+  minAttemptIntervalMs: number;
+}
+
 /**
  * Complete Cloister configuration
  */
@@ -242,6 +247,7 @@ export interface CloisterConfig {
   cost_limits?: CostLimitsConfig;
   retention?: RetentionConfig;
   close_out?: CloseOutConfig;
+  orphanProposedReconciler?: OrphanProposedReconcilerConfig;
 }
 
 /**
@@ -362,6 +368,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     delete_feature_branch: false,
     auto: false,
     auto_delay_minutes: 60,
+  },
+  orphanProposedReconciler: {
+    enabled: true,
+    minAttemptIntervalMs: 5 * 60 * 1000,
   },
 };
 

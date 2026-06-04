@@ -21,6 +21,8 @@ interface SearchModalProps {
   onSelectIssue: (issueId: string) => void;
   cycleFilter?: 'current' | 'all' | 'backlog';
   includeCompletedFilter?: boolean;
+  /** Issue prefix (e.g. "PAN") of the selected project; enables project scoping (PAN-1593). */
+  projectPrefix?: string | null;
 }
 
 export function SearchModal({
@@ -29,6 +31,7 @@ export function SearchModal({
   onSelectIssue,
   cycleFilter = 'current',
   includeCompletedFilter = false,
+  projectPrefix = null,
 }: SearchModalProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
@@ -37,10 +40,16 @@ export function SearchModal({
     includeCompleted: false,
     deepSearch: false,
   });
+  // Default to project scope when a project is selected; the user can broaden.
+  const [scopeToProject, setScopeToProject] = useState(true);
 
+  const effectiveFilters = {
+    ...filters,
+    projectPrefix: projectPrefix && scopeToProject ? projectPrefix : null,
+  };
   const { groupedResults, isSearching, hasResults, resultCount } = useSearch(
     query,
-    filters,
+    effectiveFilters,
     { cycleFilter, includeCompletedFilter }
   );
 
@@ -64,6 +73,7 @@ export function SearchModal({
         includeCompleted: false,
         deepSearch: false,
       });
+      setScopeToProject(true);
     }
   }, [isOpen]);
 
@@ -122,7 +132,7 @@ export function SearchModal({
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Search issues..."
+              placeholder={projectPrefix && scopeToProject ? `Search ${projectPrefix} issues…` : 'Search all issues…'}
               className="flex-1 bg-transparent text-foreground placeholder-gray-400 focus:outline-none text-base"
               autoFocus
             />
@@ -136,6 +146,27 @@ export function SearchModal({
 
           {/* Filters */}
           <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card flex-wrap">
+            {/* Scope toggle (PAN-1593) — only when a project is selected. */}
+            {projectPrefix && (
+              <>
+                <div className="flex items-center rounded bg-popover p-0.5 text-xs">
+                  <button
+                    onClick={() => setScopeToProject(true)}
+                    className={`rounded px-2 py-0.5 transition-colors ${scopeToProject ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {projectPrefix}
+                  </button>
+                  <button
+                    onClick={() => setScopeToProject(false)}
+                    className={`rounded px-2 py-0.5 transition-colors ${!scopeToProject ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    All
+                  </button>
+                </div>
+                <div className="w-px h-4 bg-card" />
+              </>
+            )}
+
             <span className="text-xs text-muted-foreground">Filters:</span>
 
             {/* Source toggles */}

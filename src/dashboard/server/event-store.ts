@@ -20,6 +20,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
+import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -379,6 +380,7 @@ export async function initEventStore(): Promise<EventStore> {
       console.log(`[event-store] Purged ${purged} oversized issues.snapshot events from persistent store`);
     }
     _store = store;
+    setActivityEventStoreProvider(() => store);
     // Initialize projection cache with same DB connection
     import('./services/projection-cache.js').then(({ initProjectionCache }) => {
       initProjectionCache(db);

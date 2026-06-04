@@ -16,6 +16,36 @@ interface PlanFinalizeOptions {
   noPromote?: boolean;
 }
 
+interface PromotePlanningResult {
+  success: boolean;
+  message: string | null;
+  error: string | null;
+  workAgentSpawned: boolean;
+  workAgentMessage: string | null;
+  workAgentError: string | null;
+  workAgentSkipReason: string | null;
+}
+
+type AutoPromotePhase = 'createBeads' | 'completePlanning' | 'terminal';
+type AutoPromotePhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
+
+function emitAutoPromotePhase(
+  issueId: string,
+  phase: AutoPromotePhase,
+  status: AutoPromotePhaseStatus,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  const timestamp = new Date().toISOString();
+  emitActivityEntrySync({
+    source: 'plan-finalize',
+    level: status === 'failure' ? 'error' : 'info',
+    message: `auto-promote.phase=${phase}`,
+    issueId,
+    details: JSON.stringify({ issueId, timestamp, phase, status, reason, ...details }),
+  });
+}
+
 function findWorkspaceRoot(start: string): string | null {
   let dir = resolve(start);
   while (true) {
@@ -59,10 +89,16 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // vBRIEF before beads creation. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
+  emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
   const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
 
   if (!result.success || result.created.length === 0) {
     const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
+    emitAutoPromotePhase(issueId, 'createBeads', 'failure', errors.join('; '), {
+      workspacePath,
+      createdCount: result.created.length,
+    });
+    emitAutoPromotePhase(issueId, 'terminal', 'failure', 'beads creation failed', { workspacePath });
     if (options.json) {
       console.log(JSON.stringify({ success: false, created: result.created, errors }));
     } else {
@@ -71,6 +107,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     }
     process.exit(2);
   }
+  emitAutoPromotePhase(issueId, 'createBeads', 'success', 'beads created', {
+    workspacePath,
+    createdCount: result.created.length,
+  });
 
   emitActivityEntrySync({
     source: 'plan',
@@ -92,24 +132,31 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentSpawned = false;
   let workAgentMessage: string | null = null;
   let workAgentError: string | null = null;
+  let workAgentSkipReason: string | null = null;
 
   if (!options.noPromote) {
+    emitAutoPromotePhase(issueId, 'completePlanning', 'start', 'posting complete-planning autoSpawn request');
     const promotion = await promotePlanning(issueId);
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
 
-    // After successful promotion, chain through to spawning the work agent.
-    // Auto-planned issues should run end-to-end without waiting for a human
-    // Done click or a separate Start Agent click. --no-promote opts out of
-    // both the spec promotion AND the work-agent spawn.
-    if (promoted) {
-      const spawn = await spawnWorkAgent(issueId);
-      workAgentSpawned = spawn.success;
-      workAgentMessage = spawn.message;
-      workAgentError = spawn.error;
-    }
+    workAgentSpawned = promotion.workAgentSpawned;
+    workAgentMessage = promotion.workAgentMessage;
+    workAgentError = promotion.workAgentError;
+    workAgentSkipReason = promotion.workAgentSkipReason;
+    emitAutoPromotePhase(issueId, 'completePlanning', promoted ? 'success' : 'failure', promoted ? 'complete-planning returned success' : (promoteError ?? 'complete-planning failed'), {
+      workAgentSpawned,
+      workAgentSkipReason,
+    });
+  } else {
+    emitAutoPromotePhase(issueId, 'completePlanning', 'skipped', 'promotion skipped by --no-promote');
   }
+
+  emitAutoPromotePhase(issueId, 'terminal', promoted || options.noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : options.noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
+    workAgentSpawned,
+    workAgentSkipReason,
+  });
 
   if (options.json) {
     console.log(JSON.stringify({
@@ -124,6 +171,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       ...(promoteError ? { promoteError } : {}),
       ...(workAgentMessage ? { workAgentMessage } : {}),
       ...(workAgentError ? { workAgentError } : {}),
+      ...(workAgentSkipReason ? { workAgentSkipReason } : {}),
     }));
   } else {
     console.log(chalk.green(`✓ Created ${result.created.length} beads task${result.created.length === 1 ? '' : 's'}`));
@@ -140,9 +188,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
       } else {
-        console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn failed.'));
+        console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn was skipped.'));
+        if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
         if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
-        console.log(chalk.dim('Run `pan start ' + issueId + '` to spawn the work agent.'));
+        console.log(chalk.dim('Run `pan start ' + issueId + '` to retry the work agent spawn.'));
       }
     } else {
       console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
@@ -159,17 +208,17 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  * until after the response is flushed so callers running inside the planning
  * tmux session still see this response.
  */
-async function promotePlanning(issueId: string): Promise<{ success: boolean; message: string | null; error: string | null }> {
+export async function promotePlanning(issueId: string): Promise<PromotePlanningResult> {
   try {
     const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 90_000);
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
+        body: JSON.stringify({ autoSpawn: true }),
         signal: controller.signal,
       });
     } finally {
@@ -180,52 +229,40 @@ async function promotePlanning(issueId: string): Promise<{ success: boolean; mes
     try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
     if (!response.ok) {
       const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
-      return { success: false, message: null, error: String(err) };
+      return {
+        success: false,
+        message: null,
+        error: String(err),
+        workAgentSpawned: false,
+        workAgentMessage: null,
+        workAgentError: null,
+        workAgentSkipReason: null,
+      };
     }
-    return { success: true, message: parsed?.message ?? null, error: null };
-  } catch (err: any) {
-    const message = err?.message ? String(err.message) : String(err);
-    return { success: false, message: null, error: `Dashboard unreachable: ${message}` };
-  }
-}
-
-/**
- * Spawn the work agent for the just-promoted issue. Auto-planned issues should
- * run end-to-end (plan → work → review → test → ship) without a separate human
- * click. Mirrors promotePlanning's error-shape so the caller can format
- * consistently.
- */
-async function spawnWorkAgent(issueId: string): Promise<{ success: boolean; message: string | null; error: string | null }> {
-  try {
-    const url = `${getDashboardApiUrlSync()}/api/agents`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, role: 'work', auto: true, guardrailAcknowledged: true }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-    const text = await response.text();
-    let parsed: any = null;
-    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
-    if (!response.ok) {
-      const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
-      return { success: false, message: null, error: String(err) };
-    }
+    const workAgentSpawned = parsed?.workAgentSpawned === true;
+    const workAgentSkipReason = typeof parsed?.workAgentSkipReason === 'string' ? parsed.workAgentSkipReason : null;
+    const workAgentSession = typeof parsed?.workAgentSession === 'string' ? parsed.workAgentSession : null;
+    const workAgentError = typeof parsed?.workAgentError === 'string' ? parsed.workAgentError : null;
     return {
       success: true,
-      message: parsed?.sessionName ? `Session: ${parsed.sessionName}` : (parsed?.message ?? null),
+      message: parsed?.message ?? null,
       error: null,
+      workAgentSpawned,
+      workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
+      workAgentError,
+      workAgentSkipReason,
     };
   } catch (err: any) {
     const message = err?.message ? String(err.message) : String(err);
-    return { success: false, message: null, error: `Dashboard unreachable: ${message}` };
+    return {
+      success: false,
+      message: null,
+      error: `Dashboard unreachable: ${message}`,
+      workAgentSpawned: false,
+      workAgentMessage: null,
+      workAgentError: null,
+      workAgentSkipReason: null,
+    };
   }
 }
 

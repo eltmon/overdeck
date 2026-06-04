@@ -28,6 +28,7 @@ export {
   projectContextFile,
   workspaceContextDir,
   workspaceContextFile,
+  piGlobalContextFile,
   GLOBAL_STARTER,
   PROJECT_STARTER,
   globalLayer,
@@ -50,6 +51,8 @@ export {
   REGION_BEGIN,
   REGION_END,
   applyManagedRegion,
+  hasManagedRegion,
+  userContentOutsideRegion,
   renderGlobalLayer,
   renderProjectLayer,
 } from './render.js';

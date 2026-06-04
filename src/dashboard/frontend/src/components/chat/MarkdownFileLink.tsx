@@ -101,7 +101,7 @@ async function resolvePreferredEditor(): Promise<EditorId> {
   const result = await getTransport().request((client) =>
     (client as PanRpcProtocolClient)[WS_METHODS.getAvailableEditors](),
   );
-  const availableEditors = (result as { editors: EditorId[] }).editors;
+  const availableEditors = (result as { editors: readonly EditorId[] }).editors;
   const preferred = getPreferredEditor();
   const editor = preferred && availableEditors.includes(preferred)
     ? preferred

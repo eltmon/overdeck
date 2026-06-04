@@ -17,7 +17,6 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'plan finalize',
   'start',
   'start --auto',
-  'swarm',
   'tell',
   'done',
   'review request',
@@ -39,7 +38,7 @@ export const ISSUE_SCOPED_PAN_VERBS = [
 ] as const;
 
 vi.mock('../../components/PanOpenInPicker', () => ({
-  PanOpenInPicker: ({ cwd }: { cwd: string }) => <div data-testid="pan-open-picker">Open {cwd}</div>,
+  PanOpenInPicker: ({ openInCwd }: { openInCwd: string | null }) => <div data-testid="pan-open-picker">Open {openInCwd ?? ''}</div>,
 }));
 
 const commandFilesDir = resolve(process.cwd(), '../../../src/cli/commands');

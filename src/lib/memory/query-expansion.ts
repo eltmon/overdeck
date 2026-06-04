@@ -8,6 +8,7 @@ import {
   type MemoryExtractionPolicyResult,
   type MemoryProviderSettings,
 } from './providers/index.js';
+import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
 
 const QueryExpansionPayload = Schema.Struct({
   terms: Schema.Array(Schema.String),
@@ -89,6 +90,11 @@ export function getCachedMemoryQueryExpansion(input: Pick<QueryExpansionInput, '
 
 export async function expandMemoryQuery(input: QueryExpansionInput): Promise<QueryExpansionResult> {
   const cacheKey = buildQueryExpansionCacheKey(input);
+  // Background AI gate: low-cost mode (or the memoryQueryExpansion toggle)
+  // skips the LLM expansion and falls back to the raw query.
+  if (!isBackgroundFeatureEnabled('memoryQueryExpansion')) {
+    return { query: input.prompt, expandedTerms: [], cacheKey, status: 'fallback', reason: null };
+  }
   const cached = getCachedExpansion(cacheKey, input.now ?? new Date());
   if (cached) {
     const result: QueryExpansionResult = { ...cached, status: 'cache-hit' };

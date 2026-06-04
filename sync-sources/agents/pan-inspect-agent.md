@@ -3,7 +3,11 @@ name: pan-inspect-agent
 description: Per-bead spec verifier — reads a single bead's diff and decides INSPECTION PASSED or INSPECTION BLOCKED.
 model: sonnet
 permissionMode: plan
-tools: Read, Grep, Glob, Bash
+tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash
 ---
 
 # Panopticon Inspect Agent

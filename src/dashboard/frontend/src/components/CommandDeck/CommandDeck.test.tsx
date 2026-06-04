@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
+import { usePanesStore } from '../../lib/panesStore';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -46,8 +47,16 @@ vi.mock('./SessionView/IssueHeader', () => ({
   ),
 }));
 
-vi.mock('./ZoneActionStrip', () => ({
-  ZoneActionStrip: () => <div data-testid="zone-action-strip" />,
+vi.mock('../Stage', () => ({
+  Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
+}));
+
+vi.mock('../sessionFeed/SessionFeedSidebar', () => ({
+  // PAN-1591: the merged Awareness rail passes the project's issues via
+  // `projectIssueIds` (scopeSwitcher mode); keep `issueIds` as a fallback.
+  SessionFeedSidebar: (props: any) => (
+    <div data-testid="activity-feed" data-issues={(props.projectIssueIds ?? props.issueIds ?? []).join(',')} />
+  ),
 }));
 
 vi.mock('./ZoneBActionStrip', () => ({
@@ -351,200 +360,55 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   );
 }
 
-describe('CommandDeck — project-selected session view (PAN-821)', () => {
+describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useCommandDeckSelection.getState().clearAll();
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
     localStorage.clear();
   });
 
-  it('renders the lens when a session is selected', async () => {
+  const panes = (deck: string) => usePanesStore.getState().panesByWorkspace[deck] ?? [];
+
+  it('shows an empty state until a project is selected', async () => {
     renderCommandDeck();
-
-    // Projects are visible by default — wait for project node to render
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-
-    // Wait for session tree hydration, then click the session
-    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
-
-    // Verify the lens is rendered as the top-level right pane
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
-
-    // Verify legacy IssueWorkbench is NOT rendered at the top level
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-
-    // Verify DetailPanelLayout is NOT rendered
-    expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
+    // With no project selected there is no tree to render — the deck shows its
+    // empty state and column 2 prompts for a project.
+    expect(await screen.findByText(/select a project to open its deck/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
   });
 
-  it('opens the lens on the first session click when no feature is already selected', async () => {
-    renderCommandDeck();
+  it('mounts the project deck and activity feed for the selected project', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
 
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-    expect(screen.queryByTestId('command-deck-agent-view')).not.toBeInTheDocument();
-
-    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
-
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-    expect(lens).toBeInTheDocument();
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
+    const stage = screen.getByTestId('stage');
+    expect(stage).toHaveAttribute('data-deck', 'test-project');
+    expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
   });
 
-  it('keeps the same lens on a second click of the same session row', async () => {
-    renderCommandDeck();
+  it('opens an issue tab in the deck when a tree issue is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
 
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-
-    const sessionButton = await screen.findByTestId('session-agent-pan-821');
-    fireEvent.click(sessionButton);
-
-    const firstLens = screen.getByTestId('command-deck-right-pane-tabs');
-
-    fireEvent.click(sessionButton);
-
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBe(firstLens);
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-  });
-
-  it('uses issue-local unified cost data for the issue header instead of global costs-by-issue', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
-
-    // Lens is rendered with the selected issue context
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-  });
-
-  it('auto-selects best session when feature is clicked (B5)', async () => {
-    renderCommandDeck();
-
-    // Projects are visible by default
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-
-    // Click feature row — should auto-select the active work session
     fireEvent.click(screen.getByTestId('feature-PAN-821'));
-
-    // Verify lens is rendered instead of legacy IssueWorkbench
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-    expect(lens).toBeInTheDocument();
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-    // Auto-selecting the active work session opens the agent
-    // Conversation/Terminal view, not the Pipeline tab.
-    expect(await screen.findByTestId('command-deck-agent-view')).toBeInTheDocument();
-    expect(screen.queryByTestId('project-overview')).not.toBeInTheDocument();
+    expect(panes('test-project').some(p => p.paneType === 'issue' && p.issueId === 'PAN-821')).toBe(true);
   });
 
-  it('shows the agent Conversation/Terminal view on session click and exits on tab click', async () => {
-    renderCommandDeck();
+  it('opens an issue tab when a session is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findAllByTestId('project-node');
 
-    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
-
-    // Clicking a session row opens the agent view (ZoneB + SessionPanel).
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
-    expect(await screen.findByTestId('command-deck-agent-view')).toBeInTheDocument();
-
-    // Clicking a right-pane tab clears the session and returns to the tab strip.
-    fireEvent.click(screen.getByRole('tab', { name: 'Pipeline' }));
-    expect(screen.queryByTestId('command-deck-agent-view')).not.toBeInTheDocument();
+    expect(panes('test-project').some(p => p.paneType === 'issue' && p.issueId === 'PAN-821')).toBe(true);
   });
 
-  it('renders the project overview when a project row is selected', async () => {
-    renderCommandDeck();
-
+  it('opens an agent tab in the deck when a conversation is selected', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
 
-    const overview = screen.getByTestId('project-overview');
-    expect(overview).toHaveAttribute('data-project', 'test-project');
-    expect(overview).toHaveAttribute('data-features', 'PAN-821');
-    expect(overview).toHaveAttribute('data-cost', '12.34');
-    expect(overview).toHaveAttribute('data-model-cost', '7.89');
-    expect(overview).toHaveAttribute('data-stage-cost', '4.45');
-    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
-  });
-
-  it('renders ConversationPanel inside the Conversations tab when a conversation is selected', async () => {
-    renderCommandDeck();
-
-    // Select a project
-    await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
-
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-
-    // Click a conversation in the sidebar
     fireEvent.click(screen.getByTestId('conv-test'));
-
-    // Conversations tab should be active
-    const conversationsTab = screen.getByRole('tab', { name: /Conversations/i });
-    expect(conversationsTab).toHaveAttribute('aria-selected', 'true');
-
-    // ConversationPanel renders inside the lens (not at the top level)
-    expect(lens.querySelector('[data-testid="conversation-panel"]')).toBeInTheDocument();
-  });
-
-  it('tab strip is exactly 48px tall', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
-
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-    const tablist = lens.querySelector('[role="tablist"]') as HTMLElement;
-    expect(tablist).toBeTruthy();
-    expect(tablist.classList.contains('h-[48px]')).toBe(true);
-  });
-
-  it('selecting a conversation auto-switches to Conversations tab and renders ConversationPanel inside the lens', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('project-test-project'));
-
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-
-    // Click a conversation in the sidebar
-    fireEvent.click(screen.getByTestId('conv-test'));
-
-    // Conversations tab should be active
-    const conversationsTab = screen.getByRole('tab', { name: /Conversations/i });
-    expect(conversationsTab).toHaveAttribute('aria-selected', 'true');
-
-    // ConversationPanel should render inside the lens
-    expect(lens.querySelector('[data-testid="conversation-panel"]')).toBeInTheDocument();
-  });
-
-  it('opens an unscoped conversation after a tree issue was selected (PAN-1332)', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-
-    // Step 1: select an issue in the project tree — pins the lens to that issue.
-    fireEvent.click(screen.getByTestId('feature-PAN-821'));
-    expect(screen.getByTestId('command-deck-right-pane-tabs')).toBeInTheDocument();
-
-    // Step 2: click an unscoped conversation in the sidebar.
-    fireEvent.click(await screen.findByTestId('conv-unscoped'));
-
-    // The conversation must take over the right pane. Before the fix the stale
-    // selectedFeature kept rightPaneProject non-null, so the lens stayed and the
-    // unscoped conversation (which only renders when rightPaneProject is null)
-    // never appeared.
-    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('command-deck-right-pane-tabs')).not.toBeInTheDocument();
-  });
-
-  it('renders ZoneA action strip inside the lens when a feature is selected', async () => {
-    renderCommandDeck();
-
-    await screen.findAllByTestId('project-node');
-    fireEvent.click(screen.getByTestId('feature-PAN-821'));
-
-    const lens = screen.getByTestId('command-deck-right-pane-tabs');
-    expect(lens.querySelector('[data-testid="zone-a"]')).toBeInTheDocument();
-    expect(lens.querySelector('[data-testid="zone-action-strip"]')).toBeInTheDocument();
+    expect(panes('test-project').some(p => p.paneType === 'agent' && p.conversationId === 'test-conv')).toBe(true);
   });
 });
