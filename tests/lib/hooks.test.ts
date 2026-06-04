@@ -152,7 +152,13 @@ describe('reorderHookItems', () => {
   });
 
   it('should handle empty queue', () => {
-    // Create empty hook
+    // Create hook, then clear it to leave an existing empty queue.
+    pushToHookSync(TEST_AGENT_ID, {
+      type: 'task',
+      priority: 'normal',
+      source: 'test',
+      payload: { message: 'Temporary item' },
+    });
     clearHookSync(TEST_AGENT_ID);
 
     const success = reorderHookItemsSync(TEST_AGENT_ID, []);

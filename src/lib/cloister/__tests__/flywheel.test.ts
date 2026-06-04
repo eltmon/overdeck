@@ -100,7 +100,7 @@ describe('flywheel lifecycle', () => {
     }));
     const prompt = mocks.spawnRun.mock.calls[0][2].prompt;
     expect(prompt).toContain('Effort: low');
-    expect(prompt).toContain('Max concurrent agents: 3');
+    expect(prompt).toContain('Max concurrent agents (ceiling): 3');
     expect(prompt).toContain('Scope: all-tracked-projects');
     expect(prompt).toContain('Auto-pickup backlog: false');
     expect(prompt).toContain('Require UAT before merge: true');

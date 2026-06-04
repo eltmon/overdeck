@@ -160,6 +160,7 @@ describe('role model configuration', () => {
           harness: 'pi',
           model: 'claude-sonnet-4-6',
           effort: 'medium',
+          minAgents: 2,
           maxAgents: 4,
           scope: 'all-tracked-projects',
         },
@@ -170,6 +171,7 @@ describe('role model configuration', () => {
       harness: 'pi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
+      minAgents: 2,
       maxAgents: 4,
       scope: 'all-tracked-projects',
     });

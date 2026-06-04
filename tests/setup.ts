@@ -11,6 +11,12 @@ export const FIXTURES_DIR = join(__dirname, 'fixtures');
 const TEMP_ROOT_DIR = join(__dirname, '.temp');
 const TEMP_WORKER_ID = process.env.VITEST_POOL_ID ?? String(process.pid);
 export const TEMP_DIR = join(TEMP_ROOT_DIR, `worker-${TEMP_WORKER_ID}`);
+export const TEST_HOME_DIR = join(TEMP_ROOT_DIR, `home-${TEMP_WORKER_ID}`);
+
+// Keep tests isolated from the developer machine's real ~/.panopticon/config.yaml.
+process.env.HOME = TEST_HOME_DIR;
+process.env.USERPROFILE = TEST_HOME_DIR;
+mkdirSync(join(TEST_HOME_DIR, '.panopticon'), { recursive: true });
 
 // Collapse merge-agent polling intervals in tests so syncMainIntoWorkspace
 // conflict tests finish in milliseconds instead of 5s each. See merge-agent.ts.
@@ -31,7 +37,11 @@ beforeEach(() => {
     // Ignore cleanup errors
   }
   try {
+    if (existsSync(TEST_HOME_DIR)) {
+      rmSync(TEST_HOME_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
     mkdirSync(TEMP_DIR, { recursive: true });
+    mkdirSync(join(TEST_HOME_DIR, '.panopticon'), { recursive: true });
   } catch (error) {
     // Directory might already exist from another test running in parallel
   }
@@ -45,6 +55,14 @@ afterEach(() => {
     } catch (error) {
       // Ignore cleanup errors
       console.warn('Failed to clean up TEMP_DIR in afterEach:', error);
+    }
+  }
+  if (existsSync(TEST_HOME_DIR)) {
+    try {
+      rmSync(TEST_HOME_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    } catch (error) {
+      // Ignore cleanup errors
+      console.warn('Failed to clean up TEST_HOME_DIR in afterEach:', error);
     }
   }
 });
