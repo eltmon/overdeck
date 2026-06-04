@@ -124,6 +124,15 @@ services:
       # in case someone re-adds the mount.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - {{PROJECTS_DIR}}:{{PROJECTS_DIR}}:ro
+      # Bridge the host's Codex / ChatGPT sign-in (read-only) so the container
+      # dashboard reports the same OpenAI subscription auth as the host. Without
+      # it, subscription-only models (e.g. gpt-5.5) are correctly but confusingly
+      # locked in the workspace picker while the host has them available.
+      # Read-only is safe: the host owns token refresh and the bind mount reflects
+      # refreshes live. Unlike ${HOME}/.panopticon, ${HOME}/.codex carries no
+      # Deacon/agent state, so this does NOT engage the single-deacon invariant.
+      # The dashboard server runs as user `node` (HOME=/home/node). (PAN-1619)
+      - ${HOME}/.codex:/home/node/.codex:ro
     environment:
       - NODE_ENV=development
       - PORT=3011
