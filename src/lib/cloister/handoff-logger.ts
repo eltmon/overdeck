@@ -124,7 +124,7 @@ export function createHandoffEvent(
     },
     to: {
       model: context.targetModel,
-      runtime: 'claude-code', // New agent runtime
+      runtime: context.previousRuntime, // New agent inherits the same harness
       sessionId: undefined, // Will be set after spawn
     },
     trigger,

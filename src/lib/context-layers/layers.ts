@@ -81,6 +81,11 @@ export function piGlobalContextFile(): string {
   return join(getPanopticonHome(), 'context', 'pi-global.md');
 }
 
+/** `~/.panopticon/context/codex-global.md` — the rendered global layer for Codex. */
+export function codexGlobalContextFile(): string {
+  return join(getPanopticonHome(), 'context', 'codex-global.md');
+}
+
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */

@@ -321,7 +321,7 @@ export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
   model: ModelRef;
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   effort?: RoleEffort;
   /**
    * Target minimum concurrent agents the role should keep launched. The
@@ -1516,8 +1516,8 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
 }
 
 function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code or pi`);
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi' && roleConfig.harness !== 'codex') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);

@@ -46,9 +46,9 @@ export type VerificationStatusValue = typeof VerificationStatusValue.Type
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
 
-export type Harness = 'claude-code' | 'pi'
+export type Harness = 'claude-code' | 'pi' | 'codex'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'codex'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.

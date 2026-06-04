@@ -2125,7 +2125,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'pi';
+      harness?: 'claude-code' | 'pi' | 'codex';
       graceful?: boolean;
       message?: string;
     };
@@ -3126,9 +3126,9 @@ const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'pi' | null =
-      bodyHarness === 'pi' || bodyHarness === 'claude-code' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'pi' | null = null;
+    const userPickedHarness: 'claude-code' | 'pi' | 'codex' | null =
+      bodyHarness === 'pi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

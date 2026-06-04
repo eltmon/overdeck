@@ -352,7 +352,7 @@ export const PlanningStartedEvent = Schema.Struct({
   type: Schema.Literal("planning.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, sessionName: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, sessionName: Schema.String, harness: Schema.optional(Schema.String) }),
 })
 export type PlanningStartedEvent = typeof PlanningStartedEvent.Type
 

@@ -5,7 +5,7 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 interface PlanOptions {
   auto?: boolean;
   model?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   effort?: 'low' | 'medium' | 'high';
   remote?: boolean;
   local?: boolean;

@@ -94,7 +94,7 @@ export class ModelRouter {
    * model_selection.specialist_harnesses, and falls back to 'claude-code'
    * for unknown specialists or absent overrides.
    */
-  getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' {
+  getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' | 'codex' {
     const harnesses = this.config.model_selection?.specialist_harnesses;
     if (!harnesses) return 'claude-code';
     const normalizedName = specialistName.replace(/-/g, '_') as keyof typeof harnesses;
@@ -184,7 +184,7 @@ export function getSpecialistModel(specialistName: string): 'opus' | 'sonnet' | 
  * Convenience function to get the configured specialist harness via the
  * global router (PAN-636).
  */
-export function getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' {
+export function getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' | 'codex' {
   return getGlobalRouter().getSpecialistHarness(specialistName);
 }
 

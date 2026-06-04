@@ -38,6 +38,37 @@ function compareSemver(a: string, b: string): number {
   return 0;
 }
 
+export function checkCodex(): CheckResult[] {
+  if (!checkCommand('codex')) {
+    return [
+      {
+        name: 'Codex CLI',
+        status: 'warn',
+        message: 'Not installed (optional alternative harness)',
+        fix: 'Install: npm install -g @openai/codex',
+      },
+    ];
+  }
+  const version = readCodexVersion();
+  return [
+    {
+      name: 'Codex CLI',
+      status: 'ok',
+      message: version ? `v${version}` : 'Installed (version unknown)',
+    },
+  ];
+}
+
+function readCodexVersion(): string | null {
+  try {
+    const out = execSync('codex --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const m = out.match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 export function checkPi(strict: boolean): CheckResult[] {
   const out: CheckResult[] = [];
   if (!checkCommand('pi')) {
@@ -563,6 +594,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Pi is optional: missing → warn (or error under --strict). When installed, version
   // is compared against SUPPORTED_PI_VERSION_MIN and the bundled extension is checked.
   for (const c of checkPi(options.strict ?? false)) checks.push(c);
+
+  // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
+  for (const c of checkCodex()) checks.push(c);
 
   // Check Panopticon directories
   const directories = [

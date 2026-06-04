@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+// ~/.panopticon/bin/codex-notify-hook  (PAN-1574)
+//
+// Fires via Codex CLI notify mechanism on agent-turn-complete.
+// Codex passes the event JSON as stdin or as a JSON argv argument.
+//
+// Writes ~/.panopticon/agents/<id>/heartbeat.json so codex.ts getHeartbeat
+// can detect turn-end activity. Also writes a `completed` marker used by
+// the recovery path to detect agent idle state.
+
+'use strict';
+
+const { join } = require('node:path');
+const { homedir } = require('node:os');
+const { writeFileSync, mkdirSync, existsSync } = require('node:fs');
+
+const agentId = process.env.PANOPTICON_AGENT_ID;
+if (!agentId) process.exit(0); // Not a Panopticon-managed agent
+
+// Read event JSON from stdin (Codex delivers via stdin by default).
+let eventData = {};
+try {
+  const chunks = [];
+  process.stdin.setEncoding('utf8');
+  for (const chunk of []) { chunks.push(chunk); }
+  // Synchronous stdin read — Codex provides the event before invoking the shim.
+  const raw = require('node:fs').readFileSync('/dev/stdin', 'utf8').trim();
+  if (raw) eventData = JSON.parse(raw);
+} catch {
+  // Ignore parse errors — best-effort heartbeat.
+}
+
+const panopticonHome = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
+const heartbeatsDir = join(panopticonHome, 'heartbeats');
+const agentDir = join(panopticonHome, 'agents', agentId);
+
+try {
+  mkdirSync(heartbeatsDir, { recursive: true });
+  mkdirSync(agentDir, { recursive: true });
+} catch { /* ignore */ }
+
+const timestamp = new Date().toISOString();
+const lastAction = typeof eventData['last-assistant-message'] === 'string'
+  ? eventData['last-assistant-message'].slice(0, 200)
+  : undefined;
+
+const heartbeat = {
+  timestamp,
+  tool_name: 'agent-turn-complete',
+  last_action: lastAction,
+  thread_id: eventData['thread-id'],
+};
+
+// Write heartbeat.json for the 3-tier ladder (tier 1 = active heartbeat <60s).
+try {
+  writeFileSync(join(heartbeatsDir, `${agentId}.json`), JSON.stringify(heartbeat) + '\n');
+} catch { /* ignore */ }
+
+// Write completed marker so recovery path knows the agent finished a turn.
+try {
+  writeFileSync(join(agentDir, 'turn-completed'), timestamp + '\n');
+} catch { /* ignore */ }

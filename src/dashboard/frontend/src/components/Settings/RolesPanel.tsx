@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
-type Harness = 'claude-code' | 'pi';
+type Harness = 'claude-code' | 'pi' | 'codex';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
@@ -519,6 +519,7 @@ export function RolesPanel() {
                         >
                           <option value="claude-code">Claude Code</option>
                           <option value="pi">Pi</option>
+                          <option value="codex">Codex</option>
                         </select>
                       </label>
                       <label className="space-y-1.5">

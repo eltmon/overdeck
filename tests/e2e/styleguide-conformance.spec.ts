@@ -282,8 +282,8 @@ describe('styleguide rendered surface conformance', () => {
 
     const commandDeck = await openRoute('/command-deck');
     await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
-    await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count(), renderPoll).toBe(1);
-    await expect.poll(() => commandDeck.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
+    // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTree remodel
+    await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
 
     const agents = await openRoute('/agents');

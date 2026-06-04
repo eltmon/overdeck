@@ -30,6 +30,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
   'pi': 'gpt-5.5',
+  'codex': 'codex-4o',
 };
 
 /**
@@ -170,7 +171,7 @@ export function saveStoredModel(modelId: string): void {
 export function loadStoredHarness(): Harness {
   try {
     const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
-    if (stored === 'pi' || stored === 'claude-code') return stored;
+    if (stored === 'pi' || stored === 'claude-code' || stored === 'codex') return stored;
   } catch { /* ignore */ }
   return 'claude-code';
 }
@@ -350,6 +351,9 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         <span className={styles.pickerLabel}>{label}</span>
         {harness === 'pi' && (
           <span className={styles.harnessIndicator} title="Pi harness active">Pi</span>
+        )}
+        {harness === 'codex' && (
+          <span className={styles.harnessIndicator} title="Codex harness active">Codex</span>
         )}
         {selectedWarning && (
           <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />

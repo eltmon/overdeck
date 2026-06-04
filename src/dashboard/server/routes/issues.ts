@@ -834,7 +834,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       auto = false,
       harness = 'claude-code',
     } = body as any;
-    const requestedHarness = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
+    const requestedHarness = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
@@ -990,7 +990,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     yield* eventStore.append({
       type: 'planning.started',
       timestamp: new Date().toISOString(),
-      payload: { issueId: id, sessionName },
+      payload: { issueId: id, sessionName, harness: requestedHarness },
     });
     // PAN-1048: lifecycle.transitionTo(id, 'in_planning') above already emits
     // issue.transitioned with state 'in_planning'. The redundant

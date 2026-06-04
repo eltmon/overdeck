@@ -95,7 +95,7 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
   await renameAsync(tmp, launcherScript);
 }
 
-async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code' | 'pi' | undefined): Promise<string[]> {
+async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspace);
   try {
@@ -110,6 +110,15 @@ async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code'
   if (harness === 'pi') {
     const { piGlobalContextFile } = await import('./context-layers/index.js');
     const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+
+  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
+  if (harness === 'codex') {
+    const { codexGlobalContextFile } = await import('./context-layers/index.js');
+    const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
       files.unshift(globalFile);
     }
@@ -131,8 +140,8 @@ function isNodeNotFound(error: unknown): boolean {
  * process, which is bash for work-agent launchers (`bash launcher.sh`) but can
  * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
-async function hasAgentRuntimeInSubtree(rootPid: string, harness: 'claude-code' | 'pi' = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = harness === 'pi' ? new Set(['pi']) : new Set(['claude']);
+async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
+  const expectedProcessNames = harness === 'pi' ? new Set(['pi']) : harness === 'codex' ? new Set(['codex']) : new Set(['claude']);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -186,6 +195,23 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
     piExtensionPath,
     piFifoPath: await Effect.runPromise(createPiFifo(agentId)),
     piSessionDir: paths.agentDir,
+    model,
+  };
+}
+
+function getCodexLauncherFields(agentId: string, model: string): {
+  harness: 'codex';
+  codexMode: 'exec';
+  codexHome: string;
+  codexSessionDir: string;
+  model: string;
+} {
+  const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+  return {
+    harness: 'codex',
+    codexMode: 'exec',
+    codexHome,
+    codexSessionDir: join(codexHome, 'sessions'),
     model,
   };
 }
@@ -297,7 +323,7 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
 }
 
 async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
-  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
+  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
   const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
   return decision.allowed ? requested : 'claude-code';
 }
@@ -348,7 +374,7 @@ export async function getAgentRuntimeBaseCommand(
   model: string,
   agentName?: string,
   agentDefinition?: string,
-  harness: 'claude-code' | 'pi' = 'claude-code',
+  harness: RuntimeName = 'claude-code',
   effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
@@ -356,7 +382,11 @@ export async function getAgentRuntimeBaseCommand(
   if (harness === 'pi') {
     return `pi --mode rpc --model ${quotedModel}`;
   }
-
+  if (harness === 'codex') {
+    // buildCodexCommand in launcher-generator builds the full `codex exec` line;
+    // return a stub base command so the launcher generator can short-circuit.
+    return `codex`;
+  }
 
   const provider = getProviderForModelSync(validatedModel);
   const permissionFlags = getClaudePermissionFlagsStringSync();
@@ -435,7 +465,7 @@ export async function getRoleRuntimeBaseCommand(
   model: string,
   agentName: string,
   role: Role,
-  harness: 'claude-code' | 'pi' = 'claude-code',
+  harness: RuntimeName = 'claude-code',
   subRole?: string,
   effort?: RoleEffort,
 ): Promise<string> {
@@ -443,6 +473,9 @@ export async function getRoleRuntimeBaseCommand(
   const quotedModel = shellQuoteModelIdSync(validatedModel);
   if (harness === 'pi') {
     return `pi --mode rpc --model ${quotedModel}`;
+  }
+  if (harness === 'codex') {
+    return `codex`;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -702,7 +735,7 @@ export interface AgentState {
   issueId: string;
   workspace: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
@@ -1282,21 +1315,21 @@ export async function deliverAgentMessage(
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
-  if (!resolvedMethod) {
-    try {
-      const state = await Effect.runPromise(getAgentState(normalizedId));
-      channelsEnabled = Boolean(state?.channelsEnabled);
-      resolvedMethod = state?.deliveryMethod ?? 'auto';
-    } catch {
-      resolvedMethod = 'auto';
+  try {
+    const state = await Effect.runPromise(getAgentState(normalizedId));
+    // Codex agents are headless one-shot processes; the supervisor/channels/tmux
+    // delivery ladder does not apply — route through CodexRuntimeSync.sendMessage
+    // (codex exec resume <threadId> <message>).
+    if (state?.harness === 'codex') {
+      const { CodexRuntimeSync } = await import('./runtimes/codex.js');
+      const rt = new CodexRuntimeSync();
+      await rt.sendMessage(normalizedId, message);
+      return;
     }
-  } else if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
-    try {
-      const state = await Effect.runPromise(getAgentState(normalizedId));
-      channelsEnabled = Boolean(state?.channelsEnabled);
-    } catch {
-      channelsEnabled = false;
-    }
+    channelsEnabled = Boolean(state?.channelsEnabled);
+    resolvedMethod ??= state?.deliveryMethod ?? 'auto';
+  } catch {
+    resolvedMethod ??= 'auto';
   }
 
   if (resolvedMethod === 'tmux') {
@@ -1499,7 +1532,7 @@ async function prepareSupervisorForRelaunch(
   agentId: string,
   state: AgentState,
   model: string,
-  harness: 'claude-code' | 'pi',
+  harness: RuntimeName,
 ): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
   if (state.supervisorEnabled !== true) {
     return { useSupervisor: false };
@@ -2012,6 +2045,17 @@ export function getLatestSessionIdSync(agentId: string): string | null {
     return runtimeState.claudeSessionId;
   }
 
+  // 4. codex-thread-id (written after codex rollout appears; fallback so
+  //    resumeAgent can locate the Codex session even if session.id has a
+  //    stale random UUID from spawnRun's placeholder write).
+  const codexThreadIdPath = join(getAgentDir(agentId), 'codex-thread-id');
+  try {
+    if (existsSync(codexThreadIdPath)) {
+      const threadId = readFileSync(codexThreadIdPath, 'utf-8').trim();
+      if (threadId) return threadId;
+    }
+  } catch { /* non-fatal */ }
+
   return null;
 }
 
@@ -2048,7 +2092,7 @@ export interface SpawnOptions {
   issueId: string;
   workspace: string;
   /** Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted. */
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   model?: string;
   prompt?: string;
   /**
@@ -2076,7 +2120,7 @@ export interface SpawnOptions {
 
 export interface SpawnRunOptions {
   workspace?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   model?: string;
   prompt?: string;
   agentId?: string;
@@ -2309,10 +2353,12 @@ export async function buildAgentLaunchConfig(opts: {
    * like agentId-as-name and agent-frontmatter are ignored because Pi has
    * no agent-definition system.
    */
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   extraEnvExports?: string[];
   /** Claude Code `--effort` level threaded into the launcher command. */
   effort?: RoleEffort;
+  /** Inline prompt to embed in the launch command (used for codex exec resume). */
+  promptInline?: string;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2347,8 +2393,12 @@ export async function buildAgentLaunchConfig(opts: {
   // PAN-1055: pi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getPiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
+  // PAN-1574: codex harness needs its per-agent CODEX_HOME path.
   const piLauncherFields = opts.harness === 'pi'
     ? await getPiLauncherFields(opts.agentId, model)
+    : {};
+  const codexLauncherFields = opts.harness === 'codex'
+    ? getCodexLauncherFields(opts.agentId, model)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -2385,17 +2435,19 @@ export async function buildAgentLaunchConfig(opts: {
       // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
       // frontmatter (roleAgentDefinitionPath); pi resumes route through
       // getAgentRuntimeBaseCommand which short-circuits to the pi rpc form.
-      baseCommand: opts.harness === 'pi'
-        ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, 'pi')
+      baseCommand: opts.harness === 'pi' || opts.harness === 'codex'
+        ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
       resumeSessionId: opts.resumeSessionId,
-      model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      model: opts.harness === 'pi' || opts.harness === 'codex' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: opts.harness === 'pi' || opts.harness === 'codex' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
       extraEnvExports: opts.extraEnvExports,
       useSupervisor: opts.useSupervisor,
       supervisorScriptPath: opts.supervisorScriptPath,
+      promptInline: opts.promptInline,
       ...piLauncherFields,
+      ...codexLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -2426,7 +2478,10 @@ export async function buildAgentLaunchConfig(opts: {
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
     supervisorScriptPath: opts.supervisorScriptPath,
+    // PAN-1574: codex work agents embed the initial prompt inline in `codex exec`.
+    promptInline: opts.promptInline,
     ...piLauncherFields,
+    ...codexLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -2452,7 +2507,7 @@ export async function retrieveSpawnTimeMemoryContext(input: {
   workspace: string;
   agentId: string;
   role: Role;
-  harness: 'claude-code' | 'pi';
+  harness: RuntimeName;
 }): Promise<string> {
   if (!input.prompt.trim()) return '';
 
@@ -2480,7 +2535,7 @@ async function withSpawnTimeMemoryContext(input: {
   workspace: string;
   agentId: string;
   role: Role;
-  harness: 'claude-code' | 'pi';
+  harness: RuntimeName;
 }): Promise<string> {
   const context = await retrieveSpawnTimeMemoryContext(input);
   return context ? `${context}\n\n---\n\n${input.prompt}` : input.prompt;
@@ -2578,10 +2633,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // subscription auth, a ToS violation) blocks it, so a config-level
   // `roles.work.harness: pi` cannot silently bypass the gate just because the
   // model+auth combination is illegal.
-  const requestedHarness: 'claude-code' | 'pi' = options.harness
+  const requestedHarness: RuntimeName = options.harness
     ?? loadYamlConfig().config.roles?.[role]?.harness
     ?? 'claude-code';
-  const resolvedHarness: 'claude-code' | 'pi' = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
@@ -2621,6 +2676,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
+  // For Codex, the initial prompt is passed inline to `codex exec` via promptFile.
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
         prompt: options.prompt,
@@ -2658,6 +2714,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'pi'
     ? await getPiLauncherFields(agentId, selectedModel)
+    : {};
+  const codexLauncherFields = resolvedHarness === 'codex'
+    ? getCodexLauncherFields(agentId, selectedModel)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -2738,6 +2797,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     reviewSignal: undefined,
     trapHup: undefined,
     ...piLauncherFields,
+    ...codexLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -2769,6 +2829,31 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }));
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(agentId, 'remain-on-exit', 'on'));
+
+  // PAN-1574: codex specialists are headless one-shot processes. After the session
+  // starts, poll for the rollout JSONL to capture the real thread-id, then write it
+  // to both codex-thread-id and session.id so getLatestSessionIdSync returns the
+  // correct value for later resumes (spawnRun wrote a placeholder UUID to session.id
+  // at conversation-register time; we overwrite it here with the real thread-id).
+  if (resolvedHarness === 'codex') {
+    const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
+      await import('./runtimes/codex.js');
+    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
+    if (rolloutPath) {
+      const threadId = extractThreadIdFromRollout(rolloutPath);
+      if (threadId) {
+        writeCodexThreadId(agentId, threadId);
+        try {
+          await writeFile(join(getAgentDir(agentId), 'session.id'), threadId, 'utf-8');
+        } catch (err) {
+          console.warn(`[spawnRun] Failed to update session.id with codex thread-id for ${agentId}:`, err instanceof Error ? err.message : String(err));
+        }
+      }
+    } else {
+      console.warn(`[spawnRun] Codex specialist ${agentId}: rollout did not appear within 30s — thread-id not captured`);
+    }
+  }
 
 if (prompt) {
     if (shouldDeliverPromptViaPi) {
@@ -2877,10 +2962,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
   // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
   // runs before we persist the resolved harness or hand it to the launcher.
-  const requestedHarness: 'claude-code' | 'pi' = options.harness
+  const requestedHarness: RuntimeName = options.harness
     ?? loadYamlConfig().config.roles?.[role]?.harness
     ?? 'claude-code';
-  const resolvedHarness: 'claude-code' | 'pi' = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   // Create state
   const existingState = getAgentStateSync(agentId);
@@ -3039,6 +3124,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     effort: options.effort,
+    // PAN-1574: codex work agents are headless one-shot processes; embed the
+    // initial prompt inline in `codex exec <prompt>` via the launcher generator.
+    // Claude-code and Pi receive their prompts via tmux/FIFO after session start.
+    ...(state.harness === 'codex' && prompt ? { promptInline: prompt } : {}),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -3087,6 +3176,25 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }));
 
+  // PAN-1574: codex agents are headless one-shot processes — the initial prompt
+  // is already embedded inline in the launcher's `codex exec <prompt>` command.
+  // After the session starts, poll for the rollout JSONL to capture the thread-id
+  // so getLatestSessionIdSync / getSessionPath / sendMessage can find the session.
+  if (resolvedHarness === 'codex') {
+    const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
+      await import('./runtimes/codex.js');
+    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
+    if (rolloutPath) {
+      const threadId = extractThreadIdFromRollout(rolloutPath);
+      if (threadId) {
+        writeCodexThreadId(agentId, threadId);
+      }
+    } else {
+      console.warn(`[${agentId}] Codex: rollout did not appear within 30s — thread-id not captured`);
+    }
+  }
+
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
   // the tmux session exists, but only block on completion when we are about to
   // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
@@ -3096,8 +3204,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     : null;
 
   // Send the initial prompt after Claude's interactive prompt is ready.
+  // Codex agents skip this — the prompt is embedded inline in the launch command.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
-  if (prompt) {
+  if (prompt && resolvedHarness !== 'codex') {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
@@ -3649,6 +3758,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
+    const fallbackCodexFields = fallbackHarness === 'codex'
+      ? getCodexLauncherFields(normalizedId, resumeModel)
+      : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     saveAgentStateSync(agentState);
     const fallbackContent = generateLauncherScriptSync({
@@ -3667,6 +3779,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       useSupervisor: fallbackSupervisorLaunch.useSupervisor,
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
+      ...fallbackCodexFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -3871,6 +3984,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     agentState.harness = effectiveHarness;
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
+
+    // Compute the effective message before building the launcher so codex can
+    // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
+    const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+    const effectiveMessage =
+      message ??
+      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -3882,6 +4003,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
+      // PAN-1574: codex resume embeds the message inline so `codex exec resume
+      // <threadId> <message>` delivers it in one shot without a separate send.
+      ...(effectiveHarness === 'codex' ? { promptInline: effectiveMessage } : {}),
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -3900,14 +4024,10 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }));
 
     // Always wake the resumed agent with a continue prompt — without it, the
-    // re-attached claude session sits silently at its last state, and the user
-    // (or deacon nudge loop) ends up sending one manually anyway. Default
-    // matches restartAgent's wording so behaviour is consistent across both
-    // entry points. Caller-supplied message wins.
-    const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const effectiveMessage =
-      message ??
-      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    // re-attached session sits silently at its last state, and the user (or
+    // deacon nudge loop) ends up sending one manually anyway. Default matches
+    // restartAgent's wording so behaviour is consistent across both entry points.
+    // Caller-supplied message wins.
 
     let messageDelivered = false;
     if (effectiveHarness === 'pi') {
@@ -3920,6 +4040,10 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
       }
+    } else if (effectiveHarness === 'codex') {
+      // Codex is one-shot: message is already embedded in `codex exec resume
+      // <threadId> <message>` via buildCodexCommand. No SessionStart hook fires.
+      messageDelivered = true;
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
@@ -3958,7 +4082,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
 export interface RestartAgentOptions {
   model?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   graceful?: boolean;
   message?: string;
 }
@@ -4105,7 +4229,7 @@ export async function restartAgent(
  * Check whether a tmux session has an active agent runtime.
  * A session may exist with only a bare bash shell after Claude exits.
  */
-async function hasAgentRuntimeInSession(sessionName: string, harness: 'claude-code' | 'pi'): Promise<boolean> {
+async function hasAgentRuntimeInSession(sessionName: string, harness: RuntimeName): Promise<boolean> {
   try {
     const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
     if (panePids.length === 0) return false;
@@ -4178,7 +4302,7 @@ export async function recoverAgent(
   // Check if already running — session may exist with only a bare shell
   // after Claude exited (zombie session). Kill it and recover.
   if (sessionExistsSync(normalizedId)) {
-    const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+    const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code' || state.harness === 'codex')
       ? state.harness
       : 'claude-code';
     if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
@@ -4220,7 +4344,7 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+  const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code' || state.harness === 'codex')
     ? state.harness
     : 'claude-code';
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
@@ -4264,6 +4388,9 @@ export async function recoverAgent(
     return state;
   }
 
+  const recoveryCodexFields = recoveryHarness === 'codex'
+    ? getCodexLauncherFields(normalizedId, state.model)
+    : {};
   const recoveryLauncherContent = generateLauncherScriptSync({
     role: recoveryRole,
     workingDir: state.workspace,
@@ -4275,6 +4402,7 @@ export async function recoverAgent(
     promptInline: recoveryPrompt,
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
+    ...recoveryCodexFields,
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);

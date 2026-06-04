@@ -858,6 +858,70 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
   });
 
+  // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
+
+  it('codex work agent (exec mode) emits approval_policy=never and workspace sandbox', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'exec',
+    });
+    expect(script).toMatch(/codex exec/);
+    expect(script).toMatch(/-m 'codex-4o'/);
+    expect(script).toMatch(/-c approval_policy=never/);
+    expect(script).toMatch(/-s workspace/);
+    expect(script).toMatch(/--skip-git-repo-check/);
+  });
+
+  it('codex work agent uses exec prefix when useExec=true (non-conversation non-plan)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+    });
+    expect(script).toMatch(/^exec codex exec/m);
+  });
+
+  it('codex conversation (tui) mode emits bare `codex`', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+    });
+    expect(script).toMatch(/^codex$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex is excluded from PTY supervisor wrapping', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    // Supervisor should NOT be applied to Codex
+    expect(script).not.toMatch(/pty-supervisor/);
+    expect(script).toMatch(/codex exec/);
+  });
+
+  it('codex exports CODEX_HOME env var when codexHome is set', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexHome: '/home/user/.panopticon/agents/agent-1/codex-home',
+    });
+    expect(script).toMatch(/export CODEX_HOME='\/home\/user\/.panopticon\/agents\/agent-1\/codex-home'/);
+  });
+
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
     const a = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

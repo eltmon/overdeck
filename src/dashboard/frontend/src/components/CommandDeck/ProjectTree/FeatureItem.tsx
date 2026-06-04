@@ -915,7 +915,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   return (
     <ContextMenuRoot>
-      <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
+      <div
+        className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        data-component="feature-item"
+        data-issue-id={feature.issueId}
+      >
         <div className={styles.featureItemRow}>
           {hasVisibleSessions ? (
             <button

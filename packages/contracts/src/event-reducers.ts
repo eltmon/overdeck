@@ -663,7 +663,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               issueId,
               status: 'running',
               startedAt: event.timestamp,
-              runtime: 'claude-code',
+              runtime: (event.payload.harness as 'claude-code' | 'pi' | 'codex') ?? 'claude-code',
               role: 'plan' as const,
             },
           },

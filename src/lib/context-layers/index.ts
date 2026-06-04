@@ -29,6 +29,7 @@ export {
   workspaceContextDir,
   workspaceContextFile,
   piGlobalContextFile,
+  codexGlobalContextFile,
   GLOBAL_STARTER,
   PROJECT_STARTER,
   globalLayer,

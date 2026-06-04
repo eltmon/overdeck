@@ -388,8 +388,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi') {
-    errors.push(`${fieldPath}.harness must be claude-code or pi`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, pi, or codex`);
   }
 
   const effort = roleConfig.effort;

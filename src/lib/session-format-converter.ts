@@ -32,6 +32,7 @@ import { Data, Effect } from 'effect';
 
 import type { RuntimeName } from './runtimes/types.js';
 import { sessionFilePath } from './paths.js';
+import { writeThreadId } from './runtimes/codex.js';
 
 export interface ConvertOptions {
   fromHarness: RuntimeName;
@@ -123,6 +124,42 @@ export function extractPiTranscript(raw: string): TranscriptTurn[] {
   return turns;
 }
 
+/**
+ * Read a Codex rollout JSONL transcript into ordered role/text turns.
+ *
+ * Rollout files use a different schema from --json stdout:
+ *   - task_started: the initial task (user role)
+ *   - agent_message: a model turn (assistant role)
+ *   - token_count: metadata — skipped
+ *
+ * We extract task_started as the user prompt and agent_message events as
+ * assistant turns to produce a readable transcript.
+ */
+export function extractCodexTranscript(raw: string): TranscriptTurn[] {
+  const turns: TranscriptTurn[] = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry: Record<string, unknown>;
+    try {
+      entry = JSON.parse(trimmed) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const type = entry['type'];
+    if (type === 'task_started') {
+      const task = typeof entry['task'] === 'string' ? (entry['task'] as string) : '';
+      if (task) turns.push({ role: 'user', text: task });
+    } else if (type === 'agent_message') {
+      const content = typeof entry['content'] === 'string'
+        ? (entry['content'] as string)
+        : extractContentText(entry['content']);
+      if (content) turns.push({ role: 'assistant', text: content });
+    }
+  }
+  return turns;
+}
+
 /** Render ordered turns into a single readable transcript block. */
 function renderTranscript(turns: TranscriptTurn[]): string {
   return turns
@@ -151,10 +188,45 @@ function shortId(): string {
   }
 
   const raw = await readFile(opts.sourceSessionFile, 'utf-8');
-  const turns =
-    opts.fromHarness === 'pi' ? extractPiTranscript(raw) : extractClaudeTranscript(raw);
+  let turns: TranscriptTurn[];
+  switch (opts.fromHarness) {
+    case 'pi':
+      turns = extractPiTranscript(raw);
+      break;
+    case 'codex':
+      turns = extractCodexTranscript(raw);
+      break;
+    default:
+      turns = extractClaudeTranscript(raw);
+  }
   const continuation = buildContinuation(opts.fromHarness, renderTranscript(turns));
   const timestamp = new Date().toISOString();
+
+  if (opts.toHarness === 'codex') {
+    // Seed a minimal Codex rollout JSONL with the continuation as the task.
+    // The thread-id is a random UUID used as the Codex session resume pointer.
+    const threadId = randomUUID().replace(/-/g, '').slice(0, 16);
+    const codexAgentDir = join(homedir(), '.panopticon', 'agents', opts.tmuxSession, 'codex-home');
+    const sessionDate = new Date();
+    const dateDir = [
+      sessionDate.getFullYear().toString(),
+      String(sessionDate.getMonth() + 1).padStart(2, '0'),
+      String(sessionDate.getDate()).padStart(2, '0'),
+    ].join('/');
+    const sessionsDir = join(codexAgentDir, 'sessions', dateDir);
+    await mkdir(sessionsDir, { recursive: true, mode: 0o700 });
+    const rolloutUuid = randomUUID();
+    const targetSessionFile = join(sessionsDir, `rollout-${rolloutUuid}-${threadId}.jsonl`);
+    const lines = [
+      JSON.stringify({ type: 'task_started', model: 'codex', task: continuation, thread_id: threadId, timestamp }),
+    ];
+    await writeFile(targetSessionFile, `${lines.join('\n')}\n`, 'utf-8');
+    // Persist the thread-id so CodexRuntimeSync.getSessionPath() can locate this rollout.
+    const panopticonAgentDir = join(homedir(), '.panopticon', 'agents', opts.tmuxSession);
+    await mkdir(panopticonAgentDir, { recursive: true, mode: 0o700 });
+    writeThreadId(opts.tmuxSession, threadId);
+    return { sessionId: threadId, targetSessionFile };
+  }
 
   if (opts.toHarness === 'pi') {
     const sessionId = randomUUID();

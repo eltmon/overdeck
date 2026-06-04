@@ -183,8 +183,20 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testAgentsDir, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     vi.clearAllMocks();
-    const { sessionExists } = await import('../../src/lib/tmux.js');
-    vi.mocked(sessionExists).mockReturnValue(Effect.succeed(false));
+    const tmux = await import('../../src/lib/tmux.js');
+    vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
+    // PAN-1594: spawnRun/spawnAgent now wait for the session-start hook to write
+    // ready.json (waitForReadySignal) instead of scraping the tmux pane. The real
+    // hook fires when Claude boots; in tests createSession is mocked, so simulate
+    // the hook by writing ready.json when a session is "created". Without this the
+    // claude-code prompt-delivery path blocks the full 30s and the test times out.
+    vi.mocked(tmux.createSession).mockImplementation((agentId: string) =>
+      Effect.sync(() => {
+        const agentDir = getAgentDir(agentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      }),
+    );
     const cliproxy = await import('../../src/lib/cliproxy.js');
     vi.mocked(cliproxy.isCliproxyRunningSync).mockReturnValue(true);
     const beadsQuery = await import('../../src/lib/beads-query.js');

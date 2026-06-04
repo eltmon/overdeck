@@ -249,7 +249,7 @@ export function addPanopticonHookIfMissing(
 }
 
 
-export type HookHarness = 'claude-code' | 'pi' | 'both';
+export type HookHarness = 'claude-code' | 'pi' | 'codex' | 'both';
 
 export interface SetupHooksOptions {
   /**
@@ -295,8 +295,8 @@ function verifyPiExtensionBuilt(): boolean {
 
 export function parseHookHarness(value: string | undefined): HookHarness | undefined {
   if (value === undefined) return undefined;
-  if (value === 'claude-code' || value === 'pi' || value === 'both') return value;
-  throw new Error(`Invalid harness "${value}". Expected claude-code, pi, or both.`);
+  if (value === 'claude-code' || value === 'pi' || value === 'codex' || value === 'both') return value;
+  throw new Error(`Invalid harness "${value}". Expected claude-code, pi, codex, or both.`);
 }
 
 export function hooksStatusCommand(): void {

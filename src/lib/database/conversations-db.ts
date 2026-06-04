@@ -12,6 +12,7 @@
 
 import { getDatabase, DatabaseError } from './index.js';
 import type { ConversationFilter } from './discovered-sessions-db.js';
+import type { RuntimeName } from '../runtimes/types.js';
 export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ export interface Conversation {
   /** Error message when forkStatus='failed'. */
   forkError: string | null;
   /** Coding harness used to spawn this conversation. */
-  harness: 'claude-code' | 'pi' | null;
+  harness: RuntimeName | null;
   /** Delivery method for messages: 'auto' tries channels then tmux, 'channels' is strict, 'tmux' bypasses channels. */
   deliveryMethod: 'auto' | 'channels' | 'tmux' | null;
   /** Error message when background spawn failed (e.g. quota exhausted, auth error). Null = spawned OK or not yet known. */
@@ -120,7 +121,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     effort: (row['effort'] as string | null) ?? null,
     forkStatus: (row['fork_status'] as string | null) ?? null,
     forkError: (row['fork_error'] as string | null) ?? null,
-    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code') ? row['harness'] : null,
+    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code' || row['harness'] === 'codex') ? row['harness'] as RuntimeName : null,
     deliveryMethod: (row['delivery_method'] === 'auto' || row['delivery_method'] === 'channels' || row['delivery_method'] === 'tmux')
       ? row['delivery_method'] as 'auto' | 'channels' | 'tmux'
       : null,
@@ -446,7 +447,7 @@ export function createConversation(opts: {
   model?: string;
   effort?: string;
   forkStatus?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
 }): Conversation {
   const db = getDatabase();
@@ -536,7 +537,7 @@ export function reactivateConversationForSpawn(opts: {
   issueId?: string;
   claudeSessionId?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
 }): void {
   const db = getDatabase();
   db.prepare(
@@ -623,7 +624,7 @@ export function setConversationModel(name: string, model: string): void {
   ).run(model, name);
 }
 
-export function setConversationHarness(name: string, harness: 'claude-code' | 'pi'): void {
+export function setConversationHarness(name: string, harness: RuntimeName): void {
   const db = getDatabase();
   db.prepare(
     `UPDATE conversations SET harness = ? WHERE name = ?`,

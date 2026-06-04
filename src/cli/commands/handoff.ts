@@ -25,10 +25,10 @@ function resolveConversation(convRef: string) {
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
 
 function validateHarness(harness: string | undefined): RuntimeName | undefined {
-  if (harness === undefined || harness === 'claude-code' || harness === 'pi') {
+  if (harness === undefined || harness === 'claude-code' || harness === 'pi' || harness === 'codex') {
     return harness;
   }
-  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code or pi.`));
+  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code, pi, or codex.`));
   process.exit(1);
 }
 

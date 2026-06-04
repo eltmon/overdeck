@@ -828,6 +828,7 @@ const getHarnessPolicyRoute = HttpRouter.add(
         decisions[model] = {
           'claude-code': canUseHarnessSync('claude-code', model, authMode),
           pi: canUseHarnessSync('pi', model, authMode),
+          codex: canUseHarnessSync('codex', model, authMode),
         };
       }
       return jsonResponse({ decisions });

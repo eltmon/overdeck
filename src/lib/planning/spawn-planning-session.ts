@@ -116,7 +116,7 @@ export interface SpawnPlanningOptions {
   /** Optional model override — if omitted, roles.plan.model is used. */
   model?: string;
   /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
@@ -307,7 +307,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi' | 'codex'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -322,6 +322,16 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
   if (harness === 'pi') {
     const { piGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
+  // The per-agent CODEX_HOME/AGENTS.md is set up by initCodexHome at spawn time;
+  // this file provides context for the planning session before spawn.
+  if (harness === 'codex') {
+    const { codexGlobalContextFile } = await import('../context-layers/index.js');
+    const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
       files.unshift(globalFile);
     }

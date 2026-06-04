@@ -17,7 +17,7 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
 
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
-import { existsSync, createReadStream } from 'node:fs';
+import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
@@ -184,7 +184,7 @@ const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
 async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' ? requested : 'claude-code';
+  const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : 'claude-code';
   // Conversation runtime only honors non-default harnesses when a concrete model is
   // passed through to getAgentRuntimeBaseCommand(). Without a model,
   // spawnConversationSession() intentionally launches the default Claude Code
@@ -518,6 +518,11 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.harness === 'pi') {
     return resolvePiSessionFile(conv.tmuxSession);
   }
+  // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
+  // The thread-id stored in codex-thread-id is the session identifier.
+  if (conv.harness === 'codex') {
+    return resolveCodexSessionFile(conv.tmuxSession);
+  }
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
   }
@@ -546,6 +551,21 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
 /** Detect whether a session file path is a Pi conversation JSONL. */
 function isPiSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
+}
+
+async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
+  const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
+  const threadIdPath = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
+  if (!existsSync(threadIdPath)) return null;
+  try {
+    const threadId = readFileSync(threadIdPath, 'utf-8').trim();
+    if (!threadId) return null;
+    // Walk codex-home/sessions/** to find the rollout file for this thread-id.
+    const { findRolloutPath } = await import('../../../lib/runtimes/codex.js');
+    return findRolloutPath(codexHome, threadId);
+  } catch {
+    return null;
+  }
 }
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
@@ -1049,6 +1069,12 @@ export async function spawnConversationSession(
     piSessionDir: string;
     resumeSessionId?: string;
   } | undefined;
+  let codexFields: {
+    harness: 'codex';
+    codexMode: 'tui';
+    codexHome: string;
+    codexSessionDir: string;
+  } | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -1093,6 +1119,18 @@ export async function spawnConversationSession(
         resumeSessionId: storedPiSessionId || undefined,
       };
 
+    } else if (harness === 'codex') {
+      // Codex conversations run in TUI mode — bare `codex` interactive terminal.
+      // Users type directly in the pane; dashboard messages arrive via tmux paste-buffer.
+      const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
+      const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
+      initCodexHome(codexHome);
+      codexFields = {
+        harness: 'codex',
+        codexMode: 'tui',
+        codexHome,
+        codexSessionDir: join(codexHome, 'sessions'),
+      };
     }
   }
 
@@ -1151,6 +1189,7 @@ export async function spawnConversationSession(
   let channelsBridgeMcpConfig: string | undefined;
   if (
     !piFields &&
+    !codexFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
     (!model || getProviderForModelSync(model).name === 'anthropic') &&
@@ -1178,7 +1217,7 @@ export async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+      panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       // Point the agent's hook/heartbeat POSTs at THIS server's loopback API.
       // Without it the Pi extension falls back to http://localhost:3010
       // (index.ts:120) — which in dev is the Vite dev server, whose /api proxy
@@ -1193,9 +1232,11 @@ export async function spawnConversationSession(
       baseCommand: runtimeCommand,
       appendSystemPromptFiles: piFields
         ? await piConversationSystemPromptFiles(cwd)
-        : await claudeConversationSystemPromptFiles(cwd),
+        : codexFields
+          ? []
+          : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
-      ...(piFields ?? {
+      ...(piFields ?? codexFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
         sessionId: resume ? undefined : claudeSessionId,
       }),
@@ -1255,6 +1296,27 @@ export async function spawnConversationSession(
 
   if (useSupervisor) {
     await waitForPtySupervisorSocket(tmuxSession);
+  }
+
+  // For codex TUI conversations, poll for the first rollout JSONL in the
+  // background and persist the thread-id so transcript/cost lookups can
+  // locate the session. Non-blocking — resolves after codex writes its first
+  // rollout, which happens once the user starts the first conversation turn.
+  if (harness === 'codex' && codexFields?.codexHome) {
+    const codexHomeDir = codexFields.codexHome;
+    void (async () => {
+      try {
+        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+          await import('../../../lib/runtimes/codex.js');
+        const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
+        if (rollout) {
+          const threadId = extractThreadIdFromRollout(rollout);
+          if (threadId) writeThreadId(tmuxSession, threadId);
+        }
+      } catch {
+        // non-fatal
+      }
+    })();
   }
 
   // Channels: dismiss the dev-channels confirmation dialog so the bridge MCP
@@ -1929,11 +1991,12 @@ const postConversationRoute = HttpRouter.add(
 
             if (harness === 'pi') {
               await waitForPiTuiReady(tmuxSession);
-            } else {
+            } else if (harness !== 'codex') {
               // Bounded by waitForClaudeReady's existing 30s timeout.
               await waitForClaudeReady(tmuxSession);
               console.log(`[conversations] Claude ready in ${tmuxSession}`);
             }
+            // Codex TUI: no readiness signal; proceed immediately.
 
             // If a message was provided, send it now that the runtime is ready.
             if (message) {
@@ -2112,7 +2175,7 @@ const postConversationResumeRoute = HttpRouter.add(
           await waitForTmuxSession(conv.tmuxSession);
           if (harness === 'pi') {
             await waitForPiTuiReady(conv.tmuxSession);
-          } else {
+          } else if (harness !== 'codex') {
             await waitForReadySignal(conv.tmuxSession, 30);
           }
 
@@ -2166,7 +2229,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
         const requestedHarness = body['harness'];
         let harness: RuntimeName = currentHarness;
-        if (requestedHarness === 'pi' || requestedHarness === 'claude-code') {
+        if (requestedHarness === 'pi' || requestedHarness === 'claude-code' || requestedHarness === 'codex') {
           if (requestedHarness !== currentHarness) {
             const policyModel = model ?? conv.model ?? '';
             const decision = canUseHarnessSync(
@@ -2248,6 +2311,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
                 resumeSessionId = result.sessionId;
                 canResume = true;
                 if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
+                // For Codex, result.sessionId is the thread-id; persisted separately by initCodexHome/writeThreadId.
               } catch (convErr) {
                 const cm = convErr instanceof Error ? convErr.message : String(convErr);
                 console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
@@ -2268,7 +2332,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           await waitForTmuxSession(tmuxSession);
           if (harness === 'pi') {
             await waitForPiTuiReady(tmuxSession);
-          } else {
+          } else if (harness !== 'codex') {
             await waitForReadySignal(tmuxSession, 30);
           }
 
@@ -2954,13 +3018,12 @@ async function runForkPipeline(
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
   if (forkMode === 'plain') {
-    if (conv.harness === 'pi') {
+    if (conv.harness === 'pi' || conv.harness === 'codex') {
       // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-      // Pi cannot consume Claude JSONL, so a Pi plain fork would silently start
+      // Pi and Codex cannot consume Claude JSONL, so a plain fork would silently start
       // empty while the pipeline reported success. The summary-fork route already
-      // rejects launchHarness='pi'; this guard is defense in depth so the pipeline
-      // itself never produces a "successful" empty Pi session.
-      throw new Error('Plain forks cannot launch under the Pi harness — Pi cannot consume Claude session history.');
+      // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
+      throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
     // Plain Claude Code fork: copy JSONL from last compact boundary into the new
     // session file, then spawn with --resume so Claude Code loads the history
@@ -3197,13 +3260,12 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const handoffAuthorHarness = body['handoffAuthorHarness'] !== undefined
           ? await resolveAllowedHarness(body['handoffAuthorHarness'], handoffAuthorModel || effectiveSummaryModel)
           : undefined;
-        if (forkMode === 'plain' && launchHarness === 'pi') {
+        if (forkMode === 'plain' && (launchHarness === 'pi' || launchHarness === 'codex')) {
           // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
-          // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
-          // start an empty session. Summary forks are fine because they inject the
-          // generated summary through the Pi FIFO after spawn (see injectForkSummary).
+          // Pi and Codex cannot consume Claude JSONL history, so a plain fork would silently
+          // start an empty session. Summary forks are fine.
           return jsonResponse({
-            error: 'Plain forks cannot launch under Pi — Pi cannot consume Claude session history. Use a summary fork to launch under Pi.',
+            error: `Plain forks cannot launch under ${launchHarness} — it cannot consume Claude session history. Use a summary fork instead.`,
           }, { status: 400 });
         }
         const defaultTitle = forkMode === 'plain'

@@ -9,7 +9,8 @@ import {
   type AgentState,
 } from '../agents.js';
 import { sessionFilePath } from '../paths.js';
-import { extractPiTranscript } from '../session-format-converter.js';
+import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
+import { findRolloutPath, writeThreadId as _writeThreadId } from '../runtimes/codex.js';
 import { compressJsonlBuffer } from './compress.js';
 
 export interface TranscriptEntry {
@@ -180,6 +181,77 @@ export class PiTranscriptSource implements TranscriptSource {
   }
 }
 
+export class CodexTranscriptSource implements TranscriptSource {
+  readonly harness = 'codex';
+
+  private readonly listAgents: () => Promise<RunningAgent[]>;
+  private readonly readThreadId: (agent: RunningAgent) => Promise<string | null>;
+  private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
+
+  constructor(options: {
+    listAgents?: () => Promise<RunningAgent[]>;
+    readThreadId?: (agent: RunningAgent) => Promise<string | null>;
+    statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
+  } = {}) {
+    this.listAgents = options.listAgents ?? listRunningAgentsFromStore;
+    this.readThreadId = options.readThreadId ?? readCodexThreadId;
+    this.statTranscript = options.statTranscript ?? stat;
+  }
+
+  async getActiveTranscripts(): Promise<TranscriptEntry[]> {
+    const agents = await this.listAgents();
+    const entries = await Promise.all(
+      agents
+        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'codex')
+        .map((agent) => this.resolveAgentTranscript(agent)),
+    );
+    return entries.filter((entry): entry is TranscriptEntry => entry !== null);
+  }
+
+  parseDelta(buffer: Buffer | string, fromOffset = 0): TurnEvent[] {
+    const text = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : buffer;
+    const lastNewline = text.lastIndexOf('\n');
+    if (lastNewline === -1) return [];
+
+    const complete = text.slice(0, lastNewline + 1);
+    const turns = extractCodexTranscript(complete);
+    if (turns.length === 0) return [];
+
+    return [{
+      compressedText: turns.map((turn) => `${turn.role === 'user' ? 'U' : 'A'}: ${turn.text}`).join('\n'),
+      eventsConsumed: turns.length,
+      lastFullLineOffset: fromOffset + Buffer.byteLength(complete, 'utf8'),
+    }];
+  }
+
+  private async resolveAgentTranscript(agent: RunningAgent): Promise<TranscriptEntry | null> {
+    const threadId = await this.readThreadId(agent);
+    if (!threadId) return null;
+
+    // Use per-agent CODEX_HOME, not the global ~/.codex; rollouts are written to
+    // ~/.panopticon/agents/<id>/codex-home/sessions/ by the per-agent spawn.
+    const rolloutPath = findRolloutPath(join(getAgentDir(agent.id), 'codex-home'), threadId);
+    if (!rolloutPath) return null;
+
+    let fileStat: { size: number; mtimeMs: number };
+    try {
+      fileStat = await this.statTranscript(rolloutPath);
+    } catch {
+      return null;
+    }
+
+    return {
+      agentId: agent.id,
+      sessionId: threadId,
+      transcriptPath: rolloutPath,
+      identity: buildMemoryIdentity(agent, threadId),
+      harness: 'codex',
+      size: fileStat.size,
+      mtimeMs: fileStat.mtimeMs,
+    };
+  }
+}
+
 export class TranscriptSourceRegistry {
   private readonly sources = new Map<string, TranscriptSource>();
 
@@ -205,6 +277,7 @@ export function createDefaultTranscriptSourceRegistry(): TranscriptSourceRegistr
   const registry = new TranscriptSourceRegistry();
   registry.register(new ClaudeCodeTranscriptSource());
   registry.register(new PiTranscriptSource());
+  registry.register(new CodexTranscriptSource());
   return registry;
 }
 
@@ -272,4 +345,14 @@ function inferProjectId(workspacePath: string): string {
   const workspaceName = basename(workspacePath);
   if (workspaceName.startsWith('feature-')) return basename(dirname(dirname(workspacePath)));
   return basename(workspacePath);
+}
+
+async function readCodexThreadId(agent: RunningAgent): Promise<string | null> {
+  try {
+    const threadIdPath = join(getAgentDir(agent.id), 'codex-thread-id');
+    const saved = (await readFile(threadIdPath, 'utf8')).trim();
+    return saved || null;
+  } catch {
+    return null;
+  }
 }

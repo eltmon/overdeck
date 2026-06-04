@@ -67,8 +67,14 @@ describe('validateTemplate', () => {
   });
 
   it('warns — but does not error — on an unknown harness name', () => {
+    const v = validateTemplate('{{#harness:cursor}}x{{/harness:cursor}}');
+    expect(v.ok).toBe(true);
+    expect(v.issues.some((i) => i.severity === 'warning' && /cursor/.test(i.message))).toBe(true);
+  });
+
+  it('does not warn on the codex harness name (now a known harness)', () => {
     const v = validateTemplate('{{#harness:codex}}x{{/harness:codex}}');
     expect(v.ok).toBe(true);
-    expect(v.issues.some((i) => i.severity === 'warning' && /codex/.test(i.message))).toBe(true);
+    expect(v.issues.some((i) => i.severity === 'warning' && /codex/.test(i.message))).toBe(false);
   });
 });

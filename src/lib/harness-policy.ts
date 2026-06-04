@@ -79,6 +79,10 @@ export function canUseHarnessSync(
     return ALLOWED
   }
 
+  if (harness === 'codex') {
+    return ALLOWED
+  }
+
   // harness === 'pi'
   const provider = getProviderForModelSync(model)
   if (provider.name !== 'anthropic') {
