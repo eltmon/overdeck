@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { FlywheelStatus } from "./flywheel"
+import { FlywheelStatus, FlywheelSuggestion } from "./flywheel"
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus)
+const decodeFlywheelSuggestion = Schema.decodeUnknownSync(FlywheelSuggestion)
+const encodeFlywheelSuggestion = Schema.encodeSync(FlywheelSuggestion)
 
 const validPayload = {
   runId: "RUN-1",
@@ -102,6 +104,20 @@ describe("FlywheelStatus", () => {
     const parsed = decodeFlywheelStatus(historicalPayload)
 
     expect(parsed.suggestions).toEqual([])
+  })
+
+  it("roundtrips suggestion weights through decode and encode", () => {
+    const payload = {
+      action: "investigate",
+      rationale: "Substrate bug affects the v1.0 bug-rate criterion.",
+      priority: "high",
+      weight: 1.8,
+      weightReason: "criterion 1 (bug rate) at 3.2% vs target <2% — red",
+    }
+    const decoded = decodeFlywheelSuggestion(payload)
+
+    expect(decoded).toEqual(payload)
+    expect(encodeFlywheelSuggestion(decoded)).toEqual(payload)
   })
 
   it("rejects payloads missing runId", () => {
