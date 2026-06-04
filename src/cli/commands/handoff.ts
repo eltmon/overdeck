@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
+import { resolveCurrentConversation } from '../../lib/conversations/current.js';
 import { forkConversationViaServer, ForkServerError } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
@@ -21,6 +22,8 @@ function resolveConversation(convRef: string) {
   return getConversationByName(convRef);
 }
 
+const SELF_REFS = new Set(['self', '.', 'current', 'me']);
+
 function validateHarness(harness: string | undefined): RuntimeName | undefined {
   if (harness === undefined || harness === 'claude-code' || harness === 'pi') {
     return harness;
@@ -30,13 +33,23 @@ function validateHarness(harness: string | undefined): RuntimeName | undefined {
 }
 
 export async function handoffCommand(
-  convRef: string,
+  convRef: string | undefined,
   focusArgs: string[],
   options: HandoffOptions,
 ): Promise<void> {
-  const conv = resolveConversation(convRef);
+  // Self-detect when no conversation is given (or an explicit self-ref). This is
+  // the deterministic answer to "hand off the conversation I'm in" — it replaces
+  // the old scan-and-guess pattern that picked the wrong source (PAN-1520).
+  const wantsSelf = convRef === undefined || SELF_REFS.has(convRef.toLowerCase());
+  const conv = wantsSelf ? await resolveCurrentConversation() : resolveConversation(convRef);
   if (!conv) {
-    console.log(chalk.yellow(`Conversation not found: ${convRef}`));
+    if (wantsSelf) {
+      console.log(chalk.yellow('Could not determine the current conversation.'));
+      console.log(chalk.gray('  `pan handoff` with no <conv> only works from inside a conversation session.'));
+      console.log(chalk.gray('  Pass an explicit conversation id or name, e.g. `pan handoff 371`.'));
+    } else {
+      console.log(chalk.yellow(`Conversation not found: ${convRef}`));
+    }
     process.exit(1);
   }
 

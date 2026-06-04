@@ -19,14 +19,42 @@ Create a new conversation seeded by a handoff document written by the live sourc
 ## Quick command
 
 ```bash
-pan handoff <conv> [focus text...]
+pan handoff [conv] [focus text...]
 ```
 
 The trailing text after the conversation reference becomes the focus — no flag required.
 
+## Handing off the conversation you are in (the common case)
+
+**If you are an agent inside a conversation and want to hand off *your own*
+conversation, omit `<conv>` — or pass `self`.** Do NOT run `pan conv scan`,
+`pan conv list`, or `pan conv show` to "find yourself" and then guess an id.
+That scan-and-guess pattern picks the wrong source (PAN-1520); the command
+identifies your conversation deterministically from the session you are running
+in.
+
+```bash
+pan handoff                              # hand off this conversation, no focus
+pan handoff self wire the Stripe webhook # hand off this conversation, with focus
+```
+
+Because focus text is positional, prefer the explicit `self` token whenever you
+pass focus — a bare first word like `pan handoff continue the wiring` is
+interpreted as a *conversation reference* named "continue", not focus. `self`
+removes the ambiguity.
+
+If you want to know which conversation you are resolved to, run `pan conv current`
+(alias `pan conv whoami`). It prints the deterministic answer with no guessing.
+
+Self-detection works for non-Docker `claude-code` conversations. If it cannot
+resolve (run outside a conversation, or a Docker workspace), the command errors
+and asks for an explicit `<conv>` — it never falls back to a guess.
+
 ## Usage
 
 ```bash
+pan handoff                              # hand off the conversation you are in
+pan handoff self continue the API wiring # same, with focus
 pan handoff 42
 pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
@@ -74,5 +102,6 @@ Successful handoffs print the new conversation id, tmux session, model, harness,
 
 ## See also
 
-- `pan fork <conv>` — create a summary or plain fork without asking the source agent to author a handoff.
+- `pan conv current` (alias `pan conv whoami`) — print the conversation you are running inside; the deterministic answer to "which conversation am I?".
+- `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff; also self-detects when `<conv>` is omitted.
 - `/pan-workflow` — broader Panopticon workflow guidance.

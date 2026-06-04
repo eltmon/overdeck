@@ -7,6 +7,7 @@ import { scanAction } from './scan.js';
 import { searchAction } from './search.js';
 import { listAction } from './list.js';
 import { showAction } from './show.js';
+import { currentAction } from './current.js';
 import { costAction } from './cost.js';
 import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
@@ -87,6 +88,14 @@ export function registerConversationsCommands(program: Command): void {
     .description('Show detailed information for a session by ID')
     .option('--json', 'Output as JSON')
     .action((id: string, opts: { json?: boolean }) => showAction(id, opts));
+
+  // ── current ───────────────────────────────────────────────────────────────────
+  conversations
+    .command('current')
+    .alias('whoami')
+    .description('Print the conversation you are currently running inside (deterministic — no scanning/guessing)')
+    .option('--json', 'Output as JSON')
+    .action((opts: { json?: boolean }) => currentAction(opts));
 
   // ── cost ────────────────────────────────────────────────────────────────────
   conversations

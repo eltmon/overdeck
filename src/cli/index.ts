@@ -414,16 +414,16 @@ program
   .action(untroubledCommand);
 
 program
-  .command('fork <conv>')
-  .description('Summary Fork a conversation — creates new session from a summary of previous work')
+  .command('fork [conv]')
+  .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
 program
-  .command('handoff <conv> [focus...]')
-  .description('Conversation handoff that spawns a new conversation; trailing text becomes the focus')
+  .command('handoff [conv] [focus...]')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> to hand off the conversation you are in; trailing text becomes the focus')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
   .option('--cwd <path>', 'Working directory for the new conversation')

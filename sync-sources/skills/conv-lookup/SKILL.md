@@ -33,6 +33,21 @@ Use this skill whenever the user references a Panopticon conversation — by `pa
 
 > **Do not** try `WebFetch` on `pan.localhost/conv/<id>` — the dashboard is an SPA and WebFetch will return empty page chrome. Always go through the script / DB.
 
+## "Which conversation am I in?"
+
+If you are an agent inside a conversation and need to know *your own*
+conversation (e.g. to hand it off), **do not** run `pan conv scan` / `list` /
+`show` and guess. Run:
+
+```bash
+pan conv current   # alias: pan conv whoami
+```
+
+This resolves the current conversation deterministically from the session you
+are running in (PAN-1520) — no guessing. To hand off or fork your own
+conversation, just omit `<conv>`: `pan handoff` / `pan fork` self-detect the
+same way.
+
 ## How it works
 
 Every Panopticon conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Each row maps to a Claude Code JSONL session file in `~/.claude/projects/-home-eltmon-Projects/`.

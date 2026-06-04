@@ -233,6 +233,34 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
   return row ? rowToConversation(row) : null;
 }
 
+/**
+ * Resolve the conversation currently live on a tmux session.
+ *
+ * A tmux session can transiently back more than one conversation row — after a
+ * `/clear`, a sibling row is created sharing the same `tmux_session` while the
+ * parent is marked ended (see `hasOtherActiveConversationOnTmuxSession`). So we
+ * prefer the active, non-archived row, and break ties by most-recent creation.
+ * Returns null if no live conversation owns the session.
+ */
+export function getConversationByTmuxSession(tmuxSession: string): Conversation | null {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
+              fork_status, fork_error, harness, delivery_method, spawn_error,
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+       FROM conversations
+       WHERE tmux_session = ?
+         AND archived_at IS NULL
+       ORDER BY (status = 'active') DESC, created_at DESC
+       LIMIT 1`,
+    )
+    .get(tmuxSession) as Record<string, unknown> | undefined;
+  return row ? rowToConversation(row) : null;
+}
+
 export function listArchivedConversations(): Conversation[] {
   const db = getDatabase();
   const rows = db
