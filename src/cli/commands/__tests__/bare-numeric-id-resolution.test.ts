@@ -243,6 +243,10 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
   });
 
   it('resolves bare numeric input before pan kill stops the agent', async () => {
+    // PAN-1526: kill discovers agents by scanning AGENTS_DIR, then falls back to
+    // the canonical work-agent session. There's no agent dir on disk here, so
+    // make the canonical session live for the fallback to pick it up.
+    tmuxMocks.sessionExistsSync.mockReturnValue(true);
     const { killCommand } = await import('../kill.js');
 
     await killCommand('9999', {});

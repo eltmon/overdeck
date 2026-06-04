@@ -11,6 +11,21 @@ const realBd = commandPath('bd');
 const bdDoctorFixSupportsEmbedded = realBd ? checkEmbeddedDoctorFixSupport() : false;
 const tempRoots: string[] = [];
 
+// Make the skip LOUD rather than silent (PAN-1450 review). The real-corruption
+// recovery path exercised below depends on `bd doctor --fix` working in embedded
+// mode; bd ≤ 1.0.4 reports "not yet supported in embedded mode", so the test can
+// only run once bd ships embedded doctor --fix. Surface that in CI logs so the
+// coverage gap is visible instead of vanishing into a silently-skipped case.
+if (!realBd) {
+  console.warn('[PAN-1111] Skipping real Dolt-corruption recovery test: `bd` binary not found on PATH.');
+} else if (!bdDoctorFixSupportsEmbedded) {
+  console.warn(
+    '[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support ' +
+    '`bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining ' +
+    'embedded doctor --fix support; this test runs automatically once it does.',
+  );
+}
+
 function commandPath(command: string): string | null {
   const result = spawnSync('which', [command], { encoding: 'utf-8' });
   if (result.status !== 0) return null;
