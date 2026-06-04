@@ -9,8 +9,13 @@
 # --dangerously-skip-permissions, which Auto-mode (compliance) users forbid.
 #
 # SCOPE (by PANOPTICON_AGENT_ID prefix):
-#   agent-*    → AUTO-APPROVE. Work / review / test / ship / flywheel pipeline
-#                agents run unattended; a prompt would hang them.
+#   agent-*    → AUTO-APPROVE. Work / review / test / ship pipeline agents run
+#                unattended; a prompt would hang them.
+#   flywheel-* → AUTO-APPROVE. The Fix-All Flywheel orchestrator
+#                (PANOPTICON_AGENT_ID=flywheel-orchestrator) is fully headless —
+#                a prompt hangs the entire run. It does NOT use an agent-* id.
+#   strike-* / inspect-* → AUTO-APPROVE. Headless strike (implement+merge) and
+#                per-bead inspect agents, same autonomy as a work agent.
 #   planning-* → AUTO-APPROVE. A planning agent must not be MORE restrictive than
 #                a work agent (which is auto-approved) or a conversation (which
 #                runs under bypass) — otherwise it is the only thing in the system
@@ -52,7 +57,7 @@ echo "[$(date -Iseconds)] auto-approve-hook: AGENT=${PANOPTICON_AGENT_ID:-unset}
 # Panopticon pipeline agents (work + planning). Conversations (human present,
 # currently bypass) and plain human sessions (unset) keep normal prompts.
 case "${PANOPTICON_AGENT_ID:-}" in
-  agent-*|planning-*) : ;;
+  agent-*|planning-*|flywheel-*|strike-*|inspect-*) : ;;
   *) exit 0 ;;
 esac
 
