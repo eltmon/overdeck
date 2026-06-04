@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { useTheme } from '../hooks/useTheme';
 
@@ -371,6 +372,21 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       term.open(terminalRef.current);
       // Fit terminal to container immediately so it uses the full width
       try { fit.fit(); } catch { /* element may not be sized yet */ }
+
+      // Render with the WebGL renderer instead of xterm's default DOM renderer.
+      // The DOM renderer leaves stale background cells on Retina/HiDPI Chrome —
+      // green tmux status cells smear over text until a scroll/resize forces a
+      // full repaint. WebGL paints the whole grid to a single canvas, which has
+      // no per-row stale-cell artifact. Must load after term.open(). If the GPU
+      // context is lost (or WebGL2 is unavailable), dispose the addon and xterm
+      // falls back to the DOM renderer automatically.
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch (err) {
+        console.warn('XTerminal: WebGL renderer unavailable, using DOM renderer', err);
+      }
 
       terminalInstance.current = term;
       fitAddon.current = fit;
