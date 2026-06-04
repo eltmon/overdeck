@@ -283,6 +283,11 @@ function getSyncTargetBranch(
     const featureName = featureFolder.replace(/^feature-/, '');  // e.g., 'min-574'
     const projectPath = projectConfig?.path || dirname(dirname(workspacePath));
     const domain = projectConfig?.workspace?.dns?.domain || 'localhost';
+    // PAN-666: the ref a changed-file-scoped gate diffs against. The gate already
+    // merged this branch into the workspace above, so `origin/<target>` is the
+    // pre-PR baseline; `vitest run --changed {{CHANGED_BASE}}` then runs only the
+    // tests affected by the PR and ignores pre-existing failures elsewhere.
+    const changedBase = `origin/${getSyncTargetBranch(workspacePath, projectConfig, undefined)}`;
     const placeholders: TemplatePlaceholders = {
       FEATURE_NAME: featureName,
       FEATURE_FOLDER: featureFolder,
@@ -294,7 +299,18 @@ function getSyncTargetBranch(
       PROJECTS_DIR: dirname(projectPath),
       WORKSPACE_PATH: workspacePath,
       HOME: homedir(),
+      CHANGED_BASE: changedBase,
     };
+
+    // PAN-666 (AC#3): make changed-file scoping visible so humans know pre-existing
+    // failures in unmodified files were not run and may be accumulating.
+    if (Object.values(gates).some(g => g.command?.includes('CHANGED_BASE'))) {
+      console.log(
+        `[${logPrefix}] Test gate is scoped to files changed since ${changedBase} ` +
+        `(PAN-666). Pre-existing failures in files this PR did not touch are NOT run — ` +
+        `they may be accumulating as tech debt on the target branch.`,
+      );
+    }
 
     // Install dependencies for monorepo workspaces.
     // Polyrepo workspaces manage deps per-repo via quality gate commands or containers.
