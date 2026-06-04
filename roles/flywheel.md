@@ -49,6 +49,23 @@ Before acting, read:
 
 If the brief defines `scope`, operate only inside that scope. If it defines `maxAgents`, never exceed that cap when starting or resuming issue agents.
 
+## Startup pipeline triage (resync vs restart)
+
+Run this ONCE at the start of a run, before the first tick — especially after the orchestrator has been paused for a while. Every in-progress issue may have been built on a `main` that has since moved on: silently resuming a stale branch causes merge thrash, and work whose foundation was remodeled out from under it should be redone rather than rebased.
+
+Triage each issue that has a live feature branch in the pipeline, deciding **per issue**. The trigger is **divergence, not elapsed time** — a day-old branch on a hot file can be more divergent than a month-old branch on a cold one, so judge the actual gap against `main`, never a clock.
+
+For each in-progress issue:
+
+1. **Measure divergence.** How far is its branch behind `origin/main`, and does it still rebase/merge cleanly? Read-only git inspection of the workspace is fine; you never edit the branch yourself.
+2. **Check whether the foundation moved.** Did `main` rename, remodel, or delete the files/APIs the branch's work depends on? Read the branch diff against the merge-base and the issue scope.
+3. **Decide and act:**
+   - **Resync** — the branch is behind but its changes are still *additive*: the surfaces/APIs it touches still exist and it should rebase cleanly. Run `pan sync-main <id>` to bring the branch current on top of `main`, then emit a `resume` suggestion so the operator continues it from current `main`. This is the **one** sanctioned exception to the `pan sync-main` prohibition (see the Never list) and applies only to **stopped** in-pipeline issues — never a running agent. If `pan sync-main` reports conflicts, that branch is actually a restart candidate — fall through to Restart.
+   - **Restart** — the foundation moved out from under the work: hard conflicts, or the very component/API it patched was remodeled. Launch `pan plan <id> --auto` to re-plan and re-implement from current `main`, and emit a suggestion to close the now-stale PR as superseded. *Example:* PAN-1242 patches `KanbanBoard.tsx`, which was remodeled after its branch — redoing on today's board beats rebasing a moving target (salvage the reusable backend endpoint).
+4. **Record every call** (issue, resync|restart, the divergence evidence, the why) in the run status and in `docs/FLYWHEEL-STATE.md`, so the decision is auditable and future runs inherit the context.
+
+After triage, proceed into the normal tick loop.
+
 ## Tick loop
 
 Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapshot with a ranked `suggestions[]` list; `pan flywheel emit-status --file <path>` is the tick deliverable, not an afterthought.
@@ -114,7 +131,7 @@ Allowed when `require_uat_before_merge=false`:
 
 Never:
 
-- Run `pan tell`, `pan approve`, `pan sync-main`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`.
+- Run `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`, `pan wipe`, or `pan close`. `pan sync-main` is also off-limits **except** for the single startup-triage resync case in "Startup pipeline triage" — and even then only on a *stopped* in-pipeline issue, never a running agent.
 - Edit feature branches directly or commit code fixes from this role.
 - Merge PRs without checking the configured policy.
 
