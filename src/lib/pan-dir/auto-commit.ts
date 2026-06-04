@@ -21,16 +21,9 @@
 
 import { existsSync } from 'fs';
 import { dirname, join, sep } from 'path';
-import { Effect, Layer, Stream } from 'effect';
-import { ChildProcess } from 'effect/unstable/process';
-import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
-import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
-import * as NodePath from '@effect/platform-node/NodePath';
+import { promisify } from 'util';
+import { Effect } from 'effect';
 import { GitError } from '../errors.js';
-
-const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
-  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
-);
 
 const DEBOUNCE_MS = 2_000;
 
@@ -59,47 +52,30 @@ function runGit(
   args: readonly string[],
   cwd: string,
 ): Effect.Effect<GitResult, GitError> {
-  return Effect.gen(function* () {
-    const handle = yield* ChildProcess.make('git', [...args], { cwd });
-    const stdoutBuf = yield* Stream.runFold(
-      handle.stdout,
-      () => Buffer.alloc(0),
-      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
-    );
-    const stderrBuf = yield* Stream.runFold(
-      handle.stderr,
-      () => Buffer.alloc(0),
-      (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]),
-    );
-    const exitCode = yield* handle.exitCode;
-    if (exitCode !== 0) {
-      return yield* Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: stderrBuf.toString('utf-8'),
-          exitCode,
-        }),
-      );
-    }
-    return {
-      stdout: stdoutBuf.toString('utf-8'),
-      stderr: stderrBuf.toString('utf-8'),
-      exitCode,
-    };
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(spawnerLayer),
-    Effect.catchCause((cause) =>
-      Effect.fail(
-        new GitError({
-          command: ['git', ...args],
-          stderr: String(cause),
-          exitCode: -1,
-          cause,
-        }),
-      ),
-    ),
-  );
+  return Effect.tryPromise({
+    try: async () => {
+      const { execFile } = await import('child_process');
+      const execFileAsync = promisify(execFile);
+      const result = await execFileAsync('git', [...args], { cwd, encoding: 'utf8' });
+      return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: 0,
+      };
+    },
+    catch: (cause) => {
+      const error = cause as { stderr?: string | Buffer; code?: number };
+      const stderr = error.stderr
+        ? (typeof error.stderr === 'string' ? error.stderr : error.stderr.toString('utf-8'))
+        : String(cause);
+      return new GitError({
+        command: ['git', ...args],
+        stderr,
+        exitCode: typeof error.code === 'number' ? error.code : -1,
+        cause,
+      });
+    },
+  });
 }
 
 /**
