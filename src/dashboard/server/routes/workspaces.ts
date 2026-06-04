@@ -1731,6 +1731,35 @@ const postWorkspacesRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/rebuild-stack ───────────────────────
+// Bring a workspace's Docker stack back up (e.g. so the "UAT" action on the
+// Awaiting-Merge page works when the stack is down). Fire-and-forget like the
+// create route: spawns `pan workspace rebuild`, returns an activityId so the
+// dashboard streams progress.
+const postWorkspaceRebuildRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/rebuild-stack',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const activityId = spawnPanCommand(
+      ['workspace', 'rebuild', issueId],
+      `Rebuild stack for ${issueId}`,
+      projectPath,
+    );
+    return jsonResponse({
+      success: true,
+      message: `Rebuilding stack for ${issueId}`,
+      activityId,
+    });
+  }))
+);
+
 // ─── Route: GET /api/workspaces/:issueId/plan ─────────────────────────────────
 
 const getWorkspaceStateMdRoute = HttpRouter.add(
@@ -6124,6 +6153,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceStackHealthBatchRoute,
   getWorkspaceRoute,
   postWorkspacesRoute,
+  postWorkspaceRebuildRoute,
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,

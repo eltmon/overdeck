@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp, TriangleAlert, Circle } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp, TriangleAlert, Circle, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
@@ -21,12 +21,21 @@ interface WorkspaceInfo {
   exists?: boolean;
   frontendUrl?: string;
   mrUrl?: string;
+  stackHealth?: { healthy?: boolean; reasons?: string[] };
 }
 
 async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
   const res = await fetch(`/api/workspaces/${issueId}`);
   if (!res.ok) return {};
   return res.json();
+}
+
+async function rebuildStack(issueId: string): Promise<void> {
+  const res = await fetch(`/api/workspaces/${issueId}/rebuild-stack`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Rebuild failed (${res.status})`);
+  }
 }
 
 async function forgeMerge(issueId: string): Promise<unknown> {
@@ -171,6 +180,8 @@ export function AwaitingMergePage() {
                   identifier={issue?.identifier ?? rs.issueId}
                   trackerUrl={issue?.url}
                   frontendUrl={ws?.frontendUrl}
+                  stackHealthy={ws?.stackHealth?.healthy}
+                  stackReason={ws?.stackHealth?.reasons?.[0]}
                   prUrl={rs.prUrl ?? ws?.mrUrl}
                   updatedAt={rs.updatedAt}
                   mergeStatus={rs.mergeStatus}
@@ -251,6 +262,8 @@ interface RowProps {
   title: string;
   trackerUrl?: string;
   frontendUrl?: string;
+  stackHealthy?: boolean;
+  stackReason?: string;
   prUrl?: string;
   updatedAt?: string;
   mergeStatus?: string;
@@ -318,6 +331,8 @@ function AwaitingMergeRow({
   title,
   trackerUrl,
   frontendUrl,
+  stackHealthy,
+  stackReason,
   prUrl,
   updatedAt,
   mergeStatus,
@@ -333,6 +348,16 @@ function AwaitingMergeRow({
     },
     onError: (err: Error) => {
       toast.error(`Merge failed for ${identifier}`, { description: err.message });
+    },
+  });
+
+  const rebuildMutation = useMutation({
+    mutationFn: () => rebuildStack(issueId),
+    onSuccess: () => {
+      toast.success(`Rebuilding stack for ${identifier}`, { description: 'Watch the activity feed; the UAT link works once it is healthy.' });
+    },
+    onError: (err: Error) => {
+      toast.error(`Stack rebuild failed for ${identifier}`, { description: err.message });
     },
   });
 
@@ -396,7 +421,19 @@ function AwaitingMergeRow({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {frontendUrl ? (
+          {stackHealthy === false ? (
+            // Stack is down — a UAT link would just 404. Offer a rebuild instead.
+            <button
+              type="button"
+              onClick={() => rebuildMutation.mutate()}
+              disabled={rebuildMutation.isPending}
+              title={stackReason ? `Workspace stack is down: ${stackReason}` : 'Workspace stack is down — rebuild it to UAT'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {rebuildMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
+              {rebuildMutation.isPending ? 'Rebuilding…' : 'Rebuild to UAT'}
+            </button>
+          ) : frontendUrl ? (
             <a
               href={frontendUrl}
               target="_blank"
