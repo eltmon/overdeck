@@ -81,6 +81,7 @@
     "build:desktop:linux": "cd apps/desktop && bun run build && bun run dist:linux",
     "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
     "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
+    "pretypecheck": "npm run build:contracts",
     "typecheck": "tsc --noEmit && npm run typecheck:hooks",
     "typecheck:hooks": "tsc --noEmit -p tsconfig.hooks.json",
     "lint": "eslint src/ && npm run lint:effect && npm run lint:permissions && npm run lint:skills",
