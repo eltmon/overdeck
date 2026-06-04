@@ -18,6 +18,14 @@ function formatTokens(tokens: number): string {
   return `${tokens}`;
 }
 
+/** Trim model IDs to a readable label, e.g. "claude-opus-4-8" → "opus-4-8". */
+function shortModel(model: string): string {
+  return model
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '')
+    .replace(/-latest$/, '');
+}
+
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
 
 const PHASE_ICONS = {
@@ -370,6 +378,12 @@ export function ConversationRow({
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
                 <span title={`${conv.totalTokens.toLocaleString()} tokens (input + output + cache read/write)`}>{formatTokens(conv.totalTokens)} tok</span>
+              </>
+            )}
+            {conv.model && (
+              <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
               </>
             )}
             {forkBadges}
