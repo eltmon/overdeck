@@ -221,6 +221,14 @@ pan specialists wake merge-agent --task "merge PAN-655"
 
 The merge-agent prompt forbids force-push, requires test re-runs, and mandates that conflict resolution decisions are documented in the merge commit message.
 
+Once the pipeline has driven a branch to ready-to-merge, it lands on the **Awaiting Merge** page — the single place to see every feature branch waiting on the human merge gate.
+
+<ThemedImage
+  light="/images/dashboard/awaiting-merge-light.png"
+  dark="/images/dashboard/awaiting-merge-dark.png"
+  alt="Awaiting Merge page listing feature branches ready for human merge"
+/>
+
 ## Queue Processing
 
 Each specialist has a per-project task queue at `~/.panopticon/agents/{name}/hook.json`, managed via the **FPP (Fixed Point Principle)** — borrowed from Gastown, inspired by Doctor Who: *any runnable action is a fixed point and must resolve before the system can rest.*
@@ -348,6 +356,14 @@ pan specialists clear-queue review-agent
 # Tail an active run in real-time
 pan specialists logs myproject review-agent --tail
 ```
+
+The dashboard surfaces the same state visually. The **Agents** page rolls up every running specialist and work-agent into cards — model, runtime, and last activity — under a metric strip tracking how many agents are running, how many are stuck, and the 24-hour cost and token spend. It's the at-a-glance answer to "what is every agent doing right now" without tailing a single log.
+
+<ThemedImage
+  light="/images/dashboard/agents-light.png"
+  dark="/images/dashboard/agents-dark.png"
+  alt="Agents page with a metric strip (Running, Stuck, Cost 24h, Tokens 24h, Queue) over agent cards showing model, runtime, and last activity"
+/>
 
 <ThemedImage
   light="/images/specialists/06-health-light.png"

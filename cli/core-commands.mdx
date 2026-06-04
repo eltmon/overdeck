@@ -3,6 +3,8 @@ title: Core Commands
 description: Essential Panopticon commands for system management
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Core Commands
 
 Core system management commands for Panopticon.
@@ -95,6 +97,24 @@ The dashboard provides:
 - Cost tracking
 - Skills browser
 - Health checks
+
+Beyond the board, the dashboard is where you watch and steer live agent
+conversations and the work moving through the pipeline. The Pipeline page
+groups every active issue by phase — Ship, Review, and Verifying — above a
+metric strip tracking active issues, work running, the review queue, ship
+count, and spend, with a live activity feed alongside.
+
+<ThemedImage
+  light="/images/dashboard/pipeline-light.png"
+  dark="/images/dashboard/pipeline-dark.png"
+  alt="Pipeline page: a metric strip (Active issues, Work running, Review queue, Ship, Spend) over phase-grouped issue rows for Ship, Review, and Verifying, with an activity feed on the right"
+/>
+
+<Tip>
+  The metric strip is the fastest way to answer "where are we?" at a glance —
+  it surfaces how many agents are working, how deep the review queue is, and
+  the running spend without opening any individual issue.
+</Tip>
 
 ## pan down
 

@@ -3,6 +3,8 @@ title: Harnesses
 description: Choosing the coding-agent harness that drives a workspace agent
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Harnesses
 
 A **harness** is the underlying CLI that drives a workspace agent — the binary
@@ -88,6 +90,17 @@ harness + model defaults from the dashboard Settings page. A `harness` selector
 sits next to each role's model dropdown to mix and match. Sub-roles such as
 `work.inspect` and `review.security` inherit from the parent role unless
 configured more specifically.
+
+<ThemedImage
+  light="/images/dashboard/settings-light.png"
+  dark="/images/dashboard/settings-dark.png"
+  alt="Panopticon Settings page showing per-role model routing, tracker API keys, and project configuration"
+/>
+
+The Settings page is also where you wire up tracker API keys and project
+configuration, so harness routing for autonomous role runs lives alongside the
+rest of the orchestrator's defaults — set the harness once per role here and
+every pipeline spawn for that role inherits it.
 
 ## ToS rules
 
