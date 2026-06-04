@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-1577",
+  "created": "2026-06-04T04:50:44.217Z",
+  "updated": "2026-06-04T04:57:22.161Z",
+  "gitState": { "branch": "feature/pan-1577", "sha": "6fe40a9fc", "dirty": true },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Store the project association as an explicit `project_key` override column on the `conversations` table (name-keyed). Moving NEVER rewrites `cwd` and NEVER touches the JSONL session file on disk. Sidebar grouping prefers the override when set, falling back to cwd→project-path inference when null.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D2",
+      "summary": "The single backend primitive is `PATCH /api/conversations/:name/move { projectKey }` on the name-keyed `conversations` table (the store the Command Deck sidebar groups on via `listConversations()` → `conv.cwd`). It validates the target project with `getProjectSync()` + path-exists (mirroring the 400 `Unknown project` guard at conversations.ts:1867), is a no-op 200 if already in the target project, sets the override via a new `setConversationProjectKey()`, and emits a `conversation.moved` domain event so all connected clients re-group live.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D3",
+      "summary": "The CLI `pan conversations move <query> <projectKey>` resolves `<query>` against the live `conversations` table (exact name, then fuzzy title match over `listConversations()`) — NOT the `discovered_sessions` archive that `pan conversations show`/`search` use. Rationale: the move feature re-groups the dashboard sidebar, which is backed by the `conversations` table keyed by `name`; `discovered_sessions` is the on-disk JSONL index keyed by numeric id and has no sidebar project grouping. The command calls the PATCH endpoint via `getDashboardApiUrlSync()` (the same CLI→dashboard pattern as abort-review/reset-review/plan-done) so validation + write + event emission stay in one place.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Moving is allowed regardless of session state (active or ended). Because we only flip the override column and never touch `cwd` or the running tmux process, a live session's working directory is undisturbed; only the sidebar grouping changes.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D5",
+      "summary": "The 3-dot/right-click `Move` action opens a PROJECT picker (a list of registered projects), with the conversation's current project indicated/disabled. This is the default interpretation of the issue's 'Move -> list' phrasing.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Drag-and-drop uses native HTML5 DnD (draggable row + drop-target project node), following the existing native-DnD precedent in `Stage/PaneBar.tsx`, rather than @dnd-kit. Rationale: the drag crosses two sibling components (ConversationList ↔ ProjectTree) that are not under a shared @dnd-kit `DndContext`; native HTML5 DnD needs no shared provider and keeps the change surgical. Both the menu action and the drop call the same shared `move` React-Query mutation (optimistic re-group + rollback + toast).",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    },
+    {
+      "id": "D7",
+      "summary": "A new `pan-conversations` wrapper skill is added under `sync-sources/skills/` documenting the conversations command group including `move`, because `pan conversations` is a user-facing group, is NOT in the SKILLS-CONVENTION exclusion list, and the issue AC explicitly requires the wrapper updated in the same commit. The skill must pass `scripts/lint-skills.sh`.",
+      "recordedAt": "2026-06-04T04:57:22.161Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "JSONL session files are sacred (CLAUDE.md). The override column must leave the on-disk JSONL and the conversation's `cwd` completely untouched — no file move, no path rewrite.",
+      "mitigation": "Move writes ONLY the `conversations.project_key` column. Add an explicit acceptance criterion + test asserting the JSONL path and `cwd` are unchanged after a move."
+    },
+    {
+      "id": "H2",
+      "summary": "Other project-scoped behavior that keys off `cwd` (not the sidebar) is intentionally OUT of scope — moving only changes sidebar grouping, not any cwd-based context/automation. Conflating the two would balloon scope.",
+      "mitigation": "Document scope boundary in the vBRIEF narrative: only sidebar/Project-Activity grouping reads the override. cwd-based resolution elsewhere is unchanged and explicitly not part of this issue."
+    },
+    {
+      "id": "H3",
+      "summary": "`project_key` must be added to EVERY SELECT column list and the `rowToConversation` mapper in conversations-db.ts (listConversations, listActiveConversations, getConversationByName, and any others) or the field silently reads as undefined.",
+      "mitigation": "Foundation bead enumerates all read sites; inspection gate verifies the field is threaded through every SELECT + mapper + the Conversation TS interface and surfaced in GET /api/conversations."
+    },
+    {
+      "id": "H4",
+      "summary": "Schema migration must be append-only and idempotent. SCHEMA_VERSION is 48; the new column is migration v49 plus addition to the CREATE TABLE for fresh DBs.",
+      "mitigation": "Add `if (currentVersion < 49) { ALTER TABLE conversations ADD COLUMN project_key TEXT }`, add the column to the inline CREATE TABLE, and bump SCHEMA_VERSION to 49. Wrap the ALTER in try/catch per the existing pattern."
+    },
+    {
+      "id": "H5",
+      "summary": "The frontend groups conversations by `cwd`→project-path prefix (`isUnscopedConversation` in projectsData.ts). If grouping is not updated to prefer the override, a moved conversation will visually snap back to its cwd-derived project.",
+      "mitigation": "Frontend foundation bead changes grouping to read `projectKey` first and fall back to cwd inference; covered by a grouping-precedence unit test."
+    },
+    {
+      "id": "H6",
+      "summary": "CLI move requires the dashboard to be running (it calls the HTTP endpoint). If the dashboard is down the command must fail clearly, not silently no-op.",
+      "mitigation": "On fetch failure / non-2xx, print a clear chalk.red message and exit non-zero, matching the abort-review/reset-review error convention."
+    },
+    {
+      "id": "H7",
+      "summary": "Browser UAT for the two UI surfaces (drag-drop + menu picker) must run in an isolated Playwright instance/profile and not depend on another agent's browser session.",
+      "mitigation": "Acceptance criteria for the test role specify isolated-profile Playwright UAT: drag a conversation onto a project and verify re-group; open the 3-dot Move picker and verify the move + toast."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-04T04:57:22.161Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1577: move a conversation to a different project (CLI + drag/drop + menu action). Established the override-column architecture, the single move endpoint primitive, CLI/HTTP wiring, and a 9-bead decomposition across persistence, contracts, endpoint, CLI, skill, and four frontend beads.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
