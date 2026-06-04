@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:24:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1256: Swarm: deacon orphan recovery races work-agent spawn; no startup grace window for status:starting",
-    "updated": "2026-06-04T07:02:12.221Z"
+    "updated": "2026-06-04T07:02:58.632Z"
   },
   "plan": {
     "id": "pan-1256",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "39cac9cc-27d3-45d0-85e4-3c376d3a7023",
     "author": "agent:claude-opus-4-7",
-    "sequence": 22,
+    "sequence": 28,
     "created": "2026-05-25T16:24:00.000Z",
-    "updated": "2026-06-04T07:02:12.221Z",
+    "updated": "2026-06-04T07:02:58.632Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1256",
@@ -168,29 +168,29 @@
         "phase": "work",
         "issueId": "PAN-1256",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-04T07:02:12.136Z",
+        "updatedAt": "2026-06-04T07:02:58.626Z",
         "work": {
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "status": "running",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-04T07:02:12.136Z"
+              "status": "running",
+              "at": "2026-06-04T07:02:58.626Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "notes": "Verification failed at build",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-04T07:02:12.136Z",
+              "at": "2026-06-04T07:02:58.626Z",
               "notes": "Verification failed at build"
             }
           ],
@@ -198,25 +198,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-04T07:02:12.136Z"
+              "at": "2026-06-04T07:02:58.626Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-04T07:02:12.136Z",
+          "updatedAt": "2026-06-04T07:02:58.626Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-04T07:02:12.136Z"
+              "at": "2026-06-04T07:02:58.626Z"
             }
           ],
           "readyForMerge": false,
