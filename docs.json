@@ -77,6 +77,7 @@
             "group": "Features",
             "pages": [
               "features/mission-control",
+              "features/conversations",
               "features/specialists",
               "features/cloister",
               "features/skills",
@@ -134,7 +135,7 @@
     ]
   },
   "metadata": {
-    "og:image": "/docs/screenshot-board-light.png",
+    "og:image": "/images/dashboard/command-deck-hero-light.png",
     "og:type": "website"
   },
   "footerSocials": {
