@@ -12,6 +12,7 @@
 import chalk from 'chalk';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 
 const DASHBOARD_URL = getDashboardApiUrlSync();
 
@@ -24,7 +25,14 @@ export async function reviewRestartCommand(
   id: string,
   opts: ReviewRestartOptions = {},
 ): Promise<void> {
-  const issueId = id.toUpperCase();
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
 
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) {

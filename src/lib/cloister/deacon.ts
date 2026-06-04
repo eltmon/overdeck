@@ -26,6 +26,7 @@ import {
   ProcessSpawnError,
   ProcessTimeoutError,
 } from '../errors.js';
+import { isStartingWithinGrace } from './agent-grace.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -4873,9 +4874,7 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         // spawns. Mirror the reviewer pattern (REVIEWER_LAUNCHER_GRACE_MS above)
         // with a generous window: patrol-interval (60s) + ready-poll (30s) +
         // headroom for tmux/launcher cold start.
-        const startedMs = Date.parse(state.startedAt ?? '');
-        const WORK_LAUNCHER_GRACE_MS = 120_000;
-        if (Number.isFinite(startedMs) && Date.now() - startedMs < WORK_LAUNCHER_GRACE_MS) {
+        if (isStartingWithinGrace(state)) {
           continue;
         }
         // Past the grace window with no tmux session — true orphan, fall through.

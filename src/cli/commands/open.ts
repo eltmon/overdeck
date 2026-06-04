@@ -2,8 +2,10 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
+import chalk from 'chalk';
 import type { EditorId } from '@panctl/contracts';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 
 type Editor = (typeof import('@panctl/contracts'))['EDITORS'][number];
 
@@ -41,7 +43,15 @@ function detectFirstAvailableEditor(editors: readonly Editor[]): { id: EditorId;
   return null;
 }
 
-export async function openCommand(issueId: string, options: { editor?: string }) {
+export async function openCommand(id: string, options: { editor?: string }) {
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
   const editors = await loadEditors();
   const issueLower = issueId.toLowerCase();
   const resolved = resolveProjectFromIssueSync(issueId);
