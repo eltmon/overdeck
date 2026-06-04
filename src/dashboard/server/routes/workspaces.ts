@@ -5100,6 +5100,30 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
             completePendingOperation(issueId, error);
             return { success: false, statusCode: 409, error };
           }
+          // Defense-in-depth: refuse to merge when the PR is CONFLICTING with its base.
+          // Without this, a clean-CI-but-conflicting PR sails into the rebase/retry loop in
+          // forge.ts and churns for minutes before a generic timeout. The mergeable/
+          // mergeableState fields are already on prState from getPullRequestState. Writing a
+          // merge_conflict blocker back into review status drops the row out of the
+          // "Awaiting Merge" queue and into "Blocked from Merge" with a clear reason even if
+          // the GitHub webhook that normally populates blockerReasons was delayed or dropped
+          // (the reactive-only gap that let PAN-1574 show a live MERGE button). PAN-1619-followup.
+          if ((prState.mergeable === false || prState.mergeableState === 'dirty') && !prState.merged) {
+            const error = `GitHub PR #${githubPrRef.number} is CONFLICTING with ${prState.baseBranch}. Resolve conflicts before merging — see ${prState.url || 'the PR page'}.`;
+            console.error(`[merge] ${error}`);
+            setReviewStatus(issueId, {
+              mergeStatus: 'failed',
+              readyForMerge: false,
+              mergeNotes: error,
+              blockerReasons: [{
+                type: 'merge_conflict',
+                summary: `Conflicts with ${prState.baseBranch}`,
+                detectedAt: new Date().toISOString(),
+              }],
+            });
+            completePendingOperation(issueId, error);
+            return { success: false, statusCode: 409, error };
+          }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);
             setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
