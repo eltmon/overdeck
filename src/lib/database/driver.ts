@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
 export type SqliteScalar = string | number | bigint | null | Uint8Array;
-export type SqliteBindValue = SqliteScalar;
+export type SqliteBindValue = unknown;
 export type SqliteBindParams = SqliteBindValue | Record<string, SqliteBindValue>;
 export type SqliteRow = Record<string, SqliteScalar>;
 
@@ -12,9 +12,9 @@ export interface SqliteRunResult {
 
 export interface SqliteStatement {
   run(...params: SqliteBindParams[]): SqliteRunResult;
-  get(...params: SqliteBindParams[]): SqliteRow | undefined;
-  all(...params: SqliteBindParams[]): SqliteRow[];
-  iterate(...params: SqliteBindParams[]): IterableIterator<SqliteRow>;
+  get<TRow = SqliteRow>(...params: SqliteBindParams[]): TRow | undefined;
+  all<TRow = SqliteRow>(...params: SqliteBindParams[]): TRow[];
+  iterate<TRow = SqliteRow>(...params: SqliteBindParams[]): IterableIterator<TRow>;
 }
 
 export interface SqliteDatabase {
@@ -29,9 +29,9 @@ declare const Bun: unknown;
 
 type RawStatement = {
   run: (...params: unknown[]) => SqliteRunResult;
-  get: (...params: unknown[]) => SqliteRow | undefined;
-  all: (...params: unknown[]) => SqliteRow[];
-  iterate: (...params: unknown[]) => IterableIterator<SqliteRow>;
+  get: (...params: unknown[]) => unknown;
+  all: (...params: unknown[]) => unknown[];
+  iterate: (...params: unknown[]) => IterableIterator<unknown>;
 };
 
 type RawDatabase = {
@@ -111,23 +111,30 @@ function validateBindParams(params: unknown[]): void {
   }
 }
 
+function normalizeBindParams(params: SqliteBindParams[]): unknown[] {
+  if (params.length === 1 && Array.isArray(params[0])) {
+    return params[0];
+  }
+  return params;
+}
+
 function wrapStatement(statement: RawStatement): SqliteStatement {
   return {
     run: (...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.run(...params);
+      return statement.run(...normalizeBindParams(params));
     },
-    get: (...params: SqliteBindParams[]) => {
+    get: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.get(...params);
+      return statement.get(...normalizeBindParams(params)) as TRow | undefined;
     },
-    all: (...params: SqliteBindParams[]) => {
+    all: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.all(...params);
+      return statement.all(...normalizeBindParams(params)) as TRow[];
     },
-    iterate: (...params: SqliteBindParams[]) => {
+    iterate: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.iterate(...params);
+      return statement.iterate(...normalizeBindParams(params)) as IterableIterator<TRow>;
     },
   };
 }
