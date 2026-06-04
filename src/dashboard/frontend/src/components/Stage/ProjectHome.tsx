@@ -106,17 +106,48 @@ export function ProjectHome({
 
   // S4 cockpit mode — when the project's issues are loaded, the rich
   // ProjectOverview (hero metrics · stuck callout · pipeline swimlanes · cost
-  // cards) is the primary body, with the scoped Launcher above it. Agent-spawn,
-  // terminal, and web live in the Launcher; conversations live in the left rail,
-  // so the docks/Timeline aren't duplicated here. Clicking an issue card opens
-  // its cockpit tab. Falls back to the sparse launch composition during load.
+  // cards) is the primary body. Keep the original PAN-1549/PAN-1561 Home
+  // launch affordances visible too: agent pills, project actions, and timeline.
+  // Clicking an issue card opens its cockpit tab. Falls back to the sparse
+  // launch composition during load.
   if (features && features.length > 0 && onSelectFeature) {
     return (
       <HomePane
         workspaceId={api.deckKey}
         openPane={api.openPane}
-        header={<WorkspaceHeader variant="project" name={projectName} branch={branch} />}
+        header={
+          <>
+            <WorkspaceHeader variant="project" name={projectName} branch={branch} />
+            <StatChips
+              conversationCount={conversations.length}
+              costUsd={totalCost}
+              onCostClick={openCosts}
+            />
+          </>
+        }
         launcher={launcher}
+        agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
+        actionDock={
+          // Project scope: only project-appropriate actions. Files/Commits/Plan/
+          // Docs are issue-scoped and live on issue tabs (PAN-1561).
+          <ActionDock
+            actions={['terminal', 'browser']}
+            onOpen={(t) =>
+              t === 'terminal'
+                ? api.toggleTerminal()
+                : api.openPane({ paneType: 'browser', label: 'Web' })
+            }
+          />
+        }
+        timeline={
+          <Timeline
+            conversations={timelineConversations}
+            onOpen={(id) => {
+              const conv = conversations.find((c) => c.name === id)
+              api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+            }}
+          />
+        }
         detail={
           <ProjectOverview
             projectName={projectName}
