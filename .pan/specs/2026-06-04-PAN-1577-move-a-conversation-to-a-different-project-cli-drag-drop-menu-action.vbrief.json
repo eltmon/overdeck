@@ -1,0 +1,527 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-04T04:57:22.161Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1577: Move a conversation to a different project (CLI + drag/drop + menu action)",
+    "updated": "2026-06-04T05:00:09.301Z"
+  },
+  "plan": {
+    "id": "pan-1577",
+    "title": "Move a conversation to a different project (CLI + drag/drop + menu action)",
+    "status": "proposed",
+    "uid": "76374779-47ea-470b-96d2-344954d3ae8a",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-04T04:57:22.161Z",
+    "updated": "2026-06-04T05:00:09.301Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1577",
+        "label": "PAN-1577",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "cli",
+      "dashboard",
+      "drag-and-drop",
+      "command-deck"
+    ],
+    "narratives": {
+      "Problem": "A conversation is grouped under a project by its working directory (cwd), set once at creation from the chosen projectKey (POST /api/conversations, conversations.ts:1815→getProjectSync(projectKey).path). There is no way to change it afterward, so a conversation started under the wrong project is stuck in the wrong sidebar group. We need to reassign a conversation's project from the CLI, by drag-and-drop onto a sidebar project, and via a Move menu action — without ever relocating or rewriting the sacred JSONL session file on disk.",
+      "Proposal": "Add an explicit `project_key` override column to the name-keyed `conversations` table (the store the Command Deck sidebar groups on via listConversations()→conv.cwd). Build ONE backend primitive — PATCH /api/conversations/:name/move { projectKey } — that validates the target project (getProjectSync + path-exists, mirroring the 400 'Unknown project' guard at conversations.ts:1867), is a no-op 200 when already in the target, writes only the override (cwd + JSONL untouched), and emits a `conversation.moved` domain event so every connected client re-groups live. Surface the override on GET /api/conversations and change frontend grouping to prefer it over cwd inference. The CLI `pan conversations move <query> <projectKey>`, the 3-dot/right-click Move project-picker, and native HTML5 drag-and-drop onto a sidebar project all build on that one primitive via a shared optimistic React-Query mutation. Scope boundary: only sidebar/Project-Activity grouping reads the override; any other cwd-based behavior is unchanged.",
+      "OutOfScope": "Moving/rewriting JSONL files on disk; rewriting a conversation's cwd; re-resolving non-sidebar project-scoped automation that keys off cwd; merging conversations into one another (the picker lists PROJECTS, not conversations); bulk/multi-select move."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Explicit `project_key` override column on the conversations table instead of rewriting cwd.",
+        "rationale": "JSONL files are sacred and a live session's cwd cannot change under it; an override leaves both untouched and only changes the grouping association, exactly as the issue's preferred leaning states."
+      },
+      {
+        "summary": "CLI resolves <query> against the live conversations table (name + fuzzy title), not the discovered_sessions archive used by show/search.",
+        "rationale": "The feature re-groups the dashboard sidebar, which is backed by the name-keyed conversations table; discovered_sessions is the on-disk JSONL index keyed by numeric id and is not what the sidebar groups."
+      },
+      {
+        "summary": "CLI calls the PATCH endpoint via getDashboardApiUrlSync() rather than writing the DB directly.",
+        "rationale": "Keeps validation + write + event emission in one place (single primitive) and matches the existing CLI→dashboard pattern in abort-review/reset-review/plan-done; live re-group works for free."
+      },
+      {
+        "summary": "Move is allowed for both active and ended conversations.",
+        "rationale": "Only the override column flips; the running tmux process and its cwd are never touched, so there is no reason to restrict by session state."
+      },
+      {
+        "summary": "The Move menu action opens a PROJECT picker with the current project disabled.",
+        "rationale": "Default interpretation of the issue's ambiguous 'Move -> list' phrasing; a project picker is the only thing that makes sense for a project-move feature."
+      },
+      {
+        "summary": "Drag-and-drop uses native HTML5 DnD, not @dnd-kit.",
+        "rationale": "The drag crosses two sibling components not under a shared @dnd-kit DndContext; native HTML5 DnD (precedent: Stage/PaneBar.tsx) needs no shared provider and keeps the change surgical."
+      },
+      {
+        "summary": "Add a new pan-conversations wrapper skill rather than leaving conversations skill-less.",
+        "rationale": "pan conversations is user-facing and not in the SKILLS-CONVENTION exclusion list, and the issue AC explicitly requires the wrapper updated in the same commit."
+      }
+    ],
+    "items": [
+      {
+        "id": "persist-project-key",
+        "title": "Add `project_key` override column to conversations + thread it through reads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "move-endpoint",
+            "frontend-grouping-foundation"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/schema.ts add migration `if (currentVersion < 49) { try { ALTER TABLE conversations ADD COLUMN project_key TEXT } catch {} }`, add the `project_key TEXT` column to the inline CREATE TABLE conversations statement (~line 406) for fresh DBs, and bump SCHEMA_VERSION to 49. In src/lib/database/conversations-db.ts add `projectKey: string | null` to the Conversation interface, map `row['project_key']` in rowToConversation, add `project_key` to EVERY SELECT column list (listConversations, listActiveConversations, getConversationByName, and any other reader), and add a `setConversationProjectKey(name: string, projectKey: string | null): void` setter. The override is the single source of truth for sidebar grouping; cwd is the fallback only."
+        },
+        "subItems": [
+          {
+            "id": "persist-project-key.ac1",
+            "title": "Schema migration v49 adds project_key TEXT to conversations (idempotent, try/catch) and SCHEMA_VERSION is bumped to 49; CREATE TABLE includes the column for fresh DBs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-project-key.ac2",
+            "title": "Conversation interface gains `projectKey`, rowToConversation maps it, and every SELECT column list in conversations-db.ts includes project_key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-project-key.ac3",
+            "title": "`setConversationProjectKey(name, projectKey)` updates only the project_key column for the matching conversation and is unit-tested (set, overwrite, clear-to-null).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-project-key.ac4",
+            "title": "GET /api/conversations returns `projectKey` for each conversation (verified via the listConversations enrichment path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "moved-event",
+        "title": "Add `conversation.moved` domain event to the contracts package",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/events.ts add a `conversation.moved` event with payload `{ conversationName: string; projectKey: string }`, following the shape of the existing `conversation.created` event (events.ts ~line 936). Wire it into any shared reducer/union the same way conversation.created is wired so applyEventShared accepts it. Rebuild contracts (cd packages/contracts && npm run build) so server + frontend resolve the new type."
+        },
+        "subItems": [
+          {
+            "id": "moved-event.ac1",
+            "title": "`conversation.moved` event type with `{ conversationName, projectKey }` exists in packages/contracts and is part of the DomainEvent union.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "moved-event.ac2",
+            "title": "Contracts package builds cleanly and the new event is importable from both server and frontend.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-endpoint",
+        "title": "Backend move primitive: PATCH /api/conversations/:name/move",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts add a `PATCH /api/conversations/:name/move` route taking `{ projectKey }`. Resolve the conversation via getConversationByName; 404 if not found. Validate the target project with getProjectSync(projectKey) + existsSync(path), returning 400 `Unknown project: <key>` (mirror the guard at conversations.ts:1867). If the conversation is already associated with the target project, return 200 no-op without emitting. Otherwise call setConversationProjectKey(name, projectKey), emit `conversation.moved` via getEventStore().emitOnly({...}), and return the updated conversation. The handler must NOT touch cwd, the tmux session, or the JSONL file. Register the route in the same router-composition spot as the other conversation routes."
+        },
+        "subItems": [
+          {
+            "id": "move-endpoint.ac1",
+            "title": "PATCH /api/conversations/:name/move sets the project_key override and returns the updated conversation (200).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-endpoint.ac2",
+            "title": "Unknown/path-missing target project returns 400 `Unknown project: <key>`; unknown conversation name returns 404.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-endpoint.ac3",
+            "title": "Already-in-target-project returns 200 no-op and does NOT emit conversation.moved.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-endpoint.ac4",
+            "title": "A successful move emits `conversation.moved { conversationName, projectKey }`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-endpoint.ac5",
+            "title": "Test asserts the conversation's cwd and on-disk JSONL path are unchanged after a move (JSONL sacred).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-move",
+        "title": "CLI: `pan conversations move <query> <projectKey>`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/conversations/move.ts and register `move <query> <projectKey>` in registerConversationsCommands (src/cli/commands/conversations/index.ts). Resolve <query> against the live conversations table: exact getConversationByName first, then a fuzzy title match over listConversations(); error non-zero on no match or ambiguous (multiple) matches with a clear chalk.red message listing candidates. Call the move endpoint via `${getDashboardApiUrlSync()}/api/conversations/<name>/move` (PATCH, JSON body { projectKey }). On success print the resolved conversation title + old→new project. On non-2xx or fetch failure (dashboard down), print a clear chalk.red error and process.exit(1). Match the chalk/exit conventions used by show.ts and the abort-review/reset-review CLI commands."
+        },
+        "subItems": [
+          {
+            "id": "cli-move.ac1",
+            "title": "`pan conversations move <query> <projectKey>` resolves by exact name then fuzzy title and moves via the PATCH endpoint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-move.ac2",
+            "title": "Prints resolved conversation title + old→new project on success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-move.ac3",
+            "title": "Unknown project, no-match, ambiguous-match, and dashboard-unreachable all exit non-zero with a clear message.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-move.ac4",
+            "title": "Resolver + error paths are unit-tested (using the conversations/__tests__ pattern).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-skill",
+        "title": "Add pan-conversations wrapper skill (Skills↔CLI convention)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create sync-sources/skills/pan-conversations/SKILL.md documenting the `pan conversations` command group (scan, search, list, show, current, cost, enrich, embed, and the new `move <query> <projectKey>`). Every command/flag mentioned must exactly match `pan conversations --help` and each subcommand's `--help`, so `scripts/lint-skills.sh` (wired into npm run lint) passes. Keep it concise — wrapper-skill shape per docs/SKILLS-CONVENTION.md."
+        },
+        "subItems": [
+          {
+            "id": "cli-skill.ac1",
+            "title": "sync-sources/skills/pan-conversations/SKILL.md exists and documents `pan conversations move <query> <projectKey>` accurately.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-skill.ac2",
+            "title": "`scripts/lint-skills.sh` (and `npm run lint`) pass with the new skill present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-grouping-foundation",
+        "title": "Frontend: surface projectKey, prefer it in grouping, handle conversation.moved live",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "move-mutation",
+            "menu-move",
+            "drag-drop-move"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `projectKey?: string | null` to the frontend Conversation interface (ConversationList.tsx). Change the project-grouping logic in src/dashboard/frontend/src/components/CommandDeck/projectsData.ts (isUnscopedConversation + wherever conversations bucket under project nodes) to read the explicit projectKey override FIRST and fall back to cwd→project-path inference only when the override is null. In EventRouter/store, handle `conversation.moved` the same way `conversation.created` is handled (bump conversationsListRevision / invalidate the ['conversations'] query) so other clients re-group without refresh."
+        },
+        "subItems": [
+          {
+            "id": "frontend-grouping-foundation.ac1",
+            "title": "Conversation type carries `projectKey`; grouping prefers the override and falls back to cwd inference when null (unit-tested precedence).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-grouping-foundation.ac2",
+            "title": "A `conversation.moved` event re-groups the sidebar live (invalidates/bumps the conversations list) without a manual refresh.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-mutation",
+        "title": "Frontend: shared optimistic `move` mutation (rollback + toast)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "menu-move",
+            "drag-drop-move"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `move({ name, projectKey })` React-Query mutation to useConversationMutations.ts following the favoriteMutation pattern: onMutate cancels ['conversations'] queries and optimistically sets the moved conversation's projectKey in cache (so it re-groups instantly); onError rolls back from the returned context and fires toast.error; onSuccess fires toast.success(`Moved <title> to <project>`) using the title not the id; onSettled invalidates ['conversations']. The mutationFn PATCHes /api/conversations/:name/move. This single hook is the shared primitive both the menu action and drag-drop call."
+        },
+        "subItems": [
+          {
+            "id": "move-mutation.ac1",
+            "title": "`move` mutation optimistically re-groups the conversation, rolls back on error, and shows success/error toasts (title-not-id).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-mutation.ac2",
+            "title": "Optimistic-apply + error-rollback behavior is unit-tested.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-move",
+        "title": "Frontend: Move action in 3-dot + right-click menu with project picker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In ConversationActionMenu.tsx (rendered by both the 3-dot button and ConversationRow's onContextMenu) add a `Move` item that opens a project picker listing the registered projects (from the same fetchProjects data the sidebar uses). The conversation's current project is indicated and disabled. Selecting a project calls the shared `move` mutation and closes the menu. Reuse the existing portaled-submenu approach in this menu rather than introducing a new menu library."
+        },
+        "subItems": [
+          {
+            "id": "menu-move.ac1",
+            "title": "Both the 3-dot menu and right-click on a conversation row expose a Move item opening a project picker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-move.ac2",
+            "title": "The current project is indicated and disabled in the picker; selecting another moves the conversation via the shared mutation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drag-drop-move",
+        "title": "Frontend: drag a conversation row onto a sidebar project to move it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T04:57:22.161Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1577",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Make the conversation row (ConversationRow.tsx) a native HTML5 drag source (draggable, onDragStart carrying the conversation name; drag handle/cursor affordance). Make each sidebar project node (ProjectTree/ProjectNode.tsx) a drop target (onDragOver preventDefault + drop-target highlight, onDrop calls the shared `move` mutation with the target project's key). The optimistic re-group + rollback + toast all come from the shared mutation. Drop onto the conversation's current project is a no-op."
+        },
+        "subItems": [
+          {
+            "id": "drag-drop-move.ac1",
+            "title": "Dragging a conversation row onto a sidebar project moves it there via the shared mutation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-drop-move.ac2",
+            "title": "Visual affordances present: drag handle/cursor on the row and drop-target highlight on the hovered project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-drop-move.ac3",
+            "title": "Optimistic re-group with rollback + error toast on failure; drop onto the current project is a no-op.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drag-drop-move.ac4",
+            "title": "Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "persist-project-key",
+        "to": "move-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "moved-event",
+        "to": "move-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "persist-project-key",
+        "to": "frontend-grouping-foundation",
+        "type": "blocks"
+      },
+      {
+        "from": "moved-event",
+        "to": "frontend-grouping-foundation",
+        "type": "blocks"
+      },
+      {
+        "from": "move-endpoint",
+        "to": "cli-move",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-move",
+        "to": "cli-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "move-endpoint",
+        "to": "move-mutation",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-grouping-foundation",
+        "to": "move-mutation",
+        "type": "blocks"
+      },
+      {
+        "from": "move-mutation",
+        "to": "menu-move",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-grouping-foundation",
+        "to": "menu-move",
+        "type": "blocks"
+      },
+      {
+        "from": "move-mutation",
+        "to": "drag-drop-move",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-grouping-foundation",
+        "to": "drag-drop-move",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-04-PAN-1577-move-a-conversation-to-a-different-project-cli-drag-drop-menu-action.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
