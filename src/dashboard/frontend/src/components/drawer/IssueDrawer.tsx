@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { ExternalLink } from 'lucide-react';
 import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
+import { trackerIssueUrl } from '../../lib/issueLinks';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
@@ -225,6 +227,22 @@ export function IssueDrawer() {
               {issue?.title ?? 'Issue details'}
             </h2>
           </div>
+          {(() => {
+            // PAN-1610: one-click jump to the full issue on its tracker.
+            const href = trackerIssueUrl(drawer.issueId ?? '', issue?.url);
+            return href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${drawer.issueId} on its tracker`}
+                className="inline-flex items-center gap-[6px] rounded-[var(--radius-sm)] border border-border px-[10px] py-[6px] text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <ExternalLink className="h-[14px] w-[14px]" />
+                Issue
+              </a>
+            ) : null;
+          })()}
           <button
             type="button"
             aria-label="Close issue drawer"
