@@ -5,9 +5,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
-import { listProjectsSync } from '../../lib/projects.js';
+import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { homedir } from 'os';
-import { join } from 'path';
+import { isAbsolute, join, resolve } from 'path';
 import {
   PANOPTICON_HOME,
   SKILLS_DIR,
@@ -120,54 +120,6 @@ function checkCommand(cmd: string): boolean {
 
 function checkDirectory(path: string): boolean {
   return existsSync(path);
-}
-
-export async function checkGraphifyFreshness(projectPath: string): Promise<CheckResult | null> {
-  const summaryPath = join(projectPath, 'graphify-out', 'GRAPH_SUMMARY.md');
-  if (!existsSync(summaryPath)) {
-    return null;
-  }
-
-  let headTimeMs: number;
-  try {
-    const { stdout } = await execAsync('git log -1 --format=%ct', { cwd: projectPath, encoding: 'utf-8' });
-    headTimeMs = Number(stdout.trim()) * 1000;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      name: 'Graphify graph freshness',
-      status: 'warn',
-      message: `Could not read HEAD timestamp: ${message}`,
-      fix: `Run: git status from ${projectPath}`,
-    };
-  }
-
-  if (!Number.isFinite(headTimeMs)) {
-    return {
-      name: 'Graphify graph freshness',
-      status: 'warn',
-      message: 'Could not parse HEAD timestamp',
-      fix: `Run: git log -1 --format=%ct from ${projectPath}`,
-    };
-  }
-
-  const summaryMtimeMs = statSync(summaryPath).mtimeMs;
-  if (summaryMtimeMs >= headTimeMs) {
-    return {
-      name: 'Graphify graph freshness',
-      status: 'ok',
-      message: 'Fresh — updated since HEAD',
-    };
-  }
-
-  const dayMs = 24 * 60 * 60 * 1000;
-  const days = Math.max(1, Math.ceil((headTimeMs - summaryMtimeMs) / dayMs));
-  return {
-    name: 'Graphify graph freshness',
-    status: 'warn',
-    message: `Stale — ${days} day${days === 1 ? '' : 's'} older than HEAD`,
-    fix: `Run: graphify update . from ${projectPath}; or wait for the next merge to refresh automatically`,
-  };
 }
 
 interface ComposeDriftEntry {
@@ -403,6 +355,169 @@ export function checkStoppedListClassification(options: {
   };
 }
 
+type OrphanProposedSpecReason = 'beads-zero' | 'beads-mismatch' | 'no-agent-no-reason';
+
+type DoctorProjectEntry = { key: string; config: Pick<ProjectConfig, 'name' | 'path'> };
+
+export interface OrphanProposedSpec {
+  projectKey: string;
+  projectName: string;
+  issueId: string;
+  reason: OrphanProposedSpecReason;
+  beadCount: number;
+  planItemCount: number;
+}
+
+function normalizeDoctorIssueId(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z]+-\d+$/.test(value.trim())
+    ? value.trim().toUpperCase()
+    : null;
+}
+
+function readJsonFile(path: string): any | null {
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function resolveBeadsIssuesPath(projectPath: string, issueId: string): string | null {
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const beadsDir = join(workspacePath, '.beads');
+  const localIssuesPath = join(beadsDir, 'issues.jsonl');
+  if (existsSync(localIssuesPath)) return localIssuesPath;
+
+  const redirectPath = join(beadsDir, 'redirect');
+  if (!existsSync(redirectPath)) return null;
+  try {
+    const redirected = readFileSync(redirectPath, 'utf-8').trim();
+    if (!redirected) return null;
+    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
+  } catch {
+    return null;
+  }
+}
+
+function countBeadsForIssue(projectPath: string, issueId: string): number {
+  const beadsPath = resolveBeadsIssuesPath(projectPath, issueId);
+  if (!beadsPath || !existsSync(beadsPath)) return 0;
+  try {
+    return readFileSync(beadsPath, 'utf-8')
+      .split('\n')
+      .filter(Boolean)
+      .filter((line) => {
+        try {
+          const record = JSON.parse(line) as { _type?: unknown; labels?: unknown };
+          return record._type === 'issue'
+            && Array.isArray(record.labels)
+            && record.labels.some((label) => typeof label === 'string' && label.toLowerCase() === issueId.toLowerCase());
+        } catch {
+          return false;
+        }
+      }).length;
+  } catch {
+    return 0;
+  }
+}
+
+function hasInFlightAgent(issueId: string, agentsDir: string, tmuxSessionNames: string[]): boolean {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  if (tmuxSessionNames.includes(agentId)) return true;
+
+  const statePath = join(agentsDir, agentId, 'state.json');
+  const state = existsSync(statePath) ? readJsonFile(statePath) as DoctorAgentState | null : null;
+  return state?.status === 'starting' || state?.status === 'running';
+}
+
+export function findOrphanProposedSpecs(options: {
+  projects?: DoctorProjectEntry[];
+  agentsDir?: string;
+  tmuxSessionNames?: string[];
+} = {}): OrphanProposedSpec[] {
+  const projects = options.projects ?? listProjectsSync();
+  const agentsDir = options.agentsDir ?? AGENTS_DIR;
+  const tmuxSessionNames = options.tmuxSessionNames ?? (() => {
+    try { return listSessionNamesSync(); } catch { return []; }
+  })();
+  const orphans: OrphanProposedSpec[] = [];
+
+  for (const { key, config } of projects) {
+    const specsDir = join(config.path, '.pan', 'specs');
+    if (!existsSync(specsDir)) continue;
+
+    for (const entry of readdirSync(specsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.vbrief.json')) continue;
+      const spec = readJsonFile(join(specsDir, entry.name));
+      if (spec?.plan?.status !== 'proposed') continue;
+      const issueId = normalizeDoctorIssueId(spec.plan?.id);
+      if (!issueId || hasInFlightAgent(issueId, agentsDir, tmuxSessionNames)) continue;
+
+      const planItemCount = Array.isArray(spec.plan?.items) ? spec.plan.items.length : 0;
+      const beadCount = countBeadsForIssue(config.path, issueId);
+      const reason: OrphanProposedSpecReason = beadCount === 0
+        ? 'beads-zero'
+        : beadCount !== planItemCount
+          ? 'beads-mismatch'
+          : 'no-agent-no-reason';
+      orphans.push({
+        projectKey: key,
+        projectName: config.name,
+        issueId,
+        reason,
+        beadCount,
+        planItemCount,
+      });
+    }
+  }
+
+  return orphans;
+}
+
+function orphanProposedHint(reason: OrphanProposedSpecReason): string {
+  switch (reason) {
+    case 'beads-zero':
+      return 'free disk if needed, then re-run planning so beads are materialized before promotion';
+    case 'beads-mismatch':
+      return 're-run planning or inspect bd errors; spec items and bead tasks diverged';
+    case 'no-agent-no-reason':
+      return 'retry spawn with `pan start <id>` after checking stack health; use `--host` only for an explicit operator bypass';
+  }
+}
+
+export function checkOrphanProposedSpecs(options: {
+  projects?: DoctorProjectEntry[];
+  agentsDir?: string;
+  tmuxSessionNames?: string[];
+} = {}): CheckResult {
+  const orphans = findOrphanProposedSpecs(options);
+  if (orphans.length === 0) {
+    return {
+      name: 'orphan-proposed-specs',
+      status: 'ok',
+      message: 'No proposed specs without matching work agents detected',
+    };
+  }
+
+  const grouped = new Map<string, OrphanProposedSpec[]>();
+  for (const orphan of orphans) {
+    const key = `${orphan.projectKey} (${orphan.projectName})`;
+    grouped.set(key, [...(grouped.get(key) ?? []), orphan]);
+  }
+
+  const summary = [...grouped.entries()]
+    .map(([project, items]) => `${project}: ${items.map((item) => `${item.issueId} ${item.reason} (${item.beadCount}/${item.planItemCount} beads)`).join(', ')}`)
+    .join('; ');
+  const fixes = [...new Set(orphans.map((orphan) => `${orphan.reason}: ${orphanProposedHint(orphan.reason)}`))];
+
+  return {
+    name: 'orphan-proposed-specs',
+    status: 'warn',
+    message: `${orphans.length} orphan proposed spec${orphans.length === 1 ? '' : 's'} detected by project: ${summary}`,
+    fix: fixes.join('\n  '),
+  };
+}
+
 export interface DoctorOptions {
   strict?: boolean;
 }
@@ -548,6 +663,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(checkStoppedListClassification({
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
+  checks.push(checkOrphanProposedSpecs());
 
   // Check smee-client webhook relay
   try {
@@ -580,13 +696,6 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       status: 'warn',
       message: 'Status check failed',
     });
-  }
-
-  for (const { config } of listProjectsSync()) {
-    const graphifyCheck = await checkGraphifyFreshness(config.path);
-    if (graphifyCheck) {
-      checks.push(graphifyCheck);
-    }
   }
 
   // Check Docker compose label drift (PAN-956)

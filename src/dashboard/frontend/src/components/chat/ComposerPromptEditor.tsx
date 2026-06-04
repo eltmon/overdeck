@@ -32,7 +32,7 @@ function getDraftKey(conversationName: string): string {
   return `conv-draft:${conversationName}`;
 }
 
-function loadDraft(conversationName: string): string {
+export function loadDraft(conversationName: string): string {
   try {
     return localStorage.getItem(getDraftKey(conversationName)) ?? '';
   } catch {
@@ -189,6 +189,16 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-admin-tracker-linear-cleanup', label: 'pan admin tracker linear-cleanup', description: 'Clean up Linear custom states', insert: 'pan admin tracker linear-cleanup', category: 'Admin' },
   { id: 'pan-admin-migrate-config', label: 'pan admin migrate-config', description: 'Migrate settings.json to config.yaml', insert: 'pan admin migrate-config', category: 'Admin' },
 
+  // ─── Conversation (dashboard UI actions — intercepted, do NOT pass to agent) ─
+  { id: 'handoff', label: '/handoff', description: 'Open the handoff dialog for this conversation (trailing text becomes focus)', insert: '/handoff ', category: 'Conversation' },
+  // ─── Conversation (agent-bound — pass to agent which runs the CLI) ──────────
+  { id: 'pan-fork', label: 'pan fork', description: 'Summary fork a conversation', insert: 'pan fork ', category: 'Conversation' },
+  { id: 'pan-fork-plain', label: 'pan fork --plain', description: 'Plain fork — copy raw history, skip summary', insert: 'pan fork  --plain', category: 'Conversation' },
+  { id: 'pan-handoff', label: 'pan handoff', description: 'Agent-authored handoff (trailing text becomes focus). Tip: /handoff opens a dialog instead.', insert: 'pan handoff ', category: 'Conversation' },
+  { id: 'pan-handoff-model', label: 'pan handoff --model', description: 'Model for the new conversation', insert: 'pan handoff  --model ', category: 'Conversation' },
+  { id: 'pan-handoff-harness', label: 'pan handoff --harness', description: 'Harness for the new conversation (claude-code|pi)', insert: 'pan handoff  --harness ', category: 'Conversation' },
+  { id: 'pan-handoff-cwd', label: 'pan handoff --cwd', description: 'Working directory for the new conversation', insert: 'pan handoff  --cwd ', category: 'Conversation' },
+
   // ─── Data ────────────────────────────────────────────────────────────────────
   { id: 'pan-backup-list', label: 'pan backup list', description: 'List all backups', insert: 'pan backup list', category: 'Data' },
   { id: 'pan-backup-clean', label: 'pan backup clean', description: 'Remove old backups', insert: 'pan backup clean', category: 'Data' },
@@ -264,6 +274,26 @@ function ComposerPlugin({
       unmountingRef.current = true;
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
       saveDraft(conversationName, latestTextRef.current);
+    };
+  }, [conversationName]);
+
+  // Flush draft on page teardown (hard reload, tab close, crash, dev-mode HMR
+  // full-page reload). React effect cleanups do NOT run on a page-level
+  // teardown — only on clean in-app unmounts — so the unmount flush above is
+  // not enough. Without this, text typed within the debounce window (or typed
+  // continuously, which keeps resetting the debounce) is lost when the page
+  // reloads out from under the editor. pagehide fires on reload/close/bfcache;
+  // visibilitychange→hidden is the more reliable mobile/background signal.
+  useEffect(() => {
+    const flush = () => saveDraft(conversationName, latestTextRef.current);
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [conversationName]);
 
@@ -446,7 +476,7 @@ export function SlashMenu({ commands, filter, selectedIndex, onSelect, onClose, 
 export function ComposerPromptEditor({
   conversationName,
   disabled = false,
-  placeholder = 'Message Claude…',
+  placeholder = 'Message the agent…',
   onCommandKeyDown,
   editorRef,
   onChange,

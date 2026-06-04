@@ -52,7 +52,6 @@ const GENERATED_OR_IRRELEVANT_SEGMENTS = new Set([
   'dist',
   'coverage',
   '.turbo',
-  'graphify-out',
 ]);
 
 const DEFAULT_DOCS_CONFIG = getDefaultDocsConfig();

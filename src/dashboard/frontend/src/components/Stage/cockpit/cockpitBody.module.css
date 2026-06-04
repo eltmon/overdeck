@@ -1,0 +1,20 @@
+/* Container-query layout for the issue cockpit SCAN grid. The pane width (not
+ * the viewport) decides the column count, because the cockpit lives inside a
+ * variable-width Stage pane. Matches the codebase's existing container-query
+ * pattern in command-deck.module.css. */
+.wrap {
+  container-type: inline-size;
+}
+
+.scan {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@container (min-width: 820px) {
+  .scan {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}

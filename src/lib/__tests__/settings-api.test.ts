@@ -37,6 +37,7 @@ vi.mock('../config-yaml.js', () => ({
     ship: { model: 'workhorse:mid' },
     flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
+  ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
   loadConfig: () => mockLoadConfig(),
   loadConfigSync: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
@@ -79,6 +80,11 @@ vi.mock('../model-capabilities.js', () => ({
   ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
   resolveModelIdSync: (modelId: string) => mockResolveModelId(modelId),
+  getModelEffortLevelsSync: (modelId: string) => (({
+    'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
+    'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
+    'claude-sonnet-4-6': ['low', 'medium', 'high'],
+  }) as Record<string, readonly string[]>)[mockResolveModelId(modelId)],
 }));
 
 
@@ -605,15 +611,47 @@ describe('validateSettingsApi', () => {
       ...validSettings,
       roles: {
         ...validSettings.roles,
-        flywheel: { model: 'claude-opus-4-7', harness: 'bad', effort: 'max', maxAgents: 0, scope: 'everything' } as never,
+        flywheel: { model: 'claude-opus-4-7', harness: 'bad', effort: 'maximum', maxAgents: 0, scope: 'everything' } as never,
       },
     });
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('roles.flywheel.harness must be claude-code or pi');
-    expect(result.errors).toContain('roles.flywheel.effort must be low, medium, or high');
+    expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');
+  });
+
+  it('accepts xhigh and max effort on an Opus 4.7 role', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        work: { model: 'workhorse:expensive', effort: 'xhigh' },
+        review: { model: 'claude-opus-4-7', effort: 'max' },
+      },
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('rejects an effort level the role model does not support (model-aware)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        // workhorse:mid resolves to claude-sonnet-4-6, which supports low/medium/high only.
+        test: { model: 'workhorse:mid', effort: 'xhigh' },
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high)",
+    );
   });
 
   it('rejects unknown tts settings', async () => {

@@ -16,7 +16,7 @@ export type AuthMode = 'api-key' | 'subscription';
 
 export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
   { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
-  { id: 'pi', label: 'Pi', description: 'Pi RPC harness (no tmux paste-buffer)' },
+  { id: 'pi', label: 'Pi', description: 'Alternative harness for non-Anthropic models' },
 ];
 
 export const PI_TOS_BLOCK_REASON = 'Pi cannot run Anthropic models when authenticated via Claude Code subscription. Switch Anthropic to API-key auth, or pick a non-Anthropic model.';

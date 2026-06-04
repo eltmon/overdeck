@@ -7,7 +7,6 @@ bug-fix
 check-merged
 clear-writing
 cliproxy
-code-review
 code-review-performance
 code-review-security
 conv-lookup
@@ -65,7 +64,6 @@ pan-start
 pan-status
 pan-stop-all-agents
 pan-subagent-creator
-pan-swarm
 pan-sync
 pan-sync-main
 pan-tell
@@ -77,6 +75,7 @@ pan-untroubled
 pan-up
 pan-wipe
 pan-workspace-config
+pipeline-list
 pipeline-status
 plan
 react-best-practices
@@ -94,5 +93,7 @@ stitch-setup
 unarchive-conversation
 web-design-guidelines
 work-complete
+workspace-add-repo
 workspace-status
 write-spec
+write-vbrief

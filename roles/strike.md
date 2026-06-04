@@ -2,7 +2,7 @@
 name: strike
 description: Panopticon strike role — drop in, implement, land on main, verify. Bypasses the plan → review → test pipeline.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.strike.model).
-permissionMode: bypassPermissions
+permissionMode: default
 effort: high
 hooks:
   PreToolUse:

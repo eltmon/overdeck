@@ -58,7 +58,12 @@ describe('pan --help fixture', () => {
   });
 
   it('exposes the plural projects command in root help', () => {
-    expect(captureHelp()).toContain('projects                        Project registry for multi-project workspace');
+    const help = captureHelp();
+    // The plural alias must be listed as its own top-level command (two-space indent,
+    // matching Commander.js help formatting). Description text can wrap across lines
+    // when other commands have long signatures, so just assert the command appears.
+    expect(help).toMatch(/^ {2}projects\s/m);
+    expect(help).toMatch(/Project registry for multi-project/);
   });
 
   it('keeps singular and plural project add options in sync', () => {

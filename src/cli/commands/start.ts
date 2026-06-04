@@ -10,6 +10,8 @@ import { exec, execFile, execFileSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
+import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssueSync, hasProjectsSync, listProjectsSync, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
@@ -86,6 +88,8 @@ interface IssueOptions {
   model: string;
   /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
   harness?: 'claude-code' | 'pi';
+  /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
+  effort?: RoleEffort;
   dryRun?: boolean;
   shadow?: boolean;
   remote?: boolean;
@@ -94,6 +98,9 @@ interface IssueOptions {
   host?: boolean;
   yes?: boolean;
   force?: boolean;
+  /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
+   *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
+  fresh?: boolean;
 }
 
 /**
@@ -709,6 +716,25 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Resolve the Claude Code --effort level for this spawn: explicit --effort
+  // wins, otherwise fall back to roles.work.effort from config. The flag
+  // bypasses config-load validation, so validate it here (base enum + the
+  // resolved model's supported levels) before any workspace setup.
+  const yamlConfig = loadYamlConfig().config;
+  const resolvedEffort: RoleEffort | undefined = options.effort ?? yamlConfig.roles?.work?.effort;
+  if (resolvedEffort !== undefined) {
+    if (!ROLE_EFFORTS.includes(resolvedEffort)) {
+      process.stderr.write(`Invalid --effort value: ${resolvedEffort}. Expected one of ${ROLE_EFFORTS.join(', ')}.\n`);
+      process.exit(1);
+    }
+    const workModel = resolveRoleModel('work', options.model || undefined, yamlConfig);
+    const supportedEfforts = getModelEffortLevelsSync(workModel);
+    if (supportedEfforts !== undefined && !supportedEfforts.includes(resolvedEffort)) {
+      process.stderr.write(`Effort '${resolvedEffort}' is not supported by ${workModel} (supported: ${supportedEfforts.join(', ')}).\n`);
+      process.exit(1);
+    }
+  }
+
   // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
@@ -748,8 +774,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
+    // --fresh: drop the saved session pointer (non-destructive — JSONL transcripts
+    // are never touched) so the start below opens a brand-new Claude session. This
+    // is the one-step "restart fresh" path, e.g. switching a stopped agent's model
+    // where the saved session can't resume under different provider routing. Skip
+    // silently when there's no prior agent state (nothing to clear); resetSession
+    // refuses (and exits with guidance) if the agent is still running.
+    if (options.fresh && getAgentStateSync(`agent-${id.toLowerCase()}`)) {
+      const { resetSessionCommand } = await import('./reset-session.js');
+      await resetSessionCommand(id);
+    }
+
     // Refuse fresh start when a resumable session already exists.
-    // Users must choose resume or reset-session explicitly.
+    // Users must choose resume, `pan start --fresh`, or reset-session explicitly.
     try {
       assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
     } catch (error) {
@@ -1014,7 +1051,23 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    const beadCoverage = validateBeadsMatchPlan(workspace, id);
+    let beadCoverage = validateBeadsMatchPlan(workspace, id);
+    if (!beadCoverage.valid) {
+      // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
+      // existing beads for the issue before recreating from spec, so it's safe to
+      // call when some beads exist but the count mismatches the spec — typical
+      // when planning was killed mid-materialization or hit a transient bd error.
+      spinner.text = `Beads count off (${beadCoverage.beadCount}/${beadCoverage.planItemCount}) — rematerializing from vBRIEF...`;
+      try {
+        const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
+        if (recovery.success && recovery.created.length > 0) {
+          spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
+          beadCoverage = validateBeadsMatchPlan(workspace, id);
+        }
+      } catch (recoveryErr) {
+        // Fall through to the existing failure path below
+      }
+    }
     if (!beadCoverage.valid) {
       await failPostCreateValidation({
         spinner,
@@ -1048,6 +1101,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       role: 'work',
       prompt,
       allowHost: options.host,
+      effort: resolvedEffort,
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
@@ -1071,6 +1125,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Harness:    ${agent.harness ?? 'claude-code'}`);
     console.log(`  Model:      ${agent.model}`);
     console.log(`  Role:       ${agent.role}`);
+    if (resolvedEffort) console.log(`  Effort:     ${resolvedEffort}`);
 
     // Show context info
     const planningContext = await readPlanningContext(workspace);

@@ -48,6 +48,13 @@ describe('loadCloisterConfig', () => {
     });
   });
 
+  it('defines orphan-proposed reconciler defaults', () => {
+    expect(DEFAULT_CLOISTER_CONFIG.orphanProposedReconciler).toEqual({
+      enabled: true,
+      minAttemptIntervalMs: 5 * 60 * 1000,
+    });
+  });
+
   it('loads stuck-remediation defaults when the config file has no block', () => {
     const config = loadCloisterConfigSync();
 

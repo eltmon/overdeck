@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { describePendingInput, isAwaitingInput } from '../../lib/pendingInput';
 import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
@@ -193,12 +194,13 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         </div>
       </div>
 
-      {/* Pending question indicator */}
-      {agent.hasPendingQuestion && (
+      {/* PAN-1520 — unified pending-input indicator (covers AskUserQuestion,
+          PermissionRequest, ExitPlanMode, EnterPlanMode in one pulse). */}
+      {isAwaitingInput(agent) && (
         <div
           className="absolute top-1 right-1 w-2 h-2 rounded-full"
           style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
-          title="Agent needs input"
+          title={describePendingInput(agent.pendingInputKinds)}
         />
       )}
     </motion.div>

@@ -14,6 +14,7 @@ import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } f
 import { listSessionNames } from '../../../lib/tmux.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
+import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
 
 const execFileAsync = promisify(execFile);
@@ -39,6 +40,12 @@ export interface ResourceDetails {
   hasVbrief: boolean;
   hasBeads: boolean;
   dockerContainerCount: number;
+  /** Current HEAD of the agent's workspace, or null when no workspace exists. */
+  actualBranch: string | null;
+  /** True when the workspace HEAD differs from the expected feature/<id> branch. */
+  branchDrifted: boolean;
+  /** True when the workspace path is configured but missing on disk. */
+  workspaceMissing: boolean;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -86,6 +93,9 @@ interface InternalResourceDetails {
   vbriefPath: string | null;
   beadsPath: string | null;
   dockerContainers: string[];
+  actualBranch: string | null;
+  branchDrifted: boolean;
+  workspaceMissing: boolean;
 }
 
 interface MutableResourceIssue {
@@ -200,6 +210,9 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     hasVbrief: details.vbriefPath !== null,
     hasBeads: details.beadsPath !== null,
     dockerContainerCount: details.dockerContainers.length,
+    actualBranch: details.actualBranch,
+    branchDrifted: details.branchDrifted,
+    workspaceMissing: details.workspaceMissing,
   };
 }
 
@@ -435,6 +448,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         vbriefPath: null,
         beadsPath: null,
         dockerContainers: [],
+        actualBranch: null,
+        branchDrifted: false,
+        workspaceMissing: false,
       },
     };
     issueMap.set(upper, created);
@@ -501,6 +517,10 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         issue.resourceSources.add('beads');
         issue.resourceDetails.beadsPath = join(workspace.workspacePath, '.beads');
       }
+      const gitInfo = await resolveAgentGitInfo(workspace.workspacePath, issue.branch);
+      issue.resourceDetails.actualBranch = gitInfo.actualBranch;
+      issue.resourceDetails.branchDrifted = gitInfo.branchDrifted;
+      issue.resourceDetails.workspaceMissing = gitInfo.workspaceMissing;
     }));
 
     for (const branch of branches.local) {
@@ -670,6 +690,9 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       hasVbrief: issue.resourceDetails.hasVbrief,
       hasBeads: issue.resourceDetails.hasBeads,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
+      actualBranch: issue.resourceDetails.actualBranch,
+      branchDrifted: issue.resourceDetails.branchDrifted,
+      workspaceMissing: issue.resourceDetails.workspaceMissing,
     },
   }));
 }

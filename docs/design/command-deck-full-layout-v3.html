@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Full layout v3 — keep project list, merge feeds</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080b10; --fg:#e5e7eb; --card:#0c1018; --card2:#0e131c;
+    --accent:color-mix(in srgb, white 8%, transparent);
+    --muted:color-mix(in srgb, white 4%, transparent); --mfg:#9ca3af;
+    --border:color-mix(in srgb, white 6%, transparent);
+    --bstrong:color-mix(in srgb, white 12%, transparent);
+    --primary:#6366f1; --destructive:#f87171; --dfg:#fca5a5;
+    --info:#3b82f6; --ifg:#60a5fa; --success:#10b981; --sfg:#34d399;
+    --warning:#f59e0b; --wfg:#fbbf24; --review:#a855f7; --rfg:#c084fc;
+    --cost:#06b6d4; --cfg:#22d3ee; --mono:"SF Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#05070b;color:var(--fg);font-family:"DM Sans",system-ui,sans-serif;font-size:12.5px;-webkit-font-smoothing:antialiased;}
+  .page{padding:16px 20px;}
+  h1{font-family:"Space Grotesk";font-size:15px;margin:0;}
+  .mfg{color:var(--mfg);} .mono{font-family:var(--mono);}
+  .cap{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--mfg);border:1px dashed var(--bstrong);border-radius:6px;padding:2px 7px;}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--mfg);margin:6px 0 14px;}
+  .legend b{color:var(--fg);}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .app{border:1px solid var(--bstrong);border-radius:12px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.5);background:var(--bg);}
+
+  /* APP BAR */
+  .appbar{display:flex;align-items:center;gap:11px;height:46px;padding:0 12px;background:var(--card);border-bottom:1px solid var(--border);}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-family:"Space Grotesk";font-size:13px;}
+  .logo{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary),var(--review));}
+  .search{flex:1;max-width:460px;margin:0 auto;display:flex;align-items:center;gap:8px;border:1px solid var(--bstrong);border-radius:8px;padding:6px 11px;color:var(--mfg);}
+  .search .k{margin-left:auto;font-size:10px;border:1px solid var(--bstrong);border-radius:4px;padding:0 5px;}
+  .sp{flex:1;}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bstrong);border-radius:999px;padding:4px 10px;font-size:11px;cursor:pointer;}
+  .pill.warn{border-color:color-mix(in srgb,var(--warning) 45%,transparent);color:var(--wfg);background:color-mix(in srgb,var(--warning) 8%,transparent);}
+  .ib{width:30px;height:30px;border-radius:8px;border:1px solid var(--bstrong);display:flex;align-items:center;justify-content:center;color:var(--mfg);cursor:pointer;}
+  .ib.on{color:var(--fg);background:var(--accent);}
+
+  /* TABS */
+  .tabs{display:flex;align-items:stretch;height:40px;padding:6px 8px 0;background:var(--card);box-shadow:inset 0 -1px 0 0 var(--border);overflow:hidden;}
+  .tab{display:flex;align-items:center;gap:7px;padding:0 13px;height:34px;font-size:12px;color:var(--mfg);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;flex:0 0 auto;cursor:pointer;}
+  .tab .kbd{font-size:10px;border:1px solid var(--bstrong);border-radius:4px;padding:0 4px;}
+  .tab .x{opacity:.6;}
+  .tab.active{color:var(--fg);background:var(--bg);border-color:var(--border);}
+  .add{flex:0 0 auto;width:30px;display:flex;align-items:center;justify-content:center;color:var(--mfg);font-size:17px;align-self:center;cursor:pointer;}
+  .modelchip{margin-left:auto;align-self:center;display:flex;align-items:center;gap:6px;border:1px solid var(--bstrong);border-radius:8px;padding:4px 9px;font-size:11px;color:var(--mfg);cursor:pointer;}
+
+  /* BODY: nav(projects) | tree | pane | awareness */
+  .body{display:grid;grid-template-columns:186px 232px 1fr 296px;height:580px;}
+
+  /* zone 1: project-list nav (KEPT) */
+  .nav{background:var(--card2);border-right:1px solid var(--border);overflow:auto;padding:8px 8px 14px;}
+  .navitem{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:7px;color:var(--mfg);font-size:12px;cursor:pointer;}
+  .navitem:hover{background:var(--accent);}
+  .navitem.on{background:var(--accent);color:var(--fg);}
+  .navitem .ic{width:15px;display:inline-flex;justify-content:center;opacity:.85;}
+  .navitem .ct{margin-left:auto;font-size:10px;color:var(--mfg);background:var(--muted);border-radius:6px;padding:0 6px;}
+  .navhead{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--mfg);padding:10px 9px 4px;}
+  .navdot{width:10px;height:10px;border-radius:3px;}
+
+  /* zone 2: deck tree */
+  .tree{background:var(--card);border-right:1px solid var(--border);overflow:auto;}
+  .secthead{display:flex;align-items:center;gap:7px;padding:9px 12px;font-size:11px;color:var(--mfg);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.05em;}
+  .secthead .ct{margin-left:auto;background:var(--muted);border-radius:6px;padding:0 6px;font-size:10px;}
+  .seg{display:flex;gap:4px;padding:8px 12px;}
+  .seg .b{font-size:11px;border:1px solid var(--bstrong);border-radius:6px;padding:2px 8px;color:var(--mfg);}
+  .seg .b.on{color:var(--fg);background:var(--accent);}
+  .item{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12px;border-left:2px solid transparent;cursor:pointer;}
+  .item:hover{background:var(--accent);}
+  .item.sel{background:color-mix(in srgb,var(--review) 12%,transparent);border-left-color:var(--review);}
+  .item .m2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item .cost{font-size:10px;color:var(--mfg);font-family:var(--mono);}
+  .sub{padding-left:26px;font-size:11.5px;color:var(--mfg);}
+  .pb{font-size:9px;text-transform:uppercase;letter-spacing:.04em;border-radius:4px;padding:1px 5px;}
+
+  /* zone 3: active pane (matches selection = PAN-1242 cockpit) */
+  .pane{background:var(--bg);overflow:auto;}
+  .paneband{border-bottom:1px solid var(--border);padding:12px 16px;background:linear-gradient(180deg,color-mix(in srgb,var(--review) 6%,transparent),transparent);}
+  .ptitle{font-size:16px;font-weight:600;font-family:"Space Grotesk";}
+  .pmeta{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+  .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bstrong);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--mfg);}
+  .mstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 16px;}
+  .mtile{border:1px solid var(--border);border-radius:12px;padding:9px 11px;background:color-mix(in srgb,white 1.5%,transparent);}
+  .mtile .l{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--mfg);}
+  .mtile .v{font-size:17px;font-weight:600;font-family:var(--mono);margin-top:2px;}
+  .card{border:1px solid var(--border);border-radius:14px;background:var(--card);margin:12px 16px;padding:13px;}
+  .cardh{display:flex;align-items:center;gap:8px;font-weight:600;font-family:"Space Grotesk";font-size:12.5px;margin-bottom:9px;}
+
+  /* zone 4: merged awareness rail (LOVED) */
+  .actrail{background:var(--card2);border-left:1px solid var(--border);display:flex;flex-direction:column;}
+  .actseg{display:flex;gap:4px;padding:9px 11px;border-bottom:1px solid var(--border);}
+  .actseg .b{font-size:11px;border-radius:6px;padding:3px 9px;color:var(--mfg);cursor:pointer;}
+  .actseg .b.on{color:var(--fg);background:var(--accent);}
+  .actseg .b .n{margin-left:5px;background:color-mix(in srgb,var(--warning) 22%,transparent);color:var(--wfg);border-radius:6px;padding:0 5px;font-size:9px;}
+  .needs{margin:10px 11px;border:1px solid color-mix(in srgb,var(--warning) 35%,transparent);background:color-mix(in srgb,var(--warning) 7%,transparent);border-radius:10px;padding:9px 11px;}
+  .needs .nh{font-size:11px;font-weight:600;color:var(--wfg);text-transform:uppercase;letter-spacing:.05em;}
+  .nrow{margin-top:6px;font-size:11.5px;display:flex;gap:6px;align-items:center;cursor:pointer;}
+  .arow{display:flex;gap:9px;padding:8px 11px;border-bottom:1px solid var(--border);font-size:11.5px;}
+  .arow .av{width:7px;height:7px;border-radius:50%;margin-top:5px;flex:0 0 auto;}
+  .arow .who{font-weight:600;} .arow .when{margin-left:auto;font-size:10px;color:var(--mfg);}
+
+  .note{font-size:11.5px;color:var(--mfg);margin-top:14px;line-height:1.7;}
+  .note b{color:var(--fg);} .note .good{color:var(--sfg);}
+  .rowlbl{font-size:9px;color:var(--mfg);text-transform:uppercase;letter-spacing:.08em;padding:3px 12px 1px;background:var(--card);}
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;"><h1>Full layout v3</h1><span class="cap">project list kept · feeds merged · selection fixed</span></div>
+  <div class="legend">
+    <span class="good" style="color:var(--sfg)"><b>Kept:</b> project list (left) · status pills + search (top) · Awareness rail (right)</span>
+    <span><b>Changed:</b> the two right feeds → one Awareness rail (frees a column)</span>
+    <span><b>Fixed:</b> selected issue ↔ pane ↔ tab now agree</span>
+  </div>
+
+  <div class="app">
+    <!-- APP BAR -->
+    <div class="rowlbl">app bar — brand · search (center) · deacon + agents + status (right)</div>
+    <div class="appbar">
+      <div class="brand"><span class="logo"></span>Panopticon</div>
+      <div class="search">⌕ Search issues, conversations, commands… <span class="k">/</span></div>
+      <span class="pill warn"><span class="dot" style="background:var(--warning)"></span>Deacon frozen · Resume</span>
+      <span class="pill"><span class="dot" style="background:var(--success)"></span>3 agents</span>
+      <span class="pill"><span class="dot" style="background:var(--destructive)"></span>1 stopped</span>
+      <span class="pill">28% mem</span>
+      <div class="ib" title="Theme">◐</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="rowlbl">full-width tab strip — scroll on overflow · ⌘1–9 · middle-click close · right-click ▸ pop out</div>
+    <div class="tabs">
+      <div class="tab">⌂ Home <span class="kbd">⌘1</span></div>
+      <div class="tab active">◉ PAN-1242 cockpit <span class="kbd">⌘2</span> <span class="x">×</span></div>
+      <div class="tab">⌥ Fix CLAUDE.md bloat… <span class="kbd">⌘3</span> <span class="x">×</span></div>
+      <div class="tab">▣ Terminal · agent-pan-1395 <span class="kbd">⌘4</span> <span class="x">×</span></div>
+      <div class="add">+</div>
+      <div class="modelchip">⚙ Opus 4.8 <span class="mfg">▾</span></div>
+    </div>
+
+    <!-- BODY -->
+    <div class="body">
+      <!-- zone 1: PROJECT LIST nav (kept) -->
+      <div class="nav">
+        <div class="navitem"><span class="ic">⌂</span>Home</div>
+        <div class="navitem"><span class="ic">✦</span>Flywheel <span class="ct" style="color:var(--sfg)">live</span></div>
+        <div class="navhead">Projects</div>
+        <div class="navitem"><span class="navdot" style="background:#f59e0b"></span>auricle</div>
+        <div class="navitem"><span class="navdot" style="background:#a855f7"></span>krux</div>
+        <div class="navitem"><span class="navdot" style="background:#10b981"></span>mind-your-now</div>
+        <div class="navitem on"><span class="navdot" style="background:var(--primary)"></span>panopticon-cli <span class="ct">5</span></div>
+        <div class="navitem"><span class="navdot" style="background:#06b6d4"></span>tindra</div>
+        <div class="navitem"><span class="navdot" style="background:#9ca3af"></span>papers-please</div>
+        <div class="navhead">Operations</div>
+        <div class="navitem on"><span class="ic">▦</span>Command Deck</div>
+        <div class="navitem"><span class="ic">▤</span>Board</div>
+        <div class="navitem"><span class="ic">⇉</span>Pipeline</div>
+        <div class="navitem"><span class="ic">◍</span>Agents</div>
+        <div class="navhead">System</div>
+        <div class="navitem"><span class="ic">⚙</span>Settings</div>
+      </div>
+
+      <!-- zone 2: deck tree -->
+      <div class="tree">
+        <div class="secthead">Conversations <span class="ct">48</span></div>
+        <div class="seg"><span class="b on">All</span><span class="b">Favorites</span></div>
+        <div class="item"><span class="dot" style="background:var(--success)"></span><span class="m2">Fix CLAUDE.md bloat…</span><span class="cost">$9.63</span></div>
+        <div class="item"><span class="dot" style="background:var(--mfg)"></span><span class="m2">UI REMODEL</span><span class="cost">$96</span></div>
+        <div class="item"><span class="dot" style="background:var(--info)"></span><span class="m2">CMD-K palette search</span><span class="cost">$2.8</span></div>
+        <div class="secthead" style="margin-top:6px;">Issues <span class="ct">5</span></div>
+        <div class="item sel"><span class="pb" style="background:color-mix(in srgb,var(--review) 18%,transparent);color:var(--rfg)">rev</span><span class="m2 mono">PAN-1242</span><span class="pb" style="background:color-mix(in srgb,var(--destructive) 16%,transparent);color:var(--dfg)">blocked</span></div>
+        <div class="item sub"><span class="dot" style="background:var(--success)"></span>Work · gpt-5.5 · running</div>
+        <div class="item sub"><span class="dot" style="background:var(--mfg)"></span>Review · kimi · idle</div>
+        <div class="item"><span class="pb" style="background:color-mix(in srgb,var(--info) 18%,transparent);color:var(--ifg)">work</span><span class="m2 mono">PAN-1395</span><span class="pb" style="background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--ifg)">running</span></div>
+        <div class="item"><span class="pb" style="background:color-mix(in srgb,var(--review) 18%,transparent);color:var(--rfg)">rev</span><span class="m2 mono">PAN-1574</span><span class="pb" style="background:color-mix(in srgb,var(--review) 16%,transparent);color:var(--rfg)">review</span></div>
+      </div>
+
+      <!-- zone 3: active pane — MATCHES the selected PAN-1242 -->
+      <div class="pane">
+        <div class="paneband">
+          <div class="ptitle">Board view follow-up — + New issue column footer</div>
+          <div class="pmeta">
+            <span class="chip mono">PAN-1242</span>
+            <span class="chip">⎇ feature/pan-1242</span>
+            <span class="chip" style="color:var(--rfg);border-color:color-mix(in srgb,var(--review) 35%,transparent)">● Review · blocked</span>
+            <span class="mfg" style="margin-left:auto;font-size:11px;">↑ selected in tree · ↑ active tab</span>
+          </div>
+        </div>
+        <div class="mstrip">
+          <div class="mtile"><div class="l">Cost</div><div class="v" style="color:var(--cfg)">$96.79</div></div>
+          <div class="mtile"><div class="l">Diff</div><div class="v"><span style="color:var(--sfg)">+831</span> <span style="color:var(--dfg)">−21</span></div></div>
+          <div class="mtile"><div class="l">PR</div><div class="v" style="font-size:13px">#1516</div></div>
+          <div class="mtile"><div class="l">Sessions</div><div class="v">8</div></div>
+          <div class="mtile"><div class="l">Last</div><div class="v" style="font-size:13px">167h</div></div>
+        </div>
+        <div class="card">
+          <div class="cardh"><span class="dot" style="background:var(--review)"></span>Review &amp; Verification</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+            <div class="mtile"><div class="l">Build gate</div><div class="v" style="font-size:12px;color:var(--sfg)">Passed</div></div>
+            <div class="mtile"><div class="l">Review</div><div class="v" style="font-size:12px;color:var(--dfg)">Blocked</div></div>
+            <div class="mtile"><div class="l">Tests</div><div class="v" style="font-size:12px;color:var(--wfg)">Pending</div></div>
+            <div class="mtile"><div class="l">Merge</div><div class="v" style="font-size:12px;color:var(--mfg)">Pending</div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:0;color:var(--mfg);">Code · Plan · Cost · Workspace · Agent · Activity cards continue below… <span style="opacity:.6">(the cockpit, now with real width)</span></div>
+      </div>
+
+      <!-- zone 4: merged Awareness rail -->
+      <div class="actrail">
+        <div class="actseg"><span class="b on">Needs you <span class="n">2</span></span><span class="b">Project</span><span class="b">Global</span></div>
+        <div class="needs">
+          <div class="nh">⚠ Needs you · 2</div>
+          <div class="nrow"><span class="mono mfg">PAN-1242</span> · review blocked</div>
+          <div class="nrow"><span class="mono mfg">PAN-1190</span> · awaiting your answer</div>
+        </div>
+        <div class="arow"><span class="av" style="background:var(--success)"></span><div><div class="who">Review passed</div><div class="mfg">PAN-1574 · verification</div></div><span class="when">2m</span></div>
+        <div class="arow"><span class="av" style="background:var(--info)"></span><div><div class="who">Work running</div><div class="mfg">PAN-1395 · gpt-5.5</div></div><span class="when">21m</span></div>
+        <div class="arow"><span class="av" style="background:var(--review)"></span><div><div class="who">Claude Code</div><div class="mfg">UI REMODEL · file edit</div></div><span class="when">1h</span></div>
+        <div class="arow"><span class="av" style="background:var(--mfg)"></span><div><div class="who">Merge complete</div><div class="mfg">PAN-1583</div></div><span class="when">2h</span></div>
+        <div class="arow"><span class="av" style="background:var(--success)"></span><div><div class="who">Tests passed</div><div class="mfg">PAN-1574</div></div><span class="when">3h</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>What I changed from v2 (per your notes):</b><br>
+    • <span class="good">Kept the project list on the left</span> — full vertical list (auricle / krux / … / <b>panopticon-cli</b> selected), not an icon rail.<br>
+    • <span class="good">Kept</span> the search bar centered and the deacon + agents + status pills in the upper right.<br>
+    • <span class="good">Kept</span> the Awareness rail you loved — <b>Needs-you / Project / Global</b> tabs in one right column (this is the real space win: the two old feeds become one).<br>
+    • <b>Fixed the mismatch</b> — <b>PAN-1242</b> is selected in the tree, the pane shows <b>PAN-1242's cockpit</b>, and the <b>PAN-1242 tab</b> is active. Selecting a <i>conversation</i> would instead show that conversation in the pane.<br>
+    <span class="mfg">Still on the table if you want: full-width tabs already span the wider pane column; split-panes / pop-out / ⌘K are optional adds.</span>
+  </div>
+</div>
+</body>
+</html>

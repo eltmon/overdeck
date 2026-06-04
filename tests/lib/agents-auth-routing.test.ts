@@ -138,7 +138,7 @@ describe('agents auth routing', () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
     expect(await getAgentRuntimeBaseCommand('gpt-5.4')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'gpt-5.4'"
+      "claude --permission-mode bypassPermissions --model 'gpt-5.4'"
     );
   });
 
@@ -146,7 +146,7 @@ describe('agents auth routing', () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
     expect(await getAgentRuntimeBaseCommand('gpt-5.4-pro')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'gpt-5.4'"
+      "claude --permission-mode bypassPermissions --model 'gpt-5.4'"
     );
   });
 
@@ -170,43 +170,43 @@ describe('agents auth routing', () => {
 
   it('launches Gemini models with Claude Code through CLIProxy-compatible direct routing', async () => {
     expect(await getAgentRuntimeBaseCommand('gemini-3-flash-preview')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'gemini-3-flash-preview'"
+      "claude --permission-mode bypassPermissions --model 'gemini-3-flash-preview'"
     );
   });
 
   it('launches MiniMax models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'minimax-m2.7'"
+      "claude --permission-mode bypassPermissions --model 'minimax-m2.7'"
     );
   });
 
   it('launches Kimi models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'kimi-k2.6'"
+      "claude --permission-mode bypassPermissions --model 'kimi-k2.6'"
     );
   });
 
   it('launches Z.AI models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('glm-4.7')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'glm-4.7'"
+      "claude --permission-mode bypassPermissions --model 'glm-4.7'"
     );
   });
 
   it('launches OpenRouter models directly with Claude Code and preserves slash model IDs', async () => {
     expect(await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'qwen/qwen3.6-plus:free'"
+      "claude --permission-mode bypassPermissions --model 'qwen/qwen3.6-plus:free'"
     );
   });
 
   it('launches Mimo models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('mimo-v2.5')).toBe(
-      "claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'mimo-v2.5'"
+      "claude --permission-mode bypassPermissions --model 'mimo-v2.5'"
     );
   });
 
   it('keeps role agent definition and --name for direct Kimi launches', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md')).toBe(
-      "claude --dangerously-skip-permissions --agent roles/work.md --model 'kimi-k2.6' --name agent-pan-964"
+      "claude --agent roles/work.md --model 'kimi-k2.6' --name agent-pan-964"
     );
   });
 

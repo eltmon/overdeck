@@ -5,6 +5,7 @@ requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
   - WORKSPACE_PATH
+  - BRANCH_NAME
   - LOCAL
   - REMOTE
 optional:
@@ -32,9 +33,20 @@ optional:
 
 **You MUST only operate within your workspace directory: `{{WORKSPACE_PATH}}`**
 
+**Your branch is `{{BRANCH_NAME}}`.** A worktree does NOT lock you to a branch — its HEAD can drift to `main` or become detached after a stray `git checkout`, a failed rebase, or a botched `pan sync-main`. Before your first edit and any time you resume, run:
+
+```bash
+git branch --show-current
+```
+
+It MUST return `{{BRANCH_NAME}}`. If it returns anything else — `main`, a different feature branch, or empty output (detached HEAD) — STOP. Do not edit, do not commit. Run `git status` and `git rev-parse --show-toplevel` to confirm where you are, then report the mismatch via `pan tell` to your supervisor. Commits made on the wrong branch will land in the wrong place and require manual recovery.
+
 - NEVER `cd` to the parent project directory or any path outside your workspace
-- NEVER run `git stash`, `git checkout`, or any destructive git commands outside your workspace
+- NEVER run `git checkout <other-branch>` inside your workspace — that's the most common way a worktree drifts
+- NEVER run `git stash` — Panopticon never stashes; commit, discard, or surface to operator
+- NEVER run destructive git commands outside your workspace
 - **NEVER run history-rewriting git commands:** `git rebase -i`, `git commit --amend`, `git reset --hard`, `git squash`, or any operation that changes commit hashes. These are forbidden — they destroy review history and break the pipeline.
+- **If `pan done` refuses with "Uncommitted changes":** commit your work (`git add -A && git commit -m "..."`) OR discard explicitly (`git restore --staged --worktree .`). Do NOT use `git stash` — `pan done` will keep refusing until the worktree is clean.
 - **If `pan done` fails with rebase conflicts:** run `git merge main` (or `git merge origin/main`) and resolve the single merge conflict. Do NOT attempt to squash, rewrite, or rebase-interactively to avoid conflicts.
 - Your workspace is a git worktree — it has its own branch and working tree independent of the main repo
 - Running git commands in the parent repo will destroy other agents' uncommitted work

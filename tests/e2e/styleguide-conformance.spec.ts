@@ -196,10 +196,13 @@ async function openRoute(path: string): Promise<{ context: BrowserContext; page:
 beforeAll(async () => {
   const frontendRoot = join(process.cwd(), 'src/dashboard/frontend');
   const vitePath = require.resolve('vite', { paths: [frontendRoot] });
+  const reactPath = require.resolve('@vitejs/plugin-react', { paths: [frontendRoot] });
   const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
+  const { default: react } = await import(reactPath) as { default: () => unknown };
   vite = await createServer({
     root: frontendRoot,
-    plugins: [{
+    configFile: false,
+    plugins: [react(), {
       name: 'styleguide-mock-ws-transport',
       enforce: 'pre',
       transform(_code: string, id: string) {
@@ -249,7 +252,7 @@ beforeAll(async () => {
         return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
       },
     }],
-    server: { host: '127.0.0.1', port: 0 },
+    server: { host: '127.0.0.1', port: 0, watch: null },
     logLevel: 'error',
   });
   await vite.listen();

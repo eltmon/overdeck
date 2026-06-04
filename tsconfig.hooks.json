@@ -1,0 +1,9 @@
+{
+  "//": "Typecheck gate for standalone hook scripts in sync-sources/hooks/. These are bundled by tsdown (transpile-only, no type errors), so without this they have NO type safety — which is how the PAN-1570 Effect-as-value regression shipped. Run via `npm run typecheck:hooks`.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["sync-sources/hooks/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -35,8 +35,10 @@ export interface Conversation {
   titleSource?: 'auto' | 'ai' | 'manual' | null;
   /** Original auto-generated title seed. */
   titleSeed?: string | null;
-  /** Cached total cost in USD. */
+  /** Cached total cost in USD (cache-discount aware). */
   totalCost?: number;
+  /** Cached total token throughput (input + output + cache read/write). */
+  totalTokens?: number;
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
@@ -62,6 +64,23 @@ export interface Conversation {
   forkFallbackReason?: string | null;
   /** PAN-1458: if this conv was cleared via Claude Code's /clear, the sibling conv that continues it. */
   clearedToConvId?: number | null;
+  /** PAN-1523: current git branch at cwd, null when cwd is not a git repo. */
+  branch?: string | null;
+  /** PAN-1523: true when cwd is a secondary git worktree (not the primary checkout). */
+  isWorktree?: boolean;
+  /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
+  pendingInputCount?: number;
+  pendingInputKinds?: ReadonlyArray<string>;
+  pendingAskUserQuestion?: {
+    toolUseId: string;
+    askedAt: string;
+    questions: ReadonlyArray<{
+      question: string;
+      header?: string;
+      multiSelect?: boolean;
+      options: ReadonlyArray<{ label: string; description?: string }>;
+    }>;
+  };
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
@@ -153,11 +172,14 @@ interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
   excludeIds?: Set<number>;
+  /** When provided, show only conversations whose id is in this set (PAN-1561
+   * project scope). Applied after `excludeIds`. */
+  includeIds?: Set<number>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationList({ selectedConversation, onSelectConversation, excludeIds }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds, includeIds }: ConversationListProps) {
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
 
@@ -204,6 +226,10 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       filtered = filtered.filter((c) => !excludeIds.has(c.id));
     }
 
+    if (includeIds) {
+      filtered = filtered.filter((c) => includeIds.has(c.id));
+    }
+
     if (tab === 'favorites') {
       filtered = filtered.filter((c) => c.isFavorited);
     }
@@ -219,7 +245,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     );
 
     return [...active, ...inactive];
-  }, [conversations, sort, tab, excludeIds]);
+  }, [conversations, sort, tab, excludeIds, includeIds]);
 
   if (isLoading) {
     return (
@@ -298,10 +324,12 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       {mutations.forkTarget && (
         <ForkModal
           conversation={mutations.forkTarget}
+          initialMode={mutations.forkTargetMode}
+          initialFocus={mutations.forkTargetFocus}
           isPending={mutations.isForkPending}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus) => {
-            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus);
+          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+            mutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness);
           }}
         />
       )}

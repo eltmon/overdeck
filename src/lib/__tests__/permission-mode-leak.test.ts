@@ -95,19 +95,21 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
 
   // ── PAN_YOLO escape hatch (explicit opt-in to bypass) ──────────────────────
 
-  it('Kimi direct + PAN_YOLO=true (bypass): DSP present on direct Claude Code command', async () => {
+  it('Kimi direct + PAN_YOLO=true (bypass): bypassPermissions present, never DSP', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
     expect(cmd).toMatch(/^claude /)
     expect(cmd).toMatch(/--model 'kimi-k2\.6'/)
-    expect(cmd).toMatch(/--dangerously-skip-permissions/)
+    // DSP was removed (2026-05-30); bypass is expressed via --permission-mode only.
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).toMatch(/bypassPermissions/)
   })
 
-  it('Anthropic + PAN_YOLO=true + --agent: DSP present alongside --agent', async () => {
+  it('Anthropic + PAN_YOLO=true + --agent: launches via role definition, never DSP', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md')
-    expect(cmd).toMatch(/--dangerously-skip-permissions/)
+    // The --agent path defers permission mode to the role frontmatter — no DSP, no flag.
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).toMatch(/--agent roles\/work\.md/)
   })
 

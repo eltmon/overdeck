@@ -1,7 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
+
+// ProjectOverview now fetches recent spend via react-query (PAN-1597), so every
+// render must sit under a QueryClientProvider. Shadow render() with a wrapper so
+// existing call sites (and their rerender()) work unchanged.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
@@ -183,10 +194,10 @@ describe('bucketFeaturePhase', () => {
       />,
     );
 
-    expect(screen.getByText('Active agents').parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
   });
 
-  it('renders a project-scoped five-tile metric strip that updates with feature state', () => {
+  it('renders a project-scoped five-tile hero billboard that updates with feature state', () => {
     const { rerender } = render(
       <ProjectOverview
         projectName="panopticon-cli"
@@ -199,11 +210,14 @@ describe('bucketFeaturePhase', () => {
       />,
     );
 
-    const strip = screen.getByText('Active issues').closest('[data-component="metric-strip"]') as HTMLElement;
-    expect(strip).toHaveAttribute('data-columns', '5');
-    expect(strip).toHaveTextContent('Active issues2panopticon-cli');
-    expect(strip).toHaveTextContent('Work running1work agents');
-    expect(strip).toHaveTextContent('Spend$3.25');
+    // Five project-scoped glance tiles in the hero billboard.
+    for (const label of ['Active issues', 'Stuck', 'Agents', 'Ship-ready', 'Spend']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('2');
+    expect(screen.getByText('Agents').parentElement).toHaveTextContent('1');
+    // No recent-spend query data in tests → Spend falls back to the project total.
+    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$3.25');
 
     rerender(
       <ProjectOverview
@@ -218,9 +232,9 @@ describe('bucketFeaturePhase', () => {
       />,
     );
 
-    expect(strip).toHaveTextContent('Active issues3panopticon-cli');
-    expect(strip).toHaveTextContent('Work running3work agents');
-    expect(strip).toHaveTextContent('Spend$7.25');
+    expect(screen.getByText('Active issues').parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Agents').parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Spend').parentElement).toHaveTextContent('$7.25');
   });
 
   it('renders project issues with shared command-deck IssueRow and VerbBadge primitives', () => {

@@ -46,6 +46,9 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.pendingQuestionCount !== next.pendingQuestionCount ||
     prev.pendingQuestionPrompt !== next.pendingQuestionPrompt ||
     prev.pendingQuestionReason !== next.pendingQuestionReason ||
+    prev.pendingInputCount !== next.pendingInputCount ||
+    prev.pendingInputKinds.join(',') !== next.pendingInputKinds.join(',') ||
+    prev.pendingAskUserQuestion?.toolUseId !== next.pendingAskUserQuestion?.toolUseId ||
     prev.resolution !== next.resolution ||
     prev.resolutionCount !== next.resolutionCount
   )
@@ -142,8 +145,10 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           reviewStatus?.mergeStatus === 'merging'
       }
 
-      // Skip JSONL scan if file mtime is unchanged (avoids I/O on static sessions)
-      const currentMtime = await getAgentJsonlMtime(agentId)
+      // Skip JSONL scan if file mtime is unchanged (avoids I/O on static sessions).
+      // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
+      // (awaiting a non-thenable Effect yields the Effect object, never the value).
+      const currentMtime = await Effect.runPromise(getAgentJsonlMtime(agentId))
       const prevMtime = state.lastMtime.get(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
       const jsonlUnchanged = prevMtime !== undefined && currentMtime === prevMtime && previousEnrichment?.hasPendingQuestion !== true
@@ -153,7 +158,11 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       try {
         // If JSONL hasn't changed, only re-check runtime state (resolution)
         // by passing a flag that skips the expensive JSONL scan.
-        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged)
+        // computeAgentEnrichment returns an Effect — it MUST be run, not awaited
+        // directly (awaiting a non-thenable Effect yields the Effect object, so
+        // every enrichment field came back undefined → hasPendingQuestion/
+        // pendingAskUserQuestion silently dropped for every agent). PAN-1395.
+        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged))
       } catch {
         return
       }
@@ -175,6 +184,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           pendingQuestionCount: enrichment.pendingQuestionCount,
           pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
           pendingQuestionReason: enrichment.pendingQuestionReason,
+          pendingInputCount: enrichment.pendingInputCount,
+          pendingInputKinds: enrichment.pendingInputKinds,
+          pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
           resolutionCount: enrichment.resolutionCount,
         },

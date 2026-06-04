@@ -13,6 +13,17 @@ const mocks = vi.hoisted(() => ({
   spawnDashboardDetached: vi.fn(),
   spawn: vi.fn(),
   statSync: vi.fn(),
+  readDevSupervisorMarker: vi.fn(),
+  devSupervisorRefusalLines: vi.fn(),
+}));
+
+// reloadCommand refuses to run when a `pan dev` supervisor marker is present.
+// Without mocking this, the test outcome depends on whether the host happens to
+// have a live `pan dev` session — green in CI, red on a developer's machine.
+// Default to "no dev session" so the test is hermetic.
+vi.mock('../../../lib/dev-supervisor.js', () => ({
+  readDevSupervisorMarker: mocks.readDevSupervisorMarker,
+  devSupervisorRefusalLines: mocks.devSupervisorRefusalLines,
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -80,6 +91,8 @@ describe('reloadCommand', () => {
     mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
     mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
+    mocks.readDevSupervisorMarker.mockReturnValue(null);
+    mocks.devSupervisorRefusalLines.mockReturnValue([]);
   });
 
   it('calls restartDashboard after a successful build refreshes the dashboard bundle', async () => {

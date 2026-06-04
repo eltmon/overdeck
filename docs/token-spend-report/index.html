@@ -346,7 +346,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Cost Reduction <span class="gradient-text">Features</span></h2>
-<p>RTK, Caveman, TLDR, and Graphify — how well are they working?</p>
+<p>RTK, Caveman, and TLDR — how well are they working?</p>
 </div>
 <div class="grid-2" style="margin-bottom:24px">
 <div class="card animate-in">
@@ -411,26 +411,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Not working:</strong> 93% bypass rate across all workspaces. TLDR is almost never triggering. Either file-size thresholds are too high, the daemon is not running, or the read-enforcer is missing hooks. Cost impact: effectively zero.</p>
 </div>
 </div>
-<div class="card animate-in">
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-<div style="width:40px;height:40px;border-radius:10px;background:rgba(236,72,153,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#127760;</div>
-<h3 style="margin:0">Graphify — Knowledge Graph</h3>
-</div>
-<p style="color:var(--text-muted);font-size:.9rem">Converts conversation context into a queryable knowledge graph. Replaces repeated full-context scans with targeted graph traversals.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
-<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
-<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Graphs Built</div>
-</div>
-<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
-<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
-<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Tokens Saved</div>
-</div>
-</div>
-<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)">
-<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Tracking gap:</strong> Graphify is invoked via /graphify skill. No cost-event integration exists to measure graph lookups vs full-context reads. Impact is unmeasured.</p>
-</div>
-</div>
 </div>
 <div class="card animate-in" style="margin-top:24px">
 <h3><span class="card-icon">!</span> Summary &amp; Recommendations</h3>
@@ -441,7 +421,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 </div>
 <div style="padding:16px;border-radius:12px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15)">
 <div style="font-weight:600;color:var(--warning);margin-bottom:6px">Add Telemetry</div>
-<p style="color:var(--text-muted);font-size:.85rem;margin:0">RTK, Caveman, and Graphify all lack pre/post token counts. Add a <code>tokensSaved</code> field to cost events or emit separate metrics events for each feature.</p>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0">RTK and Caveman both lack pre/post token counts. Add a <code>tokensSaved</code> field to cost events or emit separate metrics events for each feature.</p>
 </div>
 <div style="padding:16px;border-radius:12px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15)">
 <div style="font-weight:600;color:var(--success);margin-bottom:6px">Cache Is Carrying Us</div>

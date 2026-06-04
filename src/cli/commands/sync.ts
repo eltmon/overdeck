@@ -259,7 +259,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (ctx.globalStubCreated) ctxParts.push('seeded global.md');
   if (ctx.globalWritten) ctxParts.push('~/.claude/CLAUDE.md');
   if (ctx.projectsWritten.length > 0) {
-    ctxParts.push(`${ctx.projectsWritten.length} project CLAUDE.md`);
+    ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
   }
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
@@ -268,6 +268,28 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
+  }
+
+  // One-time notice: a managed region was added to a file that already had
+  // hand-authored content. Reassure the user their content is preserved and
+  // point at the backup taken before the first injection.
+  if (ctx.firstInjections.length > 0) {
+    console.log(
+      chalk.cyan('\n  ℹ Panopticon added a managed region to existing context file(s):'),
+    );
+    for (const fi of ctx.firstInjections) {
+      console.log(`    • ${fi.file}`);
+      console.log(
+        chalk.dim(
+          `      Your content outside the markers is untouched. Backup: ${fi.backupPath}`,
+        ),
+      );
+    }
+    console.log(
+      chalk.dim(
+        '    Edit the layer source (pan context edit), never the region between the markers.',
+      ),
+    );
   }
 
   // Sync hooks (bin scripts)

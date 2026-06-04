@@ -149,10 +149,14 @@ function formatFreshnessAge(ms: number): string {
 function getLastTickFreshness(lastTickAt: string, nowMs: number): { label: string; className: string } {
   const lastTickMs = new Date(lastTickAt).getTime();
   const ageMs = Number.isFinite(lastTickMs) ? Math.max(0, nowMs - lastTickMs) : Number.POSITIVE_INFINITY;
-  if (ageMs <= 30_000) {
+  // Thresholds aligned with the orchestrator's 20-minute periodic-sweep contract
+  // (roles/flywheel.md tick-loop step 8). Past 20 min = the orchestrator is
+  // failing its own contract → destructive. 1–20 min is normal between-sweep
+  // breathing → warning. ≤1 min = freshly emitted → live.
+  if (ageMs <= 60_000) {
     return { label: 'live', className: 'border-success/30 bg-success/15 text-success' };
   }
-  if (ageMs <= 90_000) {
+  if (ageMs <= 1_200_000) {
     return { label: `last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-warning/30 bg-warning/15 text-warning' };
   }
   return { label: `stalled — last tick ${formatFreshnessAge(ageMs)} ago`, className: 'border-destructive/30 bg-destructive/15 text-destructive' };

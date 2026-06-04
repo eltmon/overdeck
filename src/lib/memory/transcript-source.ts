@@ -1,13 +1,15 @@
-import { stat } from 'node:fs/promises';
-import { basename, dirname, sep } from 'node:path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { basename, dirname, join, sep } from 'node:path';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { Effect } from 'effect';
 import {
+  getAgentDir,
   getAgentRuntimeState,
   listRunningAgents,
   type AgentState,
 } from '../agents.js';
 import { sessionFilePath } from '../paths.js';
+import { extractPiTranscript } from '../session-format-converter.js';
 import { compressJsonlBuffer } from './compress.js';
 
 export interface TranscriptEntry {
@@ -40,6 +42,13 @@ interface ClaudeCodeTranscriptSourceOptions {
   resolveTranscriptPath?: (workspace: string, sessionId: string) => string;
   statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   isSubagentSession?: (sessionId: string, agent: RunningAgent, transcriptPath: string) => boolean | Promise<boolean>;
+}
+
+interface PiTranscriptSourceOptions {
+  listAgents?: () => Promise<RunningAgent[]>;
+  readSessionId?: (agent: RunningAgent) => Promise<string | null>;
+  resolveTranscriptPath?: (agent: RunningAgent, sessionId: string) => Promise<string | null>;
+  statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
 }
 
 export class ClaudeCodeTranscriptSource implements TranscriptSource {
@@ -107,12 +116,67 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
 export class PiTranscriptSource implements TranscriptSource {
   readonly harness = 'pi';
 
-  async getActiveTranscripts(): Promise<TranscriptEntry[]> {
-    return [];
+  private readonly listAgents: () => Promise<RunningAgent[]>;
+  private readonly readSessionId: (agent: RunningAgent) => Promise<string | null>;
+  private readonly resolveTranscriptPath: (agent: RunningAgent, sessionId: string) => Promise<string | null>;
+  private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
+
+  constructor(options: PiTranscriptSourceOptions = {}) {
+    this.listAgents = options.listAgents ?? listRunningAgentsFromStore;
+    this.readSessionId = options.readSessionId ?? readPiSessionId;
+    this.resolveTranscriptPath = options.resolveTranscriptPath ?? resolvePiTranscriptPath;
+    this.statTranscript = options.statTranscript ?? stat;
   }
 
-  parseDelta(): TurnEvent[] {
-    return [];
+  async getActiveTranscripts(): Promise<TranscriptEntry[]> {
+    const agents = await this.listAgents();
+    const entries = await Promise.all(
+      agents
+        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && agent.harness === 'pi')
+        .map((agent) => this.resolveAgentTranscript(agent)),
+    );
+    return entries.filter((entry): entry is TranscriptEntry => entry !== null);
+  }
+
+  parseDelta(buffer: Buffer | string, fromOffset = 0): TurnEvent[] {
+    const text = Buffer.isBuffer(buffer) ? buffer.toString('utf8') : buffer;
+    const lastNewline = text.lastIndexOf('\n');
+    if (lastNewline === -1) return [];
+
+    const complete = text.slice(0, lastNewline + 1);
+    const turns = extractPiTranscript(complete);
+    if (turns.length === 0) return [];
+
+    return [{
+      compressedText: turns.map((turn) => `${turn.role === 'user' ? 'U' : 'A'}: ${turn.text}`).join('\n'),
+      eventsConsumed: turns.length,
+      lastFullLineOffset: fromOffset + Buffer.byteLength(complete, 'utf8'),
+    }];
+  }
+
+  private async resolveAgentTranscript(agent: RunningAgent): Promise<TranscriptEntry | null> {
+    const sessionId = await this.readSessionId(agent);
+    if (!sessionId) return null;
+
+    const transcriptPath = await this.resolveTranscriptPath(agent, sessionId);
+    if (!transcriptPath) return null;
+
+    let fileStat: { size: number; mtimeMs: number };
+    try {
+      fileStat = await this.statTranscript(transcriptPath);
+    } catch {
+      return null;
+    }
+
+    return {
+      agentId: agent.id,
+      sessionId,
+      transcriptPath,
+      identity: buildMemoryIdentity(agent, sessionId),
+      harness: 'pi',
+      size: fileStat.size,
+      mtimeMs: fileStat.mtimeMs,
+    };
   }
 }
 
@@ -164,6 +228,30 @@ function getAgentRuntimeStateFromStore(agentId: string): Promise<{ claudeSession
   return Effect.runPromise(getAgentRuntimeState(agentId));
 }
 
+async function readPiSessionId(agent: RunningAgent): Promise<string | null> {
+  if (agent.sessionId) return agent.sessionId;
+  try {
+    const saved = (await readFile(join(getAgentDir(agent.id), 'session.id'), 'utf8')).trim();
+    return saved || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePiTranscriptPath(agent: RunningAgent, sessionId: string): Promise<string | null> {
+  const sessionDir = join(getAgentDir(agent.id), 'sessions');
+  let entries: string[];
+  try {
+    entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl')).sort();
+  } catch {
+    return null;
+  }
+
+  const matching = entries.findLast((name) => name.includes(sessionId));
+  if (matching) return join(sessionDir, matching);
+  return entries.length > 0 ? join(sessionDir, entries[entries.length - 1]!) : null;
+}
+
 function isClaudeCodeSubagentSession(_sessionId: string, _agent: RunningAgent, transcriptPath: string): boolean {
   return transcriptPath.split(sep).includes('subagents') || transcriptPath.includes('/subagents/');
 }
@@ -176,7 +264,7 @@ function buildMemoryIdentity(agent: RunningAgent, sessionId: string): MemoryIden
     runId: agent.id,
     sessionId,
     agentRole: agent.role,
-    agentHarness: 'claude-code',
+    agentHarness: agent.harness ?? 'claude-code',
   };
 }
 

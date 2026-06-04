@@ -796,3 +796,65 @@ describe('validateOrigin', () => {
     expect(validateOrigin({}, 'POST')).toEqual({ ok: false, error: 'Missing origin' });
   });
 });
+
+describe('transformMessageForHarness (PAN-1535)', () => {
+  it('passes claude-code messages through unchanged', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    const message = '@/home/u/.panopticon/conversation-attachments/c1/abc.png\nhello';
+    expect(transformMessageForHarness(message, 'claude-code', ['/home/u/.panopticon/conversation-attachments/c1/abc.png'])).toBe(message);
+  });
+
+  it('passes through unchanged when there are no managed paths', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    expect(transformMessageForHarness('hello', 'pi', [])).toBe('hello');
+  });
+
+  it('rewrites pi messages to an explicit Read-tool instruction', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    const path = '/home/u/.panopticon/conversation-attachments/c1/abc.png';
+    const out = transformMessageForHarness(`@${path}\nwhat is this?`, 'pi', [path]);
+    expect(out).toContain('Read tool');
+    expect(out).toContain(`- ${path}`);
+    expect(out).toContain('what is this?');
+    expect(out).not.toContain(`@${path}`);
+  });
+
+  it('handles empty user text by switching to a describe-what-you-see prompt', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    const path = '/home/u/.panopticon/conversation-attachments/c1/abc.png';
+    const out = transformMessageForHarness(`@${path}`, 'pi', [path]);
+    expect(out).toContain('describe what you see');
+    expect(out).toContain(`- ${path}`);
+    expect(out).not.toContain('Message:');
+  });
+
+  it('handles multiple managed attachments', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    const p1 = '/home/u/.panopticon/conversation-attachments/c1/a.png';
+    const p2 = '/home/u/.panopticon/conversation-attachments/c1/b.png';
+    const out = transformMessageForHarness(`@${p1}\n@${p2}\ncompare`, 'pi', [p1, p2]);
+    expect(out).toContain(`- ${p1}`);
+    expect(out).toContain(`- ${p2}`);
+    expect(out).toContain('compare');
+    expect(out).not.toContain(`@${p1}`);
+    expect(out).not.toContain(`@${p2}`);
+  });
+
+  it('leaves unmanaged @mentions in user prose alone', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    const managed = '/home/u/.panopticon/conversation-attachments/c1/a.png';
+    const unmanaged = '/etc/passwd';
+    const out = transformMessageForHarness(`@${managed}\nalso look at @${unmanaged} please`, 'pi', [managed]);
+    expect(out).toContain(`- ${managed}`);
+    expect(out).toContain(`@${unmanaged}`); // unmanaged path preserved verbatim
+  });
+
+  it('escapes regex metacharacters in attachment paths', async () => {
+    const { transformMessageForHarness } = await import('../conversations.js');
+    // Paths can legitimately contain `.` and other regex metacharacters
+    const path = '/home/u/.panopticon/conversation-attachments/c1/file.with.dots.png';
+    const out = transformMessageForHarness(`@${path}\nhi`, 'pi', [path]);
+    expect(out).toContain(`- ${path}`);
+    expect(out).not.toContain(`@${path}`);
+  });
+});

@@ -86,8 +86,6 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { issueId, projectId: issue?.project?.id };
     case 'startSkipPlanning':
       return { issueId, projectId: issue?.project?.id, auto: true };
-    case 'swarm':
-      return { issueId };
     case 'createWorkspace':
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
@@ -150,8 +148,6 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'This agent is not paused.';
     case 'untroubled':
       return 'This agent is not troubled.';
-    case 'swarm':
-      return 'Swarm requires a planned issue with beads and no running agent.';
     default:
       return `${action.label} is unavailable in the current issue state.`;
   }
@@ -161,7 +157,6 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'plan',
   'autoPlan',
   'startSkipPlanning',
-  'swarm',
   'tell',
   'switchModel',
   'inspectBead',

@@ -448,6 +448,44 @@ describe('useSearch', () => {
     });
   });
 
+  describe('Project scope (PAN-1593)', () => {
+    const mixedIssues: Issue[] = [
+      { ...mockIssues[0], id: 'a', identifier: 'PAN-100', title: 'Shared word alpha' },
+      { ...mockIssues[0], id: 'b', identifier: 'MIN-200', title: 'Shared word beta' },
+      { ...mockIssues[0], id: 'c', identifier: 'KRUX-3', title: 'Shared word gamma' },
+    ];
+
+    beforeEach(() => {
+      mockQueryClient.getQueriesData.mockReturnValue([[['issues'], mixedIssues]]);
+    });
+
+    it('restricts results to the project prefix when set', async () => {
+      const filters: SearchFilters = { ...defaultFilters, projectPrefix: 'PAN' };
+      const { result } = renderHook(() => useSearch('Shared', filters));
+      await act(async () => { vi.advanceTimersByTime(150); });
+
+      const prefixes = new Set(result.current.results.map(r => r.issue.identifier.split('-')[0]));
+      expect(result.current.results.length).toBe(1);
+      expect([...prefixes]).toEqual(['PAN']);
+    });
+
+    it('matches the prefix case-insensitively', async () => {
+      const filters: SearchFilters = { ...defaultFilters, projectPrefix: 'MIN' };
+      const { result } = renderHook(() => useSearch('Shared', filters));
+      await act(async () => { vi.advanceTimersByTime(150); });
+
+      expect(result.current.results.map(r => r.issue.identifier)).toEqual(['MIN-200']);
+    });
+
+    it('returns all projects when no prefix is set', async () => {
+      const { result } = renderHook(() => useSearch('Shared', defaultFilters));
+      await act(async () => { vi.advanceTimersByTime(150); });
+
+      const prefixes = new Set(result.current.results.map(r => r.issue.identifier.split('-')[0]));
+      expect(prefixes).toEqual(new Set(['PAN', 'MIN', 'KRUX']));
+    });
+  });
+
   describe('Edge cases', () => {
     it('should handle no cached issues gracefully', async () => {
       mockQueryClient.getQueriesData.mockReturnValue([]);

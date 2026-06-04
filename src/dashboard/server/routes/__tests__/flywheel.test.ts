@@ -697,11 +697,13 @@ describe('flywheel run payload helpers', () => {
     const reportPath = join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'report.md');
     await writeFile(reportPath, '# Report\n');
 
+    // PAN-1528: latest.system.agentsActive is now overlaid with the live
+    // work-agent count from <panopticonHome>/agents/. Empty test home => 0.
     await expect(getFlywheelRunPayload('RUN-1', { panopticonHome })).resolves.toMatchObject({
       id: 'RUN-1',
       startedAt: '2026-05-18T10:00:00.000Z',
       status: 'complete',
-      latest: status,
+      latest: { ...status, system: { ...status.system, agentsActive: 0 } },
       paths: { report: reportPath },
     });
   });
@@ -715,7 +717,11 @@ describe('flywheel run payload helpers', () => {
 
     await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: null })).resolves.toBeNull();
     await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-1' })).resolves.toBeNull();
-    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-2' })).resolves.toEqual(running);
+    // PAN-1528: agentsActive overlaid with live count from empty test home.
+    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-2' })).resolves.toEqual({
+      ...running,
+      system: { ...running.system, agentsActive: 0 },
+    });
   });
 
   it('returns null for a missing run', async () => {

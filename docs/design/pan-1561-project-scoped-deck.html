@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Project-scoped Command Deck (Home ▸ Project ▸ tabs)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f; --running:#16a34a; --queued:#f59e0b; --idle:#cbd5e1; --merged:#16a34a; --todo:#94a3b8;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+    --proj-pan:#e07b39; --proj-myn:#64748b; --proj-aur:#0ea5e9;
+    --c-rail:#6b7280; --c-tabs:#4f46e5; --c-home:#0d9488; --c-conv:#0ea5e9; --c-iss:#9333ea;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.55;padding:32px 24px 80px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);
+    box-shadow:0 6px 30px rgba(0,0,0,.10);display:flex;height:660px;}
+
+  .tag{position:absolute;z-index:6;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:#fff;
+    padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-rail{background:var(--c-rail);} .t-tabs{background:var(--c-tabs);} .t-home{background:var(--c-home);}
+  .t-conv{background:var(--c-conv);} .t-iss{background:var(--c-iss);}
+  .region{position:relative;}
+
+  /* ---- far-left rail: Home / Flywheel / Projects ---- */
+  .rail{width:212px;flex:0 0 212px;background:var(--surface);border-right:1px solid var(--border);
+    padding:12px 10px;display:flex;flex-direction:column;position:relative;font-size:13px;}
+  .rnav{padding:8px 10px;border-radius:9px;display:flex;align-items:center;gap:10px;color:var(--foreground);font-weight:600;}
+  .rnav .ic{font-size:16px;width:18px;text-align:center;}
+  .rnav.fly{color:var(--primary);}
+  .rail-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:16px 8px 6px;}
+  .proj{padding:8px 10px;border-radius:9px;display:flex;align-items:center;gap:10px;color:var(--foreground);font-weight:600;}
+  .proj .sq{width:14px;height:14px;border-radius:4px;flex:0 0 14px;}
+  .proj .cnt{margin-left:auto;color:#9ca3af;font-size:11px;font-family:"SF Mono",monospace;font-weight:500;}
+  .proj.active{background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .proj.active .nm{color:var(--proj-pan);}
+  .addp{padding:8px 10px;color:var(--muted);font-weight:500;font-size:12.5px;}
+  .rail-foot{margin-top:auto;border-top:1px solid var(--border);padding-top:8px;color:#9ca3af;font-size:11px;}
+
+  /* ---- project-scoped command deck ---- */
+  .deck{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .tabstrip{display:flex;align-items:flex-end;gap:0;height:44px;flex:0 0 44px;border-bottom:1px solid var(--border);background:var(--surface);padding:9px 8px 0;position:relative;}
+  .ptab{display:flex;align-items:center;gap:7px;padding:0 12px;height:35px;font-size:12.5px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;}
+  .ptab .x{color:#c4c4c4;font-size:12px;} .ptab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .ptab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .ptab.home.active::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--proj-pan);}
+  .ptab-add{display:flex;align-items:center;justify-content:center;width:30px;height:35px;color:#9ca3af;font-size:18px;}
+
+  .body{flex:1;overflow:auto;padding:22px 26px;min-width:0;position:relative;}
+  .phead{display:flex;align-items:center;gap:12px;}
+  .phead .icon{width:30px;height:30px;border-radius:8px;background:var(--proj-pan);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .phead h3{font-size:23px;margin:0;font-weight:700;}
+  .pbranch{color:var(--muted);font-size:12.5px;display:flex;gap:10px;align-items:center;margin:7px 0 16px;}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;}
+  .chip .mut{color:var(--muted);}
+
+  .spawn{display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);border-radius:12px;padding:11px 14px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);margin-bottom:8px;}
+  .spawn .typed{flex:1;color:#9ca3af;} .spawn .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  .scope-note{font-size:11px;color:var(--primary);margin:0 0 20px;display:flex;align-items:center;gap:6px;}
+
+  .sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:0 0 9px;display:flex;align-items:center;gap:8px;}
+  .sec-h .see{margin-left:auto;color:var(--primary);text-transform:none;letter-spacing:0;font-weight:600;}
+
+  /* conversations (scoped) */
+  .conv{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;margin-bottom:7px;font-size:12.5px;}
+  .conv .sq{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .conv .ag{font-weight:600;}
+  .conv .txt{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .conv .ago{margin-left:auto;color:#9ca3af;font-size:11px;white-space:nowrap;}
+
+  /* issue tree with workers */
+  .issues{margin-top:22px;position:relative;}
+  .issue{border:1px solid var(--border);border-radius:10px;background:#fff;margin-bottom:9px;overflow:hidden;}
+  .issue-h{display:flex;align-items:center;gap:9px;padding:10px 13px;font-size:13px;}
+  .issue-h .car{color:#9ca3af;font-size:11px;width:10px;}
+  .issue-h .st{width:9px;height:9px;border-radius:50%;}
+  .st.run{background:var(--running);} .st.queued{background:var(--queued);} .st.merged{background:var(--merged);} .st.todo{background:var(--todo);}
+  .issue-h .id{font-family:"SF Mono",monospace;font-weight:700;color:var(--foreground);}
+  .issue-h .ttl{color:var(--foreground);}
+  .issue-h .badge{margin-left:auto;font-size:10.5px;font-family:"SF Mono",monospace;color:#9ca3af;padding:1px 7px;border:1px solid var(--border);border-radius:999px;}
+  .workers{border-top:1px solid var(--border);background:var(--surface);padding:6px 13px 8px;}
+  .worker{display:flex;align-items:center;gap:9px;padding:5px 0 5px 18px;font-size:12px;color:var(--foreground);}
+  .worker .role{display:inline-flex;align-items:center;gap:6px;font-weight:600;width:104px;flex:0 0 104px;}
+  .worker .who{color:var(--muted);display:inline-flex;align-items:center;gap:6px;}
+  .worker .who .sq{width:11px;height:11px;border-radius:3px;}
+  .worker .stt{margin-left:auto;color:#9ca3af;font-size:11px;font-family:"SF Mono",monospace;display:flex;align-items:center;gap:6px;}
+  .worker .stt .d{width:7px;height:7px;border-radius:50%;}
+  .worker .open{color:var(--primary);font-weight:600;font-size:11px;border:1px solid var(--primary-border);border-radius:6px;padding:2px 8px;}
+
+  /* legend */
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;}
+  .callout{margin-top:14px;border:1px solid var(--primary-border);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;}
+  .callout b{color:var(--primary);}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;} td code{color:var(--primary);} .old code{color:#b45309;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Project-scoped Command Deck</h1>
+  <p class="sub">Dropping "Thread" — issues already live under projects, so the <b>Project is the container</b>. Far-left rail = <b>Home</b> → <b>Flywheel</b> → your <b>Projects</b>. Click a project to enter its <b>own Command Deck</b>; you land on a <b>Home tab</b> showing <b>project-scoped Conversations</b> (your #1) + the <b>issue tree with workers</b> (your #2). New conversations are scoped to the project — targeted context by default. <b>Draft for discussion.</b></p>
+
+  <h2>1 · Enter a project → its Home tab</h2>
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- far-left rail -->
+      <div class="rail region">
+        <span class="tag t-rail" style="top:8px;right:8px;">Rail <small>(Home · Flywheel · Projects — the rest is cut)</small></span>
+        <div class="rnav"><span class="ic">⌂</span> Home</div>
+        <div class="rnav fly"><span class="ic">🌀</span> Flywheel</div>
+
+        <div class="rail-h region"><span class="tag t-rail" style="top:-20px;left:0;">projects = the nav</span>Projects</div>
+        <div class="proj active"><span class="sq" style="background:var(--proj-pan)"></span><span class="nm">panopticon</span><span class="cnt">7</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-myn)"></span><span class="nm">mind-your-now</span><span class="cnt">3</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-aur)"></span><span class="nm">auricle</span><span class="cnt">2</span></div>
+        <div class="addp">+ Add project</div>
+
+        <div class="rail-foot">v0.9.4</div>
+      </div>
+
+      <!-- project-scoped deck -->
+      <div class="deck">
+        <div class="tabstrip region">
+          <span class="tag t-tabs" style="top:-2px;left:200px;">Tabs — scoped to panopticon</span>
+          <div class="ptab home active"><span>⌂</span> Home <span class="kbd">⌘1</span></div>
+          <div class="ptab"><span>💬</span> Claude Code <span class="kbd">⌘2</span> <span class="x">×</span></div>
+          <div class="ptab"><span>⬚</span> PAN-1561 <span class="kbd">⌘3</span> <span class="x">×</span></div>
+          <div class="ptab-add">+</div>
+        </div>
+
+        <div class="body region">
+          <span class="tag t-home" style="top:6px;right:8px;">Home tab <small>(the project dashboard)</small></span>
+
+          <div class="phead"><span class="icon">P</span><h3>panopticon</h3></div>
+          <div class="pbranch"><span>⎇ main</span><span>·</span><span>~/Projects/panopticon-cli</span></div>
+          <div class="stats">
+            <span class="chip">🟢 <span>3 agents running</span></span>
+            <span class="chip">📋 <span>7 open issues</span></span>
+            <span class="chip">💬 <span>5 conversations</span></span>
+            <span class="chip">$ <span>4.18 today</span></span>
+          </div>
+
+          <div class="spawn"><span>⌘</span><span class="typed">Ask Claude, run a command, or start a conversation in panopticon…</span><span class="run">↵</span></div>
+          <p class="scope-note">⊙ scoped to <b>panopticon</b> — every spawn here gets the project's context (no more global conversations)</p>
+
+          <!-- Conversations (scoped) -->
+          <div class="region">
+            <span class="tag t-conv" style="top:-12px;left:0;">Conversations <small>(#1 — now project-scoped)</small></span>
+            <div class="sec-h" style="margin-top:8px;">Conversations <span class="see">+ New</span></div>
+            <div class="conv"><span class="sq" style="background:var(--claude)"></span><span class="ag">Claude Code</span><span class="txt">— "hoist the panebar to top level…"</span><span class="ago">2m</span></div>
+            <div class="conv"><span class="sq" style="background:var(--codex)"></span><span class="ag">Codex</span><span class="txt">— "engine mismatch warnings on Node 20…"</span><span class="ago">1h</span></div>
+          </div>
+
+          <!-- Issue tree with workers -->
+          <div class="issues region">
+            <span class="tag t-iss" style="top:-12px;left:0;">Issue tree + workers <small>(#2 — work / review convoy / test / ship)</small></span>
+            <div class="sec-h" style="margin-top:8px;">Issues <span class="see">All ▾</span></div>
+
+            <div class="issue">
+              <div class="issue-h"><span class="car">▾</span><span class="st run"></span><span class="id">PAN-1561</span><span class="ttl">Hoist PaneBar to top level</span><span class="badge">running</span></div>
+              <div class="workers">
+                <div class="worker"><span class="role">🤖 work</span><span class="who"><span class="sq" style="background:var(--claude)"></span>Claude Code</span><span class="stt"><span class="d" style="background:var(--running)"></span>running · 2m</span><span class="open">open ›</span></div>
+                <div class="worker"><span class="role">🔍 review</span><span class="who">convoy · security · correctness · perf · reqs</span><span class="stt"><span class="d" style="background:var(--queued)"></span>queued (4)</span></div>
+              </div>
+            </div>
+
+            <div class="issue">
+              <div class="issue-h"><span class="car">▾</span><span class="st run"></span><span class="id">PAN-1547</span><span class="ttl">Node 22 engine bump</span><span class="badge">running</span></div>
+              <div class="workers">
+                <div class="worker"><span class="role">🤖 work</span><span class="who"><span class="sq" style="background:var(--codex)"></span>Codex</span><span class="stt"><span class="d" style="background:var(--running)"></span>running · 8m</span><span class="open">open ›</span></div>
+                <div class="worker"><span class="role">✅ test</span><span class="who">vitest + UAT</span><span class="stt"><span class="d" style="background:var(--idle)"></span>waiting</span></div>
+              </div>
+            </div>
+
+            <div class="issue">
+              <div class="issue-h"><span class="car">▸</span><span class="st merged"></span><span class="id">PAN-1540</span><span class="ttl">Kanban redesign</span><span class="badge">merged · verifying</span></div>
+            </div>
+            <div class="issue">
+              <div class="issue-h"><span class="car">▸</span><span class="st todo"></span><span class="id">PAN-1533</span><span class="ttl">Cost dashboard refresh</span><span class="badge">todo</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · Click an issue → it opens as a tab (the agents at work)</h2>
+  <p class="sub">Opening <code>PAN-1561</code> from the tree adds a tab scoped to that issue — its pipeline agents, their terminals, and the issue's conversations. This is where your #2 workflow lives in detail.</p>
+  <div class="frame-wrap">
+    <div class="win" style="height:380px;">
+      <div class="rail" style="flex:0 0 212px;">
+        <div class="rnav"><span class="ic">⌂</span> Home</div>
+        <div class="rnav fly"><span class="ic">🌀</span> Flywheel</div>
+        <div class="rail-h">Projects</div>
+        <div class="proj active"><span class="sq" style="background:var(--proj-pan)"></span><span class="nm">panopticon</span><span class="cnt">7</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-myn)"></span><span class="nm">mind-your-now</span><span class="cnt">3</span></div>
+        <div class="proj"><span class="sq" style="background:var(--proj-aur)"></span><span class="nm">auricle</span><span class="cnt">2</span></div>
+      </div>
+      <div class="deck">
+        <div class="tabstrip region">
+          <div class="ptab home"><span>⌂</span> Home <span class="kbd">⌘1</span></div>
+          <div class="ptab"><span>💬</span> Claude Code <span class="kbd">⌘2</span> <span class="x">×</span></div>
+          <div class="ptab active"><span>⬚</span> PAN-1561 <span class="kbd">⌘3</span> <span class="x">×</span></div>
+          <div class="ptab-add">+</div>
+        </div>
+        <div class="body region">
+          <span class="tag t-iss" style="top:6px;right:8px;">Issue tab <small>(PAN-1561 · pipeline + panes)</small></span>
+          <div class="phead"><span class="icon">⬚</span><h3 style="font-size:20px;">PAN-1561 · Hoist PaneBar</h3></div>
+          <div class="pbranch"><span>⎇ feature/pan-1561</span><span>·</span><span class="pill-link">↗ open PR #1554</span></div>
+          <div class="issues" style="margin-top:6px;">
+            <div class="sec-h">Pipeline</div>
+            <div class="issue"><div class="workers" style="border-top:none;">
+              <div class="worker"><span class="role">🤖 work</span><span class="who"><span class="sq" style="background:var(--claude)"></span>Claude Code</span><span class="stt"><span class="d" style="background:var(--running)"></span>running · 2m</span><span class="open">terminal ›</span></div>
+              <div class="worker"><span class="role">🔍 review</span><span class="who">convoy · 4 reviewers</span><span class="stt"><span class="d" style="background:var(--queued)"></span>queued</span><span class="open">view ›</span></div>
+              <div class="worker"><span class="role">✅ test</span><span class="who">vitest + browser UAT</span><span class="stt"><span class="d" style="background:var(--idle)"></span>—</span></div>
+              <div class="worker"><span class="role">🚢 ship</span><span class="who">rebase · verify · push</span><span class="stt"><span class="d" style="background:var(--idle)"></span>—</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Why this fits your workflow better than Threads:</b> it keeps your two most-used surfaces — <b>conversations</b> and the <b>issue-tree-with-workers</b> — but scopes them under the <b>project</b> you already think in. No awkward "two issues = two threads." Spawns inherit project context automatically (fixes the global-conversation pain). The sidebar shrinks to <b>Home · Flywheel · Projects</b>; everything else is cut or folded into Home.
+  </div>
+
+  <h2>3 · Sidebar: before → after</h2>
+  <table>
+    <thead><tr><th style="width:50%">Today (18 items)</th><th>This proposal</th></tr></thead>
+    <tbody>
+      <tr><td class="old">Home · Command Deck · Board · Pipeline · Awaiting Merge · Agents · AutoPreso · Flywheel · Resources · Activity · Sessions · Metrics · Costs · Health · Skills · Context · Settings · God View</td>
+          <td><b>Home</b> · <b>Flywheel</b> · then your <b>Projects</b> (panopticon · mind-your-now · auricle). Command Deck stops being a destination — it's <i>what a project opens into</i>. The rest is cut or surfaced as cards on Home.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-rail)">Rail</span><span class="desc"><b>Rail</b> — Home · Flywheel · Projects. The only persistent nav.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-tabs)">Tabs</span><span class="desc"><b>Tabs</b> — scoped to the open project; Home tab first, then conversations / issues / panes.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-conv)">Conv</span><span class="desc"><b>Conversations</b> — project-scoped; new ones inherit project context.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-iss)">Issues</span><span class="desc"><b>Issue tree + workers</b> — work / review convoy / test / ship, each openable.</span></div>
+  </div>
+
+  <p class="legend-note">Issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. Earlier explorations: <a class="pill-link" href="pan-1561-global-panebar.html">flat bar</a> · <a class="pill-link" href="pan-1561-global-panebar-grouped.html">grouped bar</a> · <a class="pill-link" href="pan-1561-home-first-threads.html">Threads (superseded)</a> · <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549 origin</a>.</p>
+
+</div>
+</body>
+</html>

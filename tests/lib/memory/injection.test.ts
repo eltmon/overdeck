@@ -9,6 +9,14 @@ import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../s
 import { COMPLIANCE_ADVISORY_WARNING } from '../../../src/lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
 
+// Background AI is off-by-default since PAN-1589 (cheapMode). These tests drive
+// the prompt-time query-expansion path, which only runs when the feature gate
+// is on — force it on so the expansion provider is actually invoked.
+vi.mock('../../../src/lib/background-ai/features.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/background-ai/features.js')>();
+  return { ...actual, isBackgroundFeatureEnabled: () => true };
+});
+
 let tempDir: string | null = null;
 let originalHome: string | undefined;
 

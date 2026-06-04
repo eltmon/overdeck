@@ -10,11 +10,11 @@ export const FlywheelHarness = Schema.Literals(["claude-code", "pi"])
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
   model: string
-  effort: "low" | "medium" | "high"
+  effort: "low" | "medium" | "high" | "xhigh" | "max"
   ctxPercent: number
 }
 
-export const FlywheelEffort = Schema.Literals(["low", "medium", "high"])
+export const FlywheelEffort = Schema.Literals(["low", "medium", "high", "xhigh", "max"])
 export const FlywheelOrchestrator = Schema.Struct({
   harness: FlywheelHarness,
   model: Schema.String,

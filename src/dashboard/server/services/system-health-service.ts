@@ -166,7 +166,7 @@ function toPercent(part: number, total: number): number {
   return Math.round((part / total) * 1000) / 10;
 }
 
-function classifyAgentKind(
+export function classifyAgentKind(
   agentId: string,
   role?: string,
 ): HealthAgentProcess['kind'] {

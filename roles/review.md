@@ -170,6 +170,18 @@ pan admin specialists done review <issueId> --status passed --notes "<one-line s
 pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
 ```
 
+For Pi sessions, also end your final response with exactly one structured sentinel line:
+
+```text
+PANOPTICON_SPECIALIST_RESULT: review-agent passed
+```
+
+or
+
+```text
+PANOPTICON_SPECIALIST_RESULT: review-agent failed
+```
+
 ## Boundaries
 
 - Review never merges. The ship role prepares branches for human merge.

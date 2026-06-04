@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage } from '../chat-types';
 
@@ -50,6 +50,32 @@ function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, te
         : undefined,
   };
 }
+
+describe('MessagesTimeline — search', () => {
+  it('captures Ctrl+F and searches messages beyond browser-visible text', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0, 'hello from the top'),
+      makeMessage('a1', 'assistant', 5_000, 'the needle is in the assistant reply'),
+    ];
+
+    render(<MessagesTimeline messages={messages} workLog={[]} streaming={false} />);
+
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+    const input = screen.getByRole('textbox', { name: 'Search conversation' });
+    expect(input).toHaveFocus();
+
+    fireEvent.change(input, { target: { value: 'needle' } });
+    expect(screen.getByText('1/1')).toBeInTheDocument();
+    const highlighted = screen.getByText('needle');
+    expect(highlighted).toHaveAttribute('data-conversation-search-highlight', 'true');
+    expect(highlighted).toHaveClass('bg-amber-300/40');
+    expect(highlighted.closest('[data-search-row-id]'))
+      .toHaveStyle({ outline: '2px solid var(--color-primary)' });
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Search conversation' })).toBeNull();
+  });
+});
 
 describe('MessagesTimeline — roundMarkers', () => {
   it('passes file-link context to virtualized message rows', () => {

@@ -710,12 +710,11 @@ describe('IssueDrawer', () => {
       {
         "READY_TO_MERGE": [
           "issue-action-startAgent",
-          "issue-action-swarm",
           "issue-action-syncMain",
           "issue-action-inspectBead",
+          "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-cancel",
           "issue-action-beads",

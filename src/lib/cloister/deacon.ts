@@ -26,6 +26,7 @@ import {
   ProcessSpawnError,
   ProcessTimeoutError,
 } from '../errors.js';
+import { isStartingWithinGrace } from './agent-grace.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -130,6 +131,7 @@ import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
+import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
@@ -153,6 +155,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 
 // ============================================================================
 // Configuration
@@ -668,254 +671,43 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 // it on top of the AgentRuntimeSnapshot stream.
 // ============================================================================
 
-/**
- * Status indicators in tmux output that mean the agent is actively working
- * (not idle). These appear in Claude Code's status line.
- */
-const ACTIVE_STATUS_PATTERNS = [
-  /computing/i,
-  /fermenting/i,
-  /thinking/i,
-  /reading/i,
-  /writing/i,
-  /editing/i,
-  /searching/i,
-  /running/i,
-  /executing/i,
-  /tool use/i,
-  /\bBash\b/,
-  /\bRead\b/,
-  /\bWrite\b/,
-  /\bEdit\b/,
-  /\bGrep\b/,
-  /\bGlob\b/,
-  /\bTask\b/,
-];
-
-/**
- * Check if agent tmux output indicates active work (not idle)
- * Checks the last 8 non-blank lines of pane output for status indicators.
- * Claude Code's live status bar (◆ Bash, ◆ Thinking, ⏵⏵) appears at the
- * bottom of the pane — only those lines are relevant, not the full visible
- * area which may contain completed tool calls like "● Bash(...)" from prior output.
- */
-/**
- * PAN-1249: Effect-typed implementation of `isAgentActiveInTmux`. Never fails
- * — capture errors collapse to `false`. The public Promise function is a
- * thin `Effect.runPromise` wrapper.
- */
-const isAgentActiveInTmuxProgram = (sessionName: string): Effect.Effect<boolean, never> =>
-  capturePane(sessionName, 5).pipe(
-    Effect.map((stdout) => {
-      if (!stdout.trim()) return false;
-
-      // Only scan the bottom of the pane where Claude Code's live status bar lives.
-      // Scanning the full visible area causes false positives: completed tool calls
-      // like "● Bash(npm run typecheck...)" are visible but the agent may be idle.
-      const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
-      const tail = lines.slice(-8).join('\n');
-
-      for (const pattern of ACTIVE_STATUS_PATTERNS) {
-        if (pattern.test(tail)) {
-          // Extended computation (Thinking/Fermenting) over threshold = stuck.
-          // Don't let stuck agents masquerade as active.
-          if (/thinking|fermenting/i.test(tail)) {
-            const thinkingMs = parseThinkingDuration(tail);
-            if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
-              return false; // Stuck, not active
-            }
-          }
-          return true;
-        }
-      }
-
-      return false;
-    }),
-    Effect.catch(() => Effect.succeed(false)),
-  );
-
-export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
-  return Effect.runPromise(isAgentActiveInTmuxProgram(sessionName));
-}
+// ACTIVE_STATUS_PATTERNS + isAgentActiveInTmux deleted in PAN-800 Phase 5.
+// They pane-scraped Claude Code's status line to guess "is this agent active",
+// including a parseThinkingDuration stuck heuristic. The hook-driven runtime
+// mirror (getAgentRuntimeStateSync → activity 'working'/'thinking'/'idle') is
+// the single source of truth now; capture-pane activity detection is gone.
+// isAgentActiveInTmux had no remaining callers at deletion time.
 
 // ============================================================================
 // Stuck Work Agent Detection
 // ============================================================================
 
 /**
- * Thinking duration threshold before an agent is considered stuck.
- * Claude Code shows "Thinking... (Xm Ys)" in tmux — if the duration
- * exceeds this threshold with no tool output, the agent is stalled.
- */
-const STUCK_THINKING_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
-
-/**
- * Cooldown between stuck-recovery attempts for the same agent.
- * Prevents spamming Ctrl+C or respawning in a loop.
- */
-const STUCK_RECOVERY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Track recovery attempts per agent: agentId -> { lastAttempt, attempts }
- */
-const stuckRecoveryState: Map<string, { lastAttempt: number; attempts: number }> = new Map();
-
-/**
- * Parse thinking duration from tmux output.
- * Claude Code renders: "Thinking… (Xm Ys · ...)" or "· Thinking… (Xm Ys · ...)"
- * Returns duration in milliseconds, or null if not currently thinking.
- */
-function parseThinkingDuration(tmuxOutput: string): number | null {
-  // Match Claude Code thinking/fermenting status phrases followed by a duration.
-  // Handles: "Thinking… (22m 41s", "Fermenting… (5m 10s"
-  const match = tmuxOutput.match(/(?:[Tt]hinking|[Ff]ermenting)[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
-  if (!match) return null;
-
-  const minutes = match[1] ? parseInt(match[1], 10) : 0;
-  const seconds = parseInt(match[2], 10);
-  return (minutes * 60 + seconds) * 1000;
-}
-
-/**
- * Check for work agents stuck in extended thinking loops.
+ * checkStuckWorkAgents gutted in PAN-800 Phase 5.
  *
- * Detection: tmux shows "Thinking… (Xm Ys)" where duration > threshold.
- * Recovery strategy (escalating):
- *   1. First attempt: Send Escape key to try to cancel thinking
- *   2. Second attempt: Send Ctrl+C to interrupt
- *   3. Third attempt: Kill tmux session and respawn via launcher.sh
+ * The old implementation `capturePane`d every work agent and ran a
+ * `parseThinkingDuration` regex over the tmux status line to decide an agent
+ * was "stuck thinking", then escalated Escape → Ctrl-C → kill/respawn. That is
+ * exactly the capture-pane scraping PAN-798/PAN-800 eliminate, and it was
+ * brittle: it only recognised the "Thinking"/"Fermenting" spinner words (not
+ * "Quantumizing" et al.) and could not parse hour-scale durations.
+ *
+ * Stuck detection is now hook-based and lives in `checkStuckAgentRemediation`
+ * (stuck-remediation.ts), which reads the runtime mirror via
+ * `isAgentIdleForNudge` + `getAgentRuntimeStateSync` and escalates
+ * nudge → resume → troubled. PAN-1586 made `isAgentIdleForNudge` treat a stale
+ * 'active' mirror (Stop hook never fired) as idle, so a genuinely-stalled agent
+ * — regardless of spinner word or duration — is now caught there.
+ *
+ * The "exclude-from-context" dialog auto-dismiss that also lived here was a
+ * pane-scrape active intervention; like auto-suspend and lazy-detection it is
+ * out of scope for PAN-800 and tracked under PAN-188. The notification hook
+ * already surfaces that dialog as `waiting-on-human`.
+ *
+ * Retained as a no-op stub so the patrol-cycle wiring stays stable.
  */
 export async function checkStuckWorkAgents(): Promise<string[]> {
-  const actions: string[] = [];
-  const agents = listRunningAgentsSync();
-  // Specialist sessions (global or per-project) use the specialist tmux prefix.
-  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
-  const now = Date.now();
-
-  for (const agent of agents) {
-    if (!agent.tmuxActive) continue;
-
-    // Only check work agents, not specialists (specialists have their own health checks)
-    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialistSession(agent.id);
-    if (!isWorkAgent) continue;
-
-    // Check cooldown
-    const recovery = stuckRecoveryState.get(agent.id);
-    if (recovery && (now - recovery.lastAttempt) < STUCK_RECOVERY_COOLDOWN_MS) {
-      continue;
-    }
-
-    // Capture tmux output to check for stuck thinking
-    let tmuxOutput: string;
-    try {
-      tmuxOutput = await Effect.runPromise(capturePane(agent.id, 10));
-    } catch {
-      continue;
-    }
-
-    if (!tmuxOutput.trim()) continue;
-
-    // Detect agents stuck on Claude Code's "exclude from context" interactive dialog.
-    // This dialog fires when Claude Code wants to add a file to .claudeignore and waits
-    // for user input (Esc to cancel, Tab to amend). The notification-hook sets runtime
-    // state to 'waiting-on-human', but no automated recovery was wired up for this case.
-    const isExcludeDialog = tmuxOutput.includes('Do you want to make this edit to exclude')
-      || tmuxOutput.includes('Esc to cancel') && tmuxOutput.includes('Tab to amend');
-    if (isExcludeDialog) {
-      console.log(`[deacon] Work agent ${agent.id} stuck on exclude-from-context dialog — dismissing with Escape`);
-      try {
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
-        saveAgentRuntimeState(agent.id, { state: 'active' });
-        actions.push(`Stuck recovery: dismissed exclude-from-context dialog for ${agent.id}`);
-      } catch (err) {
-        console.error(`[deacon] Failed to send Escape to ${agent.id}:`, err);
-      }
-      continue;
-    }
-
-    // Parse thinking duration
-    const thinkingMs = parseThinkingDuration(tmuxOutput);
-    if (thinkingMs === null || thinkingMs < STUCK_THINKING_THRESHOLD_MS) {
-      // Not thinking, or thinking for an acceptable duration — clear recovery state
-      if (recovery && recovery.attempts > 0) {
-        stuckRecoveryState.delete(agent.id);
-      }
-      continue;
-    }
-
-    const thinkingMinutes = Math.round(thinkingMs / 60000);
-    const attempts = recovery?.attempts ?? 0;
-
-    // PAN-653: If the workspace is marked stuck (e.g. main diverged during approve),
-    // skip all recovery actions — Deacon must not respawn a stuck workspace.
-    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
-    const agentReviewStatus = getReviewStatusSync(agentIssueId);
-    if (agentReviewStatus?.stuck) {
-      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): workspace is stuck`);
-      continue;
-    }
-    if (agentReviewStatus?.deaconIgnored) {
-      console.log(`[deacon] Skipping stuck-thinking recovery for ${agent.id} (${agentIssueId}): deacon-ignored by operator`);
-      continue;
-    }
-
-    console.log(`[deacon] Work agent ${agent.id} stuck thinking for ${thinkingMinutes}m (attempt ${attempts + 1})`);
-
-    try {
-      if (attempts === 0) {
-        // First attempt: send Escape to cancel thinking
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'Escape'])} 2>/dev/null || true`);
-        actions.push(`Stuck recovery: sent Escape to ${agent.id} (thinking ${thinkingMinutes}m)`);
-      } else if (attempts === 1) {
-        // Second attempt: send Ctrl+C to interrupt
-        await execAsync(`${buildTmuxCommandString(['send-keys', '-t', agent.id, 'C-c'])} 2>/dev/null || true`);
-        actions.push(`Stuck recovery: sent Ctrl+C to ${agent.id} (thinking ${thinkingMinutes}m)`);
-      } else {
-        // Third+ attempt: kill and respawn
-        const launcherPath = join(AGENTS_DIR, agent.id, 'launcher.sh');
-        const agentState = getAgentStateSync(agent.id);
-        const workspace = agentState?.workspace;
-
-        if (!existsSync(launcherPath) || !workspace) {
-          console.error(`[deacon] Cannot respawn ${agent.id}: missing launcher.sh or workspace`);
-          actions.push(`Stuck recovery failed for ${agent.id}: missing launcher or workspace`);
-          continue;
-        }
-
-        // Kill the stuck tmux session
-        await Effect.runPromise(killSession(agent.id)).catch(() => { /* no stale session */ });
-
-        // Small delay to let tmux clean up
-        await new Promise(r => setTimeout(r, 1000));
-
-        // Respawn in a new tmux session with the same launcher
-        // Kill stale session first to prevent "duplicate session" error (PAN-430)
-        await Effect.runPromise(killSession(agent.id)).catch(() => { /* no stale session */ });
-        await Effect.runPromise(createSession(agent.id, workspace, `bash ${launcherPath}`, {
-          env: BLANKED_PROVIDER_ENV,
-        }));
-
-        // Reset recovery state since we respawned fresh
-        stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
-
-        actions.push(`Stuck recovery: respawned ${agent.id} (was stuck thinking ${thinkingMinutes}m, attempt ${attempts + 1})`);
-        console.log(`[deacon] Respawned stuck work agent ${agent.id}`);
-        continue;
-      }
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[deacon] Stuck recovery failed for ${agent.id}:`, msg);
-      actions.push(`Stuck recovery error for ${agent.id}: ${msg}`);
-    }
-
-    // Track this recovery attempt
-    stuckRecoveryState.set(agent.id, {
-      lastAttempt: now,
-      attempts: attempts + 1,
-    });
-  }
-
-  return actions;
+  return [];
 }
 
 // ============================================================================
@@ -948,6 +740,46 @@ const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
  * Track API-error recovery attempts per agent.
  */
 const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
+
+/**
+ * Context-window overflow is NOT a transient error. It surfaces as e.g.
+ * "API Error: 400 Your input exceeds the context window of this model." and
+ * nudging "continue" only re-sends the same oversized context for the same
+ * 400. The only recovery is to compact the conversation, then — once the
+ * agent is idle again — nudge it to resume from the compacted summary.
+ *
+ * This matters most for non-Anthropic models routed through CLIProxy
+ * (e.g. gpt-5.5): Claude Code's native auto-compact is keyed to a context
+ * window it can't determine for the proxied model, so it never fires and the
+ * backend's own limit produces a hard 400 instead.
+ */
+const CONTEXT_OVERFLOW_PATTERNS = [
+  'input exceeds the context window',
+  'exceeds the context window of this model',
+];
+
+/** Continuation nudge sent after a successful /compact. */
+const CONTEXT_OVERFLOW_CONTINUE_MSG =
+  'Your context was compacted to recover from a context-window overflow. ' +
+  'Continue from where you left off using the compacted summary and your ' +
+  'beads / continue.json — do NOT start over.';
+
+/** Let `/compact` finish (and the agent return to an idle prompt) before judging the result. */
+const CONTEXT_COMPACT_SETTLE_MS = 60_000;
+
+/** Give up compacting after this many attempts in one incident and escalate to stuck. */
+const MAX_CONTEXT_COMPACT_ATTEMPTS = 3;
+
+/**
+ * Per-session context-overflow recovery state. Present only while a /compact
+ * is in flight or being retried; deleted once the overflow clears (so a later
+ * overflow is a fresh incident) or on escalation. Kept separate from
+ * apiErrorRecoveryState so the transient-error path is untouched.
+ */
+export const contextOverflowRecoveryState: Map<
+  string,
+  { lastAttempt: number; attempts: number }
+> = new Map();
 
 /**
  * Check for agents (work agents, specialists, planning) that stopped due
@@ -991,6 +823,86 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
     const hasPrompt = tmuxOutput.includes('❯');
     if (!hasPrompt) continue;
+
+    // ── Context-window overflow recovery (distinct from transient errors) ──
+    // A 400 "input exceeds the context window" cannot be retried by continuing.
+    // Recover by compacting; once the compaction has settled and the overflow
+    // is gone, nudge the agent to resume. A loop guard escalates to stuck if
+    // /compact never clears the overflow.
+    {
+      const issueId = sessionName.startsWith('agent-')
+        ? sessionName.replace('agent-', '').toUpperCase()
+        : null;
+      const overflowBlocked = (() => {
+        if (!issueId) return false;
+        const st = getReviewStatusSync(issueId);
+        return Boolean(st?.stuck || st?.deaconIgnored);
+      })();
+      const ov = contextOverflowRecoveryState.get(sessionName);
+      // Judge overflow from only the recent tail: the error sits adjacent to the
+      // idle prompt when an agent stops, and after a /compact redraw the old
+      // error scrolls past this window — so a settled /compact that cleared the
+      // overflow won't be misread as "still overflowing" from stale scrollback.
+      const recentOutput = tmuxOutput.split('\n').slice(-40).join('\n');
+      const hasOverflow = CONTEXT_OVERFLOW_PATTERNS.some(p => recentOutput.includes(p));
+
+      if (!overflowBlocked) {
+        if (ov && (now - ov.lastAttempt) < CONTEXT_COMPACT_SETTLE_MS) {
+          // A /compact is in flight — give it time to finish before judging.
+          continue;
+        }
+
+        if (ov && !hasOverflow) {
+          // The previous /compact cleared the overflow → resume the agent and
+          // close out this incident (a later overflow starts fresh).
+          try {
+            await Effect.runPromise(sendKeys(sessionName, CONTEXT_OVERFLOW_CONTINUE_MSG));
+            console.log(`[deacon] Agent ${sessionName} resumed after context-overflow compaction`);
+            actions.push(`Context overflow recovery: resumed ${sessionName} after compaction`);
+          } catch (err) {
+            console.error(`[deacon] Failed to resume ${sessionName} after compaction:`, err);
+          }
+          contextOverflowRecoveryState.delete(sessionName);
+          continue;
+        }
+
+        if (hasOverflow) {
+          // Fresh overflow, or a settled /compact that did NOT clear it.
+          const attempts = ov?.attempts ?? 0;
+          if (attempts >= MAX_CONTEXT_COMPACT_ATTEMPTS) {
+            // Loop guard: /compact isn't clearing the overflow — escalate.
+            if (issueId) {
+              markWorkspaceStuck(issueId, 'context_overflow', { compactAttempts: attempts });
+            }
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'error',
+              message: `${sessionName} stuck: context-window overflow persisted after ${attempts} /compact attempts`,
+              issueId: issueId ?? undefined,
+            });
+            console.error(`[deacon] Agent ${sessionName} stuck after ${attempts} context-overflow compaction attempts — escalating`);
+            contextOverflowRecoveryState.delete(sessionName);
+            continue;
+          }
+
+          try {
+            await Effect.runPromise(sendKeys(sessionName, '/compact'));
+            contextOverflowRecoveryState.set(sessionName, { lastAttempt: now, attempts: attempts + 1 });
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'warn',
+              message: `${sessionName} hit context-window overflow — compacting to recover (attempt ${attempts + 1})`,
+              issueId: issueId ?? undefined,
+            });
+            console.log(`[deacon] Agent ${sessionName} hit context-window overflow — sent /compact (attempt ${attempts + 1})`);
+            actions.push(`Context overflow recovery: compacting ${sessionName} (attempt ${attempts + 1})`);
+          } catch (err) {
+            console.error(`[deacon] Failed to send /compact to ${sessionName}:`, err);
+          }
+          continue;
+        }
+      }
+    }
 
     const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
     if (!hasApiError) continue;
@@ -2765,133 +2677,6 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 }
 
 /**
- * PAN-1178: detect swarm slot PRs that merged into their parent feature branch
- * but whose `/api/swarm/slot-merged` callback never fired.
- *
- * Slot branches merge into `feature/<parent>`, NOT into main. Neither
- * `reconcileStaleMergeStatus` (which scans for branches merged to main) nor the
- * GitHub-app `reviewStatus.prUrl` patrol (which tracks the issue's single main
- * PR) ever sees them. With no detector, `postMergeLifecycle` is never called
- * for the slot branch, `onSlotMergeComplete` never runs, and the swarm's
- * auto-advance stalls — every wave then needs a manual `pan swarm <id>` plus a
- * hand-rolled `/api/swarm/slot-merged` POST.
- *
- * This patrol closes that gap. For every active swarm (a feature workspace
- * whose continue vBRIEF carries a `swarmRuntime` with at least one `running`
- * slot) it asks GitHub which PRs merged into the parent feature branch, then
- * fires `postMergeLifecycle(issueId, projectPath, slotBranch, { skipDeploy })`
- * for each running slot whose slot branch is among them — exactly the loopback
- * the merge-agent drives on the happy path.
- *
- * Re-firing is guarded two ways: the durable gate is the runtime slot status
- * itself (once `onSlotMergeComplete` flips the slot to `merged` it is no longer
- * `running`, so the patrol skips it), and a short per-branch cooldown bridges
- * the window while the async loopback POST is still in flight.
- */
-const recentSlotMergeFires = new Map<string, number>();
-const SLOT_MERGE_REFIRE_COOLDOWN_MS = 5 * 60 * 1000;
-
-interface MergedSlotPr {
-  number: number;
-  headRefName: string;
-  mergedAt: string | null;
-  url: string;
-}
-
-export async function detectMergedSwarmSlots(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { parseSlotBranch, postMergeLifecycle } = await import('./merge-agent.js');
-    const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
-    const { readContinueState } = await import('../vbrief/continue-state.js');
-
-    const now = Date.now();
-    // Drop cooldown entries that can no longer suppress anything, so the map
-    // stays bounded to slot branches fired within the last cooldown window.
-    for (const [branch, firedAt] of recentSlotMergeFires) {
-      if (now - firedAt >= SLOT_MERGE_REFIRE_COOLDOWN_MS) recentSlotMergeFires.delete(branch);
-    }
-
-    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-      // Slot sub-workspaces (`feature-<parent>-slot-N`) are not swarm parents.
-      if (/-slot-\d+$/i.test(issueId)) continue;
-
-      let runtime;
-      try {
-        const cont = await Effect.runPromise(readContinueState(workspacePath, issueId));
-        runtime = cont?.swarmRuntime;
-      } catch {
-        continue; // unreadable / malformed continue file — skip this workspace
-      }
-      if (!runtime) continue;
-
-      // Only `running` slots can have a lost slot-merged callback: a `pending`
-      // slot has no branch yet, and `merged`/`failed`/`failed-merge` slots are
-      // already terminal.
-      const runningSlots = runtime.slots.filter(slot => slot.status === 'running');
-      if (runningSlots.length === 0) continue;
-
-      const gh = resolveGitHubIssueSync(issueId);
-      if (!gh.isGitHub) continue;
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project) continue;
-
-      const issueLower = issueId.toLowerCase();
-      const featureBranch = `feature/${issueLower}`;
-
-      let mergedPrs: MergedSlotPr[];
-      try {
-        const { stdout } = await execFileAsync(
-          'gh',
-          ['pr', 'list', '--repo', `${gh.owner}/${gh.repo}`, '--base', featureBranch,
-            '--state', 'merged', '--json', 'number,headRefName,mergedAt,url', '--limit', '50'],
-          { cwd: project.projectPath },
-        );
-        mergedPrs = JSON.parse(stdout || '[]') as MergedSlotPr[];
-      } catch {
-        continue; // gh query failed — leave it for the next patrol cycle
-      }
-
-      // Index merged slot PRs by head branch for an O(1) per-slot lookup.
-      const mergedSlotPrs = new Map<string, MergedSlotPr>();
-      for (const pr of mergedPrs) {
-        if (!pr.mergedAt) continue;
-        const slotInfo = parseSlotBranch(pr.headRefName);
-        if (!slotInfo) continue;
-        // Defensive: the base branch matched but the head encodes a different
-        // parent (should not happen, but never fire across issues).
-        if (slotInfo.issueLower !== issueLower) continue;
-        mergedSlotPrs.set(pr.headRefName, pr);
-      }
-      if (mergedSlotPrs.size === 0) continue;
-
-      for (const slot of runningSlots) {
-        const slotBranch = `feature/${issueLower}-slot-${slot.slotId}`;
-        const pr = mergedSlotPrs.get(slotBranch);
-        if (!pr) continue; // this slot's PR has not merged — nothing to do
-
-        const lastFired = recentSlotMergeFires.get(slotBranch);
-        if (lastFired !== undefined && now - lastFired < SLOT_MERGE_REFIRE_COOLDOWN_MS) continue;
-        recentSlotMergeFires.set(slotBranch, now);
-
-        const msg = `Detected merged swarm slot PR #${pr.number} (${slotBranch}) — firing postMergeLifecycle for ${issueId} slot ${slot.slotId}`;
-        actions.push(msg);
-        console.log(`[deacon] ${msg}`);
-        // postMergeLifecycle routes slot branches straight to the loopback
-        // `/api/swarm/slot-merged` POST and returns; projectPath is unused on
-        // that path but kept for signature parity with the main-branch case.
-        postMergeLifecycle(issueId, project.projectPath, slotBranch, { skipDeploy: true }).catch(err =>
-          console.warn(`[deacon] postMergeLifecycle (swarm slot) failed for ${issueId} slot ${slot.slotId}: ${err}`),
-        );
-      }
-    }
-  } catch (err: any) {
-    console.warn(`[deacon] Error in detectMergedSwarmSlots: ${err.message}`);
-  }
-  return actions;
-}
-
-/**
  * PAN-1027 reverse direction: detect issues whose internal mergeStatus='merged' but
  * whose GitHub PR is NOT merged (open, closed-without-merge, or reverted). When the
  * dashboard previously detected a merge that later got reverted (or the deacon's
@@ -3476,24 +3261,43 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * PAN-1531: scanner narrowed to surface only `salvageable:*` stashes, which
+ * are the only kind that needs human attention. Hand-typed stashes, retired
+ * `pre-merge` / `pre-spawn` / `review-temp` residue, and other non-canonical
+ * entries are no longer flagged — they're inert in `refs/stash` and the
+ * operator can clean them up at their leisure via a future `pan stash audit`
+ * command.
+ *
+ * Also: git worktrees share `refs/stash` with the parent repo, so listing
+ * once at the project root is enough; iterating workspaces would yield the
+ * same stash N times. Take the project root from the first workspace; if
+ * none exist, scan nothing.
+ */
 export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
   const actions: string[] = [];
+  const seenProjectRoots = new Set<string>();
 
-  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+  for (const { workspacePath } of listFeatureWorkspaces()) {
     if (!existsSync(workspacePath)) continue;
 
+    // workspaces/feature-<id>/ → project root is two levels up
+    const projectRoot = workspacePath.replace(/\/workspaces\/[^/]+\/?$/, '');
+    if (seenProjectRoots.has(projectRoot)) continue;
+    seenProjectRoots.add(projectRoot);
+    if (!existsSync(projectRoot)) continue;
+
     try {
-      const stashes = await Effect.runPromise(listStashes(workspacePath));
+      const stashes = await Effect.runPromise(listStashes(projectRoot));
       for (const stash of stashes) {
-        if (stash.kind !== 'unknown') continue;
-        const message = `Non-canonical stash in ${issueId} (${workspacePath}): ${stash.ref} ${stash.message} — audit recommended`;
+        if (stash.kind !== 'salvageable') continue;
+        const message = `Salvageable stash in ${projectRoot}: ${stash.ref} ${stash.message} — review and recover or dismiss via workspace inspector`;
         console.warn(`[deacon] ${message}`);
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message });
         actions.push(message);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[deacon] Failed non-canonical stash scan for ${issueId}: ${message}`);
+      console.warn(`[deacon] Failed salvageable-stash audit for ${projectRoot}: ${message}`);
     }
   }
 
@@ -4488,6 +4292,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...resumeActions);
   for (const a of resumeActions) addLog('action', a, state.patrolCycle);
 
+  const orphanProposedActions = await reconcileOrphanProposedSpecs();
+  actions.push(...orphanProposedActions);
+  for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
+
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
@@ -4616,12 +4424,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...staleMergeActions);
   for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-1178: detect swarm slot PRs merged into a feature branch (not main) so
-  // the slot-merged loopback fires and the swarm's auto-advance is not stranded.
-  const swarmSlotActions = await detectMergedSwarmSlots();
-  actions.push(...swarmSlotActions);
-  for (const a of swarmSlotActions) addLog('action', a, state.patrolCycle);
-
   // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
   // (closed-without-merge, reopened after revert, or false positive from squash detection).
   // Without this, those issues get stuck because mergeStatus blocks all pipeline gates.
@@ -4691,6 +4493,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
     actions.push(...stashJanitorActions);
     for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
+  // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
+  // shared dolt remote, and there is no single Panopticon write site to hook —
+  // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
+  // debounced, skips missing files, and no-ops when nothing changed.
+  for (const { config: projectConfig } of listProjectsSync()) {
+    if (projectConfig.path) queueBeadsAutoCommit(projectConfig.path);
   }
 
   // Periodic agent state cleanup (PAN-154)
@@ -5024,36 +4835,30 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         continue;
       }
 
-      // PAN-977: headless review sub-role agents run via `claude --print` in a
-      // detached, HUP-immune launcher with NO tmux session. "No tmux session"
-      // is their normal steady state, not orphanhood — gating their liveness on
-      // sessionExists() resets them to stopped on every patrol and thrashes the
-      // convoy. Their lifecycle is owned by monitorReviewConvoySignals via the
-      // launcher pid. Here we only orphan-recover them once that launcher pid is
-      // actually gone (the launcher removes the pid file after it signals).
+      // PAN-1557: convoy reviewers are interactive — they own a tmux session
+      // (remain-on-exit on) like other specialists, so liveness is the session's
+      // pane, not a launcher pid. While the pane is alive the reviewer is working
+      // or idling attachably; a dead pane (Claude exited) or a missing session
+      // past the startup grace means it's done — fall through to mark stopped.
       if (state.reviewSubRole) {
-        const reviewerLauncherPid = join(AGENTS_DIR, dir, 'reviewer-launcher.pid');
-        if (existsSync(reviewerLauncherPid)) {
-          let launcherAlive = false;
+        if (sessionExistsSync(dir)) {
           try {
-            const pid = Number.parseInt(readFileSync(reviewerLauncherPid, 'utf-8').trim(), 10);
-            if (Number.isInteger(pid) && pid > 0) {
-              try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
-            }
-          } catch { launcherAlive = false; }
-          if (launcherAlive) continue; // launcher still working — not orphaned
+            const dead = ((await Effect.runPromise(listPaneValues(dir, '#{pane_dead}')))[0]?.trim() ?? '') === '1';
+            if (!dead) continue; // pane alive — still working / idling attachably
+            try { await Effect.runPromise(killSession(dir)); } catch { /* ignore */ }
+            logDeaconEventSync(`recoverOrphanedAgents: killed dead reviewer pane ${dir}`);
+          } catch {
+            continue; // can't check — assume alive
+          }
         } else {
-          // No pid file yet: the launcher either hasn't written it (startup
-          // race) or already finished and cleaned up. Give it a startup grace
-          // window keyed off startedAt before declaring the agent orphaned.
+          // No session yet — startup grace keyed off startedAt before orphaning.
           const startedMs = Date.parse(state.startedAt ?? '');
-          const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
-          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_LAUNCHER_GRACE_MS) {
+          const REVIEWER_STARTUP_GRACE_MS = 90_000;
+          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_STARTUP_GRACE_MS) {
             continue;
           }
         }
-        // Launcher pid is gone (or never appeared past the grace window) — the
-        // headless reviewer process has exited. Fall through to mark stopped.
+        // Session gone (or dead pane past grace) — fall through to mark stopped.
       } else if (sessionExistsSync(dir)) {
         // Planning sessions use remain-on-exit, so the tmux session persists after
         // Claude exits. Check if the pane's process is actually dead.
@@ -5079,9 +4884,7 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
         // spawns. Mirror the reviewer pattern (REVIEWER_LAUNCHER_GRACE_MS above)
         // with a generous window: patrol-interval (60s) + ready-poll (30s) +
         // headroom for tmux/launcher cold start.
-        const startedMs = Date.parse(state.startedAt ?? '');
-        const WORK_LAUNCHER_GRACE_MS = 120_000;
-        if (Number.isFinite(startedMs) && Date.now() - startedMs < WORK_LAUNCHER_GRACE_MS) {
+        if (isStartingWithinGrace(state)) {
           continue;
         }
         // Past the grace window with no tmux session — true orphan, fall through.
@@ -5091,7 +4894,12 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
       await Effect.runPromise(saveAgentState(state));
-      if (state.stoppedByUser !== true) {
+      // PAN-1530: only record failure markers for agents the auto-resume gate
+      // will actually retry. Planning agents are one-shot by design — writing
+      // lastFailureReason / lastFailureNextRetryAt for them pollutes state.json
+      // with a retry that will never fire and confuses the dashboard.
+      const isResumableRole = !dir.startsWith('planning-');
+      if (state.stoppedByUser !== true && isResumableRole) {
         const failedState = await Effect.runPromise(recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
         if (failedState) {
           notifyAgentStatusChanged(failedState, oldStatus, false);
@@ -5236,54 +5044,45 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     const synthesisAlive = await Effect.runPromise(sessionExists(state.reviewSynthesisAgentId));
     if (!synthesisAlive) continue;
 
-    // PAN-977: the review sub-role launcher is HUP-immune and intentionally
-    // outlives its tmux session, so "tmux session missing" is NOT a failure.
-    // The launcher writes its pid to reviewer-launcher.pid and removes it once
-    // it has signaled. Deacon checks the launcher process itself: while that
-    // pid is alive the launcher is still working (or about to signal) and
-    // Deacon stays out of the way. Deacon only steps in once the launcher pid
-    // is gone with no signal marker — the rare SIGKILL-before-signal case.
-    const launcherPidPath = join(AGENTS_DIR, agentId, 'reviewer-launcher.pid');
-    let launcherAlive = false;
-    if (existsSync(launcherPidPath)) {
-      try {
-        const pid = Number.parseInt(readFileSync(launcherPidPath, 'utf-8').trim(), 10);
-        if (Number.isInteger(pid) && pid > 0) {
-          try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
-        }
-      } catch { launcherAlive = false; }
-    }
+    // PAN-1557: convoy reviewers are interactive now — there is no headless
+    // launcher process / pid file. Liveness is the reviewer's own tmux session:
+    // while it's alive the reviewer is still working (or idling attachably after
+    // writing its report); once it's gone the reviewer has crashed or been
+    // reaped. The Stop-hook is the primary signal (touches reviewer-signaled +
+    // delivers REVIEWER_READY); Deacon is the backup for when that didn't fire.
+    const reviewerSessionAlive = (await Effect.runPromise(sessionExists(agentId)).catch(() => false))
+      && !(await Effect.runPromise(isPaneDead(agentId)).catch(() => true));
 
-    // Startup grace: give the launcher time to write its pid file before a
-    // missing pid is read as death (avoids racing the bash env setup).
-    const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
-    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_LAUNCHER_GRACE_MS;
+    // Startup grace: give the session time to come up before "gone" reads as death.
+    const REVIEWER_STARTUP_GRACE_MS = 90_000;
+    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_STARTUP_GRACE_MS;
 
     let signal: 'ready' | 'failed' | 'timeout' | null = null;
     let reason = '';
-    if (launcherAlive) {
-      // Launcher still running — only intervene if it has blown well past its
-      // deadline (genuinely wedged, e.g. a hung `pan tell`).
-      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_LAUNCHER_GRACE_MS) {
+    if (outputWrittenForThisRun) {
+      // Report exists for this run but the Stop-hook didn't signal (no fresh
+      // marker) — back it up with READY. Safe: the report is on disk.
+      signal = 'ready';
+    } else if (reviewerSessionAlive) {
+      // Still working or idling attachably. Only intervene if well past the
+      // deadline (genuinely wedged).
+      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_STARTUP_GRACE_MS) {
         signal = 'timeout';
-        reason = `reviewer launcher still running past deadline ${state.reviewDeadlineAt}`;
+        reason = `reviewer still running past deadline ${state.reviewDeadlineAt}`;
       } else {
         continue;
       }
     } else if (withinStartupGrace) {
-      // Launcher pid not written yet — too early to call it dead.
+      // Session not up yet — too early to call it dead.
       continue;
-    } else if (outputWrittenForThisRun) {
-      // Launcher died after writing the report but before signaling READY.
-      signal = 'ready';
     } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
       signal = 'timeout';
       reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
     } else {
-      // Launcher pid is gone, no report, before deadline → the launcher bash
-      // process was SIGKILLed before it could run its signal block.
+      // Session gone, no report, before deadline → reviewer crashed or exited
+      // before writing a report.
       signal = 'failed';
-      reason = 'reviewer launcher process died before signaling synthesis';
+      reason = 'reviewer session ended before writing a report';
     }
 
     if (!signal) continue;

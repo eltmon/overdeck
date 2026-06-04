@@ -287,15 +287,21 @@ describe('FlywheelPage', () => {
     });
     expect(screen.getByText('live')).toHaveClass('text-success');
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(15_000);
-    });
-    expect(screen.getByText('last tick 35s ago')).toHaveClass('text-warning');
+    // Thresholds: live ≤ 1min, warning ≤ 20min, stalled > 20min (aligned with
+    // the orchestrator's 20-minute periodic-sweep contract). lastTickAt is
+    // 12:03:00, start is 12:03:20 (20s ago → live).
 
+    // → 12:05:00, age 2min → warning.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(100_000);
     });
-    expect(screen.getByText('stalled — last tick 1m ago')).toHaveClass('text-destructive');
+    expect(screen.getByText('last tick 2m ago')).toHaveClass('text-warning');
+
+    // → 12:25:00, age 22min → stalled.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_200_000);
+    });
+    expect(screen.getByText('stalled — last tick 22m ago')).toHaveClass('text-destructive');
   });
 
   it('clears stale live status when the subscription emits null', () => {
@@ -345,7 +351,7 @@ describe('FlywheelPage', () => {
   });
 
   it('renders the Stats tab and switches back to existing panes without losing status data', () => {
-    render(<FlywheelPage />);
+    renderFlywheelPage(<FlywheelPage />);
 
     act(() => {
       mocks.listener?.(status);

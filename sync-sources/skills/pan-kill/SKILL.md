@@ -121,9 +121,11 @@ tmux attach -t agent-ISSUE-123
 # Or capture the full session
 tmux capture-pane -t agent-ISSUE-123 -p -S - > agent-output.txt
 
-# Save workspace state
+# Preserve workspace state (per stash-discipline: commit or use salvageable: prefix)
 cd /path/to/workspaces/ISSUE-123
-git stash  # Save uncommitted changes
+git add -A && git commit -m "WIP: state before kill"
+# OR, for humans only — explicit salvageable stash:
+# git stash push -m "salvageable:ISSUE-123:$(date -u +%Y-%m-%dT%H:%M:%SZ):pre-kill"
 ```
 
 ## After Killing

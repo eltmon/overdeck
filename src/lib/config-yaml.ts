@@ -18,10 +18,15 @@ import yaml from 'js-yaml';
 import { parseDocument } from 'yaml';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
-import { MODEL_DEPRECATIONS, resolveModelIdSync } from './model-capabilities.js';
+import { MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync, type EffortLevel } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
+import {
+  BACKGROUND_AI_FEATURES,
+  defaultBackgroundAiFeatures,
+  type BackgroundAiFeature,
+} from './background-ai/registry.js';
 export type { SubscriptionPlan, AuthMode };
 
 /**
@@ -75,6 +80,23 @@ export interface MemoryConfig {
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
   worker_concurrency?: number;
+}
+
+/**
+ * Background AI configuration (PAN-1583).
+ *
+ * `cheap_mode` is the high-level low-cost master switch: when true, every
+ * optional background AI feature is disabled in one click, regardless of its
+ * individual `features.<key>` toggle. Individual toggles let the user enable or
+ * disable each background AI feature independently when cheap mode is off.
+ *
+ * `cheap_mode` defaults ON (PAN-1589): background AI is off until the user
+ * opts in. While it is on, the dashboard status bar shows a "Low-cost mode"
+ * pill linking to this config section.
+ */
+export interface BackgroundAiConfig {
+  cheap_mode?: boolean;
+  features?: Partial<Record<BackgroundAiFeature, boolean>>;
 }
 
 export const COMPLIANCE_MODES = ['off', 'advisory', 'enforcing'] as const;
@@ -293,7 +315,8 @@ export interface RoleSubConfig {
   model: ModelRef;
 }
 
-export type RoleEffort = 'low' | 'medium' | 'high';
+export type RoleEffort = EffortLevel;
+export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
@@ -324,14 +347,14 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   review: 'workhorse:expensive',
   test: 'workhorse:mid',
   ship: 'workhorse:mid',
-  flywheel: 'claude-opus-4-7',
+  flywheel: 'claude-opus-4-8',
   // Strike merges directly to main — precision matters, so default to the
   // expensive workhorse slot (same as plan/review).
   strike: 'workhorse:expensive',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
-  expensive: 'claude-opus-4-7',
+  expensive: 'claude-opus-4-8',
   mid: 'claude-sonnet-4-6',
   cheap: 'claude-haiku-4-5',
 };
@@ -362,7 +385,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   strike: { model: 'workhorse:expensive' },
   flywheel: {
     harness: 'claude-code',
-    model: 'claude-opus-4-7',
+    model: 'claude-opus-4-8',
     effort: 'high',
     minAgents: 20,
     maxAgents: 30,
@@ -464,6 +487,9 @@ export interface YamlConfig {
 
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
+
+  /** Background AI feature toggles + low-cost master switch (PAN-1583) */
+  background_ai?: BackgroundAiConfig;
 
   /** Memory-first compliance audit configuration */
   compliance?: ComplianceConfig;
@@ -693,6 +719,14 @@ export interface NormalizedConfig {
     workerConcurrency: number;
   };
 
+  /** Background AI feature toggles + low-cost master switch (PAN-1583) */
+  backgroundAi: {
+    /** Low-cost master switch: when true, all optional background AI is off. */
+    cheapMode: boolean;
+    /** Per-feature enablement, consulted by `isBackgroundFeatureEnabled`. */
+    features: Record<BackgroundAiFeature, boolean>;
+  };
+
   /** Memory-first compliance audit configuration */
   compliance: NormalizedComplianceConfig;
 
@@ -916,6 +950,11 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
+  },
+  backgroundAi: {
+    // PAN-1589: off by default — background AI stays gated until the user opts in.
+    cheapMode: true,
+    features: defaultBackgroundAiFeatures(),
   },
   compliance: {
     mode: 'advisory',
@@ -1458,11 +1497,20 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
         ...(existing?.sub ?? {}),
         ...(roleConfig.sub ?? {}),
       };
-      result.roles[role] = {
+      const mergedRoleConfig = {
         ...existing,
         ...roleConfig,
         sub: Object.keys(sub).length > 0 ? sub : undefined,
       };
+      if (
+        roleConfig.maxAgents !== undefined &&
+        roleConfig.minAgents === undefined &&
+        mergedRoleConfig.minAgents !== undefined &&
+        mergedRoleConfig.minAgents > roleConfig.maxAgents
+      ) {
+        mergedRoleConfig.minAgents = roleConfig.maxAgents;
+      }
+      result.roles[role] = mergedRoleConfig;
     }
   }
 }
@@ -1471,8 +1519,8 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code or pi`);
   }
-  if (roleConfig.effort !== undefined && roleConfig.effort !== 'low' && roleConfig.effort !== 'medium' && roleConfig.effort !== 'high') {
-    throw new Error(`config.yaml: roles.${role}.effort must be low, medium, or high`);
+  if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
+    throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
   }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
@@ -1506,7 +1554,15 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
     if (roleConfig.model) {
-      derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+      const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+      if (roleConfig.effort !== undefined) {
+        const supported = getModelEffortLevelsSync(resolvedModel);
+        if (supported !== undefined && !supported.includes(roleConfig.effort)) {
+          throw new Error(
+            `config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
+          );
+        }
+      }
     }
     for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
       if (subConfig.model && subConfig.model !== PARENT_MODEL_REF) {
@@ -1538,6 +1594,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
       sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
       workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
+    },
+    backgroundAi: {
+      cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
+      features: { ...DEFAULT_CONFIG.backgroundAi.features },
     },
     compliance: {
       mode: DEFAULT_CONFIG.compliance.mode,
@@ -1955,6 +2015,21 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (s.batch_window_seconds !== undefined) {
         result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+      }
+    }
+
+    // Merge background AI feature toggles + low-cost master switch (PAN-1583)
+    if (config.background_ai) {
+      if (typeof config.background_ai.cheap_mode === 'boolean') {
+        result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
+      }
+      if (config.background_ai.features) {
+        for (const feature of BACKGROUND_AI_FEATURES) {
+          const value = config.background_ai.features[feature];
+          if (typeof value === 'boolean') {
+            result.backgroundAi.features[feature] = value;
+          }
+        }
       }
     }
 

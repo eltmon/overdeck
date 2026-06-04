@@ -90,6 +90,14 @@ export type SkillDimension =
   | 'context-length'; // Max context window
 
 /**
+ * Canonical effort/reasoning levels accepted by Claude Code's `--effort` flag.
+ * `xhigh` was added in Opus 4.7 (between `high` and `max`); `max` predates it
+ * (Opus 4.6+/Sonnet 4.6). This is the single source of truth for the union —
+ * `RoleEffort` in config-yaml.ts aliases it.
+ */
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/**
  * Capability profile for a single model
  */
 type CapabilityModelId = ModelId;
@@ -109,6 +117,13 @@ export interface ModelCapability {
   contextWindow: number;
   /** Minimum subscription plan required to access this model via OAuth (undefined = API key only or no tier restriction) */
   minTier?: SubscriptionPlan;
+  /**
+   * Effort levels this model accepts via Claude Code's `--effort` flag.
+   * Undefined means the levels aren't enumerated for this model — callers treat
+   * that as "no model-specific restriction" and accept the full {@link EffortLevel}
+   * set. Populate only where there's ground truth (see docs/research/*-work-type-fit.md).
+   */
+  effortLevels?: readonly EffortLevel[];
   /** Additional notes about this model's strengths */
   notes?: string;
 }
@@ -127,6 +142,29 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  'claude-opus-4-8': {
+    model: 'claude-opus-4-8',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 4.8',
+    costPer1MTokens: 45.0, // Same pricing tier as Opus 4.7/4.6 — verify at launch
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 98,
+      'code-review': 99,
+      debugging: 98,
+      planning: 99,
+      documentation: 96,
+      testing: 95,
+      security: 99,
+      performance: 93,
+      synthesis: 99,
+      speed: 40,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks.',
+  },
 
   'claude-opus-4-7': {
     model: 'claude-opus-4-7',
@@ -147,7 +185,8 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 38,
       'context-length': 95,
     },
-    notes: 'Successor to Opus 4.6. Supports xhigh and max effort levels for extended thinking. Best for deepest reasoning and long-horizon coding tasks.',
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks.',
   },
 
   'claude-opus-4-6': {
@@ -169,6 +208,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 40, // Slower but 76% more token efficient
       'context-length': 95,
     },
+    effortLevels: ['low', 'medium', 'high', 'max'],
     notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
   },
 
@@ -191,6 +231,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 95,
     },
+    effortLevels: ['low', 'medium', 'high'],
     notes: 'Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning.',
   },
 
@@ -924,6 +965,25 @@ export function getModelCapabilitySync(model: ModelId): ModelCapability {
 
 export function hasModelCapabilitySync(model: ModelId | string): boolean {
   return model in MODEL_CAPABILITIES;
+}
+
+/**
+ * Effort levels a model accepts, or `undefined` when not enumerated for that
+ * model (treat undefined as "no model-specific restriction"). Resolves
+ * deprecated IDs first so callers can pass raw config refs.
+ */
+export function getModelEffortLevelsSync(model: ModelId | string): readonly EffortLevel[] | undefined {
+  const resolved = resolveModelIdSync(String(model));
+  return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.effortLevels;
+}
+
+/**
+ * Whether a model accepts the given effort level. Returns true when the model
+ * has no enumerated effort levels (permissive fallback — see {@link getModelEffortLevelsSync}).
+ */
+export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
+  const levels = getModelEffortLevelsSync(model);
+  return levels === undefined || levels.includes(effort);
 }
 
 /**

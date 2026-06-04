@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
+import { isAwaitingInput } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
@@ -131,7 +132,7 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
-  if (agent.hasPendingQuestion) return { variant: 'INPUT' };
+  if (isAwaitingInput(agent)) return { variant: 'INPUT' };
 
   switch (agent.role) {
     case 'plan':

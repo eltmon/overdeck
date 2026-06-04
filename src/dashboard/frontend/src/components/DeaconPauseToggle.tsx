@@ -63,18 +63,25 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
     : 'Freeze Deacon — stop all patrol cycles globally';
 
   if (compact) {
+    // Paused is an attention condition (all automatic patrol/recovery is off),
+    // so it reads as a warning pill with a pulsing "!" badge — not the calm
+    // informational style. Running is a subtle icon button (PAN-1591).
     return (
       <button
         onClick={onClick}
         disabled={busy}
-        className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${
+        className={`relative inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
           paused
-            ? 'text-sky-300 bg-sky-900/60 hover:bg-sky-800/80 border border-sky-500/60'
-            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            ? 'rounded-full border border-warning/50 bg-warning/15 px-2.5 py-1 text-xs font-medium text-warning-foreground hover:bg-warning/25'
+            : 'rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground'
         }`}
         title={title}
       >
-        {paused ? <Snowflake className="w-3.5 h-3.5" /> : <Snowflake className="w-3.5 h-3.5" />}
+        <Snowflake className="h-3.5 w-3.5" />
+        {paused && <span>Deacon frozen</span>}
+        {paused && (
+          <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold leading-none text-white ring-2 ring-background">!</span>
+        )}
       </button>
     );
   }

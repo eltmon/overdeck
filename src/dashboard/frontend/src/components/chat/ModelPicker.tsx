@@ -29,7 +29,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
  */
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
-  'pi': 'gpt-5.4',
+  'pi': 'gpt-5.5',
 };
 
 /**
@@ -89,10 +89,11 @@ interface ModelGroup {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
   'claude-sonnet-4-6': ['low', 'medium', 'high'],
@@ -121,6 +122,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high'] },
       { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'max'] },
@@ -406,12 +408,14 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                   const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
                   const isActive = harness === opt.id;
                   const willAutoFlip = !decision.allowed;
-                  const subtitle = willAutoFlip && decision.reason ? decision.reason : opt.description;
                   const handleClick = () => {
                     if (isActive) return;
+                    // Keep the dropdown OPEN after a harness switch so the user
+                    // sees the checkmark move and — when the model is auto-flipped
+                    // below — sees the new model highlighted and can override it
+                    // in the same interaction instead of being slammed shut.
                     if (decision.allowed) {
                       onHarnessChange(opt.id);
-                      setOpen(false);
                       return;
                     }
                     // Auto-resolve: pick a model the new harness can run.
@@ -431,7 +435,6 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       if (replacementModel !== value) onChange(replacementModel, replacementEffort);
                       onHarnessChange(opt.id);
                     }
-                    setOpen(false);
                   };
                   return (
                     <button
@@ -446,7 +449,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       </span>
                       <span className={styles.harnessOptionBody}>
                         <span className={styles.harnessOptionName}>{opt.label}</span>
-                        {subtitle && <span className={styles.harnessOptionDesc}>{subtitle}</span>}
+                        {opt.description && <span className={styles.harnessOptionDesc}>{opt.description}</span>}
+                        {willAutoFlip && decision.reason && (
+                          <span className={styles.harnessOptionNote}>{decision.reason}</span>
+                        )}
                       </span>
                     </button>
                   );

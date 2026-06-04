@@ -30,33 +30,21 @@ import type { DiffsThemeNames } from '@pierre/diffs';
 import { resolveMarkdownFileLinkMeta, shouldPreserveMarkdownFileLinkHref, splitMarkdownTextFileLinks, type MarkdownFileLinkMeta } from '../../markdown-links';
 import { MarkdownFileLink } from './MarkdownFileLink';
 import { useFilePathExists } from '../../hooks/useFilePathExists';
+import { LRUCache } from '../../lib/lruCache';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
 
-class LRUCache<K, V> {
-  private readonly map = new Map<K, V>();
-  constructor(private readonly capacity: number) {}
+const MAX_HIGHLIGHT_CACHE_ENTRIES = 500;
+const MAX_HIGHLIGHT_CACHE_MEMORY_BYTES = 50 * 1024 * 1024;
+const highlightCache = new LRUCache<string>(
+  MAX_HIGHLIGHT_CACHE_ENTRIES,
+  MAX_HIGHLIGHT_CACHE_MEMORY_BYTES,
+);
 
-  get(key: K): V | undefined {
-    const val = this.map.get(key);
-    if (val !== undefined) {
-      this.map.delete(key);
-      this.map.set(key, val);
-    }
-    return val;
-  }
-
-  set(key: K, value: V): void {
-    if (this.map.has(key)) this.map.delete(key);
-    else if (this.map.size >= this.capacity) {
-      this.map.delete(this.map.keys().next().value!);
-    }
-    this.map.set(key, value);
-  }
+function estimateHighlightedSize(html: string, code: string): number {
+  return Math.max(html.length * 2, code.length * 3);
 }
-
-const highlightCache = new LRUCache<string, string>(500);
 
 /** FNV-1a 32-bit hash — fast cache key for code blocks */
 function fnv1a32(str: string): number {
@@ -157,7 +145,7 @@ async function highlightCode(
   const key = cacheKey(code, lang);
   if (!isStreaming) {
     const cached = highlightCache.get(key);
-    if (cached !== undefined) return cached;
+    if (cached !== null) return cached;
   }
 
   try {
@@ -168,7 +156,7 @@ async function highlightCode(
       lang: lang || 'text',
       theme: 'github-light',
     });
-    if (!isStreaming) highlightCache.set(key, html);
+    if (!isStreaming) highlightCache.set(key, html, estimateHighlightedSize(html, code));
     return html;
   } catch {
     // Unknown language — return escaped plaintext

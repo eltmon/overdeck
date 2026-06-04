@@ -112,11 +112,48 @@ describe('ClaudeCodeTranscriptSource', () => {
 });
 
 describe('PiTranscriptSource', () => {
-  it('is a no-op until the pi transcript surface is defined', async () => {
-    const source = new PiTranscriptSource();
+  it('resolves active Pi work-agent transcripts from Pi session metadata', async () => {
+    const source = new PiTranscriptSource({
+      listAgents: async () => [
+        agent({ id: 'agent-pi', harness: 'pi', sessionId: 'pi-session' }),
+        agent({ id: 'agent-claude', harness: 'claude-code', sessionId: 'claude-session' }),
+      ],
+      resolveTranscriptPath: async (_agent, sessionId) => `/tmp/${sessionId}.jsonl`,
+      statTranscript: async () => ({ size: 123, mtimeMs: 456 }),
+    });
 
-    expect(await source.getActiveTranscripts()).toEqual([]);
-    expect(source.parseDelta(jsonl({ type: 'user' }))).toEqual([]);
+    expect(await source.getActiveTranscripts()).toEqual([{
+      agentId: 'agent-pi',
+      sessionId: 'pi-session',
+      transcriptPath: '/tmp/pi-session.jsonl',
+      identity: {
+        projectId: 'panopticon-cli',
+        workspaceId: 'feature-pan-1052',
+        issueId: 'PAN-1052',
+        runId: 'agent-pi',
+        sessionId: 'pi-session',
+        agentRole: 'work',
+        agentHarness: 'pi',
+      },
+      harness: 'pi',
+      size: 123,
+      mtimeMs: 456,
+    }]);
+  });
+
+  it('parses Pi-format deltas with the shared Pi transcript extractor', () => {
+    const source = new PiTranscriptSource();
+    const complete = [
+      jsonl({ type: 'session', id: 'pi-session' }),
+      jsonl({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: 'fix memory ingestion' }] } }),
+      jsonl({ type: 'message', message: { role: 'assistant', content: [{ type: 'text', text: 'updated transcript-source' }, { type: 'toolCall', name: 'edit' }] } }),
+    ].join('');
+
+    expect(source.parseDelta(`${complete}{"partial"`, 100)).toEqual([{
+      compressedText: 'U: fix memory ingestion\nA: updated transcript-source\n[tool_use: edit]',
+      eventsConsumed: 2,
+      lastFullLineOffset: 100 + Buffer.byteLength(complete, 'utf8'),
+    }]);
   });
 });
 

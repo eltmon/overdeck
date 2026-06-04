@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, packageRoot } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, getAgentSessionsSync, getAgentSessions, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, waitForClaudePrompt, setOption } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -16,7 +16,7 @@ import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
-import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfigSync } from './config.js';
@@ -96,7 +96,6 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
 }
 
 async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code' | 'pi' | undefined): Promise<string[]> {
-  if (harness === 'pi') return [];
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspace);
   try {
@@ -106,6 +105,16 @@ async function claudeSystemPromptFiles(workspace: string, harness: 'claude-code'
     if (!isNodeNotFound(error)) throw error;
   }
   files.push(await ensureSessionContextBriefingFile());
+
+  // PAN-1566: Pi also receives the rendered global context layer.
+  if (harness === 'pi') {
+    const { piGlobalContextFile } = await import('./context-layers/index.js');
+    const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+
   return files;
 }
 
@@ -197,17 +206,88 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
 }
 
 /**
+ * Inject prompt-time memory context into a Pi prompt (PAN-1546).
+ * Mirrors Claude Code's UserPromptSubmit hook behaviour: every follow-up
+ * prompt gets relevant memory surfaced via RAG.
+ */
+async function injectPiPromptTimeMemory(agentId: string, prompt: string): Promise<string> {
+  if (!prompt.trim()) return prompt;
+
+  const agentState = getAgentStateSync(agentId);
+  if (!agentState || !agentState.workspace || !agentState.issueId) {
+    return prompt;
+  }
+
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(agentState.workspace),
+      workspaceId: basename(agentState.workspace),
+      issueId: agentState.issueId,
+      runId: agentId,
+      sessionId: agentId,
+      agentRole: agentState.role ?? 'work',
+      agentHarness: agentState.harness ?? 'pi',
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
+    if (result.context) {
+      return `${result.context}\n\n---\n\n${prompt}`;
+    }
+  } catch (error) {
+    console.warn(`[agents] Prompt-time memory injection failed for ${agentId}:`, error instanceof Error ? error.message : String(error));
+  }
+  return prompt;
+}
+
+/**
+ * Prompt-time memory injection for a Pi CONVERSATION follow-up (PAN-1546).
+ *
+ * The rpc/work-agent path (injectPiPromptTimeMemory) reads agent-state.json,
+ * which conversations do not have — they deliver follow-ups via tmux
+ * paste-buffer, not the FIFO. This builds the memory identity from the
+ * conversation's cwd + issueId instead. Only issue-linked conversations have
+ * memory to surface; everything else (and any failure) passes through
+ * unchanged so a memory hiccup can never block a message.
+ */
+export async function injectPiConversationMemory(
+  opts: { cwd: string; issueId?: string | null; conversationName: string },
+  prompt: string,
+): Promise<string> {
+  if (!prompt.trim() || !opts.issueId || !opts.cwd) return prompt;
+  try {
+    const identity: MemoryIdentity = {
+      projectId: inferMemoryProjectId(opts.cwd),
+      workspaceId: basename(opts.cwd),
+      issueId: opts.issueId,
+      runId: opts.conversationName,
+      sessionId: opts.conversationName,
+      agentRole: 'work',
+      agentHarness: 'pi',
+    };
+    const { injectPromptTimeMemory } = await import('./memory/injection.js');
+    const result = await injectPromptTimeMemory({ prompt, identity, surface: 'user-prompt' });
+    if (result.context) {
+      return `${result.context}\n\n---\n\n${prompt}`;
+    }
+  } catch (error) {
+    console.warn(`[agents] Conversation memory injection failed for ${opts.conversationName}:`, error instanceof Error ? error.message : String(error));
+  }
+  return prompt;
+}
+
+/**
  * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
  * Pi never reads tmux input — pasting prompts there is a no-op as far as the
  * model is concerned. Throws if Pi never reached readiness within the timeout.
  */
 async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const augmentedPrompt = await injectPiPromptTimeMemory(agentId, prompt);
   const ready = await waitForPiAgentReady(agentId, timeoutSec);
   if (!ready) {
     throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
   }
   try {
-    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: prompt });
+    writePiCommandSync(agentId, { id: randomUUID(), type: 'prompt', message: augmentedPrompt });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
@@ -269,6 +349,7 @@ export async function getAgentRuntimeBaseCommand(
   agentName?: string,
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -282,6 +363,7 @@ export async function getAgentRuntimeBaseCommand(
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
+  const effortFlag = effort ? ` --effort ${effort}` : '';
   // PAN-982: When agentDefinition is provided, pass it directly to --agent.
   // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
   // Still pass --model when launching with an agent definition so explicit model
@@ -305,9 +387,9 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelIdSync(resolvedModel)}${effortFlag}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -317,9 +399,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${effortFlag}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${effortFlag}${nameFlag}`;
 }
 
 /**
@@ -355,7 +437,7 @@ export async function getRoleRuntimeBaseCommand(
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
-  effort?: 'low' | 'medium' | 'high',
+  effort?: RoleEffort,
 ): Promise<string> {
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
@@ -375,7 +457,10 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
 
-  const printFlag = role === 'review' && subRole ? ' --print' : '';
+  // PAN-1557: convoy sub-reviewers now run as interactive, attachable sessions
+  // (prompt delivered via tmux, completion signalled by the Stop-hook) instead
+  // of headless `claude --print`. No role uses --print anymore.
+  const printFlag = '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
@@ -540,7 +625,7 @@ function getReadySignalPath(agentId: string): string {
 /**
  * Clear ready signal before spawning (clean slate)
  */
-function clearReadySignal(agentId: string): void {
+export function clearReadySignal(agentId: string): void {
   const readyPath = getReadySignalPath(agentId);
   if (existsSync(readyPath)) {
     try {
@@ -553,11 +638,18 @@ function clearReadySignal(agentId: string): void {
 
 /**
  * Wait for agent to be ready (async - non-blocking).
- * Primary: ready.json written by SessionStart hook.
- * Fallback: tmux pane shows Claude's interactive prompt indicator.
- * Returns true if ready signal received, false if timeout.
+ *
+ * Hook-driven (PAN-1594): readiness is signaled by `ready.json`, written by the
+ * session-start hook (Claude) / Pi extension when the session reaches the
+ * prompt, and cleared by clearReadySignal() before each (re)launch — so its
+ * presence means the *current* session is ready for input. There is no tmux
+ * pane-scrape fallback and no dependency on permission mode (the old fallback
+ * matched the bypass-permissions footer `⏵⏵` / `bypass permissions on`, which
+ * silently broke readiness for every non-bypass agent).
+ *
+ * Returns true if the ready signal arrives within the timeout, false otherwise.
  */
-async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
+export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
   for (let i = 0; i < timeoutSeconds; i++) {
@@ -565,28 +657,44 @@ async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise
 
     if (existsSync(readyPath)) {
       try {
-        const content = readFileSync(readyPath, 'utf-8');
-        const signal = JSON.parse(content);
-        if (signal.ready === true) {
+        const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
+        // Accept both the Claude hook shape ({ ready: true, ... }) and the Pi
+        // extension shape ({ agentId, sessionId, ... } with no `ready` field).
+        if (signal && typeof signal === 'object' && signal.ready !== false) {
           return true;
         }
       } catch {
-        // File exists but invalid - keep waiting
+        // File exists but mid-write / invalid — keep waiting.
       }
     }
-
-    // Fallback: check tmux pane for Claude's interactive prompt indicator.
-    // ready.json is currently not written by any hook (PAN-759), so this is the
-    // primary detection path for resumed/fresh-started agents.
-    try {
-      const pane = await Effect.runPromise(capturePane(agentId, 200));
-      if (pane.includes('bypass permissions on') || pane.includes('⏵⏵')) {
-        return true;
-      }
-    } catch { /* non-fatal — session may not exist yet */ }
   }
 
   return false;
+}
+
+/**
+ * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
+ * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
+ * elapses. Returns true if idle was observed.
+ *
+ * PAN-1594/1596: this is the hook-derived "is the agent idle right now" check.
+ * It replaced the tmux pane-scrape `waitForClaudePrompt` (since removed). Works
+ * for any hook-instrumented session — agents AND conversations (`conv-*`), which
+ * feed the runtime mirror once their heartbeat POSTs authenticate (PAN-1596). No
+ * dependency on tmux output or permission mode.
+ *
+ * Distinct from waitForReadySignal: that answers the one-time "has this
+ * (re)launched session reached the prompt" (ready.json gate, used by the
+ * conversation reattach/fork paths); this answers "is the running agent idle at
+ * the prompt right now".
+ */
+export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (getAgentRuntimeStateSync(agentId)?.state === 'idle') return true;
+    await new Promise(r => setTimeout(r, 250));
+  } while (Date.now() < deadline);
+  return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
 export interface AgentState {
@@ -1956,12 +2064,14 @@ export interface SpawnOptions {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Explicit work type ID (overrides phase-based detection)
 
-  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
-  // and the one-agent-per-issue uniqueness check is scoped to the slot.
-  slotId?: number;
-  swarmItemId?: string; // vBRIEF item ID this slot is working on
+  // PAN-1517: swarm slot fields removed (slotId, swarmItemId). Parallelism
+  // is now in-context via subagents (see roles/work.md), not via slot agents.
+  // `allowHost` (workspace-isolation override) stays — it predates the swarm
+  // runtime and is used by review/test/ship agents independently.
   allowHost?: boolean;
   flywheelRunId?: string;
+  /** Claude Code `--effort` level for the spawned session (work/strike). */
+  effort?: RoleEffort;
 }
 
 export interface SpawnRunOptions {
@@ -1987,7 +2097,7 @@ export interface SpawnRunOptions {
   reviewOutputPath?: string;
   allowHost?: boolean;
   registerConversation?: boolean;
-  effort?: 'low' | 'medium' | 'high';
+  effort?: RoleEffort;
   resumeSessionId?: string;
   flywheelRunId?: string;
 }
@@ -2041,13 +2151,44 @@ export async function buildCavemanExports(
  * (DEFAULT_WORKHORSES / DEFAULT_ROLES) — anything that still raises here
  * is a real configuration bug the user must see.
  */
+/**
+ * Models that are known-broken for autonomous *work* agents and must never be
+ * used to spawn one, even if a project pins them in config. The gate falls back
+ * to WORK_AGENT_FALLBACK_MODEL (loudly) for the work role when the model wasn't
+ * an explicit per-spawn override.
+ *
+ * Empty as of PAN-1584: gpt-5.5 used to wedge at launch with CLIProxy "System
+ * messages are not allowed", which was a stale CLIProxyAPI binary (6.9.45)
+ * mis-translating Claude Code's request to the Codex backend. Upgrading the
+ * pinned CLIProxyAPI to v7.1.39 (+ a version-aware installer) fixed it; gpt-5.5
+ * work agents now launch clean under the claude-code harness. The mechanism is
+ * retained for any future known-broken model. (Pi-harness gpt-5.5 was not
+ * re-verified in this pass — re-add 'gpt-5.5' here if a Pi init hang resurfaces.)
+ */
+const WORK_AGENT_BROKEN_MODELS = new Set<string>([]);
+/** Safe fallback when a work agent's resolved model is work-broken. */
+const WORK_AGENT_FALLBACK_MODEL = 'claude-sonnet-4-6';
+
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
   const modelOverride = normalizeModelOverrideSync(options.model);
-  if (modelOverride) {
-    return modelOverride;
+  const resolved = modelOverride
+    ? modelOverride
+    : requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+
+  // Work-agent safety net: a config pin (or smart-selection) must not spawn a
+  // work agent on a model that is known to wedge for the work role. Fall back
+  // loudly rather than launch a dead agent. Only applies to the work role and
+  // only when the model wasn't an explicit, deliberate per-spawn override.
+  const role = options.role ?? 'work';
+  if (role === 'work' && !modelOverride && WORK_AGENT_BROKEN_MODELS.has(resolved)) {
+    console.warn(
+      `[determineModel] resolved work model "${resolved}" is known-broken for work agents; ` +
+      `falling back to "${WORK_AGENT_FALLBACK_MODEL}". Update roles.work.model in config to silence this.`,
+    );
+    return WORK_AGENT_FALLBACK_MODEL;
   }
 
-  return requireModelOverrideSync(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
+  return resolved;
 }
 
 /**
@@ -2170,6 +2311,8 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
   extraEnvExports?: string[];
+  /** Claude Code `--effort` level threaded into the launcher command. */
+  effort?: RoleEffort;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
@@ -2278,7 +2421,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -2360,13 +2503,6 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
-/**
- * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
- * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
- * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
- */
-const REVIEW_SUBROLE_TIMEOUT_SECONDS = 30 * 60;
-
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,
@@ -2383,14 +2519,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
   const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
 
   if (allowHost) {
+    // PAN-1556: host-override is a per-spawn detail, not user-facing activity —
+    // it fired once per convoy member and buried real feed items (conversations).
+    // Keep the console.warn for debugging; do not emit to the session feed.
     console.warn(`[agents] ${message}`);
-    emitActivityEntrySync({
-      source: role,
-      level: 'warn',
-      issueId: normalizedIssue,
-      message: `agent-spawn-host-override: ${normalizedIssue}`,
-      details,
-    });
     return;
   }
 
@@ -2418,6 +2550,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
+      effort: options.effort,
     });
   }
 
@@ -2483,8 +2616,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
-  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
+  // their prompt via tmux after Claude boots (same as the orchestrator/test/
+  // ship), not on stdin to a headless `claude --print`.
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -2577,28 +2712,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
-  // wiring so the launcher's own bash process — not the agent's good behavior,
-  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
-  // launcher signals deterministically on process exit and touches a marker
-  // file; Deacon only steps in if that bash process was SIGKILLed.
-  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
-    ? {
-        synthesisAgentId: options.reviewSynthesisAgentId,
-        subRole: options.subRole as string,
-        outputPath: options.reviewOutputPath,
-        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
-        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
-        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
-      }
-    : undefined;
+  // PAN-1557: convoy reviewers are interactive now, so the launcher no longer
+  // owns the REVIEWER_READY/FAILED signal (which previously rode a `claude
+  // --print` process exit). The Stop-hook delivers REVIEWER_READY to the
+  // synthesis agent when the reviewer finishes its turn with a written report;
+  // Deacon's REVIEWER_TIMEOUT remains the failure failsafe. We still persist
+  // the synthesis/output wiring on state.json so the Stop-hook can read it.
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
-
-  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
-  // by delivering through tmux after Claude boots. Headless review sub-roles run
-  // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScriptSync({
     role,
@@ -2607,19 +2728,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
-    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
+    promptFileMode: undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
     resumeSessionId: options.resumeSessionId,
-    reviewSignal,
-    // PAN-977: review sub-role launchers must outlive their tmux session. The
-    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
-    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
-    // process alive so it always runs its signal block when claude exits.
-    trapHup: reviewSignal ? true : undefined,
+    reviewSignal: undefined,
+    trapHup: undefined,
     ...piLauncherFields,
   });
 
@@ -2632,6 +2749,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     const { preTrustDirectory } = await import('./workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
     preTrustDirectory(workspace);
   } catch { /* non-fatal */ }
+
+  // PAN-1594: clear any stale ready.json before launch so waitForReadySignal()
+  // only observes the session-start signal from THIS launch.
+  clearReadySignal(agentId);
 
   await Effect.runPromise(createSession(agentId, workspace, claudeCmd, {
     env: {
@@ -2657,21 +2778,9 @@ if (prompt) {
         console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
     } else if (shouldDeliverPromptViaTmux) {
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-        if (!(await Effect.runPromise(sessionExists(agentId)))) {
-          console.error(`[${agentId}] Tmux session died before becoming ready`);
-          break;
-        }
-        try {
-          const pane = await Effect.runPromise(capturePane(agentId, 200));
-          if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-            ready = true;
-            break;
-          }
-        } catch { /* non-fatal */ }
-      }
+      // PAN-1594: wait for the hook-written ready.json (session-start hook),
+      // not a tmux pane-scrape. No dependency on permission-mode footer text.
+      const ready = await waitForReadySignal(agentId, 30);
       if (ready) {
         await new Promise<void>((resolve) => setTimeout(resolve, 500));
         await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
@@ -2696,12 +2805,18 @@ if (prompt) {
 
   await Effect.runPromise(saveAgentState(state));
 
-  emitActivityEntrySync({
-    source: role,
-    level: 'info',
-    message: `${role} role started for ${issueId}`,
-    issueId,
-  });
+  // PAN-1556: the review role emits a single dedicated "Review role spawned"
+  // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
+  // "role started" for review so the orchestrator + 4 convoy sub-reviewers
+  // don't each spam the session feed and bury conversations.
+  if (role !== 'review') {
+    emitActivityEntrySync({
+      source: role,
+      level: 'info',
+      message: `${role} role started for ${issueId}`,
+      issueId,
+    });
+  }
 
   return state;
 }
@@ -2709,9 +2824,9 @@ if (prompt) {
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
-  const agentId = options.slotId != null
-    ? `${sessionPrefix}-${options.issueId.toLowerCase()}-${options.slotId}`
-    : `${sessionPrefix}-${options.issueId.toLowerCase()}`;
+  // PAN-1517: slot-suffixed agent ids removed alongside the swarm runtime;
+  // there is one work agent per issue, period.
+  const agentId = `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await Effect.runPromise(sessionExists(agentId))) {
@@ -2923,6 +3038,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
+    effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -2985,28 +3101,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
-    // Wait for tmux session to exist and Claude to show its prompt
-    let ready = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 1000));
-      if (!(await Effect.runPromise(sessionExists(agentId)))) {
-        console.error(`[${agentId}] Tmux session died before becoming ready`);
-        break;
-      }
-      // Try reading ready signal first (fastest path)
-      if (existsSync(join(getAgentDir(agentId), 'ready'))) {
-        ready = true;
-        break;
-      }
-      // Fallback: check tmux output for Claude's prompt indicator
-      try {
-        const pane = await Effect.runPromise(capturePane(agentId, 200));
-        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-          ready = true;
-          break;
-        }
-      } catch { /* non-fatal */ }
-    }
+    // PAN-1594: wait for the hook-written ready.json (session-start hook),
+    // not a tmux pane-scrape. No dependency on permission-mode footer text.
+    const ready = await waitForReadySignal(agentId, 30);
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
@@ -3042,7 +3139,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 }
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
-  const tmuxSessions = getAgentSessionsSync();
+  // Match liveness against ALL panopticon-socket sessions, not just `agent-*`.
+  // Agent state dirs are named by role prefix (planning-/agent-/conv-/strike-);
+  // getAgentSessions only returns `agent-*`, so planning/conv/strike sessions
+  // would always read tmuxActive:false and get dropped by the enrichment poller.
+  const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
   const agents: (AgentState & { tmuxActive: boolean })[] = [];
@@ -3071,7 +3172,20 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
-    const tmuxSessions = yield* getAgentSessions();
+    // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
+    // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
+    // process that lacks access to that socket and `listSessions()` returns
+    // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
+    // are genuinely running. Do not conclude "the agent isn't running" / "the
+    // enrichment poller skips it" from an out-of-server-process reading. Trust
+    // the live dashboard server's view (it owns the socket) or check the tmux
+    // session directly with `tmux -L panopticon list-sessions`.
+    //
+    // Use the UNFILTERED session list (not getAgentSessions, which is `agent-*`
+    // only): agent state dirs carry role prefixes (planning-/agent-/conv-/strike-),
+    // and planning/conv/strike sessions must read tmuxActive:true so the
+    // enrichment poller scans them for AskUserQuestion / pending input (PAN-1395).
+    const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
     if (!existsSync(AGENTS_DIR)) return [];
@@ -3222,6 +3336,96 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
   }
 }
 
+/**
+ * Find and kill any running `launcher.sh` process for the given agent.
+ *
+ * PAN-1527: `tmux kill-session` only signals tmux-managed children. Planning
+ * agents (and any agent whose launcher escapes its tmux session) leave
+ * orphan launcher.sh processes alive — state.json says stopped, but bash is
+ * still burning CPU and tokens hours later. This locates them by command
+ * line and walks SIGTERM → grace → SIGKILL.
+ *
+ * Sync version: callable from CLI (`pan kill`) and from the existing
+ * `stopAgentSync`. Uses execSync only via `pgrep`, which is fast and
+ * non-blocking in practice. Acceptable per CLAUDE.md because this path is
+ * sync-by-nature already and is only called from CLI contexts and existing
+ * sync internals.
+ */
+function killLauncherProcessSync(agentId: string): void {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    pidsOut = execSync(
+      `pgrep -f ${JSON.stringify(launcherPath)}`,
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches — nothing to kill
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  // ~500ms grace period for orderly shutdown. Sync spawn of `sleep` is
+  // acceptable in CLI context; this function is never reached from the
+  // dashboard server (which uses the async `stopAgent` Effect below).
+  try {
+    execSync('sleep 0.5', { stdio: 'ignore' });
+  } catch { /* ignore */ }
+
+  const survivors: number[] = [];
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      survivors.push(pid);
+    } catch {
+      /* already dead */
+    }
+  }
+  for (const pid of survivors) {
+    try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+  }
+}
+
+async function killLauncherProcessAsync(agentId: string): Promise<void> {
+  const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
+  let pidsOut: string;
+  try {
+    const { stdout } = await execAsync(`pgrep -f ${JSON.stringify(launcherPath)}`);
+    pidsOut = stdout.trim();
+  } catch {
+    return; // pgrep exits 1 when there are no matches
+  }
+
+  const pids = pidsOut
+    .split('\n')
+    .map(s => Number.parseInt(s, 10))
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+  }
+
+  await new Promise<void>(resolve => setTimeout(resolve, 500));
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0);
+      try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+    } catch {
+      /* already dead */
+    }
+  }
+}
+
 export function stopAgentSync(agentId: string): void {
   const normalizedId = normalizeAgentId(agentId);
 
@@ -3240,6 +3444,11 @@ export function stopAgentSync(agentId: string): void {
 
     killSessionSync(normalizedId);
   }
+
+  // PAN-1527: kill orphan launcher.sh processes that escape tmux (planning
+  // agents, dashboard-spawned launchers, anything that survived tmux
+  // kill-session). Runs even when no tmux session existed in the first place.
+  killLauncherProcessSync(normalizedId);
 
   const state = getAgentStateSync(normalizedId);
   if (state) {
@@ -3284,6 +3493,14 @@ export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxEr
 
       yield* killSession(normalizedId);
     }
+
+    // PAN-1527: same orphan-launcher kill as stopAgentSync. Runs after
+    // killSession so tmux gets the first chance to take everything down
+    // cleanly; falls through and kills any survivor by command-line match.
+    yield* Effect.tryPromise({
+      try: () => killLauncherProcessAsync(normalizedId),
+      catch: (cause): never => { throw cause; },
+    }).pipe(Effect.catch(() => Effect.void));
 
     const state = yield* getAgentState(normalizedId);
     if (state) {
@@ -3517,11 +3734,12 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
-  // Wait for Claude prompt to be ready before sending — reduces dropped Enter
-  // when Claude Code is still initializing or rendering warning banners.
-  const promptReady = await Effect.runPromise(waitForClaudePrompt(normalizedId, 5000));
+  // Wait for the agent to be idle at the prompt before sending — reduces dropped
+  // Enter when Claude Code is still rendering. PAN-1594: hook-driven (runtime
+  // mirror 'idle' via Stop/SessionStart hook), not a tmux pane-scrape.
+  const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
-    console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
+    console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
   const deliveryMethod = agentState?.deliveryMethod;

@@ -27,6 +27,7 @@ pan start PAN-123          # Spawn agent for issue PAN-123
 pan start MIN-456          # Works with any tracker prefix
 pan start PAN-123 --force  # Clear a paused agent gate and start anyway
 pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
+pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. switch model)
 ```
 
 ## What It Does
@@ -41,6 +42,13 @@ Use `--force` only when you intentionally want to clear that pause gate and star
 For projects with workspace Docker configured, `pan start` checks stack health before
 spawning. Use `--host` only as an explicit break-glass override; interactive shells always
 prompt, while non-interactive callers must pass `--yes` to confirm.
+
+If a stopped agent has a saved Claude session, `pan start` refuses and points you to
+`pan resume <id>` (continue that session). Use `--fresh` to deliberately discard the
+saved session and start a brand-new one — for example, to relaunch a stopped agent on a
+different model, where the existing session can't resume under different provider routing.
+`--fresh` is non-destructive: it clears only the resume pointer, never the JSONL transcript,
+and refuses while the agent is still running (stop it first with `pan kill <id>`).
 
 ## When to Use
 

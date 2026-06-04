@@ -8,20 +8,33 @@ import { editorIconFor } from './EditorIcons';
 import { toast } from 'sonner';
 
 interface PanOpenInPickerProps {
-  cwd: string;
+  /**
+   * The cwd to open when the user clicks the picker. Pass `null` to fall back
+   * to the server-resolved `defaultCwd` (the "devroot" — `~/Projects` if it
+   * exists, else `$HOME`).
+   */
+  openInCwd: string | null;
+  /**
+   * Icon-only rendering for tight contexts (e.g. ConversationPanel header
+   * where the picker sits next to other icon-only action buttons). The
+   * editor label is hidden; the icon button keeps its tooltip and dropdown.
+   */
+  compact?: boolean;
 }
 
 const EDITOR_LABELS: Record<EditorId, string> = Object.fromEntries(
   EDITORS.map((e) => [e.id, e.label]),
 ) as Record<EditorId, string>;
 
-export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
+export function PanOpenInPicker({ openInCwd, compact = false }: PanOpenInPickerProps) {
   const [availableEditors, setAvailableEditors] = useState<EditorId[]>([]);
+  const [defaultCwd, setDefaultCwd] = useState<string | null>(null);
   const [preferred, setPreferred] = useState<EditorId | null>(getPreferredEditor);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEditorOpenFavoriteShortcut(cwd);
+  const effectiveCwd = openInCwd ?? defaultCwd;
+  useEditorOpenFavoriteShortcut(effectiveCwd);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,8 +44,12 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
       )
       .then((result) => {
         if (cancelled) return;
-        const editors = (result as { editors: EditorId[] }).editors;
-        setAvailableEditors(editors);
+        const { editors, defaultCwd: serverDefaultCwd } = result as {
+          editors: readonly EditorId[];
+          defaultCwd: string;
+        };
+        setAvailableEditors([...editors]);
+        setDefaultCwd(serverDefaultCwd);
         if (!preferred && editors.length > 0) {
           setPreferred(editors[0]!);
         }
@@ -56,13 +73,14 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
 
   const handleOpen = useCallback(
     async (editorId: EditorId) => {
+      if (!effectiveCwd) return;
       setPreferredEditor(editorId);
       setPreferred(editorId);
       setOpen(false);
       try {
         await getTransport().request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.shellOpenInEditor]({
-            cwd,
+            cwd: effectiveCwd,
             editor: editorId,
           }),
         );
@@ -70,7 +88,7 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
         toast.error(`Failed to open in ${EDITOR_LABELS[editorId]}: ${err instanceof Error ? err.message : String(err)}`);
       }
     },
-    [cwd],
+    [effectiveCwd],
   );
 
   if (availableEditors.length === 0) return null;
@@ -79,28 +97,33 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
     ? preferred
     : availableEditors[0]!;
   const PrimaryIcon = editorIconFor(primaryEditor);
+  const disabled = !effectiveCwd;
+  const tooltipCwd = effectiveCwd ?? '(no cwd available)';
 
   return (
     <div className="relative inline-flex" ref={dropdownRef}>
       <button
         onClick={() => handleOpen(primaryEditor)}
-        className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border"
-        title={`Open in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
+        disabled={disabled}
+        className={`flex items-center gap-1 py-0.5 text-[10px] rounded-l transition-colors bg-card text-primary hover:text-primary/80 border border-border disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'px-1' : 'px-1.5'}`}
+        title={`Open ${tooltipCwd} in ${EDITOR_LABELS[primaryEditor]} (${EDITOR_OPEN_FAVORITE_KEY_LABEL})`}
+        aria-label={compact ? `Open in ${EDITOR_LABELS[primaryEditor]}` : undefined}
       >
-        <PrimaryIcon className="w-2.5 h-2.5" />
-        {EDITOR_LABELS[primaryEditor]}
+        <PrimaryIcon className={compact ? 'w-3.5 h-3.5' : 'w-2.5 h-2.5'} />
+        {!compact && EDITOR_LABELS[primaryEditor]}
       </button>
       {availableEditors.length > 1 && (
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center px-0.5 py-0.5 text-[10px] rounded-r transition-colors bg-card text-muted-foreground hover:text-foreground border border-l-0 border-border"
+          disabled={disabled}
+          className="flex items-center px-0.5 py-0.5 text-[10px] rounded-r transition-colors bg-card text-muted-foreground hover:text-foreground border border-l-0 border-border disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Choose editor"
         >
           <ChevronDown className="w-2.5 h-2.5" />
         </button>
       )}
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 min-w-[140px] bg-popover border border-border rounded shadow-lg py-1">
+        <div className="absolute top-full right-0 mt-1 z-50 min-w-[140px] bg-popover border border-border rounded shadow-lg py-1">
           {availableEditors.map((editorId) => {
             const Icon = editorIconFor(editorId);
             return (

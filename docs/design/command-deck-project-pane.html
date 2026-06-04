@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Command Deck · Project cockpit (revived ProjectOverview)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f;
+    --ship:#16a34a; --review:#d97706; --work:#4f46e5; --plan:#9333ea; --todo:#9ca3af;
+    --running:#16a34a; --failed:#dc2626; --waiting:#d97706; --thinking:#9333ea; --idle:#9ca3af;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.5;padding:28px 22px 70px;}
+  .page{max-width:1240px;margin:0 auto;}
+  h1{font-size:21px;margin:0 0 4px;} .sub{color:var(--muted);margin:0 0 8px;font-size:13px;} code{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;}
+  .callout{background:#fff;border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:8px;padding:9px 13px;margin:8px 0;font-size:12.5px;}
+
+  .shell{display:flex;height:660px;border:1px solid var(--border-strong);border-radius:11px;overflow:hidden;background:var(--background);box-shadow:0 5px 22px rgba(0,0,0,.09);}
+  /* outer sidebar */
+  .osb{width:54px;flex:0 0 54px;background:#0c1018;color:#cbd5e1;padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .osb .ic{width:30px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9aa6b2;}
+  .osb .ic.on{background:rgba(79,70,229,.35);color:#fff;}
+  .osb .sep{width:24px;height:1px;background:#26303f;margin:2px 0;} .osb .lab{font-size:7px;color:#5b6675;text-transform:uppercase;}
+  /* rail */
+  .rail{width:206px;flex:0 0 206px;background:var(--surface);border-right:1px solid var(--border);overflow:auto;font-size:12px;}
+  .rail-h{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;padding:9px 11px 5px;display:flex;justify-content:space-between;}
+  .ritem{display:flex;align-items:center;gap:7px;padding:4px 11px;color:var(--foreground);}
+  .ritem.conv{color:var(--muted);} .ritem.iss{font-weight:600;} .ritem.sub{padding-left:24px;color:var(--muted);}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;} .dot.run{background:var(--running);} .dot.wait{background:var(--waiting);} .dot.stop{background:#cbd5e1;}
+  .ic{font-size:11px;width:13px;text-align:center;color:var(--muted);}
+  /* stage */
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .panebar{display:flex;align-items:stretch;border-bottom:1px solid var(--border);background:var(--surface);padding:5px 7px 0;height:36px;flex:0 0 36px;}
+  .ptab{display:flex;align-items:center;gap:6px;padding:0 10px;height:31px;font-size:11.5px;color:var(--muted);border:1px solid transparent;border-radius:7px 7px 0 0;}
+  .ptab.on{background:var(--background);color:var(--foreground);font-weight:700;border-color:var(--border);position:relative;top:1px;}
+  .ptab .kbd{font-size:8.5px;color:#9ca3af;border:1px solid var(--border);border-radius:3px;padding:0 3px;}
+  .padd{display:flex;align-items:center;justify-content:center;width:24px;height:31px;color:#9ca3af;font-size:15px;}
+  .body{flex:1;overflow:auto;padding:16px 18px;}
+
+  /* project header */
+  .phead{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+  .picon{width:28px;height:28px;border-radius:7px;background:var(--claude);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;}
+  .phead h3{font-size:18px;margin:0;font-weight:700;} .phead .br{color:var(--muted);font-size:12px;}
+  .launch{margin-left:auto;display:flex;align-items:center;gap:8px;border:1.4px solid var(--primary-border);border-radius:9px;padding:6px 11px;background:#fff;min-width:330px;}
+  .launch .scope{font-size:10px;font-weight:700;color:var(--primary);background:var(--primary-tint);border-radius:5px;padding:2px 6px;} .launch .ph{color:#9ca3af;flex:1;font-size:12px;}
+
+  /* hero metrics */
+  .hero{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;}
+  .tile{border:1px solid var(--border);border-radius:9px;padding:10px 12px;background:#fff;}
+  .tile .v{font-size:20px;font-weight:700;} .tile .l{font-size:9.5px;text-transform:uppercase;color:#9ca3af;letter-spacing:.04em;}
+  .tile .v.cost{color:var(--ship);}
+  .spark{height:20px;display:flex;align-items:flex-end;gap:2px;margin-top:4px;} .spark i{width:5px;background:var(--primary);border-radius:1px;}
+
+  /* stuck callout */
+  .stuck{border:1px solid var(--failed);background:rgba(220,38,38,.05);border-radius:9px;padding:9px 12px;margin-bottom:14px;font-size:12px;}
+  .stuck .h{font-size:10px;font-weight:700;color:var(--failed);text-transform:uppercase;margin-bottom:6px;}
+  .stuck .sc{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:7px;padding:5px 9px;background:#fff;}
+  .stuck .sc .id{color:var(--primary);font-weight:700;}
+
+  /* swimlanes */
+  .lanes-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin:4px 0 8px;display:flex;gap:8px;align-items:center;}
+  .filter{display:flex;gap:5px;margin-left:auto;} .filter b{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 8px;background:#fff;} .filter b.on{color:var(--primary);background:var(--primary-tint);}
+  .lanes{display:flex;gap:9px;}
+  .lane{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px;}
+  .lane-h{font-size:10px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:5px;margin-bottom:8px;}
+  .lane-h .ct{margin-left:auto;font-size:9px;color:#9ca3af;}
+  .ld{width:8px;height:8px;border-radius:50%;}
+  .icard{background:#fff;border:1px solid var(--border);border-radius:7px;padding:7px 9px;margin-bottom:7px;cursor:default;}
+  .icard:hover{border-color:var(--primary-border);}
+  .icard .id{font-weight:700;color:var(--primary);font-size:10.5px;} .icard .ti{font-size:11px;display:block;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .icard .meta{display:flex;gap:6px;align-items:center;font-size:9.5px;color:var(--muted);}
+  .icard .cost{font-family:"SF Mono",monospace;color:var(--ship);} .sub-pill{font-size:8.5px;color:#fff;border-radius:4px;padding:1px 5px;}
+
+  /* right project activity */
+  .ract{width:150px;flex:0 0 150px;border-left:1px solid var(--border);background:var(--surface);padding:9px;font-size:10.5px;color:var(--muted);}
+  .ract .h{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:7px;}
+  .ract .ev{padding:5px 0;border-bottom:1px solid var(--border);}
+
+  .an{position:absolute;font-size:9px;font-weight:700;color:#fff;background:var(--primary);border-radius:4px;padding:1px 6px;font-family:"SF Mono",monospace;z-index:5;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:8px;background:#fff;border-radius:8px;overflow:hidden;} th,td{text-align:left;padding:7px 11px;border-bottom:1px solid var(--border);} th{background:var(--surface-2);font-size:10.5px;text-transform:uppercase;color:var(--muted);} tr:last-child td{border-bottom:none;}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Project cockpit — click a project → land here</h1>
+  <p class="sub">The dormant <code>ProjectOverview</code> revived as the Stage <b>Home</b> tab, in your real shell. Mirrors
+  the issue cockpit: a status-rich landing for "where's this whole project at." Issue cards → open the issue cockpit tab.</p>
+  <div class="callout"><b>Same shell as everywhere:</b> outer sidebar · Command Deck rail (Conversations + Issues) · Stage ·
+  Project Activity. Only the Stage <b>Home</b> body changes — from today's sparse launcher/timeline to this cockpit.</div>
+
+  <div class="shell" style="position:relative">
+    <span class="an" style="top:42px;left:266px;">Stage · Home tab (⌘1) = Project cockpit</span>
+    <!-- outer sidebar -->
+    <div class="osb"><div class="ic">⌂</div><div class="ic">✦</div><div class="sep"></div><div class="lab">proj</div><div class="ic on">P</div><div class="ic">m</div><div class="ic">a</div><div class="sep"></div><div class="lab">lens</div><div class="ic">⌗</div><div class="ic">▦</div><div class="ic">🤖</div><div class="ic">⊟</div></div>
+    <!-- rail -->
+    <div class="rail">
+      <div class="rail-h">Conversations <span>35</span></div>
+      <div class="ritem conv"><span class="dot run"></span> Claude Code</div>
+      <div class="ritem conv"><span class="dot stop"></span> Codex</div>
+      <div class="rail-h">Issues <span>6</span></div>
+      <div class="ritem iss"><span class="ic">▸</span><span class="dot wait"></span> PAN-1242</div>
+      <div class="ritem iss"><span class="ic">▸</span><span class="dot run"></span> PAN-1395</div>
+      <div class="ritem iss"><span class="ic">▸</span><span class="dot wait"></span> PAN-1450</div>
+      <div class="ritem iss"><span class="ic">▸</span><span class="dot stop"></span> PAN-1316</div>
+    </div>
+    <!-- stage -->
+    <div class="stage">
+      <div class="panebar">
+        <div class="ptab on"><span style="color:var(--claude)">⌂</span> Home <span class="kbd">⌘1</span></div>
+        <div class="ptab"><span class="dot wait"></span> PAN-1242 <span class="kbd">⌘2</span></div>
+        <div class="padd">+</div>
+      </div>
+      <div class="body">
+        <!-- project header + scoped launcher -->
+        <div class="phead">
+          <span class="picon">P</span>
+          <div><h3>panopticon-cli</h3><div class="br">⎇ main · 9 projects</div></div>
+          <div class="launch"><span class="scope">on panopticon-cli</span><span class="ph">Ask an agent, run a command, new issue…</span><span style="color:#9ca3af">↵</span></div>
+        </div>
+
+        <!-- hero metrics -->
+        <div class="hero">
+          <div class="tile"><div class="v">6</div><div class="l">issues</div></div>
+          <div class="tile"><div class="v cost">$47.10</div><div class="l">total cost</div></div>
+          <div class="tile"><div class="v">2</div><div class="l">active agents</div></div>
+          <div class="tile"><div class="v">3</div><div class="l">active phases</div></div>
+          <div class="tile"><div class="l">7-day cost</div><div class="spark"><i style="height:5px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:13px"></i><i style="height:10px"></i><i style="height:16px"></i><i style="height:12px"></i></div></div>
+        </div>
+
+        <!-- stuck callout -->
+        <div class="stuck"><div class="h">⚠ Stuck / blocked · 1</div>
+          <span class="sc"><span class="id">PAN-1242</span> security review blocked · test gate failing (2/3) <span style="color:var(--primary)">→ open</span></span></div>
+
+        <!-- swimlanes -->
+        <div class="lanes-h">Pipeline <span style="color:#9ca3af;font-weight:400;text-transform:none">· this project, by phase</span>
+          <span class="filter"><b class="on">All</b><b>Alive</b><b>Blocked</b></span></div>
+        <div class="lanes">
+          <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--ship)"></span>Ship<span class="ct">0</span></div></div>
+          <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--review)"></span>Review<span class="ct">2</span></div>
+            <div class="icard"><span class="id">PAN-1242</span><span class="ti">Board footer button</span><div class="meta"><span class="cost">$4.20</span><span class="sub-pill" style="background:var(--failed)">sec blocked</span></div></div>
+            <div class="icard"><span class="id">PAN-1450</span><span class="ti">Audit recent fixes</span><div class="meta"><span class="cost">$6.80</span><span class="sub-pill" style="background:var(--review)">reviewing</span></div></div>
+          </div>
+          <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--work)"></span>Work<span class="ct">0</span></div></div>
+          <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--plan)"></span>Plan<span class="ct">1</span></div>
+            <div class="icard"><span class="id">PAN-1395</span><span class="ti">Ctrl+K search</span><div class="meta"><span class="cost">$0.93</span><span class="sub-pill" style="background:var(--plan)">planning</span></div></div>
+          </div>
+          <div class="lane"><div class="lane-h"><span class="ld" style="background:var(--todo)"></span>Todo<span class="ct">3</span></div>
+            <div class="icard"><span class="id">PAN-1316</span><span class="ti">Dark mode polish</span><div class="meta"><span style="color:#9ca3af">queued</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- right -->
+    <div class="ract"><div class="h">Project Activity</div>
+      <div class="ev">PAN-1242 test gate failed</div><div class="ev">PAN-1395 planning started</div><div class="ev">PAN-1450 review queued</div><div class="ev">$ cost +$1.40 (1h)</div></div>
+  </div>
+
+  <div class="callout"><b>Interaction:</b> click any issue cost-card (or a rail issue) → opens that issue's <b>cockpit tab</b>
+  (the tree+conversation we designed). The hero/stuck/swimlanes answer "where's the project," the cockpit answers
+  "work this issue." Same scoped-Launcher idea as the issue, one level up ("on panopticon-cli").</div>
+
+  <h2 style="font-size:16px;margin-top:24px">How the three cockpits nest</h2>
+  <table>
+    <thead><tr><th style="width:20%">Level</th><th style="width:34%">Stage shows</th><th>Click-through</th></tr></thead>
+    <tbody>
+      <tr><td><b>Project</b> (Home tab)</td><td>hero metrics · stuck callout · phase swimlanes · cost</td><td>issue card → issue cockpit tab</td></tr>
+      <tr><td><b>Issue</b> (issue tab)</td><td>status band (phase/gates/PR/actions/cost) + agent tree-driven body</td><td>agent → its conversation (in-tab, or ⌘-click new tab)</td></tr>
+      <tr><td><b>Agent</b> (in issue / popped tab)</td><td>conversation · Findings · Terminal</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Three nested cockpits (project → issue → agent), one consistent shell, with the global Pipeline/Board as
+  cross-project zoom-out lenses. Open: keep the project Launcher up here, or is the project cockpit read-only-ish
+  (metrics) with actions living on issues?</p>
+
+</div>
+</body>
+</html>

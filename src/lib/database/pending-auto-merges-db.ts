@@ -198,6 +198,15 @@ export function markFailed(id: number, reason: string): boolean {
   });
 }
 
+export function requeueToPending(id: number, nextScheduledMergeAt: string): boolean {
+  return runDb('requeueToPending', () => {
+    const result = getDatabase()
+      .prepare('UPDATE pending_auto_merges SET "status" = \'pending\', scheduledMergeAt = ? WHERE id = ? AND "status" = \'merging\'')
+      .run(nextScheduledMergeAt, id);
+    return result.changes === 1;
+  });
+}
+
 export function markBlocked(id: number, reason: string): boolean {
   return runDb('markBlocked', () => {
     const result = getDatabase()

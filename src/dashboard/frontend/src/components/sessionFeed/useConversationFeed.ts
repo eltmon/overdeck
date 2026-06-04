@@ -8,6 +8,8 @@ export interface ConversationFeedRow {
   name: string;
   createdAt: string;
   lastAttachedAt: string | null;
+  /** PAN-1556: transcript JSONL mtime — bumps on every message, unlike lastAttachedAt. */
+  lastActivityAt?: string | null;
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
@@ -29,7 +31,10 @@ async function fetchConversations(): Promise<ConversationFeedRow[]> {
 }
 
 export function mapConversationToFeedEntry(conversation: ConversationFeedRow): ConversationSessionFeedEntry {
-  const lastMessageDate = conversation.lastAttachedAt ?? conversation.createdAt;
+  // PAN-1556: prefer the transcript's last-activity (JSONL mtime) so a fresh
+  // reply re-surfaces the conversation at the top of the feed. lastAttachedAt
+  // only moves on terminal re-attach, so it left active conversations stale.
+  const lastMessageDate = conversation.lastActivityAt ?? conversation.lastAttachedAt ?? conversation.createdAt;
   return {
     kind: 'conversation',
     id: `conversation:${conversation.name}`,

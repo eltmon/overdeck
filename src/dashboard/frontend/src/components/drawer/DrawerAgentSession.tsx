@@ -15,11 +15,28 @@
  */
 
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { XTerminal } from '../XTerminal';
 import type { Agent } from '../../types';
+import styles from '../CommandDeck/styles/command-deck.module.css';
+
+interface AgentGitInfo {
+  actualBranch: string | null;
+  branchDrifted: boolean;
+  workspaceMissing: boolean;
+  expectedBranch: string | null;
+  workspacePath?: string | null;
+}
+
+async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/git-info`);
+  if (!res.ok) return null;
+  return res.json();
+}
 
 const ENDED_AGENT_STATUSES = new Set<Agent['status']>(['stopped', 'dead', 'failed']);
 
@@ -87,6 +104,17 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
   );
   const conversation = useMemo(() => (agent ? agentToConversation(agent) : null), [agent]);
 
+  // PAN-1523: surface the agent's actual branch + drift/missing-workspace
+  // state. ConversationPanel is embedded here so its own header is hidden;
+  // the chip lives in the drawer toolbar instead.
+  const { data: gitInfo } = useQuery({
+    queryKey: ['agent-git-info', agent?.id],
+    queryFn: () => (agent ? fetchAgentGitInfo(agent.id) : Promise.resolve(null)),
+    enabled: !!agent,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
   if (!agent || !conversation) {
     return (
       <div
@@ -103,25 +131,67 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
     );
   }
 
+  const showBranchChip = Boolean(gitInfo?.actualBranch || gitInfo?.workspaceMissing);
+  const drifted = Boolean(gitInfo?.branchDrifted);
+  const missing = Boolean(gitInfo?.workspaceMissing);
+
   return (
     <div data-testid={testId} className="flex min-h-0 flex-1 flex-col gap-[10px]">
-      {agents.length > 1 && (
+      {(agents.length > 1 || showBranchChip) && (
         <div className="flex shrink-0 items-center gap-[8px]">
-          <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Agent
-          </span>
-          <select
-            value={agent.id}
-            onChange={(event) => onSelectAgent(event.target.value)}
-            aria-label="Select agent session"
-            className="rounded-[var(--radius-sm)] border border-border bg-card px-[8px] py-[4px] text-[12px] text-foreground"
-          >
-            {agents.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {agentOptionLabel(candidate)}
-              </option>
-            ))}
-          </select>
+          {agents.length > 1 && (
+            <>
+              <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                Agent
+              </span>
+              <select
+                value={agent.id}
+                onChange={(event) => onSelectAgent(event.target.value)}
+                aria-label="Select agent session"
+                className="rounded-[var(--radius-sm)] border border-border bg-card px-[8px] py-[4px] text-[12px] text-foreground"
+              >
+                {agents.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {agentOptionLabel(candidate)}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          {showBranchChip && (
+            <span
+              className={`${styles.terminalBranchBar} ${
+                missing
+                  ? styles.terminalBranchBarMissing
+                  : drifted
+                    ? styles.terminalBranchBarDrift
+                    : ''
+              }`}
+              title={
+                missing
+                  ? `Workspace missing on disk: ${gitInfo?.workspacePath ?? '(unknown path)'}`
+                  : drifted
+                    ? `Expected ${gitInfo?.expectedBranch ?? '(none)'}, on ${gitInfo?.actualBranch ?? '(none)'}`
+                    : `${gitInfo?.workspacePath ?? ''}`
+              }
+              data-testid="drawer-agent-branch-chip"
+            >
+              {missing ? (
+                <>
+                  <AlertCircle size={12} />
+                  <span className={styles.terminalBranchBarMode}>Worktree missing</span>
+                </>
+              ) : (
+                <>
+                  {drifted ? <TriangleAlert size={12} /> : <GitFork size={12} />}
+                  <span className={styles.terminalBranchBarMode}>
+                    {drifted ? 'Drifted' : 'Worktree'}
+                  </span>
+                  <span className={styles.terminalBranchBarText}>{gitInfo?.actualBranch}</span>
+                </>
+              )}
+            </span>
+          )}
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius)] border border-border">

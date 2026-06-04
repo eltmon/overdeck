@@ -66,6 +66,27 @@ const initialLayersResponse: ContextLayersResponse = {
       editable: true,
     },
   ],
+  targets: [
+    {
+      harness: 'claude-code',
+      layerKind: 'global',
+      label: 'Claude Code · global',
+      path: '/home/user/.claude/CLAUDE.md',
+      exists: true,
+      hasManagedRegion: true,
+      hasUserContent: true,
+    },
+    {
+      harness: 'claude-code',
+      layerKind: 'project',
+      projectKey: 'panopticon-cli',
+      label: 'Claude Code · panopticon-cli',
+      path: '/repo/panopticon-cli/CLAUDE.md',
+      exists: true,
+      hasManagedRegion: true,
+      hasUserContent: false,
+    },
+  ],
 };
 
 let layersResponse: ContextLayersResponse;

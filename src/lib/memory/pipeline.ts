@@ -12,7 +12,8 @@ import type {
   CommitTranscriptRangeResult,
   TranscriptClaimTrigger,
 } from './checkpoints.js';
-import { compressTranscriptDelta, type CompressedTranscriptDelta } from './compress.js';
+import { open } from 'node:fs/promises';
+import { compressTranscriptDelta, type CompressedTranscriptDelta, MAX_TRANSCRIPT_DELTA_BYTES } from './compress.js';
 import {
   extractObservationFromTurn,
   type ExtractObservationInput,
@@ -28,6 +29,7 @@ import {
   type WritePendingTurnResult,
 } from './pending.js';
 import { isSubagentHookPayload } from './subagent-filter.js';
+import { getTranscriptSourceRegistry } from './transcript-source.js';
 
 export interface ExtractFromTranscriptDeltaInput {
   sessionId: string;
@@ -35,6 +37,7 @@ export interface ExtractFromTranscriptDeltaInput {
   fromOffset?: number;
   toOffset: number;
   identity: MemoryIdentity;
+  harness?: string;
   trigger: TranscriptClaimTrigger;
   hookPayload?: unknown;
   gitBranch?: string;
@@ -91,7 +94,7 @@ export type PipelineCommitRange = (input: {
   now?: Date;
 }) => Promise<CommitTranscriptRangeResult>;
 export type PipelineReleaseRange = (sessionId: string, expectedFromOffset: number, toOffset: number) => Promise<void>;
-export type PipelineCompress = (input: { transcriptPath: string; fromOffset: number; toOffset: number }) => Promise<CompressedTranscriptDelta>;
+export type PipelineCompress = (input: { transcriptPath: string; fromOffset: number; toOffset: number; harness?: string }) => Promise<CompressedTranscriptDelta>;
 export type PipelineWriteObservation = (observation: MemoryObservation) => Promise<WriteObservationResult>;
 export type PipelineWritePendingTurn = (turn: PendingTurn, options?: StatusRollupTriggerOptions) => Promise<WritePendingTurnResult>;
 export type PipelineMaybeTriggerRollup = (identity: MemoryIdentity, options?: StatusRollupTriggerOptions) => Promise<StatusRollupTriggerResult>;
@@ -274,10 +277,35 @@ async function safeCompress(input: ExtractFromTranscriptDeltaInput, fromOffset: 
   | { status: 'failed' }
 > {
   try {
-    const compress = input.compress ?? compressTranscriptDelta;
-    return { status: 'compressed', result: await compress({ transcriptPath: input.transcriptPath, fromOffset, toOffset }) };
+    const compress = input.compress ?? defaultCompressTranscriptDelta;
+    return { status: 'compressed', result: await compress({ transcriptPath: input.transcriptPath, fromOffset, toOffset, harness: input.harness }) };
   } catch {
     return { status: 'failed' };
+  }
+}
+
+async function defaultCompressTranscriptDelta(input: { transcriptPath: string; fromOffset: number; toOffset: number; harness?: string }): Promise<CompressedTranscriptDelta> {
+  const source = input.harness ? getTranscriptSourceRegistry().get(input.harness) : undefined;
+  if (!source || input.harness === 'claude-code') {
+    return compressTranscriptDelta(input);
+  }
+
+  const length = Math.min(Math.max(0, input.toOffset - input.fromOffset), MAX_TRANSCRIPT_DELTA_BYTES);
+  if (length === 0) return { text: '', eventsConsumed: 0, lastFullLineOffset: input.fromOffset };
+
+  const file = await open(input.transcriptPath, 'r');
+  try {
+    const buffer = Buffer.allocUnsafe(length);
+    const { bytesRead } = await file.read(buffer, 0, length, input.fromOffset);
+    const events = source.parseDelta(buffer.subarray(0, bytesRead), input.fromOffset);
+    if (events.length === 0) return { text: '', eventsConsumed: 0, lastFullLineOffset: input.fromOffset };
+    return {
+      text: events.map((event) => event.compressedText).filter(Boolean).join('\n'),
+      eventsConsumed: events.reduce((sum, event) => sum + event.eventsConsumed, 0),
+      lastFullLineOffset: Math.max(...events.map((event) => event.lastFullLineOffset)),
+    };
+  } finally {
+    await file.close();
   }
 }
 

@@ -115,6 +115,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
   let totalCost = 0;
+  let totalTokens = 0;
   let sequence = 0;
 
   for (const line of lines) {
@@ -196,6 +197,14 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
       if (typeof total === 'number' && Number.isFinite(total)) {
         totalCost += total;
       }
+
+      // Token throughput — prefer Pi's own total, else sum the categories.
+      const u = entry.message.usage;
+      if (u) {
+        totalTokens += typeof u.totalTokens === 'number'
+          ? u.totalTokens
+          : (u.input ?? 0) + (u.output ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+      }
     }
   }
 
@@ -212,6 +221,7 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
     byteOffset: fileStats.size,
     streaming,
     totalCost,
+    totalTokens,
     pendingToolUse: new Map(),
     unresolvedResults: new Map(),
     lastSequence: sequence,
