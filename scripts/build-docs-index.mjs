@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -7,7 +8,15 @@ const projectRoot = resolve(import.meta.dirname, '..');
 const libraryEntry = join(projectRoot, 'dist', 'index.js');
 
 if (!existsSync(libraryEntry)) {
-  console.error('dist/index.js is missing; run npm run build:cli before build:docs-index');
+  console.log('dist/index.js is missing; running npm run build:cli before build:docs-index');
+  const buildCli = spawnSync('npm', ['run', 'build:cli'], { cwd: projectRoot, stdio: 'inherit' });
+  if (buildCli.status !== 0) {
+    process.exit(buildCli.status ?? 1);
+  }
+}
+
+if (!existsSync(libraryEntry)) {
+  console.error('dist/index.js is missing after npm run build:cli');
   process.exit(1);
 }
 
