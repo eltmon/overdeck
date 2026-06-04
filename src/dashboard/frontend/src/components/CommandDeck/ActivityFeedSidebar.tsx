@@ -41,13 +41,51 @@ export function createActionStatusObservationSelector(issueId: string) {
   };
 }
 
+/**
+ * Project-scoped variant (PAN-1561): aggregate action-status observations
+ * across every issue in a project, newest first. Memoizes on the per-issue
+ * source arrays so it only recomputes when one of the project's issues sees a
+ * new observation.
+ */
+export function createActionStatusObservationSelectorForIssues(issueIds: readonly string[]) {
+  let lastSources: ReadonlyArray<readonly MemoryObservation[]> | undefined;
+  let lastResult: MemoryObservation[] | undefined;
+
+  return (state: Pick<DashboardState, 'observationsByIssueId'>): MemoryObservation[] => {
+    const sources = issueIds.map((id) => state.observationsByIssueId[id] ?? EMPTY_OBSERVATIONS);
+    const unchanged =
+      lastSources !== undefined &&
+      lastSources.length === sources.length &&
+      sources.every((s, i) => s === lastSources![i]);
+    if (unchanged && lastResult) return lastResult;
+
+    lastSources = sources;
+    lastResult = sources
+      .flat()
+      .filter((observation) => observation.actionStatus !== null)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    return lastResult;
+  };
+}
+
 interface ActivityFeedSidebarProps {
-  issueId: string;
+  /** Single issue scope. Ignored when `issueIds` is provided. */
+  issueId?: string;
+  /** Project scope: aggregate across these issue ids (PAN-1561). */
+  issueIds?: readonly string[];
   now?: Date;
 }
 
-export function ActivityFeedSidebar({ issueId, now = new Date() }: ActivityFeedSidebarProps) {
-  const selectActionObservations = useMemo(() => createActionStatusObservationSelector(issueId), [issueId]);
+export function ActivityFeedSidebar({ issueId, issueIds, now = new Date() }: ActivityFeedSidebarProps) {
+  // Stabilize the key so the memoized selector is not rebuilt every render.
+  const idsKey = issueIds ? issueIds.join(',') : (issueId ?? '');
+  const selectActionObservations = useMemo(
+    () =>
+      issueIds
+        ? createActionStatusObservationSelectorForIssues(issueIds)
+        : createActionStatusObservationSelector(issueId ?? ''),
+    [idsKey, issueIds, issueId],
+  );
   const observations = useDashboardStore(selectActionObservations);
   const buckets = useMemo(
     () => bucketByTime(observations, (observation) => observation.timestamp, now),

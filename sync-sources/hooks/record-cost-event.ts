@@ -15,9 +15,9 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, openSync, readSync,
 import { execFileSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
-import { calculateCost, getPricing, AIProvider } from '../../src/lib/cost.js';
-import { appendCostEvent } from '../../src/lib/costs/events.js';
-import { captureTldrMetrics, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
+import { calculateCostSync, getPricingSync, AIProvider } from '../../src/lib/cost.js';
+import { appendCostEventSync } from '../../src/lib/costs/events.js';
+import { captureTldrMetricsSync, type TldrSessionMetrics } from '../../src/lib/tldr-daemon.js';
 
 // ============== Types ==============
 
@@ -153,7 +153,7 @@ try {
     stdio: ['pipe', 'pipe', 'pipe'],
   }).trim();
   if (workspaceRoot) {
-    tldrMetrics = captureTldrMetrics(workspaceRoot);
+    tldrMetrics = captureTldrMetricsSync(workspaceRoot);
   }
 } catch { /* git not available or no workspace — skip TLDR metrics */ }
 
@@ -202,11 +202,12 @@ for (const line of lines) {
       provider = 'custom';
     }
 
-    // Get pricing and calculate cost
-    const pricing = getPricing(provider, model);
+    // Get pricing and calculate cost (Sync variants — the Effect-returning
+    // getPricing/calculateCost are lazy and silently broke recording, PAN-1570)
+    const pricing = getPricingSync(provider, model);
     if (!pricing) continue;
 
-    const cost = calculateCost({
+    const cost = calculateCostSync({
       inputTokens,
       outputTokens,
       cacheReadTokens,
@@ -230,8 +231,11 @@ for (const line of lines) {
       tldrAttachedToFirstEvent = true;
     }
 
-    // Record the cost event
-    appendCostEvent({
+    // Record the cost event.
+    // NOTE: appendCostEventSync (not the Effect-returning appendCostEvent) — the
+    // latter is a lazy Effect that does nothing unless run, which silently dropped
+    // every cost event after the PAN-1249 Effect migration (PAN-1570).
+    appendCostEventSync({
       ts: new Date().toISOString(),
       type: 'cost',
       agentId,

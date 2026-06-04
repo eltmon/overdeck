@@ -681,9 +681,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── getAvailableEditors — list detected editors (PAN-966) ───────────────
       [WS_METHODS.getAvailableEditors]: () =>
-        panOpen.getAvailableEditors().pipe(
-          Effect.map((editors) => ({ editors })),
-        ),
+        Effect.all({
+          editors: panOpen.getAvailableEditors(),
+          defaultCwd: panOpen.getDefaultCwd(),
+        }),
 
       [WS_METHODS.scanConversations]: (input) =>
         getConversationsConfig().pipe(

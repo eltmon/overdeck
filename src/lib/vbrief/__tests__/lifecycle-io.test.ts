@@ -10,6 +10,7 @@ import {
   findVBriefByIssueSync,
   moveVBrief,
   moveVBriefFilesOnly,
+  promoteContinueToProject,
   promoteVBriefToProposed,
   transitionVBriefOnMain,
   updatePlanStatus,
@@ -448,6 +449,57 @@ describe('promoteVBriefToProposed', () => {
 
     const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
     expect(copied.plan.title).toBe('Updated title');
+  });
+});
+
+describe('promoteContinueToProject', () => {
+  function writeWorkspaceContinue(workspacePath: string, state: ContinueState): void {
+    const panDir = join(workspacePath, PAN_DIRNAME);
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(
+      join(panDir, PAN_CONTINUE_FILENAME),
+      JSON.stringify(state, null, 2),
+      'utf-8',
+    );
+  }
+
+  it('returns null when the workspace has no continue file', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-100');
+    mkdirSync(workspacePath, { recursive: true });
+    expect(promoteContinueToProject(workspacePath, TEST_DIR, 'PAN-100')).toBeNull();
+    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-100'))).toBe(false);
+  });
+
+  it('carries the planning agent decisions/hazards into the project continue (PAN-1395 regression)', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-101');
+    const continueContent: ContinueState = {
+      version: '1',
+      issueId: 'PAN-101',
+      created: '2026-05-31T21:30:18.000Z',
+      updated: '2026-05-31T22:26:09.000Z',
+      gitState: { branch: 'feature/pan-101', sha: 'deadbee', dirty: false },
+      decisions: [
+        { id: 'D1', summary: 'Embedding provider: cloud-default + pluggable.', recordedAt: '2026-05-31T21:30:18.000Z' },
+        { id: 'D2', summary: 'Indexing: hybrid startup scan + watcher.', recordedAt: '2026-05-31T21:30:18.000Z' },
+      ],
+      hazards: [
+        { id: 'H1', summary: 'sqlite-vec is a native loadable extension.', mitigation: 'Fail closed if load fails.' },
+      ],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+    };
+    writeWorkspaceContinue(workspacePath, continueContent);
+
+    const dest = promoteContinueToProject(workspacePath, TEST_DIR, 'PAN-101');
+
+    expect(dest).toBe(getContinueFilePath(TEST_DIR, 'pan-101'));
+    expect(existsSync(dest!)).toBe(true);
+    const promoted = JSON.parse(readFileSync(dest!, 'utf-8')) as ContinueState;
+    expect(promoted.decisions).toHaveLength(2);
+    expect(promoted.decisions.map((d) => d.id)).toEqual(['D1', 'D2']);
+    expect(promoted.hazards).toHaveLength(1);
+    expect(promoted.hazards[0]!.id).toBe('H1');
   });
 });
 

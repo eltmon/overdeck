@@ -10,6 +10,14 @@ vi.mock('../setup.js', () => ({
   getCavemanHooksDir: vi.fn(),
 }));
 
+// Memory observations are off-by-default since PAN-1589 (cheapMode). When
+// disabled, injectMemoryHookSettings strips the memory hooks instead of
+// installing them — force the gate on so these tests exercise the install path.
+vi.mock('../../memory/settings.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../memory/settings.js')>();
+  return { ...actual, areMemoryObservationsEnabled: async () => true };
+});
+
 import { getCavemanHooksDir } from '../setup.js';
 import {
   determineCavemanVariant,

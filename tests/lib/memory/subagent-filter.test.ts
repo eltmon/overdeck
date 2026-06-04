@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { isSubagentHookPayload } from '../../../src/lib/memory/subagent-filter.js';
 import { handleMemorySessionStartBody, handleMemoryTurnBody, memoryTurnHookResponse } from '../../../src/dashboard/server/routes/hooks.js';
 
+// Memory observations are off-by-default since PAN-1589 (cheapMode). These tests
+// exercise the enabled-path acceptance/validation logic; the two disabled-path
+// cases pass an explicit `areObservationsEnabled: () => false` option, which the
+// hook honors over this default via `options.areObservationsEnabled ?? …`.
+vi.mock('../../../src/lib/memory/settings.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/memory/settings.js')>();
+  return { ...actual, areMemoryObservationsEnabled: async () => true };
+});
+
 describe('memory subagent filter', () => {
   it('detects Claude Code subagent hook payloads by agent_id presence', () => {
     expect(isSubagentHookPayload({ agent_id: 'agent-abc', session_id: 'session-1' })).toBe(true);

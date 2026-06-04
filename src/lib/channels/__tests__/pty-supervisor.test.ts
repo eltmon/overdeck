@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, watch } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,20 +50,12 @@ async function waitForProcessOutput(predicate: () => boolean, message: string): 
 }
 
 async function waitForSocketPath(socketPath: string, predicate: () => boolean, message: string): Promise<void> {
-  if (predicate()) return;
   const socketsDir = join(socketPath, '..');
   mkdirSync(socketsDir, { recursive: true, mode: 0o700 });
-  await new Promise<void>((resolve) => {
-    const watcher = watch(socketsDir, () => {
-      if (!predicate()) return;
-      watcher.close();
-      resolve();
-    });
-    if (predicate()) {
-      watcher.close();
-      resolve();
-    }
-  });
+  const deadline = Date.now() + 5_000;
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
   if (!predicate()) throw new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
 }
 

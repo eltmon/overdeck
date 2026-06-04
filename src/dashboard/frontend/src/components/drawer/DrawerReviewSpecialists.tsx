@@ -1,5 +1,6 @@
 import { cn } from '../../lib/utils';
-import { useDrawerData, type DrawerReviewSpecialistStatus } from './useDrawerData';
+import { useDashboardStore } from '../../lib/store';
+import { useIssueData, type DrawerReviewSpecialistStatus } from './useDrawerData';
 
 const STATUS_DOT_CLASSES = {
   run: 'bg-info',
@@ -8,8 +9,11 @@ const STATUS_DOT_CLASSES = {
   fail: 'bg-destructive',
 } satisfies Record<DrawerReviewSpecialistStatus, string>;
 
-export default function DrawerReviewSpecialists() {
-  const { reviewSpecialists } = useDrawerData();
+// `issueId` optional: the Command Deck cockpit passes the scoped issue; the
+// legacy IssueDrawer passes none and falls back to the global drawer slice.
+export default function DrawerReviewSpecialists({ issueId }: { issueId?: string } = {}) {
+  const drawerIssueId = useDashboardStore((s) => s.drawer.issueId);
+  const { reviewSpecialists } = useIssueData(issueId ?? drawerIssueId);
 
   return (
     <section data-component="drawer-review-specialists" data-testid="drawer-review-specialists" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">

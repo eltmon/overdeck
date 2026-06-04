@@ -4,7 +4,7 @@ description: Panopticon work role — claims beads, writes code, commits per bea
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
-permissionMode: bypassPermissions
+permissionMode: default
 effort: high
 hooks:
   PreToolUse:
@@ -18,6 +18,8 @@ hooks:
           command: "$HOME/.panopticon/bin/tldr-read-enforcer"
     - matcher: "Bash"
       hooks:
+        - type: command
+          command: "$HOME/.panopticon/bin/gh-issue-trailer-hook"
         - type: command
           command: "$HOME/.panopticon/bin/rtk-bash-filter"
   PostToolUse:
@@ -63,6 +65,73 @@ For every bead:
 11. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
+
+## Parallel work via subagents
+
+When the bead DAG (`edges[]` in `.pan/spec.vbrief.json`) shows multiple unblocked beads in the same dependency layer, you may fan out **subagents** for ones that are genuinely independent. This uses Claude Code's built-in `Agent` tool (or your harness's equivalent) — **not** a Panopticon-orchestrated swarm.
+
+Subagents share your filesystem and return their work to you as text replies. You remain the durable, supervised work agent for the issue: you decide what to fan out, integrate the results, and own the commits.
+
+### When to fan out
+
+Fan out when **all** of these hold:
+
+- 2+ unblocked beads in the same layer (no edges between them in the DAG)
+- Each bead touches a different set of files (no overlap)
+- Each bead is substantial enough to amortize subagent startup (rough rule of thumb: ~10+ minutes of work)
+- No bead's output is another's input
+
+Use `getDispatchableItems(doc, completedIds)` from `src/lib/vbrief/dag.ts` to see what's currently ready, and `groupItemsByWave(doc)` from the same module to see the topological layering. These are read-only helpers — they inform your decision, they do not drive dispatch.
+
+### When NOT to fan out
+
+- Items share files — the next bead must see the previous commit
+- Items are small (a few minutes each) — orchestration cost exceeds the savings
+- You're uncertain about ordering — default to serial
+- Any item involves the build system, migrations, or other global state where ordering matters more than you might think
+
+When in doubt, run serial. Fan-out is a tool, not a default.
+
+### How to fan out
+
+1. Spawn one subagent per independent bead via the harness's `Agent` primitive. Give each a focused prompt naming the bead, its acceptance criteria, and its file scope.
+2. Subagents share your filesystem — they read and write directly in the workspace.
+3. Receive each subagent's reply describing what it did and what it changed.
+4. If two subagents' changes collide (shouldn't happen with no file overlap, but verify), resolve manually before staging.
+5. Commit each bead's contribution as a **separate commit** — one bead = one commit, per the rule above. Do not bundle multiple subagents' outputs into a single commit.
+6. Close each bead via `bd close <id>` after its commit lands. If a bead has `metadata.requiresInspection: true`, run the inspection gate on its commit before closing, exactly as in the serial per-bead workflow.
+
+### Failure handling
+
+If a subagent fails or returns wrong output:
+
+- Retry once with a clarified prompt that names the specific failure.
+- If it fails again, fall back to doing the bead yourself, serially.
+- Record the fan-out attempt and any failure in `.pan/continue.json` `sessionHistory` so review and crash recovery have context.
+
+Do **not** loop forever on a failing subagent. Two attempts, then serial fallback.
+
+### Cost shaping
+
+You pick the model for each fan-out via the subagent's `model` parameter:
+
+- Mechanical work (fixture regeneration, file rename, mass replace) → cheap subagent (Haiku, etc.)
+- Nuanced work (writing logic, choosing APIs) → match the parent's own model
+
+Do not pass `--model` to `pan` itself unless the task genuinely warrants it — Cloister routing handles the parent. Subagent model selection happens inside the parent's harness call.
+
+### Concrete trigger examples
+
+| Task shape | Fan out? | Notes |
+|---|---|---|
+| "Regenerate snapshots for 4 components" | Yes — 4 subagents | Independent file scopes |
+| "Audit these 6 routes for missing auth checks" | Yes — 6 subagents | Read-only or non-overlapping edits |
+| "Summarize each of these N test failures" | Yes — N subagents | Pure text output, no file conflicts |
+| "Update import paths across 8 non-overlapping modules" | Yes | Verify no shared imports first |
+| "Implement the OAuth flow" | No — chain of dependencies | Auth schema → middleware → routes → tests |
+| "Add a new field to this model" | No — single point of edit | Wouldn't help anyway |
+| "Refactor X to use Y" | No — shared state, sequencing matters | |
+| "Write tests AND the code for one feature" | No — output → input | Tests inform the code |
 
 ## Jidoka Inspection Gates
 

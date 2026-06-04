@@ -207,3 +207,43 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     expect(results[0].passed).toBe(false);
   });
 });
+
+describe('runQualityGates — PAN-666 changed-file scoping placeholders', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+  });
+
+  const placeholders = {
+    FEATURE_NAME: 'pan-1',
+    FEATURE_FOLDER: 'feature-pan-1',
+    BRANCH_NAME: 'feature/pan-1',
+    COMPOSE_PROJECT: 'panopticon-cli-feature-pan-1',
+    DOMAIN: 'localhost',
+    PROJECT_NAME: 'panopticon-cli',
+    PROJECT_PATH: '/tmp/panopticon-cli',
+    PROJECTS_DIR: '/tmp',
+    WORKSPACE_PATH: workspacePath,
+    CHANGED_BASE: 'origin/main',
+  };
+
+  it('substitutes {{CHANGED_BASE}} into the gate command before running it', async () => {
+    const gates = { test: { command: 'npx vitest run --changed {{CHANGED_BASE}}' } };
+    await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', { placeholders }));
+
+    const cmd = execMock.mock.calls[0][0] as string;
+    expect(cmd).toContain('--changed origin/main');
+    expect(cmd).not.toContain('{{CHANGED_BASE}}');
+  });
+
+  it('leaves an unset placeholder literal when no placeholders are provided', async () => {
+    const gates = { test: { command: 'npx vitest run --changed {{CHANGED_BASE}}' } };
+    await Effect.runPromise(runQualityGates(gates, workspacePath));
+
+    const cmd = execMock.mock.calls[0][0] as string;
+    // Without a placeholders map there is nothing to substitute — the gate runs
+    // verbatim (a project that opts into scoping must run under verification,
+    // which always supplies CHANGED_BASE).
+    expect(cmd).toContain('{{CHANGED_BASE}}');
+  });
+});

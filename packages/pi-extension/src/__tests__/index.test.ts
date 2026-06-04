@@ -26,18 +26,23 @@ const fixedTime = '2026-05-07T05:00:00.000Z'
 const now = () => fixedTime
 
 // Track fetch calls and control responses per test.
-let fetchCalls: { url: string; body: unknown }[] = []
+let fetchCalls: { url: string; body: unknown; headers: Record<string, string> }[] = []
 let fetchResponse: { status: number } = { status: 200 }
 
 beforeEach(() => {
   fetchCalls = []
   fetchResponse = { status: 200 }
+  // Neutralize any ambient PANOPTICON_DASHBOARD_URL (set on developer machines
+  // running a live `pan dev`) so the default-host tests assert against the
+  // production fallback (http://localhost:3011), not the host's value. Tests
+  // that exercise the env var stub it explicitly; afterEach unstubs.
+  vi.stubEnv('PANOPTICON_DASHBOARD_URL', undefined)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) => {
       const url = _url
       const body = init?.body ? JSON.parse(init.body as string) : undefined
-      fetchCalls.push({ url, body })
+      fetchCalls.push({ url, body, headers: init?.headers as Record<string, string> })
       return { status: fetchResponse.status } as Response
     }),
   )
@@ -45,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('handleSessionStart', () => {
@@ -94,7 +100,7 @@ describe('handleSessionStart', () => {
       { reason: 'new', sessionId: 'sess-abc' },
     )
     expect(fetchCalls.length).toBe(2)
-    expect(fetchCalls[0]!.url).toBe('http://localhost:3010/api/agents/agent-pan-636/heartbeat')
+    expect(fetchCalls[0]!.url).toBe('http://localhost:3011/api/agents/agent-pan-636/heartbeat')
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'model_set',
       model: 'pi',
@@ -106,6 +112,18 @@ describe('handleSessionStart', () => {
       activity: 'idle',
       timestamp: fixedTime,
     })
+  })
+
+  it('attaches the internal token when one is available', async () => {
+    mkdirSync(join(h.home, '.panopticon'), { recursive: true })
+    writeFileSync(join(h.home, '.panopticon', 'internal-token'), 'test-token\n')
+
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+
+    expect(fetchCalls[0]!.headers['x-panopticon-internal-token']).toBe('test-token')
   })
 
   it('buffers to pending-events.jsonl when dashboard returns 503', async () => {
@@ -120,6 +138,23 @@ describe('handleSessionStart', () => {
     expect(lines.length).toBe(2)
     expect(JSON.parse(lines[0]!).kind).toBe('model_set')
     expect(JSON.parse(lines[1]!).kind).toBe('activity')
+  })
+
+  it('caps pending event replay to a bounded tail when dashboard remains unavailable', async () => {
+    fetchResponse = { status: 503 }
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    mkdirSync(join(h.home, '.panopticon', 'agents', 'agent-pan-636'), { recursive: true })
+    const lines = Array.from({ length: 350 }, (_, index) => JSON.stringify({ kind: 'activity', activity: 'idle', sequence: index }))
+    writeFileSync(paths.pendingEventsPath, `${lines.join('\n')}\n`)
+
+    await handleToolExecutionEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
+      { toolName: 'Bash', isError: false },
+    )
+
+    const remaining = readFileSync(paths.pendingEventsPath, 'utf8').trim().split('\n')
+    expect(remaining.length).toBeLessThanOrEqual(202)
+    expect(JSON.parse(remaining[0]!).sequence).toBeGreaterThanOrEqual(150)
   })
 
   it('flushes pending events on the next successful POST', async () => {
@@ -140,11 +175,12 @@ describe('handleSessionStart', () => {
       { toolName: 'Bash', isError: false },
     )
 
-    // 2 buffered + 1 new = 3 POSTs total.
-    expect(fetchCalls.length).toBe(3)
+    // 2 buffered + activity + cost = 4 POSTs total.
+    expect(fetchCalls.length).toBe(4)
     expect(fetchCalls[0]!.body).toEqual({ kind: 'model_set', model: 'pi', claudeSessionId: 'sess-abc', timestamp: fixedTime })
     expect(fetchCalls[1]!.body).toEqual({ kind: 'activity', activity: 'idle', timestamp: fixedTime })
     expect(fetchCalls[2]!.body).toEqual({ kind: 'activity', activity: 'working', tool: 'Bash', timestamp: fixedTime })
+    expect(fetchCalls[3]!.body).toMatchObject({ kind: 'cost-event', tool: 'Bash', costUsd: null })
 
     // Pending file should be gone after successful drain.
     expect(existsSync(paths.pendingEventsPath)).toBe(false)
@@ -224,17 +260,24 @@ describe('handleToolExecutionEnd', () => {
     expect(body.last_action).toBe('tool_error')
   })
 
-  it('PAN-1134: POSTs activity working with the tool name', async () => {
+  it('PAN-1134: POSTs activity working with the tool name and a cost event', async () => {
     await handleToolExecutionEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
-      { toolName: 'Bash', isError: false },
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now, issueId: 'PAN-636', role: 'work' },
+      { toolName: 'Bash', isError: false, usage: { inputTokens: 10, outputTokens: 3 }, costUsd: 0.001 },
     )
-    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls.length).toBe(2)
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'activity',
       activity: 'working',
       tool: 'Bash',
       timestamp: fixedTime,
+    })
+    expect(fetchCalls[1]!.body).toMatchObject({
+      kind: 'cost-event',
+      issueId: 'PAN-636',
+      tool: 'Bash',
+      usage: { inputTokens: 10, outputTokens: 3, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      costUsd: 0.001,
     })
   })
 })
@@ -257,17 +300,102 @@ describe('handleTurnEnd', () => {
     expect(body.pid).toBe(7)
   })
 
-  it('PAN-1134: POSTs activity idle', async () => {
+  it('PAN-1134: POSTs activity idle and a turn cost event', async () => {
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636' },
       {},
     )
-    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls.length).toBe(2)
     expect(fetchCalls[0]!.body).toEqual({
       kind: 'activity',
       activity: 'idle',
       timestamp: fixedTime,
     })
+    expect(fetchCalls[1]!.body).toMatchObject({ kind: 'cost-event', issueId: 'PAN-636', tool: 'turn_end' })
+  })
+
+  it('posts work-complete when all issue beads are closed', async () => {
+    const workspace = join(h.home, 'workspace')
+    mkdirSync(join(workspace, '.beads'), { recursive: true })
+    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
+  })
+
+  it('routes work turn-end completion from launcher session type env', async () => {
+    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'work')
+    const workspace = join(h.home, 'workspace')
+    mkdirSync(join(workspace, '.beads'), { recursive: true })
+    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', workspace },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
+  })
+
+  it('does not auto-complete work on negated ready-for-review output', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636' },
+      { output: 'Blocked on failing tests; not ready for review.' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(false)
+  })
+
+  it('routes specialist auto-completion from launcher session type env', async () => {
+    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'review')
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, issueId: 'PAN-636' },
+      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ agentId: 'agent-pan-636-review', issueId: 'PAN-636', role: 'review', sessionId: null, status: 'passed' })
+  })
+
+  it('does not auto-complete specialist output from loose pass phrases', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: 'Quoted reviewer text said LGTM and CODE APPROVED, but no final sentinel exists.' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+  })
+
+  it('gives structured failure evidence precedence over specialist pass sentinels', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: '## Verdict: CHANGES REQUESTED\n\nPANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ issueId: 'PAN-636', status: 'failed' })
+  })
+
+  it('posts specialist auto-complete with trusted runtime metadata when a specialist marker appears', async () => {
+    const paths = panopticonPathsFor('agent-pan-636-review', h.home)
+    mkdirSync(paths.agentDir, { recursive: true })
+    writeFileSync(paths.sessionIdPath, 'pi-session-123\n')
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
+      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
+    expect(fetchCalls.at(-1)!.body).toMatchObject({ agentId: 'agent-pan-636-review', issueId: 'PAN-636', role: 'review', sessionId: 'pi-session-123', status: 'passed' })
   })
 })
 

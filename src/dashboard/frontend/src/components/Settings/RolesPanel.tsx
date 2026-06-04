@@ -3,11 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
+type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 type Harness = 'claude-code' | 'pi';
-type Effort = 'low' | 'medium' | 'high';
+type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 interface RoleSubConfig {
@@ -65,7 +65,7 @@ interface RoleDefinition {
 }
 
 const DEFAULT_WORKHORSES: Required<Record<WorkhorseSlot, ModelRef>> = {
-  expensive: 'claude-opus-4-7',
+  expensive: 'claude-opus-4-8',
   mid: 'claude-sonnet-4-6',
   cheap: 'claude-haiku-4-5',
 };
@@ -103,6 +103,13 @@ const ROLES: RoleDefinition[] = [
     ],
   },
   {
+    id: 'strike',
+    name: 'Strike',
+    icon: 'bolt',
+    description: 'Precision agent — drop in, implement, land directly on main, verify on main. Bypasses plan/review/test/ship.',
+    defaultModel: 'workhorse:expensive',
+  },
+  {
     id: 'review',
     name: 'Review',
     icon: 'rate_review',
@@ -135,7 +142,7 @@ const ROLES: RoleDefinition[] = [
     name: 'Flywheel',
     icon: 'all_inclusive',
     description: 'Runs the singleton Fix-All Flywheel orchestrator.',
-    defaultModel: 'claude-opus-4-7',
+    defaultModel: 'claude-opus-4-8',
   },
 ];
 
@@ -526,6 +533,8 @@ export function RolesPanel() {
                           <option value="low">Low</option>
                           <option value="medium">Medium</option>
                           <option value="high">High</option>
+                          <option value="xhigh">Extra High</option>
+                          <option value="max">Max</option>
                         </select>
                       </label>
                       <label className="space-y-1.5">

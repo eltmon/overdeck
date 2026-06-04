@@ -287,6 +287,7 @@ optional:
           vars: {
             ISSUE_ID: 'PAN-611',
             ISSUE_ID_LOWER: 'pan-611',
+            BRANCH_NAME: 'feature/pan-611',
             WORKSPACE_PATH: '/workspace',
             LOCAL: true,
             REMOTE: false,
@@ -342,6 +343,7 @@ optional:
           vars: {
             ISSUE_ID: 'PAN-611',
             ISSUE_ID_LOWER: 'pan-611',
+            BRANCH_NAME: 'feature/pan-611',
             WORKSPACE_PATH: '/workspace',
             LOCAL: true,
             REMOTE: false,
@@ -494,6 +496,7 @@ optional:
           vars: {
             ISSUE_ID: 'PAN-611',
             ISSUE_ID_LOWER: 'pan-611',
+            BRANCH_NAME: 'feature/pan-611',
             WORKSPACE_PATH: '/workspace',
             LOCAL: true,
             REMOTE: false,

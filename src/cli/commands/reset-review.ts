@@ -43,9 +43,15 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
     }
 
     if (options.session) {
-      console.error(chalk.red('\nError: Claude sessions must never be reset. Sessions are sacred — use "pan resume" to continue the existing session.'));
-      process.exit(1);
-      // Hidden override (future use): await resetSessionCommand(id);
+      // Non-destructive: clears only the resume pointers (session.id / sessions.json)
+      // under ~/.panopticon/agents/<id>/ so the next start opens a fresh Claude
+      // session. The JSONL transcript history is NEVER touched — that is the truly
+      // sacred artifact, and resetSessionCommand does not delete it. Also refuses
+      // while the agent is running. Re-enabled after bf77f0194 hard-blocked this and
+      // left `pan start` pointing at a dead command (its refusal recommends exactly
+      // this). Needed e.g. to switch a stopped agent's model, where the saved session
+      // can't be resumed under different provider routing.
+      await resetSessionCommand(id);
     }
 
   } catch (error: any) {

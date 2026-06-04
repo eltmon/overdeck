@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Home-first IA with Threads (the bigger bang)</title>
+<style>
+  :root{
+    --background:#ffffff; --foreground:#1f2937; --muted:#6b7280;
+    --border:rgba(0,0,0,.10); --border-strong:rgba(0,0,0,.16);
+    --primary:#4f46e5; --primary-tint:rgba(79,70,229,.08); --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39; --codex:#10a37f; --running:#16a34a; --idle:#cbd5e1;
+    --surface:#fafafa; --surface-2:#f4f4f5;
+
+    /* #type accents */
+    --t-feature:#4f46e5; --t-bug:#e11d48; --t-explore:#9333ea; --t-chore:#64748b;
+
+    --c-rail:#6b7280; --c-home:#0d9488; --c-sess:#0ea5e9; --c-thread:#9333ea; --c-tabs:#4f46e5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px;line-height:1.55;padding:32px 24px 80px;}
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:34px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--background);
+    box-shadow:0 6px 30px rgba(0,0,0,.10);display:flex;height:600px;}
+
+  .tag{position:absolute;z-index:6;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:#fff;
+    padding:2px 7px;border-radius:5px;white-space:nowrap;font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-rail{background:var(--c-rail);} .t-home{background:var(--c-home);} .t-sess{background:var(--c-sess);}
+  .t-thread{background:var(--c-thread);} .t-tabs{background:var(--c-tabs);}
+  .region{position:relative;}
+
+  /* ---- sidebar: Home + Threads + More ---- */
+  .side{width:236px;flex:0 0 236px;background:var(--surface);border-right:1px solid var(--border);
+    padding:12px 10px;font-size:12.5px;display:flex;flex-direction:column;position:relative;}
+  .side-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:14px 6px 6px;}
+  .nav{padding:7px 9px;border-radius:8px;display:flex;align-items:center;gap:9px;color:var(--foreground);font-weight:500;}
+  .nav.root{font-weight:700;font-size:13.5px;}
+  .nav.active{background:var(--primary-tint);color:var(--primary);font-weight:700;}
+  .thread{padding:7px 9px;border-radius:8px;display:flex;align-items:center;gap:8px;color:var(--foreground);}
+  .thread.active{background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .thread .dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
+  .thread .dot.run{background:var(--running);} .thread .dot.idle{background:var(--idle);}
+  .thread .ty{font-family:"SF Mono",monospace;font-size:10.5px;font-weight:700;padding:0 5px;border-radius:4px;color:#fff;flex:0 0 auto;}
+  .ty.feature{background:var(--t-feature);} .ty.bug{background:var(--t-bug);} .ty.explore{background:var(--t-explore);} .ty.chore{background:var(--t-chore);}
+  .thread .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .thread .id{margin-left:auto;color:#9ca3af;font-family:"SF Mono",monospace;font-size:10px;}
+  .newt{padding:7px 9px;color:var(--muted);font-weight:500;}
+  .more{margin-top:auto;border-top:1px solid var(--border);padding-top:8px;}
+  .more .nav{color:var(--muted);font-weight:500;font-size:12px;padding:5px 9px;}
+
+  /* ---- main: App Home ---- */
+  .main{flex:1;overflow:auto;padding:22px 26px;min-width:0;position:relative;}
+  .hello{font-size:19px;font-weight:700;margin:0 0 12px;}
+  .spawn{display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);border-radius:12px;
+    padding:12px 15px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);margin-bottom:22px;}
+  .spawn .typed{flex:1;color:#9ca3af;} .spawn .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+
+  .sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .sec-h .see{margin-left:auto;color:var(--primary);text-transform:none;letter-spacing:0;font-weight:600;}
+
+  .sessions{margin-bottom:24px;position:relative;}
+  .srow{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;margin-bottom:7px;font-size:12.5px;}
+  .srow .dot{width:8px;height:8px;border-radius:50%;}
+  .srow .dot.run{background:var(--running);} .srow .dot.idle{background:var(--idle);}
+  .srow .ag{display:inline-flex;align-items:center;gap:6px;font-weight:600;}
+  .srow .sq{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .srow .ctx{color:#9ca3af;font-family:"SF Mono",monospace;font-size:10.5px;}
+  .srow .ago{margin-left:auto;color:#9ca3af;font-size:11px;}
+
+  .threads-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;position:relative;}
+  .tcard{border:1px solid var(--border);border-radius:11px;background:#fff;padding:13px 14px;display:flex;flex-direction:column;gap:8px;}
+  .tcard .top{display:flex;align-items:center;gap:7px;}
+  .tcard .ttl{font-weight:700;font-size:13.5px;margin:2px 0 0;}
+  .tcard .meta{display:flex;align-items:center;gap:9px;color:#9ca3af;font-size:11px;font-family:"SF Mono",monospace;margin-top:auto;}
+  .tcard .meta .dot{width:7px;height:7px;border-radius:50%;}
+  .tcard .meta .dot.run{background:var(--running);} .tcard .meta .dot.idle{background:var(--idle);}
+  .tcard.add{align-items:center;justify-content:center;color:var(--muted);border-style:dashed;font-weight:600;}
+
+  .more-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;}
+  .mcard{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px;text-align:center;font-size:11.5px;color:var(--muted);font-weight:600;}
+  .mcard .ic{font-size:18px;display:block;margin-bottom:5px;color:var(--foreground);}
+
+  /* ---- frame 2: a Thread opened ---- */
+  .win2{margin-top:46px;height:430px;}
+  .stage{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .tabstrip{display:flex;align-items:flex-end;gap:0;height:44px;flex:0 0 44px;border-bottom:1px solid var(--border);background:var(--surface);padding:9px 8px 0;position:relative;}
+  .ptab{display:flex;align-items:center;gap:7px;padding:0 12px;height:35px;font-size:12.5px;color:var(--muted);border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;white-space:nowrap;}
+  .ptab .x{color:#c4c4c4;font-size:12px;} .ptab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .ptab.active{background:var(--background);color:var(--foreground);font-weight:600;border-color:var(--border);position:relative;top:1px;}
+  .ptab.home::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--t-feature);}
+  .ptab-add{display:flex;align-items:center;justify-content:center;width:30px;height:35px;color:#9ca3af;font-size:18px;}
+  .pbody{flex:1;overflow:auto;padding:22px 28px;position:relative;}
+  .home{max-width:640px;}
+  .ws-title{display:flex;align-items:center;gap:12px;} .ws-title .icon{width:28px;height:28px;border-radius:8px;background:var(--t-feature);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .ws-title h3{font-size:22px;margin:0;font-weight:700;}
+  .crumb{color:#9ca3af;font-size:12.5px;display:flex;align-items:center;gap:7px;margin:7px 0 16px;}
+  .crumb .ty{font-family:"SF Mono",monospace;color:#fff;background:var(--t-feature);border-radius:4px;padding:0 5px;font-size:10.5px;font-weight:700;}
+  .lbar{display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);border-radius:12px;padding:11px 14px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);margin-bottom:16px;}
+  .lbar .typed{flex:1;color:#9ca3af;} .lbar .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  .dock{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .pillb{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--foreground);background:#fff;border:1px solid var(--border-strong);border-radius:9px;padding:7px 12px;}
+  .pillb.ghost{font-weight:500;color:var(--muted);border-style:dashed;} .pillb.tool{font-weight:500;} .sq{width:13px;height:13px;border-radius:4px;display:inline-block;} .car{color:#9ca3af;font-size:10px;}
+
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;}
+  .callout{margin-top:14px;border:1px solid var(--primary-border);background:var(--primary-tint);border-radius:10px;padding:12px 16px;font-size:13px;}
+  .callout b{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Home-first IA, with <span style="color:var(--t-feature)">Threads</span></h1>
+  <p class="sub">The bigger-bang restructure: <b>everything starts at Home</b> → your <b>Sessions</b> + your <b>Threads</b>. A <b>Thread</b> is the new container (was the conflated "workspace/project/issue") — lightweight, tagged with a <code>#type</code>, and it opens on an always-present <b>Home tab</b> that spawns the rest. Two tiers of tabs: <b>Threads</b> in the sidebar, <b>panes</b> inside a thread. <b>Draft for discussion.</b></p>
+
+  <h2>1 · App Home — the root</h2>
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- sidebar -->
+      <div class="side region">
+        <span class="tag t-rail" style="top:8px;right:8px;">Sidebar <small>(was 18 items → Home + Threads + More)</small></span>
+        <div class="nav root active"><span>⌂</span> Home</div>
+
+        <div class="side-h region"><span class="tag t-thread" style="top:-20px;left:0;">your Threads — primary nav</span>Threads</div>
+        <div class="thread active"><span class="dot run"></span><span class="ty feature">#feat</span><span class="nm">Hoist PaneBar</span><span class="id">PAN-1561</span></div>
+        <div class="thread"><span class="dot run"></span><span class="ty bug">#bug</span><span class="nm">Login 500</span><span class="id">MYN-204</span></div>
+        <div class="thread"><span class="dot idle"></span><span class="ty explore">#expl</span><span class="nm">Harness landscape</span><span class="id">AUR-88</span></div>
+        <div class="thread"><span class="dot idle"></span><span class="ty chore">#chore</span><span class="nm">Node 22 bump</span><span class="id">PAN-1547</span></div>
+        <div class="newt">+ New thread</div>
+
+        <div class="more region">
+          <span class="tag t-rail" style="top:-20px;left:0;">admin views → demoted to "More"</span>
+          <div class="nav"><span>▦</span> Board</div>
+          <div class="nav"><span>⎇</span> Pipeline</div>
+          <div class="nav"><span>🤖</span> Agents</div>
+          <div class="nav"><span>⚙</span> Settings</div>
+        </div>
+      </div>
+
+      <!-- main: App Home -->
+      <div class="main region">
+        <span class="tag t-home" style="top:6px;right:8px;">App Home <small>(the true root)</small></span>
+        <p class="hello">Good morning, Edward</p>
+        <div class="spawn"><span>⌘</span><span class="typed">Start something — ask an agent, run a command, or open a thread…</span><span class="run">↵</span></div>
+
+        <!-- Sessions -->
+        <div class="sessions region">
+          <span class="tag t-sess" style="top:-12px;left:0;">Sessions <small>(you wanted these front-and-center)</small></span>
+          <div class="sec-h" style="margin-top:10px;">Sessions <span class="see">See all ›</span></div>
+          <div class="srow"><span class="dot run"></span><span class="ag"><span class="sq" style="background:var(--claude)"></span> Claude Code</span><span class="ctx">PAN-1561 · #feature</span><span class="ago">running · 2m</span></div>
+          <div class="srow"><span class="dot run"></span><span class="ag"><span class="sq" style="background:var(--codex)"></span> Codex</span><span class="ctx">MYN-204 · #bug</span><span class="ago">running · 8m</span></div>
+          <div class="srow"><span class="dot idle"></span><span class="ag"><span class="sq" style="background:var(--claude)"></span> Claude Code</span><span class="ctx">AUR-88 · #explore</span><span class="ago">idle · 1h</span></div>
+        </div>
+
+        <!-- Threads -->
+        <div class="region">
+          <span class="tag t-thread" style="top:-12px;left:0;">Threads <small>(open one → its tabs)</small></span>
+          <div class="sec-h" style="margin-top:8px;">Threads <span class="see">New thread +</span></div>
+          <div class="threads-grid">
+            <div class="tcard"><div class="top"><span class="ty feature">#feature</span></div><div class="ttl">Hoist PaneBar</div><div class="meta"><span class="dot run"></span>PAN-1561 · 3 tabs</div></div>
+            <div class="tcard"><div class="top"><span class="ty bug">#bug</span></div><div class="ttl">Login 500</div><div class="meta"><span class="dot run"></span>MYN-204 · 2 tabs</div></div>
+            <div class="tcard"><div class="top"><span class="ty explore">#explore</span></div><div class="ttl">Harness landscape</div><div class="meta"><span class="dot idle"></span>AUR-88 · 3 tabs</div></div>
+          </div>
+        </div>
+
+        <!-- More -->
+        <div class="region">
+          <span class="tag t-rail" style="top:-12px;left:0;">everything else → cards, not rail real-estate</span>
+          <div class="sec-h" style="margin-top:8px;">More</div>
+          <div class="more-grid">
+            <div class="mcard"><span class="ic">▦</span>Board</div>
+            <div class="mcard"><span class="ic">⎇</span>Pipeline</div>
+            <div class="mcard"><span class="ic">🤖</span>Agents</div>
+            <div class="mcard"><span class="ic">$</span>Costs</div>
+            <div class="mcard"><span class="ic">♥</span>Health</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · A Thread opened — two tiers of tabs</h2>
+  <p class="sub">Open a Thread and you're in its tab strip. The <b>Home tab</b> is always first and unclosable — it's the per-thread launchpad (header, launcher, docks) you <b>spawn the other tabs from</b>.</p>
+  <div class="frame-wrap">
+    <div class="win win2">
+      <!-- reuse sidebar (compact) -->
+      <div class="side region" style="flex:0 0 236px;">
+        <div class="nav root"><span>⌂</span> Home</div>
+        <div class="side-h">Threads</div>
+        <div class="thread active"><span class="dot run"></span><span class="ty feature">#feat</span><span class="nm">Hoist PaneBar</span><span class="id">PAN-1561</span></div>
+        <div class="thread"><span class="dot run"></span><span class="ty bug">#bug</span><span class="nm">Login 500</span><span class="id">MYN-204</span></div>
+        <div class="thread"><span class="dot idle"></span><span class="ty explore">#expl</span><span class="nm">Harness landscape</span><span class="id">AUR-88</span></div>
+        <div class="newt">+ New thread</div>
+      </div>
+
+      <div class="stage">
+        <div class="tabstrip region">
+          <span class="tag t-tabs" style="top:-2px;left:150px;">Thread's tabs (panes) — scoped to THIS thread</span>
+          <div class="ptab home active"><span>⌂</span> Home <span class="kbd">⌘1</span></div>
+          <div class="ptab"><span>🤖</span> Claude Code <span class="kbd">⌘2</span> <span class="x">×</span></div>
+          <div class="ptab"><span>▢</span> Terminal <span class="kbd">⌘3</span> <span class="x">×</span></div>
+          <div class="ptab-add">+</div>
+        </div>
+        <div class="pbody region">
+          <span class="tag t-home" style="top:4px;right:8px;">Home tab = per-Thread launchpad <small>(spawns the others)</small></span>
+          <div class="home">
+            <div class="ws-title"><span class="icon">H</span><h3>Hoist PaneBar</h3></div>
+            <div class="crumb"><span class="ty">#feature</span> panopticon · PAN-1561 · <span>⎇ feature/pan-1561</span></div>
+            <div class="lbar"><span>⌘</span><span class="typed">spawn a tab — ask Claude, run a terminal, open files / web…</span><span class="run">↵</span></div>
+            <div class="dock">
+              <span class="pillb"><span class="sq" style="background:var(--claude)"></span> Claude Code <span class="car">▾</span></span>
+              <span class="pillb"><span class="sq" style="background:var(--codex)"></span> Codex <span class="car">▾</span></span>
+              <span class="pillb tool">▢ Terminal</span>
+              <span class="pillb tool">📄 Files</span>
+              <span class="pillb tool">🌐 Web</span>
+              <span class="pillb tool ghost">+ Actions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <b>Why this is the bigger bang:</b> it solves the tab-explosion problem <i>and</i> your conflation problem at once. Tabs stay <b>scoped to a Thread</b> (never a 20-tab pile), but Threads are <b>first-class and cheap</b> — switch them like tabs, tag them with <code>#type</code>, and they live one click from Home. The sidebar drops from 18 destinations to <b>Home + what you're actually working on</b>; everything else is a card on Home.
+  </div>
+
+  <h2>3 · The vocabulary, settled</h2>
+  <table style="border-collapse:collapse;width:100%;font-size:13px;background:#fff;border-radius:8px;overflow:hidden;">
+    <thead><tr>
+      <th style="text-align:left;padding:8px 12px;background:var(--surface-2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);width:20%">Term</th>
+      <th style="text-align:left;padding:8px 12px;background:var(--surface-2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)">Means (no overlap)</th>
+    </tr></thead>
+    <tbody>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>Home</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">App root — Sessions + Threads + spawn. <b>Everything starts here.</b></td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code style="color:var(--t-feature)">Thread</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);"><b>NEW</b> — the unit you work in; holds tabs; tagged <code>#type</code>; opens on a Home tab.</td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>#type</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">Lightweight Thread category: <code>#feature</code> · <code>#bug</code> · <code>#explore</code> · <code>#chore</code>.</td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>Tab / Pane</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">A view inside a Thread: Home · agent · terminal · files · commits · plan · docs · web.</td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>Session</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">One agent run/conversation (surfaced on Home; lives in an agent tab).</td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>Project</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">The registered repo a Thread belongs to (panopticon, mind-your-now). Unchanged.</td></tr>
+      <tr><td style="padding:8px 12px;border-top:1px solid var(--border);"><code>Workspace</code></td><td style="padding:8px 12px;border-top:1px solid var(--border);">The git <i>worktree</i> a Thread runs in. Infra-level — no longer a UI noun.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-home)">Home</span><span class="desc"><b>App Home</b> — root: Sessions, Threads, spawn, More cards.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-sess)">Sessions</span><span class="desc"><b>Sessions</b> — active + recent agent runs, front-and-center.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-thread)">Thread</span><span class="desc"><b>Thread</b> — the container; <code>#type</code> tag + status dot; click to open.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-tabs)">Tabs</span><span class="desc"><b>Tabs</b> — scoped to a Thread; Home tab always first, spawns the rest.</span></div>
+  </div>
+
+  <p class="legend-note">Issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">#1561</a>. Siblings: <a class="pill-link" href="pan-1561-global-panebar.html">Variant A (flat bar)</a> · <a class="pill-link" href="pan-1561-global-panebar-grouped.html">Variant B (grouped)</a> · <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549 (nested origin)</a>.</p>
+
+</div>
+</body>
+</html>

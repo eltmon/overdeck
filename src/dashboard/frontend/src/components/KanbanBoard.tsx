@@ -31,7 +31,7 @@ import { deriveIssueActionPhase, type PipelinePhase } from '../lib/issueActions'
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { cn } from '../lib/utils';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
-import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
+import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/workAgents';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';

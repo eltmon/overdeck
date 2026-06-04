@@ -47,6 +47,7 @@ pan doctor
 # ✓ Skills directory exists
 # ✓ tmux available
 # ✓ Docker available
+# ⚠ orphan-proposed-specs: proposed vBRIEF specs without work agents, grouped by project with remediation hints
 ```
 
 ### 2. Check Configuration

@@ -206,4 +206,33 @@ describe('conversations-db', () => {
       expect(hasOtherActiveConversationOnTmuxSession('conv-shared', 'live')).toBe(false);
     });
   });
+
+  describe('getConversationByTmuxSession (PAN-1520)', () => {
+    it('returns null when no conversation owns the session', async () => {
+      const { getConversationByTmuxSession } = await import('../conversations-db.js');
+      expect(getConversationByTmuxSession('conv-nonexistent')).toBeNull();
+    });
+
+    it('resolves the single conversation on a session', async () => {
+      const { createConversation, getConversationByTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'only', tmuxSession: 'conv-only', cwd: '/cwd' });
+      expect(getConversationByTmuxSession('conv-only')?.name).toBe('only');
+    });
+
+    it('prefers the active row over an ended sibling (post-/clear case)', async () => {
+      const { createConversation, markConversationEnded, getConversationByTmuxSession } = await import('../conversations-db.js');
+      // Parent was /cleared and marked ended; the live sibling keeps the session.
+      createConversation({ name: 'cleared-parent', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      createConversation({ name: 'live-sibling', tmuxSession: 'conv-shared', cwd: '/cwd' });
+      markConversationEnded('cleared-parent');
+      expect(getConversationByTmuxSession('conv-shared')?.name).toBe('live-sibling');
+    });
+
+    it('ignores archived rows', async () => {
+      const { createConversation, archiveConversation, getConversationByTmuxSession } = await import('../conversations-db.js');
+      createConversation({ name: 'archived-row', tmuxSession: 'conv-arch', cwd: '/cwd' });
+      archiveConversation('archived-row');
+      expect(getConversationByTmuxSession('conv-arch')).toBeNull();
+    });
+  });
 });

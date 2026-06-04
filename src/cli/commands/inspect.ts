@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
 import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
 
@@ -35,7 +36,15 @@ export function registerInspectCommand(program: Command): void {
     });
 }
 
-export async function inspectCommand(issueId: string, options: InspectOptions): Promise<void> {
+export async function inspectCommand(id: string, options: InspectOptions): Promise<void> {
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
   const normalizedIssueId = issueId.toUpperCase();
 
   // Resolve project from issue ID

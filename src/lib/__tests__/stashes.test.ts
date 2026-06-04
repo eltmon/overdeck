@@ -40,16 +40,17 @@ describe('stashes', () => {
     vi.clearAllMocks();
   });
 
-  it('builds canonical stash messages', () => {
+  // PAN-1531: CanonicalStashKind narrowed to 'salvageable' only.
+  // pre-spawn, pre-merge, review-temp are LegacyStashKind — recognized by
+  // the parser for cleanup but never created by Panopticon code.
+  it('builds canonical (salvageable-only) stash messages', () => {
     const when = new Date('2026-04-27T14:15:16.123Z');
-    expect(buildStashMessage('pre-spawn', 'pan-879', when)).toBe('pre-spawn:PAN-879:2026-04-27T14:15:16Z');
-    expect(buildStashMessage('pre-merge', 'pan-879', when)).toBe('pre-merge:PAN-879:2026-04-27T14:15:16Z');
-    expect(buildStashMessage('review-temp', 'pan-879', 3)).toBe('review-temp:PAN-879:3');
     expect(buildStashMessage('salvageable', 'pan-879', when, 'UI Draft + notes')).toBe('salvageable:PAN-879:2026-04-27T14:15:16Z:ui-draft-notes');
+    expect(buildStashMessage('salvageable', 'pan-879', when)).toBe('salvageable:PAN-879:2026-04-27T14:15:16Z:recovery');
   });
 
   it('rejects invalid issue ids at the stash-message boundary', () => {
-    expect(() => buildStashMessage('pre-merge', 'PAN-879; rm -rf /')).toThrow('Invalid issue ID format');
+    expect(() => buildStashMessage('salvageable', 'PAN-879; rm -rf /', new Date(), 'desc')).toThrow('Invalid issue ID format');
   });
 
   it('parses canonical stash messages and stash list lines', () => {

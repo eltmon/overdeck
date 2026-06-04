@@ -51,13 +51,13 @@ export interface ConvertResult {
   targetSessionFile: string;
 }
 
-interface TranscriptTurn {
+export interface TranscriptTurn {
   role: string;
   text: string;
 }
 
 /** Pull plain text out of a Claude/Pi `message.content` (string or block array). */
-function extractContentText(content: unknown): string {
+export function extractContentText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
   const parts: string[] = [];
@@ -66,9 +66,9 @@ function extractContentText(content: unknown): string {
     const b = block as Record<string, unknown>;
     if (typeof b['text'] === 'string') parts.push(b['text'] as string);
     else if (typeof b['thinking'] === 'string') parts.push(`[thinking] ${b['thinking'] as string}`);
-    else if (b['type'] === 'tool_use' && typeof b['name'] === 'string') {
+    else if ((b['type'] === 'tool_use' || b['type'] === 'toolCall') && typeof b['name'] === 'string') {
       parts.push(`[tool_use: ${b['name'] as string}]`);
-    } else if (b['type'] === 'tool_result') {
+    } else if (b['type'] === 'tool_result' || b['type'] === 'toolResult') {
       const inner = extractContentText(b['content']);
       if (inner) parts.push(`[tool_result] ${inner}`);
     }
@@ -101,7 +101,7 @@ function extractClaudeTranscript(raw: string): TranscriptTurn[] {
 }
 
 /** Read a Pi Agent JSONL transcript into ordered role/text turns. */
-function extractPiTranscript(raw: string): TranscriptTurn[] {
+export function extractPiTranscript(raw: string): TranscriptTurn[] {
   const turns: TranscriptTurn[] = [];
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();

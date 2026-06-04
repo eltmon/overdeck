@@ -51,6 +51,11 @@ describe('toRole', () => {
     expect(toRole('review')).toBe('review')
     expect(toRole('test')).toBe('test')
     expect(toRole('ship')).toBe('ship')
+    expect(toRole('flywheel')).toBe('flywheel')
+    // PAN-1506: strike is a valid Role per packages/contracts. Dropping it
+    // here caused strike agents to render with role=undefined in the
+    // dashboard, which the frontend's Strike filter then could not match.
+    expect(toRole('strike')).toBe('strike')
   })
 
   it('returns undefined for legacy phases and invalid values', () => {

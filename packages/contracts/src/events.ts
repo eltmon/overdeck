@@ -130,10 +130,29 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   payload: Schema.Struct({
     agentId: AgentId,
     role: Schema.optional(Role),
-    hasPendingQuestion: Schema.Boolean,
-    pendingQuestionCount: Schema.Number,
+    // Optional because this event type predates these fields (PAN-440). The event
+    // store is append-only, so older persisted events lack them — a required schema
+    // makes those events fail replay decode ("Missing key").
+    hasPendingQuestion: Schema.optional(Schema.Boolean),
+    pendingQuestionCount: Schema.optional(Schema.Number),
     pendingQuestionPrompt: Schema.optional(Schema.String),
     pendingQuestionReason: Schema.optional(Schema.String),
+    // PAN-1520 — unified pending-input surfaces
+    pendingInputCount: Schema.optional(Schema.Number),
+    pendingInputKinds: Schema.optional(Schema.Array(Schema.String)),
+    pendingAskUserQuestion: Schema.optional(Schema.Struct({
+      toolUseId: Schema.String,
+      askedAt: Schema.String,
+      questions: Schema.Array(Schema.Struct({
+        question: Schema.String,
+        header: Schema.optional(Schema.String),
+        multiSelect: Schema.optional(Schema.Boolean),
+        options: Schema.Array(Schema.Struct({
+          label: Schema.String,
+          description: Schema.optional(Schema.String),
+        })),
+      })),
+    })),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
   }),
@@ -458,6 +477,32 @@ export const PipelineTestCompletedEvent = Schema.Struct({
   payload: Schema.Struct({ issueId: IssueId, passed: Schema.Boolean }),
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
+
+export const OperatorInterventionEvent = Schema.Struct({
+  type: Schema.Literal("operator.intervention"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    kind: Schema.Literals(["tell", "pause", "restart", "manual_edit", "deep_wipe", "unpause", "untroubled"]),
+    source: Schema.String,
+  }),
+})
+export type OperatorInterventionEvent = typeof OperatorInterventionEvent.Type
+
+export const SubstrateBugFiledEvent = Schema.Struct({
+  type: Schema.Literal("substrate.bug_filed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    runId: Schema.optional(Schema.String),
+    filedBy: Schema.Literals(["agent", "operator"]),
+    discoveredIn: Schema.optional(IssueId),
+    severity: Schema.Literals(["P0", "P1", "P2"]),
+  }),
+})
+export type SubstrateBugFiledEvent = typeof SubstrateBugFiledEvent.Type
 
 /**
  * PAN-915 — reviewer session received a new prompt (spawn or resume of a
@@ -1041,6 +1086,8 @@ export const DomainEvent = Schema.Union([
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
+  OperatorInterventionEvent,
+  SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,
   ReviewReviewerCompletedEvent,
   ReviewSpecialistTimedOutEvent,

@@ -1,0 +1,774 @@
+/* Stage — PaneBar + pane renderer styles (PAN-1549). Ported from the
+   pan-1549 mockup, retargeted onto the app's global semantic tokens. */
+
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.pane {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: var(--background);
+}
+
+/* Split layout (PAN-1591) — the active pane plus an optional secondary pane. */
+.paneArea {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-width: 0;
+  min-height: 0;
+}
+.splitPanel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.layoutSplit {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.splitDivider {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.12s;
+}
+.splitDivider:hover {
+  background: var(--primary, var(--ring));
+}
+.splitDividerVertical {
+  cursor: row-resize;
+}
+.splitHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 26px;
+  padding: 0 4px 0 10px;
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: var(--card);
+}
+.splitHeaderFocused {
+  background: var(--accent);
+  box-shadow: inset 2px 0 0 0 var(--primary, var(--ring));
+}
+/* Split-by-drag (PAN-1591): a transparent capture layer over each region while
+   a tab is dragged, plus a highlight showing where the drop would land. */
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+}
+.dropIndicator {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--primary, #3b82f6) 22%, transparent);
+  box-shadow: inset 0 0 0 2px var(--primary, #3b82f6);
+  transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s;
+}
+.splitHeaderFocused .splitHeaderLabel {
+  color: var(--foreground);
+}
+.splitHeaderLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.splitHeaderClose {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.splitHeaderClose:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.home {
+  max-width: 680px;
+  padding: 26px 30px;
+}
+
+/* WorkspaceHeader */
+.wsHead {
+  position: relative;
+}
+
+.wsTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wsIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-foreground);
+  font-weight: 700;
+}
+
+.wsName {
+  font-size: 26px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Project-variant header: `#` accent before the project name (PAN-1561). */
+.wsHash {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+/* Agent pill brand logo (PAN-1561) — sizes the shared ProviderIcon to the pill. */
+.agentLogo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agentLogoSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.wsBranch {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin: 6px 0 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wsBranchName {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wsLink {
+  color: var(--primary);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* Stat chips */
+.stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+.chipAdd {
+  color: var(--success);
+}
+
+.chipDel {
+  color: var(--destructive);
+}
+
+/* Launcher */
+.launcher {
+  position: relative;
+  margin-bottom: 6px;
+}
+
+.launchBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px solid var(--primary);
+  border-radius: 12px;
+  padding: 11px 14px;
+  background: var(--card);
+}
+
+.launchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.dropdown {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.ddRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.ddRow:last-child {
+  border-bottom: none;
+}
+
+.ddRowSel {
+  background: var(--accent);
+}
+
+.ddLab {
+  flex: 1;
+}
+
+.ddLab b {
+  font-weight: 600;
+}
+
+.ddKeys {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-family: 'SF Mono', monospace;
+}
+
+.gicon {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  color: var(--muted-foreground);
+}
+
+/* Docks (AgentDock + ActionDock) */
+.dock {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 20px 0 0;
+  position: relative;
+}
+
+.actionDock {
+  margin-top: 10px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pill:hover {
+  background: var(--secondary);
+}
+
+.pillGhost {
+  font-weight: 500;
+  color: var(--muted-foreground);
+  border-style: dashed;
+}
+
+.pillTool {
+  font-weight: 500;
+}
+
+.actionOverflow {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.actionOverflowItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  border: none;
+  background: transparent;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.actionOverflowItem:hover {
+  background: var(--secondary);
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.timelineEmpty {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.timelineGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timelineLabel {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+.timelineCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 9px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.timelineCard:hover {
+  background: var(--secondary);
+}
+
+.timelineCardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.timelineAgent {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.timelineTime {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.timelinePreview {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* HomePane collapsible sections */
+.sections {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.collapsible {
+  border-bottom: 1px solid var(--border);
+}
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  border: none;
+  background: transparent;
+  padding: 12px 2px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.collapsibleBody {
+  padding: 4px 2px 14px;
+}
+
+.homeSection:empty {
+  display: none;
+}
+
+.homeSection {
+  margin-bottom: 18px;
+}
+
+.placeholder {
+  padding: 26px 30px;
+  color: var(--muted-foreground);
+}
+
+.terminalPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.browserFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--background);
+}
+
+.filesPane {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 2px;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--foreground);
+  text-align: left;
+}
+
+.fileRow:hover {
+  background: var(--secondary);
+}
+
+.filePath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileStat {
+  font-size: 11px;
+  font-family: 'SF Mono', monospace;
+}
+
+/* Sub-toggle panes (e.g. PlanPane, DocsPane) */
+.subPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.subTabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.subTab {
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.subTabActive {
+  color: var(--foreground);
+  background: var(--secondary);
+  font-weight: 600;
+}
+
+.subBody {
+  flex: 1;
+  overflow: auto;
+}
+
+.placeholderTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 6px;
+}
+
+.placeholderHint {
+  font-size: 13px;
+}
+
+/* Relative wrapper so the ‹ › scroll buttons can overlay the tab strip's edges
+   without scrolling along with the tabs (they live outside the scroll box). */
+.panebarWrap {
+  position: relative;
+  flex: 0 0 43px;
+}
+
+/* Edge scroll buttons — only rendered when tabs overflow (PAN-1591). The
+   gradient fades the underlying tabs so the arrow reads as "more this way". */
+.tabScrollBtn {
+  position: absolute;
+  top: 6px;
+  bottom: 1px;
+  z-index: 4;
+  display: flex;
+  width: 34px;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: color 0.12s;
+}
+.tabScrollBtn:hover {
+  color: var(--foreground);
+}
+.tabScrollLeft {
+  left: 0;
+  justify-content: flex-start;
+  padding-left: 4px;
+  background: linear-gradient(to right, var(--card) 62%, transparent);
+}
+.tabScrollRight {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: 4px;
+  background: linear-gradient(to left, var(--card) 62%, transparent);
+}
+
+.panebar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  /* Bottom border via an inset shadow (not border-bottom): with box-sizing
+     border-box, a real border-bottom shrank the content box to 35px while tabs
+     are 36px, so `overflow-x: auto` (which forces overflow-y to auto) clipped
+     every tab by 1px — that was the active-tab funkiness. An inset shadow
+     paints inside the box, isn't clipped, doesn't scroll, and the active tab
+     paints over it (see .panetab z-index + .active top) to merge into content. */
+  box-shadow: inset 0 -1px 0 0 var(--border);
+  background: var(--card);
+  padding: 6px 8px 0;
+  height: 43px;
+  flex: 0 0 43px;
+  position: relative;
+  /* Scroll horizontally when tabs overflow, but never vertically. Critically,
+     HIDE the scrollbar: a visible horizontal scrollbar steals ~15px of the
+     bar's height, which squeezes/clips the 36px tabs and makes the whole bar
+     vertically scrollable (the "bonked" tab strip). Hidden scrollbars consume
+     no space, so the tabs always fit; horizontal scroll still works via
+     trackpad / shift+wheel. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Chromium/WebKit: hide the scrollbar so it claims no vertical space. */
+.panebar::-webkit-scrollbar {
+  display: none;
+}
+
+.panetab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  height: 36px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  white-space: nowrap;
+  background: transparent;
+  font-family: inherit;
+  /* Sit above the bar's inset bottom-border shadow so the active tab can
+     cover it and merge into the content below. */
+  position: relative;
+  z-index: 1;
+}
+
+.panetabIcon {
+  display: inline-flex;
+  flex: 0 0 14px;
+}
+
+.kbd {
+  font-size: 9.5px;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 14px;
+}
+
+.active {
+  background: var(--background);
+  color: var(--foreground);
+  font-weight: 600;
+  border-color: var(--border);
+  position: relative;
+  /* Drop 1px so the active tab's bottom covers the bar's inset bottom-border
+     shadow, merging seamlessly into the content below. Now that the bar is
+     43px tall (border via inset shadow, not border-bottom), this no longer
+     overflows the content box, so it isn't clipped. */
+  top: 1px;
+}
+
+.active .kbd {
+  color: var(--muted-foreground);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  padding: 1px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.close:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 36px;
+  color: var(--muted-foreground);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+
+.add:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+/* New-tab dropdown (PAN-1561) — portaled to <body> and positioned inline
+ * (position:fixed) so the PaneBar's overflow-x clip can't hide it. */
+.addMenu {
+  z-index: 1000;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--popover, var(--card));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.addMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.addMenuItem:hover {
+  background: var(--accent);
+}

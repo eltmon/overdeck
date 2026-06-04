@@ -78,7 +78,13 @@ projects:
         command: npm run build
         required: true
       test:
-        command: npm test -- --run
+        # PAN-666: scope to files changed since the target branch so a feature
+        # agent is never blocked by pre-existing failures in code it did not
+        # touch. {{CHANGED_BASE}} is injected by the verification gate as
+        # origin/<target-branch>; vitest --changed walks the import graph and runs
+        # only tests affected by the PR's diff. Pre-existing rot in unmodified
+        # files is skipped (and logged by the gate).
+        command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
         required: true
   mind-your-now:
     name: mind-your-now

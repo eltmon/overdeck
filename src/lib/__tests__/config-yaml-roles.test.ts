@@ -40,7 +40,7 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
 
 describe('role model configuration', () => {
   it('exports default model refs for every role', () => {
-    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'test', 'work']);
+    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'strike', 'test', 'work']);
   });
 
   it('dereferences workhorse refs and passes literal model ids through', () => {
@@ -130,7 +130,7 @@ describe('role model configuration', () => {
     expect(config.workhorses).toEqual(DEFAULT_WORKHORSES);
     expect(config.roles).toEqual(DEFAULT_ROLES);
     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
-    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-7');
+    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-8');
   });
 
   it('seeds missing roles while preserving partial user role config', () => {
@@ -170,6 +170,7 @@ describe('role model configuration', () => {
       harness: 'pi',
       model: 'claude-sonnet-4-6',
       effort: 'medium',
+      minAgents: 4,
       maxAgents: 4,
       scope: 'all-tracked-projects',
     });
@@ -181,6 +182,35 @@ describe('role model configuration', () => {
         flywheel: { model: 'claude-opus-4-7', maxAgents: 0 },
       },
     })).toThrow('config.yaml: roles.flywheel.maxAgents must be a positive integer');
+  });
+
+  it('accepts xhigh/max effort on an Opus 4.7 role', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        work: { model: 'claude-opus-4-7', effort: 'xhigh' },
+        review: { model: 'workhorse:expensive', effort: 'max' },
+      },
+    });
+
+    expect(config.roles?.work?.effort).toBe('xhigh');
+    expect(config.roles?.review?.effort).toBe('max');
+  });
+
+  it('rejects an effort level the role model does not support (model-aware)', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        // claude-sonnet-4-6 supports low/medium/high only — xhigh is Opus-4.7-only.
+        test: { model: 'claude-sonnet-4-6', effort: 'xhigh' },
+      },
+    })).toThrow("config.yaml: roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high)");
+  });
+
+  it('rejects an effort value outside the enum', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        work: { model: 'claude-opus-4-7', effort: 'maximum' as never },
+      },
+    })).toThrow('config.yaml: roles.work.effort must be one of low, medium, high, xhigh, max');
   });
 
   it('seeds missing workhorse slots while preserving user-defined slots', () => {
@@ -213,6 +243,7 @@ describe('tts daemon configuration', () => {
       rate: 1,
       maxChars: 140,
       dropInfoWhenFull: true,
+      lifecycle: true,
       daemonPort: 8787,
       daemonHost: '127.0.0.1',
       daemonAutoStart: false,
@@ -251,6 +282,7 @@ describe('tts daemon configuration', () => {
       rate: 1.25,
       maxChars: 220,
       dropInfoWhenFull: false,
+      lifecycle: true,
       daemonPort: 8788,
       daemonHost: 'localhost',
       daemonAutoStart: true,

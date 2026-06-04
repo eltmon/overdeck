@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Legacy OverviewTab — reconstruction (PAN-1591)</title>
+<style>
+  :root{
+    --bg:#0b0f17; --card:#111827; --card2:#0e1420; --border:#1f2937;
+    --fg:#e5e7eb; --muted:#9ca3af; --primary:#6ea8fe; --primary-fg:#0b0f17;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --star:#f0abfc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px}
+  h0{display:block;font-size:20px;font-weight:800;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 22px;font-size:12px}
+  .legend b{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .ok{background:var(--good)} .star{background:var(--star)}
+  /* tags */
+  .tag{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .tag.ok{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+  .tag.star{background:color-mix(in srgb,var(--star) 18%,transparent);color:var(--star)}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;position:relative}
+  .panel.starred{border-color:color-mix(in srgb,var(--star) 45%,var(--border))}
+  .phead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .ptitle{font-weight:700;font-size:13px}
+  .muted{color:var(--muted)}
+  .pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
+  .pill.state{background:color-mix(in srgb,var(--primary) 14%,transparent);color:var(--primary)}
+  .pill.stage{background:color-mix(in srgb,var(--fg) 6%,transparent);color:var(--muted)}
+  .billboard{background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 8%,transparent),transparent)}
+  .metrics{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}
+  .dag{height:160px;border-radius:8px;border:1px dashed var(--border);background:repeating-linear-gradient(45deg,#0d1422,#0d1422 10px,#0e1626 10px,#0e1626 20px);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .tile{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:11px}
+  .tile.starred{border-color:color-mix(in srgb,var(--star) 45%,var(--border))}
+  .tile h4{margin:0 0 8px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .kv{display:flex;justify-content:space-between;font-size:11px;margin:2px 0}
+  .kv span:first-child{color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+  .code{font-family:ui-monospace,monospace;font-size:11px;background:color-mix(in srgb,var(--fg) 3%,transparent);border-radius:4px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .btn{font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--fg);cursor:pointer}
+  .btn.pri{background:var(--primary);color:var(--primary-fg);border-color:transparent;font-weight:600}
+  a.lnk{color:var(--primary);text-decoration:none;font-size:12px;display:block;margin:3px 0}
+  .spark{height:34px;display:flex;align-items:flex-end;gap:3px}
+  .spark i{display:block;width:7px;background:color-mix(in srgb,var(--primary) 60%,transparent);border-radius:2px 2px 0 0}
+  .sectionlbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:22px 0 8px}
+  .note{font-size:11px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h0>Legacy “OverviewTab” — reconstruction</h0>
+  <div class="sub">The old issue-detail dump (deleted in <span class="mono">b76d07ce4</span>, ~1350 LOC). Rebuilt from source so we can spot anything worth carrying into the new cockpit. <b style="color:var(--star)">★ = not carried into the new cockpit (borrow candidate)</b>.</div>
+  <div class="legend">
+    <b><span class="dot ok"></span> Already covered by the new cockpit</b>
+    <b><span class="dot star"></span> Borrow candidate — gone in the new design</b>
+  </div>
+
+  <!-- WorkspaceStatusCard -->
+  <div class="panel starred">
+    <div class="phead"><span class="ptitle">Workspace status (memory)</span><span class="tag star">★ borrow</span></div>
+    <div class="muted" style="font-size:12px">STATE summary + recent observations, workspace stats, “Open workspace home”.</div>
+    <div style="margin-top:8px"><button class="btn">Generate memory summary</button></div>
+    <div class="note">New cockpit: STATE lives in a <i>dig tab</i>; there’s no at-a-glance memory summary card or the one-click “generate memory summary”.</div>
+  </div>
+
+  <!-- Billboard -->
+  <div class="panel billboard">
+    <div class="phead">
+      <div>
+        <div style="font-size:18px;font-weight:700">Kanban board redesign</div>
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
+          <span class="pill state">In Review</span><span class="pill stage">work</span><span class="muted">PAN-1242</span>
+        </div>
+      </div>
+      <div style="text-align:right"><div style="font-size:18px;font-weight:700">$96.79</div><div class="muted" style="font-size:11px">cost to date</div></div>
+    </div>
+    <div class="metrics"><span>⏱ Runtime: 2h 14m</span><span>▣ 1 active agent</span><span>▤ 3 sessions</span><span>last activity 4m ago</span></div>
+    <div style="position:absolute;top:12px;right:12px"><span class="tag ok">✓ = IssueStatusBand</span></div>
+  </div>
+
+  <!-- DAG -->
+  <div class="panel starred">
+    <div class="phead"><span class="ptitle">Directive DAG (front-loaded, 520px)</span><span class="tag star">★ borrow</span></div>
+    <div class="dag">PlanDAGViewer — the full plan graph, shown up-front</div>
+    <div class="note">New cockpit: the DAG is demoted into the <i>vBRIEF</i> dig tab, not shown at a glance.</div>
+  </div>
+
+  <!-- Tile grid -->
+  <div class="sectionlbl">Tile grid (auto-fill)</div>
+  <div class="grid">
+    <div class="tile"><h4>Agent <span class="tag ok">✓ AgentCard</span></h4>
+      <div class="kv"><span>Model</span><span>Opus 4.8</span></div>
+      <div class="kv"><span>Runtime</span><span>claude-code</span></div>
+      <div class="kv"><span>Uptime</span><span>2h 14m</span></div>
+      <div class="kv"><span>Status</span><span>running</span></div>
+      <div class="note">(or a <b>Spawn Work</b> button when no agent)</div>
+    </div>
+    <div class="tile starred"><h4>Cost <span class="tag star">★ by-model</span></h4>
+      <div style="font-weight:700">$96.79</div>
+      <div class="kv"><span>Input tokens</span><span>4.2M</span></div>
+      <div class="kv"><span>Output tokens</span><span>318K</span></div>
+      <div class="kv"><span>opus-4.8</span><span>$71.40</span></div>
+      <div class="kv"><span>haiku-4.5</span><span>$25.39</span></div>
+      <div class="note">CostCard has the total; the <b>per-model</b> split may be partial/missing.</div>
+    </div>
+    <div class="tile starred"><h4>By Stage <span class="tag star">★ borrow</span></h4>
+      <div class="kv"><span>work</span><span>$58.10</span></div>
+      <div class="kv"><span>review</span><span>$22.65</span></div>
+      <div class="kv"><span>test</span><span>$9.80</span></div>
+      <div class="kv"><span>plan</span><span>$6.24</span></div>
+      <div class="note">Cost split per pipeline stage — not in the new cockpit.</div>
+    </div>
+    <div class="tile starred"><h4>Services <span class="tag star">★ borrow</span></h4>
+      <a class="lnk">Frontend ↗</a><a class="lnk">API ↗</a><a class="lnk">Storybook ↗</a>
+      <div class="note">Per-workspace running service URLs.</div>
+    </div>
+    <div class="tile starred"><h4>Attach <span class="tag star">★ borrow</span></h4>
+      <div class="code"><span class="mono">tmux attach -t agent-pan-1242</span><span>⧉</span></div>
+      <div class="note">Copy-the-attach-command. New cockpit streams the terminal in-pane but has no copy-attach.</div>
+    </div>
+    <div class="tile"><h4>Actions <span class="tag ok">✓ ActionStrip</span></h4>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn">Review &amp; Test</button><button class="btn">Recover Pipeline</button></div>
+      <div class="note">Superset now lives in the hybrid action menu (~41 actions).</div>
+    </div>
+    <div class="tile"><h4>Workspace <span class="tag ok">✓ WorkspaceCard</span></h4>
+      <div class="kv"><span>Branch</span><span>feature/pan-1242</span></div>
+      <div class="mono muted">workspaces/feature-pan-1242</div>
+    </div>
+    <div class="tile starred"><h4>Links <span class="tag star">★ check</span></h4>
+      <a class="lnk">GitHub issue ↗</a><a class="lnk">PR #1516 ↗</a>
+      <div class="note">Quick external links — verify these exist somewhere now.</div>
+    </div>
+  </div>
+
+  <!-- Sections -->
+  <div class="sectionlbl">Sections</div>
+  <div class="panel starred"><div class="phead"><span class="ptitle">Workspace Stack</span><span class="tag star">★ shown only when unhealthy</span></div><div class="muted" style="font-size:12px">Stack-health failure reasons (containers down, port conflicts, …).</div></div>
+  <div class="panel starred"><div class="phead"><span class="ptitle">Containers <span class="muted" style="font-size:10px">right-click</span></span><span class="tag star">★ borrow</span></div><div class="muted" style="font-size:12px">Per-container rows with right-click actions (restart / logs / stop).</div></div>
+  <div class="panel"><div class="phead"><span class="ptitle">Pipeline</span><span class="tag ok">✓ ReviewVerificationCard</span></div><div class="muted" style="font-size:12px">Review → Test → Merge stepper.</div></div>
+  <div class="panel"><div class="phead"><span class="ptitle">Reviewer summary</span><span class="tag ok">✓ ReviewVerificationCard</span></div><div class="muted" style="font-size:12px">Per-reviewer verdicts (correctness/security/perf/requirements).</div></div>
+  <div class="panel"><div class="phead"><span class="ptitle">Tests</span><span class="tag ok">✓ gates</span></div><div class="muted" style="font-size:12px">typecheck / lint / test / UAT gate states.</div></div>
+  <div class="panel"><div class="phead"><span class="ptitle">Pull request</span><span class="tag ok">✓ CodeCard</span></div><div class="muted" style="font-size:12px">PR #1516, +831/−21, per-file diffstat.</div></div>
+  <div class="panel starred"><div class="phead"><span class="ptitle">Cost trend over recent sessions</span><span class="tag star">★ sparkline</span></div>
+    <div class="spark"><i style="height:8px"></i><i style="height:16px"></i><i style="height:11px"></i><i style="height:24px"></i><i style="height:19px"></i><i style="height:30px"></i><i style="height:14px"></i><i style="height:22px"></i></div>
+    <div class="note">ActivitySparkline of $/session + “N billed sessions”. New cockpit links to a Costs tab but has no inline trend.</div>
+  </div>
+  <div class="panel"><div class="phead"><span class="ptitle">Recent activity</span><span class="tag ok">✓ ActivityCard</span></div><div class="muted" style="font-size:12px">Issue-scoped event feed (capped at 10).</div></div>
+</div>
+</body>
+</html>

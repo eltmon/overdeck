@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
+import { useActivityEntryFeed } from './useActivityEntryFeed';
 import { useConversationFeed } from './useConversationFeed';
 import { useGitFeed } from './useGitFeed';
 import { useObservationFeed } from './useObservationFeed';
@@ -42,11 +43,12 @@ export function filterSessionFeedEntriesForTab(entries: readonly SessionFeedEntr
 export function useMergedFeed(tab: SessionFeedTab): UseMergedFeedResult {
   const conversations = useConversationFeed();
   const observations = useObservationFeed();
+  const activityEntries = useActivityEntryFeed();
   const git = useGitFeed();
 
   const allEntries = useMemo(
-    () => mergeSessionFeedEntries(conversations.entries, observations, git.entries),
-    [conversations.entries, observations, git.entries],
+    () => mergeSessionFeedEntries(conversations.entries, activityEntries, observations, git.entries),
+    [conversations.entries, activityEntries, observations, git.entries],
   );
   const entries = useMemo(() => filterSessionFeedEntriesForTab(allEntries, tab), [allEntries, tab]);
 

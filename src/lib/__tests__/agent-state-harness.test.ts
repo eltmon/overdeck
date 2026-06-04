@@ -29,9 +29,9 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
     expect(a).toBe(b)
   })
 
-  it('claude-code branch builds the legacy "claude --dangerously-skip-permissions ... --model X" command for an Anthropic model', async () => {
+  it('claude-code branch builds the "claude --permission-mode bypassPermissions --model X" command for an Anthropic model', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'claude-code')
-    expect(cmd).toBe("claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
+    expect(cmd).toBe("claude --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
   })
 
   it('pi harness emits a `pi --mode rpc --model <model>` command (AC4)', async () => {
@@ -72,9 +72,9 @@ describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('PAN_YOLO=true produces the legacy bypass command', async () => {
+  it('PAN_YOLO=true produces the bypass command', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
-    expect(cmd).toBe("claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
+    expect(cmd).toBe("claude --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
   })
 })

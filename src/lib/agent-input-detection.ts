@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { capturePane } from './tmux.js'
 import { TmuxError } from './errors.js'
 
-export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'other'
+export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'other'
 
 export interface AwaitingInputDetection {
   reason: AwaitingInputReason
@@ -137,6 +137,21 @@ function looksLikePlanningDone(text: string): boolean {
     || /planning (?:is )?complete.{0,120}(?:click|press|select) Done/i.test(text)
 }
 
+/**
+ * PAN-1520 (covers #1197) — Claude Code session-resume dialog. Fires when an
+ * agent is resumed via `claude --resume <session>` and a prior session is
+ * still considered active or interrupted. The dialog blocks tool execution
+ * until acknowledged. Conservative patterns — we want false-negatives over
+ * false-positives, so we only match strings that clearly indicate a resume
+ * choice point.
+ */
+function looksLikeSessionResumeDialog(text: string): boolean {
+  return /this session (?:is|was)\s+(?:still\s+)?(?:active|interrupted|running)/i.test(text)
+    || /resume (?:the\s+)?previous session/i.test(text)
+    || /(?:continue|resume) (?:this\s+)?session\??.{0,40}(?:\[[Yy]\/[Nn]\]|\([Yy]\/[Nn]\)|press\s+enter)/i.test(text)
+    || /press enter to (?:continue|resume)/i.test(text)
+}
+
 export function detectAwaitingInputFromPaneSync(
   pane: string,
   options: { isPlanning?: boolean } = {},
@@ -173,6 +188,15 @@ export function detectAwaitingInputFromPaneSync(
     return {
       reason: 'planning_done',
       prompt: snippetAround(lines, doneIndex >= 0 ? doneIndex : lines.length - 1, 8, 2),
+    }
+  }
+
+  // PAN-1520 (covers #1197) — Claude Code session-resume dialog.
+  if (looksLikeSessionResumeDialog(recentText)) {
+    const resumeIndex = lastIndexMatching(lines, (line) => looksLikeSessionResumeDialog(line))
+    return {
+      reason: 'session_resume',
+      prompt: snippetAround(lines, resumeIndex >= 0 ? resumeIndex : lines.length - 1, 8, 2),
     }
   }
 

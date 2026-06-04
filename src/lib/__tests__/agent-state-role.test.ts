@@ -355,12 +355,9 @@ describe('AgentState role persistence', () => {
 
     expect(state.hostOverride).toBe(true);
     expect(createSessionAsync).toHaveBeenCalled();
+    // PAN-1556: host-override is logged via console.warn, not the activity feed
+    // (it was per-spawn feed spam). The spawn proceeding + the warn is the contract.
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host to override'));
-    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
-      level: 'warn',
-      issueId: 'PAN-1140',
-      message: 'agent-spawn-host-override: PAN-1140',
-    }));
     warnSpy.mockRestore();
     rmSync(workspace, { recursive: true, force: true });
   });

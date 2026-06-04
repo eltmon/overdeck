@@ -8,12 +8,13 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 ---
 
-## The five roles
+## The six roles
 
 | Role | File | Purpose |
 |------|------|---------|
 | `plan` | `roles/plan.md` | Read issue, research codebase, write vBRIEF, create beads |
 | `work` | `roles/work.md` | Claim beads, write code, commit per bead, self-inspect (Jidoka) |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses plan/review/test/ship. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
 | `ship` | `roles/ship.md` | Rebase, resolve conflicts, run verification, prep for merge |
@@ -134,7 +135,7 @@ Pick the shape that matches the use case before you start writing.
 
 **Adding a top-level role** (new pipeline stage):
 1. Create `roles/<name>.md` with Claude-compatible frontmatter (`name`, `description`, `model`, `permissionMode`, `tools`, `hooks`) and the role's prompt body.
-2. Add the role to the `Role` type in `src/lib/agents.ts` (or wherever the central role enum lives).
+2. Add the role to the `Role` type in `src/lib/agents.ts` AND to the `isRole()` guard in the same file. `parseAgentState()` returns `null` for any state.json whose role fails `isRole()`, which silently hides the agent from `listRunningAgents()`, the dashboard read-model bootstrap, and every consumer that iterates from there. The `Role` literal in `packages/contracts/src/types.ts` must also list the new role, and `VALID_ROLES` in `src/dashboard/server/read-model.ts` must accept it — otherwise `toRole()` strips it from snapshots before they reach the frontend. (PAN-1506: strike agents were invisible on the Agents page for exactly this reason — the literal was added to the contract and the role file shipped, but the runtime guards in `agents.ts` and `read-model.ts` were never updated.)
 3. Wire it through `resolveModel()`, the reactive scheduler, and any lifecycle transitions.
 4. Add coverage in `src/lib/__tests__/role-definitions.test.ts`.
 

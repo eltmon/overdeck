@@ -322,16 +322,20 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(loadConfig().stashJanitorEveryCycles).toBe(0);
   });
 
-  it('logs non-canonical stashes on startup without deleting them', async () => {
+  // PAN-1531: scanner narrowed to surface only `salvageable:*` stashes;
+  // unknown/legacy entries are ignored as residue.
+  it('surfaces salvageable stashes on startup without deleting them', async () => {
     mockListStashes.mockReturnValue(Effect.succeed([
       { ref: 'stash@{5}', kind: 'unknown', issueId: undefined, message: 'legacy stash name' } as any,
+      { ref: 'stash@{6}', kind: 'salvageable', issueId: 'PAN-879', message: 'salvageable:PAN-879:2026-05-26T10:00:00Z:user-work' } as any,
     ]) as any);
 
     const actions = await logNonCanonicalStashesOnStartup();
 
     expect(mockDropStash).not.toHaveBeenCalled();
-    expect(actions[0]).toContain('Non-canonical stash in PAN-879');
-    expect(actions[0]).toContain('audit recommended');
+    expect(actions.length).toBe(1);
+    expect(actions[0]).toContain('Salvageable stash');
+    expect(actions[0]).toContain('workspace inspector');
   });
 });
 
@@ -416,13 +420,13 @@ describe('monitorReviewConvoySignals', () => {
 
     expect(agents.messageAgent).toHaveBeenCalledWith(
       'agent-pan-879-review',
-      'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
+      'REVIEWER_FAILED security reviewer session ended before writing a report',
     );
     expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',
     }));
     expect(actions).toEqual([
-      'Signaled REVIEWER_FAILED security reviewer launcher process died before signaling synthesis to agent-pan-879-review',
+      'Signaled REVIEWER_FAILED security reviewer session ended before writing a report to agent-pan-879-review',
     ]);
   });
 
@@ -451,7 +455,7 @@ describe('monitorReviewConvoySignals', () => {
 
     expect(agents.messageAgent).toHaveBeenCalledWith(
       'agent-pan-879-review',
-      'REVIEWER_FAILED security reviewer launcher process died before signaling synthesis',
+      'REVIEWER_FAILED security reviewer session ended before writing a report',
     );
     expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
       reviewMonitorSignaled: 'failed',

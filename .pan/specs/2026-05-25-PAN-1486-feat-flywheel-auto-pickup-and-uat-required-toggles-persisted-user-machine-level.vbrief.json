@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1486: feat(flywheel): auto-pickup and UAT-required toggles, persisted user-machine level",
-    "updated": "2026-05-25T08:34:19.937Z"
+    "updated": "2026-05-25T12:41:18.851Z"
   },
   "plan": {
     "id": "pan-1486",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "2e53e703-a734-48c7-874a-22ef0c502bae",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 44,
     "created": "2026-05-25T08:35:00.000Z",
-    "updated": "2026-05-25T08:34:19.937Z",
+    "updated": "2026-05-25T12:41:18.851Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1486",
@@ -86,7 +86,7 @@
       {
         "id": "b01-app-settings-keys",
         "title": "Add flywheel.auto_pickup_backlog and flywheel.require_uat_before_merge keys to app-settings.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -102,7 +102,7 @@
           {
             "id": "b01.ac1",
             "title": "FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog' is exported; getter returns false on a fresh DB and after explicit set false; returns true after set true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -110,7 +110,7 @@
           {
             "id": "b01.ac2",
             "title": "FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge' is exported; getter returns true on a fresh DB (preserves today's behavior) and after explicit set true; returns false after set false.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -118,7 +118,7 @@
           {
             "id": "b01.ac3",
             "title": "Both getters route through Effect.runSync(getSettingProgram(...).pipe(catchTag('DatabaseError', () => Effect.succeed(<default>)))), matching the existing isFlywheelGloballyPaused pattern.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -126,7 +126,7 @@
           {
             "id": "b01.ac4",
             "title": "Vitest unit tests in src/lib/database/__tests__/app-settings.test.ts cover: default-on-empty-db, round-trip set/get for both booleans, both keys, and that the two keys are independent (setting one does not affect the other).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -134,7 +134,7 @@
           {
             "id": "b01.ac5",
             "title": "npm run typecheck and npm test pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -144,7 +144,7 @@
       {
         "id": "b02-lifecycle-options-and-brief",
         "title": "Plumb the two toggle values into FlywheelLifecycleOptions and render in the brief configSection",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -160,7 +160,7 @@
           {
             "id": "b02.ac1",
             "title": "FlywheelLifecycleOptions interface includes optional autoPickupBacklog and requireUatBeforeMerge booleans.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -168,7 +168,7 @@
           {
             "id": "b02.ac2",
             "title": "spawnFlywheel() and resumeFlywheel() resolve undefined values from app_settings via the new getters from b01 before calling spawnFlywheelAgent; no caller has to know the default values.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -176,7 +176,7 @@
           {
             "id": "b02.ac3",
             "title": "defaultFlywheelPrompt renders the two lines verbatim (e.g. 'Auto-pickup backlog: false') and the configSection appears in the prompt body when at least one option is set.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -184,7 +184,7 @@
           {
             "id": "b02.ac4",
             "title": "Vitest unit tests in src/lib/cloister/__tests__/flywheel.test.ts cover the 2x2 truth table at the brief-rendering level: (false,true), (false,false), (true,true), (true,false) — each expectation asserts the configSection substring exactly.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -192,7 +192,7 @@
           {
             "id": "b02.ac5",
             "title": "npm run typecheck and npm test pass; src/cli/commands/__tests__/flywheel.test.ts still passes (no regressions in CLI spawn).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -202,7 +202,7 @@
       {
         "id": "b03-role-prompt-inventory-conditional",
         "title": "Update roles/flywheel.md Inventory step to conditionally include backlog when auto_pickup_backlog=true",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -218,41 +218,46 @@
           {
             "id": "b03.ac1",
             "title": "Inventory step explicitly references the 'Auto-pickup backlog: <bool>' line in the brief and describes both behaviors (true/false) in a single conditional paragraph.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac2",
             "title": "Backlog-inclusion mode preserves all existing inventory filters (eltmon author/assignee gate; exclude needs-design / needs-discussion) — these are not relaxed when auto_pickup_backlog=true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac3",
             "title": "Backlog-inclusion mode caps total active agents at maxAgents from the brief; the orchestrator must not exceed it.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           },
           {
             "id": "b03.ac4",
             "title": "No other section of roles/flywheel.md is changed by this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:45:21.974Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:45:21.974Z"
       },
       {
         "id": "b04-role-prompt-forbidden-conditional",
         "title": "Update roles/flywheel.md forbidden list to gate merge action on require_uat_before_merge",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -268,41 +273,46 @@
           {
             "id": "b04.ac1",
             "title": "Forbidden bullet is rewritten as a conditional and references both the brief config line and the schedule endpoint by name.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac2",
             "title": "The orchestrator is still forbidden from invoking gh pr merge directly under any setting; only the schedule endpoint is allowed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac3",
             "title": "An 'Allowed' subsection names the new schedule endpoint and clarifies that the operator-cancellable cooldown is server-managed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           },
           {
             "id": "b04.ac4",
             "title": "No other section of roles/flywheel.md is changed by this bead.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:46:47.974Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:46:47.974Z"
       },
       {
         "id": "b05-config-http-routes",
         "title": "Add GET/POST /api/flywheel/config routes for the two toggles",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -318,7 +328,7 @@
           {
             "id": "b05.ac1",
             "title": "GET /api/flywheel/config returns the two toggles and their current values without authentication required (read-only).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -326,7 +336,7 @@
           {
             "id": "b05.ac2",
             "title": "POST /api/flywheel/config is origin-validated; missing-origin returns 403 with the same error shape as other flywheel POST routes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -334,7 +344,7 @@
           {
             "id": "b05.ac3",
             "title": "POST with {auto_pickup_backlog: 'yes'} or any non-boolean value returns 400 with a clear error naming the offending key.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -342,7 +352,7 @@
           {
             "id": "b05.ac4",
             "title": "POST with a partial body updates only the named key; the other key is untouched.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -350,7 +360,7 @@
           {
             "id": "b05.ac5",
             "title": "Vitest route tests in src/dashboard/server/routes/__tests__/flywheel.test.ts cover GET, POST happy path (each key), 403 on missing origin, 400 on invalid body, partial update.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -360,7 +370,7 @@
       {
         "id": "b06-flywheel-page-checkboxes",
         "title": "Add two toggle checkboxes to FlywheelPage header wired to /api/flywheel/config",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -376,57 +386,64 @@
           {
             "id": "b06.ac1",
             "title": "Two checkboxes labeled 'Auto-pickup backlog' and 'Require UAT before merge' render in the FlywheelPage header.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac2",
             "title": "Initial values are fetched from /api/flywheel/config; toggling either sends POST /api/flywheel/config with the new partial value and updates the cached query data optimistically.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac3",
             "title": "While the mutation is in flight the checkbox is disabled; on error it reverts and surfaces a small inline error (red text under the checkbox).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac4",
             "title": "Each checkbox has a title= tooltip describing the off/on behavior verbatim (matches the descriptions in the issue body).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac5",
             "title": "Verified manually in a browser via npm run dev: toggling each checkbox round-trips through the server and persists across page reload.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           },
           {
             "id": "b06.ac6",
             "title": "Vitest component test in src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx covers: initial render reads /api/flywheel/config, click sends POST, optimistic update.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:43:13.472Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:43:13.472Z"
       },
       {
         "id": "b07-pan-flywheel-config-cli",
         "title": "Add `pan flywheel config --get/--set` CLI subcommand + skill update",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -442,7 +459,7 @@
           {
             "id": "b07.ac1",
             "title": "`pan flywheel config --get` prints both keys with their current values in `<key>=<bool>` form on stdout, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -450,7 +467,7 @@
           {
             "id": "b07.ac2",
             "title": "`pan flywheel config --get flywheel.require_uat_before_merge` prints only that key, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -458,7 +475,7 @@
           {
             "id": "b07.ac3",
             "title": "`pan flywheel config --set flywheel.auto_pickup_backlog=true` sets the value (writes through app_settings), prints the new value, exit 0.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -466,7 +483,7 @@
           {
             "id": "b07.ac4",
             "title": "`pan flywheel config --set unknown.key=true` exits non-zero with stderr 'Unknown flywheel config key: unknown.key'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -474,7 +491,7 @@
           {
             "id": "b07.ac5",
             "title": "`pan flywheel config --set flywheel.auto_pickup_backlog=maybe` exits non-zero with stderr explaining boolean is required.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -482,7 +499,7 @@
           {
             "id": "b07.ac6",
             "title": "sync-sources/skills/pan-flywheel/SKILL.md documents both `--get` and `--set` forms with an example for each key; `npm run lint` (which includes scripts/lint-skills.sh) passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -490,7 +507,7 @@
           {
             "id": "b07.ac7",
             "title": "Vitest tests in src/cli/commands/__tests__/flywheel.test.ts cover get-all, get-one, set-valid, set-unknown-key, set-non-boolean.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -500,7 +517,7 @@
       {
         "id": "b08-auto-merge-eligibility",
         "title": "Add isAutoMergeEligible(issueId) predicate + BLOCKER_LABELS constant",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -516,65 +533,73 @@
           {
             "id": "b08.ac1",
             "title": "BLOCKER_LABELS is exported as a readonly tuple from the new module; the role prompt and any future surface should import this constant rather than hard-coding the strings.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac2",
             "title": "isAutoMergeEligible returns {eligible:false, reason: 'review status is not readyForMerge'} when readyForMerge is false.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac3",
             "title": "Returns {eligible:false, reason: 'CI checks failing on PR HEAD <sha>'} when checksFailed===true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac4",
             "title": "Returns {eligible:false, reason: 'PR is already merged'} when prState.merged===true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac5",
             "title": "Returns {eligible:false, reason: 'issue carries blocker label: <label>'} when any BLOCKER_LABELS member is on the issue.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac6",
             "title": "Returns {eligible:true} only when all checks pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           },
           {
             "id": "b08.ac7",
             "title": "Vitest unit tests in src/lib/cloister/__tests__/auto-merge-eligibility.test.ts cover all five branches with mocked review-status + getPullRequestState + label-fetch.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-25T09:53:51.151Z"
           }
-        ]
+        ],
+        "updated": "2026-05-25T09:53:51.151Z"
       },
       {
         "id": "b09-pending-auto-merges-table",
-        "title": "Add pending_auto_merges SQLite table (schema v28) + CRUD module",
-        "status": "pending",
+        "title": "Add pending_auto_merges SQLite table (schema v45) + CRUD module",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -592,21 +617,21 @@
           ]
         },
         "narrative": {
-          "Action": "Bump src/lib/database/schema.ts CURRENT_SCHEMA_VERSION from 27 to 28; add a v27→v28 migration block CREATE TABLE IF NOT EXISTS pending_auto_merges (id INTEGER PK AUTOINCREMENT, issueId TEXT NOT NULL, prUrl TEXT NOT NULL, prNumber INTEGER, projectKey TEXT NOT NULL, status TEXT NOT NULL CHECK status IN ('pending','merging','blocked','failed'), scheduledMergeAt TEXT NOT NULL, scheduledAt TEXT NOT NULL, mergedAt TEXT, failureReason TEXT, cancelledAt TEXT, cancelledBy TEXT). Add CREATE UNIQUE INDEX idx_pending_auto_merges_active_issue ON pending_auto_merges(issueId) WHERE status IN ('pending','merging'). Create src/lib/database/pending-auto-merges-db.ts with scheduleAutoMerge, getPendingAutoMerge(issueId), listPendingAutoMerges, transitionToMerging(id), markFailed(id, reason), markBlocked(id, reason), markMerged(id), cancelPending(id, cancelledBy), clearAllPending() — all sync and wrapped in Effect.try with DatabaseError tag like app-settings.ts."
+          "Action": "Bump src/lib/database/schema.ts SCHEMA_VERSION to 45; add the pending_auto_merges table through the live migration chain with status CHECK covering pending, merging, blocked, failed, merged, and cancelled. Add the active unique issue index plus SQL-filtered due/actionable indexes for executor and dashboard polling. Create src/lib/database/pending-auto-merges-db.ts with scheduleAutoMerge, getPendingAutoMerge(issueId), getActionableAutoMerge(issueId), listPendingAutoMerges, listActionableAutoMerges, listDuePendingAutoMerges(nowIso), transitionToMerging(id), markFailed(id, reason), markBlocked(id, reason), markMerged(id), cancelPending(id, cancelledBy), clearAllPending() — all sync and wrapped in Effect.try with DatabaseError tag like app-settings.ts."
         },
         "subItems": [
           {
             "id": "b09.ac1",
-            "title": "CURRENT_SCHEMA_VERSION is 28 and a fresh-DB init creates the pending_auto_merges table with the schema described in the Action.",
-            "status": "pending",
+            "title": "SCHEMA_VERSION is 45 and a fresh-DB init creates the pending_auto_merges table with the schema and indexes described in the Action.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "b09.ac2",
-            "title": "v27→v28 migration block runs on an existing v27 DB without dropping any existing data; the table appears after migration.",
-            "status": "pending",
+            "title": "The migration chain runs on an existing pre-auto-merge DB without dropping any existing data; the table appears after migration.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -614,7 +639,7 @@
           {
             "id": "b09.ac3",
             "title": "UNIQUE partial index prevents two simultaneously-active (pending OR merging) entries for the same issueId; a second scheduleAutoMerge for the same issue returns the existing entry rather than inserting.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -622,7 +647,7 @@
           {
             "id": "b09.ac4",
             "title": "transitionToMerging is atomic — uses UPDATE ... WHERE id=? AND status='pending' and returns boolean indicating whether the row transitioned; concurrent calls produce exactly one winner.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -630,7 +655,7 @@
           {
             "id": "b09.ac5",
             "title": "cancelPending refuses (returns false / 409-shape) when the entry is in 'merging' state; succeeds when status='pending'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -638,7 +663,7 @@
           {
             "id": "b09.ac6",
             "title": "clearAllPending() removes all entries whose status='pending' but leaves 'merging' / 'failed' / 'blocked' historical entries intact.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -646,7 +671,7 @@
           {
             "id": "b09.ac7",
             "title": "scheduledMergeAt and scheduledAt columns are documented (jsdoc on the type) as absolute ISO timestamps that survive process sleep; failureReason free-text up to 1024 chars.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -654,15 +679,15 @@
           {
             "id": "b09.ac8",
             "title": "Vitest tests in src/lib/database/__tests__/pending-auto-merges-db.test.ts cover: schedule + read-back; schedule-duplicate-idempotent; transition pending→merging exactly once across concurrent calls; cancelPending honors status; clearAllPending behavior.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
             "id": "b09.ac9",
-            "title": "Vitest schema test in src/lib/database/__tests__/stuck-schema.test.ts (or sibling) asserts CURRENT_SCHEMA_VERSION === 28 and that the table is present after migrate-from-v27.",
-            "status": "pending",
+            "title": "Vitest schema test in src/lib/database/__tests__/pending-auto-merges-schema.test.ts asserts SCHEMA_VERSION === 45, table creation on fresh init, and indexed migration from prior schema versions.",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -672,7 +697,7 @@
       {
         "id": "b10-auto-merge-scanner",
         "title": "Add POST /api/flywheel/auto-merge/schedule + scanner that enqueues with cooldown and TTS",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -694,7 +719,7 @@
           {
             "id": "b10.ac1",
             "title": "AUTO_MERGE_COOLDOWN_MS = 300_000 exported from src/lib/cloister/auto-merge-config.ts; not duplicated elsewhere.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -702,7 +727,7 @@
           {
             "id": "b10.ac2",
             "title": "POST /api/flywheel/auto-merge/schedule with valid {issueId} when require_uat_before_merge=false, flywheel running, and PR eligible: returns 200 with the persisted entry containing scheduledMergeAt = now + 300s (±2s tolerance for test wall-clock).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -710,7 +735,7 @@
           {
             "id": "b10.ac3",
             "title": "POST when require_uat_before_merge=true returns 412 with a body explaining UAT is still required.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -718,7 +743,7 @@
           {
             "id": "b10.ac4",
             "title": "POST when flywheel paused returns 423 (Locked) with a body explaining the flywheel is paused.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -726,7 +751,7 @@
           {
             "id": "b10.ac5",
             "title": "POST when isAutoMergeEligible returns {eligible:false} returns 422 with the eligibility reason verbatim in the body.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -734,7 +759,7 @@
           {
             "id": "b10.ac6",
             "title": "POST is origin-validated; missing/wrong origin returns 403.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -742,7 +767,7 @@
           {
             "id": "b10.ac7",
             "title": "TTS announcement fires exactly once per (issueId, 'scheduled') transition; duplicate schedule calls return 200 with the existing entry and do NOT re-announce.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -750,7 +775,7 @@
           {
             "id": "b10.ac8",
             "title": "GET /api/flywheel/auto-merge/pending returns the active list sorted by scheduledMergeAt ascending; entries include {id, issueId, scheduledMergeAt, scheduledAt, status, prNumber, prUrl}.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -758,7 +783,7 @@
           {
             "id": "b10.ac9",
             "title": "Vitest route tests cover each branch above; TTS announcement is mocked and asserted exactly-once.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -768,7 +793,7 @@
       {
         "id": "b11-auto-merge-executor",
         "title": "Add server-side executor that fires pending auto-merges after cooldown via the existing merge code path",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -784,7 +809,7 @@
           {
             "id": "b11.ac1",
             "title": "Executor starts when the dashboard server boots and is registered alongside the existing Deacon patrol so dev-mode and prod both pick it up; it can be disabled via env (PANOPTICON_DISABLE_AUTO_MERGE=1) for tests.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -792,7 +817,7 @@
           {
             "id": "b11.ac2",
             "title": "Tick processes only entries whose scheduledMergeAt <= Date.now(); future-scheduled entries remain pending.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -800,7 +825,7 @@
           {
             "id": "b11.ac3",
             "title": "If isFlywheelGloballyPaused() is true at tick time, the executor logs '[auto-merge] flywheel paused, skipping tick' and does NOT fire any merge; entries remain pending.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -808,7 +833,7 @@
           {
             "id": "b11.ac4",
             "title": "If isAutoMergeEligible returns false at fire-time (e.g. CI flipped red during cooldown), the entry is marked status='blocked' with the eligibility reason and the executor moves on without firing.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -816,7 +841,7 @@
           {
             "id": "b11.ac5",
             "title": "transitionToMerging is called and only the winning concurrent call proceeds; the loser logs and continues.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -824,7 +849,7 @@
           {
             "id": "b11.ac6",
             "title": "Successful merge: status set to 'merging' then 'merged' with mergedAt timestamp; the existing dashboard merge function (the one wired to the MERGE button) is invoked unchanged — no second merge path is added.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -832,7 +857,7 @@
           {
             "id": "b11.ac7",
             "title": "Failed merge: status set to 'failed' with failureReason; TTS announces 'PAN-XXX auto-merge failed: <reason>'; entry persists for the orchestrator to surface.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -840,7 +865,7 @@
           {
             "id": "b11.ac8",
             "title": "Vitest tests with mocked merge function cover: future-scheduled-skipped, paused-skipped, eligibility-recheck-blocked, transition-race-loser-skips, successful-merge happy path, failed-merge marks failed and announces.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -848,7 +873,7 @@
           {
             "id": "b11.ac9",
             "title": "Tests use vi.useFakeTimers() — no real interval delays per the CLAUDE.md retry/delay rule.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -858,7 +883,7 @@
       {
         "id": "b12-auto-merge-failure-surface",
         "title": "Surface failed/blocked auto-merges as 'investigate' suggestions in FlywheelStatus",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -874,7 +899,7 @@
           {
             "id": "b12.ac1",
             "title": "roles/flywheel.md Tick loop step 3 ('Emit suggestions') gains a sub-bullet describing the auto-merge surface call and the suggestion shape; references GET /api/flywheel/auto-merge/pending by name.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -882,7 +907,7 @@
           {
             "id": "b12.ac2",
             "title": "Role prompt explicitly says the failed/blocked entry remains in the table until cancelled — the orchestrator does not auto-clear them.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -892,7 +917,7 @@
       {
         "id": "b13-pan-merge-cancel-cli",
         "title": "Add `pan merge cancel <id>` CLI + DELETE /api/flywheel/auto-merge/:id route",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -908,7 +933,7 @@
           {
             "id": "b13.ac1",
             "title": "`pan merge cancel PAN-123` for a pending entry exits 0 and prints the cancellation confirmation; the entry is removed from the active list.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -916,7 +941,7 @@
           {
             "id": "b13.ac2",
             "title": "`pan merge cancel PAN-123` when the entry is already 'merging' exits non-zero with a message explaining the cooldown has expired and the merge is in progress.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -924,7 +949,7 @@
           {
             "id": "b13.ac3",
             "title": "`pan merge cancel PAN-999` for a non-pending issue exits non-zero with 'No pending auto-merge for PAN-999'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -932,7 +957,7 @@
           {
             "id": "b13.ac4",
             "title": "DELETE /api/flywheel/auto-merge/:id is origin-validated; non-trusted origin returns 403.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -940,7 +965,7 @@
           {
             "id": "b13.ac5",
             "title": "DELETE on a 'pending' entry returns 200 with the cancelled entry body; on 'merging' returns 409; on missing returns 404.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -948,7 +973,7 @@
           {
             "id": "b13.ac6",
             "title": "TTS announcement 'auto-merge cancelled for <issueId>' fires exactly once per cancellation.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -956,7 +981,7 @@
           {
             "id": "b13.ac7",
             "title": "sync-sources/skills/pan-merge/SKILL.md exists, documents `pan merge cancel <id>`, and `npm run lint` passes (skill ↔ CLI cross-check OK).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -964,7 +989,7 @@
           {
             "id": "b13.ac8",
             "title": "Vitest tests in src/cli/commands/__tests__/merge.test.ts and src/dashboard/server/routes/__tests__/flywheel.test.ts cover the happy / merging / missing / origin paths.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -974,7 +999,7 @@
       {
         "id": "b14-dashboard-cancel-banner",
         "title": "Add pending auto-merges banner with countdown + cancel button to FlywheelPage",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -990,7 +1015,7 @@
           {
             "id": "b14.ac1",
             "title": "Banner only renders when there is at least one entry with status='pending'; empty list renders nothing (no empty placeholder).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -998,7 +1023,7 @@
           {
             "id": "b14.ac2",
             "title": "Each row's countdown updates every second based on Date.parse(scheduledMergeAt) - Date.now(); when remaining <= 0 the row shows 'merging…' (executor will pick it up).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1006,7 +1031,7 @@
           {
             "id": "b14.ac3",
             "title": "Cancel button is disabled while the mutation is in flight and while the entry is in 'merging' state.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1014,7 +1039,7 @@
           {
             "id": "b14.ac4",
             "title": "Cancel mutation invalidates the pending query so the row disappears from all open tabs within the next refetch.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1022,7 +1047,7 @@
           {
             "id": "b14.ac5",
             "title": "issueId is a link that opens the issue's existing dashboard route.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1030,7 +1055,7 @@
           {
             "id": "b14.ac6",
             "title": "Verified manually in npm run dev: schedule via curl, observe banner appear, click cancel, banner row disappears.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1038,17 +1063,18 @@
           {
             "id": "b14.ac7",
             "title": "Vitest component test renders the banner with a fixed scheduledMergeAt, advances fake timers, and asserts cancel triggers the DELETE call.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completedAt": "2026-05-25T10:55:38.515Z"
       },
       {
         "id": "b15-integration-test",
         "title": "End-to-end integration test: cooldown respected, cancel works, executor fires on expiry",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:35:00.000Z",
         "metadata": {
@@ -1064,7 +1090,7 @@
           {
             "id": "b15.ac1",
             "title": "Test uses vi.useFakeTimers() and vi.advanceTimersByTimeAsync — no real-wall-clock delays.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1072,7 +1098,7 @@
           {
             "id": "b15.ac2",
             "title": "Scenario 1 (cancel during cooldown): cancel returns 200, the pending list becomes empty, the mocked merge function is never invoked even after the cooldown elapses.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1080,7 +1106,7 @@
           {
             "id": "b15.ac3",
             "title": "Scenario 2 (cooldown expires): the mocked merge function is invoked exactly once, the entry transitions pending→merging→merged.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1088,7 +1114,7 @@
           {
             "id": "b15.ac4",
             "title": "Scenario 3 (eligibility flips during cooldown): the entry transitions pending→blocked with the eligibility reason; merge function is never invoked.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1096,7 +1122,7 @@
           {
             "id": "b15.ac5",
             "title": "All three scenarios run in under 100ms wall-clock thanks to fake timers.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1104,12 +1130,13 @@
           {
             "id": "b15.ac6",
             "title": "npm run typecheck and npm test pass; full suite is green.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completedAt": "2026-05-25T11:08:07.825Z"
       }
     ],
     "edges": [
@@ -1210,7 +1237,66 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1486-feat-flywheel-auto-pickup-and-uat-required-toggles-persisted-user-machine-level.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1486",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-25T12:41:18.850Z",
+        "work": {
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-25T12:41:18.850Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "reviewing",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "notes": "Agent re-review request (4/25): Fixed review issues",
+          "history": [
+            {
+              "status": "reviewing",
+              "at": "2026-05-25T12:41:18.850Z",
+              "notes": "Agent re-review request (4/25): Fixed review issues"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T12:41:18.850Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-25T12:41:18.850Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-25T12:41:18.850Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1503"
+        }
+      }
     }
   },
   "status": "proposed"

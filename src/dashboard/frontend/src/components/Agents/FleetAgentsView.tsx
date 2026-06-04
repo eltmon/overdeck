@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
+import { isAwaitingInput } from '../../lib/pendingInput';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
@@ -17,14 +18,15 @@ import { IssueActionMenu } from '../IssueActionMenu';
 const ROLE_ORDER = {
   plan: 0,
   work: 1,
-  review: 2,
-  test: 3,
-  ship: 4,
-  flywheel: 5,
+  strike: 2,
+  review: 3,
+  test: 4,
+  ship: 5,
+  flywheel: 6,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed', 'error', 'unknown']);
-const PHASE_FILTERS = ['work', 'review', 'ship', 'plan', 'stuck'] as const;
+const PHASE_FILTERS = ['work', 'strike', 'review', 'ship', 'plan', 'stuck'] as const;
 type AgentPhaseFilter = typeof PHASE_FILTERS[number];
 
 type AgentsFilterState = {
@@ -130,7 +132,7 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
-  if (agent.hasPendingQuestion) return { variant: 'INPUT' };
+  if (isAwaitingInput(agent)) return { variant: 'INPUT' };
 
   switch (agent.role) {
     case 'plan':
@@ -140,6 +142,8 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
       return { variant: 'REVIEW RUNNING' };
     case 'ship':
       return { variant: 'SHIP RUNNING' };
+    case 'strike':
+      return { variant: 'STRIKE RUNNING' };
     case 'work':
     default:
       return { variant: 'WORK RUNNING' };
@@ -151,10 +155,17 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
   const role = agentRole(agent);
   if (role === 'test') return 'review';
   if (role === 'flywheel') return 'work';
+  if (role === 'strike') return 'strike';
   return role;
 }
 
 function isFleetAgent(agent: Agent) {
+  // Strike agents are intentionally short-lived — they exit cleanly after their
+  // analyze/implement/merge/verify cycle. Keep finished strikes visible so the
+  // operator can review what each one decided (PR landed vs. self-aborted with
+  // recommendation) instead of losing them off the dashboard the moment Claude
+  // exits. Work/review/test agents still get the strict isFleetAgent filter.
+  if (agent.role === 'strike') return agent.status !== 'dead';
   return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || FLEET_STATUSES.has(agent.status));
 }
 
@@ -468,7 +479,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                       { label: 'Runtime', value: runtime },
                       { label: 'Last heard', value: lastHeard },
                     ]}
-                    streamLines={output.slice(-8)}
+                    streamLines={output.slice(-16)}
                     verbBadge={verbBadgeForAgent(agent, now)}
                     stuck={stuck}
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}

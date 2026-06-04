@@ -48,6 +48,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
+import type { RoleEffort } from '../lib/config-yaml.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
@@ -98,16 +99,18 @@ import { createComplianceCommand } from './commands/compliance.js';
 import { createRegistryCommand } from './commands/registry.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
+import { strikeCommand } from './commands/strike.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { ensureNativeSqliteAbi } from '../lib/native-sqlite-guard.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
-import { registerSwarmCommands } from './commands/swarm.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
+import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
@@ -411,20 +414,22 @@ program
   .action(untroubledCommand);
 
 program
-  .command('fork <conv>')
-  .description('Summary Fork a conversation — creates new session from a summary of previous work')
+  .command('fork [conv]')
+  .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
 program
-  .command('handoff <conv>')
-  .description('Agent-authored conversation handoff that spawns a new conversation')
-  .option('--focus <text>', 'Guidance for what the source agent should focus on in the handoff')
-  .option('--model <model>', 'Model for the handoff-forked session')
-  .option('--harness <harness>', 'Harness for the handoff-forked session: claude-code or pi')
-  .option('--cwd <path>', 'Working directory for the handoff-forked session')
+  .command('handoff [conv] [focus...]')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> to hand off the conversation you are in; trailing text becomes the focus')
+  .option('--model <model>', 'Model for the handoff-forked (new) conversation')
+  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
+  .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
+  .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
+  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code or pi (only when --author=external)')
   .action(handoffCommand);
 
 program
@@ -457,6 +462,7 @@ program
   .description('Mark work complete, move to review')
   .option('-c, --comment <message>', 'Comment for the tracker')
   .option('--force', 'Skip pre-flight completion checks')
+  .option('--strike', 'Strike-agent shape: skip review-pipeline dispatch (used by `pan strike` agents that merged directly to main)')
   .option('--json', 'Output as JSON')
   .action(doneCommand);
 
@@ -498,6 +504,7 @@ program
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
   .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -505,11 +512,21 @@ program
   .option('--local', 'Use local workspace (explicit override)')
   .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
+  .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
 
-registerSwarmCommands(program);
+program
+  .command('strike <ids...>')
+  .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
+  .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
+  .option('--dry-run', 'Print what would happen without spawning')
+  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
+    strikeCommand(ids, options),
+  );
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
@@ -544,6 +561,7 @@ registerInspectCommand(program);
 registerCavemanCommands(program);
 registerScopeCommands(program);
 registerFlywheelCommands(program);
+registerMergeCommands(program);
 registerArtifactCommands(program);
 
 // Shorthand: pan status = pan status
@@ -605,11 +623,30 @@ program
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+
+    // Refuse to start a detached production dashboard on top of a running
+    // interactive `pan dev` session — they would fight over the same ports.
+    {
+      const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../lib/dev-supervisor.js');
+      const dev = readDevSupervisorMarker();
+      if (dev) {
+        for (const line of devSupervisorRefusalLines('start a detached dashboard', dev)) {
+          console.error(chalk.yellow(line));
+        }
+        process.exitCode = 2;
+        return;
+      }
+    }
+
     if (options.noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
 
-    // Auto-sync skills, hooks, and MCP config on every startup
+    // Auto-sync on every startup: skills, agents, hooks, MCP config,
+    // and rendered context layers (~/.claude/CLAUDE.md + per-project
+    // CLAUDE.md files). Ensures bundled engineering rules and any
+    // edits to global.md / project.md reach every Claude Code session
+    // without the user remembering to run `pan sync` first.
     {
       const origWrite = process.stdout.write;
       const origErrWrite = process.stderr.write;
@@ -620,7 +657,7 @@ program
         await syncCommand({});
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
-        console.log(chalk.dim('  Auto-synced skills, hooks, and MCP config'));
+        console.log(chalk.dim('  Auto-synced skills, agents, rules, hooks, MCP config, and CLAUDE.md context layers'));
       } catch {
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
@@ -1364,6 +1401,10 @@ if (process.argv.length === 2) {
   // npx panopticon with no args → act as serve
   process.argv.push('serve');
 }
+
+// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
+// under one Node major, loaded under another) before any command opens the DB.
+ensureNativeSqliteAbi();
 
 // Parse and execute
 await program.parseAsync();

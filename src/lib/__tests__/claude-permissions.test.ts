@@ -46,7 +46,6 @@ describe('claude-permissions', () => {
 
     it('returns bypass flags for explicit bypass mode', () => {
       expect(getClaudePermissionFlagsSync('bypass')).toEqual([
-        '--dangerously-skip-permissions',
         '--permission-mode',
         'bypassPermissions',
       ]);
@@ -55,7 +54,7 @@ describe('claude-permissions', () => {
     it('joins the array as a single string for shell construction', () => {
       expect(getClaudePermissionFlagsStringSync('auto')).toBe('--permission-mode auto');
       expect(getClaudePermissionFlagsStringSync('bypass')).toBe(
-        '--dangerously-skip-permissions --permission-mode bypassPermissions',
+        '--permission-mode bypassPermissions',
       );
     });
   });
@@ -65,8 +64,8 @@ describe('claude-permissions', () => {
       expect(bypassPrefixForAgentFlagSync('auto')).toBe('');
     });
 
-    it('returns leading-space DSP under bypass', () => {
-      expect(bypassPrefixForAgentFlagSync('bypass')).toBe(' --dangerously-skip-permissions');
+    it('returns empty string under bypass (DSP flag removed)', () => {
+      expect(bypassPrefixForAgentFlagSync('bypass')).toBe('');
     });
 
     it('honors PAN_YOLO=false even with no explicit arg', () => {
@@ -76,7 +75,7 @@ describe('claude-permissions', () => {
 
     it('honors PAN_YOLO=true even with no explicit arg', () => {
       process.env.PAN_YOLO = 'true';
-      expect(bypassPrefixForAgentFlagSync()).toBe(' --dangerously-skip-permissions');
+      expect(bypassPrefixForAgentFlagSync()).toBe('');
     });
   });
 

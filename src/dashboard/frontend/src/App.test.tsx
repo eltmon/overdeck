@@ -29,6 +29,7 @@ const {
       issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
+      agentsWithPendingAskUserQuestion: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
     },
@@ -92,7 +93,9 @@ vi.mock('./components/skeletons/PipelineSkeleton', () => ({ PipelineSkeleton: ()
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, History: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
+// lucide-react icons are lightweight SVG components that render fine in jsdom,
+// so we don't mock them — the enumerated mock used to drift every time the app
+// bar gained an icon (PAN-1593 added Search/Snowflake/SlidersHorizontal).
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({
   Toaster: () => null,
@@ -114,6 +117,8 @@ vi.mock('./lib/store', () => ({
     Object.values(state.channelPermissionRequestsById ?? {}),
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
+  selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
+    state.agentsWithPendingAskUserQuestion ?? [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
@@ -165,6 +170,7 @@ beforeEach(() => {
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
+  mockDashboardState.agentsWithPendingAskUserQuestion = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
   mockOpenIssue.mockClear()

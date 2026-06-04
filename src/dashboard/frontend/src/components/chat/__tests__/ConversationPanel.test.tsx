@@ -16,9 +16,22 @@ vi.mock('../../DialogProvider', () => ({
 }));
 
 // Mock heavy child components that are not under test
-vi.mock('../../XTerminal', () => ({ XTerminal: () => null }));
+vi.mock('../../XTerminal', () => ({ XTerminal: () => <div data-testid="xterminal" /> }));
 vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
-vi.mock('../ComposerFooter', () => ({ ComposerFooter: () => null }));
+vi.mock('../../DiffWorkerPoolProvider', () => ({
+  DiffWorkerPoolProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock('../../DiffPanel', () => ({
+  DiffPanel: () => <div data-testid="diff-panel" />,
+}));
+// PAN-1523 moved the context-usage meter into the composer footer. Capture the
+// usage snapshot ConversationPanel computes and passes down so we can assert it
+// without rendering the real ContextWindowMeter.
+vi.mock('../ComposerFooter', () => ({
+  ComposerFooter: ({ contextWindowUsage }: { contextWindowUsage: unknown }) => (
+    <div data-testid="composer-footer" data-usage={JSON.stringify(contextWindowUsage)} />
+  ),
+}));
 vi.mock('../ModelPicker', () => ({
   loadStoredHarness: () => 'claude-code',
   saveStoredHarness: vi.fn(),
@@ -123,6 +136,7 @@ describe('ConversationPanel rename flow', () => {
   });
 
   afterEach(() => {
+    window.history.replaceState(null, '', '/');
     vi.clearAllMocks();
   });
 
@@ -131,7 +145,34 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
   });
 
-  it('renders context usage in the header', () => {
+  it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {
+    window.history.replaceState(null, '', '/conv/1?diff=1&diffTurnId=turn-1&diffFilePath=src%2Ffile.ts');
+    const activeConversation = {
+      ...mockConversation,
+      sessionAlive: true,
+      endedAt: null,
+    };
+    const client = makeClient();
+    client.setQueryData(['conversation-diffs', 'test-conv'], {
+      summaries: [{ turnId: 'turn-1', completedAt: '2024-01-01T00:00:00Z', status: 'completed', files: [] }],
+    });
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel
+            conversation={activeConversation}
+            viewMode="terminal"
+            onArchived={() => {}}
+          />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTestId('diff-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('xterminal')).not.toBeInTheDocument();
+  });
+
+  it('passes conversation context usage to the composer footer', () => {
     renderPanel({
       ...mockConversation,
       contextUsage: {
@@ -141,7 +182,10 @@ describe('ConversationPanel rename flow', () => {
         percentUsed: 0.75,
       },
     });
-    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('1.50k');
+    expect(screen.getByTestId('composer-footer')).toHaveAttribute(
+      'data-usage',
+      expect.stringContaining('"usedTokens":1500'),
+    );
   });
 
   it('prefers the latest messages response context usage', () => {
@@ -168,7 +212,10 @@ describe('ConversationPanel rename flow', () => {
         },
       },
     );
-    expect(screen.getByTestId('context-usage-indicator')).toHaveTextContent('33.04k');
+    expect(screen.getByTestId('composer-footer')).toHaveAttribute(
+      'data-usage',
+      expect.stringContaining('"usedTokens":33041'),
+    );
   });
 
   it('shows title input with current value when pencil button is clicked', () => {

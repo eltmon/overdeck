@@ -230,6 +230,126 @@ export const selectChannelPermissionRequests = memoizeArraySelector<
 )
 
 /**
+ * PAN-1520 — agents that have an outstanding AskUserQuestion the operator
+ * can answer by clicking an option. Sorted by askedAt (oldest first).
+ */
+export const selectAgentsWithPendingAskUserQuestion = memoizeArraySelector<
+  DashboardState,
+  'agentsById',
+  AgentSnapshot[]
+>(
+  'agentsById',
+  (agentsById) =>
+    Object.values(agentsById)
+      .filter((a) => a.pendingAskUserQuestion != null)
+      .sort((a, b) => {
+        const aTime = a.pendingAskUserQuestion?.askedAt ?? ''
+        const bTime = b.pendingAskUserQuestion?.askedAt ?? ''
+        return aTime === bTime ? a.id.localeCompare(b.id) : aTime.localeCompare(bTime)
+      }),
+)
+
+/**
+ * PAN-1520 — a single agent-or-conversation subject that is blocked waiting on
+ * the operator, across EVERY surface (AskUserQuestion, ExitPlanMode,
+ * EnterPlanMode, session-resume, and PermissionRequest). This is what the
+ * unified "Needs you" list and indicator consume so a dismissed plan-approval
+ * or permission is recoverable, not just AskUserQuestions.
+ *
+ * `kinds` merges the agent's JSONL-derived `pendingInputKinds` (which the
+ * enrichment poller owns) with `permissionRequest` derived from the SEPARATE
+ * channel-permission event stream — they live in different store slices and the
+ * enrichment event overwrites `pendingInputKinds` each poll, so the merge must
+ * happen here at read time rather than being baked into one field server-side.
+ */
+export interface PendingInputSubject {
+  agentId: string
+  issueId?: string
+  kinds: string[]
+  /** AUQ payload when an AskUserQuestion is among the kinds (for the dialog). */
+  pendingAskUserQuestion?: AgentSnapshot['pendingAskUserQuestion']
+  /** Outstanding permission requests for this agent (for routing/labels). */
+  permissionRequestIds: string[]
+  /** Oldest blocking timestamp for stable ordering. */
+  since: string
+}
+
+function deriveMemo<S, A, B, R>(
+  ka: (s: S) => A,
+  kb: (s: S) => B,
+  derive: (a: A, b: B) => R,
+): (s: S) => R {
+  let lastA: A | undefined
+  let lastB: B | undefined
+  let last: R | undefined
+  return (s: S) => {
+    const a = ka(s)
+    const b = kb(s)
+    if (a === lastA && b === lastB && last !== undefined) return last
+    lastA = a
+    lastB = b
+    last = derive(a, b)
+    return last
+  }
+}
+
+export const selectPendingInputSubjects = deriveMemo<
+  DashboardState,
+  DashboardState['agentsById'],
+  DashboardState['channelPermissionRequestsById'],
+  PendingInputSubject[]
+>(
+  (s) => s.agentsById,
+  (s) => s.channelPermissionRequestsById,
+  (agentsById, permsById) => {
+    const perms = Object.values(permsById ?? {})
+    const permByAgent = new Map<string, ChannelPermissionRequestSnapshot[]>()
+    for (const p of perms) {
+      const list = permByAgent.get(p.agentId) ?? []
+      list.push(p)
+      permByAgent.set(p.agentId, list)
+    }
+
+    const subjects: PendingInputSubject[] = []
+    for (const a of Object.values(agentsById)) {
+      const jsonlKinds = a.pendingInputKinds ? [...a.pendingInputKinds] : []
+      const agentPerms = permByAgent.get(a.id) ?? []
+      const kinds = [...jsonlKinds]
+      if (agentPerms.length > 0 && !kinds.includes('permissionRequest')) {
+        kinds.push('permissionRequest')
+      }
+      // PAN-1591 — "Needs you" must be ACTIONABLE. Require a concrete pending
+      // surface (askUserQuestion / plan-mode / sessionResume / permissionRequest);
+      // do NOT trust the fuzzy `hasPendingQuestion` superset bool here. That bool
+      // is set by generic pane/runtime/fallback detections (reason 'other') that
+      // add no kind, no count, and no answerable payload — e.g. a stopped agent
+      // whose `resolution: needs_input` lingers forever, or a live pane-scan
+      // false-positive. Those surfaced phantom "Waiting on your input" rows that
+      // said "no longer waiting" the moment you clicked them. An actionable wait
+      // always carries a kind, so `kinds.length > 0` is the precise signal.
+      const waiting = kinds.length > 0
+      if (!waiting) continue
+      const since =
+        a.pendingAskUserQuestion?.askedAt ??
+        agentPerms.map((p) => p.createdAt).sort()[0] ??
+        ''
+      subjects.push({
+        agentId: a.id,
+        issueId: a.issueId,
+        kinds,
+        pendingAskUserQuestion: a.pendingAskUserQuestion,
+        permissionRequestIds: agentPerms.map((p) => p.requestId),
+        since,
+      })
+    }
+    subjects.sort((x, y) =>
+      x.since === y.since ? x.agentId.localeCompare(y.agentId) : x.since.localeCompare(y.since),
+    )
+    return subjects
+  },
+)
+
+/**
  * Issues currently awaiting a human merge click — `readyForMerge: true`
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
  * don't age in the queue.

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PAN-1561 · Global PaneBar — panes as the outermost surface (Subspace model)</title>
+<style>
+  :root{
+    /* Panopticon light-theme tokens (from src/dashboard/frontend/src/index.css) */
+    --background:#ffffff;
+    --foreground:#1f2937;
+    --muted:#6b7280;
+    --border:rgba(0,0,0,.10);
+    --border-strong:rgba(0,0,0,.16);
+    --card:#ffffff;
+    --primary:#4f46e5;          /* indigo — our real --primary */
+    --primary-tint:rgba(79,70,229,.08);
+    --primary-border:rgba(79,70,229,.32);
+    --claude:#e07b39;           /* Claude Code agent brand */
+    --claude-tint:rgba(224,123,57,.12);
+    --codex:#10a37f;            /* Codex agent */
+    --running:#16a34a;
+    --surface:#fafafa;
+    --surface-2:#f4f4f5;
+
+    /* per-WORKSPACE accent colors (the whole point: tabs span workspaces) */
+    --ws-1549:#4f46e5;   /* panopticon · PAN-1549  (indigo) */
+    --ws-1547:#0ea5e9;   /* panopticon · PAN-1547  (sky)    */
+    --ws-myn:#16a34a;    /* mind-your-now · MYN-204 (green) */
+    --ws-global:#94a3b8; /* no workspace — a global web pane */
+
+    /* annotation category colors */
+    --c-shell:#6b7280;   /* app rail */
+    --c-bar:#0ea5e9;     /* the global pane bar */
+    --c-pane:#4f46e5;    /* the active pane */
+    --c-home:#0d9488;    /* home-pane regions */
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:#eceef1;color:var(--foreground);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-size:14px;line-height:1.55;padding:32px 24px 80px;
+  }
+  .page{max-width:1180px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:16px;margin:36px 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .sub{color:var(--muted);margin:0 0 8px;}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;}
+  .legend-note{color:var(--muted);font-size:12.5px;margin:8px 0 0;}
+  .pill-link{color:var(--primary);text-decoration:none;}
+
+  /* ---------- before/after trees ---------- */
+  .trees{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .tree{
+    background:#0c1018;color:#e5e7eb;border-radius:10px;padding:16px 18px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+    line-height:1.7;overflow:auto;white-space:pre;
+  }
+  .tree .cap{display:block;color:#9ca3af;font-style:italic;margin-bottom:8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .tree .nm{color:#7dd3fc;font-weight:600;}
+  .tree .new{color:#34d399;}
+  .tree .was{color:#9ca3af;font-style:italic;}
+  .tree .gone{color:#f87171;text-decoration:line-through;opacity:.75;}
+  @media(max-width:820px){.trees{grid-template-columns:1fr;}}
+
+  /* ---------- comparison table ---------- */
+  table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px;background:#fff;border-radius:8px;overflow:hidden;}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--surface-2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;}
+  td code{color:var(--primary);}
+  .old code{color:#b45309;}
+
+  /* ===================================================================
+     MOCKUP — global PaneBar as the outermost surface
+     =================================================================== */
+  .frame-wrap{position:relative;margin-top:14px;}
+  .win{
+    border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;
+    background:var(--background);box-shadow:0 6px 30px rgba(0,0,0,.10);
+    display:flex;flex-direction:column;height:680px;
+  }
+
+  /* annotation chip shared style */
+  .tag{
+    position:absolute;z-index:6;font-size:10.5px;font-weight:700;letter-spacing:.02em;
+    color:#fff;padding:2px 7px;border-radius:5px;white-space:nowrap;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  .tag small{font-weight:500;opacity:.85;font-style:italic;}
+  .t-shell{background:var(--c-shell);}
+  .t-bar{background:var(--c-bar);}
+  .t-pane{background:var(--c-pane);}
+  .t-home{background:var(--c-home);}
+
+  .region{position:relative;}
+  .ol-bar{outline:2px dashed var(--c-bar);outline-offset:-2px;}
+  .ol-pane{outline:2px dashed var(--c-pane);outline-offset:-3px;}
+  .ol-home{outline:1.5px dashed var(--c-home);outline-offset:-2px;border-radius:8px;}
+
+  /* ---- ROW 1: the GLOBAL PaneBar (outermost, full width) ---- */
+  .panebar{
+    display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);
+    background:var(--surface);padding:0 10px;height:46px;flex:0 0 46px;position:relative;
+  }
+  /* workspace switcher / new-tab opener on the far left */
+  .switcher{
+    display:flex;align-items:center;gap:8px;padding:6px 11px;margin-right:8px;height:32px;
+    border:1px solid var(--border-strong);border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;
+    color:var(--foreground);white-space:nowrap;flex:0 0 auto;
+  }
+  .switcher .logo{width:16px;height:16px;border-radius:4px;background:var(--primary);display:inline-block;}
+  .switcher .car{color:#9ca3af;font-size:10px;}
+
+  .tabs{display:flex;align-items:flex-end;gap:0;height:46px;padding-top:10px;overflow:hidden;flex:1;min-width:0;}
+  .tab{
+    display:flex;align-items:center;gap:7px;padding:0 11px;height:34px;font-size:12.5px;
+    color:var(--muted);border:1px solid transparent;border-bottom:none;cursor:default;
+    border-radius:8px 8px 0 0;white-space:nowrap;position:relative;max-width:210px;
+  }
+  /* left workspace-accent stripe — the visual cue that tabs belong to different workspaces */
+  .tab .stripe{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
+  .tab .ic{font-size:13px;opacity:.85;}
+  .tab .lab{overflow:hidden;text-overflow:ellipsis;}
+  .tab .ws{color:#9ca3af;font-size:10.5px;font-family:"SF Mono",monospace;}
+  .tab .kbd{font-size:9.5px;color:#9ca3af;border:1px solid var(--border);border-radius:4px;padding:0 4px;line-height:14px;}
+  .tab .x{color:#bbb;font-size:13px;margin-left:1px;}
+  .tab.active{
+    background:var(--background);color:var(--foreground);font-weight:600;
+    border-color:var(--border);position:relative;top:1px;
+  }
+  .tab.active .ws{color:var(--muted);}
+  .tab.active::before{               /* top accent bar in the workspace color */
+    content:"";position:absolute;left:0;right:0;top:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--accent,var(--primary));
+  }
+  .tab-add{display:flex;align-items:center;justify-content:center;width:30px;height:34px;color:#9ca3af;font-size:18px;flex:0 0 30px;}
+  .bar-right{display:flex;align-items:center;gap:10px;margin-left:auto;padding-left:10px;flex:0 0 auto;color:var(--muted);}
+  .bar-right .hpill{display:inline-flex;align-items:center;gap:6px;font-size:11px;border:1px solid var(--border);border-radius:999px;padding:3px 9px;}
+
+  /* ---- ROW 2: app rail (left) + active pane (right) ---- */
+  .body{display:flex;flex:1;min-height:0;}
+  .rail{
+    width:54px;flex:0 0 54px;background:var(--surface);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;position:relative;
+  }
+  .rail .ri{
+    width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;color:var(--muted);
+  }
+  .rail .ri.active{background:var(--primary-tint);color:var(--primary);}
+  .rail .sep{flex:1;}
+
+  /* active pane fills the rest */
+  .pane{flex:1;overflow:auto;padding:24px 30px;position:relative;background:var(--background);min-width:0;}
+  .home{max-width:700px;}
+
+  /* WorkspaceHeader */
+  .ws-head{position:relative;}
+  .ws-title{display:flex;align-items:center;gap:12px;}
+  .ws-title .icon{width:30px;height:30px;border-radius:8px;background:var(--ws-1549);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .ws-title h3{font-size:25px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .ws-title .crumb{color:#9ca3af;font-size:13px;font-weight:500;}
+  .ws-branch{color:var(--muted);font-size:13px;margin:6px 0 16px;display:flex;gap:10px;align-items:center;}
+  .ws-branch .lnk{color:var(--primary);}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);
+    background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px 11px;cursor:default;
+  }
+  .chip .mut{color:var(--muted);}
+
+  /* Launcher */
+  .launcher{position:relative;margin-bottom:6px;}
+  .launch-bar{
+    display:flex;align-items:center;gap:10px;border:1.5px solid var(--primary-border);
+    border-radius:12px;padding:11px 14px;background:#fff;box-shadow:0 2px 10px rgba(79,70,229,.07);
+  }
+  .launch-bar .typed{flex:1;color:var(--foreground);}
+  .launch-bar .run{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;}
+  .launch-bar .gly{color:var(--muted);}
+
+  /* AgentDock + ActionDock */
+  .dock{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 0;position:relative;}
+  .pillb{
+    display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--foreground);
+    background:#fff;border:1px solid var(--border-strong);border-radius:9px;padding:7px 12px;cursor:default;
+  }
+  .pillb .car{color:#9ca3af;font-size:10px;}
+  .pillb.ghost{font-weight:500;color:var(--muted);border-style:dashed;}
+  .pillb.tool{font-weight:500;}
+  .sq{width:13px;height:13px;border-radius:4px;display:inline-block;}
+
+  /* Timeline */
+  .timeline{margin-top:24px;position:relative;}
+  .tl-date{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;display:flex;align-items:center;gap:10px;}
+  .tl-date::after{content:"";flex:1;height:1px;background:var(--border);}
+  .convo{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff;}
+  .convo-h{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.04em;}
+  .convo-h .ago{margin-left:auto;text-transform:none;letter-spacing:0;}
+  .convo .msg{font-size:12.5px;color:var(--foreground);opacity:.85;}
+  .convo .msg.u{color:var(--muted);}
+
+  /* legend grid */
+  .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 28px;margin-top:18px;font-size:12.5px;}
+  .legend .row{display:flex;gap:9px;align-items:flex-start;}
+  .legend .key{font-weight:700;color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-family:"SF Mono",monospace;flex:0 0 auto;margin-top:2px;}
+  .legend .desc b{font-family:"SF Mono",monospace;font-size:12px;}
+  .legend .desc .was{color:var(--muted);font-style:italic;}
+
+  /* workspace color key */
+  .wskey{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 0;font-size:12px;color:var(--muted);}
+  .wskey span{display:inline-flex;align-items:center;gap:6px;}
+  .wskey i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+  .callout{
+    margin-top:14px;border:1px solid var(--primary-border);background:var(--primary-tint);
+    border-radius:10px;padding:12px 16px;font-size:13px;color:var(--foreground);
+  }
+  .callout b{color:var(--primary);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>PAN-1561 · Global PaneBar</h1>
+  <p class="sub">The <b>bigger step</b> beyond <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549</a>: the PaneBar stops being a strip <i>inside</i> the Command&nbsp;Deck's Stage and becomes the <b>outermost work surface</b>. Tabs span <b>all workspaces and projects</b> in one flat, global strip — exactly the Subspace model. The Command&nbsp;Deck host view (project-tree + per-workspace Stage) is dissolved. <b>Draft for discussion.</b></p>
+
+  <h2>1 · The inversion — workspace ▸ panes  becomes  panes ▸ workspace</h2>
+  <div class="trees">
+    <div class="tree"><span class="cap">Before — PAN-1549 (nested, 3 levels deep)</span><span class="nm">App</span>
+└── <span class="nm">Sidebar</span> nav            <span class="was">// Home · Command Deck · Board · …</span>
+    └── <span class="nm">Command Deck</span> view
+        ├── <span class="nm">Navigator</span>       <span class="was">// project ▸ workspace SELECT</span>
+        └── <span class="nm">Stage</span> <span class="was">(one workspace)</span>
+            ├── <span class="nm">PaneBar</span>     <span class="was">// tabs of THIS workspace only</span>
+            └── <span class="nm">Pane</span>
+
+<span class="was">panesByWorkspace: Record&lt;WsId, Pane[]&gt;
+activePaneByWorkspace: Record&lt;WsId, PaneId&gt;</span></div>
+
+    <div class="tree"><span class="cap">After — PAN-1561 (flat, outermost)</span><span class="nm">App</span>
+├── <span class="nm">PaneBar</span> <span class="new">(GLOBAL, outermost)</span>
+│   ├── <span class="nm">PaneTab</span> <span class="was">ws=PAN-1549 · agent</span>
+│   ├── <span class="nm">PaneTab</span> <span class="was">ws=PAN-1547 · terminal</span>
+│   ├── <span class="nm">PaneTab</span> <span class="was">ws=MYN-204 · docs</span>
+│   └── <span class="nm">Pane</span> <span class="was">// the one active pane</span>
+└── <span class="nm">App Rail</span>           <span class="new">// app views only</span>
+    <span class="gone">Command Deck host view (dissolved)</span>
+    <span class="gone">Navigator as a container (gone)</span>
+
+<span class="new">panes: Pane[]              // each carries workspaceId
+activePaneId: PaneId | null</span></div>
+  </div>
+  <p class="legend-note">The project tree doesn't vanish — it <b>demotes</b> from a container that swaps the pane set into a <b>pane-opener</b> (the workspace switcher ▾ at the bar's left, or a HOME launcher). Selecting a workspace <i>opens / focuses a tab</i>; it never wipes the other open tabs.</p>
+
+  <h2>2 · The surface, annotated</h2>
+  <p class="sub">Colors: <span style="color:var(--c-bar);font-weight:700">Global PaneBar</span> · <span style="color:var(--c-shell);font-weight:700">App Rail</span> · <span style="color:var(--c-pane);font-weight:700">Active Pane</span> · <span style="color:var(--c-home);font-weight:700">HomePane regions</span>. Each tab's dot + top-accent encodes <b>which workspace it belongs to</b>.</p>
+
+  <div class="frame-wrap">
+    <div class="win">
+
+      <!-- ROW 1 · GLOBAL PANEBAR (outermost) -->
+      <div class="panebar region ol-bar">
+        <span class="tag t-bar" style="top:-2px;left:200px;">Global PaneBar — outermost · spans every workspace</span>
+
+        <!-- workspace switcher / opener -->
+        <div class="switcher region">
+          <span class="tag t-shell" style="top:-22px;left:0;">Workspace switcher <small>(opens a tab — was the Navigator tree)</small></span>
+          <span class="logo"></span> panopticon <span class="car">▾</span>
+        </div>
+
+        <!-- the flat, cross-workspace tab strip -->
+        <div class="tabs">
+          <div class="tab active" style="--accent:var(--ws-1549)">
+            <span class="stripe" style="background:var(--ws-1549)"></span>
+            <span class="ic">⌂</span><span class="lab">Home</span><span class="ws">PAN-1549</span><span class="kbd">⌘1</span>
+          </div>
+          <div class="tab" style="--accent:var(--ws-1549)">
+            <span class="stripe" style="background:var(--ws-1549)"></span>
+            <span class="ic">🤖</span><span class="lab">Claude Code</span><span class="ws">PAN-1549</span><span class="kbd">⌘2</span><span class="x">×</span>
+          </div>
+          <div class="tab" style="--accent:var(--ws-1547)">
+            <span class="stripe" style="background:var(--ws-1547)"></span>
+            <span class="ic">▢</span><span class="lab">Terminal</span><span class="ws">PAN-1547</span><span class="kbd">⌘3</span><span class="x">×</span>
+          </div>
+          <div class="tab" style="--accent:var(--ws-1547)">
+            <span class="stripe" style="background:var(--ws-1547)"></span>
+            <span class="ic">📋</span><span class="lab">vBRIEF</span><span class="ws">PAN-1547</span><span class="kbd">⌘4</span><span class="x">×</span>
+          </div>
+          <div class="tab" style="--accent:var(--ws-myn)">
+            <span class="stripe" style="background:var(--ws-myn)"></span>
+            <span class="ic">📄</span><span class="lab">STATE.md</span><span class="ws">MYN-204</span><span class="kbd">⌘5</span><span class="x">×</span>
+          </div>
+          <div class="tab" style="--accent:var(--ws-global)">
+            <span class="stripe" style="background:var(--ws-global)"></span>
+            <span class="ic">🌐</span><span class="lab">deftai/vBRIEF</span><span class="ws">web</span><span class="kbd">⌘6</span><span class="x">×</span>
+          </div>
+          <div class="tab-add">+</div>
+        </div>
+
+        <div class="bar-right">
+          <span class="hpill">◷ 6 panes</span>
+        </div>
+      </div>
+
+      <!-- ROW 2 · app rail + active pane -->
+      <div class="body">
+
+        <!-- App Rail (the real top-level views, demoted to a slim icon rail) -->
+        <div class="rail region">
+          <span class="tag t-shell" style="top:64px;left:46px;">App Rail <small>(Home · Board · Pipeline · Agents — NOT panes)</small></span>
+          <div class="ri">⌂</div>
+          <div class="ri active" title="Command Deck → now the pane surface">▤</div>
+          <div class="ri">▦</div>
+          <div class="ri">⎇</div>
+          <div class="ri">🤖</div>
+          <div class="sep"></div>
+          <div class="ri">⚙</div>
+        </div>
+
+        <!-- Active Pane = HomePane of the focused tab's workspace (PAN-1549) -->
+        <div class="pane region ol-pane">
+          <span class="tag t-pane" style="top:4px;right:8px;">Active Pane · paneType="home" → <b>HomePane</b> <small>(workspace = PAN-1549)</small></span>
+
+          <div class="home">
+
+            <!-- WorkspaceHeader -->
+            <div class="ws-head region ol-home" style="padding:8px;margin:-8px -8px 14px;">
+              <span class="tag t-home" style="top:-9px;left:6px;">WorkspaceHeader <small>(resolved from pane.workspaceId)</small></span>
+              <div class="ws-title">
+                <span class="icon">P</span>
+                <h3>Hoist PaneBar to top level</h3>
+              </div>
+              <div class="ws-branch">
+                <span class="crumb">panopticon · PAN-1549</span>
+                <span>⎇ feature/pan-1549</span>
+                <span class="lnk">↗ open PR</span>
+              </div>
+              <div class="stats">
+                <span class="chip">⏱ <span>2 days</span></span>
+                <span class="chip">⇄ <span style="color:var(--running)">+412</span> <span class="mut">−38</span> ›</span>
+                <span class="chip">📄 <span>9 files</span> ›</span>
+                <span class="chip">💬 <span>3 convos</span> ›</span>
+              </div>
+            </div>
+
+            <!-- Launcher -->
+            <div class="launcher region ol-home" style="padding:8px;margin:0 -8px 10px;">
+              <span class="tag t-home" style="top:-9px;left:6px;">Launcher <small>(opens new panes into THIS workspace)</small></span>
+              <div class="launch-bar">
+                <span class="gly">⌘</span><span class="typed">flatten panesStore to a single ordered list…</span>
+                <span class="run">↵ Run</span>
+              </div>
+            </div>
+
+            <!-- AgentDock -->
+            <div class="dock region ol-home" style="padding:8px;margin:10px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">AgentDock</span>
+              <span class="pillb"><span class="sq" style="background:var(--claude)"></span> Claude Code <span class="car">▾</span></span>
+              <span class="pillb"><span class="sq" style="background:var(--codex)"></span> Codex <span class="car">▾</span></span>
+              <span class="pillb ghost">+ More Agents</span>
+            </div>
+
+            <!-- ActionDock -->
+            <div class="dock region ol-home" style="padding:8px;margin:6px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">ActionDock <small>(each opens a tab in the global bar)</small></span>
+              <span class="pillb tool">▢ Terminal</span>
+              <span class="pillb tool">📄 Files</span>
+              <span class="pillb tool">🌐 Web</span>
+              <span class="pillb tool">⎇ Commits</span>
+              <span class="pillb tool ghost">+ Actions</span>
+            </div>
+
+            <!-- Timeline -->
+            <div class="timeline region ol-home" style="padding:8px;margin:16px -8px 0;">
+              <span class="tag t-home" style="top:-9px;left:6px;">Timeline</span>
+              <p class="tl-date" style="margin-top:8px;">Today</p>
+              <div class="convo">
+                <div class="convo-h"><span class="sq" style="background:var(--claude)"></span> Claude Code <span class="ago">just now</span></div>
+                <div class="msg u">👤 Let's go bigger — make the panebar replace the command-deck host view.</div>
+                <div class="msg">🤖 Mockup drafted: global PaneBar, tabs span PAN-1549 / PAN-1547 / MYN-204.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- workspace color key -->
+  <div class="wskey">
+    <span><i style="background:var(--ws-1549)"></i> panopticon · PAN-1549</span>
+    <span><i style="background:var(--ws-1547)"></i> panopticon · PAN-1547</span>
+    <span><i style="background:var(--ws-myn)"></i> mind-your-now · MYN-204</span>
+    <span><i style="background:var(--ws-global)"></i> global (no workspace) — a Web pane</span>
+  </div>
+
+  <div class="callout">
+    <b>The single tell:</b> in the <a class="pill-link" href="pan-1549-workspace-panes.html">PAN-1549</a> mockup every tab is the same color — they all belong to one selected workspace. Here the tabs are <b>three different colors</b>: panes from different workspaces (and one cross-project web pane) live side-by-side in one outermost bar. That is the whole feature.
+  </div>
+
+  <!-- legend -->
+  <div class="legend">
+    <div class="row"><span class="key" style="background:var(--c-bar)">PaneBar</span><span class="desc"><b>Global PaneBar</b> — outermost, full-width; one flat ordered list of every open pane. <span class="was">was inside Stage</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-shell)">Switcher</span><span class="desc"><b>Workspace switcher</b> — opens / focuses a tab. <span class="was">was the Navigator project tree</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-shell)">App Rail</span><span class="desc"><b>App Rail</b> — Home · Board · Pipeline · Agents · Settings. App views, not panes.</span></div>
+    <div class="row"><span class="key" style="background:var(--c-pane)">Pane</span><span class="desc"><b>Active Pane</b> — resolves its own workspace via <code>pane.workspaceId</code>. <span class="was">was Stage-scoped</span></span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">Header</span><span class="desc"><b>WorkspaceHeader</b> — now shows a project · issue crumb (panes mix workspaces).</span></div>
+    <div class="row"><span class="key" style="background:var(--c-home)">Launcher</span><span class="desc"><b>Launcher</b> / <b>Docks</b> — open new tabs into the pane's workspace.</span></div>
+  </div>
+
+  <h2>3 · What changes vs PAN-1549</h2>
+  <table>
+    <thead><tr><th style="width:26%">Aspect</th><th style="width:37%">PAN-1549 (today)</th><th>PAN-1561 (this mockup)</th></tr></thead>
+    <tbody>
+      <tr><td>Relationship</td><td class="old"><code>workspace → panes</code> (children)</td><td><code>pane → workspace</code> (a facet)</td></tr>
+      <tr><td>PaneBar lives</td><td class="old">inside <code>Stage</code>, per selected workspace</td><td>at the app shell, <b>outermost &amp; global</b></td></tr>
+      <tr><td>Store shape</td><td class="old"><code>Record&lt;WsId, Pane[]&gt;</code></td><td>one flat <code>Pane[]</code>; each pane tagged <code>workspaceId</code></td></tr>
+      <tr><td>Active pane</td><td class="old">one per workspace</td><td>one, globally</td></tr>
+      <tr><td>Command Deck view</td><td class="old">the host (tree + Stage)</td><td><b>dissolved</b> — tree becomes a switcher; Stage becomes a pane renderer</td></tr>
+      <tr><td>Cross-workspace</td><td class="old">impossible — one at a time</td><td>native — mix freely in one bar</td></tr>
+      <tr><td>Workspace switch</td><td class="old">swaps the whole pane set</td><td>focuses / opens a tab; others stay open</td></tr>
+      <tr><td>HOME pane</td><td class="old">the only way to "see" a workspace</td><td>one per workspace, deduped; just another tab</td></tr>
+    </tbody>
+  </table>
+
+  <p class="legend-note">Implementation phasing for this lives in the issue: <b>PAN-1561</b> — <a class="pill-link" href="https://github.com/eltmon/panopticon-cli/issues/1561">github.com/eltmon/panopticon-cli/issues/1561</a>. This mockup illustrates decision&nbsp;#5 (PaneBar replaces the Command&nbsp;Deck host view) taken to its full conclusion.</p>
+
+</div>
+</body>
+</html>

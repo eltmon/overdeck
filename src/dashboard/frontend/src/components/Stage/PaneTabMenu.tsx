@@ -1,0 +1,67 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { Columns2, Rows2, X } from 'lucide-react'
+import menu from '../CommandDeck/styles/command-deck.module.css'
+
+interface PaneTabMenuProps {
+  /** Viewport coordinates (fixed positioning) — typically the cursor. */
+  position: { top: number; left: number }
+  onClose: () => void
+  /** Open this pane in a side-by-side (right) split (PAN-1591). */
+  onOpenInSplit: () => void
+  /** Open this pane in a stacked (below) split. */
+  onSplitDown: () => void
+  /** Close the tab — omitted for permanent panes (HOME). */
+  onCloseTab?: () => void
+  /** Close every closable tab (HOME stays). */
+  onCloseAll: () => void
+}
+
+/**
+ * Lightweight right-click menu for non-conversation pane tabs (issue, plan,
+ * docs, commits, files, browser, home). Conversation/agent tabs use the richer
+ * {@link ConversationActionMenu} instead. Reuses the command-deck menu styling
+ * so both menus look identical. Portaled + fixed-positioned to escape clips.
+ */
+export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab, onCloseAll }: PaneTabMenuProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const dismiss = () => onClose()
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', dismiss, true)
+    window.addEventListener('resize', dismiss)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', dismiss, true)
+      window.removeEventListener('resize', dismiss)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <>
+      <div className={menu.headerMenuOverlay} onClick={onClose} />
+      <div role="menu" className={menu.headerMenu} style={{ position: 'fixed', top: position.top, left: position.left, right: 'auto' }}>
+        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onOpenInSplit(); onClose() }}>
+          <Columns2 size={14} />
+          Split right
+        </button>
+        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onSplitDown(); onClose() }}>
+          <Rows2 size={14} />
+          Split down
+        </button>
+        <div className={menu.headerMenuDivider} />
+        {onCloseTab && (
+          <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseTab(); onClose() }}>
+            <X size={14} />
+            Close tab
+          </button>
+        )}
+        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseAll(); onClose() }}>
+          <X size={14} />
+          Close all tabs
+        </button>
+      </div>
+    </>,
+    document.body,
+  )
+}

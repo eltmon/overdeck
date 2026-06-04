@@ -45,6 +45,26 @@ export function createBackupSync(sourceDirs: string[]): BackupInfo {
   };
 }
 
+/**
+ * Back up a single file into a timestamped `context/` backup dir, preserving
+ * its original absolute path in the backup filename. Returns the backup file
+ * path, or null when the source does not exist.
+ *
+ * Used to snapshot a hand-authored CLAUDE.md / AGENTS.md the first time
+ * `pan sync` injects a Panopticon-managed region — a safety net for the one
+ * write that touches pre-existing content. Pass a shared `timestamp` to group
+ * several files from the same sync run under one backup dir.
+ */
+export function backupFileSync(file: string, timestamp = createBackupTimestamp()): string | null {
+  if (!existsSync(file)) return null;
+  const dir = join(BACKUPS_DIR, timestamp, 'context');
+  mkdirSync(dir, { recursive: true });
+  const encoded = file.replace(/^[/\\]+/, '').replace(/[/\\]/g, '__');
+  const dest = join(dir, encoded);
+  cpSync(file, dest);
+  return dest;
+}
+
 export function listBackupsSync(): BackupInfo[] {
   if (!existsSync(BACKUPS_DIR)) return [];
 

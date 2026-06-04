@@ -10,6 +10,7 @@ import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { resolveTrackerTypeSync, isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 
 interface ReopenOptions {
@@ -283,19 +284,28 @@ export function findLocalWorkspace(issueId: string, startDir?: string): string |
 }
 
 export async function reopenCommand(id: string, options: ReopenOptions = {}): Promise<void> {
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
+
   // Resolve tracker type using the same logic as `pan start` so GitHub issues
   // (e.g. pan-457) don't misroute to Linear (MIN-848).
-  const trackerType = resolveTrackerTypeSync(id);
+  const trackerType = resolveTrackerTypeSync(issueId);
 
   if (trackerType === 'github') {
-    await reopenGitHubIssueCommand(id, options);
+    await reopenGitHubIssueCommand(issueId, options);
   } else if (trackerType === 'linear') {
-    await reopenLinearIssueCommand(id, options);
+    await reopenLinearIssueCommand(issueId, options);
   } else {
     // rally and gitlab are not yet supported — fail fast rather than silently
     // falling through to the Linear SDK which could misroute the issue.
     console.log(chalk.red(`\nError: \`pan reopen\` does not support ${trackerType} tracker.`));
-    console.log(`  Issue ${id} is tracked as ${trackerType} in your projects.yaml.`);
+    console.log(`  Issue ${issueId} is tracked as ${trackerType} in your projects.yaml.`);
     console.log(`  Currently supported trackers: github, linear.`);
     process.exit(1);
   }

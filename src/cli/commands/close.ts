@@ -14,6 +14,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
+import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 
 const execFileAsync = promisify(execFile);
@@ -60,7 +61,16 @@ async function readGitHubCanonicalState(owner: string, repo: string, number: num
   return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
 }
 
-export async function closeOutCommand(issueId: string, options: CloseOutOptions): Promise<void> {
+export async function closeOutCommand(id: string, options: CloseOutOptions): Promise<void> {
+  const issueId = resolveBareNumericIdSync(id);
+  if (!issueId) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
+
   // Human-only guard: reject if running as an agent
   if (process.env.PANOPTICON_AGENT_ID) {
     console.error(chalk.red('Close-out is a human-only operation. Agents cannot close out issues.'));

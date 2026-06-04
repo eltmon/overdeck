@@ -282,6 +282,11 @@ export interface TemplatePlaceholders {
   PROJECTS_DIR: string;      // e.g., '/home/user/Projects' (parent of PROJECT_PATH)
   WORKSPACE_PATH: string;    // e.g., '/home/user/Projects/myn/workspaces/feature-min-123'
   HOME?: string;             // e.g., '/home/user' (for docker-compose path sanitization)
+  // PAN-666: git ref to diff against for changed-file-scoped quality gates, e.g.
+  // 'origin/main'. A test gate can use `vitest run --changed {{CHANGED_BASE}}` to
+  // run only tests affected by the PR's changes and skip pre-existing failures in
+  // unmodified files. Only set during verification (where a target branch exists).
+  CHANGED_BASE?: string;
 }
 
 /**
@@ -290,6 +295,7 @@ export interface TemplatePlaceholders {
 export function replacePlaceholdersSync(template: string, placeholders: TemplatePlaceholders): string {
   let result = template;
   for (const [key, value] of Object.entries(placeholders)) {
+    if (value == null) continue; // skip unset optional placeholders (e.g. CHANGED_BASE)
     result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
   }
   return result;

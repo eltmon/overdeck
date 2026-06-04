@@ -12,7 +12,6 @@
  */
 
 import {
-  Fragment,
   useMemo,
   useRef,
   useState,
@@ -22,7 +21,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck, Wrench, Search, X } from 'lucide-react';
 import type { WorkingPhase } from '../../lib/workingPhase';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
@@ -46,6 +45,107 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 const ALWAYS_UNVIRTUALIZED_TAIL_ROWS = 8;
 const AUTO_SCROLL_THRESHOLD_PX = 64;
+
+function stringifyToolInput(input: Record<string, unknown> | undefined): string {
+  if (!input) return '';
+  try {
+    return JSON.stringify(input);
+  } catch {
+    return '';
+  }
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractSearchHighlightTerms(query: string): string[] {
+  const matches = query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
+  const dedup = new Set<string>();
+  for (const term of matches) {
+    if (term.length > 0) dedup.add(term);
+  }
+  return [...dedup].sort((a, b) => b.length - a.length);
+}
+
+// Match CommandPalette highlighting: quiet background-only amber, no text color swap.
+const SEARCH_HIGHLIGHT_CLASS = 'rounded-sm px-px text-inherit bg-amber-300/40 dark:bg-amber-400/20';
+const SEARCH_HIGHLIGHT_ATTR = 'data-conversation-search-highlight';
+
+function escapeDataAttributeValue(value: string): string {
+  const cssEscape = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape : null;
+  if (cssEscape) return cssEscape(value);
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function clearSearchHighlights(root: ParentNode): void {
+  const highlights = Array.from(root.querySelectorAll<HTMLElement>(`[${SEARCH_HIGHLIGHT_ATTR}]`));
+  for (const highlight of highlights) {
+    highlight.replaceWith(document.createTextNode(highlight.textContent ?? ''));
+  }
+}
+
+function highlightSearchTermsInElement(element: HTMLElement, terms: string[]): void {
+  clearSearchHighlights(element);
+  if (terms.length === 0) return;
+
+  const pattern = new RegExp(`(${terms.map(escapeRegex).join('|')})`, 'gi');
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      pattern.lastIndex = 0;
+      if (!node.textContent || !pattern.test(node.textContent)) return NodeFilter.FILTER_REJECT;
+      pattern.lastIndex = 0;
+      const parent = node.parentElement;
+      if (!parent || parent.closest(`[${SEARCH_HIGHLIGHT_ATTR}]`)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+  for (const node of textNodes) {
+    const text = node.textContent ?? '';
+    const parts = text.split(pattern);
+    if (parts.length <= 1) continue;
+    const fragment = document.createDocumentFragment();
+    for (const part of parts) {
+      if (!part) continue;
+      if (terms.some((term) => part.toLocaleLowerCase() === term.toLocaleLowerCase())) {
+        const span = document.createElement('span');
+        span.className = SEARCH_HIGHLIGHT_CLASS;
+        span.setAttribute(SEARCH_HIGHLIGHT_ATTR, 'true');
+        span.textContent = part;
+        fragment.appendChild(span);
+      } else {
+        fragment.appendChild(document.createTextNode(part));
+      }
+    }
+    node.replaceWith(fragment);
+  }
+}
+
+function getRowSearchText(row: MessagesTimelineRow): string {
+  if (row.kind === 'message') return row.message.text;
+  if (row.kind === 'work') {
+    return row.groupedEntries
+      .map((entry) => [
+        entry.label,
+        entry.detail,
+        entry.result,
+        entry.command,
+        entry.toolTitle,
+        entry.changedFiles?.join('\n'),
+        stringifyToolInput(entry.toolInput),
+      ].filter(Boolean).join('\n'))
+      .join('\n');
+  }
+  if (row.kind === 'proposed-plan') return row.plan.plan;
+  if (row.kind === 'compact-boundary') return `Conversation compacted ${row.boundary.trigger ?? ''} ${row.boundary.model ?? ''}`;
+  if (row.kind === 'compacting') return 'Compacting conversation';
+  if (row.kind === 'working') return 'Working';
+  return '';
+}
 
 /** Format an ISO timestamp as a short time string (e.g., "3:42 PM" or "May 14, 3:42 PM"). */
 function formatTimestamp(iso: string): string {
@@ -145,8 +245,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [width, setWidth] = useState(800);
   // Track whether user has manually scrolled up
   const isPinnedToBottomRef = useRef(true);
+  // Set by wheel/touch/pointerdown/keydown — distinguishes a real user scroll
+  // from a programmatic scrollTop adjustment. Without this, virtualizer
+  // re-measurement after a row is added briefly grows scrollHeight before
+  // our auto-scroll catches up, the scroll event fires with
+  // distanceFromBottom > threshold, and pinning is lost even though the
+  // user never touched the timeline. (Regression of fix in commit 80b33db80.)
+  const userScrollIntentRef = useRef(false);
   // Visible state for scroll-to-bottom button
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [searchRenderTick, setSearchRenderTick] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const previousSearchQueryRef = useRef('');
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
@@ -288,10 +401,29 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   // auto-scroll effects above.
   useLayoutEffect(() => {
     isPinnedToBottomRef.current = true;
+    userScrollIntentRef.current = false;
     setShowScrollToBottom(false);
     const el = scrollContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [conversationName]);
+
+  // Mark user-initiated scroll intent so handleScroll can distinguish a real
+  // scroll-up from a transient programmatic-scroll undershoot.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const markIntent = () => { userScrollIntentRef.current = true; };
+    el.addEventListener('wheel', markIntent, { passive: true });
+    el.addEventListener('touchstart', markIntent, { passive: true });
+    el.addEventListener('pointerdown', markIntent);
+    el.addEventListener('keydown', markIntent);
+    return () => {
+      el.removeEventListener('wheel', markIntent);
+      el.removeEventListener('touchstart', markIntent);
+      el.removeEventListener('pointerdown', markIntent);
+      el.removeEventListener('keydown', markIntent);
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -307,6 +439,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       }
     });
     isPinnedToBottomRef.current = true;
+    userScrollIntentRef.current = false;
     setShowScrollToBottom(false);
   }, [rowVirtualizer, virtualRows.length]);
 
@@ -315,11 +448,114 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
     const atBottom = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
-    isPinnedToBottomRef.current = atBottom;
-    setShowScrollToBottom(!atBottom);
+    if (atBottom) {
+      // Landing at the bottom always re-pins, regardless of cause.
+      isPinnedToBottomRef.current = true;
+      userScrollIntentRef.current = false;
+      setShowScrollToBottom(false);
+    } else if (userScrollIntentRef.current) {
+      // Only unpin when the user actually scrolled. Programmatic scrolls that
+      // momentarily land short of the bottom (virtualizer re-measurement
+      // during streaming) must not unpin — the resize-observer auto-scroll
+      // below will catch up on the next tick.
+      isPinnedToBottomRef.current = false;
+      setShowScrollToBottom(true);
+    }
   }, []);
 
+  const searchMatches = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return [];
+    return rows
+      .map((row, index) => ({ row, index, text: getRowSearchText(row).toLocaleLowerCase() }))
+      .filter((candidate) => candidate.text.includes(query));
+  }, [rows, searchQuery]);
+
+  const currentMatch = searchMatches[currentMatchIndex] ?? null;
+  const searchHighlightTerms = useMemo(() => extractSearchHighlightTerms(searchQuery), [searchQuery]);
+
+  const scrollToRow = useCallback((rowIndex: number, rowId: string) => {
+    isPinnedToBottomRef.current = false;
+    userScrollIntentRef.current = true;
+    setShowScrollToBottom(true);
+
+    const scrollRenderedRowIntoView = () => {
+      const selector = `[data-search-row-id="${escapeDataAttributeValue(rowId)}"]`;
+      const rowEl = scrollContainerRef.current?.querySelector<HTMLElement>(selector);
+      rowEl?.scrollIntoView({ block: 'center' });
+      setSearchRenderTick((tick) => tick + 1);
+    };
+
+    if (rowIndex < firstUnvirtIdx) {
+      rowVirtualizer.scrollToIndex(rowIndex, { align: 'center' });
+      requestAnimationFrame(scrollRenderedRowIntoView);
+      return;
+    }
+
+    requestAnimationFrame(scrollRenderedRowIntoView);
+  }, [firstUnvirtIdx, rowVirtualizer]);
+
+  const goToMatch = useCallback((nextIndex: number) => {
+    if (searchMatches.length === 0) return;
+    const normalized = ((nextIndex % searchMatches.length) + searchMatches.length) % searchMatches.length;
+    setCurrentMatchIndex(normalized);
+    const match = searchMatches[normalized]!;
+    scrollToRow(match.index, match.row.id);
+  }, [scrollToRow, searchMatches]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+    searchInputRef.current?.select();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (previousSearchQueryRef.current === searchQuery) return;
+    previousSearchQueryRef.current = searchQuery;
+    setCurrentMatchIndex(0);
+    if (searchMatches[0]) {
+      scrollToRow(searchMatches[0].index, searchMatches[0].row.id);
+    }
+  }, [searchQuery, searchMatches, scrollToRow]);
+
+  useEffect(() => {
+    if (currentMatchIndex >= searchMatches.length) {
+      setCurrentMatchIndex(Math.max(0, searchMatches.length - 1));
+    }
+  }, [currentMatchIndex, searchMatches.length]);
+
   const virtualItems = rowVirtualizer.getVirtualItems();
+
+  useLayoutEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!root) return;
+    clearSearchHighlights(root);
+    if (!currentMatch || searchHighlightTerms.length === 0) return;
+    const selector = `[data-search-row-id="${escapeDataAttributeValue(currentMatch.row.id)}"]`;
+    const rowEl = root.querySelector<HTMLElement>(selector);
+    if (rowEl) highlightSearchTermsInElement(rowEl, searchHighlightTerms);
+    return () => clearSearchHighlights(root);
+  }, [currentMatch, searchHighlightTerms, searchRenderTick, virtualItems.length, tailRows.length]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        event.stopPropagation();
+        setSearchOpen(true);
+        return;
+      }
+      if (event.key === 'Escape' && searchOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        setSearchOpen(false);
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [searchOpen]);
+
   const dedupedVirtualItems = (() => {
     const seen = new Set<number>();
     return virtualItems.filter((item) => {
@@ -350,6 +586,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 <div
                   key={row.id}
                   data-index={virtualItem.index}
+                  data-search-row-id={row.id}
                   ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
@@ -358,6 +595,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
                     background: 'var(--background)',
+                    outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                    outlineOffset: '-2px',
+                    borderRadius: 8,
                   }}
                 >
                   <TimelineRowRenderer
@@ -388,7 +628,15 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         {tailRows.map((row) => {
           const markersForRow = markersByAfterId.get(row.id);
           return (
-            <Fragment key={row.id}>
+            <div
+              key={row.id}
+              data-search-row-id={row.id}
+              style={{
+                outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                outlineOffset: '-2px',
+                borderRadius: 8,
+              }}
+            >
               <TimelineRowRenderer
                 row={row}
                 isStreaming={streaming}
@@ -407,11 +655,94 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   marker={marker}
                 />
               ))}
-            </Fragment>
+            </div>
           );
         })}
       </div>
     </div>
+
+    {searchOpen && (
+      <div
+        role="search"
+        aria-label="Search conversation"
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 16,
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: 8,
+          background: 'var(--popover, var(--background))',
+          color: 'var(--foreground)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+        }}
+      >
+        <Search size={14} />
+        <input
+          ref={searchInputRef}
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setSearchOpen(false);
+              setSearchQuery('');
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              goToMatch(currentMatchIndex + (event.shiftKey ? -1 : 1));
+            }
+          }}
+          placeholder="Search conversation…"
+          aria-label="Search conversation"
+          style={{
+            width: 260,
+            background: 'var(--input, var(--background))',
+            color: 'var(--foreground)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '5px 8px',
+            fontSize: 12,
+            outline: 'none',
+          }}
+        />
+        <span style={{ minWidth: 54, textAlign: 'center', fontSize: 12, color: 'var(--muted-foreground)' }}>
+          {searchQuery.trim() ? `${searchMatches.length === 0 ? 0 : currentMatchIndex + 1}/${searchMatches.length}` : '0/0'}
+        </span>
+        <button
+          type="button"
+          onClick={() => goToMatch(currentMatchIndex - 1)}
+          disabled={searchMatches.length === 0}
+          title="Previous match"
+          aria-label="Previous match"
+          style={{ padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'inherit', cursor: searchMatches.length ? 'pointer' : 'not-allowed' }}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          onClick={() => goToMatch(currentMatchIndex + 1)}
+          disabled={searchMatches.length === 0}
+          title="Next match"
+          aria-label="Next match"
+          style={{ padding: '4px 6px', border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'inherit', cursor: searchMatches.length ? 'pointer' : 'not-allowed' }}
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+          title="Close search"
+          aria-label="Close search"
+          style={{ padding: 4, border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer' }}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    )}
 
     {/* Failed message outbox — shows messages that failed to send with Retry/Discard */}
     {failedMessages && failedMessages.length > 0 && (

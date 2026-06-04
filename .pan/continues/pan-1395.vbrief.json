@@ -1,0 +1,19 @@
+{
+  "version": "1",
+  "issueId": "PAN-1395",
+  "created": "2026-05-31T22:28:56.001Z",
+  "updated": "2026-05-31T22:28:56.001Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-8",
+      "timestamp": "2026-05-31T22:28:56.001Z"
+    }
+  ]
+}

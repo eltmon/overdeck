@@ -65,6 +65,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       ISSUE_ID: ctx.issueId,
       ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
       WORKSPACE_PATH: ctx.workspacePath,
+      BRANCH_NAME: `feature/${ctx.issueId.toLowerCase()}`,
       LOCAL: ctx.env === 'LOCAL',
       REMOTE: ctx.env === 'REMOTE',
       PROJECT_ROOT: ctx.projectRoot || '',
@@ -100,7 +101,8 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       issueId: issueId.toUpperCase(),
       itemId: nextItem.id,
       currentItemIds,
-      synthesisOutputs: cont?.swarmRuntime?.synthesisOutputs,
+      // PAN-1517: swarmRuntime is gone — no synthesisOutputs to pass.
+      synthesisOutputs: undefined,
     });
     return [
       '## Active vBRIEF Slice (Canonical Task Graph)',

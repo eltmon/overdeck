@@ -89,7 +89,13 @@ describe('flywheel run state', () => {
     const detail = await getFlywheelRunDetail('RUN-1', { panopticonHome });
 
     expect(latestPath).toBe(join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'latest.json'));
-    expect(detail?.latest).toEqual(status);
+    // PAN-1528: getFlywheelRunDetail overlays a live work-agent count over the
+    // persisted status. Empty test panopticonHome => no agents => count is 0,
+    // overriding the fixture's `agentsActive: 1`.
+    expect(detail?.latest).toEqual({
+      ...status,
+      system: { ...status.system, agentsActive: 0 },
+    });
     expect(await readFile(latestPath, 'utf8')).toContain('"runId": "RUN-1"');
   });
 

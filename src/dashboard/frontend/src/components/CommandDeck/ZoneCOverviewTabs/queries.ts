@@ -12,6 +12,9 @@ import {
   type UseQueryOptions,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import type { StatusHistoryEntry } from '../../../lib/workspace-types';
+
+export type { StatusHistoryEntry };
 
 export interface PlanningSummaryResponse {
   hasPrd: boolean;
@@ -188,6 +191,8 @@ export interface ReviewStatusData {
   queuePosition?: number | null;
   /** PAN-366: Which specialist is active or will handle this issue */
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
+  /** Chronological review/test/merge/verify status transitions (S3 History tab). */
+  history?: StatusHistoryEntry[];
 }
 
 export interface BlockerReason {

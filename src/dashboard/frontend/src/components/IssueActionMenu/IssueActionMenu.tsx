@@ -3,7 +3,6 @@ import { MoreHorizontal, X } from 'lucide-react';
 
 import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
-import { SwarmDispatchDialog } from '../SwarmDispatchDialog';
 import { SwitchModelModal } from '../SwitchModelModal';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 import type { IssueActionKey } from '../../lib/issueActions';
@@ -266,19 +265,6 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
           className="space-y-3"
           inputClassName="min-h-[110px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
           actionsClassName="flex justify-end gap-2"
-        />
-      </ActionDialogFrame>
-    );
-  }
-
-  if (activeDialog.key === 'swarm') {
-    return (
-      <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
-        <SwarmDispatchDialog
-          issueId={issueId}
-          onClose={handleClose}
-          onDispatch={() => actions.submitDialogAction(activeDialog.action)}
-          pending={actions.isActionPending(activeDialog.action.key)}
         />
       </ActionDialogFrame>
     );

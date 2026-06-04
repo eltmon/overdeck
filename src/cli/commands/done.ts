@@ -9,6 +9,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
@@ -23,6 +24,14 @@ import type { MergeSet } from '../../lib/merge-set.js';
 interface DoneOptions {
   comment?: string;
   force?: boolean;
+  /**
+   * Strike-agent shape (PAN strike role). When true, `pan done` short-circuits
+   * the review-pipeline dispatch: the strike has already merged to main and
+   * verified there, so there is no PR to open, no review specialists to spawn,
+   * and no tracker `in_review` transition. We only emit a completion activity
+   * entry and exit cleanly.
+   */
+  strike?: boolean;
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
@@ -178,6 +187,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const issueId = resolveIssueIdSync(id);
   const agentId = `agent-${issueId.toLowerCase()}`;
 
+  // Strike-agent shape: the strike already merged to main and verified there,
+  // so there is no review pipeline to dispatch. Emit an activity event and exit.
+  if (options.strike) {
+    emitActivityEntrySync({
+      source: 'strike',
+      level: 'info',
+      issueId,
+      message: `Strike ${issueId} reported done${options.comment ? `: ${options.comment}` : ''}`,
+    });
+    console.log(chalk.green(`✓ Strike ${issueId} acknowledged (review pipeline skipped)`));
+    return;
+  }
+
   // Guard: reject completion for already-closed issues
   if (!options.force) {
     const { resolveGitHubIssueSync } = await import('../../lib/tracker-utils.js');
@@ -263,8 +285,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           console.error(line);
         }
         console.error('');
-        console.error(chalk.dim(`  Fix these issues, then run 'pan done ${issueId}' again.`));
-        console.error(chalk.dim('  Use --force to skip checks.'));
+        // PAN-1531: explicit three-option resolution for dirty worktrees.
+        // No silent stashing — the agent (or operator) picks one and reruns.
+        console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
+        console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>"'));
+        console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (destructive; type the command yourself)'));
+        console.error(chalk.dim('    3. Stash:   git stash push -u -m "salvageable:' + issueId + ':$(date -Iseconds):<description>"'));
+        console.error('');
+        console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
+        console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));
         console.error('');
         process.exit(1);
         return;
@@ -505,6 +534,19 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
+    emitActivityEntrySync({
+      source: 'work-agent',
+      level: 'info',
+      message: `${issueId} work complete — entering review pipeline`,
+      issueId,
+    });
+    emitActivityTtsSync({
+      utterance: `Work agent finished ${issueId}, entering review`,
+      priority: 2,
+      issueId,
+      source: 'work-agent',
+      eventType: 'workAgent.finished',
+    });
     console.log('');
 
     // Summary

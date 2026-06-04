@@ -1,0 +1,1 @@
+export const AUTO_MERGE_COOLDOWN_MS = 300_000;

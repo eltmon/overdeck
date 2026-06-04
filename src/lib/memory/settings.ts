@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import yaml from 'js-yaml';
 import { getGlobalConfigPath } from '../config-yaml.js';
+import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
 import type { ExtractionProviderTarget, MemoryProviderSettings } from './providers/types.js';
 
 const CACHE_TTL_MS = 5_000;
@@ -68,6 +69,9 @@ export async function getMemoryWorkerConcurrency(): Promise<number> {
 }
 
 export async function areMemoryObservationsEnabled(): Promise<boolean> {
+  // Honor both the memory-specific toggle and the background-AI gate
+  // (low-cost mode / memoryExtraction feature toggle).
+  if (!isBackgroundFeatureEnabled('memoryExtraction')) return false;
   return (await loadMemorySettings()).observationsEnabled;
 }
 

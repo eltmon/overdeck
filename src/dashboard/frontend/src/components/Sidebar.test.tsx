@@ -7,7 +7,6 @@ import { useDashboardStore } from '../lib/store';
 import type { Tab } from './Header';
 import type { Issue } from '../types';
 
-vi.mock('./CloisterStatusBar', () => ({ CloisterStatusBar: () => <div data-testid="cloister-status" /> }));
 vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
 vi.mock('./DeaconPauseToggle', () => ({
   DeaconPauseToggle: () => <button type="button">Pause Deacon</button>,
@@ -74,23 +73,18 @@ describe('Sidebar navigation', () => {
     }));
   });
 
-  it('orders Operations as Home, Command Deck, Board, Pipeline, Awaiting Merge, Agents, AutoPreso, Flywheel', () => {
+  it('shows Home and Flywheel as the primary rail, with other views under More (PAN-1561)', () => {
     const { container, onTabChange } = renderSidebar({ activeTab: 'command-deck' });
 
-    const operationLabels = Array.from(container.querySelectorAll('nav [data-testid^="sidebar-"]'))
-      .slice(0, 8)
-      .map((button) => button.textContent?.trim());
+    // Primary rail: the first two nav buttons are Home and Flywheel.
+    const navButtons = Array.from(container.querySelectorAll('nav button[data-testid^="sidebar-"]'));
+    const labels = navButtons.map((button) => button.textContent?.trim());
+    expect(labels[0]).toBe('Home');
+    expect(labels[1]).toBe('Flywheel');
 
-    expect(operationLabels).toEqual([
-      'Home',
-      'Command Deck',
-      'Board',
-      'Pipeline',
-      'Awaiting Merge',
-      'Agents',
-      'AutoPreso',
-      'Flywheel',
-    ]);
+    // Secondary views are relocated into the "More" section but still reachable.
+    expect(screen.getByTestId('sidebar-more')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-command-deck')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-awaiting-merge')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('sidebar-command-deck'));

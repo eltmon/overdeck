@@ -14,6 +14,19 @@
 PAN_DASHBOARD_URL="${PANOPTICON_DASHBOARD_URL:-http://localhost:3011}"
 PAN_CURL_TIMEOUT="${PANOPTICON_HOOK_TIMEOUT:-0.5}"
 
+# Internal token for authenticated HTTP ingestion (PAN-1596). The
+# /api/agents/:id/heartbeat route is token-gated — without this header every
+# hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
+# (thinking/working/idle/waiting) never reaches the AgentStateService mirror.
+# No launcher exports PANOPTICON_INTERNAL_TOKEN, so source it from the on-disk
+# token as the primary path. Empty token => same 403/drop as before (no
+# regression).
+PAN_INTERNAL_TOKEN="${PANOPTICON_INTERNAL_TOKEN:-}"
+if [ -z "$PAN_INTERNAL_TOKEN" ]; then
+  _pan_token_path="${PANOPTICON_HOME:-$HOME/.panopticon}/internal-token"
+  [ -f "$_pan_token_path" ] && PAN_INTERNAL_TOKEN=$(cat "$_pan_token_path" 2>/dev/null || true)
+fi
+
 # Resolve the current agent ID without a "main-cli" fallback (PAN-69).
 # Returns 0 and sets AGENT_ID on success; returns 1 on failure so the caller
 # can exit cleanly. We refuse to emit events that can't be authoritatively
@@ -66,7 +79,8 @@ pan_emit_event() {
 
   local http_code
   http_code=$(curl -s -m "$PAN_CURL_TIMEOUT" -o /dev/null -w '%{http_code}' \
-    -X POST "$url" -H 'Content-Type: application/json' --data "$body" 2>/dev/null || echo '000')
+    -X POST "$url" -H 'Content-Type: application/json' \
+    -H "x-panopticon-internal-token: $PAN_INTERNAL_TOKEN" --data "$body" 2>/dev/null || echo '000')
 
   if [[ "$http_code" =~ ^2 ]]; then
     return 0
@@ -116,7 +130,8 @@ pan__drain_pending() {
       fi
       local code
       code=$(curl -s -m "$PAN_CURL_TIMEOUT" -o /dev/null -w '%{http_code}' \
-        -X POST "$url" -H 'Content-Type: application/json' --data "$line" 2>/dev/null || echo '000')
+        -X POST "$url" -H 'Content-Type: application/json' \
+        -H "x-panopticon-internal-token: $PAN_INTERNAL_TOKEN" --data "$line" 2>/dev/null || echo '000')
       if [[ "$code" =~ ^2 ]]; then
         : # drained successfully
       elif [[ "$code" =~ ^4 ]]; then

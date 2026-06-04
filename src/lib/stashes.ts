@@ -5,7 +5,19 @@ import { GitError } from './errors.js';
 
 const execAsync = promisify(exec);
 
-export type CanonicalStashKind = 'pre-merge' | 'pre-spawn' | 'review-temp' | 'salvageable';
+/**
+ * Canonical stash kinds Panopticon creates.
+ *
+ * PAN-1531: collapsed from four kinds to one. The retired kinds (`pre-merge`,
+ * `pre-spawn`, `review-temp`) are no longer created by Panopticon code, but
+ * `parseCanonicalStashMessage` still recognizes them so existing stashes in
+ * `refs/stash` parse correctly during cleanup. Only `salvageable` may be
+ * created going forward — see /home/eltmon/.panopticon/context/global.md
+ * "Stash Discipline" and docs/MERGE-WORKFLOW.md.
+ */
+export type CanonicalStashKind = 'salvageable';
+export type LegacyStashKind = 'pre-merge' | 'pre-spawn' | 'review-temp';
+export type AnyStashKind = CanonicalStashKind | LegacyStashKind;
 
 export interface ParsedStashEntry {
   /** Stable stash object SHA for persisted references. */
@@ -15,7 +27,13 @@ export interface ParsedStashEntry {
   message: string;
   createdAt?: Date;
   issueId?: string;
-  kind: CanonicalStashKind | 'unknown';
+  /**
+   * `'salvageable'` for canonical stashes Panopticon creates today.
+   * `'pre-merge' | 'pre-spawn' | 'review-temp'` for stashes left behind by
+   * the pre-PAN-1531 pipeline; recognized for cleanup but never created anew.
+   * `'unknown'` for hand-typed or otherwise unrecognized stashes.
+   */
+  kind: AnyStashKind | 'unknown';
   shortDescription?: string;
   sequence?: number;
 }
@@ -57,40 +75,28 @@ function validateIssueId(issueId: string): string {
   return normalizedIssueId;
 }
 
-export function buildStashMessage(
-  kind: 'pre-merge' | 'pre-spawn',
-  issueId: string,
-  date?: Date,
-): string;
-export function buildStashMessage(
-  kind: 'review-temp',
-  issueId: string,
-  sequence: number,
-): string;
-export function buildStashMessage(
-  kind: 'salvageable',
-  issueId: string,
-  date: Date,
-  shortDescription: string,
-): string;
+/**
+ * Build a canonical stash message.
+ *
+ * PAN-1531: `salvageable` is the only canonical kind Panopticon creates.
+ * Retired overloads for `pre-merge` / `pre-spawn` / `review-temp` were
+ * removed when their callers were deleted. Any human who wants a stash
+ * Panopticon will leave alone uses `salvageable:`.
+ */
 export function buildStashMessage(
   kind: CanonicalStashKind,
   issueId: string,
-  arg3: Date | number = new Date(),
-  arg4?: string,
+  date: Date = new Date(),
+  shortDescription: string = 'recovery',
 ): string {
   const normalizedIssueId = validateIssueId(issueId);
-  if (kind === 'review-temp') {
-    // PAN-879 / GitHub issue #879: review-temp is the canonical sequence-based exception
-    // to the timestamped stash taxonomy. Acceptance criteria were updated to match.
-    return `review-temp:${normalizedIssueId}:${arg3}`;
-  }
   if (kind === 'salvageable') {
-    const when = arg3 instanceof Date ? arg3 : new Date();
-    return `salvageable:${normalizedIssueId}:${isoForStash(when)}:${sanitizeShortDescription(arg4 ?? 'recovery')}`;
+    return `salvageable:${normalizedIssueId}:${isoForStash(date)}:${sanitizeShortDescription(shortDescription)}`;
   }
-  const when = arg3 instanceof Date ? arg3 : new Date();
-  return `${kind}:${normalizedIssueId}:${isoForStash(when)}`;
+  // Unreachable: type system narrows `kind` to 'salvageable'. Defensive throw
+  // so type widening at the call site is caught at runtime rather than
+  // silently producing an invalid message.
+  throw new Error(`buildStashMessage: unsupported kind ${kind as string}`);
 }
 
 export function parseCanonicalStashMessage(message: string): ParsedStashEntry {

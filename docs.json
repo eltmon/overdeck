@@ -96,7 +96,8 @@
               "configuration/projects",
               "configuration/harnesses",
               "configuration/issue-trackers",
-              "configuration/polyrepo"
+              "configuration/polyrepo",
+              "configuration/auto-merge"
             ]
           }
         ]
@@ -124,7 +125,8 @@
               "reference/harness-landscape",
               "reference/template-conversations",
               "reference/prompts",
-              "reference/troubleshooting"
+              "reference/troubleshooting",
+              "reference/token-spend-report"
             ]
           }
         ]

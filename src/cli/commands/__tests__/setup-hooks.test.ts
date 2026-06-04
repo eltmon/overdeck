@@ -5,12 +5,21 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   addPanopticonHookIfMissing,
+  parseHookHarness,
   setupHooksCommand,
   type ClaudeSettings,
 } from '../setup/hooks.js';
 
 describe('setup hooks', () => {
   const originalHome = process.env.HOME;
+
+  it('parses hook harness choices', () => {
+    expect(parseHookHarness(undefined)).toBeUndefined();
+    expect(parseHookHarness('claude-code')).toBe('claude-code');
+    expect(parseHookHarness('pi')).toBe('pi');
+    expect(parseHookHarness('both')).toBe('both');
+    expect(() => parseHookHarness('bogus')).toThrow('Invalid harness');
+  });
 
   afterEach(() => {
     if (originalHome === undefined) {
@@ -52,6 +61,8 @@ describe('setup hooks', () => {
     ['PostToolUse', 'permission-event-hook', '.*'],
     ['Stop', 'stop-hook', '.*'],
     ['Stop', 'permission-event-hook', '.*'],
+    ['PreToolUse', 'gh-issue-trailer-hook', 'Bash'],
+    ['PreToolUse', 'ask-user-question-hook', 'AskUserQuestion'],
     ['PreToolUse', 'tldr-read-enforcer', 'Read'],
     ['PostToolUse', 'tldr-post-edit', 'Edit|Write'],
   ] as const)('adds restored tool-event hook %s:%s once', (hookType, scriptName, matcher) => {
@@ -87,13 +98,21 @@ describe('setup hooks', () => {
     process.env.HOME = home;
 
     try {
-      await setupHooksCommand();
+      await setupHooksCommand({ harness: 'claude-code' });
 
       const settings = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8')) as ClaudeSettings;
       expect(settings.hooks?.PreToolUse).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
           hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'pre-tool-hook') }],
+        },
+        {
+          matcher: 'Bash',
+          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'gh-issue-trailer-hook') }],
+        },
+        {
+          matcher: 'AskUserQuestion',
+          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'ask-user-question-hook') }],
         },
       ]));
       expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([

@@ -6,12 +6,29 @@ import { promisify } from 'node:util';
 import { Effect, Schema } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { Command } from 'commander';
-import { FlywheelStatus } from '@panctl/contracts';
+import {
+  FlywheelStats,
+  FlywheelStatus,
+  type FlywheelStats as FlywheelStatsPayload,
+  type FlywheelStatsCriteria,
+  type FlywheelStatsCriterion,
+  type FlywheelStatsCriterionStatus,
+  type FlywheelStatsTrend,
+} from '@panctl/contracts';
 import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, readFlywheelLaunchMetadata, resolveLiveFlywheelRunId, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
+import {
+  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
+  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
+  getFlywheelActiveRunId,
+  isFlywheelAutoPickupBacklog,
+  isFlywheelGloballyPaused,
+  isFlywheelRequireUatBeforeMerge,
+  setFlywheelAutoPickupBacklog,
+  setFlywheelRequireUatBeforeMerge,
+} from '../../lib/database/app-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
@@ -24,6 +41,20 @@ interface EmitStatusOptions {
 
 interface StatusOptions {
   json?: boolean;
+}
+
+interface StatsOptions {
+  window?: string;
+  json?: boolean;
+}
+
+interface FormatStatsOptions {
+  color?: boolean;
+}
+
+interface ConfigOptions {
+  get?: true | string;
+  set?: string;
 }
 
 interface StartOptions {
@@ -56,12 +87,17 @@ interface ResolvedFlywheelRoleConfig {
   harness: 'claude-code' | 'pi';
   model: string;
   effort: RoleEffort;
+  minAgents: number;
   maxAgents: number;
   scope: FlywheelScope;
+  autoPickupBacklog: boolean;
+  requireUatBeforeMerge: boolean;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
+const decodeFlywheelStats = Schema.decodeUnknownSync(FlywheelStats);
 const execAsync = promisify(exec);
+const DEFAULT_STATS_WINDOW = '30d';
 
 function dashboardBaseUrl(): string {
   return (process.env.PANOPTICON_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
@@ -95,7 +131,85 @@ export function validateFlywheelStatusPayload(payload: unknown): FlywheelStatus 
   }
 }
 
+function isFlywheelConfigKey(key: string): key is FlywheelConfigKey {
+  return FLYWHEEL_CONFIG_KEYS.includes(key as FlywheelConfigKey);
+}
+
+function parseFlywheelConfigKey(key: string): FlywheelConfigKey {
+  if (!isFlywheelConfigKey(key)) throw new Error(`Unknown flywheel config key: ${key}`);
+  return key;
+}
+
+function readFlywheelConfigValue(key: FlywheelConfigKey): boolean {
+  switch (key) {
+    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
+      return isFlywheelAutoPickupBacklog();
+    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
+      return isFlywheelRequireUatBeforeMerge();
+  }
+}
+
+function writeFlywheelConfigValue(key: FlywheelConfigKey, value: boolean): void {
+  switch (key) {
+    case FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY:
+      setFlywheelAutoPickupBacklog(value);
+      return;
+    case FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY:
+      setFlywheelRequireUatBeforeMerge(value);
+      return;
+  }
+}
+
+function formatFlywheelConfigValue(key: FlywheelConfigKey): string {
+  return `${key}=${readFlywheelConfigValue(key)}`;
+}
+
+function parseConfigBoolean(key: string, rawValue: string): boolean {
+  if (rawValue === 'true') return true;
+  if (rawValue === 'false') return false;
+  throw new Error(`Boolean value required for ${key}: ${rawValue}`);
+}
+
+function parseFlywheelConfigAssignment(assignment: string): { key: FlywheelConfigKey; value: boolean } {
+  const separator = assignment.indexOf('=');
+  if (separator === -1) throw new Error('Flywheel config assignment must use <key>=<bool>');
+  const key = parseFlywheelConfigKey(assignment.slice(0, separator));
+  const value = parseConfigBoolean(key, assignment.slice(separator + 1));
+  return { key, value };
+}
+
+export async function flywheelConfigCommand(options: ConfigOptions = {}): Promise<void> {
+  try {
+    if (options.get !== undefined && options.set !== undefined) {
+      throw new Error('Use either --get or --set, not both');
+    }
+
+    if (options.set !== undefined) {
+      const { key, value } = parseFlywheelConfigAssignment(options.set);
+      writeFlywheelConfigValue(key, value);
+      console.log(`${key}=${value}`);
+      return;
+    }
+
+    if (typeof options.get === 'string') {
+      console.log(formatFlywheelConfigValue(parseFlywheelConfigKey(options.get)));
+      return;
+    }
+
+    console.log(FLYWHEEL_CONFIG_KEYS.map(formatFlywheelConfigValue).join('\n'));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
+const FLYWHEEL_CONFIG_KEYS = [
+  FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
+  FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
+] as const;
+
+type FlywheelConfigKey = typeof FLYWHEEL_CONFIG_KEYS[number];
 
 function isInsideRoot(projectRoot: string, candidate: string): boolean {
   const relativePath = relative(projectRoot, candidate);
@@ -144,8 +258,11 @@ function resolveFlywheelRoleConfig(): ResolvedFlywheelRoleConfig {
     harness: flywheel?.harness ?? 'claude-code',
     model: resolveModel('flywheel', undefined, config),
     effort: flywheel?.effort ?? 'high',
-    maxAgents: flywheel?.maxAgents ?? 8,
+    minAgents: flywheel?.minAgents ?? 20,
+    maxAgents: flywheel?.maxAgents ?? 30,
     scope: flywheel?.scope ?? 'pan-only',
+    autoPickupBacklog: isFlywheelAutoPickupBacklog(),
+    requireUatBeforeMerge: isFlywheelRequireUatBeforeMerge(),
   };
 }
 
@@ -251,8 +368,11 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
+    autoPickupBacklog: roleConfig.autoPickupBacklog,
+    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
   });
   await writeLatestFlywheelStatus(await createInitialFlywheelStatus(
     runId,
@@ -323,6 +443,119 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
     }
 
     console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+const STATS_CRITERION_KEYS = [
+  'c1_bugRate',
+  'c2_p0Bugs',
+  'c3_passRate',
+  'c4_mttr',
+  'c5_intervention',
+  'c6_timeConsistency',
+  'c7_flake',
+] as const satisfies readonly (keyof FlywheelStatsCriteria)[];
+
+const STATUS_GLYPH: Record<FlywheelStatsCriterionStatus, string> = {
+  green: '● green',
+  yellow: '● yellow',
+  red: '● red',
+  insufficient_data: '○ insufficient_data',
+};
+
+const STATUS_COLOR: Record<FlywheelStatsCriterionStatus, string> = {
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  insufficient_data: '\x1b[90m',
+};
+
+const TREND_LABEL: Record<FlywheelStatsTrend, string> = {
+  up: '↗ up',
+  down: '↘ down',
+  flat: '→ flat',
+};
+
+export async function fetchFlywheelStats(window: string, fetchImpl: typeof fetch = fetch): Promise<FlywheelStatsPayload> {
+  const internalToken = ensureInternalTokenSync();
+  const url = new URL(`${dashboardBaseUrl()}/api/flywheel/stats`);
+  url.searchParams.set('window', window);
+  const res = await fetchImpl(url.toString(), {
+    headers: {
+      [INTERNAL_TOKEN_HEADER]: internalToken,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Dashboard rejected Flywheel stats request (${res.status})${body ? `: ${body}` : ''}`);
+  }
+
+  return decodeFlywheelStats(await res.json());
+}
+
+function formatScalar(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  if (value > 0 && Math.abs(value) < 1) return `${(value * 100).toFixed(1)}%`;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatDuration(ms: number): string {
+  const abs = Math.abs(ms);
+  if (abs >= 24 * 60 * 60 * 1000) return `${(ms / (24 * 60 * 60 * 1000)).toFixed(1)}d`;
+  if (abs >= 60 * 60 * 1000) return `${(ms / (60 * 60 * 1000)).toFixed(1)}h`;
+  if (abs >= 60 * 1000) return `${(ms / (60 * 1000)).toFixed(1)}m`;
+  return `${Math.round(ms)}ms`;
+}
+
+function formatObjectValue(value: Record<string, unknown>): string {
+  return Object.entries(value)
+    .map(([key, entry]) => {
+      if (typeof entry === 'number' && key.toLowerCase().endsWith('ms')) return `${key}: ${formatDuration(entry)}`;
+      if (typeof entry === 'number') return `${key}: ${formatScalar(entry)}`;
+      if (typeof entry === 'string' || typeof entry === 'boolean' || entry === null) return `${key}: ${String(entry)}`;
+      return `${key}: ${JSON.stringify(entry)}`;
+    })
+    .join(', ');
+}
+
+function formatCriterionValue(value: FlywheelStatsCriterion['value']): string {
+  return typeof value === 'number' ? formatScalar(value) : formatObjectValue(value as Record<string, unknown>);
+}
+
+function colorStatus(status: FlywheelStatsCriterionStatus, color: boolean): string {
+  if (!color) return STATUS_GLYPH[status];
+  const [glyph, label] = STATUS_GLYPH[status].split(' ');
+  return `${STATUS_COLOR[status]}${glyph}\x1b[0m ${label}`;
+}
+
+function tableStatsCell(value: string | number | undefined): string {
+  return String(value ?? '—').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+export function formatFlywheelStats(stats: FlywheelStatsPayload, options: FormatStatsOptions = {}): string {
+  const color = options.color ?? process.stdout.isTTY === true;
+  const rows = STATS_CRITERION_KEYS.map((key) => {
+    const criterion = stats.criteria[key];
+    return `| ${tableStatsCell(criterion.label)} | ${tableStatsCell(formatCriterionValue(criterion.value))} | ${tableStatsCell(formatCriterionValue(criterion.target))} | ${tableStatsCell(colorStatus(criterion.status, color))} | ${tableStatsCell(criterion.trend ? TREND_LABEL[criterion.trend] : '—')} | ${criterion.sampleSize} |`;
+  });
+  return [
+    `Flywheel stats (${stats.window})`,
+    `Generated: ${stats.generatedAt}`,
+    '',
+    '| Criterion | Value | Target | Status | Trend | Sample |',
+    '|---|---:|---:|---|---|---:|',
+    ...rows,
+  ].join('\n');
+}
+
+export async function flywheelStatsCommand(options: StatsOptions = {}): Promise<void> {
+  try {
+    const stats = await fetchFlywheelStats(options.window ?? DEFAULT_STATS_WINDOW);
+    console.log(options.json ? JSON.stringify(stats, null, 2) : formatFlywheelStats(stats));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -526,8 +759,11 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
     model: roleConfig.model,
     harness: roleConfig.harness,
     effort: roleConfig.effort,
+    minAgents: roleConfig.minAgents,
     maxAgents: roleConfig.maxAgents,
     scope: roleConfig.scope,
+    autoPickupBacklog: roleConfig.autoPickupBacklog,
+    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
   });
   return { before, after: readFlywheelGateSnapshot(), changed: true };
 }
@@ -686,10 +922,24 @@ export function registerFlywheelCommands(program: Command): void {
     .action(emitStatusCommand);
 
   flywheel
+    .command('config')
+    .description('Get or set Flywheel autonomy configuration')
+    .option('--get [key]', 'Print Flywheel config values')
+    .option('--set <key=value>', 'Set a Flywheel config boolean')
+    .action(flywheelConfigCommand);
+
+  flywheel
     .command('status')
     .description('Show the active Flywheel run status')
     .option('--json', 'Emit the raw FlywheelStatus JSON')
     .action(flywheelStatusCommand);
+
+  flywheel
+    .command('stats')
+    .description('Show Flywheel v1.0 readiness stats')
+    .option('--window <duration>', 'Stats window duration', DEFAULT_STATS_WINDOW)
+    .option('--json', 'Emit the raw FlywheelStats JSON')
+    .action(flywheelStatsCommand);
 
   flywheel
     .command('pause')

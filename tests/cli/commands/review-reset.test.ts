@@ -39,14 +39,17 @@ describe('resetReviewCommand (pan review reset)', () => {
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
-  it('--session: resets review but rejects session reset with error', async () => {
-    await expect(resetReviewCommand('PAN-2', { session: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
+  it('--session: additively resets review AND clears the Claude session', async () => {
+    // PAN-1584: the prior hard-block (bf77f0194) made this reject; restored to the
+    // additive behavior this file's header documents. resetSessionCommand is
+    // non-destructive (clears resume pointers only, never the JSONL transcript).
+    await resetReviewCommand('PAN-2', { session: true });
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/review/PAN-2/reset'),
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(resetSessionMock).not.toHaveBeenCalled();
+    expect(resetSessionMock).toHaveBeenCalledWith('PAN-2');
   });
 
   it('session: false behaves like default', async () => {

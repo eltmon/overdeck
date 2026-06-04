@@ -374,10 +374,13 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           [event.payload.agentId]: {
             ...agent,
             role: event.payload.role ?? agent.role,
-            hasPendingQuestion: event.payload.hasPendingQuestion,
-            pendingQuestionCount: event.payload.pendingQuestionCount,
+            hasPendingQuestion: event.payload.hasPendingQuestion ?? false,
+            pendingQuestionCount: event.payload.pendingQuestionCount ?? 0,
             pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
             pendingQuestionReason: event.payload.pendingQuestionReason,
+            pendingInputCount: event.payload.pendingInputCount,
+            pendingInputKinds: event.payload.pendingInputKinds,
+            pendingAskUserQuestion: event.payload.pendingAskUserQuestion,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },
@@ -462,6 +465,20 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               base[field] = value
             }
           }
+        }
+        // PAN-1520 (fixes #339) — clear stale pending-input fields whenever the
+        // agent transitions out of an actively-running state. The enrichment
+        // poller stops emitting events for non-running agents, so without this
+        // a paused or stopped agent would keep showing INPUT/AskUserQuestion
+        // forever from the operator's perspective.
+        if (event.payload.status !== 'running' && event.payload.status !== 'starting') {
+          delete base['hasPendingQuestion']
+          delete base['pendingQuestionCount']
+          delete base['pendingQuestionPrompt']
+          delete base['pendingQuestionReason']
+          delete base['pendingInputCount']
+          delete base['pendingInputKinds']
+          delete base['pendingAskUserQuestion']
         }
         return base as AgentSnapshot
       })()
@@ -739,6 +756,8 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.item_status_changed':
     case 'plan.subitem_status_changed':
     case 'plan.items_unblocked':
+    case 'operator.intervention':
+    case 'substrate.bug_filed':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
@@ -817,7 +836,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         issueId: event.payload.issueId,
         status: event.payload.status,
         reason: event.payload.reason,
-        ragDecision: event.payload.ragDecision,
+        // Omit the key entirely when absent — an explicit `ragDecision: undefined`
+        // is not a valid JSON value and makes the whole DashboardSnapshot fail the
+        // Schema.Json codec used for the `memory` field, breaking the RPC bootstrap.
+        ...(event.payload.ragDecision !== undefined ? { ragDecision: event.payload.ragDecision } : {}),
         updatedAt: event.timestamp,
       }
       return {

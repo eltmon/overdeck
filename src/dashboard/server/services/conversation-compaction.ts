@@ -9,6 +9,7 @@ import { generateFallbackSummary } from '../../../lib/conversations/summary-fork
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../../lib/agents.js';
 import { getEventStore } from '../event-store.js';
+import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 
 const COMPACT_TOKEN_THRESHOLD = 100_000;
 
@@ -168,6 +169,9 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
 export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnOptions): Promise<void> {
   if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
+  // Background AI gate: low-cost mode (or the summaryFork toggle) skips
+  // automatic LLM compaction before respawn.
+  if (!isBackgroundFeatureEnabled('summaryFork')) return;
 
   const tokens = await estimateContextTokens(opts.sessionFile);
   const overThreshold = tokens > COMPACT_TOKEN_THRESHOLD;

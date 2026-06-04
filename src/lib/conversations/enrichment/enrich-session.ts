@@ -12,7 +12,16 @@ import { createReadStream } from 'fs';
 import { Effect } from 'effect';
 
 import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
-import { calculateCostSync, getPricingSync } from '../../cost.js';
+import { calculateCostSync, getPricingSync, type AIProvider } from '../../cost.js';
+import { recordBackgroundAiCost } from '../../background-ai/cost.js';
+
+/** Coarse provider label from a model id, for cost-event tagging. */
+function providerForModel(model: string): AIProvider {
+  const m = model.toLowerCase();
+  if (m.includes('gpt') || m.startsWith('oai@') || m.startsWith('cx@')) return 'openai';
+  if (m.includes('gemini') || m.startsWith('go@')) return 'google';
+  return 'anthropic';
+}
 import { applyFallbackSync, selectEnrichmentModelForTier } from '../../model-fallback.js';
 import { loadConfigSync as loadYamlConfig } from '../../config-yaml.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../../providers.js';
@@ -386,6 +395,17 @@ export async function callClaudeApi(
 
     // Call API
     const response = await apiCall(model, prompt);
+
+    // Record token spend so enrichment is visible in the cost ledger (PAN-1589).
+    if (response.usage) {
+      recordBackgroundAiCost({
+        feature: 'conversationEnrichment',
+        provider: providerForModel(model),
+        model,
+        usage: response.usage,
+        costUsd: response.usage.cost,
+      });
+    }
 
     const existing = getDiscoveredSessionById(sessionId);
     const preserveQuickSummary = tier === 2 && existing?.enrichmentLevel === 1 && Boolean(existing.summary);

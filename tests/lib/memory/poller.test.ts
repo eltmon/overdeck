@@ -3,6 +3,15 @@ import type { MemoryIdentity } from '@panctl/contracts';
 import { MAX_MEMORY_POLLER_SAMPLE_BYTES, TranscriptPoller } from '../../../src/lib/memory/poller.js';
 import type { TranscriptEntry } from '../../../src/lib/memory/transcript-source.js';
 
+// Memory observations are off-by-default since PAN-1589 (cheapMode). The poller
+// no-ops when disabled; force the default on so the tick mechanics run. The two
+// disabled-path tests pass an explicit `areObservationsEnabled: () => false`,
+// which the poller honors over this default via `options.… ?? …`.
+vi.mock('../../../src/lib/memory/settings.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/memory/settings.js')>();
+  return { ...actual, areMemoryObservationsEnabled: async () => true };
+});
+
 const identity = {
   projectId: 'panopticon-cli',
   workspaceId: 'feature-pan-1052',

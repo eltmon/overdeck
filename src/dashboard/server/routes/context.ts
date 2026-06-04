@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -15,6 +16,7 @@ import {
   type ContextPreviewResponse,
   type ContextProjectSummary,
   type ContextSyncResponse,
+  type ContextSyncTarget,
   type ContextWorkspaceSummary,
   type Harness,
 } from '@panctl/contracts';
@@ -27,9 +29,12 @@ import {
   projectContextFile,
   workspaceContextFile,
 } from '../../../lib/context-layers/layers.js';
-import { getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
+import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
+import { CLAUDE_DIR, getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
+import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { jsonResponse } from '../http-helpers.js';
+import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
 type ProjectEntry = { key: string; config: ProjectConfig };
@@ -221,6 +226,55 @@ async function layerRecord(
   } as ResolvedLayer;
 }
 
+/**
+ * Describe one injection target so the dashboard can show the user where a
+ * managed region lands and whether their own content is preserved there.
+ */
+async function describeSyncTarget(
+  harness: Harness,
+  layerKind: 'global' | 'project',
+  projectKey: string | undefined,
+  label: string,
+  path: string,
+): Promise<ContextSyncTarget> {
+  const { exists, content } = await readOptionalFile(path);
+  return {
+    harness,
+    layerKind,
+    ...(projectKey ? { projectKey } : {}),
+    label,
+    path,
+    exists,
+    hasManagedRegion: exists ? hasManagedRegion(content) : false,
+    hasUserContent: exists ? userContentOutsideRegion(content).length > 0 : false,
+  };
+}
+
+/**
+ * The files `pan sync` writes Panopticon-managed regions into: the global
+ * Claude Code CLAUDE.md, and — for each project with a `project.md` — that
+ * project's CLAUDE.md (Claude Code) and AGENTS.md (Pi). The Pi global layer is
+ * a Panopticon-owned file, not a user file, so it is not listed as a target.
+ */
+async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTarget[]> {
+  const targets: ContextSyncTarget[] = [
+    await describeSyncTarget('claude-code', 'global', undefined, 'Claude Code · global', join(CLAUDE_DIR, 'CLAUDE.md')),
+  ];
+
+  for (const { key, config } of projects) {
+    const projectMd = await readOptionalFile(projectContextFile(config.path));
+    if (!projectMd.exists) continue; // no project.md → sync leaves this project's files alone
+    targets.push(
+      await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
+    );
+    targets.push(
+      await describeSyncTarget('pi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
+    );
+  }
+
+  return targets;
+}
+
 export async function buildContextLayerState(
   projects: ProjectEntry[],
   panopticonHome = getPanopticonHome(),
@@ -250,6 +304,7 @@ export async function buildContextLayerState(
     projects: catalog.summaries,
     workspaces: catalog.workspaces,
     layers: resolvedLayers.map(({ dir: _dir, ...layer }) => layer),
+    targets: await buildSyncTargets(catalog.projects),
     resolvedLayers,
   };
 }
@@ -456,7 +511,17 @@ export async function saveContextLayer(
     throw new Error(`Context layer path escapes its directory: ${layer.file}`);
   }
   await mkdir(layer.dir, { recursive: true });
-  await writeFile(layer.file, request.content, 'utf-8');
+  // Atomic write: write to a temp file in the same directory, then rename over
+  // the target. rename(2) is atomic on POSIX, so a concurrent reader (or a
+  // crash mid-write) never sees a partially written context file.
+  const tempFile = join(layer.dir, `.${randomUUID()}.tmp`);
+  try {
+    await writeFile(tempFile, request.content, 'utf-8');
+    await rename(tempFile, layer.file);
+  } catch (err) {
+    await rm(tempFile, { force: true }).catch(() => undefined);
+    throw err;
+  }
   const savedLayer = await layerRecord(
     layer.file,
     targetForLayer(layer) as Omit<ContextEditableLayerRecord, 'file' | 'exists' | 'content' | 'editable'>,
@@ -518,6 +583,11 @@ export async function syncContextLayers(
   }
 }
 
+function issueIdFromWorkspacePath(workspacePath: string): string | null {
+  const match = /(?:^|[^a-z0-9])([a-z]+-\d+)(?:[^a-z0-9]|$)/i.exec(workspacePath);
+  return match ? match[1]!.toUpperCase() : null;
+}
+
 function readJsonBody() {
   return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -565,7 +635,19 @@ const putContextLayerRoute = HttpRouter.add(
       catch: (error) => new Error(error instanceof Error ? error.message : String(error)),
     });
     const projects = yield* loadProjectsForRoute();
-    return jsonResponse(yield* Effect.promise(() => saveContextLayer(projects, parsed)));
+    const eventStore = yield* EventStoreService;
+    const response = yield* Effect.promise(() => saveContextLayer(projects, parsed));
+    if (parsed.target.kind === 'workspace') {
+      const issueId = issueIdFromWorkspacePath(parsed.target.workspacePath);
+      if (issueId) {
+        yield* eventStore.appendAsync(operatorInterventionEvent({
+          issueId,
+          kind: 'manual_edit',
+          source: 'dashboard:context-layer-save',
+        }));
+      }
+    }
+    return jsonResponse(response);
   })),
 );
 

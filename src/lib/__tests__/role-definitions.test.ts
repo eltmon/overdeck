@@ -25,7 +25,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'plan',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
@@ -49,7 +49,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'work',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
@@ -67,6 +67,22 @@ describe('role definitions', () => {
       expect(body.toLowerCase()).not.toContain(phase);
     }
   });
+
+  it.each(['flywheel', 'work', 'plan'] as const)(
+    'wires gh issue trailer hook before RTK Bash filtering for %s role',
+    (role) => {
+      const { frontmatter } = splitFrontmatter(readRepoFile(`roles/${role}.md`));
+      const hooks = frontmatter.hooks as {
+        PreToolUse: Array<{ matcher: string; hooks: Array<{ command: string }> }>;
+      };
+      const bashMatcher = hooks.PreToolUse.find((entry) => entry.matcher === 'Bash');
+
+      expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual([
+        '$HOME/.panopticon/bin/gh-issue-trailer-hook',
+        '$HOME/.panopticon/bin/rtk-bash-filter',
+      ]);
+    },
+  );
 
   it('ships a workflow-injected inspect prompt with the Jidoka sentinels', () => {
     // Sub-roles work.inspect and work.inspect-deep both inline this single
@@ -105,7 +121,7 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'test',
-      permissionMode: 'bypassPermissions',
+      permissionMode: 'default',
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
@@ -120,25 +136,9 @@ describe('role definitions', () => {
     expect(body).toContain('TESTS FAILED');
   });
 
-  it('defines the ship role as ready-to-merge preparation without merge authority', () => {
-    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/ship.md'));
-
-    expect(frontmatter).toMatchObject({
-      name: 'ship',
-      permissionMode: 'bypassPermissions',
-      effort: 'high',
-    });
-    expect(frontmatter.model).toBeUndefined();
-    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Edit']));
-    expect(body).toContain('Ship NEVER merges');
-    expect(body).toContain('ready-to-merge');
-    expect(body).toContain('gh pr merge');
-    expect(body).toContain('merge API `POST`');
-    expect(body).toContain('git merge` into `main`');
-    expect(body).toContain('npm run typecheck');
-    expect(body).toContain('npm run lint');
-    expect(body).toContain('npm test');
-  });
+  // PAN-1531: ship role removed. Rebase is performed server-side by
+  // rebaseFeatureBranch() in src/lib/cloister/merge-rebase.ts. See
+  // docs/MERGE-WORKFLOW.md for the new two-actor design.
 
   it('keeps legacy pan plan/work/review/inspect/test/uat/merge agent definitions until spawn migration deletes them', () => {
     // Check sync-sources/agents/ (the committed source); .claude/agents/ is gitignored and populated by pan install.

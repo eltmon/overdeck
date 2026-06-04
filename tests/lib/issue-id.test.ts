@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   parseIssueIdSync,
   extractPrefixSync,
@@ -7,7 +10,28 @@ import {
   extractStandardPrefixSync,
   extractStandardNumberSync,
   resolveIssueIdSync,
+  resolveBareNumericIdSync,
 } from '../../src/lib/issue-id.js';
+
+const tempRoots: string[] = [];
+
+function makePanopticonHome(): string {
+  const root = mkdtempSync(join(tmpdir(), 'pan-1173-issue-id-'));
+  tempRoots.push(root);
+  return root;
+}
+
+function writeAgentState(panopticonHome: string, issueId: string): void {
+  const agentDir = join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`);
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ issueId }));
+}
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 describe('parseIssueId', () => {
   describe('standard format (PREFIX-NUMBER)', () => {
@@ -243,6 +267,45 @@ describe('extractStandardNumber', () => {
 
   it('returns null for invalid format', () => {
     expect(extractStandardNumberSync('notanid')).toBeNull();
+  });
+});
+
+describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
+  it('returns null when no agent state matches the bare number', () => {
+    const panopticonHome = makePanopticonHome();
+    writeAgentState(panopticonHome, 'PAN-4');
+
+    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
+  });
+
+  it('returns null when multiple agent states match the bare number', () => {
+    const panopticonHome = makePanopticonHome();
+    writeAgentState(panopticonHome, 'PAN-3');
+    writeAgentState(panopticonHome, 'MIN-3');
+
+    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
+  });
+
+  it('returns the fully-prefixed issue ID from the single matching state file', () => {
+    const panopticonHome = makePanopticonHome();
+    writeAgentState(panopticonHome, 'MIN-3');
+
+    expect(resolveBareNumericIdSync('3', panopticonHome)).toBe('MIN-3');
+  });
+
+  it('delegates already-prefixed inputs without probing the agent state directory', () => {
+    const panopticonHome = makePanopticonHome();
+    writeAgentState(panopticonHome, 'MIN-3');
+
+    expect(resolveBareNumericIdSync('PAN-3', panopticonHome)).toBe('PAN-3');
+    expect(resolveBareNumericIdSync('agent-pan-3', panopticonHome)).toBe('PAN-3');
+    expect(resolveBareNumericIdSync('F29698', panopticonHome)).toBe('F29698');
+  });
+
+  it('returns null without throwing when the agents directory is absent', () => {
+    const panopticonHome = makePanopticonHome();
+
+    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
   });
 });
 

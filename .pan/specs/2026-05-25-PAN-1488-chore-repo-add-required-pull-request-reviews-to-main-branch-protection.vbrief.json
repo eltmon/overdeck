@@ -1,0 +1,269 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-25T23:35:53.950Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1488: chore(repo): add required_pull_request_reviews to main branch protection",
+    "updated": "2026-05-25T23:38:35.440Z"
+  },
+  "plan": {
+    "id": "pan-1488",
+    "title": "chore(repo): add required_pull_request_reviews to main branch protection",
+    "status": "proposed",
+    "uid": "9ae9365e-d1eb-4574-bb43-48f2368105ea",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 4,
+    "created": "2026-05-25T23:35:53.950Z",
+    "updated": "2026-05-25T23:38:35.440Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1488",
+        "label": "PAN-1488",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/vision/flywheel-dev-loop-to-v1/docs/FLYWHEEL-VISION.md#humans-only-merge--current-state-and-the-gap",
+        "label": "Flywheel Vision: Humans-only-merge",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "chore",
+      "repo",
+      "branch-protection",
+      "github",
+      "ops",
+      "flywheel-vision"
+    ],
+    "narratives": {
+      "Problem": "main branch protection on eltmon/panopticon-cli requires panopticon/review and panopticon/test status checks, conversation resolution, and blocks force-push/deletion, but does NOT require any human approving review. The 'only owner merges' property currently holds via access (eltmon is the sole push collaborator), not via policy. The moment a second push collaborator is added — or the moment Flywheel auto-merge runs with a bot that has push access — the gate disappears. The Flywheel Vision explicitly calls for humans-only-merge as the load-bearing rule.",
+      "Proposal": "Codify the desired main branch protection state in a checked-in idempotent shell script at scripts/apply-branch-protection.sh that PUTs the full protection config (all currently-enabled fields PLUS required_pull_request_reviews with required_approving_review_count: 1, dismiss_stale_reviews: false, require_code_owner_reviews: false). Document the script as the source of truth in CONTRIBUTING.md and flip the docs/PRD.md row to DONE. The operator (repo admin) runs the script post-merge to apply the change to GitHub — agents do not execute it because branch protection requires admin scope and is a destructive shared-state operation."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement as shell script (not Node/TS)",
+        "rationale": "Matches existing pattern of scripts/install-git-hooks.sh, scripts/post-merge-deploy.sh, scripts/lint-skills.sh. One-shot ops with no logic to test beyond the gh api call. Shell + gh CLI keeps it self-contained with no build step and reviewable end-to-end in one file."
+      },
+      {
+        "summary": "Inline JSON in the script via heredoc, not a separate .json manifest",
+        "rationale": "Single source of truth in one file is easier to review. The protection config is small (~30 lines of JSON) and changes rarely. A separate manifest adds an indirection without measurable benefit."
+      },
+      {
+        "summary": "Hardcode eltmon/panopticon-cli and main in the script",
+        "rationale": "This is a repo-specific ops script, not a generic helper. Other forks would copy and edit. Parameterizing adds complexity that no caller needs."
+      },
+      {
+        "summary": "Operator (eltmon) runs the script after merge — agents do NOT execute it as part of the pipeline",
+        "rationale": "Branch protection requires admin scope on the repo, which panopticon-agent[bot] does not (and should not) hold. The change is a destructive shared-state operation per CLAUDE.md's reversibility/blast-radius rules. Operator-run keeps the human in the loop for an explicitly admin-scope change. Documented in script docstring and CONTRIBUTING.md."
+      },
+      {
+        "summary": "Issue acceptance criteria are scoped to code-shipping (script + docs land on main) rather than 'protection is live on GitHub'",
+        "rationale": "The PR pipeline can verify the script exists, is executable, is shellcheck-clean, and contains the correct JSON payload. It cannot verify the GitHub-side effect without an operator running it. The operator step is documented in the new CONTRIBUTING.md section."
+      },
+      {
+        "summary": "Include ALL currently-enabled protection fields (status checks, conversation resolution, force-push/deletion blocks, enforce_admins, etc.) in the script's PUT body, not just the new required_pull_request_reviews block",
+        "rationale": "GitHub's PUT /branches/{branch}/protection REPLACES the entire config — any omitted field gets silently unset. Script must function as a complete spec of desired state, with parity against the current protection output (captured during planning: contexts=['panopticon/review','panopticon/test'], strict=false, enforce_admins=false, required_conversation_resolution=true, allow_force_pushes=false, allow_deletions=false, required_linear_history=false, block_creations=false, lock_branch=false)."
+      },
+      {
+        "summary": "Set required_approving_review_count: 1, dismiss_stale_reviews: false, require_code_owner_reviews: false exactly as the issue body specifies — no extra knobs",
+        "rationale": "The issue is explicit. Dismiss-stale and code-owners are deliberately off for the single-collaborator phase. Future tightening (e.g., dismiss_stale_reviews after a second contributor is added) is a follow-up issue, not in scope here."
+      },
+      {
+        "summary": "Update CONTRIBUTING.md and docs/PRD.md as two separate beads",
+        "rationale": "Different files, different audiences, independently reviewable. CONTRIBUTING.md teaches future contributors how to manage protection; PRD.md tracks completion of the original work item. Splitting keeps each diff focused and matches the bead-decomposition heuristics in the plan role."
+      }
+    ],
+    "items": [
+      {
+        "id": "script",
+        "title": "Add scripts/apply-branch-protection.sh codifying main branch protection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-25T23:35:53.950Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1488",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create scripts/apply-branch-protection.sh as an idempotent shell script that PUTs the complete desired main branch protection state to GitHub via gh api. The script must include EVERY currently-enabled protection field (see Hazard H1 in continue.json), plus the new required_pull_request_reviews block with required_approving_review_count: 1, dismiss_stale_reviews: false, require_code_owner_reviews: false. The script header docstring must state: (1) what it does, (2) that it requires admin scope on eltmon/panopticon-cli and must be run by the repo owner, (3) that Flywheel auto-merge will now block on a human approval by design (see Hazard H2). The script must be executable (git mode 0755) and use 'set -euo pipefail'. JSON body construction should be via heredoc so reviewers can read the complete protection spec inline."
+        },
+        "subItems": [
+          {
+            "id": "script.ac1",
+            "title": "File scripts/apply-branch-protection.sh exists, is executable (git mode 0755), uses '#!/usr/bin/env bash' and 'set -euo pipefail'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac2",
+            "title": "Script issues a single 'gh api -X PUT repos/eltmon/panopticon-cli/branches/main/protection' call with the full desired protection config as the request body (not a delta)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac3",
+            "title": "PUT body includes required_status_checks with strict: false and contexts ['panopticon/review', 'panopticon/test']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac4",
+            "title": "PUT body includes required_pull_request_reviews with required_approving_review_count: 1, dismiss_stale_reviews: false, require_code_owner_reviews: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac5",
+            "title": "PUT body includes required_conversation_resolution: true, allow_force_pushes: false, allow_deletions: false, enforce_admins: false, required_linear_history: false, block_creations: false, lock_branch: false, allow_fork_syncing: false (mirrors current state to avoid silent unset by GitHub PUT replace semantics)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac6",
+            "title": "Script header comment explicitly states: requires admin scope on eltmon/panopticon-cli, must be run by the repo owner (not by panopticon-agent[bot]), and notes that adding required_pull_request_reviews intentionally requires a human approver on every PR per docs/FLYWHEEL-VISION.md humans-only-merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac7",
+            "title": "Script is idempotent: re-running it on a repo already at the target protection state succeeds with exit code 0 and leaves the state unchanged (verify by reading current state with 'gh api repos/eltmon/panopticon-cli/branches/main/protection' after the call — required_pull_request_reviews.required_approving_review_count == 1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "script.ac8",
+            "title": "Script passes shellcheck with no errors or warnings ('shellcheck scripts/apply-branch-protection.sh' exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-contributing",
+        "title": "Add Branch Protection section to CONTRIBUTING.md pointing at the script",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-25T23:35:53.950Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1488",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a 'Branch Protection' section to CONTRIBUTING.md describing scripts/apply-branch-protection.sh as the source of truth for main branch protection. Include: (1) what the script does, (2) who runs it (repo owner, admin scope required), (3) when to run it (after any intended change to main branch protection), (4) explicit callout that required_pull_request_reviews: 1 gates Flywheel auto-merge on a human approver by design, (5) warning that GitHub PUT replaces the entire config so the script must remain a complete spec of all desired fields."
+        },
+        "subItems": [
+          {
+            "id": "docs-contributing.ac1",
+            "title": "CONTRIBUTING.md gains a 'Branch Protection' (or similarly titled) heading section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-contributing.ac2",
+            "title": "Section references scripts/apply-branch-protection.sh by name with a relative link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-contributing.ac3",
+            "title": "Section states that the script requires admin scope and must be run by the repo owner (not by panopticon-agent[bot])",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-contributing.ac4",
+            "title": "Section explicitly notes that required_pull_request_reviews intentionally requires a human approver on every PR per docs/FLYWHEEL-VISION.md humans-only-merge, and that Flywheel auto-merge will block on this approval by design",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-contributing.ac5",
+            "title": "Section warns that GitHub's PUT branches/protection REPLACES the entire config and the script must therefore remain a complete spec of all desired protection fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-prd-row",
+        "title": "Flip docs/PRD.md branch protection row from TODO to DONE",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-25T23:35:53.950Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1488",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update docs/PRD.md line 3790 from '| Branch protection | 📋 TODO | Require PR reviews for main branch |' to a DONE row referencing scripts/apply-branch-protection.sh. Status icon should match whatever convention the rest of the PRD uses for completed rows (search the file for a sibling DONE example to match style)."
+        },
+        "subItems": [
+          {
+            "id": "docs-prd-row.ac1",
+            "title": "docs/PRD.md no longer contains the literal line 'Branch protection | 📋 TODO | Require PR reviews for main branch'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-prd-row.ac2",
+            "title": "The replacement row marks the item as done using the same convention/icon as other completed rows in docs/PRD.md, and references scripts/apply-branch-protection.sh (by name or relative link) in the description column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "script",
+        "to": "docs-contributing",
+        "type": "informs"
+      },
+      {
+        "from": "script",
+        "to": "docs-prd-row",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-25-PAN-1488-chore-repo-add-required-pull-request-reviews-to-main-branch-protection.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

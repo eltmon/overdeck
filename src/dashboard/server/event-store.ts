@@ -20,6 +20,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
+import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -137,6 +138,16 @@ export async function openEventDb(): Promise<DbAdapter> {
       )
     `);
     db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
     db.exec(`
       CREATE TABLE IF NOT EXISTS projection_cache (
         key        TEXT PRIMARY KEY,
@@ -369,6 +380,7 @@ export async function initEventStore(): Promise<EventStore> {
       console.log(`[event-store] Purged ${purged} oversized issues.snapshot events from persistent store`);
     }
     _store = store;
+    setActivityEventStoreProvider(() => store);
     // Initialize projection cache with same DB connection
     import('./services/projection-cache.js').then(({ initProjectionCache }) => {
       initProjectionCache(db);

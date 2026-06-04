@@ -95,11 +95,36 @@ export const ContextLayerDraft = Schema.Struct({
 })
 export type ContextLayerDraft = typeof ContextLayerDraft.Type
 
+/**
+ * A rendered output file `pan sync` writes a Panopticon-managed region into
+ * (e.g. ~/.claude/CLAUDE.md, a project's CLAUDE.md or AGENTS.md). Distinct from
+ * the editable *layer source* files — this describes the injection *target* so
+ * the dashboard can show the user exactly where context lands and reassure them
+ * their own content is preserved.
+ */
+export const ContextSyncTarget = Schema.Struct({
+  harness: ContextPreviewHarness,
+  layerKind: Schema.Literals(["global", "project"]),
+  projectKey: Schema.optional(Schema.String),
+  /** Short human label, e.g. "Claude Code · global". */
+  label: Schema.String,
+  /** Resolved absolute path of the target file. */
+  path: Schema.String,
+  exists: Schema.Boolean,
+  /** True when the file already contains a Panopticon-managed region. */
+  hasManagedRegion: Schema.Boolean,
+  /** True when the file has hand-authored content outside the managed region. */
+  hasUserContent: Schema.Boolean,
+})
+export type ContextSyncTarget = typeof ContextSyncTarget.Type
+
 export const ContextLayersResponse = Schema.Struct({
   operation: Schema.Literal("load"),
   projects: Schema.Array(ContextProjectSummary),
   workspaces: Schema.Array(ContextWorkspaceSummary),
   layers: Schema.Array(ContextEditableLayerRecord),
+  /** Injection targets `pan sync` writes managed regions into. */
+  targets: Schema.Array(ContextSyncTarget),
 })
 export type ContextLayersResponse = typeof ContextLayersResponse.Type
 

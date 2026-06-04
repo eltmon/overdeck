@@ -15,6 +15,8 @@
  */
 
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
 import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panctl/contracts';
 import { useLiveFlash } from '../../lib/useLiveFlash';
 import { useDashboardStore } from '../../lib/store';
@@ -23,6 +25,72 @@ import { StatusDot, type StatusDotStatus } from './StatusDot';
 import { ZoneBActionStrip } from './ZoneBActionStrip';
 import { RoundCard, type RoundData, type RoundVerdict } from './RoundCard';
 import { ToolFlash } from './ToolFlash';
+import styles from './styles/command-deck.module.css';
+
+// PAN-1523: branch chip rendered inline on the ZoneB session strip,
+// right next to the model name. Same /api/agents/:id/git-info source the
+// SessionPanel header and DrawerAgentSession use.
+interface AgentGitInfo {
+  actualBranch: string | null;
+  branchDrifted: boolean;
+  workspaceMissing: boolean;
+  expectedBranch: string | null;
+  workspacePath?: string | null;
+}
+
+async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/git-info`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+function ZoneBBranchChip({ sessionId }: { sessionId: string }) {
+  const { data: gitInfo } = useQuery({
+    queryKey: ['agent-git-info', sessionId],
+    queryFn: () => fetchAgentGitInfo(sessionId),
+    enabled: !!sessionId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+
+  if (!gitInfo) return null;
+  if (!gitInfo.actualBranch && !gitInfo.workspaceMissing) return null;
+
+  const drifted = gitInfo.branchDrifted;
+  const missing = gitInfo.workspaceMissing;
+
+  return (
+    <span
+      className={`${styles.terminalBranchBar} ${
+        missing
+          ? styles.terminalBranchBarMissing
+          : drifted
+            ? styles.terminalBranchBarDrift
+            : ''
+      }`}
+      title={
+        missing
+          ? `Workspace missing on disk: ${gitInfo.workspacePath ?? '(unknown path)'}`
+          : drifted
+            ? `Expected ${gitInfo.expectedBranch ?? '(none)'}, on ${gitInfo.actualBranch ?? '(none)'}`
+            : `${gitInfo.workspacePath ?? ''}`
+      }
+      data-testid="zone-b-branch-chip"
+    >
+      {missing ? (
+        <>
+          <AlertCircle size={11} />
+          <span className={styles.terminalBranchBarMode}>Worktree missing</span>
+        </>
+      ) : (
+        <>
+          {drifted ? <TriangleAlert size={11} /> : <GitFork size={11} />}
+          <span className={styles.terminalBranchBarText}>{gitInfo.actualBranch}</span>
+        </>
+      )}
+    </span>
+  );
+}
 
 interface ZoneBProps {
   session: SessionNodeType;
@@ -164,6 +232,7 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
         <span style={{ color: 'var(--muted-foreground)' }}>
           {session.model}
         </span>
+        <ZoneBBranchChip sessionId={session.sessionId} />
         {/* Phase + tool inline — wired to runtime currentTool for motion catalog (PAN-847) */}
         <ToolFlash currentTool={currentTool} />
         <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>

@@ -1,5 +1,6 @@
 import { cn } from '../../lib/utils';
-import { useDrawerData, type DrawerBeadStatus } from './useDrawerData';
+import { useDashboardStore } from '../../lib/store';
+import { useIssueData, type DrawerBeadStatus } from './useDrawerData';
 
 function BeadStatusMarker({ status }: { status: DrawerBeadStatus }) {
   if (status === 'done') {
@@ -25,8 +26,9 @@ function BeadStatusMarker({ status }: { status: DrawerBeadStatus }) {
   return <span data-testid="drawer-bead-status-open" className="h-[18px] w-[18px] rounded-full border border-border bg-background/60" />;
 }
 
-export default function DrawerBeadsList() {
-  const { beads } = useDrawerData();
+export default function DrawerBeadsList({ issueId }: { issueId?: string } = {}) {
+  const drawerIssueId = useDashboardStore((s) => s.drawer.issueId);
+  const { beads } = useIssueData(issueId ?? drawerIssueId);
 
   return (
     <section data-component="drawer-beads-list" data-testid="drawer-beads-list" className="overflow-hidden rounded-[var(--radius)] border border-border bg-card">

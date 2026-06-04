@@ -104,6 +104,22 @@ export const bodyToEvent = (
           claudeSessionId: source['claudeSessionId'] as string | undefined,
         },
       };
+    case 'cost-event': {
+      const usage = source['usage'] && typeof source['usage'] === 'object'
+        ? source['usage'] as Record<string, unknown>
+        : {};
+      return {
+        type: 'cost.event_recorded',
+        timestamp,
+        payload: {
+          agentId,
+          issueId: typeof source['issueId'] === 'string' && source['issueId'] ? source['issueId'] : 'UNKNOWN-0',
+          cost: typeof source['costUsd'] === 'number' ? source['costUsd'] : 0,
+          inputTokens: typeof usage['inputTokens'] === 'number' ? usage['inputTokens'] : 0,
+          outputTokens: typeof usage['outputTokens'] === 'number' ? usage['outputTokens'] : 0,
+        },
+      };
+    }
     case 'resolution_set':
       return {
         type: 'agent.resolution_changed',

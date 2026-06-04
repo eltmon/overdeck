@@ -147,7 +147,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Executive Summary</h2>
-<p>Between February 2025 and May 2026, Panopticon's AI coding pipeline generated <strong>6,429 commits</strong>, <strong>2.8K files</strong>, and over <strong>2 million lines of code</strong>. Here's what that cost at standard API rates.</p>
+<p>Between February 2025 and May 2026, Panopticon's AI coding pipeline generated <strong>6,463 commits</strong>, <strong>2.8K files</strong>, and over <strong>2 million lines of code</strong>. Here's what that cost at standard API rates.</p>
 </div>
 <div class="card-grid">
 <div class="card animate-in">
@@ -181,7 +181,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <ul>
 <li><strong>panopticon.db cost_events table</strong> &mdash; 734,117 tracked API calls across 464 days of active cost tracking (Feb 2025 &ndash; May 2026)</li>
 <li><strong>Claude Code JSONL session files</strong> &mdash; 6,367 session files parsed for per-message token usage and model breakdowns</li>
-<li><strong>Git history</strong> &mdash; 6,429 commits analyzed for code evolution, file growth, and contributor patterns</li>
+<li><strong>Git history</strong> &mdash; 6,463 commits analyzed for code evolution, file growth, and contributor patterns</li>
 <li><strong>Pi session files</strong> &mdash; Alternative harness sessions parsed for cross-harness usage comparison</li>
 </ul>
 <h4 style="margin-top:20px">Caveats & Limitations</h4>
@@ -235,13 +235,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 </div>
 <div class="card animate-in">
 <h3><span class="card-icon" style="background:rgba(59,130,246,.1);color:#3b82f6">G5.4</span> GPT-5.4</h3>
-<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">
-</div>
-</div>
-</section>,829</p>
+<p style="font-size:2rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--text)">$2,829</p>
 <p style="color:var(--text-muted);font-size:.9rem">93,777 calls &middot; 8.3B tokens &middot; High-volume OpenAI workhorse</p>
 </div>
-
 </div>
 </div>
 </section>
@@ -350,7 +346,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Cost Reduction <span class="gradient-text">Features</span></h2>
-<p>RTK, Caveman, TLDR, and Graphify — how well are they working?</p>
+<p>RTK, Caveman, and TLDR — how well are they working?</p>
 </div>
 <div class="grid-2" style="margin-bottom:24px">
 <div class="card animate-in">
@@ -415,26 +411,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Not working:</strong> 93% bypass rate across all workspaces. TLDR is almost never triggering. Either file-size thresholds are too high, the daemon is not running, or the read-enforcer is missing hooks. Cost impact: effectively zero.</p>
 </div>
 </div>
-<div class="card animate-in">
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-<div style="width:40px;height:40px;border-radius:10px;background:rgba(236,72,153,.15);display:flex;align-items:center;justify-content:center;font-size:1.2rem">&#127760;</div>
-<h3 style="margin:0">Graphify — Knowledge Graph</h3>
-</div>
-<p style="color:var(--text-muted);font-size:.9rem">Converts conversation context into a queryable knowledge graph. Replaces repeated full-context scans with targeted graph traversals.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
-<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
-<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Graphs Built</div>
-</div>
-<div style="text-align:center;padding:12px;border-radius:10px;background:rgba(30,41,59,.5)">
-<div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">?</div>
-<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Tokens Saved</div>
-</div>
-</div>
-<div style="margin-top:12px;padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)">
-<p style="color:var(--text-muted);font-size:.8rem;margin:0"><strong>Tracking gap:</strong> Graphify is invoked via /graphify skill. No cost-event integration exists to measure graph lookups vs full-context reads. Impact is unmeasured.</p>
-</div>
-</div>
 </div>
 <div class="card animate-in" style="margin-top:24px">
 <h3><span class="card-icon">!</span> Summary &amp; Recommendations</h3>
@@ -445,7 +421,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 </div>
 <div style="padding:16px;border-radius:12px;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15)">
 <div style="font-weight:600;color:var(--warning);margin-bottom:6px">Add Telemetry</div>
-<p style="color:var(--text-muted);font-size:.85rem;margin:0">RTK, Caveman, and Graphify all lack pre/post token counts. Add a <code>tokensSaved</code> field to cost events or emit separate metrics events for each feature.</p>
+<p style="color:var(--text-muted);font-size:.85rem;margin:0">RTK and Caveman both lack pre/post token counts. Add a <code>tokensSaved</code> field to cost events or emit separate metrics events for each feature.</p>
 </div>
 <div style="padding:16px;border-radius:12px;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15)">
 <div style="font-weight:600;color:var(--success);margin-bottom:6px">Cache Is Carrying Us</div>
@@ -565,16 +541,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <p>Watch Panopticon grow from nothing to 2,834 files</p>
 </div>
 <div class="video-container animate-in">
-<video controls poster="video-poster.jpg">
-<source src="panopticon-evolution.mp4" type="video/mp4">
+<video controls autoplay muted loop playsinline poster="video-poster.jpg">
+<source src="gource.mp4" type="video/mp4">
 <div class="video-placeholder">
 <div class="video-placeholder-icon">🎬</div>
 <h3>Video Loading...</h3>
-<p>If the video doesn't load, your browser may not support MP4 playback.<br>The video shows the git history visualization of Panopticon's growth.</p>
+<p>If the video doesn't load, your browser may not support MP4 playback.<br>The video shows the codebase structure evolution of Panopticon's growth.</p>
 </div>
 </video>
 </div>
-<p style="text-align:center;color:var(--text-muted);font-size:.85rem;margin-top:16px">Generated with custom canvas renderer + ffmpeg &middot; 30fps &middot; 1920x1080</p>
+<p style="text-align:center;color:var(--text-muted);font-size:.85rem;margin-top:16px">Generated with Gource + ffmpeg &middot; 60fps &middot; 1024x768</p>
 </div>
 </section>
 
@@ -584,7 +560,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="shoutout animate-in">
 <h3>Produced by <span class="gradient-text">Kimi 2.6</span></h3>
 <p>This entire report &mdash; from data analysis to HTML generation to video rendering &mdash; was produced by Kimi 2.6 (Moonshot AI) in a single interactive session. No Panopticon work agents were spawned. No beads were claimed. Just one very long conversation, a lot of SQL queries, and some creative coding.</p>
-<p style="margin-top:16px;font-size:.9rem;color:var(--text-muted)">Built on 2026-05-24 &middot; Data through 2026-04-11 &middot; Git history through 2026-05-24</p>
+<p style="margin-top:16px;font-size:.9rem;color:var(--text-muted)">Built on 2026-05-25 &middot; Data through 2026-05-25 &middot; Git history through 2026-05-25</p>
 </div>
 </div>
 </section>

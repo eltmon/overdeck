@@ -555,20 +555,16 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
-  // Scan all configured projects. Priority: numeric-suffix form (feature-1034) before
-  // full lowercased form (feature-pan-1034). The numeric-suffix is the canonical naming
-  // for git worktrees; the full lowercased form is the legacy fallback.
   for (const { config } of listProjectsSync()) {
     if (!config.path) continue;
-    for (const candidate of [`feature-${numericSuffix}`, `feature-${issueLower}`]) {
+    for (const candidate of [`feature-${issueLower}`, `feature-${numericSuffix}`]) {
       const p = join(config.path, 'workspaces', candidate);
       if (existsSync(p)) return { exists: true, isRemote: false, localPath: p };
     }
   }
 
-  // Fallback: canonical path under getProjectPath
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const workspacePath = join(projectPath, 'workspaces', `feature-${numericSuffix}`);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
 
   return { exists: false, isRemote: false };
@@ -4570,7 +4566,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
 // ─── Shared triggerMerge logic ────────────────────────────────────────────────
 
-interface TriggerMergeResult {
+export interface TriggerMergeResult {
   success: boolean;
   statusCode: number;
   error?: string;
@@ -4607,7 +4603,7 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
   }
 }
 
-async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
+export async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
   if (!reviewStatus?.readyForMerge) {
     return {
@@ -4683,6 +4679,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       success: true,
       statusCode: 200,
       message: `Queued for merge (position ${position}, waiting for ${currentlyMerging})`,
+      mergeStatus: 'queued',
     };
   }
   // Mark as processing IMMEDIATELY — before any async work — to prevent race conditions.
@@ -4757,6 +4754,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           success: true,
           statusCode: 200,
           message: `Successfully merged PR #${remotePrNumber} for ${issueId}`,
+          mergeStatus: 'merged',
           prUrl: prResult.prUrl,
           remote: true,
         };
@@ -5009,6 +5007,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
         success: true,
         statusCode: 200,
         message: `Polyrepo merge complete for ${issueId}`,
+        mergeStatus: 'merged',
         repos: mergeResults,
       };
     }
@@ -5082,6 +5081,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
               success: true,
               statusCode: 200,
               message: `PR #${githubPrRef.number} for ${issueId} was already merged`,
+              mergeStatus: 'merged',
               prUrl: prResult.prUrl,
             };
           }
@@ -5346,6 +5346,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       success: true,
       statusCode: 200,
       message: `Successfully merged ${primaryForge} review artifact for ${issueId}`,
+      mergeStatus: 'merged',
       prUrl: prResult.prUrl,
     };
   } catch (error: any) {
@@ -5788,53 +5789,35 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           });
         }
 
-        // Fallback: direct merge via merge-agent
-        console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
+        // Fallback (PAN-1531): direct server-side rebase via rebaseFeatureBranch.
+        // The ship-role LLM agent was retired — rebase is deterministic mechanical
+        // work and runs in-process. On success the workspace branch is pushed to
+        // origin with --force-with-lease and the dashboard flips readyForMerge so
+        // the human Merge button renders. On conflict the operator resolves
+        // manually in the workspace and re-requests review.
+        console.log(`[approve] Step 3/3: Running server-side rebase for ${issueId}...`);
 
         try {
-          const { spawnMergeAgentForBranches } = await import(
-            '../../../lib/cloister/merge-agent.js'
+          const { rebaseFeatureBranch } = await import(
+            '../../../lib/cloister/merge-rebase.js'
           );
-          const mergeResult = await spawnMergeAgentForBranches(
-            projectPath,
-            branchName,
-            'main',
-            issueId
+          const workspacePathForRebase = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          const rebaseResult = await Effect.runPromise(
+            rebaseFeatureBranch(workspacePathForRebase, branchName, 'main', issueId),
           );
 
-          if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
-            console.log(`merge-agent successfully merged ${issueId}`);
-          } else if (mergeResult.success && mergeResult.testsStatus === 'SKIP') {
-            console.log(`merge-agent merged ${issueId} (tests skipped)`);
-          } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
-            try {
-              await execAsync('git reset --hard HEAD~1', {
-                cwd: projectPath,
-                encoding: 'utf-8',
-              });
-            } catch {}
-            const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
-            completePendingOperation(issueId, error);
-            return jsonResponse({ error }, { status: 400 });
-          } else {
-            try {
-              await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
-            } catch {}
-            try {
-              await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
-            } catch {}
-            const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+          if (!rebaseResult.success) {
+            const conflictDetail = rebaseResult.conflictFiles?.length
+              ? `\nConflict files: ${rebaseResult.conflictFiles.join(', ')}`
+              : '';
+            const error = `Rebase blocked for ${issueId}.\nReason: ${rebaseResult.reason ?? 'Unknown'}${conflictDetail}\n\nResume in workspace:\n  cd ${workspacePathForRebase}\n  git rebase origin/main\n  # resolve conflicts, then\n  git push --force-with-lease`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });
           }
-        } catch (agentError: any) {
-          try {
-            await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
-          } catch {}
-          try {
-            await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
-          } catch {}
-          const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+
+          console.log(`[approve] Rebase complete for ${issueId} (${rebaseResult.skipped ? 'no-op' : 'rebased'}); ready for human Merge button`);
+        } catch (rebaseError: any) {
+          const error = `Server-side rebase failed: ${rebaseError.message}\n\nResolve manually:\n  cd <workspace>\n  git rebase origin/main\n  git push --force-with-lease`;
           completePendingOperation(issueId, error);
           return jsonResponse({ error }, { status: 400 });
         }

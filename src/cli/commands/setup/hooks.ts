@@ -249,6 +249,8 @@ export function addPanopticonHookIfMissing(
 }
 
 
+export type HookHarness = 'claude-code' | 'pi' | 'both';
+
 export interface SetupHooksOptions {
   /**
    * Preview the proposed settings.json diff and exit without writing.
@@ -256,14 +258,73 @@ export interface SetupHooksOptions {
    * settings.json mutation is skipped. (PAN-1137)
    */
   dryRun?: boolean;
+  harness?: HookHarness;
+}
+
+function commandExists(name: string): boolean {
+  try {
+    execFileSync('which', [name], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function detectInstalledHookHarnesses(): { claudeCode: boolean; pi: boolean } {
+  return { claudeCode: commandExists('claude'), pi: commandExists('pi') };
+}
+
+function resolveHookHarnessSelection(requested: HookHarness | undefined): HookHarness {
+  if (requested) return requested;
+  const detected = detectInstalledHookHarnesses();
+  if (detected.claudeCode && detected.pi) return 'both';
+  if (detected.pi) return 'pi';
+  return 'claude-code';
+}
+
+function verifyPiExtensionBuilt(): boolean {
+  const extensionPath = join(process.cwd(), 'packages', 'pi-extension', 'dist', 'index.js');
+  if (existsSync(extensionPath)) {
+    console.log(chalk.green('✓ Pi extension build found'));
+    return true;
+  }
+  console.log(chalk.yellow('⚠ Pi extension build not found'));
+  console.log(chalk.dim('  Run: cd packages/pi-extension && npm run build'));
+  return false;
+}
+
+export function parseHookHarness(value: string | undefined): HookHarness | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'claude-code' || value === 'pi' || value === 'both') return value;
+  throw new Error(`Invalid harness "${value}". Expected claude-code, pi, or both.`);
+}
+
+export function hooksStatusCommand(): void {
+  const detected = detectInstalledHookHarnesses();
+  console.log(chalk.bold('Panopticon hook harness status\n'));
+  console.log(`${detected.claudeCode ? '✓' : '○'} Claude Code binary: ${detected.claudeCode ? 'installed' : 'not found'}`);
+  console.log(`${detected.pi ? '✓' : '○'} Pi binary: ${detected.pi ? 'installed' : 'not found'}`);
+  verifyPiExtensionBuilt();
 }
 
 /**
- * Setup Claude Code hooks for Panopticon heartbeat
+ * Setup Claude Code / Pi hooks for Panopticon heartbeat
  */
 export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<void> {
   const dryRun = opts.dryRun === true;
+  const harness = resolveHookHarnessSelection(opts.harness);
   console.log(chalk.bold('Setting up Panopticon heartbeat hooks\n'));
+  console.log(chalk.dim(`Harness target: ${harness}\n`));
+
+  if (harness === 'pi' || harness === 'both') {
+    verifyPiExtensionBuilt();
+  }
+
+  if (harness === 'pi') {
+    console.log(chalk.green('\n✓ Pi hook extension check complete'));
+    return;
+  }
+
   if (dryRun) {
     console.log(chalk.cyan('— dry run: no settings.json write will be performed —\n'));
   }
@@ -304,6 +365,8 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   const hookScripts = [
     'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
     'pre-tool-hook',
+    'ask-user-question-hook',
+    'auto-approve-hook',
     'heartbeat-hook',
     'stop-hook',
     'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
@@ -314,6 +377,8 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator
     'post-compact-hook',           // PostCompact — emits activity=idle to clear compacting state
     'record-cost-event.js',
+    'gh-issue-trailer-hook',
+    'gh-issue-trailer-hook.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
     'rtk-bash-filter',
@@ -419,6 +484,18 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // PAN-982, but Claude Code did not honor them when Panopticon invoked agents
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
+  // Auto-approve tool calls for Panopticon agents (self-scoped via
+  // PANOPTICON_AGENT_ID inside the hook) — replaces launching agents with
+  // --dangerously-skip-permissions so headless agents never hang on Claude
+  // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
+  // hook's permissionDecision is NOT honored, so this must be registered here in
+  // settings.json. AskUserQuestion is skipped by the hook so ask-user-question-hook's
+  // deny still wins.
+  addHookIfMissing('PreToolUse', 'auto-approve-hook');
+  addHookIfMissing('PreToolUse', 'gh-issue-trailer-hook', 'Bash');
+  // PAN-1520: block AskUserQuestion to prevent upstream silent-corruption
+  // (option #1 fabricated as answer under --dangerously-skip-permissions).
+  addHookIfMissing('PreToolUse', 'ask-user-question-hook', 'AskUserQuestion');
   addHookIfMissing('PostToolUse', 'heartbeat-hook');
   addHookIfMissing('PostToolUse', 'permission-event-hook');
   addHookIfMissing('Stop', 'stop-hook');

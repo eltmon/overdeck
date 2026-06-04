@@ -27,6 +27,9 @@ interface DashboardSettings {
   tts?: {
     enabled?: boolean;
   };
+  background_ai?: {
+    cheap_mode?: boolean;
+  };
 }
 
 interface TtsHealthStatus {
@@ -216,7 +219,20 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
   };
 
   if (!status) {
-    return null;
+    // Cloister status unavailable (e.g. the status fetch 401'd). Still render the
+    // settings gear so the user always has a way into Settings — previously the
+    // whole bar (gear included) vanished on any fetch failure (PAN-1600).
+    return (
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onOpenSettings}
+          className="p-1 rounded text-xs bg-popover text-foreground hover:bg-card transition-colors"
+          title="Open Settings"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
   }
 
   const hasWarnings = status.summary.warning > 0 || status.summary.stuck > 0;
@@ -297,8 +313,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
           }`}
         >
           {isToggling
-            ? (status.running ? '...' : '...')
-            : (status.running ? 'Pause' : 'Start')}
+            ? '…'
+            : (status.running ? 'Stop Cloister' : 'Start Cloister')}
         </button>
 
         {/* Restart Sessions */}
