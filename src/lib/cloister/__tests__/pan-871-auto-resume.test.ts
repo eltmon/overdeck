@@ -58,6 +58,10 @@ vi.mock('../../../lib/shadow-state.js', async () => {
   return { getShadowState };
 });
 
+vi.mock('../issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+}));
+
 vi.mock('../../../lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: vi.fn(),
 }));
@@ -159,6 +163,7 @@ import { autoResumeStoppedWorkAgents } from '../deacon.js';
 import { getAgentStateSync, getAgentState, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
+import { isIssueClosed } from '../issue-closed.js';
 import { existsSync } from 'fs';
 
 const mockGetAgentState = getAgentStateSync as any;
@@ -166,6 +171,7 @@ const mockGetAgentStateAsync = getAgentState as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
+const mockIsIssueClosed = isIssueClosed as any;
 const mockExistsSync = existsSync as any;
 
 // Default existsSync behaviour mirrors the module mock: no completed markers present.
@@ -196,23 +202,18 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       updatedAt: new Date().toISOString(),
     } as any);
     mockGetShadowState.mockResolvedValue(null);
+    mockIsIssueClosed.mockResolvedValue(false);
     mockResumeAgent.mockResolvedValue({ success: true } as any);
     mockExistsSync.mockImplementation(noCompletedMarkers);
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {
-    mockGetShadowState.mockResolvedValue({
-      issueId: 'PAN-871',
-      shadowStatus: 'closed',
-      trackerStatus: 'closed',
-      trackerStatusUpdatedAt: new Date().toISOString(),
-      shadowedAt: new Date().toISOString(),
-      history: [],
-    } as any);
+    mockIsIssueClosed.mockResolvedValue(true);
 
     const resumed = await autoResumeStoppedWorkAgents();
 
     expect(resumed).toEqual([]);
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-871');
     expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 

@@ -5932,10 +5932,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    const shadowState = await Effect.runPromise(getShadowState(state.issueId));
-    const issueClosed = shadowState?.trackerStatus === 'closed';
-    if (issueClosed) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is closed`);
       continue;
     }
 
