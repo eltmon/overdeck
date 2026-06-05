@@ -4,7 +4,7 @@ import {
   Eye, Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal,
+  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
@@ -107,6 +107,7 @@ const MORE_GROUPS: NavGroup[] = [
       { id: 'metrics' as Tab, label: 'Metrics', icon: BarChart3 },
       { id: 'costs' as Tab, label: 'Costs', icon: DollarSign },
       { id: 'health' as Tab, label: 'Health', icon: HeartPulse },
+      { id: 'deacon' as Tab, label: 'Deacon', icon: Shield },
     ],
   },
   {
