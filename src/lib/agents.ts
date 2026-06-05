@@ -738,6 +738,12 @@ export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promi
   return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
+export type DeliveryResult = {
+  ok: boolean;
+  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  failure?: string;
+};
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -1326,7 +1332,7 @@ export async function deliverAgentMessage(
   message: string,
   caller: string = 'unknown',
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<void> {
+): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
 
   let channelsEnabled = false;
@@ -1340,7 +1346,7 @@ export async function deliverAgentMessage(
       const { CodexRuntimeSync } = await import('./runtimes/codex.js');
       const rt = new CodexRuntimeSync();
       await rt.sendMessage(normalizedId, message);
-      return;
+      return { ok: true, path: 'codex' };
     }
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
@@ -1350,7 +1356,7 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'tmux') {
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux' };
   }
 
   let supervisorFailure: string | undefined;
@@ -1371,7 +1377,7 @@ export async function deliverAgentMessage(
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return;
+        return { ok: true, path: 'supervisor' };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -1407,7 +1413,7 @@ export async function deliverAgentMessage(
             caller,
             ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
           });
-          return;
+          return { ok: true, path: 'channels' };
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           channelFailure = `socket-post-failed: ${reason}`;
@@ -1427,10 +1433,11 @@ export async function deliverAgentMessage(
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
   }
 
   await Effect.runPromise(sendKeys(normalizedId, message));
+  return { ok: true, path: 'tmux' };
 }
 
 export async function deliverAgentPermissionDecision(

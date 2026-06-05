@@ -151,7 +151,8 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'supervisor hi', 'caller-supervisor');
+      const result = await deliverAgentMessage(agentId, 'supervisor hi', 'caller-supervisor');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       expect(JSON.parse(capture.lastBody!)).toMatchObject({
@@ -172,7 +173,8 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'plain fork hi', 'plain-fork-test');
+      const result = await deliverAgentMessage(agentId, 'plain fork hi', 'plain-fork-test');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(JSON.parse(capture.lastBody!)).toMatchObject({
         content: 'plain fork hi',
@@ -192,7 +194,8 @@ describe('channel bridge delivery', () => {
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
-      await deliverAgentMessage(agentId, 'channel hi', 'caller-channel');
+      const result = await deliverAgentMessage(agentId, 'channel hi', 'caller-channel');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
         path: 'channel',
@@ -207,8 +210,9 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-no-sockets';
     writeAgentState(agentId, { channelsEnabled: true });
 
-    await deliverAgentMessage(agentId, 'tmux hi', 'caller-tmux');
+    const result = await deliverAgentMessage(agentId, 'tmux hi', 'caller-tmux');
 
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'socket-missing' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'tmux hi');
     expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
@@ -232,7 +236,8 @@ describe('channel bridge delivery', () => {
       body: 'ok',
     });
     try {
-      await deliverAgentMessage(agentId, 'fallback channel', 'caller-500');
+      const result = await deliverAgentMessage(agentId, 'fallback channel', 'caller-500');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
       expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
@@ -262,7 +267,7 @@ describe('channel bridge delivery', () => {
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
       await vi.advanceTimersByTimeAsync(2_500);
-      await delivered;
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
       expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
@@ -288,13 +293,15 @@ describe('channel bridge delivery', () => {
   it('deliverAgentMessage flag-off: delegates to sendKeysProgram exactly once with no socket attempt', async () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
-    await deliverAgentMessage(agentId, 'hello', 'test');
+    const result = await deliverAgentMessage(agentId, 'hello', 'test');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'hello');
   });
 
   it('state-file missing: delegates to sendKeysProgram (treat as flag-off)', async () => {
-    await deliverAgentMessage('agent-no-state', 'hello', 'test');
+    const result = await deliverAgentMessage('agent-no-state', 'hello', 'test');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
   });
 
@@ -306,7 +313,8 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
+      const result = await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
@@ -321,12 +329,14 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-no-sock';
     writeAgentState(agentId, { channelsEnabled: true });
     // Do NOT start a bridge — socket file does not exist.
-    await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
+    const result = await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'socket-missing' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback hi');
   });
 
   it('flag-on, socket-timeout: falls back to sendKeysProgram', async () => {
+    vi.useFakeTimers();
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     writeBridgeTokenSync(agentId);
@@ -334,12 +344,15 @@ describe('channel bridge delivery', () => {
     // Bridge that delays its response longer than the deliver timeout.
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500 });
     try {
-      await deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
+      const delivered = deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
+      await vi.advanceTimersByTimeAsync(2_500);
+      await expect(delivered).resolves.toMatchObject({ ok: true, path: 'tmux' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     } finally {
+      vi.useRealTimers();
       await new Promise<void>((r) => server.close(() => r()));
     }
-  }, 10_000);
+  });
 
   it('flag-on, missing bridge token: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-no-token';
@@ -347,7 +360,8 @@ describe('channel bridge delivery', () => {
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
-      await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
+      const result = await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
+      expect(result).toEqual({ ok: true, path: 'tmux', failure: 'bridge-token-missing' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback no token');
     } finally {
