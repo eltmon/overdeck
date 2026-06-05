@@ -156,6 +156,7 @@ import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
+import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 
 // ============================================================================
 // Configuration
@@ -4493,6 +4494,17 @@ export async function runPatrol(): Promise<PatrolResult> {
     const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
     actions.push(...stashJanitorActions);
     for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
+  // that lost the port but keep running — and can run a second Deacon). Low
+  // cadence (~10 min). Never touches the live server, the port owner, a
+  // just-spawned server, or a workspace-container server — see the reaper module.
+  const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
+  if (state.patrolCycle % serverReaperEveryCycles === 0) {
+    const reaperActions = await reapOrphanedDashboardServers();
+    actions.push(...reaperActions);
+    for (const a of reaperActions) addLog('action', a, state.patrolCycle);
   }
 
   // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
