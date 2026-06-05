@@ -5698,6 +5698,10 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     if (!state) continue;
     if (state.status !== 'running') continue;
     if (state.role !== 'work') continue;
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} skipped — issue ${state.issueId} is closed`);
+      continue;
+    }
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await Effect.runPromise(sessionExists(agentId))) continue;
