@@ -412,6 +412,21 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
   }
 }
 
+/**
+ * PAN-1624: a handoff spawned with a cwd that is not inside a git work tree
+ * (e.g. the repo's parent directory) produces a session that immediately ends
+ * with no tmux session at all — a silent dead conversation. Validate up front
+ * so the caller gets a clear error instead of a vanished session.
+ */
+export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: dir, encoding: 'utf-8' });
+    return stdout.trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
 const ALLOWED_UPLOAD_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
   ['image/jpeg', '.jpg'],
@@ -2996,17 +3011,83 @@ function handoffTitleFromFocus(focus: string | undefined, fallback: string): str
   return `Handoff: ${trimmed}`;
 }
 
-async function injectForkSummary(conv: Conversation, summary: string): Promise<void> {
+/**
+ * Watch the hook-driven runtime mirror to confirm a delivered fork brief was
+ * actually accepted as a prompt. Once a prompt is submitted the agent leaves
+ * idle and goes active (UserPromptSubmit hook → 'working'). Returns:
+ *   - 'accepted'  : observed active/waiting — the brief landed and was submitted
+ *   - 'still-idle': mirror was live and stayed idle for the whole window — the
+ *                   paste was dropped (a fresh Claude TUI flushes stdin during
+ *                   startup, discarding a paste delivered a beat too early)
+ *   - 'unknown'   : mirror never reported a usable state — can't tell, so the
+ *                   caller must NOT retry (avoids double-submitting a brief that
+ *                   may have landed). No tmux pane scraping — activity hooks only.
+ */
+export async function confirmForkPromptAccepted(
+  tmuxSession: string,
+  timeoutMs: number,
+): Promise<'accepted' | 'still-idle' | 'unknown'> {
+  const deadline = Date.now() + timeoutMs;
+  let sawIdle = false;
+  do {
+    const state = getAgentRuntimeStateSync(tmuxSession)?.state;
+    if (state === 'active' || state === 'waiting-on-human') return 'accepted';
+    if (state === 'idle') sawIdle = true;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  } while (Date.now() < deadline);
+  return sawIdle ? 'still-idle' : 'unknown';
+}
+
+/**
+ * Deliver a forked conversation's brief (summary or handoff doc) into the
+ * freshly-spawned successor session, then CONFIRM it actually landed.
+ *
+ * PAN-1624: a fresh Claude Code TUI drains/flushes its stdin while
+ * initializing, so a payload pasted before the input loop is live is silently
+ * discarded — the successor sits at an empty welcome screen and never starts.
+ * The `ready.json` session-start signal can fire before the input loop has
+ * settled, so a single fire-and-forget paste is unreliable. We deliver, then
+ * watch the runtime mirror: if it positively reports the agent is still idle
+ * after the window, the paste was dropped — re-deliver once. Re-delivery only
+ * happens from a confirmed-still-idle state, so a brief that already landed is
+ * never double-submitted; when the mirror can't tell us, we fall back to a
+ * single delivery (the pre-PAN-1624 behavior).
+ */
+async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
+  const method = resolveConversationDeliveryMethod(conv);
+
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
-  } else {
-    const ready = await waitForReadySignal(conv.tmuxSession, 60);
-    if (!ready) {
-      console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
+    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+    return;
+  }
+
+  const ready = await waitForReadySignal(conv.tmuxSession, 60);
+  if (!ready) {
+    console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
+  }
+
+  const MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+    const outcome = await confirmForkPromptAccepted(conv.tmuxSession, 8000);
+    if (outcome === 'accepted') return;
+    if (outcome === 'unknown') {
+      // Runtime mirror not reporting for this session — we cannot distinguish a
+      // dropped paste from a slow hook, so do not retry (would risk a double
+      // submit). Behaves like the original single delivery.
+      console.warn(`[${caller}] delivery to ${conv.name} could not be confirmed (runtime mirror silent) — not retrying`);
+      return;
+    }
+    // outcome === 'still-idle': the mirror is live and the agent never picked
+    // up the brief — the TUI dropped the paste during startup.
+    if (attempt < MAX_ATTEMPTS) {
+      console.warn(`[${caller}] ${conv.name} still idle 8s after delivery (attempt ${attempt}/${MAX_ATTEMPTS}) — TUI likely dropped the paste during startup, re-delivering`);
+    } else {
+      console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
     }
   }
-  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', resolveConversationDeliveryMethod(conv));
 }
 
 async function runForkPipeline(
@@ -3148,7 +3229,7 @@ async function runForkPipeline(
   );
   await waitForTmuxSession(conv.tmuxSession);
 
-  await injectForkSummary(conv, summary);
+  await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -3257,8 +3338,18 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid summaryModel' }, { status: 400 });
         }
 
+        const effectiveCwd = cwd || conv.cwd || process.cwd();
+
+        // PAN-1624: a handoff whose cwd is not a git work tree spawns a session
+        // that immediately dies (no tmux, no launcher dir). Fail loudly here.
+        if (forkMode === 'handoff' && !(await isInsideGitWorkTree(effectiveCwd))) {
+          return jsonResponse({
+            error: `Handoff cwd is not inside a git repository: ${effectiveCwd}. Run the handoff from a git working tree.`,
+          }, { status: 400 });
+        }
+
         const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(
-          cwd || conv.cwd || process.cwd(),
+          effectiveCwd,
         ));
 
         const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
