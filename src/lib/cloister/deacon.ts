@@ -158,7 +158,6 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
-import { computeContextUsage } from '../../dashboard/server/services/conversation-service.js';
 
 // ============================================================================
 // Configuration
@@ -801,8 +800,9 @@ async function maybeProactivelyCompactContext(sessionName: string, now: number):
   const sessionId = agentState?.sessionId ?? runtimeState?.claudeSessionId;
   if (!agentState?.workspace || !sessionId || !agentState.model) return null;
 
-  let usage: Awaited<ReturnType<typeof computeContextUsage>> | null = null;
+  let usage: { percentUsed: number } | null = null;
   try {
+    const { computeContextUsage } = await import('../../dashboard/server/services/conversation-service.js');
     usage = await computeContextUsage(sessionFilePath(agentState.workspace, sessionId), agentState.model);
   } catch {
     return null;
