@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 import { spawnAgent } from '../../lib/agents.js';
+import type { SpawnOptions } from '../../lib/agents.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 
@@ -111,6 +112,18 @@ function buildStrikePrompt(plan: StrikePlan): string {
   ].join('\n');
 }
 
+function buildStrikeSpawnOptions(plan: StrikePlan, options: StrikeOptions, prompt: string): SpawnOptions {
+  return {
+    issueId: plan.issueId,
+    workspace: plan.workspace,
+    harness: options.harness,
+    model: options.model,
+    role: 'strike',
+    effort: options.effort,
+    prompt,
+  };
+}
+
 async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
   const spinner = ora(`Striking ${issueId}...`).start();
   try {
@@ -133,15 +146,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
 
     spinner.text = `Spawning strike agent for ${plan.issueId}...`;
     const prompt = buildStrikePrompt(plan);
-    const agent = await spawnAgent({
-      issueId: plan.issueId,
-      workspace: plan.workspace,
-      harness: options.harness,
-      model: options.model,
-      role: 'strike',
-      prompt,
-      effort: options.effort,
-    });
+    const agent = await spawnAgent(buildStrikeSpawnOptions(plan, options, prompt));
 
     spinner.succeed(`Strike agent spawned: ${agent.id}`);
     console.log('');
@@ -190,4 +195,5 @@ export async function strikeCommand(ids: string[], options: StrikeOptions = {}):
 export const __testInternals = {
   planStrike,
   buildStrikePrompt,
+  buildStrikeSpawnOptions,
 };
