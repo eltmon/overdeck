@@ -255,6 +255,53 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect((reloaded as unknown as { agentType?: string }).agentType).toBeUndefined();
     });
 
+    it('marks kickoffDelivered true after a ready work-agent kickoff is delivered', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+
+      const state = await spawnAgent({
+        issueId: 'PAN-KICKOFF-1',
+        workspace: '/tmp/test-workspace',
+        role: 'work',
+        prompt: 'do the work',
+      });
+
+      expect(state.kickoffDelivered).toBe(true);
+      expect(getAgentStateSync('agent-pan-kickoff-1')?.kickoffDelivered).toBe(true);
+      expect(tmux.sendKeys).toHaveBeenCalledWith('agent-pan-kickoff-1', expect.stringContaining('do the work'));
+    });
+
+    it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
+      vi.useFakeTimers();
+      const tmux = await import('../../src/lib/tmux.js');
+      let created!: () => void;
+      const createdPromise = new Promise<void>((resolve) => { created = resolve; });
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.sync(() => { created(); }));
+
+      try {
+        const spawned = spawnAgent({
+          issueId: 'PAN-KICKOFF-FAIL',
+          workspace: '/tmp/test-workspace',
+          role: 'work',
+          prompt: 'do the work',
+        });
+
+        await createdPromise;
+        await Promise.resolve();
+        await vi.advanceTimersByTimeAsync(61_000);
+        const state = await spawned;
+        const reloaded = getAgentStateSync('agent-pan-kickoff-fail');
+
+        expect(state.status).toBe('error');
+        expect(state.kickoffDelivered).toBe(false);
+        expect(reloaded?.status).toBe('error');
+        expect(reloaded?.kickoffDelivered).toBe(false);
+        expect(reloaded?.lastFailureReason).toBe('kickoff delivery failed');
+        expect(tmux.sendKeys).not.toHaveBeenCalledWith('agent-pan-kickoff-fail', expect.stringContaining('do the work'));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('honours an explicit options.model over the role config default', async () => {
       const state = await spawnAgent({
         issueId: 'PAN-TEST-3',

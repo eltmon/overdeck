@@ -1440,6 +1440,53 @@ export async function deliverAgentMessage(
   return { ok: true, path: 'tmux' };
 }
 
+async function deliverInitialPromptWithRetry(
+  agentId: string,
+  prompt: string,
+  caller: string,
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+): Promise<DeliveryResult> {
+  let lastFailure = 'not-attempted';
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const ready = await waitForReadySignal(agentId, 30);
+    if (!ready) {
+      lastFailure = 'ready-signal-timeout';
+      console.error(`[${agentId}] Claude did not become ready within 30s (kickoff attempt ${attempt}/2)`);
+      continue;
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    try {
+      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      if (result.ok) return result;
+      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+    } catch (err) {
+      lastFailure = err instanceof Error ? err.message : String(err);
+    }
+    console.error(`[${agentId}] Kickoff delivery attempt ${attempt}/2 failed: ${lastFailure}`);
+  }
+
+  return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
+  await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'error';
+    failedState.kickoffDelivered = false;
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+  state.status = 'error';
+  state.kickoffDelivered = false;
+  emitActivityEntrySync({
+    source,
+    level: 'error',
+    message: `${state.id}: kickoff delivery failed`,
+    issueId,
+  });
+}
+
 export async function deliverAgentPermissionDecision(
   agentId: string,
   requestId: string,
@@ -2955,7 +3002,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-if (prompt) {
+  if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
         await writePiAgentPrompt(agentId, prompt);
@@ -3171,6 +3218,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   if (prompt) {
     await writeFileAsync(promptFile, prompt);
+    if (role === 'work') {
+      state.kickoffDelivered = false;
+      saveAgentStateSync(state);
+    }
   }
 
   // Auto-setup hooks if not configured
@@ -3293,6 +3344,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } else {
       console.warn(`[${agentId}] Codex: rollout did not appear within 30s — thread-id not captured`);
     }
+    if (prompt && role === 'work') {
+      state.kickoffDelivered = true;
+      saveAgentStateSync(state);
+    }
   }
 
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
@@ -3306,19 +3361,33 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Codex agents skip this — the prompt is embedded inline in the launch command.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
-  if (prompt && resolvedHarness !== 'codex') {
+  if (prompt && resolvedHarness === 'pi') {
+    try {
+      await writePiAgentPrompt(agentId, prompt);
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } catch (err) {
+      console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      if (role === 'work') {
+        await recordKickoffDeliveryFailure(state, options.issueId, role);
+        return state;
+      }
+    }
+  } else if (prompt && resolvedHarness !== 'codex') {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
-    // PAN-1594: wait for the hook-written ready.json (session-start hook),
-    // not a tmux pane-scrape. No dependency on permission-mode footer text.
-    const ready = await waitForReadySignal(agentId, 30);
-    if (ready) {
-      // Small delay after ready to ensure Claude is fully rendered and accepting input
-      await new Promise(r => setTimeout(r, 500));
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
-    } else {
-      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
+    if (delivery.ok) {
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } else if (role === 'work') {
+      await recordKickoffDeliveryFailure(state, options.issueId, role);
+      return state;
     }
   }
 
