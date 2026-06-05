@@ -159,6 +159,7 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { isIssueClosed } from './issue-closed.js';
 
 // ============================================================================
 // Configuration
@@ -1786,17 +1787,13 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Operator-set ignore flag: skip all patrol re-dispatch for this issue
       // until the human toggles it back off via the kanban button.
       if (status.deaconIgnored) continue;
-      // PAN-1496: never re-dispatch review/test for an issue closed on the
-      // tracker (e.g. closed on GitHub mid-pipeline, bypassing close-out which
-      // clears the review_status row). isTrackerIssueClosed is TTL-cached, so
+      // PAN-1496/PAN-1613: never re-dispatch review/test for an issue closed
+      // on the tracker or shadow-state. The shared helper is TTL-cached, so
       // checking each surviving row at most once per cache window is bounded and
       // cannot reproduce the PAN-328 API storm.
-      {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
-        if (await isIssueClosed(issueId)) {
-          actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed on the tracker`);
-          continue;
-        }
+      if (await isIssueClosed(issueId)) {
+        actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed`);
+        continue;
       }
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
@@ -2118,6 +2115,10 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
     for (const dir of agentDirs) {
       const issueId = dir.name.replace('agent-', '').toUpperCase();
       if (statuses[issueId]) continue; // already has a status row
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
+        continue;
+      }
 
       const completedFile = join(AGENTS_DIR, dir.name, 'completed');
       const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
@@ -2216,6 +2217,10 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
+        continue;
+      }
 
       const retryCount = status.testRetryCount ?? 0;
       if (retryCount >= 3) continue;
@@ -2654,6 +2659,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       if (status.mergeStatus === 'merged') continue;
       if (!status.reviewedAtCommit) continue;
       if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
+        continue;
+      }
 
       // Resolve workspace path
       const project = resolveProjectFromIssueSync(issueId);
