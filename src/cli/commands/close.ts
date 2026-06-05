@@ -71,9 +71,16 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     process.exit(1);
   }
 
-  // Human-only guard: reject if running as an agent
-  if (process.env.PANOPTICON_AGENT_ID) {
-    console.error(chalk.red('Close-out is a human-only operation. Agents cannot close out issues.'));
+  // Human-only guard: reject if running as an AUTONOMOUS agent.
+  // `conv-*` sessions are operator-driven conversations (the human is in the loop
+  // and explicitly asked), so they are allowed — only autonomous pipeline agents
+  // (`agent-*`, `planning-*`, `flywheel-*`, `strike-*`, `inspect-*`, …) are barred,
+  // since close-out is destructive (closes the tracker issue + tears down the
+  // workspace). Without the `conv-*` exception the operator could not close out
+  // from their own dashboard conversation and was forced to a bare terminal. PAN-1621.
+  const agentId = process.env.PANOPTICON_AGENT_ID;
+  if (agentId && !agentId.startsWith('conv-')) {
+    console.error(chalk.red('Close-out is a human-only operation. Autonomous agents cannot close out issues.'));
     process.exit(1);
   }
 
