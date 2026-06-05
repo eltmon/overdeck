@@ -5058,6 +5058,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...postReviewActions);
   for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
+  const stalledConvoyActions = await recoverStalledReviewConvoys();
+  actions.push(...stalledConvoyActions);
+  for (const a of stalledConvoyActions) addLog('action', a, state.patrolCycle);
+
   // Check for completed work with no review status entry at all (PAN-699)
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
