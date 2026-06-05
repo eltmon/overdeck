@@ -28,7 +28,7 @@ export interface IssueOverviewProps {
   conversations?: Conversation[]
   /** Create a conversation for this issue, returning the new conversation's
    * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string) => Promise<string | undefined>
+  onCreateConversation?: (agentId: string, message?: string) => Promise<string | undefined>
   api: StageApi
 }
 
@@ -65,9 +65,9 @@ export function IssueOverview({
     [issueConversations],
   )
 
-  const onAgentSelected = async (id: string) => {
+  const onAgentSelected = async (id: string, message?: string) => {
     writeLastUsedAgent(issueId, id)
-    const conversationName = await onCreateConversation?.(id)
+    const conversationName = await onCreateConversation?.(id, message)
     if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
   }
   // PAN-1561: terminal actions open the drawer stacked below, not a tab.
@@ -103,7 +103,7 @@ export function IssueOverview({
           lastUsedAgentId={readLastUsedAgent(issueId)}
           onSelect={(intent, query) =>
             dispatchLauncherIntent(intent, query, {
-              openAgent: (i) => onAgentSelected(i.id),
+              openAgent: (i, query) => onAgentSelected(i.id, query),
               openTerminal,
               openWeb: (_q, url) =>
                 api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),

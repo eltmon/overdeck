@@ -840,13 +840,15 @@ export function CommandDeck({
   // agent tab in the current project's deck. Returns the new conversation's
   // name so the deck's launch components can focus the tab.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string): Promise<string | undefined> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
           harness: harnessOverride ?? sidebarHarness,
         };
         if (projectKey) payload.projectKey = projectKey;
+        const trimmedMessage = message?.trim();
+        if (trimmedMessage) payload.message = trimmedMessage;
         const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -891,11 +893,11 @@ export function CommandDeck({
   // a project conversation for the chosen agent and return its name so the deck
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
-    (agentId: string): Promise<string | undefined> => {
+    (agentId: string, message?: string): Promise<string | undefined> => {
       const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
-      return createConversationForProject(projectKey, harness);
+      return createConversationForProject(projectKey, harness, message);
     },
     [createConversationForProject, selectedProject],
   );
