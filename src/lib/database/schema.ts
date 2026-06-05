@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 48;
+export const SCHEMA_VERSION = 49;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -213,6 +213,10 @@ export function initSchema(db: Database.Database): void {
       review_status         TEXT NOT NULL DEFAULT 'pending',
       test_status           TEXT NOT NULL DEFAULT 'pending',
       merge_status          TEXT,
+      inspect_status        TEXT,
+      inspect_notes         TEXT,
+      inspect_started_at    TEXT,
+      inspect_bead_id       TEXT,
       verification_status   TEXT,
       verification_notes    TEXT,
       verification_cycle_count  INTEGER DEFAULT 0,
@@ -1389,6 +1393,14 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
     } catch { /* already exists */ }
+  }
+
+  // v48 → v49: persist per-bead inspect status metadata for watchdogs (PAN-1616)
+  if (currentVersion < 49) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

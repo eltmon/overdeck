@@ -39,6 +39,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
     db.prepare(`
       INSERT INTO review_status (
         issue_id, review_status, test_status, merge_status,
+        inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
@@ -57,12 +58,16 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         last_verified_commit,
         merge_step
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
         test_status           = excluded.test_status,
         merge_status          = excluded.merge_status,
+        inspect_status        = excluded.inspect_status,
+        inspect_notes         = excluded.inspect_notes,
+        inspect_started_at    = excluded.inspect_started_at,
+        inspect_bead_id       = excluded.inspect_bead_id,
         verification_status   = excluded.verification_status,
         verification_notes    = excluded.verification_notes,
         verification_cycle_count = excluded.verification_cycle_count,
@@ -97,6 +102,10 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.reviewStatus,
       s.testStatus,
       s.mergeStatus ?? null,
+      s.inspectStatus ?? null,
+      s.inspectNotes ?? null,
+      s.inspectStartedAt ?? null,
+      s.inspectBeadId ?? null,
       s.verificationStatus ?? null,
       s.verificationNotes ?? null,
       s.verificationCycleCount ?? null,
@@ -321,6 +330,10 @@ interface DbReviewStatusRow {
   review_status: string;
   test_status: string;
   merge_status: string | null;
+  inspect_status: string | null;
+  inspect_notes: string | null;
+  inspect_started_at: string | null;
+  inspect_bead_id: string | null;
   verification_status: string | null;
   verification_notes: string | null;
   verification_cycle_count: number | null;
@@ -369,6 +382,10 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],
     mergeStatus: row.merge_status as ReviewStatus['mergeStatus'] ?? undefined,
+    inspectStatus: row.inspect_status as ReviewStatus['inspectStatus'] ?? undefined,
+    inspectNotes: row.inspect_notes ?? undefined,
+    inspectStartedAt: row.inspect_started_at ?? undefined,
+    inspectBeadId: row.inspect_bead_id ?? undefined,
     verificationStatus: row.verification_status as ReviewStatus['verificationStatus'] ?? undefined,
     verificationNotes: row.verification_notes ?? undefined,
     verificationCycleCount: row.verification_cycle_count ?? undefined,
