@@ -147,7 +147,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Executive Summary</h2>
-<p>Between February 2025 and May 2026, Panopticon's AI coding pipeline generated <strong>6,463 commits</strong>, <strong>2.8K files</strong>, and over <strong>2 million lines of code</strong>. Here's what that cost at standard API rates.</p>
+<p>Between February 2025 and May 2026, Panopticon's AI coding pipeline generated <strong>6,463 commits</strong>, <strong>3.3K files</strong>, and over <strong>2 million lines of code</strong>. Here's what that cost at standard API rates.</p>
 </div>
 <div class="card-grid">
 <div class="card animate-in">
@@ -456,7 +456,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Codebase <span class="gradient-text">Evolution</span></h2>
-<p>From 1 file to 2,834 in 128 days of tracked git history</p>
+<p>From 12 files to 3,264 in 139 days of tracked git history</p>
 </div>
 <div class="card animate-in">
 <h3><span class="card-icon">G</span> File Growth Over Time</h3>
@@ -538,7 +538,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-
 <div class="container">
 <div class="section-header animate-in">
 <h2>Codebase <span class="gradient-text">Timelapse</span></h2>
-<p>Watch Panopticon grow from nothing to 2,834 files</p>
+<p>Watch Panopticon grow from nothing to 3,264 files</p>
 </div>
 <div class="video-container animate-in">
 <video controls autoplay muted loop playsinline poster="video-poster.jpg">
@@ -761,24 +761,18 @@ new Chart(subCtx, {
 });
 
 // Files Chart
-const fileGrowth = [{"date":"2026-01-17","files":1},{"date":"2026-01-18","files":40},{"date":"2026-01-19","files":33},{"date":"2026-01-20","files":27},{"date":"2026-01-21","files":96},{"date":"2026-01-22","files":216},{"date":"2026-01-23","files":262},{"date":"2026-01-24","files":76},{"date":"2026-01-25","files":122},{"date":"2026-01-26","files":102},{"date":"2026-01-27","files":154},{"date":"2026-01-28","files":104},{"date":"2026-01-29","files":72},{"date":"2026-01-30","files":198},{"date":"2026-01-31","files":74},{"date":"2026-02-01","files":110},{"date":"2026-02-02","files":90},{"date":"2026-02-03","files":108},{"date":"2026-02-04","files":106},{"date":"2026-02-05","files":44},{"date":"2026-02-06","files":17},{"date":"2026-02-07","files":93},{"date":"2026-02-08","files":3},{"date":"2026-02-09","files":93},{"date":"2026-02-10","files":62},{"date":"2026-02-11","files":62},{"date":"2026-02-12","files":80},{"date":"2026-02-13","files":66},{"date":"2026-02-14","files":80},{"date":"2026-02-15","files":52},{"date":"2026-02-16","files":242},{"date":"2026-02-17","files":11087},{"date":"2026-02-18","files":9004},{"date":"2026-02-19","files":1759},{"date":"2026-02-20","files":22},{"date":"2026-02-21","files":9880},{"date":"2026-02-22","files":1686},{"date":"2026-02-23","files":7252},{"date":"2026-02-24","files":8349},{"date":"2026-02-25","files":1003},{"date":"2026-02-26","files":847},{"date":"2026-02-27","files":955},{"date":"2026-02-28","files":4434},{"date":"2026-03-01","files":19646},{"date":"2026-03-02","files":13256},{"date":"2026-03-03","files":1765},{"date":"2026-03-04","files":7936},{"date":"2026-03-05","files":7565},{"date":"2026-03-06","files":14896},{"date":"2026-03-07","files":15414},{"date":"2026-03-08","files":17697},{"date":"2026-03-09","files":7488},{"date":"2026-03-10","files":16536},{"date":"2026-03-11","files":4171},{"date":"2026-03-12","files":1700},{"date":"2026-03-13","files":1099},{"date":"2026-03-14","files":14035},{"date":"2026-03-15","files":7480},{"date":"2026-03-16","files":17265},{"date":"2026-03-17","files":40054},{"date":"2026-03-18","files":21384},{"date":"2026-03-19","files":25383},{"date":"2026-03-20","files":2570},{"date":"2026-03-21","files":2144},{"date":"2026-03-22","files":7254},{"date":"2026-03-23","files":1199},{"date":"2026-03-24","files":1027},{"date":"2026-03-25","files":1499},{"date":"2026-03-26","files":1038},{"date":"2026-03-27","files":605},{"date":"2026-03-28","files":441},{"date":"2026-03-29","files":1186},{"date":"2026-03-30","files":1601},{"date":"2026-03-31","files":3339},{"date":"2026-04-01","files":916},{"date":"2026-04-02","files":2213},{"date":"2026-04-03","files":1913},{"date":"2026-04-04","files":4656},{"date":"2026-04-05","files":4820},{"date":"2026-04-06","files":4623},{"date":"2026-04-07","files":7322},{"date":"2026-04-08","files":8885},{"date":"2026-04-09","files":7621},{"date":"2026-04-10","files":6613},{"date":"2026-04-11","files":310},{"date":"2026-04-12","files":0},{"date":"2026-04-13","files":0},{"date":"2026-04-14","files":0},{"date":"2026-04-15","files":0},{"date":"2026-04-16","files":0},{"date":"2026-04-17","files":0},{"date":"2026-04-18","files":0},{"date":"2026-04-19","files":0},{"date":"2026-04-20","files":0},{"date":"2026-04-21","files":0},{"date":"2026-04-22","files":0},{"date":"2026-04-23","files":0},{"date":"2026-04-24","files":0},{"date":"2026-04-25","files":0},{"date":"2026-04-26","files":0},{"date":"2026-04-27","files":0},{"date":"2026-04-28","files":0},{"date":"2026-04-29","files":0},{"date":"2026-04-30","files":0},{"date":"2026-05-01","files":0},{"date":"2026-05-02","files":0},{"date":"2026-05-03","files":0},{"date":"2026-05-04","files":0},{"date":"2026-05-05","files":0},{"date":"2026-05-06","files":0},{"date":"2026-05-07","files":0},{"date":"2026-05-08","files":0},{"date":"2026-05-09","files":0},{"date":"2026-05-10","files":0},{"date":"2026-05-11","files":0},{"date":"2026-05-12","files":0},{"date":"2026-05-13","files":0},{"date":"2026-05-14","files":0},{"date":"2026-05-15","files":0},{"date":"2026-05-16","files":0},{"date":"2026-05-17","files":0},{"date":"2026-05-18","files":0},{"date":"2026-05-19","files":0},{"date":"2026-05-20","files":0},{"date":"2026-05-21","files":0},{"date":"2026-05-22","files":0},{"date":"2026-05-23","files":2834}];
+const fileGrowth = [{"date":"2026-01-17","files":12},{"date":"2026-01-18","files":101},{"date":"2026-01-19","files":165},{"date":"2026-01-20","files":255},{"date":"2026-01-21","files":286},{"date":"2026-01-22","files":320},{"date":"2026-01-23","files":408},{"date":"2026-01-24","files":419},{"date":"2026-01-25","files":451},{"date":"2026-01-26","files":525},{"date":"2026-01-28","files":481},{"date":"2026-01-29","files":547},{"date":"2026-01-30","files":549},{"date":"2026-02-01","files":572},{"date":"2026-02-02","files":577},{"date":"2026-02-03","files":607},{"date":"2026-02-04","files":608},{"date":"2026-02-05","files":608},{"date":"2026-02-06","files":630},{"date":"2026-02-07","files":665},{"date":"2026-02-08","files":703},{"date":"2026-02-09","files":708},{"date":"2026-02-10","files":708},{"date":"2026-02-11","files":706},{"date":"2026-02-15","files":709},{"date":"2026-02-16","files":710},{"date":"2026-02-17","files":711},{"date":"2026-02-18","files":719},{"date":"2026-02-19","files":719},{"date":"2026-02-20","files":838},{"date":"2026-02-21","files":837},{"date":"2026-02-22","files":749},{"date":"2026-02-23","files":751},{"date":"2026-02-24","files":756},{"date":"2026-02-25","files":766},{"date":"2026-02-26","files":802},{"date":"2026-02-27","files":814},{"date":"2026-02-28","files":829},{"date":"2026-03-01","files":837},{"date":"2026-03-02","files":833},{"date":"2026-03-03","files":833},{"date":"2026-03-04","files":833},{"date":"2026-03-05","files":834},{"date":"2026-03-06","files":856},{"date":"2026-03-07","files":856},{"date":"2026-03-08","files":857},{"date":"2026-03-09","files":863},{"date":"2026-03-11","files":863},{"date":"2026-03-12","files":863},{"date":"2026-03-14","files":867},{"date":"2026-03-15","files":871},{"date":"2026-03-16","files":878},{"date":"2026-03-17","files":886},{"date":"2026-03-18","files":927},{"date":"2026-03-19","files":958},{"date":"2026-03-20","files":966},{"date":"2026-03-21","files":963},{"date":"2026-03-22","files":973},{"date":"2026-03-30","files":973},{"date":"2026-03-31","files":987},{"date":"2026-04-01","files":987},{"date":"2026-04-02","files":978},{"date":"2026-04-03","files":1017},{"date":"2026-04-04","files":1078},{"date":"2026-04-05","files":1162},{"date":"2026-04-06","files":1193},{"date":"2026-04-07","files":1231},{"date":"2026-04-08","files":1248},{"date":"2026-04-09","files":1276},{"date":"2026-04-10","files":1280},{"date":"2026-04-11","files":1330},{"date":"2026-04-12","files":1384},{"date":"2026-04-13","files":1407},{"date":"2026-04-14","files":1470},{"date":"2026-04-15","files":1492},{"date":"2026-04-16","files":1497},{"date":"2026-04-17","files":1520},{"date":"2026-04-18","files":1526},{"date":"2026-04-19","files":1557},{"date":"2026-04-20","files":1587},{"date":"2026-04-21","files":1666},{"date":"2026-04-22","files":1632},{"date":"2026-04-23","files":1643},{"date":"2026-04-24","files":1646},{"date":"2026-04-25","files":1678},{"date":"2026-04-26","files":1730},{"date":"2026-04-27","files":1780},{"date":"2026-04-28","files":1789},{"date":"2026-04-29","files":1803},{"date":"2026-04-30","files":1831},{"date":"2026-05-01","files":1843},{"date":"2026-05-02","files":1843},{"date":"2026-05-03","files":2084},{"date":"2026-05-04","files":2092},{"date":"2026-05-05","files":2107},{"date":"2026-05-06","files":2120},{"date":"2026-05-07","files":2213},{"date":"2026-05-08","files":2239},{"date":"2026-05-09","files":2241},{"date":"2026-05-10","files":2255},{"date":"2026-05-11","files":2222},{"date":"2026-05-12","files":2619},{"date":"2026-05-13","files":2306},{"date":"2026-05-14","files":2316},{"date":"2026-05-15","files":2636},{"date":"2026-05-16","files":2676},{"date":"2026-05-17","files":2619},{"date":"2026-05-18","files":2686},{"date":"2026-05-19","files":2687},{"date":"2026-05-20","files":2687},{"date":"2026-05-21","files":2684},{"date":"2026-05-22","files":2732},{"date":"2026-05-23","files":2859},{"date":"2026-05-24","files":2911},{"date":"2026-05-25","files":3027},{"date":"2026-05-26","files":3038},{"date":"2026-05-27","files":3043},{"date":"2026-05-28","files":3085},{"date":"2026-05-29","files":3106},{"date":"2026-05-30","files":3121},{"date":"2026-05-31","files":3136},{"date":"2026-06-01","files":3162},{"date":"2026-06-02","files":3181},{"date":"2026-06-03","files":3198},{"date":"2026-06-04","files":3255},{"date":"2026-06-05","files":3264}];
 
-// Fix file growth - some days show commit file counts, not repo file counts
-// Use cumulative max to show true growth
-let maxFiles = 0;
-const fixedGrowth = fileGrowth.map(d => {
-  maxFiles = Math.max(maxFiles, d.files);
-  return { date: d.date, files: maxFiles };
-}).filter((d, i, arr) => i === 0 || d.files !== arr[i-1].files);
-
+// fileGrowth holds the true repo file count per day (last commit of each day,
+// counted via `git ls-tree -r --name-only <hash> | wc -l`), so it can be charted directly.
 const filesCtx = document.getElementById('filesChart').getContext('2d');
 new Chart(filesCtx, {
   type: 'line',
   data: {
-    labels: fixedGrowth.map(d => d.date),
+    labels: fileGrowth.map(d => d.date),
     datasets: [{
       label: 'Files in Repo',
-      data: fixedGrowth.map(d => d.files),
+      data: fileGrowth.map(d => d.files),
       borderColor: '#6366f1',
       backgroundColor: 'rgba(99,102,241,0.08)',
       fill: true,
