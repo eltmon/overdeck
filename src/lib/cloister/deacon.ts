@@ -841,6 +841,14 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       // error scrolls past this window — so a settled /compact that cleared the
       // overflow won't be misread as "still overflowing" from stale scrollback.
       const hasOverflow = isContextOverflowTail(tmuxOutput);
+      const runtimeState = getAgentRuntimeStateSync(sessionName);
+      if (hasOverflow) {
+        if (!runtimeState?.contextSaturatedAt) {
+          await saveAgentRuntimeState(sessionName, { contextSaturatedAt: new Date(now).toISOString() });
+        }
+      } else if (runtimeState?.contextSaturatedAt) {
+        await saveAgentRuntimeState(sessionName, { contextSaturatedAt: undefined });
+      }
 
       if (!overflowBlocked) {
         if (ov && (now - ov.lastAttempt) < CONTEXT_COMPACT_SETTLE_MS) {

@@ -1130,6 +1130,23 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'agent.context_saturation_changed': {
+      const { agentId, contextSaturatedAt } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        contextSaturatedAt,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
     case 'agent.resolution_changed': {
       const { agentId, resolution, resolutionCount } = event.payload
       const prev = state.agentRuntimeById[agentId]

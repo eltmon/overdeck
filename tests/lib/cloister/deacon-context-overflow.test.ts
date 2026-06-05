@@ -26,6 +26,8 @@ const mockListSessionNames = vi.fn();
 const mockGetReviewStatusSync = vi.fn();
 const mockMarkWorkspaceStuck = vi.fn();
 const mockEmitActivityEntry = vi.fn();
+const mockGetAgentRuntimeState = vi.fn();
+const mockSaveAgentRuntimeState = vi.fn();
 
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
@@ -72,9 +74,9 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
-  getAgentRuntimeState: vi.fn().mockReturnValue(null),
-  getAgentRuntimeStateSync: vi.fn().mockReturnValue(null),
-  saveAgentRuntimeState: vi.fn(),
+  getAgentRuntimeState: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+  saveAgentRuntimeState: (...args: unknown[]) => mockSaveAgentRuntimeState(...args),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
@@ -111,6 +113,8 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockGetReviewStatusSync.mockReset().mockReturnValue(null);
     mockMarkWorkspaceStuck.mockReset();
     mockEmitActivityEntry.mockReset();
+    mockGetAgentRuntimeState.mockReset().mockReturnValue(null);
+    mockSaveAgentRuntimeState.mockReset().mockResolvedValue(undefined);
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkApiErrorAgents = mod.checkApiErrorAgents;
@@ -123,12 +127,44 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
 
     const actions = await checkApiErrorAgents();
 
+    expect(mockSaveAgentRuntimeState).toHaveBeenCalledWith(
+      SESSION,
+      expect.objectContaining({ contextSaturatedAt: expect.any(String) }),
+    );
     expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
     expect(contextOverflowRecoveryState.get(SESSION)?.attempts).toBe(1);
     expect(actions.some(a => /compacting/.test(a))).toBe(true);
     expect(mockEmitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', issueId: ISSUE }),
     );
+  });
+
+  it('preserves the first contextSaturatedAt timestamp on repeated overflow detections', async () => {
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: '2026-06-05T12:00:00.000Z',
+      contextSaturatedAt: '2026-06-05T12:01:00.000Z',
+    });
+    mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+
+    await checkApiErrorAgents();
+
+    expect(mockSaveAgentRuntimeState).not.toHaveBeenCalled();
+    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+  });
+
+  it('clears contextSaturatedAt when the recent tail no longer overflows', async () => {
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: '2026-06-05T12:00:00.000Z',
+      contextSaturatedAt: '2026-06-05T12:01:00.000Z',
+    });
+    mockCapturePane.mockResolvedValue(pane('all good', 'no errors here'));
+
+    await checkApiErrorAgents();
+
+    expect(mockSaveAgentRuntimeState).toHaveBeenCalledWith(SESSION, { contextSaturatedAt: undefined });
+    expect(mockSendKeys).not.toHaveBeenCalled();
   });
 
   it('(b) does nothing while a /compact is still in flight (within settle window)', async () => {

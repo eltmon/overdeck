@@ -1844,6 +1844,7 @@ export interface AgentRuntimeState {
   waitingReason?: string;
   waitingStartedAt?: string;
   waitingNotification?: string;
+  contextSaturatedAt?: string;
 }
 
 function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
@@ -1871,6 +1872,7 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     waitingReason: snap.waiting?.reason,
     waitingStartedAt: snap.waiting?.startedAt,
     waitingNotification: snap.waiting?.message,
+    contextSaturatedAt: snap.contextSaturatedAt,
   };
 }
 
@@ -1939,6 +1941,28 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
         claudeSessionId: patch.claudeSessionId,
       }));
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+    await Effect.runPromise(emitAgentEvent(agentId, {
+      kind: 'context_saturation_changed',
+      contextSaturatedAt: patch.contextSaturatedAt,
+    }));
+  }
+}
+
+export async function setAgentContextSaturatedAt(agentId: string, detectedAt = new Date().toISOString()): Promise<string> {
+  const existing = getAgentRuntimeStateSync(agentId)?.contextSaturatedAt;
+  const contextSaturatedAt = existing ?? detectedAt;
+  if (!existing) {
+    await saveAgentRuntimeState(agentId, { contextSaturatedAt });
+  }
+  return contextSaturatedAt;
+}
+
+export async function clearAgentContextSaturatedAt(agentId: string): Promise<void> {
+  if (getAgentRuntimeStateSync(agentId)?.contextSaturatedAt) {
+    await saveAgentRuntimeState(agentId, { contextSaturatedAt: undefined });
   }
 }
 

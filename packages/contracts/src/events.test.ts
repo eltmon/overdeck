@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent } from "./events"
+import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent } from "./events"
 
+const decodeAgentContextSaturationChangedEvent = Schema.decodeUnknownSync(AgentContextSaturationChangedEvent)
 const decodeOperatorInterventionEvent = Schema.decodeUnknownSync(OperatorInterventionEvent)
 const decodeSubstrateBugFiledEvent = Schema.decodeUnknownSync(SubstrateBugFiledEvent)
 const encodeSubstrateBugFiledEvent = Schema.encodeSync(SubstrateBugFiledEvent)
@@ -29,6 +30,33 @@ function operatorInterventionEvent(kind: typeof operatorInterventionKinds[number
     },
   }
 }
+
+describe("AgentContextSaturationChangedEvent", () => {
+  it("decodes set and clear events through DomainEvent", () => {
+    const setEvent = {
+      type: "agent.context_saturation_changed",
+      sequence: 1,
+      timestamp: "2026-06-05T12:00:00.000Z",
+      payload: {
+        agentId: "agent-pan-1615",
+        contextSaturatedAt: "2026-06-05T12:00:00.000Z",
+      },
+    }
+    const clearEvent = {
+      type: "agent.context_saturation_changed",
+      sequence: 2,
+      timestamp: "2026-06-05T12:01:00.000Z",
+      payload: {
+        agentId: "agent-pan-1615",
+      },
+    }
+
+    expect(decodeAgentContextSaturationChangedEvent(setEvent)).toEqual(setEvent)
+    expect(decodeDomainEvent(setEvent)).toEqual(setEvent)
+    expect(decodeAgentContextSaturationChangedEvent(clearEvent)).toEqual(clearEvent)
+    expect(decodeDomainEvent(clearEvent)).toEqual(clearEvent)
+  })
+})
 
 describe("OperatorInterventionEvent", () => {
   it.each(operatorInterventionKinds)("decodes %s interventions", (kind) => {

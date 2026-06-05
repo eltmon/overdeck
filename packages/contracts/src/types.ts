@@ -242,6 +242,8 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   resolutionUpdatedAt: Schema.optional(Schema.String),
   // For specialists: the issue currently being processed.
   currentIssue: Schema.optional(IssueId),
+  // Set while the agent's recent terminal tail shows a hard context-window overflow.
+  contextSaturatedAt: Schema.optional(Schema.String),
   updatedAtSequence: SequenceNumber,              // event sequence that produced this snapshot
 })
 export type AgentRuntimeSnapshot = typeof AgentRuntimeSnapshot.Type
