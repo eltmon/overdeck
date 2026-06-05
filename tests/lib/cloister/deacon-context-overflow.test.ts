@@ -28,6 +28,8 @@ const mockMarkWorkspaceStuck = vi.fn();
 const mockEmitActivityEntry = vi.fn();
 const mockGetAgentRuntimeState = vi.fn();
 const mockSaveAgentRuntimeState = vi.fn();
+const mockGetAgentState = vi.fn();
+const mockComputeContextUsage = vi.fn();
 
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
@@ -63,6 +65,10 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityDetailedSync: vi.fn(),
 }));
 
+vi.mock('../../../src/dashboard/server/services/conversation-service.js', () => ({
+  computeContextUsage: (...args: unknown[]) => mockComputeContextUsage(...args),
+}));
+
 // Stub heavy transitive dependencies that deacon imports at module level.
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
@@ -81,8 +87,8 @@ vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
-  getAgentState: vi.fn().mockReturnValue(null),
-  getAgentStateSync: vi.fn().mockReturnValue(null),
+  getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
+  getAgentStateSync: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
 }));
@@ -104,6 +110,7 @@ function pane(...lines: string[]): string {
 describe('checkApiErrorAgents — context-window overflow recovery', () => {
   let checkApiErrorAgents: () => Promise<string[]>;
   let contextOverflowRecoveryState: Map<string, { lastAttempt: number; compactAttempts: number; clearAttempts: number; phase: 'compact' | 'clear' }>;
+  let contextProactiveCompactState: Map<string, { lastAttempt: number }>;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -115,11 +122,15 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockEmitActivityEntry.mockReset();
     mockGetAgentRuntimeState.mockReset().mockReturnValue(null);
     mockSaveAgentRuntimeState.mockReset().mockResolvedValue(undefined);
+    mockGetAgentState.mockReset().mockReturnValue(null);
+    mockComputeContextUsage.mockReset().mockResolvedValue(null);
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkApiErrorAgents = mod.checkApiErrorAgents;
     contextOverflowRecoveryState = mod.contextOverflowRecoveryState;
+    contextProactiveCompactState = mod.contextProactiveCompactState;
     contextOverflowRecoveryState.clear();
+    contextProactiveCompactState.clear();
   });
 
   it('(a) detects overflow at an idle prompt → sends /compact and records attempt 1', async () => {
@@ -248,5 +259,94 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(mockSendKeys).not.toHaveBeenCalled();
     expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
     expect(contextOverflowRecoveryState.has(SESSION)).toBe(false);
+  });
+
+  it('proactively compacts an idle agent above the context high-water mark', async () => {
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: 'session-123',
+    });
+    mockGetAgentState.mockReturnValue({
+      id: SESSION,
+      issueId: ISSUE,
+      workspace: '/workspace/pan-9001',
+      model: 'gpt-5.5',
+      status: 'running',
+    });
+    mockComputeContextUsage.mockResolvedValue({ percentUsed: 86, contextWindow: 200_000, estimatedTokens: 172_000 });
+    mockCapturePane.mockResolvedValue(pane('all good', 'idle'));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+    expect(contextProactiveCompactState.has(SESSION)).toBe(true);
+    expect(actions.some(a => /86%/.test(a))).toBe(true);
+  });
+
+  it('does not proactively compact below the context high-water mark', async () => {
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: 'session-123',
+    });
+    mockGetAgentState.mockReturnValue({
+      id: SESSION,
+      issueId: ISSUE,
+      workspace: '/workspace/pan-9001',
+      model: 'gpt-5.5',
+      status: 'running',
+    });
+    mockComputeContextUsage.mockResolvedValue({ percentUsed: 84, contextWindow: 200_000, estimatedTokens: 168_000 });
+    mockCapturePane.mockResolvedValue(pane('all good', 'idle'));
+
+    await checkApiErrorAgents();
+
+    expect(mockSendKeys).not.toHaveBeenCalled();
+    expect(contextProactiveCompactState.has(SESSION)).toBe(false);
+  });
+
+  it('does not run the proactive trigger for an already-overflowing agent', async () => {
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: 'session-123',
+    });
+    mockGetAgentState.mockReturnValue({
+      id: SESSION,
+      issueId: ISSUE,
+      workspace: '/workspace/pan-9001',
+      model: 'gpt-5.5',
+      status: 'running',
+    });
+    mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+
+    await checkApiErrorAgents();
+
+    expect(mockComputeContextUsage).not.toHaveBeenCalled();
+    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+  });
+
+  it('does not proactively compact within the cooldown window', async () => {
+    contextProactiveCompactState.set(SESSION, { lastAttempt: Date.now() - 1_000 });
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: 'session-123',
+    });
+    mockGetAgentState.mockReturnValue({
+      id: SESSION,
+      issueId: ISSUE,
+      workspace: '/workspace/pan-9001',
+      model: 'gpt-5.5',
+      status: 'running',
+    });
+    mockComputeContextUsage.mockResolvedValue({ percentUsed: 99, contextWindow: 200_000, estimatedTokens: 198_000 });
+    mockCapturePane.mockResolvedValue(pane('all good', 'idle'));
+
+    await checkApiErrorAgents();
+
+    expect(mockComputeContextUsage).not.toHaveBeenCalled();
+    expect(mockSendKeys).not.toHaveBeenCalled();
   });
 });

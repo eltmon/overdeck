@@ -124,7 +124,7 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 /** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
 export { GitError, ProcessTimeoutError };
 
-import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
+import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
@@ -158,6 +158,7 @@ import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { computeContextUsage } from '../../dashboard/server/services/conversation-service.js';
 
 // ============================================================================
 // Configuration
@@ -764,6 +765,10 @@ const CONTEXT_OVERFLOW_CONTINUE_MSG =
 /** Let `/compact` finish (and the agent return to an idle prompt) before judging the result. */
 const CONTEXT_COMPACT_SETTLE_MS = 60_000;
 
+export const CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT = 85;
+const CONTEXT_PROACTIVE_COMPACT_COOLDOWN_MS = 30 * 60_000;
+const CONTEXT_PROACTIVE_IDLE_STALE_MS = 5 * 60_000;
+
 /** Give /clear one settled chance before escalating to stuck. */
 const MAX_CONTEXT_CLEAR_ATTEMPTS = 1;
 
@@ -783,6 +788,37 @@ type ContextOverflowRecovery = {
  * apiErrorRecoveryState so the transient-error path is untouched.
  */
 export const contextOverflowRecoveryState: Map<string, ContextOverflowRecovery> = new Map();
+export const contextProactiveCompactState: Map<string, { lastAttempt: number }> = new Map();
+
+async function maybeProactivelyCompactContext(sessionName: string, now: number): Promise<string | null> {
+  if (!sessionName.startsWith('agent-')) return null;
+  const cooldown = contextProactiveCompactState.get(sessionName);
+  if (cooldown && (now - cooldown.lastAttempt) < CONTEXT_PROACTIVE_COMPACT_COOLDOWN_MS) return null;
+  if (!isAgentIdleForNudge(sessionName, CONTEXT_PROACTIVE_IDLE_STALE_MS, now)) return null;
+
+  const agentState = getAgentStateSync(sessionName);
+  const runtimeState = getAgentRuntimeStateSync(sessionName);
+  const sessionId = agentState?.sessionId ?? runtimeState?.claudeSessionId;
+  if (!agentState?.workspace || !sessionId || !agentState.model) return null;
+
+  let usage: Awaited<ReturnType<typeof computeContextUsage>> | null = null;
+  try {
+    usage = await computeContextUsage(sessionFilePath(agentState.workspace, sessionId), agentState.model);
+  } catch {
+    return null;
+  }
+  if (!usage || usage.percentUsed < CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) return null;
+
+  await Effect.runPromise(sendKeys(sessionName, '/compact'));
+  contextProactiveCompactState.set(sessionName, { lastAttempt: now });
+  emitActivityEntrySync({
+    source: 'cloister',
+    level: 'warn',
+    message: `${sessionName} context window ${Math.round(usage.percentUsed)}% full — proactively compacting before the hard ceiling`,
+    issueId: agentState.issueId,
+  });
+  return `Context high-water recovery: compacting ${sessionName} at ${Math.round(usage.percentUsed)}%`;
+}
 
 /**
  * Check for agents (work agents, specialists, planning) that stopped due
@@ -947,6 +983,14 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             console.error(`[deacon] Failed to send /compact to ${sessionName}:`, err);
           }
           continue;
+        }
+
+        if (!ov && !hasOverflow) {
+          const proactiveAction = await maybeProactivelyCompactContext(sessionName, now);
+          if (proactiveAction) {
+            actions.push(proactiveAction);
+            continue;
+          }
         }
       }
     }
