@@ -109,12 +109,17 @@ describe('initCodexHome', () => {
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
   })
 
-  it('writes config.toml with approval policy', () => {
+  it('writes config.toml with flat top-level Codex keys', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-02')
     initCodexHome(codexDir)
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
-    expect(config).toContain('policy = "never"')
+    // approval_policy is a flat top-level string, not an [approval] table.
+    expect(config).toContain('approval_policy = "never"')
+    // No TOML table sections — Codex deserializes these keys as scalars, and a
+    // `[model]` table breaks config load with "invalid type: map, expected a
+    // string in `model`" (PAN-1574 regression).
+    expect(config).not.toMatch(/^\[(model|approval|notify)\]/m)
   })
 
   it('is idempotent — does not overwrite existing config', () => {

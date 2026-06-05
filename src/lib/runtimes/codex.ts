@@ -153,24 +153,23 @@ export function initCodexHome(codexHomeDir: string): void {
   if (!existsSync(configPath)) {
     // Minimal config — approval_policy=never so the agent never prompts.
     // The notify shim writes heartbeat.json on agent-turn-complete (D-5).
+    // Codex config keys are flat top-level scalars, NOT TOML table sections:
+    // `model`/`approval_policy` are strings and `notify` is a single argv
+    // array. model/provider is set at launch via the -m flag, so it is omitted
+    // here. (Writing `[model]` as a table makes Codex fail config load with
+    // "invalid type: map, expected a string in `model`".)
     const notifyHookPath = join(homedir(), '.panopticon', 'bin', 'codex-notify-hook')
-    const notifyCmds = existsSync(notifyHookPath)
-      ? `[["node", "${notifyHookPath}"]]`
-      : '[]'
-    const config = [
+    const lines = [
       '# Panopticon-managed Codex config — do not edit manually',
-      '',
-      '[model]',
       '# model/provider set at launch via -m flag',
       '',
-      '[approval]',
-      'policy = "never"',
-      '',
-      '[notify]',
-      `cmds = ${notifyCmds}`,
-      '',
-    ].join('\n')
-    writeFileSync(configPath, config, { mode: 0o600 })
+      'approval_policy = "never"',
+    ]
+    if (existsSync(notifyHookPath)) {
+      lines.push(`notify = ["node", "${notifyHookPath}"]`)
+    }
+    lines.push('')
+    writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
   }
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
