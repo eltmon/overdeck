@@ -45,8 +45,7 @@ projects:
       unit:
         type: vitest
         path: .
-        command: npx vitest run --no-file-parallelism && cd src/dashboard/frontend &&
-          npm test
+        command: npx vitest run --no-file-parallelism && cd src/dashboard/frontend && npm test
       e2e:
         type: vitest
         path: .
@@ -79,14 +78,13 @@ projects:
         command: npm run build
         required: true
       test:
-        # PAN-666 changed-file scoping (`npx vitest run --changed {{CHANGED_BASE}}
-        # && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}`)
-        # is committed in the repo's tracked .panopticon/projects.yaml. Activate it
-        # here only AFTER `pan reload` rebuilds the dashboard with the new gate
-        # code (585e8fe39) — the running build does not yet substitute {{...}}
-        # placeholders into gate commands, so adopting it before the rebuild would
-        # pass the literal token to vitest --changed and fail the gate.
-        command: npm test -- --run
+        # PAN-666: scope to files changed since the target branch so a feature
+        # agent is never blocked by pre-existing failures in code it did not
+        # touch. {{CHANGED_BASE}} is injected by the verification gate as
+        # origin/<target-branch>; vitest --changed walks the import graph and runs
+        # only tests affected by the PR's diff. Pre-existing rot in unmodified
+        # files is skipped (and logged by the gate).
+        command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
         required: true
   mind-your-now:
     name: mind-your-now
@@ -178,8 +176,7 @@ projects:
       migration-validation:
         type: maven
         path: api
-        command: ./mvnw test -Dtest=FlywayMigrationValidationTest
-          -Dtestcontainers.reuse.enable=true
+        command: ./mvnw test -Dtest=FlywayMigrationValidationTest -Dtestcontainers.reuse.enable=true
       frontend-unit:
         type: vitest
         path: fe
@@ -359,25 +356,3 @@ projects:
       type: standalone
       workspaces_dir: workspaces
       default_branch: main
-  eltmon-video:
-    name: eltmon-video
-    path: /home/eltmon/Projects/eltmon-video
-    issue_prefix: ELV
-    workspace:
-      type: standalone
-      workspaces_dir: workspaces
-      default_branch: main
-  tindra:
-    name: tindra
-    path: /home/eltmon/Projects/tindra
-    issue_prefix: TIN
-    linear_team: TIN
-    workspace:
-      type: standalone
-      workspaces_dir: workspaces
-      default_branch: main
-    tests:
-      unit:
-        type: vitest
-        path: .
-        command: npm test -- --run
