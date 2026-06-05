@@ -750,6 +750,13 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  /**
+   * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
+   * undefined = legacy/pre-feature agent or non-applicable role;
+   * false = spawned but kickoff delivery not yet confirmed;
+   * true = kickoff delivery confirmed.
+   */
+  kickoffDelivered?: boolean;
   stoppedAt?: string;
   /** True when markAgentStopped was called (user-initiated stop). Cleared on
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
@@ -832,6 +839,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
+    kickoffDelivered: raw.kickoffDelivered,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
     stoppedByPause: raw.stoppedByPause,
