@@ -159,12 +159,18 @@ import { autoResumeStoppedWorkAgents } from '../deacon.js';
 import { getAgentStateSync, getAgentState, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
+import { existsSync } from 'fs';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
+const mockExistsSync = existsSync as any;
+
+// Default existsSync behaviour mirrors the module mock: no completed markers present.
+const noCompletedMarkers = (path: string) =>
+  !path.endsWith('/completed') && !path.endsWith('/completed.processed');
 
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   beforeEach(() => {
@@ -191,6 +197,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     } as any);
     mockGetShadowState.mockResolvedValue(null);
     mockResumeAgent.mockResolvedValue({ success: true } as any);
+    mockExistsSync.mockImplementation(noCompletedMarkers);
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {
@@ -209,7 +216,9 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
-  it('does not auto-resume a deliberately stopped agent even when review feedback is pending', async () => {
+  it('does not auto-resume a deliberately killed agent (no completed marker) even when review feedback is pending', async () => {
+    // `pan kill` mid-work: stoppedByUser=true but the agent never reached `pan done`,
+    // so there is no completed marker. The user's stop must stand.
     mockGetAgentState.mockReturnValue({
       id: 'agent-pan-871',
       issueId: 'PAN-871',
@@ -226,6 +235,32 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
     expect(resumed).toEqual([]);
     expect(mockResumeAgent).not.toHaveBeenCalled();
+  });
+
+  it('auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)', async () => {
+    // `pan done` stamps both a completed.processed marker AND stoppedByUser=true.
+    // When the review later lands blocked and the agent's tmux session has been
+    // reaped, the deacon must resume it to address the feedback — the deliberate-stop
+    // gate must not wedge a done-handoff agent forever.
+    mockExistsSync.mockImplementation(
+      (path: string) => path.endsWith('/completed.processed') || noCompletedMarkers(path),
+    );
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      stoppedByUser: true,
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual(['agent-pan-871']);
+    expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
   });
 
   it('still auto-resumes an open issue with pending review feedback when not deliberately stopped', async () => {

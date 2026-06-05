@@ -5426,7 +5426,12 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     // review or test found issues that need fixing (blocked / failed).
     const completedFile = join(getAgentDir(agentId), 'completed');
     const processedFile = join(getAgentDir(agentId), 'completed.processed');
-    if (existsSync(completedFile) || existsSync(processedFile)) {
+    // A completed marker means the agent reached `pan done` and handed off to the
+    // review pipeline (as opposed to being killed mid-work). `pan done` also stamps
+    // stoppedByUser=true, so this flag is the discriminator the deliberate-stop gate
+    // below uses to tell a done-handoff apart from a genuine `pan kill` (PAN-1614).
+    const handedOffViaDone = existsSync(completedFile) || existsSync(processedFile);
+    if (handedOffViaDone) {
       const review = getReviewStatusSync(state.issueId);
       const needsFix =
         review?.reviewStatus === 'blocked' ||
@@ -5476,12 +5481,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    const deliberatelyStopped = state.stoppedByUser === true;
-    if (deliberatelyStopped) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
-      continue;
-    }
-
     // Resume agents with pending review feedback regardless of why they stopped.
     // Review/test/verification failures mean the specialist pipeline needs the
     // agent to fix issues — auto-resume must NOT block on runtime.state here.
@@ -5490,6 +5489,21 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       review?.reviewStatus === 'failed' ||
       review?.testStatus === 'failed' ||
       review?.verificationStatus === 'failed';
+
+    // PAN-1614: `pan done` (handoff) and `pan kill` both stamp stoppedByUser=true.
+    // When a review lands blocked/failed AFTER the work agent handed off via done,
+    // the agent must be resumed to fix it — but if its tmux session was later reaped,
+    // the stoppedByUser gate would wedge it forever (checkDeadEndAgents can't nudge a
+    // dead session either). Exempt the deliberate-stop gate ONLY for a done-handoff
+    // (completed marker present) carrying pending review feedback — that preserves the
+    // genuine `pan kill` case (no completed marker), where the user's stop stands.
+    // The stronger gates (paused, troubled, closed, merged) still hold regardless.
+    const deliberatelyStopped = state.stoppedByUser === true;
+    if (deliberatelyStopped && !(handedOffViaDone && hasPendingReviewFeedback)) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
+      continue;
+    }
+
     if (hasPendingReviewFeedback) {
       logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
     } else {
