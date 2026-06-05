@@ -12,6 +12,7 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
@@ -117,6 +118,12 @@ console.log('[panopticon] AgentEnrichmentService started');
 // so DrawerActiveAgent and other consumers receive live stream excerpts.
 startAgentOutputService();
 console.log('[panopticon] AgentOutputService started');
+
+// Start merge-blocker reconcile poller (PAN-1620) — proactively refreshes GitHub
+// mergeability for readyForMerge PRs so a stale/conflicting one drops out of the
+// Awaiting-Merge queue (and its live MERGE button) before any click.
+startMergeBlockerReconcileService();
+console.log('[panopticon] MergeBlockerReconcileService started');
 
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.

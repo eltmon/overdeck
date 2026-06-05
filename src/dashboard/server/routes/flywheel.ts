@@ -41,6 +41,7 @@ import {
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
+import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
@@ -564,6 +565,40 @@ const getAutoMergeProblemsRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * Issues that passed review but are blocked from merging by a GitHub-native
+ * reason (conflict, failing CI, not mergeable). PAN-1620: the flywheel polls
+ * this per tick and dispatches a rebase fix so a blocked PR does not sit forever
+ * waiting on a webhook that may never fire — distinct from auto-merge *scheduling*
+ * problems, which live in /auto-merge/problems.
+ */
+const MERGE_BLOCKER_TYPES = new Set(['merge_conflict', 'failing_checks', 'not_mergeable']);
+
+export function getMergeBlockersPayload(): Array<{
+  issueId: string;
+  prUrl?: string;
+  reasons: Array<{ type: string; summary: string }>;
+}> {
+  const statuses = getAllReviewStatusesFromDb();
+  const out: Array<{ issueId: string; prUrl?: string; reasons: Array<{ type: string; summary: string }> }> = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.reviewStatus !== 'passed') continue;
+    if (status.mergeStatus === 'merged') continue;
+    const reasons = (status.blockerReasons ?? []).filter((b) => MERGE_BLOCKER_TYPES.has(b.type));
+    if (reasons.length === 0) continue;
+    out.push({ issueId, prUrl: status.prUrl, reasons: reasons.map((b) => ({ type: b.type, summary: b.summary })) });
+  }
+  return out;
+}
+
+const getMergeBlockersRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/merge-blockers',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getMergeBlockersPayload());
+  })),
+);
+
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -819,6 +854,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
+  getMergeBlockersRoute,
   postAutoMergeScheduleRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,

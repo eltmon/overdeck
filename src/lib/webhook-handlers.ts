@@ -193,7 +193,7 @@ function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumbe
   reconciliationTimeouts.set(issueId, timeout);
 }
 
-async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
+export async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
   try {
     const { execFile } = await import('child_process');
     const { promisify } = await import('util');
