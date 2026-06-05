@@ -1503,11 +1503,11 @@ async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, 
   await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
   const failedState = await Effect.runPromise(getAgentState(state.id));
   if (failedState) {
-    failedState.status = 'error';
+    failedState.status = 'running';
     failedState.kickoffDelivered = false;
     await Effect.runPromise(saveAgentState(failedState));
   }
-  state.status = 'error';
+  state.status = 'running';
   state.kickoffDelivered = false;
   emitActivityEntrySync({
     source,
