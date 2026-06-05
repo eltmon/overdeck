@@ -130,6 +130,7 @@ import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { REVIEW_SUB_ROLES } from './review-monitor.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1598,6 +1599,35 @@ const testStackRebuildState: Map<string, { lastAttempt: number; attempts: number
   new Map();
 const TEST_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const TEST_STACK_REBUILD_MAX_ATTEMPTS = 3;
+
+export interface ReviewConvoyLiveness {
+  anyLive: boolean;
+  anyGated: boolean;
+  agentIds: string[];
+}
+
+export function reviewConvoyLiveness(issueId: string): ReviewConvoyLiveness {
+  const normalizedIssueId = issueId.toLowerCase();
+  const agentIds = [
+    `agent-${normalizedIssueId}`,
+    `agent-${normalizedIssueId}-review`,
+    ...REVIEW_SUB_ROLES.map((subRole) => `agent-${normalizedIssueId}-review-${subRole}`),
+  ];
+
+  let anyLive = false;
+  let anyGated = false;
+
+  for (const agentId of agentIds) {
+    const agentState = getAgentStateSync(agentId);
+    if (!agentState) {
+      continue;
+    }
+    anyLive ||= agentState.status === 'running' || agentState.status === 'starting';
+    anyGated ||= agentState.paused === true || agentState.troubled === true;
+  }
+
+  return { anyLive, anyGated, agentIds };
+}
 
 /**
  * Outcome of an orphan-test stack-health recovery attempt:
