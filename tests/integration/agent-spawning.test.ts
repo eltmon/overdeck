@@ -22,6 +22,7 @@ import {
   spawnAgent,
   spawnRun,
   getAgentStateSync,
+  resumeAgent,
   type SpawnOptions,
   getAgentDir,
 } from '../../src/lib/agents.js';
@@ -215,6 +216,29 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     }
   });
 
+  function writeResumableWorkAgent(agentId: string, kickoffDelivered: boolean | undefined, withPrompt = true): string {
+    const workspace = join(testPanopticonHome, `${agentId}-workspace`);
+    mkdirSync(workspace, { recursive: true });
+    const agentDir = getAgentDir(agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'session.id'), `${agentId}-session`);
+    if (withPrompt) {
+      writeFileSync(join(agentDir, 'initial-prompt.md'), `original kickoff for ${agentId}`);
+    }
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-RESUME',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: DEFAULT_WORKHORSES.mid,
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      ...(kickoffDelivered === undefined ? {} : { kickoffDelivered }),
+    }));
+    return workspace;
+  }
+
   describe('work role (spawnAgent)', () => {
     it('writes role: "work" to AgentState and resolves the work model from roles config', async () => {
       const options: SpawnOptions = {
@@ -300,6 +324,45 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('resumeAgent re-delivers the original kickoff when kickoffDelivered is false', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-redeliver';
+      writeResumableWorkAgent(agentId, false);
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining(`original kickoff for ${agentId}`));
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+      expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
+    });
+
+    it('resumeAgent keeps generic continue behavior when kickoffDelivered is true', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-confirmed';
+      writeResumableWorkAgent(agentId, true);
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining(`original kickoff for ${agentId}`));
+      expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
+    });
+
+    it('resumeAgent surfaces missing original kickoff instead of sending a contextless continue', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-missing-kickoff';
+      writeResumableWorkAgent(agentId, false, false);
+
+      const result = await resumeAgent(agentId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('kickoff prompt missing');
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+      expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(false);
     });
 
     it('honours an explicit options.model over the role config default', async () => {
