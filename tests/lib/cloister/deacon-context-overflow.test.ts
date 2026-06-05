@@ -28,8 +28,11 @@ const mockMarkWorkspaceStuck = vi.fn();
 const mockEmitActivityEntry = vi.fn();
 const mockGetAgentRuntimeState = vi.fn();
 const mockSaveAgentRuntimeState = vi.fn();
+<<<<<<< HEAD
 const mockGetAgentState = vi.fn();
 const mockComputeContextUsage = vi.fn();
+=======
+>>>>>>> cec6be03c (feat(agents): persist context saturation marker)
 
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
@@ -122,8 +125,11 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockEmitActivityEntry.mockReset();
     mockGetAgentRuntimeState.mockReset().mockReturnValue(null);
     mockSaveAgentRuntimeState.mockReset().mockResolvedValue(undefined);
+<<<<<<< HEAD
     mockGetAgentState.mockReset().mockReturnValue(null);
     mockComputeContextUsage.mockReset().mockResolvedValue(null);
+=======
+>>>>>>> cec6be03c (feat(agents): persist context saturation marker)
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkApiErrorAgents = mod.checkApiErrorAgents;
@@ -168,7 +174,10 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     await checkApiErrorAgents();
 
     expect(mockSaveAgentRuntimeState).not.toHaveBeenCalled();
+<<<<<<< HEAD
     expect(mockEmitActivityEntry.mock.calls.some(([entry]) => entry.message?.includes('marked wedged'))).toBe(false);
+=======
+>>>>>>> cec6be03c (feat(agents): persist context saturation marker)
     expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
   });
 

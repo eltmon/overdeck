@@ -1967,12 +1967,33 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
   }
 
   if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+<<<<<<< HEAD
     await patchRuntimeJson(agentId, patch);
+=======
+>>>>>>> cec6be03c (feat(agents): persist context saturation marker)
     await Effect.runPromise(emitAgentEvent(agentId, {
       kind: 'context_saturation_changed',
       contextSaturatedAt: patch.contextSaturatedAt,
     }));
   }
+<<<<<<< HEAD
+=======
+}
+
+export async function setAgentContextSaturatedAt(agentId: string, detectedAt = new Date().toISOString()): Promise<string> {
+  const existing = getAgentRuntimeStateSync(agentId)?.contextSaturatedAt;
+  const contextSaturatedAt = existing ?? detectedAt;
+  if (!existing) {
+    await saveAgentRuntimeState(agentId, { contextSaturatedAt });
+  }
+  return contextSaturatedAt;
+}
+
+export async function clearAgentContextSaturatedAt(agentId: string): Promise<void> {
+  if (getAgentRuntimeStateSync(agentId)?.contextSaturatedAt) {
+    await saveAgentRuntimeState(agentId, { contextSaturatedAt: undefined });
+  }
+>>>>>>> cec6be03c (feat(agents): persist context saturation marker)
 }
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
