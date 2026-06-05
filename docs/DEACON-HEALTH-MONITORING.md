@@ -13,6 +13,8 @@ The Deacon is Panopticon's health monitor, running as part of the dashboard serv
 | **Parallel Review Re-dispatch** | Review got stuck in `reviewing`/`testing` after dispatch | `recoveryStartedAt` cutoff | Re-dispatch parallel-review specialists | 3 before breaker trips (PAN-794) |
 | **Orphaned Agents** | status=running but no tmux session | Immediate | Reset to stopped | N/A |
 | **Dead Planning Sessions** | Planning tmux with remain-on-exit, process dead | Immediate | Kill session + reset | N/A |
+| **Context-Window Wedged** | Recent terminal tail shows `input exceeds the context window` 400 | Immediate | Mark `wedged`, `/compact` → `/clear` + reseed → stuck | 1 clear tier |
+| **Context High-Water** | Idle work agent reaches ≥85% of effective context window | Immediate | Proactive `/compact` before the hard ceiling | Cooldown-guarded |
 | **Specialist Timeout** | Specialist active >15 min without completing | 15 min | Force-kill | N/A |
 | **Merge-Ready Reminder** | Issue readyForMerge for >1 hour, human hasn't clicked MERGE | 1 hour | Dashboard notification | 3 reminders |
 | **Deleted Workspaces** | readyForMerge=true but workspace directory gone | Immediate | Clear readyForMerge | N/A |
@@ -51,6 +53,17 @@ The Deacon is Panopticon's health monitor, running as part of the dashboard serv
   - `stuck` with count ≥ 3 → send poke message
   - `working`, `completed`, `needs_input`, `unclear` → skip
 
+### Context-Window Wedged Recovery (`checkApiErrorAgents`)
+- **File:** `src/lib/cloister/deacon.ts`
+- **Detection:** The deacon inspects only the recent terminal tail (last ~40 lines) for the hard 400 context-overflow strings. Stale scrollback outside that tail does not count.
+- **Marker:** On first detection, the deacon emits an activity-feed event and sets `contextSaturatedAt` on the runtime snapshot. The marker clears automatically as soon as the recent tail no longer shows the overflow.
+- **Health:** Dashboard health and Cloister health report marked agents as `wedged`/non-healthy even when `lastActivity` is recent. Wedged agents need attention, but the regular idle poke/kill ladder does not own their recovery.
+- **Recovery ladder:**
+  1. Send `/compact` first. This preserves conversation context when the agent is still under the hard ceiling.
+  2. If the settled terminal tail still overflows, send `/clear`, then a transcript-free reseed nudge that tells the agent to reconstruct from `.pan/continue.json`, Beads (`bd ready`, `bd show <id>`), and `git status`/`git diff`.
+  3. If the overflow persists after the `/clear` tier settles, call `markWorkspaceStuck(issueId, 'context_overflow', ...)`.
+- **Proactive trigger:** For idle work agents below the hard overflow state, the deacon computes current JSONL context usage and sends one cooldown-guarded `/compact` at the 85% high-water mark. This prevents the wedge instead of waiting for the 400.
+
 ### Orphaned Agents (`recoverOrphanedAgents`)
 - **File:** `src/lib/cloister/deacon.ts:2362-2395`
 - **Runs:** Every patrol cycle + on startup
@@ -76,6 +89,7 @@ Computed from `lastActivity` timestamp:
 | `healthy` | < 15 min | Agent actively working |
 | `warning` | 15-30 min | Agent may be idle or slow |
 | `stuck` | > 30 min | Agent hasn't done anything — needs attention |
+| `wedged` | `contextSaturatedAt` marker present | Agent hit the model context ceiling; deacon context recovery is in progress |
 | `dead` | No tmux session | Crashed or cleaned up |
 
 **Source:** `src/dashboard/lib/health-filtering.ts:41-124`

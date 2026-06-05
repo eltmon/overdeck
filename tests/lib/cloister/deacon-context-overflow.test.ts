@@ -146,6 +146,13 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(contextOverflowRecoveryState.get(SESSION)?.compactAttempts).toBe(1);
     expect(actions.some(a => /compacting/.test(a))).toBe(true);
     expect(mockEmitActivityEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        issueId: ISSUE,
+        message: expect.stringContaining('marked wedged'),
+      }),
+    );
+    expect(mockEmitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', issueId: ISSUE }),
     );
   });
@@ -161,6 +168,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     await checkApiErrorAgents();
 
     expect(mockSaveAgentRuntimeState).not.toHaveBeenCalled();
+    expect(mockEmitActivityEntry.mock.calls.some(([entry]) => entry.message?.includes('marked wedged'))).toBe(false);
     expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
   });
 

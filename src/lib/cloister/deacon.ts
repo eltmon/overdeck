@@ -887,6 +887,12 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       if (hasOverflow) {
         if (!runtimeState?.contextSaturatedAt) {
           await saveAgentRuntimeState(sessionName, { contextSaturatedAt: new Date(now).toISOString() });
+          emitActivityEntrySync({
+            source: 'cloister',
+            level: 'warn',
+            message: `${sessionName} marked wedged: context-window overflow detected`,
+            issueId: issueId ?? undefined,
+          });
         }
       } else if (runtimeState?.contextSaturatedAt) {
         await saveAgentRuntimeState(sessionName, { contextSaturatedAt: undefined });
