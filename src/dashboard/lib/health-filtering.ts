@@ -42,6 +42,7 @@ export const determineHealthStatus = (
   Effect.gen(function* () {
     let agentStatus: string | undefined;
     let lastActivity: Date | null = null;
+    let contextSaturatedAt: string | undefined;
 
     if (!existsSync(stateFile)) return null;
 
@@ -71,6 +72,9 @@ export const determineHealthStatus = (
           lastActivity = runtimeDate;
         }
       }
+      if (runtime?.contextSaturatedAt) {
+        contextSaturatedAt = runtime.contextSaturatedAt;
+      }
     }
 
     const alive = liveSessions.has(agentId);
@@ -86,6 +90,13 @@ export const determineHealthStatus = (
         return null;
       }
       return { status: 'dead', reason: 'Agent crashed unexpectedly' };
+    }
+
+    if (contextSaturatedAt) {
+      return {
+        status: 'wedged',
+        reason: 'Context window exhausted (400) — recovery in progress',
+      };
     }
 
     if (lastActivity) {
