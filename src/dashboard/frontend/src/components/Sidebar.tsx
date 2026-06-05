@@ -571,6 +571,18 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 </button>
                 <div className="ml-auto flex items-center gap-1">
                   {/* Deacon Freeze/Resume moved to the top app bar (PAN-1607). */}
+                  <button
+                    onClick={() => onTabChange('settings')}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      activeTab === 'settings'
+                        ? 'text-foreground bg-accent'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`}
+                    title="Settings"
+                    data-testid="sidebar-settings-pinned"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
                   {isDev && (
                     <button
                       onClick={() => rebuildMutation.mutate()}
@@ -622,6 +634,18 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               }`}>
                 {isDev ? 'DEV' : 'PROD'}
               </span>
+              <button
+                onClick={() => onTabChange('settings')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  activeTab === 'settings'
+                    ? 'text-foreground bg-accent'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                }`}
+                title="Settings"
+                data-testid="sidebar-settings-pinned"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
               {isDev && (
                 <button
                   onClick={() => rebuildMutation.mutate()}
