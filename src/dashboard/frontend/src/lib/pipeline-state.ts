@@ -79,7 +79,7 @@ export function isAgentRunningStatus(status?: Agent['status'] | null): boolean {
 }
 
 export function isAgentProblemStatus(status?: Agent['status'] | null): boolean {
-  return status === 'stuck' || status === 'failed' || status === 'error' || status === 'unknown';
+  return status === 'stuck' || status === 'stalled' || status === 'failed' || status === 'error' || status === 'unknown';
 }
 
 /**

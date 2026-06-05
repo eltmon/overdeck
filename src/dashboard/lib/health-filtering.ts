@@ -9,6 +9,8 @@ import { Effect } from 'effect';
 import { loadCloisterConfig } from '../../lib/cloister/config.js';
 import { capturePane, sessionExists } from '../../lib/tmux.js';
 
+const KICKOFF_STALL_GRACE_MS = 5 * 60 * 1000;
+
 /**
  * Check if agent tmux session is alive
  */
@@ -86,6 +88,17 @@ export const determineHealthStatus = (
         return null;
       }
       return { status: 'dead', reason: 'Agent crashed unexpectedly' };
+    }
+
+    const startedAtMs = typeof state.startedAt === 'string' ? Date.parse(state.startedAt) : Number.NaN;
+    if (
+      state.role === 'work' &&
+      agentStatus === 'running' &&
+      state.kickoffDelivered === false &&
+      Number.isFinite(startedAtMs) &&
+      Date.now() - startedAtMs > KICKOFF_STALL_GRACE_MS
+    ) {
+      return { status: 'stalled', reason: 'Work agent running with no kickoff delivered since spawn' };
     }
 
     if (lastActivity) {
