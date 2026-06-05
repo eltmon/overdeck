@@ -27,6 +27,7 @@ import {
   ProcessTimeoutError,
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
+import { isContextOverflowTail } from '../context-overflow.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -754,11 +755,6 @@ const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
  * window it can't determine for the proxied model, so it never fires and the
  * backend's own limit produces a hard 400 instead.
  */
-const CONTEXT_OVERFLOW_PATTERNS = [
-  'input exceeds the context window',
-  'exceeds the context window of this model',
-];
-
 /** Continuation nudge sent after a successful /compact. */
 const CONTEXT_OVERFLOW_CONTINUE_MSG =
   'Your context was compacted to recover from a context-window overflow. ' +
@@ -844,8 +840,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       // idle prompt when an agent stops, and after a /compact redraw the old
       // error scrolls past this window — so a settled /compact that cleared the
       // overflow won't be misread as "still overflowing" from stale scrollback.
-      const recentOutput = tmuxOutput.split('\n').slice(-40).join('\n');
-      const hasOverflow = CONTEXT_OVERFLOW_PATTERNS.some(p => recentOutput.includes(p));
+      const hasOverflow = isContextOverflowTail(tmuxOutput);
 
       if (!overflowBlocked) {
         if (ov && (now - ov.lastAttempt) < CONTEXT_COMPACT_SETTLE_MS) {
