@@ -62,6 +62,10 @@ vi.mock('../test-agent-queue.js', () => ({
   dispatchTestAgentAndNotify: vi.fn(async () => undefined),
 }));
 
+vi.mock('../issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
@@ -124,6 +128,7 @@ import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState } fro
 import { sessionExists, killSession } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
+import { isIssueClosed } from '../issue-closed.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -140,6 +145,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(getAgentState).mockResolvedValue(null);
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
+    vi.mocked(isIssueClosed).mockResolvedValue(false);
     mockHeadSha = 'newhead1';
   });
 
@@ -163,6 +169,24 @@ describe('reactive Cloister scheduler', () => {
       branch: 'feature/pan-503',
     }));
     expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'in_review',
+    'testing',
+    'shipping',
+  ] as const)('skips %s dispatch when the issue is closed', async (state) => {
+    vi.mocked(isIssueClosed).mockResolvedValue(true);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+
+    expect(isIssueClosed).toHaveBeenCalledWith('PAN-503');
+    expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(listRunningAgents).not.toHaveBeenCalled();
+    expect(getAgentState).not.toHaveBeenCalled();
+    expect(sessionExists).not.toHaveBeenCalled();
   });
 
   it('skips spawning when an active run already exists for the issue and role', async () => {
