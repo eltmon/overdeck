@@ -4,17 +4,17 @@
     "created": "2026-05-31T07:48:02Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1574: Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
-    "updated": "2026-06-02T13:18:59.242Z"
+    "updated": "2026-06-05T01:41:21.576Z"
   },
   "plan": {
     "id": "pan-1574",
     "title": "Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "74c6fa4c-897f-49d7-9f34-e9b4a443d1a0",
     "author": "agent:claude-opus-4-8",
-    "sequence": 104,
+    "sequence": 105,
     "created": "2026-05-31T07:48:02Z",
-    "updated": "2026-06-02T13:18:59.242Z",
+    "updated": "2026-06-05T01:41:21.576Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1574",
@@ -1233,5 +1233,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
