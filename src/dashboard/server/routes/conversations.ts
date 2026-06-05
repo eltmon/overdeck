@@ -1122,9 +1122,21 @@ export async function spawnConversationSession(
     } else if (harness === 'codex') {
       // Codex conversations run in TUI mode — bare `codex` interactive terminal.
       // Users type directly in the pane; dashboard messages arrive via tmux paste-buffer.
+      //
+      // Pre-seed the per-agent config so Codex never shows its first-run
+      // "Decide how much autonomy" / folder-trust wizard (which otherwise fires
+      // on every fresh CODEX_HOME and blocks the pane). Autonomy follows the
+      // global Panopticon yolo setting: bypass → never + danger-full-access,
+      // auto → on-request + workspace-write. This is the Codex analog of
+      // preTrustDirectory(cwd) below, which only pre-accepts Claude Code trust.
       const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
+      const codexYolo = resolvePermissionModeSync() === 'bypass';
       const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
-      initCodexHome(codexHome);
+      initCodexHome(codexHome, {
+        trustedDir: cwd,
+        approvalPolicy: codexYolo ? 'never' : 'on-request',
+        sandboxMode: codexYolo ? 'danger-full-access' : 'workspace-write',
+      });
       codexFields = {
         harness: 'codex',
         codexMode: 'tui',

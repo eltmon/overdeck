@@ -140,33 +140,59 @@ export class CodexSpawnTimeout extends Error {
 }
 
 /**
+ * Options for seeding the per-agent Codex config.
+ *   - trustedDir: pre-record `[projects."<dir>"] trust_level = "trusted"` so the
+ *     interactive TUI skips its first-run "Decide how much autonomy" / folder-
+ *     trust wizard. This is the exact artifact the wizard writes once accepted;
+ *     a fresh per-agent CODEX_HOME has no entry, so without this the wizard
+ *     fires on every conversation launch and blocks the pane.
+ *   - approvalPolicy / sandboxMode: autonomy for interactive conversations,
+ *     derived from the Panopticon yolo setting. Headless `codex exec` overrides
+ *     these via -c/-s flags at launch, so the defaults here only matter for TUI.
+ */
+export interface InitCodexHomeOpts {
+  trustedDir?: string
+  approvalPolicy?: string
+  sandboxMode?: string
+}
+
+/**
  * Create the per-agent CODEX_HOME directory layout:
  *   <codexHomeDir>/
- *     config.toml   — Codex settings (approval_policy, notify hooks)
+ *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
+ *                     trust, notify hooks)
  *     AGENTS.md     — Populated by context-layering bead; placeholder for now
  *     sessions/     — Codex writes rollout JSONL here
  */
-export function initCodexHome(codexHomeDir: string): void {
+export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
   mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
 
   const configPath = join(codexHomeDir, 'config.toml')
   if (!existsSync(configPath)) {
-    // Minimal config — approval_policy=never so the agent never prompts.
     // The notify shim writes heartbeat.json on agent-turn-complete (D-5).
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
-    // `model`/`approval_policy` are strings and `notify` is a single argv
-    // array. model/provider is set at launch via the -m flag, so it is omitted
-    // here. (Writing `[model]` as a table makes Codex fail config load with
-    // "invalid type: map, expected a string in `model`".)
+    // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a
+    // single argv array. model/provider is set at launch via the -m flag, so it
+    // is omitted here. (Writing `[model]` as a table makes Codex fail config
+    // load with "invalid type: map, expected a string in `model`".)
     const notifyHookPath = join(homedir(), '.panopticon', 'bin', 'codex-notify-hook')
     const lines = [
       '# Panopticon-managed Codex config — do not edit manually',
       '# model/provider set at launch via -m flag',
       '',
-      'approval_policy = "never"',
+      `approval_policy = "${opts.approvalPolicy ?? 'never'}"`,
     ]
+    if (opts.sandboxMode) {
+      lines.push(`sandbox_mode = "${opts.sandboxMode}"`)
+    }
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)
+    }
+    if (opts.trustedDir) {
+      // Pre-seed folder trust so the TUI skips its first-run autonomy wizard.
+      // TOML basic-string key: escape backslashes and double-quotes in the path.
+      const escaped = opts.trustedDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
