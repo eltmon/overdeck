@@ -157,7 +157,7 @@ describe('orphan proposed spec reconciler', () => {
     expect(spawnWorkAgent).toHaveBeenCalledTimes(1);
   });
 
-  it('emits structured reconciler activity metadata for scan and spawn lifecycle', async () => {
+  it('surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3151', 'proposed');
@@ -177,28 +177,45 @@ describe('orphan proposed spec reconciler', () => {
       ...event,
       details: JSON.parse(String(event.details)),
     }));
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        issueId: 'ALL',
-        message: 'orphan-proposed-reconciler.scan-start',
-        details: expect.objectContaining({ issueId: 'ALL', reason: expect.any(String), timestamp: expect.any(String) }),
-      }),
-      expect.objectContaining({
-        issueId: 'PAN-3151',
-        message: 'orphan-proposed-reconciler.orphan-detected',
-        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
-      }),
-      expect.objectContaining({
-        issueId: 'PAN-3151',
-        message: 'orphan-proposed-reconciler.spawn-attempt',
-        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
-      }),
-      expect.objectContaining({
-        issueId: 'PAN-3151',
-        message: 'orphan-proposed-reconciler.spawn-success',
-        details: expect.objectContaining({ issueId: 'PAN-3151', reason: expect.any(String), timestamp: expect.any(String) }),
-      }),
-    ]));
+
+    // Exactly one feed entry — the spawn success — with a plain-sentence message.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(expect.objectContaining({
+      source: 'cloister',
+      level: 'success',
+      issueId: 'PAN-3151',
+      message: 'Started work agent for PAN-3151 — proposed spec had tasks but no running agent',
+      details: expect.objectContaining({ issueId: 'PAN-3151', agentId: 'agent-pan-3151', timestamp: expect.any(String) }),
+    }));
+
+    // Per-cycle diagnostics (scan-start, orphan-detected, spawn-attempt) must NOT
+    // reach the feed — they were the spam (PAN-1626).
+    const messages = events.map((e) => e.message);
+    expect(messages.some((m) => m.startsWith('orphan-proposed-reconciler.'))).toBe(false);
+  });
+
+  it('emits no activity-feed events for an orphan sitting in attempt cooldown (PAN-1626)', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3152', 'proposed');
+    writeBeads(projectPath, 'PAN-3152');
+
+    const baseOpts = {
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [] as string[],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set<string>(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: async () => ({ spawned: true, agentId: 'agent-pan-3152' }),
+    };
+
+    // First scan attempts a spawn (one success entry).
+    await reconcileOrphanProposedSpecs({ ...baseOpts, now: new Date('2026-05-25T20:00:00.000Z') });
+    activityLogger.emitActivityEntrySync.mockReset();
+
+    // Second scan a minute later: still within cooldown → no feed events at all.
+    await reconcileOrphanProposedSpecs({ ...baseOpts, now: new Date('2026-05-25T20:01:00.000Z') });
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
   });
 
   it('does not scan or spawn when disabled by config', async () => {

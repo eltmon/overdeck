@@ -265,10 +265,15 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
   };
 }
 
-function emitReconcilerEvent(
+/**
+ * Surface a real, actioned reconciler outcome in the dashboard activity feed.
+ * Use this ONLY when something actually happened that a human should see — a
+ * work agent was started, or a start genuinely failed. `message` must read as a
+ * plain sentence (it is what the feed shows), not a machine event name.
+ */
+function emitReconcilerActivity(
   level: 'info' | 'warn' | 'error' | 'success',
   message: string,
-  reason: string,
   details: Record<string, unknown> = {},
   issueId = 'ALL',
 ): void {
@@ -282,9 +287,18 @@ function emitReconcilerEvent(
       ...details,
       issueId: eventIssueId,
       timestamp: new Date().toISOString(),
-      reason,
     }),
   });
+}
+
+/**
+ * Per-cycle diagnostic trail — console only, never the user activity feed.
+ * The reconciler scans on every patrol (~60s); scan-start / orphan-detected /
+ * cooldown-skip chatter was flooding the feed and reading as cryptic machine
+ * codes (PAN-1626). Those belong in logs, not in front of the operator.
+ */
+function logReconcilerDiagnostic(kind: string, info: Record<string, unknown> = {}): void {
+  console.debug(`[orphan-proposed-reconciler] ${kind}`, info);
 }
 
 export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanProposedOptions = {}): Promise<string[]> {
@@ -296,7 +310,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
   );
   if (loadedConfig.enabled === false) return [];
   if (scanInFlight) {
-    emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-skipped', 'previous scan still running');
+    logReconcilerDiagnostic('scan-skipped', { reason: 'previous scan still running' });
     return [];
   }
 
@@ -306,58 +320,52 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
     const minAttemptIntervalMs = Math.max(loadedConfig.minAttemptIntervalMs ?? DEFAULT_ATTEMPT_INTERVAL_MS, DEFAULT_ATTEMPT_INTERVAL_MS);
     const actions: string[] = [];
 
-    emitReconcilerEvent('info', 'orphan-proposed-reconciler.scan-start', 'scanning proposed specs for missing work agents', { scanAt: now.toISOString() });
+    logReconcilerDiagnostic('scan-start', { scanAt: now.toISOString() });
     const candidates = await findOrphanProposedSpecsForReconciler(options);
 
     for (const candidate of candidates) {
-    emitReconcilerEvent(
-      'warn',
-      'orphan-proposed-reconciler.orphan-detected',
-      'proposed spec has matching beads but no running work agent',
-      { ...candidate },
-      candidate.issueId,
-    );
+    // Per-cycle detection is diagnostic, not feed-worthy — the actionable
+    // outcome (spawn / failure) below is what the operator needs to see.
+    logReconcilerDiagnostic('orphan-detected', { ...candidate });
 
     const lastAttempt = attemptCooldowns.get(candidate.issueId);
     if (lastAttempt !== undefined && now.getTime() - lastAttempt < minAttemptIntervalMs) {
       const remainingMs = minAttemptIntervalMs - (now.getTime() - lastAttempt);
-      emitReconcilerEvent('info', 'orphan-proposed-reconciler.spawn-skipped', 'cooldown', {
-        ...candidate,
-        remainingMs,
-      }, candidate.issueId);
+      logReconcilerDiagnostic('spawn-skipped', { ...candidate, reason: 'cooldown', remainingMs });
       continue;
     }
 
     attemptCooldowns.set(candidate.issueId, now.getTime());
-    emitReconcilerEvent(
-      'info',
-      'orphan-proposed-reconciler.spawn-attempt',
-      'attempting work-agent spawn for orphan proposed spec',
-      { ...candidate },
-      candidate.issueId,
-    );
+    logReconcilerDiagnostic('spawn-attempt', { ...candidate });
 
     try {
       const spawn = await (options.spawnWorkAgent ?? ((issueId) => spawnWorkAgentThroughAgentsEndpoint(issueId, options.dashboardOrigin)))(candidate.issueId);
       if (spawn.spawned) {
-        emitReconcilerEvent('success', 'orphan-proposed-reconciler.spawn-success', 'work-agent spawn accepted', {
-          ...candidate,
-          agentId: spawn.agentId,
-        }, candidate.issueId);
+        emitReconcilerActivity(
+          'success',
+          `Started work agent for ${candidate.issueId} — proposed spec had tasks but no running agent`,
+          { ...candidate, agentId: spawn.agentId },
+          candidate.issueId,
+        );
         actions.push(`Spawned work agent for orphan proposed spec ${candidate.issueId}`);
       } else {
-        emitReconcilerEvent('warn', 'orphan-proposed-reconciler.spawn-skipped', spawn.skippedReason ?? 'spawn-failed', {
-          ...candidate,
-          error: spawn.error,
-        }, candidate.issueId);
-        actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${spawn.skippedReason ?? 'spawn-failed'}`);
+        const reason = spawn.skippedReason ?? 'spawn-failed';
+        emitReconcilerActivity(
+          'warn',
+          `Couldn't start work agent for ${candidate.issueId}: ${reason}`,
+          { ...candidate, error: spawn.error },
+          candidate.issueId,
+        );
+        actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${reason}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      emitReconcilerEvent('error', 'orphan-proposed-reconciler.spawn-skipped', 'spawn-failed', {
-        ...candidate,
-        error: message,
-      }, candidate.issueId);
+      emitReconcilerActivity(
+        'error',
+        `Couldn't start work agent for ${candidate.issueId}: ${message}`,
+        { ...candidate, error: message },
+        candidate.issueId,
+      );
       actions.push(`Skipped orphan proposed spec ${candidate.issueId}: spawn-failed`);
     }
   }
