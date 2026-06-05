@@ -157,6 +157,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
@@ -4723,6 +4724,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanProposedActions = await reconcileOrphanProposedSpecs();
   actions.push(...orphanProposedActions);
   for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
+
+  const closedIssueAgentActions = await reconcileClosedIssueAgents();
+  actions.push(...closedIssueAgentActions);
+  for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
