@@ -184,11 +184,12 @@ will be rejected.
 6. `bd close <bead-id> --reason="what you did"`
 7. **Re-read this bead's plan item metadata** in `.pan/spec.vbrief.json` after the commit and before deciding inspection:
    - If `metadata.requiresInspection === false`: skip inspection entirely and proceed straight to step 1.
-   - If `metadata.requiresInspection === true`: read `metadata.inspectionDepth` (`fast` by default when omitted), then run the matching command and **WAIT** for the verdict (delivered via `pan tell`):
+   - If `metadata.requiresInspection === true`: read `metadata.inspectionDepth` (`fast` by default when omitted), then run the matching command and **WAIT** for the verdict (delivered via `pan tell`). A terminal verdict is guaranteed within the inspection timeout because Deacon watchdog backstops stalled inspect sessions:
      - `inspectionDepth: "fast"` or omitted → `pan inspect {{ISSUE_ID}} --bead <bead-id>`
      - `inspectionDepth: "deep"` → `pan inspect {{ISSUE_ID}} --bead <bead-id> --deep`
      - `INSPECTION PASSED` → proceed to step 1
      - `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again
+     - `INSPECTION ERROR` → infrastructure failure: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop
    - If `requiresInspection` is missing on a legacy plan item, treat it as `true` with `inspectionDepth: "fast"`.
 
 The planning agent decides per-bead whether inspection is required and how deep it should be. Most mechanical beads carry `requiresInspection: false`; foundational beads that downstream beads build on top of carry `true`, usually with fast depth unless the plan explicitly says `inspectionDepth: "deep"`. Trust the plan — do not request inspection on beads marked `false`, do not skip inspection on beads marked `true`, and do not reuse stale metadata from before you closed the bead.
@@ -305,8 +306,8 @@ and your work will be rejected.
 6. `bd close <bead-id> --reason="what you did"`
 7. Re-read `metadata.requiresInspection` and `metadata.inspectionDepth` for this bead in `.pan/spec.vbrief.json`.
 8. If inspection is required, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for fast depth or add `--deep` for deep depth; closing a bead does NOT spawn the inspector.
-9. **WAIT** for the inspection result (delivered to your session via `pan tell`).
-10. `INSPECTION PASSED` → proceed to step 1; `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again.
+9. **WAIT** for the inspection result (delivered to your session via `pan tell`). A terminal verdict (`INSPECTION PASSED`, `INSPECTION BLOCKED`, or `INSPECTION ERROR`) is guaranteed within the inspection timeout because Deacon watchdog backstops stalled inspect sessions.
+10. `INSPECTION PASSED` → proceed to step 1; `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again; `INSPECTION ERROR` → infrastructure failure: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
