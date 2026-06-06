@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:44.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1617: Substrate: work agents spawn but kickoff prompt is never delivered — idle 'ghost' agents at the launch screen, misreported healthy",
-    "updated": "2026-06-06T08:50:42.507Z"
+    "updated": "2026-06-06T08:54:36.881Z"
   },
   "plan": {
     "id": "pan-1617",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b1ba5134-1861-4179-9b08-bff65a545378",
     "author": "agent:claude-opus-4-8",
-    "sequence": 28,
+    "sequence": 37,
     "created": "2026-06-05T18:57:44.000Z",
-    "updated": "2026-06-06T08:50:42.507Z",
+    "updated": "2026-06-06T08:54:36.881Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1617",
@@ -426,55 +426,55 @@
         "phase": "review",
         "issueId": "PAN-1617",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-06T08:50:41.086Z",
+        "updatedAt": "2026-06-06T08:54:36.838Z",
         "work": {
-          "updatedAt": "2026-06-06T08:50:41.086Z",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-06T08:50:41.086Z",
+          "status": "passed",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-06T08:50:41.086Z"
+              "status": "passed",
+              "at": "2026-06-06T08:54:36.838Z"
             }
           ]
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-06-06T08:50:41.086Z",
-          "notes": "Verification failed at test",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
+          "notes": "Agent re-review request (1/25): Fixed lint and test",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-06-06T08:50:41.086Z",
-              "notes": "Verification failed at test"
+              "at": "2026-06-06T08:54:36.838Z",
+              "notes": "Agent re-review request (1/25): Fixed lint and test"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-06T08:50:41.086Z",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T08:50:41.086Z"
+              "at": "2026-06-06T08:54:36.838Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-06T08:50:41.086Z",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-06T08:50:41.086Z",
+          "updatedAt": "2026-06-06T08:54:36.838Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T08:50:41.086Z"
+              "at": "2026-06-06T08:54:36.838Z"
             }
           ],
           "readyForMerge": false,
