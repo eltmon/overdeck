@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-06T21:02:28.907Z"
+    "updated": "2026-06-06T21:09:26.825Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 20,
+    "sequence": 26,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-06T21:02:28.907Z",
+    "updated": "2026-06-06T21:09:26.825Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -418,31 +418,29 @@
         "phase": "work",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-06T21:02:28.899Z",
+        "updatedAt": "2026-06-06T21:09:26.819Z",
         "work": {
-          "updatedAt": "2026-06-06T21:02:28.899Z",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-06T21:02:28.899Z",
-          "notes": "Verification FAILED at test (34273ms):\n\n\u001b[39m[deacon] Auto close-out failed for PAN-1190: archive failed\n\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 2 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mwarns and asks for confirmation when the issue is not verifying-on-main\n\u001b[31m\u001b[1mError\u001b[22m: process.exit unexpectedly called with \"0\"\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m Module.closeOutCommand src/cli/commands/close.ts:\u001b[2m212:13\u001b[22m\u001b[39m\n    \u001b[90m210|\u001b[39m     // hangs after printing \"complete\". The failure path below already…\n    \u001b[90m211|\u001b[39m     \u001b[90m// this makes success symmetric. (PAN-1621)\u001b[39m\n    \u001b[90m212|\u001b[39m     process\u001b[33m.\u001b[39m\u001b[34mexit\u001b[39m(\u001b[34m0\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m             \u001b[31m^\u001b[39m\n    \u001b[90m213|\u001b[39m   } \u001b[35melse\u001b[39m {\n    \u001b[90m214|\u001b[39m     const failedStep = result.steps.find(s => !s.success && !s.skipped…\n\u001b[90m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m79:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mskips the confirmation prompt when --force is used\n\u001b[31m\u001b[1mError\u001b[22m: process.exit unexpectedly called with \"0\"\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m Module.closeOutCommand src/cli/commands/close.ts:\u001b[2m212:13\u001b[22m\u001b[39m\n    \u001b[90m210|\u001b[39m     // hangs after printing \"complete\". The failure path below already…\n    \u001b[90m211|\u001b[39m     \u001b[90m// this makes success symmetric. (PAN-1621)\u001b[39m\n    \u001b[90m212|\u001b[39m     process\u001b[33m.\u001b[39m\u001b[34mexit\u001b[39m(\u001b[34m0\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m             \u001b[31m^\u001b[39m\n    \u001b[90m213|\u001b[39m   } \u001b[35melse\u001b[39m {\n    \u001b[90m214|\u001b[39m     const failedStep = result.steps.find(s => !s.success && !s.skipped…\n\u001b[90m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m93:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n",
+          "status": "pending",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-06T21:02:28.899Z",
-              "notes": "Verification FAILED at test (34273ms):\n\n\u001b[39m[deacon] Auto close-out failed for PAN-1190: archive failed\n\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 2 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mwarns and asks for confirmation when the issue is not verifying-on-main\n\u001b[31m\u001b[1mError\u001b[22m: process.exit unexpectedly called with \"0\"\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m Module.closeOutCommand src/cli/commands/close.ts:\u001b[2m212:13\u001b[22m\u001b[39m\n    \u001b[90m210|\u001b[39m     // hangs after printing \"complete\". The failure path below already…\n    \u001b[90m211|\u001b[39m     \u001b[90m// this makes success symmetric. (PAN-1621)\u001b[39m\n    \u001b[90m212|\u001b[39m     process\u001b[33m.\u001b[39m\u001b[34mexit\u001b[39m(\u001b[34m0\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m             \u001b[31m^\u001b[39m\n    \u001b[90m213|\u001b[39m   } \u001b[35melse\u001b[39m {\n    \u001b[90m214|\u001b[39m     const failedStep = result.steps.find(s => !s.success && !s.skipped…\n\u001b[90m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m79:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mskips the confirmation prompt when --force is used\n\u001b[31m\u001b[1mError\u001b[22m: process.exit unexpectedly called with \"0\"\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m Module.closeOutCommand src/cli/commands/close.ts:\u001b[2m212:13\u001b[22m\u001b[39m\n    \u001b[90m210|\u001b[39m     // hangs after printing \"complete\". The failure path below already…\n    \u001b[90m211|\u001b[39m     \u001b[90m// this makes success symmetric. (PAN-1621)\u001b[39m\n    \u001b[90m212|\u001b[39m     process\u001b[33m.\u001b[39m\u001b[34mexit\u001b[39m(\u001b[34m0\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m             \u001b[31m^\u001b[39m\n    \u001b[90m213|\u001b[39m   } \u001b[35melse\u001b[39m {\n    \u001b[90m214|\u001b[39m     const failedStep = result.steps.find(s => !s.success && !s.skipped…\n\u001b[90m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m93:5\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n"
+              "status": "pending",
+              "at": "2026-06-06T21:09:26.819Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-06T21:02:28.899Z",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "notes": "Verification failed at build",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T21:02:28.899Z",
+              "at": "2026-06-06T21:09:26.819Z",
               "notes": "Verification failed at build"
             }
           ],
@@ -450,25 +448,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-06T21:02:28.899Z",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T21:02:28.899Z"
+              "at": "2026-06-06T21:09:26.819Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-06T21:02:28.899Z",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-06T21:02:28.899Z",
+          "updatedAt": "2026-06-06T21:09:26.819Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T21:02:28.899Z"
+              "at": "2026-06-06T21:09:26.819Z"
             }
           ],
           "readyForMerge": false,
