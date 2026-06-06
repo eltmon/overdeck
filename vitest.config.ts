@@ -23,12 +23,6 @@ export default defineConfig({
       // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
       forks: { minForks: 1, maxForks: process.env.CI ? 1 : 4, singleFork: false },
     },
-    experimental: {
-      // Persist transformed module cache across runs in node_modules/.experimental-vitest-cache.
-      // Vitest v4 introduced this; meaningful on a ~200-file suite where re-running a
-      // subset (e.g. `npm test -- foo.test.ts`) skips re-transpilation of unchanged files.
-      fsModuleCache: true,
-    },
     include: includeBenchmarks
       ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
       : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'],
