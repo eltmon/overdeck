@@ -117,9 +117,9 @@ function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): Flywhe
 
       const group = prioritySorted.filter((entry) => entry.suggestion.priority === item.suggestion.priority);
       const weighted = group
-        .filter((entry) => hasWeight(entry.suggestion))
-        .sort((left, right) => right.suggestion.weight - left.suggestion.weight)
-        .map((entry) => entry.suggestion);
+        .map((entry) => entry.suggestion)
+        .filter(hasWeight)
+        .sort((left, right) => right.weight - left.weight);
       sorted.push(...group.map((entry) => hasWeight(entry.suggestion) ? weighted.shift()! : entry.suggestion));
       return sorted;
     }, []);
