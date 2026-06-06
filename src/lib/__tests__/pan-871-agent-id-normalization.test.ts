@@ -34,14 +34,13 @@ vi.mock('../tmux.js', () => ({
   sessionExists: vi.fn(() => true),
   sessionExistsSync: vi.fn(() => true),
   sessionExistsAsync: vi.fn(async () => true),
-  listSessionsSync: vi.fn(() => [{ name: 'agent-pan-871', created: new Date(0), attached: false, windows: 1 }]),
   getAgentSessions: vi.fn(() => [{ name: 'agent-pan-871' }]),
   getAgentSessionsSync: vi.fn(() => [{ name: 'agent-pan-871' }]),
   getAgentSessionsAsync: vi.fn(async () => [{ name: 'agent-pan-871' }]),
   // listRunningAgentsSync now matches liveness against ALL panopticon-socket
   // sessions via listSessionsSync (360edc268), not just agent-* sessions.
   listSessions: vi.fn(() => [{ name: 'agent-pan-871' }]),
-  listSessionsSync: vi.fn(() => [{ name: 'agent-pan-871' }]),
+  listSessionsSync: vi.fn(() => [{ name: 'agent-pan-871', created: new Date(0), attached: false, windows: 1 }]),
   capturePane: vi.fn(() => ''),
   capturePaneAsync: vi.fn(async () => ''),
   listPaneValues: vi.fn(() => []),
