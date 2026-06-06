@@ -252,6 +252,31 @@ export const EventStoreServiceLive = Layer.effect(
       })();
     });
 
+    // PAN-1635: bridge Claude-native compaction to the conversation "compacting"
+    // flag. Only the Panopticon-native path emits conversation.compacting_changed
+    // directly; a built-in Claude Code /compact is invisible to it. But the
+    // PreCompact hook emits activity{tool:"compact"} and PostCompact emits
+    // activity{idle} for *both* paths, so mirror that signal here. This gives the
+    // dashboard a live "Compacting…" indicator during Claude's own /compact (and
+    // visibly explains a prompt eaten by submit-time compaction). Conversation
+    // agentIds (`conv-*`) double as the conversation name.
+    const compactingConvs = new Set<string>();
+    store.subscribe((event) => {
+      if (event.type !== 'agent.activity_changed') return;
+      const p = (event.payload ?? {}) as Record<string, unknown>;
+      const agentId = p['agentId'] as string | undefined;
+      if (!agentId || !agentId.startsWith('conv-')) return;
+      const compacting = p['currentTool'] === 'compact';
+      if (compacting === compactingConvs.has(agentId)) return;
+      if (compacting) compactingConvs.add(agentId);
+      else compactingConvs.delete(agentId);
+      store.emitOnly({
+        type: 'conversation.compacting_changed',
+        timestamp: event.timestamp ?? new Date().toISOString(),
+        payload: { conversationName: agentId, compacting },
+      } as never);
+    });
+
     const streamEvents = Stream.callback<StoredEvent>((queue) =>
       Effect.acquireRelease(
         Effect.sync(() =>
