@@ -93,7 +93,7 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   let embeddingModel = config.embedding.model;
 
   await mkdir(outputDir, { recursive: true });
-  const buildDir = await mkdtemp(join(outputDir, '.docs-index-'));
+  const buildDir = await mkdtemp(join(dirname(outputDir), '.pan-docs-index-'));
   const buildPath = join(buildDir, 'docs-index.tmp.sqlite');
 
   const db = new Database(buildPath);
