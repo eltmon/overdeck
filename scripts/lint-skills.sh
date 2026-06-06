@@ -3,9 +3,17 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+mkdir -p .cache
+TMP_ROOT="$(mktemp -d .cache/lint-skills-dist.XXXXXX)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+cp -a dist "$TMP_ROOT/dist"
+cp package.json "$TMP_ROOT/package.json"
+export LINT_SKILLS_DIST="$TMP_ROOT/dist"
+
 python3 - <<'PY'
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -17,7 +25,7 @@ ROOT = Path.cwd()
 DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
 # PAN-1201: bundled skills live under sync-sources/.
 SKILLS = ROOT / "sync-sources" / "skills"
-LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
+LOCAL_PAN = ["node", str(Path(os.environ["LINT_SKILLS_DIST"]) / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
 RUN_PAN_CACHE_LOCK = Lock()
 LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}
