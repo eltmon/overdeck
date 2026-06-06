@@ -30,6 +30,9 @@ pan flywheel config --set flywheel.auto_pickup_backlog=true
 pan flywheel config --set flywheel.require_uat_before_merge=false
 pan flywheel status
 pan flywheel status --json
+pan flywheel weights
+pan flywheel weights --issue PAN-1234
+pan flywheel weights --window 7d --json
 pan flywheel pause
 pan flywheel resume
 pan flywheel abort
@@ -71,6 +74,16 @@ pan flywheel status --json
 ```
 
 Shows the active run's latest `FlywheelStatus` snapshot. Use `--json` when another tool or script needs the raw contract payload.
+
+### Weights
+
+```bash
+pan flywheel weights
+pan flywheel weights --issue PAN-1234
+pan flywheel weights --window 7d --json
+```
+
+Shows metric-aware substrate bug weights from `GET /api/flywheel/substrate-bug-weights`. Default output is a table with issue id, affected criteria, weight, and reason. Use `--issue <id>` to filter to one open substrate bug and `--json` when another tool or the Flywheel role needs the raw payload.
 
 ### Pause and Resume
 

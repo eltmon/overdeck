@@ -116,7 +116,9 @@ import {
   flywheelStartCommand,
   flywheelStatsCommand,
   flywheelStatusCommand,
+  flywheelWeightsCommand,
   formatFlywheelStats,
+  formatFlywheelWeights,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
   registerFlywheelCommands,
@@ -158,6 +160,15 @@ const validStatus: FlywheelStatus = {
   openQuestions: [],
   ticks: 1,
   lastTickAt: '2026-05-18T12:00:00.000Z',
+};
+
+const validWeights = {
+  window: '30d',
+  generatedAt: '2026-05-25T10:00:00.000Z',
+  weights: [
+    { issueId: 'PAN-1002', criteria: [1], weight: 1.8, reason: 'criterion 1 (bug rate) at 3.2% vs target <2% — red' },
+    { issueId: 'PAN-1001', criteria: [], weight: 0, reason: 'no affected criteria declared' },
+  ],
 };
 
 const validStats: FlywheelStats = {
@@ -370,6 +381,44 @@ describe('flywheel CLI commands', () => {
 
     expect(output).toContain('\x1b[32m●\x1b[0m green');
     expect(output).toContain('\x1b[31m●\x1b[0m red');
+  });
+
+  it('prints a substrate bug weights table with the default window', async () => {
+    const fetchMock = vi.fn(async () => Response.json(validWeights));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await flywheelWeightsCommand({});
+
+    expect(fetchMock).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/substrate-bug-weights?window=30d', expect.objectContaining({
+      headers: expect.objectContaining({ 'x-panopticon-internal-token': expect.any(String) }),
+    }));
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain('Flywheel substrate bug weights (30d)');
+    expect(output).toContain('PAN-1002  1         1.8');
+    expect(output).toContain('criterion 1 (bug rate) at 3.2% vs target <2% — red');
+    expect(output).toContain('PAN-1001  —         0.0');
+  });
+
+  it('emits raw substrate bug weights JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(validWeights)));
+
+    await flywheelWeightsCommand({ json: true });
+
+    expect(JSON.parse(logSpy.mock.calls[0][0] as string)).toEqual(validWeights);
+  });
+
+  it('filters substrate bug weights by issue for table output', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(validWeights)));
+
+    await flywheelWeightsCommand({ issue: 'PAN-1001' });
+
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain('PAN-1001');
+    expect(output).not.toContain('PAN-1002');
+  });
+
+  it('formats an empty substrate bug weights table', () => {
+    expect(formatFlywheelWeights({ ...validWeights, weights: [] })).toContain('Issue  Criteria  Weight  Reason');
   });
 
   it('exits 1 when no active run exists', async () => {
@@ -752,6 +801,7 @@ describe('flywheel CLI commands', () => {
     const config = flywheel?.commands.find(command => command.name() === 'config');
     const status = flywheel?.commands.find(command => command.name() === 'status');
     const stats = flywheel?.commands.find(command => command.name() === 'stats');
+    const weights = flywheel?.commands.find(command => command.name() === 'weights');
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
@@ -761,6 +811,7 @@ describe('flywheel CLI commands', () => {
     expect(config?.options.map(option => option.long)).toEqual(expect.arrayContaining(['--get', '--set']));
     expect(status?.options.map(option => option.long)).toContain('--json');
     expect(stats?.options.map(option => option.long)).toEqual(expect.arrayContaining(['--window', '--json']));
+    expect(weights?.options.map(option => option.long)).toEqual(expect.arrayContaining(['--issue', '--window', '--json']));
     expect(pause).toBeDefined();
     expect(resume).toBeDefined();
     expect(report).toBeDefined();

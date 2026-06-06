@@ -49,6 +49,23 @@ interface StatsOptions {
   json?: boolean;
 }
 
+interface WeightsOptions {
+  issue?: string;
+  window?: string;
+  json?: boolean;
+}
+
+interface FlywheelSubstrateBugWeightsPayload {
+  window: string;
+  generatedAt: string;
+  weights: Array<{
+    issueId: string;
+    criteria: number[];
+    weight: number;
+    reason: string;
+  }>;
+}
+
 interface FormatStatsOptions {
   color?: boolean;
 }
@@ -563,6 +580,69 @@ export async function flywheelStatsCommand(options: StatsOptions = {}): Promise<
   }
 }
 
+export async function fetchFlywheelWeights(window: string, fetchImpl: typeof fetch = fetch): Promise<FlywheelSubstrateBugWeightsPayload> {
+  const internalToken = ensureInternalTokenSync();
+  const url = new URL(`${dashboardBaseUrl()}/api/flywheel/substrate-bug-weights`);
+  url.searchParams.set('window', window);
+  const res = await fetchImpl(url.toString(), {
+    headers: {
+      [INTERNAL_TOKEN_HEADER]: internalToken,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Dashboard rejected Flywheel weights request (${res.status})${body ? `: ${body}` : ''}`);
+  }
+
+  return await res.json() as FlywheelSubstrateBugWeightsPayload;
+}
+
+function filterFlywheelWeights(payload: FlywheelSubstrateBugWeightsPayload, issueId: string | undefined): FlywheelSubstrateBugWeightsPayload {
+  if (!issueId) return payload;
+  const normalizedIssueId = issueId.trim().toUpperCase();
+  return { ...payload, weights: payload.weights.filter((entry) => entry.issueId.toUpperCase() === normalizedIssueId) };
+}
+
+function padCell(value: string, width: number): string {
+  return value.padEnd(width, ' ');
+}
+
+export function formatFlywheelWeights(payload: FlywheelSubstrateBugWeightsPayload): string {
+  const rows = payload.weights.map((entry) => ({
+    issueId: entry.issueId,
+    criteria: entry.criteria.length > 0 ? entry.criteria.join(',') : '—',
+    weight: entry.weight.toFixed(1),
+    reason: entry.reason,
+  }));
+  const widths = {
+    issueId: Math.max('Issue'.length, ...rows.map((row) => row.issueId.length)),
+    criteria: Math.max('Criteria'.length, ...rows.map((row) => row.criteria.length)),
+    weight: Math.max('Weight'.length, ...rows.map((row) => row.weight.length)),
+  };
+  return [
+    `Flywheel substrate bug weights (${payload.window})`,
+    `Generated: ${payload.generatedAt}`,
+    '',
+    `${padCell('Issue', widths.issueId)}  ${padCell('Criteria', widths.criteria)}  ${padCell('Weight', widths.weight)}  Reason`,
+    `${'-'.repeat(widths.issueId)}  ${'-'.repeat(widths.criteria)}  ${'-'.repeat(widths.weight)}  ------`,
+    ...rows.map((row) => `${padCell(row.issueId, widths.issueId)}  ${padCell(row.criteria, widths.criteria)}  ${padCell(row.weight, widths.weight)}  ${row.reason}`),
+  ].join('\n');
+}
+
+export async function flywheelWeightsCommand(options: WeightsOptions = {}): Promise<void> {
+  try {
+    const payload = filterFlywheelWeights(
+      await fetchFlywheelWeights(options.window ?? DEFAULT_STATS_WINDOW),
+      options.issue,
+    );
+    console.log(options.json ? JSON.stringify(payload, null, 2) : formatFlywheelWeights(payload));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 function runNumberFromRunId(runId: string): number {
   const match = /^RUN-(\d+)$/.exec(runId);
   if (!match) throw new Error(`Invalid Flywheel run id for report: ${runId}`);
@@ -941,6 +1021,14 @@ export function registerFlywheelCommands(program: Command): void {
     .option('--window <duration>', 'Stats window duration', DEFAULT_STATS_WINDOW)
     .option('--json', 'Emit the raw FlywheelStats JSON')
     .action(flywheelStatsCommand);
+
+  flywheel
+    .command('weights')
+    .description('Show metric-aware substrate bug weights')
+    .option('--issue <id>', 'Filter to a single substrate bug issue')
+    .option('--window <duration>', 'Stats window duration', DEFAULT_STATS_WINDOW)
+    .option('--json', 'Emit the raw substrate bug weights JSON')
+    .action(flywheelWeightsCommand);
 
   flywheel
     .command('pause')
