@@ -718,6 +718,10 @@ const postIssuesRoute = HttpRouter.add(
   'POST',
   '/api/issues',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const mutationError = rejectUnsafeDashboardMutationRequest(request);
+    if (mutationError) return mutationError;
+
     const body = yield* readJsonBody;
     const validation = validateNewIssueBody(body);
     if (!validation.ok) {

@@ -11,7 +11,6 @@ import { GitHubTracker } from './github.js';
 import { GitLabTracker } from './gitlab.js';
 import { RallyTracker } from './rally.js';
 import type { TrackersConfig } from '../config.js';
-import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 
 // Configuration for a single tracker
 export interface TrackerConfig {
@@ -43,26 +42,13 @@ export type TrackerKeyOverrides = Partial<Record<TrackerType, string>>;
 // Multi-tracker configuration (re-exported from config.ts)
 // Note: Use TrackersConfig from config.ts for full type with nested configs
 
-/**
- * Get tracker API key from config.yaml (Settings page).
- * This is checked FIRST — env vars are the fallback, not the other way around.
- */
-function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
-  try {
-    const { config: yamlConfig } = loadYamlConfig();
-    return yamlConfig.trackerKeys[trackerType];
-  } catch {
-    return undefined;
-  }
-}
-
 function getTrackerKey(trackerType: TrackerType, overrides?: TrackerKeyOverrides): string | undefined {
-  return overrides ? overrides[trackerType] : getTrackerKeyFromConfig(trackerType);
+  return overrides?.[trackerType];
 }
 
 /**
  * Create a tracker instance from configuration.
- * Priority: config.yaml (Settings) > environment variable > custom env var name
+ * Priority: explicit tracker key overrides > environment variable > custom env var name
  */
 export function createTracker(config: TrackerConfig, trackerKeys?: TrackerKeyOverrides): IssueTracker {
   switch (config.type) {

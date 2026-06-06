@@ -20,6 +20,13 @@ vi.mock('@dnd-kit/core', async () => {
   };
 });
 
+vi.mock('../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': 'test-csrf',
+  })),
+}));
+
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
     id,
@@ -680,6 +687,65 @@ describe('KanbanBoard drawer wiring', () => {
       targetStatus: 'todo',
       title: 'Created from test',
       description: 'Dialog body',
+    });
+  });
+
+  it('maps a GitHub project filter to its registered project key when creating an issue', async () => {
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [
+        createBoardIssue({
+          identifier: 'PAN-1',
+          status: 'Todo',
+          state: 'todo',
+          project: { id: 'github-eltmon-panopticon-cli', name: 'eltmon/panopticon-cli', color: '#333', icon: 'github' },
+        }),
+        createBoardIssue({
+          identifier: 'DOCS-1',
+          status: 'Todo',
+          state: 'todo',
+          project: { id: 'linear-docs-project', name: 'Docs', color: '#666', icon: 'linear' },
+        }),
+      ],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/registered-projects') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            { key: 'docs', name: 'Docs', linearTeam: 'DOCS', githubRepo: null, linearProject: null },
+            { key: 'panopticon-cli', name: 'Panopticon', linearTeam: null, githubRepo: 'eltmon/panopticon-cli', linearProject: null },
+          ]),
+        } as Response);
+      }
+      if (url === '/api/issues' && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'issue-42', identifier: 'PAN-42', title: 'Created from test' }),
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve('{}'), json: () => Promise.resolve({ issues: [], workspaces: [] }) } as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    renderBoard();
+
+    fireEvent.click(await screen.findByRole('button', { name: /eltmon\/panopticon-cli/ }));
+    fireEvent.click(await screen.findByTestId('new-issue-button-todo'));
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'GitHub-filtered issue' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues', expect.objectContaining({ method: 'POST' }));
+    });
+    const postCall = fetchMock.mock.calls.find(([input, init]) => input.toString() === '/api/issues' && init?.method === 'POST');
+    expect(JSON.parse(postCall?.[1]?.body as string)).toMatchObject({
+      projectKey: 'panopticon-cli',
+      targetStatus: 'todo',
+      title: 'GitHub-filtered issue',
     });
   });
 

@@ -1108,11 +1108,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
-  const selectedProjectDefaultKey = useMemo(() => {
-    if (selectedProjects.size !== 1) return undefined;
-    const selected = Array.from(selectedProjects)[0];
-    return selected.startsWith('registered:') ? selected.slice('registered:'.length) : selected;
-  }, [selectedProjects]);
   const [newIssueDialog, setNewIssueDialog] = useState<{ targetStatus: NewIssueTargetStatus; defaultProjectKey?: string } | null>(null);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
   const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
@@ -1501,6 +1496,26 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     staleTime: 60000,
   });
 
+  const selectedProjectDefaultKey = useMemo(() => {
+    if (selectedProjects.size !== 1) return undefined;
+    const selectedId = Array.from(selectedProjects)[0];
+    const selectedWithoutPrefix = selectedId.startsWith('registered:')
+      ? selectedId.slice('registered:'.length)
+      : selectedId;
+    const matchedProject = registeredProjects.find((project) => {
+      const displayName = project.linearProject || project.githubRepo || project.name;
+      const githubProjectId = project.githubRepo ? `github-${project.githubRepo.replace('/', '-')}` : null;
+      return selectedId === project.key
+        || selectedWithoutPrefix === project.key
+        || selectedId === `registered:${project.key}`
+        || selectedId === project.name
+        || selectedId === displayName
+        || selectedId === githubProjectId
+        || selectedId === project.linearProject;
+    });
+    return matchedProject?.key ?? selectedWithoutPrefix;
+  }, [registeredProjects, selectedProjects]);
+
   // Extract unique projects from issues, then merge registered projects that have no issues yet
   const projects = useMemo(() => {
     const projectMap = new Map<string, LinearProject>();
@@ -1528,7 +1543,13 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     const isSupported = (project: RegisteredProject) => Boolean(project.githubRepo || project.linearTeam || project.linearProject);
     const projectMatchesSelection = (project: RegisteredProject, selectedId: string) => {
       const displayName = project.linearProject || project.githubRepo || project.name;
-      return selectedId === project.key || selectedId === `registered:${project.key}` || selectedId === project.name || selectedId === displayName;
+      const githubProjectId = project.githubRepo ? `github-${project.githubRepo.replace('/', '-')}` : null;
+      return selectedId === project.key
+        || selectedId === `registered:${project.key}`
+        || selectedId === project.name
+        || selectedId === displayName
+        || selectedId === githubProjectId
+        || selectedId === project.linearProject;
     };
 
     if (selectedProjects.size === 0) {
@@ -2001,9 +2022,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onClose={() => setNewIssueDialog(null)}
           defaultProjectKey={newIssueDialog.defaultProjectKey}
           targetStatus={newIssueDialog.targetStatus}
-          onCreated={() => {
-            void refreshDashboardState(queryClient);
-          }}
+          onCreated={() => {}}
         />
       )}
 

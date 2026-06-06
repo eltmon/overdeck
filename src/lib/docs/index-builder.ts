@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { mkdir, readFile, rename, rm, stat } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, stat } from 'fs/promises';
 import { dirname, join } from 'path';
 import { createHash } from 'crypto';
 
@@ -89,14 +89,12 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   const config = resolveBuildConfig(options.config);
   const embeddingFn = options.embeddingFn ?? createDocsEmbeddingFunction(config.embedding);
   const outputDir = dirname(outputPath);
-  const buildDir = join(outputDir, '..', '.pan-docs-index-tmp');
-  const buildPath = join(buildDir, `docs-index.${process.pid}.${Date.now()}.tmp.sqlite`);
   let embeddingProvider: DocsEmbeddingProvider = config.embedding.provider;
   let embeddingModel = config.embedding.model;
 
   await mkdir(outputDir, { recursive: true });
-  await mkdir(buildDir, { recursive: true });
-  await removeSqliteFiles(buildPath);
+  const buildDir = await mkdtemp(join(outputDir, '.docs-index-'));
+  const buildPath = join(buildDir, 'docs-index.tmp.sqlite');
 
   const db = new Database(buildPath);
   let sourceCount = 0;
@@ -211,7 +209,6 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
 
     await mkdir(outputDir, { recursive: true });
     await rename(buildPath, outputPath);
-    await removeSqliteFiles(buildPath);
 
     return {
       outputPath,
@@ -227,6 +224,8 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   } catch (error) {
     await removeSqliteFiles(buildPath);
     throw error;
+  } finally {
+    await rm(buildDir, { recursive: true, force: true });
   }
 }
 

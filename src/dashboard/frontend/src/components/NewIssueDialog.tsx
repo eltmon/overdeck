@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, X } from 'lucide-react';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 export type NewIssueTargetStatus = 'backlog' | 'todo';
 
@@ -40,6 +41,17 @@ function isCreateSupportedProject(project: RegisteredProject): boolean {
   return Boolean(project.githubRepo || project.linearTeam || project.linearProject);
 }
 
+function projectMatchesDefault(project: RegisteredProject, defaultProjectKey: string): boolean {
+  const displayName = project.linearProject || project.githubRepo || project.name;
+  const githubProjectId = project.githubRepo ? `github-${project.githubRepo.replace('/', '-')}` : null;
+  return defaultProjectKey === project.key
+    || defaultProjectKey === `registered:${project.key}`
+    || defaultProjectKey === project.name
+    || defaultProjectKey === displayName
+    || defaultProjectKey === githubProjectId
+    || defaultProjectKey === project.linearProject;
+}
+
 async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
   const res = await fetch('/api/registered-projects');
   if (!res.ok) return [];
@@ -73,25 +85,33 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
   const availableProjects = useMemo(() => {
     const supported = registeredProjects.filter(isCreateSupportedProject);
     if (supported.length > 0) return supported;
-    if (!defaultProjectKey) return [];
+    const fallbackProjectKey = defaultProjectKey?.startsWith('registered:')
+      ? defaultProjectKey.slice('registered:'.length)
+      : defaultProjectKey?.startsWith('github-') ? undefined : defaultProjectKey;
+    if (!fallbackProjectKey) return [];
     return [{
-      key: defaultProjectKey,
-      name: defaultProjectKey,
+      key: fallbackProjectKey,
+      name: fallbackProjectKey,
       linearTeam: null,
       githubRepo: null,
       linearProject: null,
     }];
   }, [defaultProjectKey, registeredProjects]);
 
+  const resolvedDefaultProjectKey = useMemo(() => {
+    if (!defaultProjectKey) return undefined;
+    return availableProjects.find((project) => projectMatchesDefault(project, defaultProjectKey))?.key ?? defaultProjectKey;
+  }, [availableProjects, defaultProjectKey]);
+
   useEffect(() => {
     if (!isOpen) return;
     setSelectedProjectKey((current) => {
       const keys = new Set(availableProjects.map((project) => project.key));
-      if (defaultProjectKey && keys.has(defaultProjectKey)) return defaultProjectKey;
+      if (resolvedDefaultProjectKey && keys.has(resolvedDefaultProjectKey)) return resolvedDefaultProjectKey;
       if (keys.has(current)) return current;
-      return availableProjects[0]?.key ?? defaultProjectKey ?? '';
+      return availableProjects[0]?.key ?? resolvedDefaultProjectKey ?? '';
     });
-  }, [availableProjects, defaultProjectKey, isOpen]);
+  }, [availableProjects, isOpen, resolvedDefaultProjectKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -124,7 +144,7 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
     try {
       const response = await fetch('/api/issues', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({
           projectKey: selectedProjectKey,
           targetStatus,

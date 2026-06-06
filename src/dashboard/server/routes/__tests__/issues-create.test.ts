@@ -51,6 +51,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
   }),
 }));
 
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 import { issuesRouteLayer } from '../issues.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import type { Issue } from '../../../../lib/tracker/interface.js';
@@ -85,11 +86,11 @@ function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   });
 }
 
-async function postIssue(body: Record<string, unknown>) {
+async function postIssue(body: Record<string, unknown>, headers: Record<string, string> = {}) {
   const appendedEvents: Record<string, unknown>[] = [];
   const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/issues', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token', ...headers },
     body: JSON.stringify(body),
   }));
 
@@ -108,6 +109,8 @@ async function postIssue(body: Record<string, unknown>) {
 describe('POST /api/issues', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    _resetInternalTokenCacheForTests();
     loadProjectsConfigMock.mockReturnValue(Effect.succeed({
       projects: {
         pan: {
@@ -140,6 +143,24 @@ describe('POST /api/issues', () => {
     updateShadowStateMock.mockReturnValue(Effect.succeed({ issueId: 'PAN-42' }));
     refreshShadowStatesCacheMock.mockResolvedValue(undefined);
     invalidateTrackerMock.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+  });
+
+  it('rejects unauthenticated requests before parsing config or creating issues', async () => {
+    const result = await postIssue(
+      { projectKey: 'pan', targetStatus: 'todo', title: 'No auth' },
+      { [INTERNAL_TOKEN_HEADER]: '' },
+    );
+
+    expect(result.status).toBe(401);
+    expect(loadProjectsConfigMock).not.toHaveBeenCalled();
+    expect(loadConfigNoMigrationMock).not.toHaveBeenCalled();
+    expect(createTrackerMock).not.toHaveBeenCalled();
+    expect(createIssueMock).not.toHaveBeenCalled();
   });
 
   it('creates an issue in the requested column and emits a refresh event', async () => {
