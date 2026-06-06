@@ -134,6 +134,25 @@ describe('FlywheelStatusDetails', () => {
     expect(within(suggestions!).getByText('System-wide starter suggestion')).toBeInTheDocument();
   });
 
+  it('renders and sorts weighted suggestions within priority tiers', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-20', rationale: 'Operator-injected high stays in place' },
+        { priority: 'high', action: 'investigate', issueId: 'PAN-21', rationale: 'Lower weighted bug', weight: 0.4, weightReason: 'criterion 3 (pass rate) at 99% vs target ≥99.5% — yellow' },
+        { priority: 'medium', action: 'review', issueId: 'PAN-30', rationale: 'Medium priority work', weight: 9.2, weightReason: 'criterion 2 (open P0s) at 3 vs target 0 — red' },
+        { priority: 'high', action: 'investigate', issueId: 'PAN-22', rationale: 'Higher weighted bug', weight: 1.8, weightReason: 'criterion 1 (bug rate) at 3.2% vs target <2% — red' },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(rows.map((row) => within(row).getByRole('button').textContent)).toEqual(['PAN-20', 'PAN-22', 'PAN-21', 'PAN-30']);
+    expect(within(rows[0]).queryByText(/Weight/)).not.toBeInTheDocument();
+    expect(within(rows[1]).getByText('Weight 1.8')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('criterion 1 (bug rate) at 3.2% vs target <2% — red')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Weight 0.4')).toBeInTheDocument();
+  });
+
   it('renders the suggestions empty state', () => {
     render(<FlywheelStatusDetails status={{ ...status, suggestions: [] }} />);
 

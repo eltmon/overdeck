@@ -100,6 +100,10 @@ function SuggestionPriorityBadge({ priority }: { priority: FlywheelSuggestion['p
   );
 }
 
+function hasWeight(suggestion: FlywheelSuggestion): suggestion is FlywheelSuggestion & { weight: number } {
+  return typeof suggestion.weight === 'number' && Number.isFinite(suggestion.weight);
+}
+
 function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): FlywheelSuggestion[] {
   return suggestions
     .map((suggestion, index) => ({ suggestion, index }))
@@ -107,7 +111,18 @@ function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): Flywhe
       const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
       return priorityDiff === 0 ? left.index - right.index : priorityDiff;
     })
-    .map(({ suggestion }) => suggestion);
+    .reduce<FlywheelSuggestion[]>((sorted, item, index, prioritySorted) => {
+      const previous = prioritySorted[index - 1];
+      if (previous && previous.suggestion.priority === item.suggestion.priority) return sorted;
+
+      const group = prioritySorted.filter((entry) => entry.suggestion.priority === item.suggestion.priority);
+      const weighted = group
+        .filter((entry) => hasWeight(entry.suggestion))
+        .sort((left, right) => right.suggestion.weight - left.suggestion.weight)
+        .map((entry) => entry.suggestion);
+      sorted.push(...group.map((entry) => hasWeight(entry.suggestion) ? weighted.shift()! : entry.suggestion));
+      return sorted;
+    }, []);
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -145,8 +160,14 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                         {issueId}
                       </button>
                     )}
+                    {hasWeight(suggestion) && (
+                      <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                        Weight {suggestion.weight.toFixed(1)}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
+                  {suggestion.weightReason && <p className="mt-1 text-xs text-muted-foreground">{suggestion.weightReason}</p>}
                 </div>
               );
             })}
