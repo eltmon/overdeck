@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:44.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1617: Substrate: work agents spawn but kickoff prompt is never delivered — idle 'ghost' agents at the launch screen, misreported healthy",
-    "updated": "2026-06-06T08:55:38.342Z"
+    "updated": "2026-06-06T08:59:16.771Z"
   },
   "plan": {
     "id": "pan-1617",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b1ba5134-1861-4179-9b08-bff65a545378",
     "author": "agent:claude-opus-4-8",
-    "sequence": 43,
+    "sequence": 50,
     "created": "2026-06-05T18:57:44.000Z",
-    "updated": "2026-06-06T08:55:38.342Z",
+    "updated": "2026-06-06T08:59:16.771Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1617",
@@ -423,32 +423,32 @@
     "metadata": {
       "canonicalFilename": "2026-06-05-PAN-1617-substrate-work-agents-spawn-but-kickoff-prompt-is-never-delivered-idle-ghost-agents-misreported-healthy.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1617",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-06T08:55:38.337Z",
+        "updatedAt": "2026-06-06T08:59:16.755Z",
         "work": {
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "status": "passed",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-06T08:55:38.337Z"
+              "status": "passed",
+              "at": "2026-06-06T08:59:16.755Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "status": "reviewing",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "notes": "Agent re-review request (1/25): Fixed lint and test",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-06T08:55:38.337Z",
+              "status": "reviewing",
+              "at": "2026-06-06T08:59:16.755Z",
               "notes": "Agent re-review request (1/25): Fixed lint and test"
             }
           ],
@@ -456,25 +456,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T08:55:38.337Z"
+              "at": "2026-06-06T08:59:16.755Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-06T08:55:38.337Z",
+          "updatedAt": "2026-06-06T08:59:16.755Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T08:55:38.337Z"
+              "at": "2026-06-06T08:59:16.755Z"
             }
           ],
           "readyForMerge": false,
