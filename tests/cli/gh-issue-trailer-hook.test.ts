@@ -53,6 +53,16 @@ describe('gh issue trailer hook', () => {
     expect(command).toContain("--body '");
   });
 
+  it('preserves Flywheel-Affects-Criterion trailers when appending provenance', () => {
+    const { env } = makeHome();
+
+    const result = outputFor("gh issue create --title 'Bug' --body 'body text\nFlywheel-Affects-Criterion: 5,7'", env);
+    const command = updatedCommand(result);
+
+    expect(command).toContain('Flywheel-Affects-Criterion: 5,7');
+    expect(command).toContain('Flywheel-Run-Id: RUN-777');
+  });
+
   it('copies --body-file content to a temp file with trailers appended', () => {
     const { env } = makeHome();
     const bodyDir = mkdtempSync(join(tmpdir(), 'pan-gh-issue-body-src-'));
