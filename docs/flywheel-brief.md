@@ -34,6 +34,8 @@ Rank suggestions by priority:
 
 Within each tier, prefer the oldest ready item. Never let easy low-priority work hide an urgent substrate fix suggestion.
 
+For substrate bugs, call `pan flywheel weights --json` once per tick after inventory and merge the returned `weight` and `weightReason` onto matching suggestions by `issueId`. `weight` is the metric-aware secondary rank for the affected v1.0 criterion; `weightReason` explains the top contributing criterion. P0/`urgent` suggestions are unaffected by weights. Within `high`, `medium`, and `low`, sort substrate-bug suggestions with server-set weights by `weight` descending. Operator-injected suggestions (no server-set `weight`) preserve their explicit order. Example: a criterion 1 bug rate at 3.2% vs target <2% with red status yields weight ≈ 1.8, so it outranks an older P1 bug tagged criterion 3 at 99.5% vs target ≥99.5% with green status and weight 0.
+
 ### Author + assignee allowlist (hard filter — security-critical)
 
 Include an issue in inventory and suggestions **only if at least one of**:
