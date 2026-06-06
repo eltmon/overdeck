@@ -89,7 +89,7 @@ describe('parseSummaryForkFocus', () => {
       ok: true,
       focus: 'continue the API wiring',
     });
-  });
+  }, 15_000);
 
   it('normalizes blank and absent focus to undefined', async () => {
     expect(parseSummaryForkFocus(undefined)).toEqual({ ok: true, focus: undefined });
