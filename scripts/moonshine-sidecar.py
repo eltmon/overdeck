@@ -7,10 +7,8 @@ import signal
 import sys
 import threading
 import time
-import wave
-from io import BytesIO
 
-SAMPLE_RATE = 24000
+SAMPLE_RATE = 16000
 BYTES_PER_SECOND = SAMPLE_RATE * 2
 COMMIT_SILENCE_SECONDS = 0.45
 MIN_COMMIT_BYTES = BYTES_PER_SECOND // 2
@@ -26,49 +24,54 @@ def emit(message):
     sys.stdout.flush()
 
 
+def resolve_model(model_name):
+    """Map a requested model name to a (model_path, ModelArch) pair.
+
+    The ``tiny-en`` model ships bundled in the moonshine_voice package assets, so
+    it works fully offline. ``base-en`` is downloaded from the Moonshine CDN on
+    first use and cached. Anything else falls back to the bundled tiny model.
+    """
+    from moonshine_voice import ModelArch
+    from moonshine_voice.utils import get_model_path
+
+    name = (model_name or "").strip().lower().replace("moonshine/", "").replace("_", "-")
+
+    if name in ("", "tiny", "tiny-en"):
+        return str(get_model_path("tiny-en")), ModelArch.TINY
+
+    if name in ("base", "base-en"):
+        from moonshine_voice.download import get_model_for_language
+        model_root, arch = get_model_for_language("en", ModelArch.BASE)
+        return str(model_root), arch
+
+    return str(get_model_path("tiny-en")), ModelArch.TINY
+
+
 def load_model(model_name):
     try:
-        from moonshine_onnx import MoonshineOnnxModel, load_tokenizer
-        model = MoonshineOnnxModel(model_name=model_name)
-        tokenizer = load_tokenizer()
+        from moonshine_voice import Transcriber
+    except ImportError as error:
+        raise RuntimeError(
+            "Moonshine Python package is unavailable; run scripts/build-moonshine-sidecars.js to build inside its managed venv"
+        ) from error
 
-        def transcribe(pcm_bytes):
-            samples = pcm16_to_float32(pcm_bytes)
-            tokens = model.generate(samples)
-            return tokenizer.decode_batch(tokens)[0].strip()
+    model_path, model_arch = resolve_model(model_name)
+    transcriber = Transcriber(model_path, model_arch)
 
-        return transcribe
-    except ImportError:
-        try:
-            from moonshine import MoonshineModel
-            model = MoonshineModel(model_name)
+    def transcribe(pcm_bytes):
+        samples = pcm16_to_float32(pcm_bytes).tolist()
+        if not samples:
+            return ""
+        transcript = transcriber.transcribe_without_streaming(samples, sample_rate=SAMPLE_RATE)
+        return " ".join(line.text for line in transcript.lines if line.text).strip()
 
-            def transcribe(pcm_bytes):
-                wav = pcm16_to_wav(pcm_bytes)
-                return str(model.transcribe(wav)).strip()
-
-            return transcribe
-        except ImportError as error:
-            raise RuntimeError(
-                "Moonshine Python package is unavailable; run scripts/build-moonshine-sidecars.js to build inside its managed venv"
-            ) from error
+    return transcribe
 
 
 def pcm16_to_float32(pcm_bytes):
     import numpy as np
 
     return np.frombuffer(pcm_bytes, dtype="<i2").astype("float32") / 32768.0
-
-
-def pcm16_to_wav(pcm_bytes):
-    output = BytesIO()
-    with wave.open(output, "wb") as wav:
-        wav.setnchannels(1)
-        wav.setsampwidth(2)
-        wav.setframerate(SAMPLE_RATE)
-        wav.writeframes(pcm_bytes)
-    output.seek(0)
-    return output
 
 
 def main():

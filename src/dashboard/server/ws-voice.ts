@@ -145,7 +145,13 @@ export function setupVoiceWebSocket(server: http.Server): void {
           return;
         }
         if (!transcription.sendAudio(audio)) {
-          sendJson(ws, { type: 'error', error: 'Voice transcription is backpressured' });
+          if (!transcription.isAlive()) {
+            const detail = transcription.getLastError();
+            sendJson(ws, { type: 'error', error: `Voice engine stopped${detail ? `: ${detail}` : ''}` });
+            ws.close(1011, 'Voice engine stopped');
+          } else {
+            sendJson(ws, { type: 'error', error: 'Voice transcription is backpressured' });
+          }
         }
         return;
       }
