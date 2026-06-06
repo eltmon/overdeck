@@ -30,6 +30,7 @@ import {
 } from '../services/flywheel-actions.js';
 import { readFlywheelState } from '../services/flywheel-state.js';
 import { computeFlywheelStats, parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
+import { computeFlywheelSubstrateBugWeights, type FlywheelSubstrateBugWeightsDeps, type FlywheelSubstrateBugWeightsPayload } from '../services/flywheel-bug-weights.js';
 import { derivePipelineRunStatsInputs } from '../services/pipeline-run-metrics.js';
 import {
   isFlywheelAutoPickupBacklog,
@@ -98,6 +99,11 @@ interface FlywheelStatusResponse {
 interface FlywheelStatsResponse {
   status: number;
   body: FlywheelStatsPayload | { error: string; details?: string[] };
+}
+
+interface FlywheelSubstrateBugWeightsResponse {
+  status: number;
+  body: FlywheelSubstrateBugWeightsPayload | { error: string; details?: string[] };
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -448,6 +454,23 @@ export async function getFlywheelStatsPayload(window: string | null | undefined,
   }
 }
 
+export async function getFlywheelSubstrateBugWeightsPayload(
+  window: string | null | undefined,
+  deps: FlywheelSubstrateBugWeightsDeps = {},
+): Promise<FlywheelSubstrateBugWeightsResponse> {
+  try {
+    return { status: 200, body: await computeFlywheelSubstrateBugWeights(window ?? '30d', deps) };
+  } catch (error) {
+    return {
+      status: 400,
+      body: {
+        error: 'Invalid Flywheel substrate bug weights request or payload',
+        details: [error instanceof Error ? error.message : String(error)],
+      },
+    };
+  }
+}
+
 export async function postFlywheelStartPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
   const body = (payload ?? {}) as StartRequestBody;
   if (body.brief !== undefined && typeof body.brief !== 'string') {
@@ -538,6 +561,20 @@ const getFlywheelStatsRoute = HttpRouter.add(
       onSome: (url) => url.searchParams.get('window'),
     }));
     const result = yield* Effect.promise(() => getFlywheelStatsPayload(window));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const getFlywheelSubstrateBugWeightsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/substrate-bug-weights',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const window = HttpServerRequest.toURL(request).pipe(Option.match({
+      onNone: () => undefined,
+      onSome: (url) => url.searchParams.get('window'),
+    }));
+    const result = yield* Effect.promise(() => getFlywheelSubstrateBugWeightsPayload(window));
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -992,6 +1029,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
   getFlywheelStatsRoute,
+  getFlywheelSubstrateBugWeightsRoute,
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,

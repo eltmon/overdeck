@@ -14,6 +14,7 @@ import {
   getFlywheelRunsPayload,
   deleteAutoMergePayload,
   getFlywheelStatsPayload,
+  getFlywheelSubstrateBugWeightsPayload,
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelMergeNextPayload,
@@ -279,6 +280,67 @@ describe('flywheel stats payload helper', () => {
       delete process.env.PANOPTICON_HOME;
       rmSync(panopticonHome, { recursive: true, force: true });
     }
+  });
+});
+
+describe('flywheel substrate bug weights payload helper', () => {
+  it('defaults to 30d, includes untagged bugs, and sorts by weight descending', async () => {
+    const result = await getFlywheelSubstrateBugWeightsPayload(undefined, {
+      now: () => new Date('2026-06-06T10:00:00.000Z'),
+      listBugs: () => [
+        {
+          issueId: 'PAN-1001',
+          filedAt: '2026-06-05T10:00:00.000Z',
+          runId: 'RUN-1',
+          filedBy: 'agent',
+          discoveredInIssueId: 'PAN-999',
+          severity: 'P1',
+          status: 'open',
+          fixMergedAt: null,
+          fixCommitSha: null,
+          updatedAt: '2026-06-05T10:00:00.000Z',
+        },
+        {
+          issueId: 'PAN-1002',
+          filedAt: '2026-06-05T11:00:00.000Z',
+          runId: 'RUN-1',
+          filedBy: 'agent',
+          discoveredInIssueId: 'PAN-999',
+          severity: 'P1',
+          status: 'open',
+          fixMergedAt: null,
+          fixCommitSha: null,
+          updatedAt: '2026-06-05T11:00:00.000Z',
+        },
+      ],
+      fetchIssueDetails: async (issueId) => issueId === 'PAN-1002'
+        ? { body: 'Flywheel-Affects-Criterion: 1', labels: [] }
+        : { body: '', labels: [] },
+      computeStats: async (window) => ({
+        ...makeStats(window),
+        criteria: {
+          ...makeStats(window).criteria,
+          c1_bugRate: {
+            label: 'Substrate-bug discovery rate',
+            value: 0.032,
+            target: 0.02,
+            status: 'red',
+            sampleSize: 50,
+            dataSufficient: true,
+          },
+        },
+      }),
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      window: '30d',
+      generatedAt: '2026-06-06T10:00:00.000Z',
+      weights: [
+        { issueId: 'PAN-1002', criteria: [1], weight: 1.8, reason: 'criterion 1 (bug rate) at 3.2% vs target <2% — red' },
+        { issueId: 'PAN-1001', criteria: [], weight: 0, reason: 'no affected criteria declared' },
+      ],
+    });
   });
 });
 
