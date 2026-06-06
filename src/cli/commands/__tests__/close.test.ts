@@ -90,6 +90,7 @@ describe('closeOutCommand', () => {
       projectPath: '/repo',
       github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
     });
+    expect(process.exit).toHaveBeenCalledWith(0);
   });
 
   it('skips the confirmation prompt when --force is used', async () => {
@@ -97,6 +98,7 @@ describe('closeOutCommand', () => {
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
     expect(mocks.closeOut).toHaveBeenCalledOnce();
+    expect(process.exit).toHaveBeenCalledWith(0);
   });
 
   it('allows the flywheel orchestrator to close out', async () => {
