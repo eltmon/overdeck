@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:44.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1617: Substrate: work agents spawn but kickoff prompt is never delivered — idle 'ghost' agents at the launch screen, misreported healthy",
-    "updated": "2026-06-05T21:19:59.835Z"
+    "updated": "2026-06-06T08:50:42.507Z"
   },
   "plan": {
     "id": "pan-1617",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b1ba5134-1861-4179-9b08-bff65a545378",
     "author": "agent:claude-opus-4-8",
-    "sequence": 17,
+    "sequence": 28,
     "created": "2026-06-05T18:57:44.000Z",
-    "updated": "2026-06-05T21:19:59.835Z",
+    "updated": "2026-06-06T08:50:42.507Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1617",
@@ -426,57 +426,55 @@
         "phase": "review",
         "issueId": "PAN-1617",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-05T21:19:59.830Z",
+        "updatedAt": "2026-06-06T08:50:41.086Z",
         "work": {
-          "updatedAt": "2026-06-05T21:19:59.830Z",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-05T21:19:59.830Z",
-          "notes": "Verification FAILED at test (65947ms):\n\nest.ts\u001b[2m > \u001b[22moperator.intervention dashboard routes\u001b[2m > \u001b[22memits deep_wipe from the successful dashboard deep-wipe route\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/operator-interventions.test.ts:\u001b[2m259:3\u001b[22m\u001b[39m\n    \u001b[90m257|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m258|\u001b[39m\n    \u001b[90m259|\u001b[39m   it('emits deep_wipe from the successful dashboard deep-wipe route', …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m260|\u001b[39m     const { response, appendedEvents } = await requestIssues('/api/iss…\n    \u001b[90m261|\u001b[39m       body\u001b[33m:\u001b[39m \u001b[33mJSON\u001b[39m\u001b[33m.\u001b[39m\u001b[34mstringify\u001b[39m({ deleteWorkspace\u001b[33m:\u001b[39m \u001b[35mfalse\u001b[39m })\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/37]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/issue-lifecycle.test.ts\u001b[2m > \u001b[22mIssueLifecycle Effect service\u001b[2m > \u001b[22mtransitionTo — Linear\u001b[2m > \u001b[22mtransitions to \"in_progress\" on Linear\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:\u001b[2m122:5\u001b[22m\u001b[39m\n    \u001b[90m120|\u001b[39m\n    \u001b[90m121|\u001b[39m   \u001b[34mdescribe\u001b[39m(\u001b[32m'transitionTo — Linear'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m122|\u001b[39m     \u001b[34mit\u001b[39m(\u001b[32m'transitions to \"in_progress\" on Linear'\u001b[39m\u001b[33m,\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m   |\u001b[39m     \u001b[31m^\u001b[39m\n    \u001b[90m123|\u001b[39m       \u001b[35mconst\u001b[39m { \u001b[33mIssueLifecycle\u001b[39m } \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[35mimport\u001b[39m(\u001b[32m'../issue-lifecycle.js'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m124|\u001b[39m       \u001b[35mconst\u001b[39m layer \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mmakeTestLayer\u001b[39m()\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/37]⎯\u001b[22m\u001b[39m\n\n",
+          "status": "running",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-05T21:19:59.830Z",
-              "notes": "Verification FAILED at test (65947ms):\n\nest.ts\u001b[2m > \u001b[22moperator.intervention dashboard routes\u001b[2m > \u001b[22memits deep_wipe from the successful dashboard deep-wipe route\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/operator-interventions.test.ts:\u001b[2m259:3\u001b[22m\u001b[39m\n    \u001b[90m257|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m258|\u001b[39m\n    \u001b[90m259|\u001b[39m   it('emits deep_wipe from the successful dashboard deep-wipe route', …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m260|\u001b[39m     const { response, appendedEvents } = await requestIssues('/api/iss…\n    \u001b[90m261|\u001b[39m       body\u001b[33m:\u001b[39m \u001b[33mJSON\u001b[39m\u001b[33m.\u001b[39m\u001b[34mstringify\u001b[39m({ deleteWorkspace\u001b[33m:\u001b[39m \u001b[35mfalse\u001b[39m })\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/37]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/issue-lifecycle.test.ts\u001b[2m > \u001b[22mIssueLifecycle Effect service\u001b[2m > \u001b[22mtransitionTo — Linear\u001b[2m > \u001b[22mtransitions to \"in_progress\" on Linear\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:\u001b[2m122:5\u001b[22m\u001b[39m\n    \u001b[90m120|\u001b[39m\n    \u001b[90m121|\u001b[39m   \u001b[34mdescribe\u001b[39m(\u001b[32m'transitionTo — Linear'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m122|\u001b[39m     \u001b[34mit\u001b[39m(\u001b[32m'transitions to \"in_progress\" on Linear'\u001b[39m\u001b[33m,\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m   |\u001b[39m     \u001b[31m^\u001b[39m\n    \u001b[90m123|\u001b[39m       \u001b[35mconst\u001b[39m { \u001b[33mIssueLifecycle\u001b[39m } \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[35mimport\u001b[39m(\u001b[32m'../issue-lifecycle.js'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m124|\u001b[39m       \u001b[35mconst\u001b[39m layer \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mmakeTestLayer\u001b[39m()\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/37]⎯\u001b[22m\u001b[39m\n\n"
+              "status": "running",
+              "at": "2026-06-06T08:50:41.086Z"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-05T21:19:59.830Z",
+          "status": "reviewing",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "notes": "Verification failed at test",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-05T21:19:59.830Z",
+              "status": "reviewing",
+              "at": "2026-06-06T08:50:41.086Z",
               "notes": "Verification failed at test"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-05T21:19:59.830Z",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-05T21:19:59.830Z"
+              "at": "2026-06-06T08:50:41.086Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-05T21:19:59.830Z",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-05T21:19:59.830Z",
+          "updatedAt": "2026-06-06T08:50:41.086Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-05T21:19:59.830Z"
+              "at": "2026-06-06T08:50:41.086Z"
             }
           ],
           "readyForMerge": false,
