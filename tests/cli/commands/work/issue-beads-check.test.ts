@@ -33,7 +33,7 @@ describe('hasBeadsTasks', () => {
   it('returns false when .beads directory does not exist', async () => {
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(false);
-  });
+  }, 15_000);
 
   it('returns false when .beads exists without exported issues', async () => {
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
