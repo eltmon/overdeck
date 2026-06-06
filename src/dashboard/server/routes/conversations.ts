@@ -78,6 +78,7 @@ import {
   MessageDeliveryFailed,
   capturePane,
   sessionExists,
+  isHarnessProcessAlive,
   killSession,
   createSession,
   setOption,
@@ -2141,9 +2142,18 @@ const postConversationResumeRoute = HttpRouter.add(
           ? body['effort'].trim()
           : (conv.effort ?? undefined);
 
-        const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+        // Reattach only when the harness process is genuinely alive. The tmux
+        // session existing is NOT sufficient: the launcher's keep-alive loop
+        // (`while true; do sleep 60; done`) outlives Claude, so a crashed/exited
+        // session lingers as a "corpse" with the same name. Reattaching to that
+        // drops the user into a dead shell loop. When Claude is alive we
+        // reattach (continue the same session); when it's a corpse we fall
+        // through to the respawn branch, which relaunches `claude --resume
+        // <sessionId>` into the SAME session/transcript (no history loss) and
+        // kills the stale tmux session first. PAN-1637.
+        const claudeAlive = await isHarnessProcessAlive(conv.tmuxSession);
 
-        if (sessionAlive) {
+        if (claudeAlive) {
           // Reattach: just update last_attached_at and mark active
           updateLastAttached(name);
           markConversationActive(name);
