@@ -72,6 +72,20 @@ Criterion 6 uses the D12 complexity buckets captured at planning completion: `si
 
 Criterion 7 uses the H9 flake definition: a review or test check that passes on one cycle and fails on the next cycle in the same pipeline run with no intervening code commit, meaning the head SHA is unchanged. Failures after a new commit are treated as ordinary pass/fail outcomes, not flakes.
 
+### Metric-aware suggestion weights
+
+Substrate-bug suggestions can declare which v1.0 criteria they affect. The primary signal is a GitHub issue body trailer:
+
+```text
+Flywheel-Affects-Criterion: 1,5
+```
+
+Labels matching `affects-criterion-N` are the fallback signal. When both are present, the Flywheel uses the sorted, deduplicated union of the trailer ids and labels.
+
+The Flywheel converts affected criteria into a suggestion `weight` and `weightReason`. The `weight` is a metric-aware secondary rank inside non-urgent priority tiers; the `weightReason` is the operator-facing sentence explaining the top contributing criterion. On the dashboard suggestion list, a higher weight means the substrate bug is closer to, or further beyond, a v1.0 readiness threshold. `urgent` suggestions still outrank everything, and unweighted operator-injected suggestions preserve their explicit order.
+
+Weight is computed as the sum of each affected criterion's distance from target multiplied by readiness status: `red = 3`, `yellow = 2`, `green = 1`, and `insufficient_data = 0`. Rate or duration criteria use `(value - target) / target`, clamped at zero. Ratio criteria where higher is better use `(target - value) / target`, clamped at zero. Critical/P0 substrate bugs use the raw open count. Empty or unknown affected criteria produce weight `0` with reason `no affected criteria declared`.
+
 ## Substrate-bug provenance
 
 Substrate bug issues filed during a Flywheel run carry a trailer block at the bottom of the GitHub issue body:

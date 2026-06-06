@@ -83,6 +83,8 @@ We are v1.0-ready when **all** of the following hold for **30 consecutive days**
 | 6 | [Time-in-pipeline consistency, per complexity bucket](./docs/FLYWHEEL.md#reading-the-stats-panel) | **p95 within 2× median** | Shopify CI p95 < 2.5× target |
 | 7 | [Flake rate on substrate-attributable failures](./docs/FLYWHEEL.md#reading-the-stats-panel) | **< 5%** | Tighter than Google's observed 16% / Microsoft's 13% (substrate flakes block the whole pipeline, so compound cost is higher) |
 
+Metric-aware Flywheel ranking uses these criteria to explain why one substrate-bug suggestion outranks another; see [Metric-aware suggestion weights](./docs/FLYWHEEL.md#metric-aware-suggestion-weights) for the trailer, label fallback, and operator-facing weight/reason semantics.
+
 Why "all of the above" and not a weighted score: a single metric can be gamed (fewer pipeline runs → fewer bugs) or hidden (operator intervenes constantly → success rate looks fine). The combination is harder to game and forces honest measurement.
 
 Why 30 consecutive days: gives statistical signal (dozens of pipeline runs at current cadence) without being a year-long wait. After 30 days, we can either re-affirm v1.0 or identify which criterion is the bottleneck.
