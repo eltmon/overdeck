@@ -1,5 +1,6 @@
 import { execSync, spawn, ChildProcess } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
@@ -195,6 +196,10 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const node22 = resolveNode22();
   const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
   const frontendDir = join(__dirname, '..', '..', 'src', 'dashboard', 'frontend');
+  // PAN-1670: sentinel file the Vite plugin watches; touched after a hot-reload's
+  // API child is healthy again so Vite pushes a full browser reload (recovers the
+  // tab instead of leaving it stuck on "Reconnecting…").
+  const reloadSignalPath = join(tmpdir(), `pan-dev-fullreload-${config.dashboardPort}.signal`);
 
   console.log(chalk.bold('Starting Panopticon in development mode...\n'));
 
@@ -480,6 +485,9 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       try {
         await waitForHealth(config.dashboardApiPort, '/api/health', 15000);
         console.log(chalk.green('✓ Dashboard server reloaded'));
+        // PAN-1670: API is healthy again — tell Vite to full-reload open tabs so
+        // they re-establish the proxied WS instead of wedging on "Reconnecting…".
+        try { writeFileSync(reloadSignalPath, String(Date.now())); } catch { /* best effort */ }
       } catch (err: any) {
         console.error(chalk.red('[pan dev] server unhealthy after reload:'), err.message);
       }
@@ -501,6 +509,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       env: {
         ...process.env,
         TRAEFIK_ENABLED: config.traefikEnabled ? 'true' : 'false',
+        PAN_DEV_RELOAD_SIGNAL: reloadSignalPath,
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[vite] ${data}`)));
