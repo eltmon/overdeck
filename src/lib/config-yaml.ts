@@ -22,6 +22,7 @@ import { MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync, type 
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
+import { OLLAMA_BASE_URL, resolveOllamaBaseUrl } from './ollama.js';
 import {
   BACKGROUND_AI_FEATURES,
   defaultBackgroundAiFeatures,
@@ -37,6 +38,8 @@ export interface ProviderConfig {
   enabled: boolean;
   /** API key (optional, can use env var) */
   api_key?: string;
+  /** Local/provider base URL (Ollama only for now) */
+  base_url?: string;
   /** Authentication mode: api-key (default) or subscription (OAuth) */
   auth?: AuthMode;
   /** Subscription plan tier (only used when auth is 'subscription') */
@@ -433,6 +436,7 @@ export interface YamlConfig {
       openrouter?: ProviderConfig | boolean;
       nous?: ProviderConfig | boolean;
       dashscope?: ProviderConfig | boolean;
+      ollama?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
@@ -654,6 +658,11 @@ export interface NormalizedConfig {
 
   /** Provider subscription plan by provider */
   providerPlan: Partial<Record<ModelProvider, SubscriptionPlan>>;
+
+  /** Provider-specific base URLs */
+  providerBaseUrls: {
+    ollama: string;
+  };
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
@@ -880,6 +889,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
+  providerBaseUrls: {
+    ollama: OLLAMA_BASE_URL,
+  },
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
@@ -1582,6 +1594,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.tmux,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    providerBaseUrls: { ...DEFAULT_CONFIG.providerBaseUrls },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
     memory: {
@@ -1778,6 +1791,17 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         }
       } else if (providers.dashscope !== undefined) {
         explicitlyDisabled.add('dashscope');
+      }
+
+      // Ollama local sidecar (no API key required)
+      const ollama = normalizeProviderConfig(providers.ollama, undefined);
+      if (providers.ollama !== undefined) {
+        result.providerBaseUrls.ollama = resolveOllamaBaseUrl(config);
+      }
+      if (ollama.enabled) {
+        result.enabledProviders.add('ollama');
+      } else if (providers.ollama !== undefined) {
+        explicitlyDisabled.add('ollama');
       }
     }
 

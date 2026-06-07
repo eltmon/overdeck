@@ -10,6 +10,7 @@ import {
   mergeConfigs,
   mergeRtkConfigs,
 } from '../../src/lib/config-yaml.js';
+import { OLLAMA_BASE_URL } from '../../src/lib/ollama.js';
 
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
@@ -148,6 +149,31 @@ api_keys:
 
       expect(config.apiKeys.dashscope).toBe('dashscope-test-key');
       expect(config.enabledProviders.has('dashscope')).toBe(false);
+    });
+
+    it('normalizes Ollama base_url and defaults to localhost when unset', () => {
+      expect(mergeConfigs().config.providerBaseUrls.ollama).toBe(OLLAMA_BASE_URL);
+
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            ollama: { enabled: true, base_url: 'http://127.0.0.1:11434/' },
+          },
+        },
+      });
+
+      expect(config.enabledProviders.has('ollama')).toBe(true);
+      expect(config.providerBaseUrls.ollama).toBe('http://127.0.0.1:11434');
+    });
+
+    it('rejects non-localhost Ollama base_url', () => {
+      expect(() => mergeConfigs({
+        models: {
+          providers: {
+            ollama: { enabled: true, base_url: 'https://example.com' },
+          },
+        },
+      })).toThrow(/localhost/);
     });
 
     it('normalizes RTK agent config with default-off precedence', () => {

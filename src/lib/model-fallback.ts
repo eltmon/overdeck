@@ -14,7 +14,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'ollama';
 
 /**
  * Map of model ID to provider

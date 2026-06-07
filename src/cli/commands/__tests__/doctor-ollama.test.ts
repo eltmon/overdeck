@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   resolveOllamaBaseUrl: vi.fn(),
 }));
 
-vi.mock('../../../lib/ollama.js', () => ({
+vi.mock('../../../lib/ollama.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/ollama.js')>()),
   isOllamaInstalled: mocks.isOllamaInstalled,
   checkOllamaEndpointReachable: mocks.checkOllamaEndpointReachable,
   resolveOllamaBaseUrl: mocks.resolveOllamaBaseUrl,
