@@ -4,7 +4,7 @@
     "created": "2026-06-07T03:07:29Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1580: Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "updated": "2026-06-07T05:05:32.468Z"
+    "updated": "2026-06-07T05:05:34.968Z"
   },
   "plan": {
     "id": "pan-1580",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "e05658d9-aea0-49e8-8c58-3af56a8a819f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 53,
+    "sequence": 54,
     "created": "2026-06-07T03:07:29Z",
-    "updated": "2026-06-07T05:05:32.468Z",
+    "updated": "2026-06-07T05:05:34.968Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1580",
@@ -450,53 +450,53 @@
         "phase": "work",
         "issueId": "PAN-1580",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:05:31.658Z",
+        "updatedAt": "2026-06-07T05:05:31.659Z",
         "work": {
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "status": "running",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T05:05:31.658Z"
+              "status": "running",
+              "at": "2026-06-07T05:05:31.659Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:05:31.658Z"
+              "at": "2026-06-07T05:05:31.659Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:05:31.658Z"
+              "at": "2026-06-07T05:05:31.659Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:05:31.658Z",
+          "updatedAt": "2026-06-07T05:05:31.659Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:05:31.658Z"
+              "at": "2026-06-07T05:05:31.659Z"
             }
           ],
           "readyForMerge": false,
