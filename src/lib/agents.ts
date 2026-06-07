@@ -4115,10 +4115,10 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
-  logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
+  logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
@@ -4222,7 +4222,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
-    const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
+    const effectiveHarness = await resolveEffectiveHarness(opts?.harness ?? agentState.harness, model);
     agentState.harness = effectiveHarness;
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);

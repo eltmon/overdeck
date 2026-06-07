@@ -54,6 +54,11 @@ vi.mock('../../../lib/formatRelativeTime', () => ({
 }));
 
 vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
+  HARNESS_OPTIONS: [
+    { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
+    { id: 'pi', label: 'Pi', description: 'Alternative harness for non-Anthropic models' },
+  ],
+  canUsePickerHarness: () => ({ allowed: true }),
   useAvailableModels: () => ({ groups: [] }),
 }));
 

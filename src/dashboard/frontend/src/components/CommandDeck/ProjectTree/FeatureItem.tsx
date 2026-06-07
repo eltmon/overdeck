@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
+import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
@@ -38,7 +39,7 @@ interface FeatureItemProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
@@ -654,7 +655,7 @@ interface FeatureContextMenuProps {
   onDeepWipe?: (issueId: string) => void;
   onStopSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onOpenPlanDialog?: (issueId: string) => void;
 }
 
@@ -763,7 +764,7 @@ function ReviewGroup({
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
