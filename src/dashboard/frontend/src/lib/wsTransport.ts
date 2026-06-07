@@ -112,7 +112,23 @@ export interface SubscribeOptions {
   readonly onRetry?: (attempt: number) => void
 }
 
-const DEFAULT_RETRY_DELAY = Duration.millis(250)
+export const RECONNECT_BASE_DELAY_MS = 500
+export const RECONNECT_MAX_DELAY_MS = 10_000
+
+export function reconnectBackoffDelayMs(attempt: number): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt))
+  return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** (safeAttempt - 1), RECONNECT_MAX_DELAY_MS)
+}
+
+const DEFAULT_RETRY_DELAY = Duration.millis(RECONNECT_BASE_DELAY_MS)
+const MAX_RETRY_DELAY = Duration.millis(RECONNECT_MAX_DELAY_MS)
+
+function reconnectRetrySchedule(baseDelay: Duration.Input = DEFAULT_RETRY_DELAY) {
+  return Schedule.exponential(baseDelay).pipe(
+    Schedule.either(Schedule.spaced(MAX_RETRY_DELAY)),
+    Schedule.jittered,
+  )
+}
 
 function formatError(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) return error.message
@@ -221,7 +237,7 @@ export class WsTransport {
               }
             }),
           ),
-          Effect.retry(Schedule.fixed(retryDelay)),
+          Effect.retry(reconnectRetrySchedule(retryDelay)),
           Effect.forever,
         ),
         {
@@ -232,7 +248,7 @@ export class WsTransport {
               try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
-              setTimeout(run, 1000)
+              setTimeout(run, reconnectBackoffDelayMs(reconnectAttempts))
             }
           },
         },
