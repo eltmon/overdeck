@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-06-07T06:06:50.715Z"
+    "updated": "2026-06-07T06:11:52.850Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 45,
+    "sequence": 49,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-06-07T06:06:50.715Z",
+    "updated": "2026-06-07T06:11:52.850Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -508,53 +508,53 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T06:06:50.712Z",
+        "updatedAt": "2026-06-07T06:11:52.672Z",
         "work": {
-          "updatedAt": "2026-06-07T06:06:50.712Z",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T06:06:50.712Z",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T06:06:50.712Z"
+              "at": "2026-06-07T06:11:52.672Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T06:06:50.712Z",
-          "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean.",
+          "status": "reviewing",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
+          "notes": "Agent re-review request (1/25): Completed acceptance criteria",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T06:06:50.712Z",
-              "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean."
+              "status": "reviewing",
+              "at": "2026-06-07T06:11:52.672Z",
+              "notes": "Agent re-review request (1/25): Completed acceptance criteria"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:06:50.712Z",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:06:50.712Z"
+              "at": "2026-06-07T06:11:52.672Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T06:06:50.712Z",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-07T06:06:50.712Z",
+          "updatedAt": "2026-06-07T06:11:52.672Z",
           "history": [],
           "readyForMerge": false
         }
