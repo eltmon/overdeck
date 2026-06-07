@@ -810,7 +810,7 @@ export function SettingsPage() {
         conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
         return;
       }
-      conversationSearchReindexMutation.mutate();
+      conversationSearchReindexMutation.mutate(undefined);
     } catch (error) {
       toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
