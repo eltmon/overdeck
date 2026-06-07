@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -27,6 +27,11 @@ function message(role: string, text: string, timestamp: string): unknown {
   };
 }
 
+function sourceSlice(filePath: string, byteOffset: number, byteLength: number): string {
+  const bytes = readFileSync(filePath);
+  return bytes.subarray(byteOffset, byteOffset + byteLength).toString('utf8');
+}
+
 afterEach(() => {
   if (tmpDir) {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -50,8 +55,7 @@ describe('conversation JSONL chunker', () => {
         projectId: 'panopticon-cli',
         role: 'user',
         ts: '2026-06-02T01:00:00.000Z',
-        byteOffset: 0,
-        charLength: 'hello from user'.length,
+        charLength: Buffer.byteLength('hello from user', 'utf8'),
         text: 'hello from user',
       }),
       expect.objectContaining({
@@ -59,11 +63,13 @@ describe('conversation JSONL chunker', () => {
         projectId: 'panopticon-cli',
         role: 'assistant',
         ts: '2026-06-02T01:00:01.000Z',
-        byteOffset: Buffer.byteLength(first, 'utf8'),
-        charLength: 'assistant reply'.length,
+        charLength: Buffer.byteLength('assistant reply', 'utf8'),
         text: 'assistant reply',
       }),
     ]);
+    for (const chunk of chunks) {
+      expect(sourceSlice(filePath, chunk.byteOffset, chunk.charLength)).toBe(chunk.text);
+    }
   });
 
   it('splits long text into overlapping approximate token windows', () => {
@@ -100,10 +106,10 @@ describe('conversation JSONL chunker', () => {
     expect(appendedOnly).toEqual([
       expect.objectContaining({
         text: 'third message',
-        byteOffset: cursor,
-        charLength: 'third message'.length,
+        charLength: Buffer.byteLength('third message', 'utf8'),
       }),
     ]);
+    expect(sourceSlice(filePath, appendedOnly[0]!.byteOffset, appendedOnly[0]!.charLength)).toBe('third message');
   });
 
   it('ignores a trailing partial JSONL line until it is complete', async () => {

@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { estimateFullReindexConversationSearchCost, indexConversationFile } from '../indexer.js';
+import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch, indexConversationFile } from '../indexer.js';
 import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversation-embeddings-db.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
@@ -112,6 +112,54 @@ describe('conversation search indexer', () => {
 
     expect(result.disabled).toBe(true);
     expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('full reindex no-ops without touching cursors when conversation search is disabled', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'session-disabled-full.jsonl');
+    writeFileSync(filePath, line(message('user', 'disabled full')));
+    const db = fakeDb();
+    const provider = fakeProvider();
+
+    const result = await fullReindexConversationSearch({ config: config({ enabled: false }), roots: [dir], db, provider });
+
+    expect(result.disabled).toBe(true);
+    expect(db.cursors.size).toBe(0);
+    expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('does not advance the cursor past a trailing partial JSONL line', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'session-partial.jsonl');
+    const complete = line(message('user', 'complete before partial'));
+    writeFileSync(filePath, `${complete}{"type":"assistant"`);
+    const db = fakeDb();
+    const provider = fakeProvider();
+
+    await indexConversationFile({ filePath, config: config(), db, provider });
+
+    expect(db.getCursor(filePath)).toBe(Buffer.byteLength(complete, 'utf8'));
+    appendFileSync(filePath, `,"timestamp":"2026-06-02T01:00:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"completed later"}]}}\n`);
+    const result = await indexConversationFile({ filePath, config: config(), db, provider });
+
+    expect(result.chunksIndexed).toBe(1);
+    expect(db.chunks.map((chunk) => chunk.text)).toEqual(['complete before partial', 'completed later']);
+  });
+
+  it('embeds and persists large appends in bounded batches', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'session-batches.jsonl');
+    writeFileSync(filePath, [0, 1, 2].map((i) => line(message('user', `batch ${i}`))).join(''));
+    const db = fakeDb();
+    const provider = fakeProvider();
+
+    const result = await indexConversationFile({ filePath, config: config(), db, provider, batchSize: 2 });
+
+    expect(result.chunksIndexed).toBe(3);
+    expect(provider.embed).toHaveBeenCalledTimes(2);
+    expect(provider.embed).toHaveBeenNthCalledWith(1, ['batch 0', 'batch 1']);
+    expect(provider.embed).toHaveBeenNthCalledWith(2, ['batch 2']);
+    expect(db.getCursor(filePath)).toBe(Buffer.byteLength(readFileSync(filePath), 'utf8'));
   });
 
   it('estimates full reindex cost without embedding chunks', async () => {

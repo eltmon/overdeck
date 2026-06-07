@@ -20,10 +20,11 @@ import { jsonResponse } from '../http-helpers.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
-import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
-import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
-import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
+import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
+import { searchConversationChunks } from '../services/conversation-search-service.js';
+import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
 
 // ─── Pan command catalog ──────────────────────────────────────────────────────
 //
@@ -202,10 +203,18 @@ export interface PaletteConversationHit {
   rank: number;
 }
 
+function routeableConversationName(sessionId: string): string {
+  try {
+    return getConversationByClaudeSessionId(sessionId)?.name ?? sessionId;
+  } catch {
+    return sessionId;
+  }
+}
+
 function toPaletteConversationHit(hit: ConversationSearchHit): PaletteConversationHit {
   return {
     sessionId: hit.sessionId,
-    conversationId: hit.sessionId,
+    conversationId: routeableConversationName(hit.sessionId),
     projectId: hit.projectId,
     role: hit.role,
     ts: hit.ts,
@@ -218,30 +227,8 @@ function toPaletteConversationHit(hit: ConversationSearchHit): PaletteConversati
 }
 
 async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
-  const config = getConversationSearchConfigSync();
-  if (!config.enabled) return [];
-
-  const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-  if (!db.available) return [];
-
-  try {
-    const provider = createConversationEmbeddingProvider({ config });
-    const hits = await rankConversationSearch({
-      query: rawQuery,
-      limit,
-      store: {
-        searchBm25: (_query, candidateLimit) => db.searchBm25(matchQuery, candidateLimit),
-        searchVector: (embedding, candidateLimit) => db.searchVector(embedding, candidateLimit),
-      },
-      provider,
-    });
-    return hits.map(toPaletteConversationHit);
-  } catch (error) {
-    console.error('[palette] conversation search failed:', error);
-    return [];
-  } finally {
-    db.close();
-  }
+  const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
+  return hits.map(toPaletteConversationHit);
 }
 
 async function searchProjectMemory(
@@ -347,6 +334,11 @@ const getPaletteSearchRoute = HttpRouter.add(
   '/api/palette/search',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
     const url = new URL(request.url, 'http://localhost');
     const rawQuery = (url.searchParams.get('q') ?? '').trim();
     const limitParam = url.searchParams.get('limit');

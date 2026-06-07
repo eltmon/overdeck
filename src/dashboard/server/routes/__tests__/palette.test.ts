@@ -36,6 +36,7 @@ import { runMemoryFtsStatement } from '../../../../lib/memory/fts-db.js';
 import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../../lib/database/conversation-embeddings-db.js';
+import { closeConversationSearchService } from '../../services/conversation-search-service.js';
 import { runPaletteSearch } from '../palette.js';
 
 let tmpDir: string | undefined;
@@ -75,6 +76,7 @@ describe('palette conversation search', () => {
   });
 
   afterEach(() => {
+    closeConversationSearchService();
     vi.restoreAllMocks();
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = undefined;
@@ -121,7 +123,6 @@ describe('palette conversation search', () => {
       conversationId: 'session-a',
       projectId: 'panopticon-cli',
       role: 'assistant',
-      byteOffset: 0,
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
   });

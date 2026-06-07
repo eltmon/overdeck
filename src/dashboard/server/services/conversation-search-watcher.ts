@@ -32,6 +32,17 @@ const DEFAULT_WRITE_POLL_MS = 50;
 
 let activeWatcher: ConversationSearchWatcher | null = null;
 
+function watcherSignature(config: NormalizedConversationSearchConfig, roots: string[]): string {
+  return JSON.stringify({
+    enabled: config.enabled,
+    provider: config.provider,
+    model: config.model,
+    apiKeyRef: config.apiKeyRef ?? null,
+    dbPath: config.dbPath,
+    roots,
+  });
+}
+
 export class ConversationSearchWatcher {
   private readonly config: NormalizedConversationSearchConfig;
   private readonly roots: string[];
@@ -40,6 +51,7 @@ export class ConversationSearchWatcher {
   private readonly indexAll: IndexAllFn;
   private readonly indexFile: IndexFileFn;
   private readonly log: Pick<Console, 'log' | 'warn'>;
+  readonly signature: string;
   private watcher: WatcherLike | null = null;
   private stopped = false;
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
@@ -48,6 +60,7 @@ export class ConversationSearchWatcher {
     this.config = options.config ?? getConversationSearchConfigSync();
     this.roots = options.roots ?? defaultConversationRoots();
     this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+    this.signature = watcherSignature(this.config, this.roots);
     this.watchFactory = options.watchFactory ?? ((paths, watchOptions) => chokidarWatch(paths, watchOptions) as FSWatcher);
     this.indexAll = options.indexAll ?? indexConversationSearch;
     this.indexFile = options.indexFile ?? indexConversationFile;
@@ -123,12 +136,23 @@ export async function stopConversationSearchWatcher(): Promise<void> {
 
 export async function syncConversationSearchWatcher(options: ConversationSearchWatcherOptions = {}): Promise<ConversationSearchWatcher | null> {
   const config = options.config ?? getConversationSearchConfigSync();
+  const roots = options.roots ?? defaultConversationRoots();
   if (!config.enabled) {
     await stopConversationSearchWatcher();
     options.log?.log?.('[conversation-search] watcher stopped because config is disabled');
     return null;
   }
-  return startConversationSearchWatcher({ ...options, config });
+
+  const signature = watcherSignature(config, roots);
+  if (activeWatcher?.signature === signature) return activeWatcher;
+
+  if (activeWatcher) {
+    await stopConversationSearchWatcher();
+    options.log?.log?.('[conversation-search] watcher restarting because config changed');
+  }
+  activeWatcher = new ConversationSearchWatcher({ ...options, config, roots });
+  activeWatcher.start();
+  return activeWatcher;
 }
 
 function defaultConversationRoots(): string[] {

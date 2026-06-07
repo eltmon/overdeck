@@ -5,10 +5,14 @@ export interface ConversationChunkRecord {
   projectId: string;
   role: string;
   ts: string | null;
+  /** Byte offset of this chunk's text payload inside the source JSONL file. */
   byteOffset: number;
+  /** Byte length of this chunk's source text payload. */
   charLength: number;
   text: string;
   tokenCount: number;
+  /** Byte offset immediately after the complete JSONL line that produced this chunk. */
+  sourceLineEndOffset: number;
 }
 
 export interface ChunkConversationJsonlOptions {
@@ -27,6 +31,7 @@ export interface ChunkConversationJsonlOptions {
 
 interface JsonlLine {
   byteOffset: number;
+  lineEndOffset: number;
   bytes: Buffer;
 }
 
@@ -50,6 +55,11 @@ interface TextWindow {
 interface TokenSpan {
   start: number;
   end: number;
+}
+
+interface TextPayload {
+  text: string;
+  byteOffset: number;
 }
 
 const DEFAULT_MAX_TOKENS = 512;
@@ -76,20 +86,27 @@ export async function* chunkConversationJsonl(
     const role = extractRole(parsed);
     if (!role) continue;
 
-    const text = extractMessageText(parsed).trim();
+    const payload = extractMessagePayload(line);
+    if (!payload) continue;
+
+    const text = payload.text.trim();
     if (!text) continue;
 
+    const leadingTrimChars = payload.text.length - payload.text.trimStart().length;
+    const payloadTextStart = payload.byteOffset + Buffer.byteLength(payload.text.slice(0, leadingTrimChars), 'utf8');
     const ts = extractTimestamp(parsed);
     for (const window of splitTextIntoWindows(text, maxTokens, overlapTokens)) {
+      const byteOffset = payloadTextStart + Buffer.byteLength(text.slice(0, window.charStart), 'utf8');
       yield {
         sessionId: options.sessionId,
         projectId: options.projectId,
         role,
         ts,
-        byteOffset: line.byteOffset + Buffer.byteLength(text.slice(0, window.charStart), 'utf8'),
-        charLength: window.charLength,
+        byteOffset,
+        charLength: Buffer.byteLength(window.text, 'utf8'),
         text: window.text,
         tokenCount: window.tokenCount,
+        sourceLineEndOffset: line.lineEndOffset,
       };
     }
   }
@@ -103,6 +120,18 @@ export async function chunkConversationJsonlFile(
   return records;
 }
 
+export async function getLastCompleteJsonlOffset(
+  filePath: string,
+  fromOffset = 0,
+  toOffset?: number,
+): Promise<number> {
+  let lastCompleteOffset = Math.max(0, fromOffset);
+  for await (const line of readCompleteJsonlLines(filePath, fromOffset, toOffset)) {
+    lastCompleteOffset = line.lineEndOffset;
+  }
+  return lastCompleteOffset;
+}
+
 async function* readCompleteJsonlLines(
   filePath: string,
   fromOffset: number,
@@ -113,7 +142,6 @@ async function* readCompleteJsonlLines(
   const endExclusive = Math.max(start, Math.min(toOffset ?? stat.size, stat.size));
   if (start >= endExclusive) return;
 
-  let offset = start;
   let pending = Buffer.alloc(0);
   let pendingOffset = start;
   let skipFirstPartialLine = await startsInsideLine(filePath, start);
@@ -128,14 +156,14 @@ async function* readCompleteJsonlLines(
       const lineBytes = pending.subarray(0, newlineIndex);
       const nextPending = pending.subarray(newlineIndex + 1);
       const lineStartOffset = pendingOffset;
-      pendingOffset += newlineIndex + 1;
-      offset = pendingOffset;
+      const lineEndOffset = pendingOffset + newlineIndex + 1;
+      pendingOffset = lineEndOffset;
       pending = nextPending;
 
       if (skipFirstPartialLine) {
         skipFirstPartialLine = false;
       } else if (lineBytes.some((byte) => byte !== 0x20 && byte !== 0x09 && byte !== 0x0d)) {
-        yield { byteOffset: lineStartOffset, bytes: stripTrailingCarriageReturn(lineBytes) };
+        yield { byteOffset: lineStartOffset, lineEndOffset, bytes: stripTrailingCarriageReturn(lineBytes) };
       }
 
       newlineIndex = pending.indexOf(0x0a);
@@ -144,7 +172,6 @@ async function* readCompleteJsonlLines(
 
   // Deliberately ignore a trailing partial line. Live Claude sessions append JSONL
   // continuously; indexing only complete lines keeps cursors and byte offsets stable.
-  void offset;
 }
 
 async function startsInsideLine(filePath: string, offset: number): Promise<boolean> {
@@ -185,8 +212,27 @@ function extractTimestamp(entry: TranscriptEntry): string | null {
   return null;
 }
 
-function extractMessageText(entry: TranscriptEntry): string {
-  return extractText(entry.message?.content).join('\n');
+function extractMessagePayload(line: JsonlLine): TextPayload | null {
+  const entry = parseTranscriptEntry(line.bytes);
+  if (!entry) return null;
+  const text = extractText(entry.message?.content).join('\n');
+  if (!text) return null;
+
+  const rawLine = line.bytes.toString('utf8');
+  const encoded = JSON.stringify(text).slice(1, -1);
+  const encodedIndex = rawLine.indexOf(encoded);
+  if (encodedIndex >= 0) {
+    return { text, byteOffset: line.byteOffset + Buffer.byteLength(rawLine.slice(0, encodedIndex), 'utf8') };
+  }
+
+  // Fallback for multi-part content: locate the first text leaf and use the
+  // concatenated decoded text for indexing. This preserves stable line-local
+  // keys; common single-text Claude Code messages take the exact path above.
+  const firstText = firstTextLeaf(entry.message?.content);
+  if (!firstText) return { text, byteOffset: line.byteOffset };
+  const firstEncoded = JSON.stringify(firstText).slice(1, -1);
+  const firstIndex = rawLine.indexOf(firstEncoded);
+  return { text, byteOffset: firstIndex >= 0 ? line.byteOffset + Buffer.byteLength(rawLine.slice(0, firstIndex), 'utf8') : line.byteOffset };
 }
 
 function extractText(value: unknown): string[] {
@@ -197,6 +243,21 @@ function extractText(value: unknown): string[] {
   if (typeof value.text === 'string' && (value.type === undefined || value.type === 'text')) return [value.text];
   if (typeof value.content === 'string') return [value.content];
   return [];
+}
+
+function firstTextLeaf(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = firstTextLeaf(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  if (typeof value.text === 'string' && (value.type === undefined || value.type === 'text')) return value.text;
+  if (typeof value.content === 'string') return value.content;
+  return null;
 }
 
 export function splitTextIntoWindows(

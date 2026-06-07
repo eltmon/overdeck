@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../database/conversation-embeddings-db.js';
-import { chunkConversationJsonl, type ConversationChunkRecord } from './chunker.js';
+import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
 export interface ConversationIndexerOptions {
@@ -20,6 +20,7 @@ export interface IndexConversationFileOptions extends ConversationIndexerOptions
   sessionId?: string;
   projectId?: string;
   fullReindex?: boolean;
+  batchSize?: number;
 }
 
 export interface ConversationIndexResult {
@@ -40,6 +41,8 @@ const EMPTY_RESULT: ConversationIndexResult = {
   errors: [],
   disabled: false,
 };
+
+const DEFAULT_EMBED_BATCH_SIZE = 64;
 
 export async function indexConversationSearch(
   options: ConversationIndexerOptions = {},
@@ -75,9 +78,19 @@ export async function fullReindexConversationSearch(
   options: ConversationIndexerOptions = {},
 ): Promise<ConversationIndexResult> {
   const config = options.config ?? getConversationSearchConfigSync();
+  if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+
   const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
   const db = options.db ?? openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
   try {
+    if (!db.available) {
+      return {
+        ...EMPTY_RESULT,
+        filesScanned: files.length,
+        disabled: true,
+        unavailableReason: db.unavailableReason ?? 'embeddings DB unavailable',
+      };
+    }
     for (const filePath of files) db.setCursor(filePath, 0);
   } finally {
     if (!options.db) db.close();
@@ -97,12 +110,15 @@ export async function estimateFullReindexConversationSearchCost(
 ): Promise<ConversationReindexCostEstimate> {
   const config = options.config ?? getConversationSearchConfigSync();
   const provider = options.provider ?? createConversationEmbeddingProvider({ config });
+  const empty = provider.estimateCost([]);
   if (!config.enabled) {
-    return { ...provider.estimateCost([]), filesScanned: 0, chunksEstimated: 0, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+    return { ...empty, filesScanned: 0, chunksEstimated: 0, disabled: true, unavailableReason: 'conversationSearch is disabled' };
   }
 
   const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
-  const texts: string[] = [];
+  let tokenCount = 0;
+  let estimatedUsd = 0;
+  let chunksEstimated = 0;
   for (const filePath of files) {
     for await (const chunk of chunkConversationJsonl({
       filePath,
@@ -110,10 +126,13 @@ export async function estimateFullReindexConversationSearchCost(
       projectId: projectIdFromPath(filePath),
       fromOffset: 0,
     })) {
-      texts.push(chunk.text);
+      const estimate = provider.estimateCost([chunk.text]);
+      tokenCount += estimate.tokenCount;
+      estimatedUsd += estimate.estimatedUsd;
+      chunksEstimated += 1;
     }
   }
-  return { ...provider.estimateCost(texts), filesScanned: files.length, chunksEstimated: texts.length, disabled: false };
+  return { ...empty, tokenCount, estimatedUsd, filesScanned: files.length, chunksEstimated, disabled: false };
 }
 
 export async function indexConversationFile(
@@ -137,7 +156,14 @@ export async function indexConversationFile(
       return result;
     }
 
-    const chunks: ConversationChunkRecord[] = [];
+    const lastCompleteOffset = await getLastCompleteJsonlOffset(options.filePath, fromOffset, stat.size);
+    if (lastCompleteOffset <= fromOffset) {
+      result.chunksSkipped += 1;
+      return result;
+    }
+
+    const batchSize = Math.max(1, options.batchSize ?? DEFAULT_EMBED_BATCH_SIZE);
+    let batch: ConversationChunkRecord[] = [];
     for await (const chunk of chunkConversationJsonl({
       filePath: options.filePath,
       sessionId: options.sessionId ?? sessionIdFromPath(options.filePath),
@@ -145,24 +171,22 @@ export async function indexConversationFile(
       fromOffset,
       toOffset: stat.size,
     })) {
-      chunks.push(chunk);
+      batch.push(chunk);
+      if (batch.length >= batchSize) {
+        await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result });
+        batch = [];
+      }
     }
 
-    if (chunks.length === 0) {
-      owned.db.setCursor(options.filePath, stat.size);
-      return result;
+    if (batch.length > 0) {
+      await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result });
     }
 
-    const embedded = await owned.provider.embed(chunks.map((chunk) => chunk.text));
-    const indexedAt = options.now?.() ?? new Date().toISOString();
-    chunks.forEach((chunk, index) => {
-      const rowid = owned.db.upsertChunk({ ...chunk, indexedAt });
-      const embedding = embedded.embeddings[index];
-      if (embedding) owned.db.upsertEmbedding(rowid, embedding);
-    });
-    owned.db.setCursor(options.filePath, stat.size);
-    result.filesIndexed = 1;
-    result.chunksIndexed = chunks.length;
+    if (result.chunksIndexed === 0) {
+      result.chunksSkipped += 1;
+    }
+    owned.db.setCursor(options.filePath, lastCompleteOffset);
+    result.filesIndexed = result.chunksIndexed > 0 ? 1 : 0;
     return result;
   } catch (error) {
     result.errors.push({ filePath: options.filePath, message: error instanceof Error ? error.message : String(error) });
@@ -170,6 +194,27 @@ export async function indexConversationFile(
   } finally {
     owned.close();
   }
+}
+
+async function indexBatch(input: {
+  batch: ConversationChunkRecord[];
+  db: EmbeddingsDbHandle;
+  provider: ConversationEmbeddingProvider;
+  filePath: string;
+  now?: () => string;
+  result: ConversationIndexResult;
+}): Promise<void> {
+  const embedded = await input.provider.embed(input.batch.map((chunk) => chunk.text));
+  const indexedAt = input.now?.() ?? new Date().toISOString();
+  input.batch.forEach((chunk, index) => {
+    const { sourceLineEndOffset: _sourceLineEndOffset, ...insert } = chunk;
+    const rowid = input.db.upsertChunk({ ...insert, indexedAt });
+    const embedding = embedded.embeddings[index];
+    if (embedding) input.db.upsertEmbedding(rowid, embedding);
+  });
+  const lastBatchOffset = Math.max(...input.batch.map((chunk) => chunk.sourceLineEndOffset));
+  input.db.setCursor(input.filePath, lastBatchOffset);
+  input.result.chunksIndexed += input.batch.length;
 }
 
 async function discoverConversationJsonlFiles(roots: string[]): Promise<string[]> {

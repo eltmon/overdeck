@@ -11,6 +11,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   PUT  /api/settings
  */
 
+import { randomBytes } from 'node:crypto';
+
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -38,11 +40,33 @@ import {
 import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 import { syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
+
+const REINDEX_CONFIRM_THRESHOLD_USD = 1;
+const REINDEX_CONFIRM_TTL_MS = 10 * 60 * 1000;
+const reindexConfirmationNonces = new Map<string, { estimatedUsd: number; expiresAt: number }>();
+
+function createReindexConfirmationNonce(estimatedUsd: number): string {
+  const nonce = randomBytes(24).toString('base64url');
+  const now = Date.now();
+  for (const [key, entry] of reindexConfirmationNonces) {
+    if (entry.expiresAt <= now) reindexConfirmationNonces.delete(key);
+  }
+  reindexConfirmationNonces.set(nonce, { estimatedUsd, expiresAt: now + REINDEX_CONFIRM_TTL_MS });
+  return nonce;
+}
+
+function consumeReindexConfirmationNonce(nonce: unknown, estimatedUsd: number): boolean {
+  if (typeof nonce !== 'string') return false;
+  const entry = reindexConfirmationNonces.get(nonce);
+  reindexConfirmationNonces.delete(nonce);
+  return !!entry && entry.expiresAt > Date.now() && Math.abs(entry.estimatedUsd - estimatedUsd) < 0.000001;
+}
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -687,6 +711,18 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   httpHandler(Effect.try({
     try: () => {
       const config = getConversationSearchConfigSync();
+      if (!config.enabled) {
+        return jsonResponse({
+          enabled: false,
+          available: false,
+          unavailableReason: 'conversationSearch is disabled',
+          dbPath: config.dbPath,
+          chunkCount: 0,
+          indexedFileCount: 0,
+          lastIndexedAt: null,
+        });
+      }
+
       const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
       try {
         const stats = db.getStats();
@@ -710,16 +746,39 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
   '/api/settings/conversation-search/reindex-estimate',
   httpHandler(Effect.promise(async () => {
     const estimate = await estimateFullReindexConversationSearchCost();
-    return jsonResponse(estimate);
+    const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
+      ? createReindexConfirmationNonce(estimate.estimatedUsd)
+      : undefined;
+    return jsonResponse({ ...estimate, confirmationNonce });
   })),
 );
 
 const postConversationSearchReindexRoute = HttpRouter.add(
   'POST',
   '/api/settings/conversation-search/reindex',
-  httpHandler(Effect.promise(async () => {
-    const result = await fullReindexConversationSearch();
-    return jsonResponse(result);
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const estimate = await estimateFullReindexConversationSearchCost();
+      if (estimate.disabled) return jsonResponse(estimate);
+      if (estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD) {
+        const nonce = (body as { confirmationNonce?: unknown }).confirmationNonce;
+        if (!consumeReindexConfirmationNonce(nonce, estimate.estimatedUsd)) {
+          return jsonResponse({
+            error: 'Reindex confirmation required',
+            requiresConfirmation: true,
+            estimate,
+          }, { status: 409 });
+        }
+      }
+
+      const result = await fullReindexConversationSearch();
+      return jsonResponse(result);
+    });
   })),
 );
 

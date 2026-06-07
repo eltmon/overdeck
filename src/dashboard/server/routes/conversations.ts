@@ -46,6 +46,7 @@ import {
   listConversations,
   listArchivedConversationsWithEnrichment,
   getConversationByName,
+  getConversationByClaudeSessionId,
   getConversationById,
   createConversation,
   markConversationEnded,
@@ -2557,7 +2558,7 @@ const getConversationMessageLocatorRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
+        const conv = getConversationByName(name) ?? getConversationByClaudeSessionId(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
         const sessionFile = await resolveSessionFile(conv);

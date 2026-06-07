@@ -59,7 +59,7 @@ import {
   SettingsRow,
   type NavItem,
 } from './primitives';
-import { ensureDashboardSession } from '../../lib/wsTransport';
+import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -121,6 +121,7 @@ interface ConversationSearchCostEstimate {
   chunksEstimated: number;
   disabled: boolean;
   unavailableReason?: string;
+  confirmationNonce?: string;
 }
 
 async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
@@ -129,8 +130,12 @@ async function estimateConversationSearchReindex(): Promise<ConversationSearchCo
   return res.json();
 }
 
-async function reindexConversationSearch(): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
-  const res = await fetch('/api/settings/conversation-search/reindex', { method: 'POST' });
+async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
+  const res = await fetch('/api/settings/conversation-search/reindex', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ confirmationNonce }),
+  });
   if (!res.ok) throw new Error('Failed to reindex conversations');
   return res.json();
 }
@@ -802,6 +807,8 @@ export function SettingsPage() {
           `Reindexing is estimated to cost $${estimate.estimatedUsd.toFixed(2)} (${estimate.tokenCount.toLocaleString()} tokens). Continue?`,
         );
         if (!confirmed) return;
+        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+        return;
       }
       conversationSearchReindexMutation.mutate();
     } catch (error) {

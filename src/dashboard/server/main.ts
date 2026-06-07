@@ -46,6 +46,7 @@ import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
+import { closeConversationSearchService } from './services/conversation-search-service.js';
 
 declare const Bun: unknown;
 
@@ -460,6 +461,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAutoMergeExecutor();
   stopTranscriptPoller();
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
+  closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);
 };
