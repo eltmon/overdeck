@@ -6104,7 +6104,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         if (!issueId) {
           return jsonResponse({ ok: false, error: `${type} requires issueId` }, 400);
         }
-        notifyPipeline({ type, issueId });
+        notifyPipelineSync({ type, issueId });
         return jsonResponse({ ok: true });
       }
       case 'task_queued': {
