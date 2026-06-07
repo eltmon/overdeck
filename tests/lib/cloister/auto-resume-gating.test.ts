@@ -13,6 +13,9 @@ describe('auto-resume gates', () => {
   let originalNoResume: string | undefined;
   let originalCwd: string;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
+  // PAN-1665: free work slots the governor reports. High by default so the gating
+  // tests below (1 candidate each) are unaffected; the cap test lowers it.
+  let resumeSlotsMock: number;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -29,6 +32,7 @@ describe('auto-resume gates', () => {
     process.env.PANOPTICON_HOME = tempHome;
     delete process.env.PANOPTICON_NO_RESUME;
     resumeAgentMock = vi.fn();
+    resumeSlotsMock = 999;
   });
 
   afterEach(() => {
@@ -54,6 +58,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/remote/workspace-metadata.js');
     vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
+    vi.doUnmock('../../../src/lib/cloister/concurrency.js');
     vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
@@ -98,6 +103,14 @@ describe('auto-resume gates', () => {
         listRunningAgentsSync: vi.fn(() => []),
       };
     });
+    // PAN-1665: deterministic concurrency budget — avoids reading the real machine's
+    // cloister config / running-agent counts from inside the governor.
+    vi.doMock('../../../src/lib/cloister/concurrency.js', () => ({
+      getConcurrencyLimits: () => ({ maxWorkAgents: resumeSlotsMock, reservedAdvancingSlots: 3, totalCeiling: resumeSlotsMock + 3 }),
+      countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+      workResumeSlotsAvailable: () => resumeSlotsMock,
+      canDispatchAdvancing: () => true,
+    }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
       getReviewStatus: vi.fn().mockReturnValue({
         reviewStatus: 'blocked',
@@ -593,9 +606,10 @@ describe('auto-resume gates', () => {
     });
   }
 
-  it('caps resumes per patrol and defers the rest to the next patrol', async () => {
+  it('resumes only up to the free work slots and defers the rest (concurrency cap)', async () => {
     resumeAgentMock.mockResolvedValue({ success: true });
-    // Low load, plenty of cores → load gate stays open; only the cap should bite.
+    resumeSlotsMock = 3; // only 3 free work slots this patrol
+    // Low load, plenty of cores → load gate stays open; only the concurrency cap bites.
     const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock({
       loadavg: [1, 1, 1],
       cpusCount: 24,
@@ -605,12 +619,27 @@ describe('auto-resume gates', () => {
 
     const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
 
-    // MAX_RESUMES_PER_PATROL = 3 — the other two are left for the next cycle.
+    // 3 slots → resume 3; the other two wait for a future cycle.
     expect(resumed).toHaveLength(3);
     expect(resumeAgentMock).toHaveBeenCalledTimes(3);
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
-      expect.stringContaining('per-patrol resume cap reached'),
+      expect.stringContaining('work concurrency cap reached'),
     );
+  });
+
+  it('resumes nothing when already at the work-agent cap (never kills, lets attrition drain)', async () => {
+    resumeAgentMock.mockResolvedValue({ success: true });
+    resumeSlotsMock = 0; // already at/over the cap
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock({
+      loadavg: [1, 1, 1],
+      cpusCount: 24,
+    });
+    for (let i = 0; i < 4; i++) saveCandidate(agents, `agent-pan-1141-overcap-${i}`);
+
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 
   it('skips all resumes when system load already exceeds the ceiling', async () => {

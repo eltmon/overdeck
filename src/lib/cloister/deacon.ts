@@ -126,6 +126,7 @@ export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -5528,14 +5529,15 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
  *
  * Called by runPatrol() on every patrol cycle AND during deacon startup.
  *
- * PAN-1665: throttled. An unfreeze used to mass-resume ~37 stopped work agents
- * back-to-back with no cap, no load gate, and no stagger — each resume spawns a
- * heavy `claude` process, so load spiked 5→52. The throttle below bounds resumes
- * per patrol, bails out when system load is already high, and staggers spawns so
- * the OS scheduler can absorb each one. Remaining candidates are picked up on the
- * next patrol (every patrolIntervalMs), so nothing is dropped — only spread out.
+ * PAN-1665: bounded by the concurrency governor. An unfreeze used to mass-resume
+ * every stopped work agent back-to-back, marching the box toward dozens of heavy
+ * `claude` processes (load spiked 5→52). We now resume only up to the number of
+ * free work slots (`max_work_agents − runningWork`); at or over the cap we resume
+ * nothing and let attrition drain. This is a gate on *starting* work — it never
+ * kills a running agent. The load gate and stagger below are secondary safety
+ * valves. Remaining candidates are re-evaluated next patrol, so nothing is
+ * dropped — only spread out and bounded.
  */
-const MAX_RESUMES_PER_PATROL = 3;
 // Skip the rest of this cycle once 1-minute load exceeds cores * this factor.
 const RESUME_LOAD_FACTOR = 1.5;
 // Pause between consecutive resume spawns so the herd is spread across the cycle.
@@ -5544,8 +5546,15 @@ const RESUME_STAGGER_MS = 150;
 export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
   // PAN-1665: count spawn attempts (not just successes) — a failed resume still
-  // forks a `claude` process, so the cap must bound attempts to curb the herd.
+  // forks a `claude` process, so the budget must bound attempts to curb the herd.
   let resumeAttempts = 0;
+  // Free work slots this patrol = max_work_agents − running work agents. Zero when
+  // already at/over the cap, in which case we resume nothing (never kill). Computed
+  // once: newly-resumed sessions take time to register as tmux-alive, so we count
+  // attempts against this fixed budget rather than re-polling mid-loop.
+  const concurrencyLimits = getConcurrencyLimits();
+  const runningBefore = countRunningAgents();
+  const workSlots = workResumeSlotsAvailable(runningBefore, concurrencyLimits);
   const cores = cpus().length || 1;
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
   const noResumeMode = getNoResumeMode();
@@ -5718,11 +5727,11 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       }
     }
 
-    // PAN-1665 throttle: bound spawns per patrol and bail when load is high so an
-    // unfreeze doesn't thundering-herd the box. Deferred candidates are re-evaluated
-    // next patrol — they are not dropped.
-    if (resumeAttempts >= MAX_RESUMES_PER_PATROL) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: per-patrol resume cap reached (${MAX_RESUMES_PER_PATROL}); deferring remaining candidates to next patrol`);
+    // PAN-1665 concurrency gate: resume only up to the free work slots, and bail
+    // when load is high. At/over the cap workSlots is 0 → we resume nothing and let
+    // attrition drain (never kill). Deferred candidates are re-evaluated next patrol.
+    if (resumeAttempts >= workSlots) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: work concurrency cap reached (running=${runningBefore.work}, max=${concurrencyLimits.maxWorkAgents}, slots=${workSlots}); deferring remaining candidates to next patrol`);
       break;
     }
     const load1 = loadavg()[0];
