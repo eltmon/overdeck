@@ -165,7 +165,12 @@ export function rejectUnsafeDashboardMutationRequest(
  * caller could spoof.
  */
 function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
-  const addr = Option.getOrElse(request.remoteAddress, () => '');
+  const remoteAddress = request.remoteAddress as Option.Option<string> | string | undefined;
+  const addr = typeof remoteAddress === 'string'
+    ? remoteAddress
+    : remoteAddress
+      ? Option.getOrElse(remoteAddress, () => '')
+      : '';
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
