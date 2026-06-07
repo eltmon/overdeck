@@ -4,7 +4,7 @@
     "created": "2026-05-31T21:30:18.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-06-06T09:16:58.289Z"
+    "updated": "2026-06-06T09:18:48.364Z"
   },
   "plan": {
     "id": "pan-1395",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
     "author": "agent:claude-opus-4-8",
-    "sequence": 11,
+    "sequence": 15,
     "created": "2026-05-31T21:30:18.000Z",
-    "updated": "2026-06-06T09:16:58.289Z",
+    "updated": "2026-06-06T09:18:48.364Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
@@ -724,53 +724,53 @@
         "phase": "work",
         "issueId": "PAN-1395",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-06T09:16:58.255Z",
+        "updatedAt": "2026-06-06T09:18:42.358Z",
         "work": {
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": []
         },
         "verification": {
           "status": "running",
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": [
             {
               "status": "running",
-              "at": "2026-06-06T09:16:58.255Z"
+              "at": "2026-06-06T09:18:42.358Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T09:16:58.255Z"
+              "at": "2026-06-06T09:18:42.358Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T09:16:58.255Z"
+              "at": "2026-06-06T09:18:42.358Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-06T09:16:58.255Z",
+          "updatedAt": "2026-06-06T09:18:42.358Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T09:16:58.255Z"
+              "at": "2026-06-06T09:18:42.358Z"
             }
           ],
           "readyForMerge": false,
