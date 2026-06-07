@@ -119,6 +119,14 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-rtk-toggle"');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleRtkToggle(!formData.agents?.rtk?.enabled)');
   });
+
+  it('surfaces the Streamdown renderer toggle in experimental settings', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('Streamdown renderer');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Render chat markdown with Streamdown — research preview');
+    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Render chat markdown with Streamdown"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('data-testid="experimental-streamdown-toggle"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleStreamdownToggle(!formData.experimental?.streamdownRenderer)');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {

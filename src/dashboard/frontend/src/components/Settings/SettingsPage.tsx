@@ -1181,6 +1181,21 @@ export function SettingsPage() {
     });
   };
 
+  const handleStreamdownToggle = (enabled: boolean) => {
+    const next: SettingsConfig = {
+      ...formData,
+      experimental: {
+        ...formData.experimental,
+        streamdownRenderer: enabled,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
+  };
+
   const handleRtkToggle = (enabled: boolean) => {
     const next: SettingsConfig = {
       ...formData,
@@ -3279,6 +3294,30 @@ export function SettingsPage() {
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 formData.experimental?.claudeCodeChannels ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Streamdown renderer</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Render chat markdown with Streamdown — research preview
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.experimental?.streamdownRenderer)}
+              aria-label="Render chat markdown with Streamdown"
+              data-testid="experimental-streamdown-toggle"
+              onClick={() => handleStreamdownToggle(!formData.experimental?.streamdownRenderer)}
+              disabled={saveMutation.isPending}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.experimental?.streamdownRenderer ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.experimental?.streamdownRenderer ? 'translate-x-[18px]' : 'translate-x-[3px]'
               }`} />
             </button>
           </div>

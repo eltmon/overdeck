@@ -79,5 +79,14 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
       experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false, streamdownRenderer: false },
     });
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    const streamdownToggle = page.getByTestId('experimental-streamdown-toggle');
+    await expect(streamdownToggle).toHaveAttribute('aria-checked', 'false');
+
+    await streamdownToggle.click();
+    await expect.poll(() => lastWrittenBody, { timeout: 5_000 }).toMatchObject({
+      experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false, streamdownRenderer: true },
+    });
+    await expect(streamdownToggle).toHaveAttribute('aria-checked', 'true');
   });
 });
