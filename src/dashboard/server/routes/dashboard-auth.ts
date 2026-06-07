@@ -8,6 +8,12 @@ import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } 
 
 export const DASHBOARD_SESSION_COOKIE = 'panopticon_session';
 export const DASHBOARD_CSRF_HEADER = 'x-panopticon-csrf-token';
+// Session cookie lifetime. Without Max-Age the cookie was a *session* cookie that
+// died when the browser fully closed — so a reopened tab on a trusted origin had
+// no cookie, its mint 401'd, and every mutation failed with "CSRF token
+// unavailable" until the operator re-bootstrapped via the one-time URL token.
+// A 30-day rolling expiry means the operator bootstraps once per browser.
+const DASHBOARD_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 let browserSessionToken: string | undefined;
 let browserCsrfToken: string | undefined;
@@ -73,7 +79,7 @@ function cookieValue(cookieHeader: string | undefined, name: string): string | u
 
 export function dashboardSessionCookieHeader(options: { secure?: boolean } = {}): string {
   const secure = options.secure ? '; Secure' : '';
-  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict${secure}`;
+  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${DASHBOARD_SESSION_MAX_AGE_SECONDS}${secure}`;
 }
 
 export function hasDashboardInternalTokenHeaders(headers: HeaderMap): boolean {
