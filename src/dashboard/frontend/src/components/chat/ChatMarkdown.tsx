@@ -22,7 +22,11 @@ import React, {
   useMemo,
   type ReactNode,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
+import { Streamdown, defaultRehypePlugins, type StreamdownProps } from 'streamdown';
+import 'streamdown/styles.css';
+import { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
@@ -245,6 +249,19 @@ function transformMarkdownUrl(url: string): string {
 }
 
 type ReactMarkdownRemarkPlugins = React.ComponentProps<typeof ReactMarkdown>['remarkPlugins'];
+type StreamdownComponents = NonNullable<StreamdownProps['components']>;
+
+interface ChatMarkdownSettings {
+  experimental?: {
+    streamdownRenderer?: boolean;
+  };
+}
+
+async function fetchChatMarkdownSettings(): Promise<ChatMarkdownSettings> {
+  const res = await fetch('/api/settings');
+  if (!res.ok) throw new Error('settings fetch failed');
+  return res.json();
+}
 
 interface MarkdownNode {
   type: string;
@@ -255,6 +272,25 @@ interface MarkdownNode {
 }
 
 const TEXT_LINK_SKIP_NODE_TYPES = new Set(['code', 'inlineCode', 'link', 'linkReference', 'definition']);
+
+const streamdownSanitizeSchema = {
+  ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    // Streamdown sanitizes before its urlTransform hook. Leave href protocol
+    // filtering to rehype-harden + transformMarkdownUrl so file-link hrefs like
+    // `package.json:1` survive while javascript:/data:/vbscript: remain blocked.
+    href: undefined,
+  },
+};
+
+const streamdownRehypePlugins = [
+  defaultRehypePlugins.raw,
+  [(defaultRehypePlugins.sanitize as unknown[])[0], streamdownSanitizeSchema],
+  defaultRehypePlugins.harden,
+] as unknown as StreamdownProps['rehypePlugins'];
+
+const StreamdownRenderer = Streamdown as React.ComponentType<StreamdownProps>;
 
 /**
  * Gates MarkdownFileLink chip rendering on a server-side existence check
@@ -312,7 +348,7 @@ function remarkBareFileTextLinks(options: { cwd?: string } = {}) {
   };
 }
 
-function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components {
+function makeComponents(isStreaming: boolean, cwd: string | undefined, issueId: string | null | undefined): Components & StreamdownComponents {
   return {
     pre({ children }) {
       // Extract code block contents
@@ -394,13 +430,31 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
     [cwd],
   );
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchChatMarkdownSettings,
+    retry: false,
+  });
+  const useStreamdown = settings?.experimental?.streamdownRenderer === true;
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
       <div className={styles.chatMarkdown}>
-        <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
-          {text}
-        </ReactMarkdown>
+        {useStreamdown ? (
+          <StreamdownRenderer
+            mode={isStreaming ? 'streaming' : 'static'}
+            rehypePlugins={streamdownRehypePlugins}
+            remarkPlugins={remarkPlugins as StreamdownProps['remarkPlugins']}
+            components={components as StreamdownProps['components']}
+            urlTransform={(url) => transformMarkdownUrl(url)}
+          >
+            {text}
+          </StreamdownRenderer>
+        ) : (
+          <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
+            {text}
+          </ReactMarkdown>
+        )}
       </div>
     </ChatMarkdownErrorBoundary>
   );
