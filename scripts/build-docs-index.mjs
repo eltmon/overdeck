@@ -11,13 +11,19 @@ if (!existsSync(libraryEntry)) {
   process.exit(1);
 }
 
-const { buildDocsIndex, DEFAULT_DOCS_INDEX_PATH, DEFAULT_DOCS_INDEX_MAX_BYTES } = await import(pathToFileURL(libraryEntry).href);
+const {
+  buildDocsIndex,
+  DEFAULT_DOCS_INDEX_PATH,
+  DEFAULT_DOCS_INDEX_MAX_BYTES,
+  deterministicDocsHashEmbedding,
+} = await import(pathToFileURL(libraryEntry).href);
 
 try {
   const result = await buildDocsIndex({
     outputPath: DEFAULT_DOCS_INDEX_PATH,
     rootDir: projectRoot,
     maxIndexBytes: DEFAULT_DOCS_INDEX_MAX_BYTES,
+    embeddingFn: deterministicDocsHashEmbedding,
   });
   console.log(`Built docs index at ${result.outputPath} (${result.chunkCount} chunks, ${result.sizeBytes} bytes)`);
 } catch (error) {

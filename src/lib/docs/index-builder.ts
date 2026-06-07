@@ -382,7 +382,7 @@ export function bufferToFloat32Array(buffer: Buffer, dimensions: number): Float3
   return new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 }
 
-export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
+export function deterministicDocsHashEmbedding(input: DocsEmbeddingInput): Float32Array {
   const values = new Float32Array(input.dimensions);
   let seed = `${input.model}\n${input.chunk.docPath}\n${input.chunk.sectionAnchor ?? ''}\n${input.chunk.content}`;
 
@@ -395,6 +395,10 @@ export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float
   }
 
   return normalizeFloat32Embedding(values, input.dimensions);
+}
+
+export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
+  return deterministicDocsHashEmbedding(input);
 }
 
 function resolveDocsEmbeddingOutput(output: Float32Array | DocsEmbeddingOutput): DocsEmbeddingOutput {
