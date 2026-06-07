@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
+import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
@@ -151,6 +152,23 @@ export function rejectUnsafeDashboardMutationRequest(
   return null;
 }
 
+/**
+ * A request whose TCP peer is loopback originated from this machine — either the
+ * local browser hitting the dashboard directly, or via the host-local Traefik
+ * (127.0.0.1) that fronts pan.localhost. We trust it to mint a session.
+ *
+ * This is the auto-bootstrap that removes the manual one-time #panopticon_token
+ * step: any browser on pan.localhost gets a session with no user action. It is
+ * NOT a security downgrade for the LAN — the raw API ports bind 0.0.0.0, but a
+ * direct LAN hit to :3010 has a non-loopback peer and is rejected here. We read
+ * ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For, which a
+ * caller could spoof.
+ */
+function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
+  const addr = Option.getOrElse(request.remoteAddress, () => '');
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
 ): HttpServerResponse.HttpServerResponse | null {
@@ -158,7 +176,7 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
-  if (!hasDashboardInternalToken(request)) {
+  if (!hasDashboardInternalToken(request) && !isLoopbackPeer(request)) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
   return null;
