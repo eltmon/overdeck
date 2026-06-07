@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, X } from 'lucide-react';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
@@ -74,6 +74,8 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const activeRequestRef = useRef<AbortController | null>(null);
 
   const { data: registeredProjects = [] } = useQuery<RegisteredProject[]>({
     queryKey: ['registered-projects'],
@@ -104,6 +106,13 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
   }, [availableProjects, defaultProjectKey]);
 
   useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      activeRequestRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) return;
     setSelectedProjectKey((current) => {
       const keys = new Set(availableProjects.map((project) => project.key));
@@ -119,7 +128,7 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
     setDescription('');
     setError(null);
     setIsSubmitting(false);
-  }, [isOpen, targetStatus, defaultProjectKey]);
+  }, [isOpen, targetStatus]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -140,11 +149,14 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
 
     setIsSubmitting(true);
     setError(null);
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
 
     try {
       const response = await fetch('/api/issues', {
         method: 'POST',
         headers: await dashboardMutationJsonHeaders(),
+        signal: controller.signal,
         body: JSON.stringify({
           projectKey: selectedProjectKey,
           targetStatus,
@@ -154,19 +166,29 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
       });
 
       if (!response.ok) {
-        setError(await responseErrorMessage(response));
-        setIsSubmitting(false);
+        const message = await responseErrorMessage(response);
+        if (mountedRef.current) {
+          setError(message);
+          setIsSubmitting(false);
+        }
         return;
       }
 
       const issue = await response.json() as CreatedIssue;
       onCreated(issue);
       await refreshDashboardState(queryClient);
-      setIsSubmitting(false);
-      onClose();
+      if (mountedRef.current) {
+        setIsSubmitting(false);
+        onClose();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create issue');
-      setIsSubmitting(false);
+      if (controller.signal.aborted) return;
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to create issue');
+        setIsSubmitting(false);
+      }
+    } finally {
+      if (activeRequestRef.current === controller) activeRequestRef.current = null;
     }
   }
 

@@ -1677,9 +1677,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const kanbanIssueIds = useMemo(() => {
     if (cycleFilter === 'all' || cycleFilter === 'backlog' || cycleFilter === 'canceled') return [];
-    return STATUS_ORDER
-      .filter((status) => status !== 'backlog')
-      .flatMap((status) => sortedGrouped[status].map((issue) => issue.identifier));
+    return STATUS_ORDER.flatMap((status) => sortedGrouped[status].map((issue) => issue.identifier));
   }, [cycleFilter, sortedGrouped]);
   const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
 

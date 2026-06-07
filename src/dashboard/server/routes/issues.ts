@@ -626,6 +626,8 @@ type NewIssueRequestBody = {
 };
 
 const newIssueTargetStatuses = new Set<string>(['backlog', 'todo']);
+const NEW_ISSUE_TITLE_MAX_LENGTH = 256;
+const NEW_ISSUE_DESCRIPTION_MAX_LENGTH = 16_384;
 const NEW_ISSUE_CREATE_RATE_LIMIT_WINDOW_MS = 60_000;
 const NEW_ISSUE_CREATE_RATE_LIMIT_MAX = 10;
 const newIssueCreateRateLimits = new Map<string, { windowStartedAt: number; count: number }>();
@@ -645,8 +647,10 @@ function validateNewIssueBody(body: unknown): { ok: true; value: NewIssueRequest
 
   if (!projectKey) errors.projectKey = 'projectKey is required';
   if (!title) errors.title = 'title is required';
+  if (title.length > NEW_ISSUE_TITLE_MAX_LENGTH) errors.title = `title must be ${NEW_ISSUE_TITLE_MAX_LENGTH} characters or fewer`;
   if (!newIssueTargetStatuses.has(targetStatus)) errors.targetStatus = 'targetStatus must be one of: backlog, todo';
   if (record.description !== undefined && typeof record.description !== 'string') errors.description = 'description must be a string';
+  if (description && description.length > NEW_ISSUE_DESCRIPTION_MAX_LENGTH) errors.description = `description must be ${NEW_ISSUE_DESCRIPTION_MAX_LENGTH} characters or fewer`;
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
@@ -662,14 +666,20 @@ function validateNewIssueBody(body: unknown): { ok: true; value: NewIssueRequest
 
 function newIssueRateLimitKey(request: HttpServerRequest.HttpServerRequest): string {
   const headers = request.headers as HeaderMap;
-  return getHeaderFromMap(headers, 'x-forwarded-for')?.split(',')[0]?.trim()
-    || getHeaderFromMap(headers, 'x-real-ip')?.trim()
-    || getHeaderFromMap(headers, 'origin')
-    || 'dashboard-local';
+  return getHeaderFromMap(headers, 'origin') || 'dashboard-local';
+}
+
+function pruneNewIssueCreateRateLimits(now: number): void {
+  for (const [key, value] of newIssueCreateRateLimits) {
+    if (now - value.windowStartedAt >= NEW_ISSUE_CREATE_RATE_LIMIT_WINDOW_MS) {
+      newIssueCreateRateLimits.delete(key);
+    }
+  }
 }
 
 function rejectNewIssueCreateRateLimit(request: HttpServerRequest.HttpServerRequest): Response | null {
   const now = Date.now();
+  pruneNewIssueCreateRateLimits(now);
   const key = newIssueRateLimitKey(request);
   const current = newIssueCreateRateLimits.get(key);
   if (!current || now - current.windowStartedAt >= NEW_ISSUE_CREATE_RATE_LIMIT_WINDOW_MS) {
@@ -705,14 +715,6 @@ function getCreatedIssueIdentifier(projectKey: string, project: ProjectConfig, i
     return number ? `${prefix}-${number}` : issue.ref || issue.id;
   }
   return issue.ref || issue.id;
-}
-
-function trackerErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
-    return (error as { message: string }).message;
-  }
-  return String(error);
 }
 
 async function pathIsDirectory(path: string): Promise<boolean> {
@@ -809,7 +811,8 @@ const postIssuesRoute = HttpRouter.add(
         tracker = createTracker({ ...(trackersConfig.linear ?? { type: 'linear' as const }), type: 'linear', team: projectTeam }, trackerKeys);
       }
     } catch (error) {
-      return jsonResponse({ error: trackerErrorMessage(error) }, { status: 503 });
+      console.error('[issues] Failed to initialize tracker for issue creation:', error);
+      return jsonResponse({ error: 'Tracker is not configured for issue creation' }, { status: 503 });
     }
 
     const createPayload: NewIssue = {
@@ -827,8 +830,11 @@ const postIssuesRoute = HttpRouter.add(
       const tag = createResult.error && typeof createResult.error === 'object' && '_tag' in createResult.error
         ? String((createResult.error as { _tag?: unknown })._tag)
         : '';
+      if (tag !== 'NotImplementedError') {
+        console.error('[issues] Tracker issue creation failed:', createResult.error);
+      }
       return jsonResponse(
-        { error: tag === 'NotImplementedError' ? 'GitLab issue creation is not yet supported' : trackerErrorMessage(createResult.error) },
+        { error: tag === 'NotImplementedError' ? 'GitLab issue creation is not yet supported' : 'Failed to create issue in tracker' },
         { status: tag === 'NotImplementedError' ? 501 : 502 },
       );
     }
@@ -839,10 +845,12 @@ const postIssuesRoute = HttpRouter.add(
     yield* updateShadowState(identifier, 'open', 'dashboard-new-issue', validation.value.targetStatus);
 
     const issueDataService = getIssueDataService();
-    yield* Effect.promise(() => Promise.all([
-      issueDataService.refreshShadowStatesCache(),
-      issueDataService.invalidateTracker(trackerType),
-    ]));
+    void issueDataService.refreshShadowStatesCache().catch((error) => {
+      console.error('[issues] Failed to refresh shadow-state cache after issue creation:', error);
+    });
+    void issueDataService.invalidateTracker(trackerType).catch((error) => {
+      console.error('[issues] Failed to invalidate tracker cache after issue creation:', error);
+    });
 
     const eventStore = yield* EventStoreService;
     const displayStatus = validation.value.targetStatus === 'backlog' ? 'Backlog' : 'Todo';

@@ -216,11 +216,35 @@ describe('POST /api/issues', () => {
     expect(createIssueMock).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when projectKey is missing', async () => {
+    const result = await postIssue({ targetStatus: 'todo', title: 'No project key' });
+
+    expect(result.status).toBe(400);
+    expect(result.body.details.projectKey).toBe('projectKey is required');
+    expect(createTrackerMock).not.toHaveBeenCalled();
+    expect(createIssueMock).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when targetStatus is invalid', async () => {
     const result = await postIssue({ projectKey: 'pan', targetStatus: 'done', title: 'Nope' });
 
     expect(result.status).toBe(400);
     expect(result.body.details.targetStatus).toBe('targetStatus must be one of: backlog, todo');
+    expect(createTrackerMock).not.toHaveBeenCalled();
+    expect(createIssueMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when title or description exceeds the allowed length', async () => {
+    const result = await postIssue({
+      projectKey: 'pan',
+      targetStatus: 'todo',
+      title: 'x'.repeat(257),
+      description: 'x'.repeat(16_385),
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.body.details.title).toBe('title must be 256 characters or fewer');
+    expect(result.body.details.description).toBe('description must be 16384 characters or fewer');
     expect(createTrackerMock).not.toHaveBeenCalled();
     expect(createIssueMock).not.toHaveBeenCalled();
   });
@@ -259,6 +283,38 @@ describe('POST /api/issues', () => {
 
     expect(result.status).toBe(500);
     expect(result.body.error).toBe('Failed to load tracker config');
+  });
+
+  it('returns a generic 503 when tracker initialization fails', async () => {
+    createTrackerMock.mockImplementation(() => {
+      throw new Error('/home/user/.panopticon/config.yaml: missing token');
+    });
+
+    const result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Tracker failure' });
+
+    expect(result.status).toBe(503);
+    expect(result.body.error).toBe('Tracker is not configured for issue creation');
+  });
+
+  it('returns a generic 502 when tracker issue creation fails', async () => {
+    createIssueMock.mockReturnValue(Effect.fail(new Error('secret tracker response')));
+
+    const result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Create failure' });
+
+    expect(result.status).toBe(502);
+    expect(result.body.error).toBe('Failed to create issue in tracker');
+  });
+
+  it('does not fail the response when cache refresh side effects fail after issue creation', async () => {
+    refreshShadowStatesCacheMock.mockRejectedValue(new Error('cache refresh failed'));
+    invalidateTrackerMock.mockRejectedValue(new Error('invalidate failed'));
+
+    const result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Side effect failure' });
+
+    expect(result.status).toBe(200);
+    expect(result.body.identifier).toBe('PAN-42');
+    expect(refreshShadowStatesCacheMock).toHaveBeenCalledOnce();
+    expect(invalidateTrackerMock).toHaveBeenCalledWith('github');
   });
 
   it('rate limits repeated issue creation requests', async () => {
