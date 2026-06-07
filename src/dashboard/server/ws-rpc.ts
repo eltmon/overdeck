@@ -16,6 +16,7 @@ import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
 import { computeContextUsage, parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -599,6 +600,12 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
             if (!sessionFile) {
               // Session file not yet discovered — emit a single discovering event
+              return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
+            }
+
+            if (isPiSessionFile(sessionFile)) {
+              // Pi session files use a different JSONL schema and must not be
+              // routed through the Claude-only incremental watcher.
               return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
             }
 

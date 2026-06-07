@@ -24,6 +24,10 @@ import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contracts';
 import type { ParseResult } from './conversation-service.js';
 
+export function isPiSessionFile(sessionFile: string): boolean {
+  return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
+}
+
 interface PiUsage {
   input?: number;
   output?: number;
