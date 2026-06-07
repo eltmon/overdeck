@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { isModuleLoadError } from './recovery';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isModuleLoadError, RootErrorBoundary } from './recovery';
+
+afterEach(() => {
+  document.body.innerHTML = '';
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+});
 
 describe('isModuleLoadError', () => {
   it('matches the common dynamic-import failure messages', () => {
@@ -21,5 +27,25 @@ describe('isModuleLoadError', () => {
     expect(isModuleLoadError(undefined)).toBe(false);
     expect(isModuleLoadError(null)).toBe(false);
     expect(isModuleLoadError({})).toBe(false);
+  });
+});
+
+describe('RootErrorBoundary recovery policy', () => {
+  it('leaves generic render crashes on the in-app fallback without auto-reloading', () => {
+    const boundary = new RootErrorBoundary({ children: null });
+
+    boundary.componentDidCatch(new Error('Cannot read properties of undefined'));
+
+    expect(document.getElementById('pan-recovery-overlay')).toBeNull();
+    expect(sessionStorage.getItem('pan.recovery.lastCrashReload')).toBeNull();
+  });
+
+  it('still starts self-recovery for module load errors', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
+    const boundary = new RootErrorBoundary({ children: null });
+
+    boundary.componentDidCatch(new Error('Failed to fetch dynamically imported module: /assets/App.js'));
+
+    expect(document.getElementById('pan-recovery-overlay')).not.toBeNull();
   });
 });
