@@ -17,7 +17,13 @@
  */
 
 import { loadCloisterConfigSync } from './config.js';
-import { listRunningAgentsSync } from '../agents.js';
+import {
+  listRunningAgentsSync,
+  stopAgentSync,
+  getAgentStateSync,
+  saveAgentStateSync,
+  getAgentRuntimeStateSync,
+} from '../agents.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -118,4 +124,69 @@ export function tryReserveAdvancingSlot(): boolean {
   if (total + advancingReservedThisPatrol >= totalCeiling) return false;
   advancingReservedThisPatrol++;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Emergency brake
+//
+// The governor never auto-kills to satisfy a limit, so an over-cap system
+// (forced `pan start`s, an unfreeze backlog) stays over until attrition drains.
+// The emergency brake is the *explicit operator action* that forcibly trims the
+// excess. It is deliberately separate from the nuclear `emergencyStop` (which
+// kills ALL agents): the brake stops only work agents above the cap, idle ones
+// first, and clears the user-stop flag so the deacon re-admits them as slots free
+// (drain-at-cap, not retirement). Never called automatically.
+// ---------------------------------------------------------------------------
+export interface BrakeResult {
+  /** Running work agents before the brake. */
+  before: number;
+  /** The configured work-agent cap. */
+  cap: number;
+  /** Agent ids stopped by the brake. */
+  stopped: string[];
+  /** Running work agents after the brake. */
+  remaining: number;
+}
+
+export function emergencyBrake(): BrakeResult {
+  const { maxWorkAgents } = getConcurrencyLimits();
+  const runningWork = listRunningAgentsSync().filter(a => a.tmuxActive && a.role === 'work');
+  const excess = runningWork.length - maxWorkAgents;
+  if (excess <= 0) {
+    return { before: runningWork.length, cap: maxWorkAgents, stopped: [], remaining: runningWork.length };
+  }
+
+  // Stop the least-productive first: idle agents ahead of active ones, and among
+  // equals the stalest (oldest lastActivity) first.
+  const ordered = [...runningWork].sort((a, b) => {
+    const aIdle = getAgentRuntimeStateSync(a.id)?.state === 'idle' ? 0 : 1;
+    const bIdle = getAgentRuntimeStateSync(b.id)?.state === 'idle' ? 0 : 1;
+    if (aIdle !== bIdle) return aIdle - bIdle;
+    return (Date.parse(a.lastActivity ?? '') || 0) - (Date.parse(b.lastActivity ?? '') || 0);
+  });
+
+  const stopped: string[] = [];
+  for (const agent of ordered.slice(0, excess)) {
+    try {
+      stopAgentSync(agent.id);
+      // stopAgentSync stamps stoppedByUser=true (deliberate stop). Clear it so the
+      // deacon re-admits this agent when a slot frees — the brake trims to the cap,
+      // it does not retire the work.
+      const state = getAgentStateSync(agent.id);
+      if (state) {
+        delete state.stoppedByUser;
+        saveAgentStateSync(state);
+      }
+      stopped.push(agent.id);
+    } catch {
+      // best effort — skip agents that fail to stop cleanly
+    }
+  }
+
+  return {
+    before: runningWork.length,
+    cap: maxWorkAgents,
+    stopped,
+    remaining: runningWork.length - stopped.length,
+  };
 }

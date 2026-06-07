@@ -8,6 +8,7 @@ import { Command } from 'commander';
 import { statusCommand } from './status.js';
 import { startCommand } from './start.js';
 import { stopCommand } from './stop.js';
+import { brakeCommand } from './brake.js';
 
 export function registerCloisterCommands(program: Command): void {
   const cloister = program
@@ -38,4 +39,11 @@ export function registerCloisterCommands(program: Command): void {
     .command('emergency-stop')
     .description('Emergency stop - kill ALL agents immediately')
     .action(() => stopCommand({ emergency: true }));
+
+  // pan cloister brake
+  cloister
+    .command('brake')
+    .description('Emergency brake - trim running work agents down to the concurrency cap (idle-first, resumable)')
+    .option('--json', 'Output in JSON format')
+    .action(brakeCommand);
 }

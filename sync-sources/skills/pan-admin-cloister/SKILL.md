@@ -1,6 +1,6 @@
 ---
 name: pan-admin-cloister
-description: "pan admin cloister <cmd> — lifecycle watchdog management: status, start, stop, emergency-stop"
+description: "pan admin cloister <cmd> — lifecycle watchdog management: status, start, stop, brake, emergency-stop"
 triggers:
   - pan admin cloister
   - cloister status
@@ -23,6 +23,7 @@ ship specialist pipeline.
 pan admin cloister status [--json]   # Show watchdog service status and agent health
 pan admin cloister start             # Start the watchdog (no-op if already running)
 pan admin cloister stop              # Stop the watchdog (running agents continue)
+pan admin cloister brake [--json]    # Trim running WORK agents down to the concurrency cap (idle-first, resumable)
 pan admin cloister emergency-stop    # Kill ALL agents immediately — destructive
 ```
 
@@ -39,6 +40,12 @@ re-engage automation.
   no watchdog process.
 - **`stop`** — when debugging the watchdog itself, or when you want to make
   manual lifecycle interventions without the daemon racing you.
+- **`brake`** — the *measured* alternative to `emergency-stop`. Stops only work
+  agents **above** the configured concurrency cap (`cloister.concurrency.max_work_agents`),
+  idle ones first, leaving them resumable so the deacon re-admits them as slots
+  free. Use when the running count has drifted over the cap (forced `pan start`s,
+  an unfreeze backlog) and you want to drain back to the limit without killing
+  in-flight work. Non-destructive to source/git; review/test/ship are untouched.
 - **`emergency-stop`** — last resort. Kills every running agent (work, review,
   test, ship, planning). Workspaces and branches survive but tmux sessions
   are destroyed. Use when something has gone catastrophically wrong (runaway

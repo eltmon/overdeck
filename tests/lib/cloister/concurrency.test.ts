@@ -79,4 +79,57 @@ describe('concurrency governor — config + counting', () => {
     resetPatrolDispatchBudget();
     expect(tryReserveAdvancingSlot()).toBe(true);  // budget cleared for the next patrol
   });
+
+  it('emergency brake stops excess work agents idle-first and clears stoppedByUser', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1 } }),
+    }));
+    const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
+      'agent-a': { id: 'agent-a' }, 'agent-b': { id: 'agent-b' },
+      'agent-c': { id: 'agent-c' }, 'agent-d': { id: 'agent-d' },
+    };
+    const saved: Record<string, { id: string; stoppedByUser?: boolean }> = {};
+    const idle = new Set(['agent-c', 'agent-d']);
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-a', role: 'work', tmuxActive: true, lastActivity: '2026-01-01T00:00:00Z' }, // active
+        { id: 'agent-b', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' }, // active
+        { id: 'agent-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' }, // idle
+        { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
+      ],
+      stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
+      getAgentStateSync: (id: string) => states[id],
+      saveAgentStateSync: (s: { id: string }) => { saved[s.id] = states[s.id]; },
+      getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = emergencyBrake();
+
+    // 4 running, cap 2 → stop the 2 idle ones first.
+    expect(result.before).toBe(4);
+    expect(result.cap).toBe(2);
+    expect(result.remaining).toBe(2);
+    expect(result.stopped).toEqual(['agent-c', 'agent-d']);
+    // stoppedByUser cleared so the deacon re-admits them as slots free.
+    expect(saved['agent-c'].stoppedByUser).toBeUndefined();
+    expect(saved['agent-d'].stoppedByUser).toBeUndefined();
+  });
+
+  it('emergency brake is a no-op when within the cap', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 6, reserved_advancing_slots: 3 } }),
+    }));
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', tmuxActive: true }],
+      stopAgentSync: () => { throw new Error('should not stop anything'); },
+      getAgentStateSync: () => null,
+      saveAgentStateSync: () => {},
+      getAgentRuntimeStateSync: () => null,
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+    expect(emergencyBrake()).toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
+  });
 });
