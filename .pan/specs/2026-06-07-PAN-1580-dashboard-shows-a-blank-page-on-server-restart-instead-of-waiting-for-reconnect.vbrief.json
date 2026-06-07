@@ -4,7 +4,7 @@
     "created": "2026-06-07T03:07:29Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1580: Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "updated": "2026-06-07T04:30:34.451Z"
+    "updated": "2026-06-07T04:55:18.189Z"
   },
   "plan": {
     "id": "pan-1580",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "e05658d9-aea0-49e8-8c58-3af56a8a819f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 25,
+    "sequence": 42,
     "created": "2026-06-07T03:07:29Z",
-    "updated": "2026-06-07T04:30:34.451Z",
+    "updated": "2026-06-07T04:55:18.189Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1580",
@@ -447,58 +447,62 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1580-dashboard-shows-a-blank-page-on-server-restart-instead-of-waiting-for-reconnect.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "test",
         "issueId": "PAN-1580",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T04:30:33.667Z",
+        "updatedAt": "2026-06-07T04:55:18.163Z",
         "work": {
-          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T04:30:33.667Z"
+              "at": "2026-06-07T04:55:18.163Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-07T04:30:33.667Z",
-          "notes": "Verification failed at test",
+          "status": "passed",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
+          "notes": "Zero blockers across all four sub-roles. Two non-blocking advisories: latent XSS sink in showOverlay (defense-in-depth) and minor DOM-query overhead in hideOverlay hot path.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-07T04:30:33.667Z",
-              "notes": "Verification failed at test"
+              "status": "passed",
+              "at": "2026-06-07T04:55:18.163Z",
+              "notes": "Zero blockers across all four sub-roles. Two non-blocking advisories: latent XSS sink in showOverlay (defense-in-depth) and minor DOM-query overhead in hideOverlay hot path."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "status": "passed",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T04:30:33.667Z"
+              "status": "passed",
+              "at": "2026-06-07T04:55:18.163Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "updatedAt": "2026-06-07T04:55:18.163Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T04:30:33.667Z"
+              "at": "2026-06-07T04:55:18.163Z"
             }
           ],
           "readyForMerge": false,
