@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-07T05:12:53.196Z"
+    "updated": "2026-06-07T05:18:08.783Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 49,
+    "sequence": 51,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-07T05:12:53.196Z",
+    "updated": "2026-06-07T05:18:08.783Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,60 +415,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:12:52.576Z",
+        "updatedAt": "2026-06-07T05:18:08.761Z",
         "work": {
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "notes": "Verification FAILED at lint (43036ms):\n\ns'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m  │\u001b[0m                               ─────────┬─────────  \n \u001b[38;5;240m  │\u001b[0m                                        ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m───╯\u001b[0m\n\nsrc/dashboard/server/read-model.ts (24:7) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve '@panctl/contracts' in src/dashboard/server/read-model.ts\n    \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/read-model.ts:24:8 \u001b[38;5;246m]\u001b[0m\n    \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m24 │\u001b[0m \u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m   │\u001b[0m        ─────────┬─────────  \n \u001b[38;5;240m   │\u001b[0m                 ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (78%)\n  - rolldown-plugin-dts:generate (18%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 227, in <module>\n  File \"<stdin>\", line 191, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1242/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T05:12:52.576Z",
+              "status": "pending",
+              "at": "2026-06-07T05:18:08.761Z",
               "notes": "Verification FAILED at lint (43036ms):\n\ns'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m  │\u001b[0m                               ─────────┬─────────  \n \u001b[38;5;240m  │\u001b[0m                                        ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m───╯\u001b[0m\n\nsrc/dashboard/server/read-model.ts (24:7) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve '@panctl/contracts' in src/dashboard/server/read-model.ts\n    \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/read-model.ts:24:8 \u001b[38;5;246m]\u001b[0m\n    \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m24 │\u001b[0m \u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mf\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249m \u001b[0m'@panctl/contracts'\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m   │\u001b[0m        ─────────┬─────────  \n \u001b[38;5;240m   │\u001b[0m                 ╰─────────── Module not found, treating it as an external dependency\n\u001b[38;5;246m────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (78%)\n  - rolldown-plugin-dts:generate (18%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nTraceback (most recent call last):\n  File \"<stdin>\", line 227, in <module>\n  File \"<stdin>\", line 191, in main\n  File \"<stdin>\", line 49, in run_pan\nsubprocess.CalledProcessError: Command '['node', '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1242/dist/cli/index.js', '--help']' returned non-zero exit status 1.\n"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "notes": "Verification failed at lint",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T05:12:52.576Z",
+              "status": "pending",
+              "at": "2026-06-07T05:18:08.761Z",
               "notes": "Verification failed at lint"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:12:52.576Z"
+              "at": "2026-06-07T05:18:08.761Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:12:52.576Z",
+          "updatedAt": "2026-06-07T05:18:08.761Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:12:52.576Z"
+              "at": "2026-06-07T05:18:08.761Z"
             }
           ],
           "readyForMerge": false,
