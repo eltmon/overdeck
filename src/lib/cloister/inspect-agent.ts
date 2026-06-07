@@ -154,6 +154,8 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     setReviewStatusSync(context.issueId.toUpperCase(), {
       inspectStatus: 'inspecting',
       inspectNotes: `Inspecting bead ${context.beadId}`,
+      inspectStartedAt: new Date().toISOString(),
+      inspectBeadId: context.beadId,
     });
 
     // Resolve model via the role primitive: work.<inspect|inspect-deep>.

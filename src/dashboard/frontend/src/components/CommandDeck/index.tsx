@@ -337,6 +337,14 @@ export function CommandDeck({
     });
   }, [projects, sessionTreeMap]);
 
+  useEffect(() => {
+    if (selectedProject || !onSelectProject) return;
+    const projectsWithFeatures = projectsWithSessions.filter((project) => project.features.length > 0);
+    if (projectsWithFeatures.length === 1) {
+      onSelectProject(projectsWithFeatures[0]!.name);
+    }
+  }, [onSelectProject, projectsWithSessions, selectedProject]);
+
   const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
 
   // Poll container stats every 5s when issues have containers

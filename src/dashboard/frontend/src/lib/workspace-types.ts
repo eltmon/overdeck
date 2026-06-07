@@ -12,8 +12,10 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
+  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
+  inspectStartedAt?: string;
+  inspectBeadId?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';

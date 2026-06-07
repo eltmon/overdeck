@@ -738,6 +738,12 @@ export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promi
   return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
+export type DeliveryResult = {
+  ok: boolean;
+  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  failure?: string;
+};
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -750,6 +756,13 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  /**
+   * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
+   * undefined = legacy/pre-feature agent or non-applicable role;
+   * false = spawned but kickoff delivery not yet confirmed;
+   * true = kickoff delivery confirmed.
+   */
+  kickoffDelivered?: boolean;
   stoppedAt?: string;
   /** True when markAgentStopped was called (user-initiated stop). Cleared on
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
@@ -832,6 +845,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
+    kickoffDelivered: raw.kickoffDelivered,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
     stoppedByPause: raw.stoppedByPause,
@@ -1318,7 +1332,7 @@ export async function deliverAgentMessage(
   message: string,
   caller: string = 'unknown',
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<void> {
+): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
 
   let channelsEnabled = false;
@@ -1332,7 +1346,7 @@ export async function deliverAgentMessage(
       const { CodexRuntimeSync } = await import('./runtimes/codex.js');
       const rt = new CodexRuntimeSync();
       await rt.sendMessage(normalizedId, message);
-      return;
+      return { ok: true, path: 'codex' };
     }
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
@@ -1342,7 +1356,7 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'tmux') {
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux' };
   }
 
   let supervisorFailure: string | undefined;
@@ -1363,7 +1377,7 @@ export async function deliverAgentMessage(
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return;
+        return { ok: true, path: 'supervisor' };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -1399,7 +1413,7 @@ export async function deliverAgentMessage(
             caller,
             ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
           });
-          return;
+          return { ok: true, path: 'channels' };
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           channelFailure = `socket-post-failed: ${reason}`;
@@ -1419,10 +1433,88 @@ export async function deliverAgentMessage(
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
   }
 
   await Effect.runPromise(sendKeys(normalizedId, message));
+  return { ok: true, path: 'tmux' };
+}
+
+async function deliverInitialPromptWithRetry(
+  agentId: string,
+  prompt: string,
+  caller: string,
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+): Promise<DeliveryResult> {
+  let lastFailure = 'not-attempted';
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const ready = await waitForReadySignal(agentId, 30);
+    if (!ready) {
+      lastFailure = 'ready-signal-timeout';
+      console.error(`[${agentId}] Claude did not become ready within 30s (kickoff attempt ${attempt}/2)`);
+      continue;
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    try {
+      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      if (result.ok) return result;
+      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+    } catch (err) {
+      lastFailure = err instanceof Error ? err.message : String(err);
+    }
+    console.error(`[${agentId}] Kickoff delivery attempt ${attempt}/2 failed: ${lastFailure}`);
+  }
+
+  return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+async function buildResumeMessageForAgent(
+  state: AgentState,
+  fallbackMessage: string,
+  callerMessage?: string,
+): Promise<{ message?: string; redeliveringKickoff: boolean; error?: string }> {
+  if (state.role !== 'work' || state.kickoffDelivered !== false) {
+    return { message: callerMessage ?? fallbackMessage, redeliveringKickoff: false };
+  }
+
+  const promptPath = join(getAgentDir(state.id), 'initial-prompt.md');
+  try {
+    const kickoffPrompt = await readFile(promptPath, 'utf-8');
+    const suffix = callerMessage
+      ? `\n\n---\n\nAdditional message delivered during resume:\n\n${callerMessage}`
+      : '';
+    return { message: `${kickoffPrompt}${suffix}`, redeliveringKickoff: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      redeliveringKickoff: true,
+      error: `kickoff prompt missing at ${promptPath}: ${reason}`,
+    };
+  }
+}
+
+function markKickoffRedelivered(state: AgentState): void {
+  state.kickoffDelivered = true;
+  saveAgentStateSync(state);
+}
+
+async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
+  await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'running';
+    failedState.kickoffDelivered = false;
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+  state.status = 'running';
+  state.kickoffDelivered = false;
+  emitActivityEntrySync({
+    source,
+    level: 'error',
+    message: `${state.id}: kickoff delivery failed`,
+    issueId,
+  });
 }
 
 export async function deliverAgentPermissionDecision(
@@ -2973,7 +3065,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-if (prompt) {
+  if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
         await writePiAgentPrompt(agentId, prompt);
@@ -3189,6 +3281,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   if (prompt) {
     await writeFileAsync(promptFile, prompt);
+    if (role === 'work') {
+      state.kickoffDelivered = false;
+      saveAgentStateSync(state);
+    }
   }
 
   // Auto-setup hooks if not configured
@@ -3311,6 +3407,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } else {
       console.warn(`[${agentId}] Codex: rollout did not appear within 30s — thread-id not captured`);
     }
+    if (prompt && role === 'work') {
+      state.kickoffDelivered = true;
+      saveAgentStateSync(state);
+    }
   }
 
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
@@ -3324,19 +3424,33 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Codex agents skip this — the prompt is embedded inline in the launch command.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
-  if (prompt && resolvedHarness !== 'codex') {
+  if (prompt && resolvedHarness === 'pi') {
+    try {
+      await writePiAgentPrompt(agentId, prompt);
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } catch (err) {
+      console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      if (role === 'work') {
+        await recordKickoffDeliveryFailure(state, options.issueId, role);
+        return state;
+      }
+    }
+  } else if (prompt && resolvedHarness !== 'codex') {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
-    // PAN-1594: wait for the hook-written ready.json (session-start hook),
-    // not a tmux pane-scrape. No dependency on permission-mode footer text.
-    const ready = await waitForReadySignal(agentId, 30);
-    if (ready) {
-      // Small delay after ready to ensure Claude is fully rendered and accepting input
-      await new Promise(r => setTimeout(r, 500));
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
-    } else {
-      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
+    if (delivery.ok) {
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } else if (role === 'work') {
+      await recordKickoffDeliveryFailure(state, options.issueId, role);
+      return state;
     }
   }
 
@@ -3915,9 +4029,19 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     saveAgentStateSync(agentState);
 
     const ready = await waitForReadySignal(normalizedId, 30);
-    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
-    if (ready) {
-      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+    const fallbackResumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
+    const resumeMessage = await buildResumeMessageForAgent(agentState, fallbackResumePrompt, message);
+    if (resumeMessage.error) {
+      console.error(`[agents] Fallback-restarted ${normalizedId} but ${resumeMessage.error}`);
+      emitActivityEntrySync({
+        source: 'work-agent',
+        level: 'error',
+        message: `${normalizedId}: ${resumeMessage.error}`,
+        issueId: agentState.issueId,
+      });
+    } else if (ready && resumeMessage.message) {
+      const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
@@ -4106,9 +4230,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const effectiveMessage =
-      message ??
-      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const defaultResumeMessage = `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
+    if (resumeMessage.error) {
+      console.error(`[resumeAgent] ${resumeMessage.error}`);
+      emitActivityEntrySync({
+        source: 'work-agent',
+        level: 'error',
+        message: `${normalizedId}: ${resumeMessage.error}`,
+        issueId,
+      });
+      return { success: false, error: resumeMessage.error };
+    }
+    const effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -4154,6 +4288,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       try {
         await writePiAgentPrompt(normalizedId, effectiveMessage);
         messageDelivered = true;
+        if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
@@ -4162,12 +4297,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Codex is one-shot: message is already embedded in `codex exec resume
       // <threadId> <message>` via buildCodexCommand. No SessionStart hook fires.
       messageDelivered = true;
+      if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
-        messageDelivered = true;
+        const delivery = await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
+        messageDelivered = delivery.ok;
+        if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }

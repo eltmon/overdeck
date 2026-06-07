@@ -141,7 +141,8 @@ Replace `{{resultStatus}}` with `passed` or `failed`.
 
 ## Important Constraints
 
-- **Timeout:** You have 10 minutes to complete this inspection
+- **Timeout:** You have 10 minutes to complete this inspection. The Deacon watchdog enforces the bound: overrun sessions are killed and an INSPECTION ERROR verdict is delivered to the parent agent.
+- **Permissions:** Read-only inspection commands (git diff/branch/rev-parse, file reads, grep) are auto-approved; do not expect or wait on a permission prompt.
 - **Scope:** Only review changes since the last checkpoint — do NOT review the entire branch
 - **Be Specific:** "This code is wrong" is useless. "Line 42 imports X but bead specifies Y" is actionable
 - **Don't over-block:** If the implementation achieves the bead's intent through a reasonable alternative approach not explicitly prohibited, that's a PASS. Only block for genuine spec violations and constraint breaches.

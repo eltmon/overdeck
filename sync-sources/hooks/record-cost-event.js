@@ -4356,6 +4356,10 @@ function initSchema(db) {
       review_status         TEXT NOT NULL DEFAULT 'pending',
       test_status           TEXT NOT NULL DEFAULT 'pending',
       merge_status          TEXT,
+      inspect_status        TEXT,
+      inspect_notes         TEXT,
+      inspect_started_at    TEXT,
+      inspect_bead_id       TEXT,
       verification_status   TEXT,
       verification_notes    TEXT,
       verification_cycle_count  INTEGER DEFAULT 0,
@@ -4779,7 +4783,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 48`);
+	db.pragma(`user_version = 49`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4787,7 +4791,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 48) return;
+	if (currentVersion === 49) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5371,7 +5375,21 @@ function runMigrations(db) {
 	if (currentVersion < 48) try {
 		db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
 	} catch {}
-	db.pragma(`user_version = 48`);
+	if (currentVersion < 49) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 49`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

@@ -13,7 +13,7 @@ import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 export interface IssueAgent {
   id: string;
   issueId?: string | null;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
+  status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped';
   runtime: string;
   model: string;
   startedAt: string;
@@ -51,6 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
   healthy: 'bg-status-healthy',
   warning: 'bg-status-warning',
   stuck: 'bg-status-stuck',
+  stalled: 'bg-status-stuck',
   dead: 'bg-status-dead',
   stopped: 'bg-muted-foreground',
   running: 'bg-status-healthy',
