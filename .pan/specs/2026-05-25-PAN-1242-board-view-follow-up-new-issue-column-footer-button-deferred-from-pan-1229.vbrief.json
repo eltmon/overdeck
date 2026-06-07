@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-07T18:44:31.709Z"
+    "updated": "2026-06-07T18:55:20.929Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 95,
+    "sequence": 97,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-07T18:44:31.709Z",
+    "updated": "2026-06-07T18:55:20.929Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,58 +415,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T18:44:31.705Z",
+        "updatedAt": "2026-06-07T18:55:20.882Z",
         "work": {
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "status": "failed",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
+          "notes": "Verification FAILED at test (31468ms):\n\nwhen GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | src/lib/cloister/__tests__/deacon-auto-closeout.test.ts\u001b[2m > \u001b[22m\u001b[2mautoCloseOut\u001b[2m > \u001b[22m\u001b[2mrecords failure through review status and activity so retry backs off via updatedAt\n\u001b[22m\u001b[39m[deacon] Auto close-out failed for PAN-1190: archive failed\n\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\u001b[90mstderr\u001b[2m | src/lib/cloister/__tests__/test-agent-queue.test.ts\u001b[2m > \u001b[22m\u001b[2mtest role dispatch\u001b[2m > \u001b[22m\u001b[2mdoes not spawn when no project is configured\n\u001b[22m\u001b[39m[test-dispatch] No project configured for PAN-503 — cannot spawn test role\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnRun review when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: ENOTEMPTY: directory not empty, rmdir '/tmp/pan-home-test-1780858509487-y5mbubqeaq/registry'\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m216:7\u001b[22m\u001b[39m\n    \u001b[90m214|\u001b[39m     }\n    \u001b[90m215|\u001b[39m     \u001b[35mif\u001b[39m (\u001b[34mexistsSync\u001b[39m(testPanopticonHome)) {\n    \u001b[90m216|\u001b[39m       \u001b[34mrmSync\u001b[39m(testPanopticonHome\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m\u001b[33m,\u001b[39m force\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m       \u001b[31m^\u001b[39m\n    \u001b[90m217|\u001b[39m     }\n    \u001b[90m218|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-07T18:44:31.705Z"
+              "status": "failed",
+              "at": "2026-06-07T18:55:20.882Z",
+              "notes": "Verification FAILED at test (31468ms):\n\nwhen GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | src/lib/cloister/__tests__/deacon-auto-closeout.test.ts\u001b[2m > \u001b[22m\u001b[2mautoCloseOut\u001b[2m > \u001b[22m\u001b[2mrecords failure through review status and activity so retry backs off via updatedAt\n\u001b[22m\u001b[39m[deacon] Auto close-out failed for PAN-1190: archive failed\n\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\u001b[90mstderr\u001b[2m | src/lib/cloister/__tests__/test-agent-queue.test.ts\u001b[2m > \u001b[22m\u001b[2mtest role dispatch\u001b[2m > \u001b[22m\u001b[2mdoes not spawn when no project is configured\n\u001b[22m\u001b[39m[test-dispatch] No project configured for PAN-503 — cannot spawn test role\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnRun review when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: ENOTEMPTY: directory not empty, rmdir '/tmp/pan-home-test-1780858509487-y5mbubqeaq/registry'\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m216:7\u001b[22m\u001b[39m\n    \u001b[90m214|\u001b[39m     }\n    \u001b[90m215|\u001b[39m     \u001b[35mif\u001b[39m (\u001b[34mexistsSync\u001b[39m(testPanopticonHome)) {\n    \u001b[90m216|\u001b[39m       \u001b[34mrmSync\u001b[39m(testPanopticonHome\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m\u001b[33m,\u001b[39m force\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m       \u001b[31m^\u001b[39m\n    \u001b[90m217|\u001b[39m     }\n    \u001b[90m218|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
           "notes": "createTracker removal of config.yaml lookup breaks all existing callers (agents, deacon, CLI, prompts) — guaranteed auth regressions for config.yaml tracker key users",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-07T18:44:31.705Z",
+              "status": "pending",
+              "at": "2026-06-07T18:55:20.882Z",
               "notes": "createTracker removal of config.yaml lookup breaks all existing callers (agents, deacon, CLI, prompts) — guaranteed auth regressions for config.yaml tracker key users"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T18:44:31.705Z"
+              "at": "2026-06-07T18:55:20.882Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T18:44:31.705Z",
+          "updatedAt": "2026-06-07T18:55:20.882Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T18:44:31.705Z"
+              "at": "2026-06-07T18:55:20.882Z"
             }
           ],
           "readyForMerge": false,
