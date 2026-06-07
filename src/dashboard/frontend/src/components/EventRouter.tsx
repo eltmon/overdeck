@@ -13,7 +13,7 @@
 import { useEffect, useRef } from 'react'
 import { useDashboardStore } from '../lib/store'
 import { createRecoveryCoordinator, type RecoveryCoordinator } from '../lib/recoveryCoordinator'
-import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport'
+import { getTransport, resetTransport, type PanRpcProtocolClient } from '../lib/wsTransport'
 import type { DomainEvent, DashboardSnapshot } from '@panctl/contracts'
 import { WS_METHODS } from '@panctl/contracts'
 import { Stream } from 'effect'
@@ -21,6 +21,13 @@ import { loadSnapshotFromCache } from '../lib/snapshotCache'
 
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
+const STREAM_STALENESS_TIMEOUT_MS = 35_000
+
+type SequencedDomainEvent = Exclude<DomainEvent, { type: 'system.heartbeat' }>
+
+function isSequencedDomainEvent(event: DomainEvent): event is SequencedDomainEvent {
+  return 'sequence' in event
+}
 
 // ─── EventRouter component ────────────────────────────────────────────────────
 
@@ -28,17 +35,19 @@ export function EventRouter() {
   const syncSnapshot = useDashboardStore((s) => s.syncSnapshot)
   const applyEvents = useDashboardStore((s) => s.applyEvents)
   const recovery = useRef<RecoveryCoordinator | null>(null)
-  const pendingBatch = useRef<DomainEvent[]>([])
+  const pendingBatch = useRef<SequencedDomainEvent[]>([])
   const flushScheduled = useRef(false)
 
   useEffect(() => {
-    const transport = getTransport()
+    let transport = getTransport()
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
     let bootstrapInFlight = false
     let bootstrapComplete = false
     let fallbackInterval: ReturnType<typeof setInterval> | null = null
     let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
+    let stalenessTimeout: ReturnType<typeof setTimeout> | null = null
+    let unsubscribe: (() => void) | null = null
 
     function stopFallbackPoller() {
       if (fallbackInterval) clearInterval(fallbackInterval)
@@ -57,6 +66,24 @@ export function EventRouter() {
         bootstrap().catch(console.error)
       }, SNAPSHOT_FALLBACK_INTERVAL_MS)
       fallbackTimeout = setTimeout(stopFallbackPoller, SNAPSHOT_FALLBACK_WINDOW_MS)
+    }
+
+    function stopStalenessWatchdog() {
+      if (stalenessTimeout) clearTimeout(stalenessTimeout)
+      stalenessTimeout = null
+    }
+
+    function resetStalenessWatchdog() {
+      stopStalenessWatchdog()
+      stalenessTimeout = setTimeout(() => {
+        console.warn('[EventRouter] domain event stream stale — reconnecting')
+        unsubscribe?.()
+        unsubscribe = null
+        resetTransport()
+        transport = getTransport()
+        subscribeToDomainEvents()
+        bootstrap().catch(console.error)
+      }, STREAM_STALENESS_TIMEOUT_MS)
     }
 
     // ── Instant render: load from localStorage cache ─────────────────────────
@@ -96,7 +123,7 @@ export function EventRouter() {
         const events = await transport.request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.replayEvents]({ fromSequence }),
         )
-        const typed = events as DomainEvent[]
+        const typed = (events as DomainEvent[]).filter(isSequencedDomainEvent)
         if (typed.length > 0) {
           applyEvents(typed)
           coordinator.markEventBatchApplied(typed[typed.length - 1]!.sequence)
@@ -149,6 +176,9 @@ export function EventRouter() {
 
     // ── Event handler ─────────────────────────────────────────────────────────
     function handleEvent(event: DomainEvent) {
+      resetStalenessWatchdog()
+      if (!isSequencedDomainEvent(event)) return
+
       const classification = coordinator.classifyDomainEvent(event.sequence)
       if (classification === 'ignore') return
       if (classification === 'defer') {
@@ -167,31 +197,37 @@ export function EventRouter() {
     }
 
     // ── Subscribe to domain events ────────────────────────────────────────────
-    const unsubscribe = transport.subscribe(
-      (client) =>
-        (client as PanRpcProtocolClient)[WS_METHODS.subscribeDomainEvents]({}) as unknown as Stream.Stream<DomainEvent, Error>,
-      (event) => handleEvent(event as DomainEvent),
-      {
-        // When the WebSocket reconnects after a dashboard restart, re-fetch
-        // the snapshot from the new server instance. Without this, the
-        // frontend operates on a stale snapshot and conversations/sessions
-        // that were being viewed vanish with "no longer exists" errors.
-        onReconnect: () => {
-          console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
-          bootstrap()
-          // Broadcast to all useQuery consumers so they re-fetch stale data
-          // (session trees, conversations, costs, etc.)
-          window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+    function subscribeToDomainEvents() {
+      unsubscribe?.()
+      unsubscribe = transport.subscribe(
+        (client) =>
+          (client as PanRpcProtocolClient)[WS_METHODS.subscribeDomainEvents]({}) as unknown as Stream.Stream<DomainEvent, Error>,
+        (event) => handleEvent(event as DomainEvent),
+        {
+          // When the WebSocket reconnects after a dashboard restart, re-fetch
+          // the snapshot from the new server instance. Without this, the
+          // frontend operates on a stale snapshot and conversations/sessions
+          // that were being viewed vanish with "no longer exists" errors.
+          onReconnect: () => {
+            console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
+            bootstrap()
+            // Broadcast to all useQuery consumers so they re-fetch stale data
+            // (session trees, conversations, costs, etc.)
+            window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+          },
         },
-      },
-    )
+      )
+      resetStalenessWatchdog()
+    }
 
+    subscribeToDomainEvents()
     bootstrap()
     startFallbackPoller()
 
     return () => {
       stopFallbackPoller()
-      unsubscribe()
+      stopStalenessWatchdog()
+      unsubscribe?.()
     }
   }, [syncSnapshot, applyEvents])
 
