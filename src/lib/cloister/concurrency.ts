@@ -88,3 +88,34 @@ export function canDispatchAdvancing(
 ): boolean {
   return counts.total < limits.totalCeiling;
 }
+
+// ---------------------------------------------------------------------------
+// Per-patrol advancing-dispatch reservation
+//
+// countRunningAgents() only sees tmux-alive sessions. Agents dispatched earlier
+// in the SAME patrol haven't registered a session yet, so several dispatch
+// functions (checkOrphanedReviewStatuses, checkMissingReviewStatuses,
+// checkPendingTestDispatch, checkPostReviewCommits) running back-to-back would
+// each see the stale low count and blow past the ceiling. runPatrol() resets
+// this counter at the top of every cycle; each dispatch site reserves a slot.
+// ---------------------------------------------------------------------------
+let advancingReservedThisPatrol = 0;
+
+/** Reset the per-patrol advancing-dispatch budget. Called once at patrol start. */
+export function resetPatrolDispatchBudget(): void {
+  advancingReservedThisPatrol = 0;
+}
+
+/**
+ * Claim one advancing-role (review/test/ship) dispatch slot for this patrol.
+ * Returns false when the total ceiling is reached — the caller must DEFER (leave
+ * status untouched so a later patrol retries), never fail. Counts both tmux-alive
+ * agents and advancing dispatches already reserved this patrol.
+ */
+export function tryReserveAdvancingSlot(): boolean {
+  const { total } = countRunningAgents();
+  const { totalCeiling } = getConcurrencyLimits();
+  if (total + advancingReservedThisPatrol >= totalCeiling) return false;
+  advancingReservedThisPatrol++;
+  return true;
+}

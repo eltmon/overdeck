@@ -60,4 +60,23 @@ describe('concurrency governor — config + counting', () => {
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, total: 3 });
   });
+
+  it('reserves advancing slots up to the ceiling per patrol, then resets', async () => {
+    vi.resetModules();
+    // ceiling = max_work_agents (1) + reserved_advancing_slots (1) = 2
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1 } }),
+    }));
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [], // 0 running → all headroom is from the per-patrol budget
+    }));
+    const { tryReserveAdvancingSlot, resetPatrolDispatchBudget } = await import('../../../src/lib/cloister/concurrency.js');
+
+    resetPatrolDispatchBudget();
+    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 running + 0 reserved < 2
+    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 + 1 < 2
+    expect(tryReserveAdvancingSlot()).toBe(false); // 0 + 2 >= 2 → defer
+    resetPatrolDispatchBudget();
+    expect(tryReserveAdvancingSlot()).toBe(true);  // budget cleared for the next patrol
+  });
 });

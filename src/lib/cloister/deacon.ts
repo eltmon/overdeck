@@ -126,7 +126,7 @@ export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
-import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents } from './concurrency.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -1788,7 +1788,12 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           const issueLower = issueId.toLowerCase();
           const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-          if (workspace && resolved) {
+          if (workspace && resolved && !tryReserveAdvancingSlot()) {
+            // PAN-1665: at the concurrency ceiling — defer (leave status untouched
+            // so a later patrol retries once a slot frees). Never fail the review.
+            actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
+          } else if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
             // PAN-1048 R4: deacon recovery routes through the role primitive.
             const { spawnReviewRoleForIssue } = await import('./review-agent.js');
@@ -1857,6 +1862,11 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
                 ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
                 : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
             );
+          } else if (!tryReserveAdvancingSlot()) {
+            // PAN-1665: at the concurrency ceiling — defer without touching status
+            // so a later patrol retries once a slot frees.
+            actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
           } else {
             try {
               const run = await spawnRun(issueId, 'test', {
@@ -1959,6 +1969,14 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         continue;
       }
 
+      // PAN-1665: defer when at the advancing-role concurrency ceiling. No status
+      // row exists yet, so leaving it untouched lets a later patrol retry cleanly.
+      if (!tryReserveAdvancingSlot()) {
+        actions.push(`Deferred missing-status review for ${issueId} — advancing-role concurrency ceiling reached`);
+        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        continue;
+      }
+
       // PAN-1048 R4: deacon auto-trigger routes through the role primitive.
       const { spawnReviewRoleForIssue } = await import('./review-agent.js');
       try {
@@ -2032,6 +2050,14 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
 
       if (!workspace) {
         actions.push(`Skipped test retry for ${issueId}: workspace unavailable`);
+        continue;
+      }
+
+      // PAN-1665: defer at the advancing-role concurrency ceiling; status stays
+      // pending/dispatch_failed so a later patrol retries once a slot frees.
+      if (!tryReserveAdvancingSlot()) {
+        actions.push(`Deferred test retry for ${issueId} — advancing-role concurrency ceiling reached`);
+        logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665)`);
         continue;
       }
 
@@ -2507,7 +2533,12 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
       // already picked up the work between the reset above and now.
       const freshStatus = getReviewStatusSync(issueId);
-      if (freshStatus?.reviewStatus === 'pending') {
+      if (freshStatus?.reviewStatus === 'pending' && !tryReserveAdvancingSlot()) {
+        // PAN-1665: at the ceiling — status is already reset to pending above, so
+        // the orphan-review path will re-dispatch on a later patrol once a slot frees.
+        actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+      } else if (freshStatus?.reviewStatus === 'pending') {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const branch = `feature/${issueId.toLowerCase()}`;
         const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -4418,6 +4449,11 @@ export async function runPatrol(): Promise<PatrolResult> {
     lastPatrolResult = skipped;
     return skipped;
   }
+
+  // PAN-1665: reset the per-patrol advancing-dispatch budget. Every review/test/
+  // ship re-dispatch below reserves a slot via tryReserveAdvancingSlot() so the
+  // patrol's combined spawns stay under the concurrency ceiling.
+  resetPatrolDispatchBudget();
 
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);

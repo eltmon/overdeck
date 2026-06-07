@@ -57,6 +57,17 @@ vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
   }),
 }));
 
+// PAN-1665: permissive concurrency governor — these tests assert the dispatch
+// logic itself, not the slot budget, so always allow a slot.
+vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
+  resetPatrolDispatchBudget: () => {},
+  tryReserveAdvancingSlot: () => true,
+  canDispatchAdvancing: () => true,
+  getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
+  countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+  workResumeSlotsAvailable: () => 6,
+}));
+
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
   getTmuxSessionName: (...args: unknown[]) => mockGetTmuxSessionName(...args),
