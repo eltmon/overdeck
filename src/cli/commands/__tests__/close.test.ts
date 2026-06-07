@@ -79,7 +79,7 @@ describe('closeOutCommand', () => {
   });
 
   it('warns and asks for confirmation when the issue is not verifying-on-main', async () => {
-    await closeOutCommand('PAN-1190', {});
+    await expect(closeOutCommand('PAN-1190', {})).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain("Issue should normally be in 'verifying-on-main' before close-out.");
@@ -93,7 +93,7 @@ describe('closeOutCommand', () => {
   });
 
   it('skips the confirmation prompt when --force is used', async () => {
-    await closeOutCommand('PAN-1190', { force: true });
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
     expect(mocks.closeOut).toHaveBeenCalledOnce();
