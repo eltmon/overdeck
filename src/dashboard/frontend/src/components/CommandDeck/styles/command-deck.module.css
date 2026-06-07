@@ -1723,7 +1723,10 @@
 
 /* Markdown tables (remark-gfm) */
 .markdownContent table {
-  width: 100%;
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 0 0 12px;
   font-size: 12px;
@@ -3497,8 +3500,11 @@
 }
 
 .chatMarkdown table {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
-  width: 100%;
   font-size: 12px;
 }
 .chatMarkdown th, .chatMarkdown td {
