@@ -800,6 +800,15 @@ export async function parseConversationMessages(
   };
 }
 
+/**
+ * PAN-1635: a conversation whose JSONL hasn't been written in this long is no
+ * longer "working" — even if its last entry is a trailing user/meta line (e.g. a
+ * post-compaction summary whose follow-up prompt was eaten by the compaction).
+ * Generous enough not to flap a slow-but-live turn; finite so a stranded session
+ * can't spin forever.
+ */
+const WORKING_STALENESS_MS = 180_000;
+
 /** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
 const ACTIVITY_SUMMARY_CACHE_MAX = 100;
 const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; summary: ConversationActivitySummary }>();
@@ -826,9 +835,20 @@ export async function summarizeConversationActivity(
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
   // — empty history, last message is user (tool result or prompt), or last message is
   // an assistant still streaming / waiting on tool_use — means the agent is working.
-  const isWorking = messages.length === 0 ||
+  //
+  // PAN-1635: guard on file recency. After a compaction the only post-boundary
+  // entries are user-role meta lines (compact summary, /compact echoes) with no
+  // following assistant turn, so the raw heuristic below pegs isWorking true
+  // forever. A session whose JSONL has been idle for WORKING_STALENESS_MS is not
+  // working — mirrors the `fileRecent` guards on `streaming` and `currentTool`.
+  // The window is generous (covers a long compaction / deep think that writes
+  // nothing for a while); during a real in-progress compaction the PreCompact
+  // hook's activity event keeps the card "working" independently.
+  const workingFileRecent = Date.now() - mtimeMs < WORKING_STALENESS_MS;
+  const isWorking = workingFileRecent && (
+    messages.length === 0 ||
     lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt);
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt));
 
   // Find the most recent pending tool (tool_use sent but tool_result not yet received).
   // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for

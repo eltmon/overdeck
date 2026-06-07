@@ -273,6 +273,26 @@ export function getProviderEnvSync(
     }
   }
 
+  // Pi-native provider env vars so the Pi harness can authenticate directly
+  // when driving non-Anthropic models (Pi has its own provider registry).
+  if (provider.name === 'kimi') {
+    env.KIMI_API_KEY = apiKey;
+  } else if (provider.name === 'minimax') {
+    env.MINIMAX_API_KEY = apiKey;
+  } else if (provider.name === 'zai') {
+    env.ZAI_API_KEY = apiKey;
+  } else if (provider.name === 'mimo') {
+    env.MIMO_API_KEY = apiKey;
+  } else if (provider.name === 'openrouter') {
+    env.OPENROUTER_API_KEY = apiKey;
+  } else if (provider.name === 'nous') {
+    env.NOUS_API_KEY = apiKey;
+  } else if (provider.name === 'dashscope') {
+    env.DASHSCOPE_API_KEY = apiKey;
+  } else if (provider.name === 'google') {
+    env.GEMINI_API_KEY = apiKey;
+  }
+
   // MiniMax, Z.AI, and MiMo recommend longer timeouts
   if (provider.name === 'minimax' || provider.name === 'zai' || provider.name === 'mimo') {
     env.API_TIMEOUT_MS = '300000';

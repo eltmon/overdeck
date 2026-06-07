@@ -22,6 +22,7 @@ import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
+import { DeaconActivityView } from './components/DeaconActivityView';
 import { ContextPage } from './components/context/ContextPage';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
@@ -88,6 +89,7 @@ const TAB_PATHS: Record<Tab, string> = {
   health: '/health',
   settings: '/settings',
   'god-view': '/god-view',
+  deacon: '/deacon',
   sessions: '/sessions',
   'awaiting-merge': '/awaiting-merge',
 };
@@ -1379,6 +1381,11 @@ export default function App() {
               <GodViewPage />
             </div>
           </BootstrapGate>
+        )}
+        {activeTab === 'deacon' && (
+          <div className="w-full h-full overflow-hidden">
+            <DeaconActivityView />
+          </div>
         )}
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers

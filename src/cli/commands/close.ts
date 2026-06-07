@@ -205,6 +205,11 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
 
   if (result.success) {
     console.log(chalk.green(`Close-out complete for ${issueUpper}.`));
+    // Exit explicitly: close-out opens the SQLite handle (and other resources)
+    // whose open handles otherwise keep the event loop alive, so the command
+    // hangs after printing "complete". The failure path below already exits;
+    // this makes success symmetric. (PAN-1621)
+    process.exit(0);
   } else {
     const failedStep = result.steps.find(s => !s.success && !s.skipped);
     console.log(chalk.red(`Close-out failed: ${failedStep?.error || 'Unknown error'}`));

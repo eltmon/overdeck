@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1574",
   "created": "2026-06-02T00:18:15.534Z",
-  "updated": "2026-06-02T13:36:33.569Z",
+  "updated": "2026-06-05T05:34:09.725Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -141,13 +141,5 @@
       "timestamp": "2026-06-02T13:36:33.569Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-06-02T13:36:33Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1574 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (77718ms):\n\n mockGetAgentState\u001b[33m.\u001b[39m\u001b[34mmockReturnValue\u001b[39m(\u001b[34mmakeAgentState\u001b[39m(tempDir))\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/work/done.test.ts\u001b[2m > \u001b[22mdoneCommand --force bypass\u001b[2m > \u001b[22mdoes NOT call process.exit(1) from pre-flight when --force is set\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 1 ] to be undefined\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nundefined\n\n\u001b[31m+ Received:\u001b[39m\n[\n  1,\n]\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/cli/commands/work/done.test.ts:\u001b[2m225:27\u001b[22m\u001b[39m\n    \u001b[90m223|\u001b[39m     \u001b[35mconst\u001b[39m exitCalls \u001b[33m=\u001b[39m exitSpy\u001b[33m.\u001b[39mmock\u001b[33m.\u001b[39mcalls\u001b[33m;\u001b[39m\n    \u001b[90m224|\u001b[39m     \u001b[35mconst\u001b[39m preflightExit \u001b[33m=\u001b[39m exitCalls\u001b[33m.\u001b[39m\u001b[34mfind\u001b[39m(([code]) \u001b[33m=>\u001b[39m code \u001b[33m===\u001b[39m \u001b[34m1\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m225|\u001b[39m     \u001b[34mexpect\u001b[39m(preflightExit)\u001b[33m.\u001b[39m\u001b[34mtoBeUndefined\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                           \u001b[31m^\u001b[39m\n    \u001b[90m226|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m227|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/conversations.test.ts\u001b[2m > \u001b[22mparseSummaryForkFocus\u001b[2m > \u001b[22mtrims handoff focus text\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/conversations.test.ts:\u001b[2m86:3\u001b[22m\u001b[39m\n    \u001b[90m 84|\u001b[39m\n    \u001b[90m 85|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'parseSummaryForkFocus'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 86|\u001b[39m   \u001b[34mit\u001b[39m(\u001b[32m'trims handoff focus text'\u001b[39m\u001b[33m,\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m 87|\u001b[39m     const { parseSummaryForkFocus } = await import('../conversations.j…\n    \u001b[90m 88|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯\u001b[22m\u001b[39m\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1574 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1574 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ]
+  "feedback": []
 }

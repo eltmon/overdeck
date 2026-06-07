@@ -32,6 +32,23 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
+// PAN-1635: a turn that has shown no transcript progress for this long is
+// stalled, not working. Covers a slow compaction + response (a Claude-native
+// /compact here ran ~128s before any follow-up); finite so a prompt that was
+// eaten by submit-time compaction can't strand the spinner forever.
+const TURN_STALL_MS = 4 * 60_000;
+
+/**
+ * Whether the conversation's latest transcript entry is recent enough that the
+ * agent could still be mid-turn. Empty/loading history counts as recent (startup).
+ */
+function lastActivityRecent(lastMsg: ChatMessage | undefined): boolean {
+  if (!lastMsg) return true;
+  const ts = Date.parse(lastMsg.completedAt || lastMsg.createdAt || '');
+  if (Number.isNaN(ts)) return true;
+  return Date.now() - ts < TURN_STALL_MS;
+}
+
 // ─── Phase icon map ───────────────────────────────────────────────────────────
 
 const PHASE_ICONS = {
@@ -164,11 +181,15 @@ export function ConversationPanel({
   const headerLastMsg = headerMessages[headerMessages.length - 1];
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
+  // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
+  // recent — otherwise a prompt eaten by submit-time compaction spins the header forever.
   const isWorking = conversation.sessionAlive && (
     messagesData == null ||
     headerMessages.length === 0 ||
-    headerLastMsg?.role === 'user' ||
-    (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
+    (lastActivityRecent(headerLastMsg) && (
+      headerLastMsg?.role === 'user' ||
+      (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
+    ))
   );
   const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
@@ -1125,6 +1146,30 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     if (serverCaughtUp) clearOptimistic(conversation.name);
   }, [serverCaughtUp, clearOptimistic, conversation.name]);
 
+  // PAN-1635: a sent message can be silently eaten when Claude Code compacts on
+  // submit (the paste+Enter races the compaction state-transition) — the prompt
+  // is dropped and never echoes, leaving the optimistic bubble "Sending…" forever.
+  // Detect it: a compact boundary that appeared at/after the send means the prompt
+  // was eaten (surface fast); otherwise fall back to a plain stall timeout. Either
+  // way, move it to the retry outbox so the user can re-send instead of waiting on
+  // a response that will never come.
+  useEffect(() => {
+    if (visibleOptimistic.length === 0) return;
+    const oldest = visibleOptimistic[0];
+    const sentTs = Date.parse(oldest.createdAt || '');
+    if (Number.isNaN(sentTs)) return;
+    const eatenByCompaction = (data?.compactBoundaries ?? []).some((b) => {
+      const bt = Date.parse(b.timestamp);
+      return !Number.isNaN(bt) && bt >= sentTs;
+    });
+    const deadline = sentTs + (eatenByCompaction ? 20_000 : TURN_STALL_MS);
+    const timer = setTimeout(
+      () => failSend(conversation.name, oldest.text),
+      Math.max(0, deadline - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [visibleOptimistic, data?.compactBoundaries, failSend, conversation.name]);
+
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
@@ -1139,10 +1184,16 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
   // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
   const lastMsg = messages[messages.length - 1];
+  // PAN-1635: an in-progress compaction keeps us working; otherwise a trailing
+  // user/incomplete-assistant entry only implies "working" while it's recent, so a
+  // prompt eaten by Claude's submit-time compaction can't spin the panel forever.
   const isWorking = conversation.sessionAlive && (
+    isCompacting ||
     messages.length === 0 ||
-    lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    (lastActivityRecent(lastMsg) && (
+      lastMsg?.role === 'user' ||
+      (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    ))
   );
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;

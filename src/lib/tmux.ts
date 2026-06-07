@@ -448,6 +448,29 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
   }
 }
 
+/**
+ * Foreground commands that mean a launcher session is a keep-alive *corpse*, not
+ * a live harness. Launchers end with `while true; do sleep 60; done`
+ * (src/lib/launcher-generator.ts), so after the harness process (Claude/Pi/…)
+ * exits the tmux session stays alive running that loop. Its foreground command
+ * is then `sleep` (during the wait) or the hosting shell (between iterations) —
+ * never the harness, which surfaces as `node`/`claude`/the runtime binary.
+ */
+const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
+
+/**
+ * Honest liveness signal for a launcher-managed session: true only when the
+ * session exists AND a real harness process is running in it — not the post-exit
+ * keep-alive loop. `sessionExists` alone cannot tell a live session from a
+ * corpse because the keep-alive loop outlives the harness. A pane whose only
+ * foreground command is a shell or `sleep` is treated as dead. PAN-1637/PAN-1638.
+ */
+export async function isHarnessProcessAlive(sessionName: string): Promise<boolean> {
+  const cmds = await listPaneValuesText(sessionName, '#{pane_current_command}');
+  if (cmds.length === 0) return false;
+  return cmds.some((cmd) => !KEEPALIVE_FOREGROUND_COMMANDS.has(cmd));
+}
+
 
 /**
  * Categorizes an API failure surfaced inside an interactive Claude Code pane.

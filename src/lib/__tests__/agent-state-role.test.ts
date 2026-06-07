@@ -18,6 +18,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../config-yaml.js');
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
+    vi.doUnmock('../workspace/rebuild-stack.js');
     vi.doUnmock('../beads-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -231,6 +232,11 @@ describe('AgentState role persistence', () => {
       getProject: vi.fn(() => projectConfig),
       getProjectSync: vi.fn(() => projectConfig),
     }));
+    // PAN-1618: the spawn gate now attempts an auto-rebuild before failing.
+    // Mock it to fail so the gate still blocks deterministically here.
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: false, error: 'rebuild unavailable in test' })),
+    }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
       sessionExists: vi.fn(() => Effect.succeed(false)),
@@ -262,10 +268,12 @@ describe('AgentState role persistence', () => {
     })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
+    // PAN-1618: an auto-rebuild is attempted first; when it fails the gate
+    // blocks and emits the failed-rebuild marker.
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       issueId: 'PAN-1140',
-      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+      message: 'agent-spawn-stack-rebuild-failed: PAN-1140',
     }));
     rmSync(workspace, { recursive: true, force: true });
   });
@@ -280,6 +288,11 @@ describe('AgentState role persistence', () => {
         reasons: ['panopticon-feature-pan-1140-init init exited non-zero (1)'],
         lastObserved: '2026-05-16T00:00:00.000Z',
       })),
+    }));
+    // PAN-1618: the spawn gate now attempts an auto-rebuild before failing.
+    // Mock it to fail so the gate still blocks deterministically here.
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: false, error: 'rebuild unavailable in test' })),
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
@@ -304,10 +317,11 @@ describe('AgentState role persistence', () => {
     })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
+    // PAN-1618: failed auto-rebuild → blocked with the failed-rebuild marker.
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       issueId: 'PAN-1140',
-      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+      message: 'agent-spawn-stack-rebuild-failed: PAN-1140',
     }));
     rmSync(workspace, { recursive: true, force: true });
   });
@@ -374,6 +388,32 @@ describe('AgentState role persistence', () => {
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 
     await expect(assertWorkspaceStackHealthyForSpawn('MIN-1', 'work')).resolves.toBeUndefined();
+  });
+
+  it('PAN-1618: auto-rebuilds an unhealthy stack and then permits the spawn', async () => {
+    const emitActivityEntry = vi.fn();
+    const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: true }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['No Docker containers found for workspace stack pan-1579'],
+        lastObserved: '2026-06-04T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+    }));
+
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    // Unhealthy stack + successful rebuild ⇒ the gate resolves rather than throwing,
+    // so a `proposed` item reaches a running work agent with no human step.
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-1579', 'work')).resolves.toBeUndefined();
+    expect(rebuildWorkspaceStack).toHaveBeenCalledWith('PAN-1579', expect.any(Object));
+    expect(emitActivityEntry).not.toHaveBeenCalled();
   });
 
   it('treats state.json without a valid role as missing', async () => {

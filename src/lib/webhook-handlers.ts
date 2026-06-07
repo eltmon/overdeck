@@ -170,6 +170,9 @@ const KNOWN_CONFLICT_STATES = new Set(['dirty']);
 const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
 const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 
+/** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
+const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
+
 const pendingReconciliation = new Set<string>();
 const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();
 
@@ -198,59 +201,52 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const { execFile } = await import('child_process');
     const { promisify } = await import('util');
     const execFileAsync = promisify(execFile);
+    // gh GraphQL fields (NOT the REST webhook shape): mergeable is an enum
+    // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
+    // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
+    // carries the required-check results. The previous query used `mergeableState`
+    // (no such gh field) so the call threw on every invocation and this reconciler
+    // silently did nothing — leaving readyForMerge PRs with stale/empty blockers. PAN-1620.
     const { stdout } = await execFileAsync(
       'gh',
-      ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeableState,draft', '--jq', '[.mergeable,.mergeableState,.draft]'],
+      ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
       { encoding: 'utf-8', timeout: 15000 },
     );
-    const [mergeable, mergeableState, draft] = JSON.parse(stdout) as [boolean | null, string | null, boolean];
+    const pr = JSON.parse(stdout) as {
+      mergeable?: string | null;
+      mergeStateStatus?: string | null;
+      isDraft?: boolean;
+      statusCheckRollup?: Array<{ conclusion?: string | null; state?: string | null }>;
+    };
     const status = await Effect.runPromise(getReviewStatus(issueId));
     if (!status) return;
 
-    const update: Partial<ReviewStatus> = {};
-    let blockers = [...(status.blockerReasons ?? [])];
+    const mergeable = (pr.mergeable ?? '').toUpperCase();
+    const mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
+    const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
+    const checksFailed = (pr.statusCheckRollup ?? []).some((c) =>
+      FAILING_CHECK_CONCLUSIONS.has((c.conclusion || c.state || '').toUpperCase()),
+    );
 
-    if (draft) {
-      const draftBlocker: BlockerReason = {
-        type: 'draft_pr',
-        summary: 'Pull request is in draft state',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = [...blockers.filter((b) => b.type !== 'draft_pr'), draftBlocker];
-    } else {
-      blockers = blockers.filter((b) => b.type !== 'draft_pr');
+    // Rebuild the GitHub-native blockers from live state, preserving any
+    // non-GitHub-native ones (e.g. unresolved_conversations, changes_requested).
+    const GH_NATIVE = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable', 'failing_checks', 'draft_pr']);
+    const now = new Date().toISOString();
+    const blockers: BlockerReason[] = (status.blockerReasons ?? []).filter((b) => !GH_NATIVE.has(b.type));
+    if (pr.isDraft) blockers.push({ type: 'draft_pr', summary: 'Pull request is in draft state', detectedAt: now });
+    if (isConflicting) {
+      blockers.push({ type: 'merge_conflict', summary: 'Merge conflict with target branch', detectedAt: now });
+    } else if (mergeState === 'BLOCKED' && !checksFailed) {
+      blockers.push({ type: 'not_mergeable', summary: 'PR blocked by branch protection', detectedAt: now });
     }
+    if (checksFailed) blockers.push({ type: 'failing_checks', summary: 'Required checks are failing', detectedAt: now });
 
-    if (mergeableState && KNOWN_CONFLICT_STATES.has(mergeableState)) {
-      const mergeConflictBlocker: BlockerReason = {
-        type: 'merge_conflict',
-        summary: 'Merge conflict with target branch',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
-    } else if (mergeable === false && (mergeableState == null || mergeableState === undefined)) {
-      const mergeConflictBlocker: BlockerReason = {
-        type: 'merge_conflict',
-        summary: 'Merge conflict with target branch',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
-    } else if ((mergeableState && KNOWN_NON_BLOCKING_STATES.has(mergeableState)) || mergeable === true) {
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-    } else if (mergeableState && KNOWN_NOT_MERGEABLE_STATES.has(mergeableState)) {
-      const notMergeableBlocker: BlockerReason = {
-        type: 'not_mergeable',
-        summary: `PR not mergeable: ${mergeableState}`,
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), notMergeableBlocker];
-    }
-
-    if (blockers.length > 0) update.blockerReasons = blockers;
-    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-    if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatus(issueId, update, status));
+    // Only write when the GitHub-native blocker set actually changed.
+    const prevTypes = new Set((status.blockerReasons ?? []).filter((b) => GH_NATIVE.has(b.type)).map((b) => b.type));
+    const nextTypes = new Set(blockers.filter((b) => GH_NATIVE.has(b.type)).map((b) => b.type));
+    const changed = prevTypes.size !== nextTypes.size || [...nextTypes].some((t) => !prevTypes.has(t));
+    if (changed) {
+      await Effect.runPromise(setReviewStatus(issueId, { blockerReasons: blockers.length > 0 ? blockers : undefined }, status));
     }
   } catch (err) {
     console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);

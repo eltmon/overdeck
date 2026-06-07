@@ -13,6 +13,7 @@ describe('providers', () => {
   it('returns Anthropic-compatible env for Google direct routing', () => {
     expect(getProviderEnvSync(PROVIDERS.google, 'AIza-test')).toEqual({
       ANTHROPIC_AUTH_TOKEN: 'AIza-test',
+      GEMINI_API_KEY: 'AIza-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite-preview',
@@ -25,6 +26,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_CODING_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
+      KIMI_API_KEY: 'sk-kimi-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
@@ -37,6 +39,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-platform-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_PLATFORM_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-platform-test',
+      KIMI_API_KEY: 'sk-platform-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
@@ -50,6 +53,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
+      MINIMAX_API_KEY: 'sk-minimax-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'minimax-m2.7',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'minimax-m2.7',
@@ -64,6 +68,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.zai, 'sk-zai-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
+      ZAI_API_KEY: 'sk-zai-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-4.7',
@@ -78,6 +83,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.mimo, 'sk-mimo-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
+      MIMO_API_KEY: 'sk-mimo-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
@@ -92,6 +98,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1',
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
+      OPENROUTER_API_KEY: 'sk-or-test',
     });
   });
 
@@ -106,6 +113,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.dashscope, 'sk-test')).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
       ANTHROPIC_AUTH_TOKEN: 'sk-test',
+      DASHSCOPE_API_KEY: 'sk-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-max',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3-coder-plus',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',

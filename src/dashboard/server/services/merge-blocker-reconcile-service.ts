@@ -7,11 +7,11 @@
  * dropped after a `readyForMerge` PR goes stale, the row keeps a clickable button
  * until someone clicks it (which then churns the rebase loop or fails).
  *
- * Every tick this polls live GitHub mergeability for issues that are
- * `readyForMerge` with no known blockers, and `refreshMergeStateFromGitHub`
- * writes any discovered merge_conflict / draft blocker back into review status —
- * so the row drops out of "Awaiting Merge" and into "Blocked from Merge"
- * proactively, before any click, and the flywheel can pick it up to rebase.
+ * Every tick this polls live GitHub state for issues that are `readyForMerge`
+ * with no known blockers, and `refreshMergeStateFromGitHub` writes any discovered
+ * merge_conflict / failing_checks / draft / not_mergeable blocker back into review
+ * status — so the row drops out of "Awaiting Merge" and into "Blocked from Merge"
+ * proactively, before any click, and the flywheel can pick it up to rebase/fix CI.
  *
  * Bounded + cheap: typically 0–3 ready PRs; each is re-checked at most once per
  * RECHECK_INTERVAL_MS via a per-issue throttle. One `gh pr view` per due PR;

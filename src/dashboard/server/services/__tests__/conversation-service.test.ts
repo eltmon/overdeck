@@ -468,6 +468,31 @@ describe('parseConversationMessages', () => {
     expect(result.isWorking).toBe(true);
   });
 
+  it('does NOT mark a stale user-last conversation as working (PAN-1635: post-compaction idle)', async () => {
+    // After a compaction the only post-boundary entry is a user-role meta line
+    // (the continuation summary) with no following assistant turn — if the
+    // follow-up prompt was eaten by the compaction, the agent is actually idle.
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-1',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        message: {
+          content: [{ type: 'text', text: 'This session is being continued from a previous conversation' }],
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+    // JSONL idle for >3min (WORKING_STALENESS_MS) — last entry is user-role but
+    // the file is stale, so the agent is not working.
+    mockStat.mockResolvedValue({ mtimeMs: Date.now() - 200_000, birthtimeMs: Date.now() - 200_000, size: (await mockReadFile()).length });
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result.isWorking).toBe(false);
+  });
+
   it('summarizes a completed assistant-last conversation as idle', async () => {
     const lines = [
       {

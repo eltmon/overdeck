@@ -141,7 +141,7 @@ LINEAR_API_KEY=lin_api_...
 HUME_API_KEY=your-hume-api-key
 ```
 
-**Note**: Direct-compatible providers (Kimi, GLM) don't need claude-code-router. Only OpenAI and Gemini require the router.
+**Note**: Direct-compatible providers (Kimi, GLM, MiniMax, MiMo) route through their native Anthropic-compatible endpoints. OpenAI and Gemini route through Panopticon's built-in CLIProxy sidecar.
 
 **Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
 
@@ -815,9 +815,9 @@ Different LLM providers have different compatibility with Claude Code's API form
 - **Kimi/Moonshot** - Implements Anthropic-compatible API ✅ Tested
 - **GLM (Z.AI)** - Implements Anthropic-compatible API ✅ Tested
 
-**🔄 Requires Router** (API format translation needed):
-- **OpenAI** - Different API structure, requires claude-code-router
-- **Google Gemini** - Different API structure, requires claude-code-router
+**🔄 Requires CLIProxy** (Anthropic-compatible sidecar):
+- **OpenAI** - Subscription auth via Codex CLI / CLIProxy sidecar
+- **Google Gemini** - API key bridged into CLIProxy sidecar
 
 ### Why Use Alternative APIs?
 
@@ -887,21 +887,15 @@ claude /status
 
 You should see the custom API endpoint listed in the status output.
 
-### When to Use claude-code-router
+### CLIProxy Sidecar (OpenAI, Gemini)
 
-For providers that require API format translation (OpenAI, Gemini), use claude-code-router:
-
-```bash
-# Install router
-npm install -g @musistudio/claude-code-router
-
-# Configure via router config
-# See PAN-78 for dashboard UI configuration
-```
+For providers whose APIs differ from Anthropic's format (OpenAI, Gemini), Panopticon
+runs a local CLIProxy sidecar that translates requests. The sidecar starts
+automatically with the dashboard — no manual installation needed.
 
 **Architecture Decision**:
-- **Direct APIs** (Kimi, GLM): Use `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ← Simpler, less overhead
-- **Incompatible APIs** (OpenAI, Gemini): Use claude-code-router ← Required for API translation
+- **Direct APIs** (Kimi, GLM, MiniMax, MiMo): Use `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ← Simpler, less overhead
+- **Incompatible APIs** (OpenAI, Gemini): Use CLIProxy sidecar ← Handles auth bridging and API translation
 
 ### Important Notes
 

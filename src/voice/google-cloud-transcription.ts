@@ -22,6 +22,7 @@ class GoogleCloudTranscription implements ITurnEmitter {
   private closed = false;
   private stopRequested = false;
   private startComplete = false;
+  private lastError: string | null = null;
   private stopResolver: (() => void) | null = null;
 
   constructor(apiKey: string, model: string) {
@@ -41,6 +42,14 @@ class GoogleCloudTranscription implements ITurnEmitter {
 
   onError(cb: (error: Error) => void): void {
     this.errorCallbacks.add(cb);
+  }
+
+  isAlive(): boolean {
+    return !this.closed && !this.stopRequested;
+  }
+
+  getLastError(): string | null {
+    return this.lastError;
   }
 
   sendAudio(pcm: Buffer): boolean {
@@ -138,6 +147,7 @@ class GoogleCloudTranscription implements ITurnEmitter {
   }
 
   private emitError(error: Error): void {
+    this.lastError = error.message;
     for (const cb of this.errorCallbacks) cb(error);
   }
 }

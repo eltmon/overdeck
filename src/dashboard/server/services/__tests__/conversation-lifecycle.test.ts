@@ -9,6 +9,7 @@ const mockListActiveConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
 const mockListSessionNames = vi.fn();
+const mockIsHarnessProcessAlive = vi.fn();
 const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
@@ -38,6 +39,7 @@ vi.mock('../conversation-attachments.js', () => ({
 
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: mockListSessionNames,
+  isHarnessProcessAlive: mockIsHarnessProcessAlive,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
@@ -47,6 +49,8 @@ vi.mock('node:util', () => ({ promisify: vi.fn((fn: unknown) => fn) }));
 describe('ConversationLifecycleService — pollConversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: harness alive in sessions that exist (corpse cases set false explicitly).
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -127,6 +131,23 @@ describe('ConversationLifecycleService — pollConversations', () => {
     );
   });
 
+  it('marks a session that is alive but whose harness process has exited (keep-alive corpse)', async () => {
+    mockListActiveConversations.mockReturnValue([
+      { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    // tmux session IS in the alive list, but the harness process is dead — only
+    // the launcher keep-alive `sleep` loop remains. PAN-1638.
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-corpse']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
+  });
+
   it('does not throw when listActiveConversations errors', async () => {
     mockListActiveConversations.mockImplementation(() => { throw new Error('DB error'); });
 
@@ -143,6 +164,8 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: harness alive in sessions that exist (corpse cases set false explicitly).
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
     fakeHome = mkdtempSync(join(tmpdir(), 'pan-clear-orphan-'));
     cwd = '/work/myproj';
     // encodeClaudeProjectDir(/work/myproj) → -work-myproj (slashes/dots collapse to dashes)

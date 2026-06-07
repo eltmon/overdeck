@@ -29,7 +29,7 @@ import {
   setClearedToConvId,
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
-import { listSessionNames } from '../../../lib/tmux.js';
+import { listSessionNames, isHarnessProcessAlive } from '../../../lib/tmux.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
@@ -73,10 +73,21 @@ export async function pollConversations(): Promise<void> {
     const endedConversations: typeof conversations = [];
     const now = Date.now();
     for (const conv of conversations) {
+      const ageMs = now - new Date(conv.createdAt).getTime();
+      // Grace protects a just-spawned conversation: its pane may still be the
+      // launcher shell before the harness process takes the foreground.
+      if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
       if (!aliveSessions.has(conv.tmuxSession)) {
-        const ageMs = now - new Date(conv.createdAt).getTime();
-        if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
         console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
+        markConversationEnded(conv.name);
+        endedConversations.push(conv);
+      } else if (!(await isHarnessProcessAlive(conv.tmuxSession))) {
+        // Session exists but the harness process has exited — only the launcher
+        // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
+        // reports the session, so the gone-check above misses it. Mark ended so
+        // the dashboard stops showing a dead conversation as active and resume
+        // respawns it. PAN-1638.
+        console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`);
         markConversationEnded(conv.name);
         endedConversations.push(conv);
       }

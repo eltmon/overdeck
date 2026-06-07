@@ -595,6 +595,14 @@ const PROVIDER_ENV_KEYS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  // Pi-native provider env vars (bridged from Panopticon settings so Pi can auth)
+  'KIMI_API_KEY',
+  'MINIMAX_API_KEY',
+  'ZAI_API_KEY',
+  'MIMO_API_KEY',
+  'OPENROUTER_API_KEY',
+  'NOUS_API_KEY',
+  'DASHSCOPE_API_KEY',
 ] as const;
 
 export async function getProviderExportsForModel(model: string): Promise<string> {
@@ -2555,6 +2563,22 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
 }
 
 /**
+ * Spawn-time stack-rebuild self-heal state. PAN-1618: the work-spawn gate
+ * (`assertWorkspaceStackHealthyForSpawn`) used to fail hard when the workspace
+ * docker stack was down, with only manual recoveries (`pan workspace rebuild`
+ * or interactive `--host`). Under autonomous operation a fully-planned
+ * `proposed` item whose stack happened to be down could never auto-start its
+ * work agent — it sat at the gate forever. This mirrors the PAN-1247
+ * orphan-test self-heal one role earlier: rebuild the stack before failing,
+ * bounded by a cooldown + attempt cap so a stack that genuinely cannot be
+ * rebuilt escalates to a human instead of looping `docker compose` forever.
+ */
+const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+  new Map();
+const SPAWN_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
+const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
+
+/**
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
@@ -2566,10 +2590,14 @@ export async function assertWorkspaceStackHealthyForSpawn(
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
-  if (health.healthy) return;
-
   const normalizedIssue = issueId.toUpperCase();
+
+  const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
+  if (health.healthy) {
+    spawnStackRebuildState.delete(normalizedIssue);
+    return;
+  }
+
   const details = health.reasons.join('; ');
   const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
 
@@ -2581,12 +2609,69 @@ export async function assertWorkspaceStackHealthyForSpawn(
     return;
   }
 
+  // PAN-1618: attempt an autonomous rebuild before failing, so a `proposed`
+  // item reaches a running work agent without a human step. Bounded by a
+  // cooldown + attempt cap (same shape as PAN-1247's orphan-test recovery).
+  const record = spawnStackRebuildState.get(normalizedIssue)
+    ?? { lastAttempt: 0, attempts: 0, escalated: false };
+  const now = Date.now();
+
+  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+    if (!record.escalated) {
+      record.escalated = true;
+      spawnStackRebuildState.set(normalizedIssue, record);
+      emitActivityEntrySync({
+        source: role,
+        level: 'error',
+        issueId: normalizedIssue,
+        message: `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
+        details: `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+      });
+    }
+    throw new Error(message);
+  }
+
+  if (now - record.lastAttempt < SPAWN_STACK_REBUILD_COOLDOWN_MS) {
+    // A rebuild was attempted recently and the stack is still unhealthy —
+    // surface the blocker but don't hammer `docker compose` every spawn.
+    emitActivityEntrySync({
+      source: role,
+      level: 'error',
+      issueId: normalizedIssue,
+      message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
+      details,
+    });
+    throw new Error(message);
+  }
+
+  record.lastAttempt = now;
+  record.attempts += 1;
+  spawnStackRebuildState.set(normalizedIssue, record);
+  console.log(
+    `[agents] Workspace stack for ${normalizedIssue} unhealthy (${details}) — rebuilding ` +
+      `before spawn (attempt ${record.attempts}/${SPAWN_STACK_REBUILD_MAX_ATTEMPTS})`,
+  );
+
+  const { rebuildWorkspaceStack } = await import('./workspace/rebuild-stack.js');
+  const result = await Effect.runPromise(
+    rebuildWorkspaceStack(issueId, {
+      onProgress: (m) => console.log(`[agents]   ${normalizedIssue} stack rebuild: ${m}`),
+    }),
+  );
+
+  if (result.success) {
+    spawnStackRebuildState.delete(normalizedIssue);
+    console.log(`[agents] Workspace stack for ${normalizedIssue} rebuilt — proceeding with spawn`);
+    return;
+  }
+
+  console.warn(`[agents] Workspace stack rebuild failed for ${normalizedIssue}: ${result.error}`);
   emitActivityEntrySync({
     source: role,
     level: 'error',
     issueId: normalizedIssue,
-    message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
-    details,
+    message: `agent-spawn-stack-rebuild-failed: ${normalizedIssue}`,
+    details: result.error ?? details,
   });
   throw new Error(message);
 }

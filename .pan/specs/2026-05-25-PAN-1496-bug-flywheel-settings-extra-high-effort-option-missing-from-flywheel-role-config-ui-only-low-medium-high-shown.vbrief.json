@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-06-07T05:14:47.529Z"
+    "updated": "2026-06-07T05:30:47.614Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 32,
+    "sequence": 35,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-06-07T05:14:47.529Z",
+    "updated": "2026-06-07T05:30:47.614Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -504,44 +504,42 @@
         "phase": "review",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:14:47.523Z",
+        "updatedAt": "2026-06-07T05:30:47.381Z",
         "work": {
-          "updatedAt": "2026-06-07T05:14:47.523Z",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-06-07T05:14:47.523Z",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": []
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-07T05:14:47.523Z",
-          "notes": "Tmux env-var strip list regression leaks provider API keys into agent sessions in spawn-planning-session.ts",
+          "status": "reviewing",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-07T05:14:47.523Z",
-              "notes": "Tmux env-var strip list regression leaks provider API keys into agent sessions in spawn-planning-session.ts"
+              "status": "reviewing",
+              "at": "2026-06-07T05:30:47.381Z"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:14:47.523Z",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:14:47.523Z"
+              "at": "2026-06-07T05:30:47.381Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:14:47.523Z",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-07T05:14:47.523Z",
+          "updatedAt": "2026-06-07T05:30:47.381Z",
           "history": [],
           "readyForMerge": false
         }

@@ -66,6 +66,9 @@ describe('closeOutCommand', () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it so the
+    // function returns and these assertions run, instead of vitest trapping the exit.
+    vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => {}) as never);
     installIssueState([]);
     answerConfirmation('yes');
   });

@@ -27,7 +27,7 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { getProviderForModelSync, PROVIDERS } from '../../../lib/providers.js';
+import { getProviderForModelSync, PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
@@ -247,7 +247,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'kimi': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'K2.6-code-preview') : 'K2.6-code-preview';
           try {
-            const resp = await fetch(`${PROVIDERS.kimi.baseUrl}v1/messages`, {
+            const resp = await fetch(`${getKimiAnthropicBaseUrl(apiKey)}v1/messages`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -537,7 +537,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'kimi': {
           try {
-            const resp = await fetch(`${PROVIDERS.kimi.baseUrl}v1/models`, {
+            const resp = await fetch(`${getKimiAnthropicBaseUrl(apiKey)}v1/models`, {
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
             });
             if (resp.ok) {

@@ -109,12 +109,34 @@ describe('initCodexHome', () => {
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
   })
 
-  it('writes config.toml with approval policy', () => {
+  it('writes config.toml with flat top-level Codex keys', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-02')
     initCodexHome(codexDir)
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
-    expect(config).toContain('policy = "never"')
+    // approval_policy is a flat top-level string, not an [approval] table.
+    expect(config).toContain('approval_policy = "never"')
+    // No TOML table sections — Codex deserializes these keys as scalars, and a
+    // `[model]` table breaks config load with "invalid type: map, expected a
+    // string in `model`" (PAN-1574 regression).
+    expect(config).not.toMatch(/^\[(model|approval|notify)\]/m)
+  })
+
+  it('pre-seeds folder trust and autonomy so the TUI skips its first-run wizard', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-trust')
+    initCodexHome(codexDir, {
+      trustedDir: '/home/eltmon/Projects/panopticon-cli',
+      approvalPolicy: 'never',
+      sandboxMode: 'danger-full-access',
+    })
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain('approval_policy = "never"')
+    expect(config).toContain('sandbox_mode = "danger-full-access"')
+    // The folder-trust entry is what the onboarding wizard persists; pre-writing
+    // it suppresses the wizard on a fresh per-agent CODEX_HOME.
+    expect(config).toContain('[projects."/home/eltmon/Projects/panopticon-cli"]')
+    expect(config).toContain('trust_level = "trusted"')
   })
 
   it('is idempotent — does not overwrite existing config', () => {

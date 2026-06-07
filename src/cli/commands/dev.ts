@@ -98,9 +98,23 @@ async function waitForHttp200(port: number, timeoutMs = 10000): Promise<void> {
   throw new Error(`Frontend at ${url} did not return 200 within ${timeoutMs}ms`);
 }
 
-function killPort(port: number): void {
+function killPort(port: number, signal: 'TERM' | 'KILL' = 'TERM'): void {
   try {
-    execSync(`fuser -k -TERM ${port}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`fuser -k -${signal} ${port}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Kill ALL bundled dashboard-server processes by path — not just the current port
+ * owner. An orphan that already lost the port (e.g. after a failed restart) is
+ * invisible to killPort(), survives forever, and can run a second Deacon racing
+ * the live one. PAN-1622.
+ */
+function killAllDashboardServers(signal: 'TERM' | 'KILL' = 'TERM'): void {
+  try {
+    execSync(`pkill -${signal} -f 'dist/dashboard/server\\.js' 2>/dev/null || true`, { stdio: 'pipe' });
   } catch {
     // ignore
   }
@@ -276,15 +290,35 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
   // ── Kill existing processes ────────────────────────────────────────────────
   console.log(chalk.dim('Cleaning up existing dashboard processes...'));
-  killPort(config.dashboardPort);
-  killPort(config.dashboardApiPort);
+  // PAN-1622: kill ALL dashboard servers (not just the port owner) so orphans
+  // can't keep serving stale data or run a second Deacon. Escalate SIGTERM →
+  // SIGKILL if the ports don't free, and ABORT rather than spawn a doomed child
+  // that can't bind (which silently leaves the stale server serving).
+  killAllDashboardServers('TERM');
+  killPort(config.dashboardPort, 'TERM');
+  killPort(config.dashboardApiPort, 'TERM');
   try {
     await Promise.all([
       waitForPortFree(config.dashboardPort, 5000),
       waitForPortFree(config.dashboardApiPort, 5000),
     ]);
   } catch {
-    // proceed anyway
+    console.log(chalk.yellow('Ports still busy after SIGTERM — escalating to SIGKILL...'));
+    killAllDashboardServers('KILL');
+    killPort(config.dashboardPort, 'KILL');
+    killPort(config.dashboardApiPort, 'KILL');
+    try {
+      await Promise.all([
+        waitForPortFree(config.dashboardPort, 5000),
+        waitForPortFree(config.dashboardApiPort, 5000),
+      ]);
+    } catch {
+      console.error(chalk.red(
+        `Port ${config.dashboardApiPort} is still in use after SIGKILL. A stuck process ` +
+        `is holding it — run \`pan down\`, or kill it manually, then retry \`pan dev\`.`,
+      ));
+      process.exit(1);
+    }
   }
 
   // Tracked here (not in shutdown()) so child-close handlers can see it.

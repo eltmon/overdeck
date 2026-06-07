@@ -154,7 +154,7 @@ Rally Features (PortfolioItems) get special treatment in the dashboard:
 
 ### Multi-Model Support
 
-Panopticon integrates with [claude-code-router](https://github.com/musistudio/claude-code-router) to enable using multiple AI model providers alongside Anthropic models.
+Panopticon supports multiple AI model providers through direct Anthropic-compatible endpoints (Kimi, GLM, MiniMax, MiMo, OpenRouter) and a built-in CLIProxy sidecar (OpenAI, Gemini). You can also use the [Pi harness](https://github.com/badlogic/pi-mono) for native multi-provider routing.
 
 📖 **[Complete work types guide →](WORK-TYPES.md)**
 📋 **[Configuration file reference →](CONFIGURATION.md)**
@@ -210,6 +210,8 @@ GOOGLE_AI_KEY="AIza..."
 ZAI_API_KEY="..."
 ```
 
+These keys are used by both the Claude Code harness (routed through Anthropic-compatible endpoints) and the Pi harness (bridged as native provider env vars automatically).
+
 In `config.yaml`, reference them with `$` syntax:
 ```yaml
 models:
@@ -218,10 +220,6 @@ models:
       enabled: true
       api_key: $KIMI_API_KEY
 ```
-
-#### Router Configuration
-
-**Panopticon owns the router configuration.** Settings saved in the dashboard automatically generate `~/.claude-code-router/config.json`. Manual edits will be overwritten.
 
 ### Register Projects
 
