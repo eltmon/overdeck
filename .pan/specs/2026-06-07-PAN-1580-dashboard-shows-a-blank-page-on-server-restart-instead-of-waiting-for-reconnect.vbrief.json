@@ -4,7 +4,7 @@
     "created": "2026-06-07T03:07:29Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1580: Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "updated": "2026-06-07T03:10:19.870Z"
+    "updated": "2026-06-07T05:07:24.059Z"
   },
   "plan": {
     "id": "pan-1580",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "e05658d9-aea0-49e8-8c58-3af56a8a819f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 59,
     "created": "2026-06-07T03:07:29Z",
-    "updated": "2026-06-07T03:10:19.870Z",
+    "updated": "2026-06-07T05:07:24.059Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1580",
@@ -445,7 +445,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-07-PAN-1580-dashboard-shows-a-blank-page-on-server-restart-instead-of-waiting-for-reconnect.vbrief.json"
+      "canonicalFilename": "2026-06-07-PAN-1580-dashboard-shows-a-blank-page-on-server-restart-instead-of-waiting-for-reconnect.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1580",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-07T05:07:23.154Z",
+        "work": {
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "history": []
+        },
+        "verification": {
+          "status": "failed",
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "notes": "Verification FAILED at lint (53378ms):\n\ns/SKILL.md:141: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:142: pan tts test \"Build is green, ready for review.\": could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:143: pan tts voices list: could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:144: pan tts voices show \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:145: pan tts voices play \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:146: pan tts voices set-default \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:147: pan tts voices map reviewStatus.passed \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:150: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-07T05:07:23.154Z",
+              "notes": "Verification FAILED at lint (53378ms):\n\ns/SKILL.md:141: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:142: pan tts test \"Build is green, ready for review.\": could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:143: pan tts voices list: could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:144: pan tts voices show \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:145: pan tts voices play \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:146: pan tts voices set-default \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:147: pan tts voices map reviewStatus.passed \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md:150: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n"
+            }
+          ]
+        },
+        "review": {
+          "status": "failed",
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "notes": "Verification failed at lint",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-07T05:07:23.154Z",
+              "notes": "Verification failed at lint"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-07T05:07:23.154Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:07:23.154Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-07T05:07:23.154Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1649"
+        }
+      }
     }
   },
   "status": "proposed"
