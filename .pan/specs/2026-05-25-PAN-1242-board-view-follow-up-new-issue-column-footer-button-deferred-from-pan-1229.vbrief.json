@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-07T19:19:44.649Z"
+    "updated": "2026-06-07T19:27:07.454Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 107,
+    "sequence": 112,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-07T19:19:44.649Z",
+    "updated": "2026-06-07T19:27:07.454Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -418,55 +418,55 @@
         "phase": "review",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T19:19:44.643Z",
+        "updatedAt": "2026-06-07T19:27:07.407Z",
         "work": {
-          "updatedAt": "2026-06-07T19:19:44.643Z",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T19:19:44.643Z",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T19:19:44.643Z"
+              "at": "2026-06-07T19:27:07.407Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-07T19:19:44.643Z",
-          "notes": "Promise.all cache ops can 500 after successful tracker creation, risking duplicate issues on client retry",
+          "status": "reviewing",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-07T19:19:44.643Z",
-              "notes": "Promise.all cache ops can 500 after successful tracker creation, risking duplicate issues on client retry"
+              "status": "reviewing",
+              "at": "2026-06-07T19:27:07.407Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T19:19:44.643Z",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T19:19:44.643Z"
+              "at": "2026-06-07T19:27:07.407Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T19:19:44.643Z",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T19:19:44.643Z",
+          "updatedAt": "2026-06-07T19:27:07.407Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T19:19:44.643Z"
+              "at": "2026-06-07T19:27:07.407Z"
             }
           ],
           "readyForMerge": false,
