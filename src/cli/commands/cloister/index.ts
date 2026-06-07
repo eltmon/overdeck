@@ -9,6 +9,7 @@ import { statusCommand } from './status.js';
 import { startCommand } from './start.js';
 import { stopCommand } from './stop.js';
 import { brakeCommand } from './brake.js';
+import { freezeCommand, unfreezeCommand } from './freeze.js';
 
 export function registerCloisterCommands(program: Command): void {
   const cloister = program
@@ -46,4 +47,16 @@ export function registerCloisterCommands(program: Command): void {
     .description('Emergency brake - trim running work agents down to the concurrency cap (idle-first, resumable)')
     .option('--json', 'Output in JSON format')
     .action(brakeCommand);
+
+  // pan cloister freeze
+  cloister
+    .command('freeze')
+    .description('Globally pause the Deacon (patrols run but skip all actions); running agents unaffected')
+    .action(freezeCommand);
+
+  // pan cloister unfreeze
+  cloister
+    .command('unfreeze')
+    .description('Resume the Deacon from a global pause')
+    .action(unfreezeCommand);
 }
