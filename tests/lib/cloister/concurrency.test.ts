@@ -1,0 +1,135 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  workResumeSlotsAvailable,
+  canDispatchAdvancing,
+  type ConcurrencyLimits,
+  type RunningCounts,
+} from '../../../src/lib/cloister/concurrency.js';
+
+const LIMITS: ConcurrencyLimits = { maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 };
+
+describe('concurrency governor — pure math', () => {
+  it('reports free work slots below the cap', () => {
+    const counts: RunningCounts = { work: 2, advancing: 1, total: 3 };
+    expect(workResumeSlotsAvailable(counts, LIMITS)).toBe(4);
+  });
+
+  it('reports zero slots at the cap (never negative)', () => {
+    expect(workResumeSlotsAvailable({ work: 6, advancing: 0, total: 6 }, LIMITS)).toBe(0);
+    // Over the cap (e.g. forced starts) → still 0, never negative; deacon resumes nothing.
+    expect(workResumeSlotsAvailable({ work: 9, advancing: 0, total: 9 }, LIMITS)).toBe(0);
+  });
+
+  it('allows advancing dispatch until the total ceiling, using reserved headroom', () => {
+    // Work at its cap but total below ceiling → advancing roles can still claim slots.
+    expect(canDispatchAdvancing({ work: 6, advancing: 2, total: 8 }, LIMITS)).toBe(true);
+    expect(canDispatchAdvancing({ work: 6, advancing: 3, total: 9 }, LIMITS)).toBe(false);
+  });
+});
+
+describe('concurrency governor — config + counting', () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.doUnmock('../../../src/lib/cloister/config.js');
+    vi.doUnmock('../../../src/lib/agents.js');
+  });
+
+  it('falls back to safe defaults when config omits/garbles concurrency', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 0, reserved_advancing_slots: -5 } }),
+    }));
+    const { getConcurrencyLimits } = await import('../../../src/lib/cloister/concurrency.js');
+    const limits = getConcurrencyLimits();
+    expect(limits.maxWorkAgents).toBe(1); // clamped to >= 1
+    expect(limits.reservedAdvancingSlots).toBe(0); // clamped to >= 0
+  });
+
+  it('counts only tmux-alive agents, grouped into work vs advancing', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { role: 'work', tmuxActive: true },
+        { role: 'work', tmuxActive: false }, // dead — ignored
+        { role: 'review', tmuxActive: true },
+        { role: 'ship', tmuxActive: true },
+        { role: 'plan', tmuxActive: true }, // neither work nor advancing
+      ],
+    }));
+    const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
+    expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, total: 3 });
+  });
+
+  it('reserves advancing slots up to the ceiling per patrol, then resets', async () => {
+    vi.resetModules();
+    // ceiling = max_work_agents (1) + reserved_advancing_slots (1) = 2
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 1, reserved_advancing_slots: 1 } }),
+    }));
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [], // 0 running → all headroom is from the per-patrol budget
+    }));
+    const { tryReserveAdvancingSlot, resetPatrolDispatchBudget } = await import('../../../src/lib/cloister/concurrency.js');
+
+    resetPatrolDispatchBudget();
+    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 running + 0 reserved < 2
+    expect(tryReserveAdvancingSlot()).toBe(true);  // 0 + 1 < 2
+    expect(tryReserveAdvancingSlot()).toBe(false); // 0 + 2 >= 2 → defer
+    resetPatrolDispatchBudget();
+    expect(tryReserveAdvancingSlot()).toBe(true);  // budget cleared for the next patrol
+  });
+
+  it('emergency brake stops excess work agents idle-first and clears stoppedByUser', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1 } }),
+    }));
+    const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
+      'agent-a': { id: 'agent-a' }, 'agent-b': { id: 'agent-b' },
+      'agent-c': { id: 'agent-c' }, 'agent-d': { id: 'agent-d' },
+    };
+    const saved: Record<string, { id: string; stoppedByUser?: boolean }> = {};
+    const idle = new Set(['agent-c', 'agent-d']);
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-a', role: 'work', tmuxActive: true, lastActivity: '2026-01-01T00:00:00Z' }, // active
+        { id: 'agent-b', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' }, // active
+        { id: 'agent-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' }, // idle
+        { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
+      ],
+      stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
+      getAgentStateSync: (id: string) => states[id],
+      saveAgentStateSync: (s: { id: string }) => { saved[s.id] = states[s.id]; },
+      getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = emergencyBrake();
+
+    // 4 running, cap 2 → stop the 2 idle ones first.
+    expect(result.before).toBe(4);
+    expect(result.cap).toBe(2);
+    expect(result.remaining).toBe(2);
+    expect(result.stopped).toEqual(['agent-c', 'agent-d']);
+    // stoppedByUser cleared so the deacon re-admits them as slots free.
+    expect(saved['agent-c'].stoppedByUser).toBeUndefined();
+    expect(saved['agent-d'].stoppedByUser).toBeUndefined();
+  });
+
+  it('emergency brake is a no-op when within the cap', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 6, reserved_advancing_slots: 3 } }),
+    }));
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [{ id: 'agent-a', role: 'work', tmuxActive: true }],
+      stopAgentSync: () => { throw new Error('should not stop anything'); },
+      getAgentStateSync: () => null,
+      saveAgentStateSync: () => {},
+      getAgentRuntimeStateSync: () => null,
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+    expect(emergencyBrake()).toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
+  });
+});

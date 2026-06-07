@@ -27,7 +27,7 @@ import {
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
-import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
+import { canUsePickerHarness, HARNESS_OPTIONS, useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
@@ -168,7 +168,7 @@ interface SessionNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
@@ -405,13 +405,15 @@ function getSessionStatusTitle({
 function RestartModelSubmenu({
   defaultModel,
   groups,
+  harnessPolicy,
   label,
   onRestart,
 }: {
   defaultModel: string | null;
   groups: ModelGroup[];
+  harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
-  onRestart: (model?: string) => void;
+  onRestart: (model?: string, harness?: Harness) => void;
 }) {
   const defaultLabel = defaultModel
     ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
@@ -424,24 +426,45 @@ function RestartModelSubmenu({
       </ContextMenuSubTrigger>
       <ContextMenuSubContent>
         <ContextMenuItem onSelect={() => onRestart()}>
-          <span className="flex-1">Default ({defaultLabel})</span>
+          <span className="flex-1">Default role config ({defaultLabel})</span>
         </ContextMenuItem>
-        {groups.map((group) => (
-          <div key={group.provider}>
-            <ContextMenuLabel>{group.label}</ContextMenuLabel>
-            {group.models.map((m) => (
-              <ContextMenuItem key={m.id} onSelect={() => onRestart(m.id)}>
-                <span
-                  className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
-                >
-                  {m.label}
-                </span>
-                {m.costDisplay && (
-                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
-                )}
+        <ContextMenuSeparator />
+        {HARNESS_OPTIONS.map((harness) => (
+          <ContextMenuSub key={harness.id}>
+            <ContextMenuSubTrigger>{harness.label}</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem onSelect={() => onRestart(undefined, harness.id)}>
+                <span className="flex-1">Default model ({defaultLabel})</span>
               </ContextMenuItem>
-            ))}
-          </div>
+              {groups.map((group) => (
+                <div key={`${harness.id}-${group.provider}`}>
+                  <ContextMenuLabel>{group.label}</ContextMenuLabel>
+                  {group.models.map((m) => {
+                    const decision = canUsePickerHarness(harness.id, m.id, harnessPolicy);
+                    return (
+                      <ContextMenuItem
+                        key={`${harness.id}-${m.id}`}
+                        disabled={!decision.allowed}
+                        onSelect={() => onRestart(m.id, harness.id)}
+                      >
+                        <span
+                          className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
+                        >
+                          {m.label}
+                        </span>
+                        {!decision.allowed && (
+                          <span className="ml-2 shrink-0 text-[10px] opacity-50">ToS gated</span>
+                        )}
+                        {decision.allowed && m.costDisplay && (
+                          <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                        )}
+                      </ContextMenuItem>
+                    );
+                  })}
+                </div>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
         ))}
       </ContextMenuSubContent>
     </ContextMenuSub>
@@ -466,7 +489,7 @@ export function SessionNode({
   expanded,
   onToggleExpand,
 }: SessionNodeProps) {
-  const { groups } = useAvailableModels();
+  const { groups, harnessPolicy } = useAvailableModels();
   const resolvedModels = useResolvedModels();
 
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
@@ -591,8 +614,9 @@ export function SessionNode({
           <RestartModelSubmenu
             defaultModel={defaultModel}
             groups={groups}
+            harnessPolicy={harnessPolicy}
             label={restartLabel}
-            onRestart={(model) => onRestartSession!(session.sessionId, issueId!, session.type, session.role, model)}
+            onRestart={(model, harness) => onRestartSession!(session.sessionId, issueId!, session.type, session.role, model, harness)}
           />
         )}
 

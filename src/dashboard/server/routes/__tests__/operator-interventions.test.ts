@@ -225,12 +225,17 @@ describe('operator.intervention dashboard routes', () => {
     }));
   });
 
-  it('emits restart from the successful dashboard restart route', async () => {
+  it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {
     const { response, appendedEvents } = await requestAgents('/api/agents/agent-pan-1/restart', {
-      body: JSON.stringify({ graceful: false }),
+      body: JSON.stringify({ model: 'gpt-5.5', harness: 'pi', graceful: false }),
     });
 
     expect(response.status).toBe(200);
+    expect(agentMocks.restartAgent).toHaveBeenCalledWith('agent-pan-1', expect.objectContaining({
+      model: 'gpt-5.5',
+      harness: 'pi',
+      graceful: false,
+    }));
     expect(appendedEvents).toContainEqual(expect.objectContaining({
       type: 'operator.intervention',
       payload: { issueId: 'PAN-1', kind: 'restart', source: 'dashboard' },

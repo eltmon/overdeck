@@ -9,9 +9,10 @@ describe('getDirectRestartRequest', () => {
       sessionId: 'agent-pan-1381-review',
       sessionType: 'review',
       model: 'claude-opus-4-7',
+      harness: 'pi',
     })).toEqual({
       endpoint: '/api/specialists/panopticon-cli/PAN-1381/review/restart',
-      body: { model: 'claude-opus-4-7' },
+      body: { model: 'claude-opus-4-7', harness: 'pi' },
       successMessage: 'Review restarted',
       errorMessage: 'Failed to restart review',
     });
@@ -48,9 +49,10 @@ describe('getDirectRestartRequest', () => {
       sessionId: `agent-pan-1381-${sessionType}`,
       sessionType,
       model: 'claude-haiku-4-5-20251001',
+      harness: 'codex',
     })).toEqual({
       endpoint: `/api/agents/agent-pan-1381-${sessionType}/restart`,
-      body: { model: 'claude-haiku-4-5-20251001', graceful: false },
+      body: { model: 'claude-haiku-4-5-20251001', harness: 'codex', graceful: false },
       successMessage: `${sessionType.charAt(0).toUpperCase() + sessionType.slice(1)} restarted`,
       errorMessage: `Failed to restart ${sessionType} agent`,
     });

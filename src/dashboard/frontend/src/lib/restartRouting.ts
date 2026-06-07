@@ -1,4 +1,4 @@
-import type { SessionNodeType } from '@panctl/contracts';
+import type { Harness, SessionNodeType } from '@panctl/contracts';
 
 export interface RestartRouteInput {
   projectKey?: string | null;
@@ -7,6 +7,7 @@ export interface RestartRouteInput {
   sessionType?: SessionNodeType | string;
   role?: string;
   model?: string;
+  harness?: Harness;
 }
 
 export interface RestartRequestDescriptor {
@@ -27,7 +28,10 @@ export function getDirectRestartRequest(input: RestartRouteInput): RestartReques
 
     return {
       endpoint: `/api/specialists/${encodeURIComponent(input.projectKey)}/${encodeURIComponent(input.issueId)}/review/restart`,
-      body: input.model ? { model: input.model } : {},
+      body: {
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.harness ? { harness: input.harness } : {}),
+      },
       successMessage: 'Review restarted',
       errorMessage: 'Failed to restart review',
     };
@@ -38,7 +42,11 @@ export function getDirectRestartRequest(input: RestartRouteInput): RestartReques
 
     return {
       endpoint: `/api/agents/${encodeURIComponent(input.sessionId)}/restart`,
-      body: input.model ? { model: input.model, graceful: false } : { graceful: false },
+      body: {
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.harness ? { harness: input.harness } : {}),
+        graceful: false,
+      },
       successMessage: `${label} restarted`,
       errorMessage: `Failed to restart ${input.sessionType} agent`,
     };

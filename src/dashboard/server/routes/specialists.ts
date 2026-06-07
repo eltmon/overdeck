@@ -1526,7 +1526,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const project = params['project'] as string;
     const issueId = params['issueId'] as string;
     const body = yield* readJsonBody;
-    const { model } = body as { model?: string };
+    const { model, harness } = body as { model?: string; harness?: 'claude-code' | 'pi' | 'codex' };
 
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
@@ -1564,6 +1564,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       branch,
       prUrl,
       model,
+      harness,
     });
 
     return jsonResponse({
@@ -1571,6 +1572,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       message: result.message,
       killed: killResult.killed,
       model: model ?? undefined,
+      harness: harness ?? undefined,
     });
   })),
 );

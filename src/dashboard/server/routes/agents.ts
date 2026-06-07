@@ -131,6 +131,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
+import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePane, killSession, listSessions, sessionExists } from '../../../lib/tmux.js';
@@ -1974,7 +1975,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { message, model } = body as any;
+    const { message, model, harness } = body as { message?: string; model?: string; harness?: RuntimeName };
     let resumeModel: string | undefined;
     try {
       resumeModel = normalizeModelOverrideSync(model);
@@ -1995,9 +1996,11 @@ const postAgentResumeRoute = HttpRouter.add(
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
       model: resumeModel || undefined,
+      harness: harness || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeModel ? { model: resumeModel } : undefined));
+    const resumeOpts = resumeModel || harness ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}) } : undefined;
+    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
@@ -2013,6 +2016,7 @@ const postAgentResumeRoute = HttpRouter.add(
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
             workspace: agentState?.workspace,
+            runtime: agentState?.harness ?? 'claude-code',
             model: agentState?.model,
             status: 'running',
             startedAt: agentState?.startedAt,
@@ -2144,6 +2148,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
       model: restartModel || agentState.model,
+      harness: harness || undefined,
       graceful,
       hasMessage: !!message,
     }));
