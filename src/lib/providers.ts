@@ -12,6 +12,8 @@ import { Effect } from 'effect';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
+import { OLLAMA_OPENAI_BASE_URL } from './ollama.js';
+export { OLLAMA_OPENAI_BASE_URL } from './ollama.js';
 
 export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'ollama';
 
@@ -50,7 +52,6 @@ export interface ProviderConfig {
  */
 export const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
 export const KIMI_PLATFORM_BASE_URL = 'https://api.moonshot.ai/anthropic';
-export const OLLAMA_OPENAI_BASE_URL = 'http://localhost:11434/v1';
 
 export function getKimiAnthropicBaseUrl(apiKey: string): string {
   return apiKey.trim().startsWith('sk-kimi-')
