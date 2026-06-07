@@ -1,0 +1,564 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-07T02:40:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1641: Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness",
+    "updated": "2026-06-07T02:30:32.812Z"
+  },
+  "plan": {
+    "id": "pan-1641",
+    "title": "Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness",
+    "status": "proposed",
+    "uid": "7f3c9a2e-1b6d-4e58-9c0a-2d4f8b6e1a37",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-07T02:40:00.000Z",
+    "updated": "2026-06-07T02:30:32.812Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1641",
+        "label": "PAN-1641",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "providers",
+      "ollama",
+      "pi-harness",
+      "local-models",
+      "gemma"
+    ],
+    "narratives": {
+      "Problem": "Panopticon has no first-class local-model path. Every provider (Anthropic, OpenAI, Google, Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous, DashScope) routes to a cloud endpoint through an Anthropic-compatible shape (ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN). There is no way to run a Pi work agent against a model on the owner's own GPU at zero marginal cost and full privacy.",
+      "Proposal": "Add a model-agnostic `ollama` provider wired to Pi's NATIVE OpenAI-compatible support at http://localhost:11434/v1 (NOT via ANTHROPIC_BASE_URL). Models route via an `ollama:` prefix convention in getProviderForModelSync (mirroring OpenRouter's `/` heuristic); the prefix is stripped before the bare Ollama tag reaches Pi. A new src/lib/ollama.ts owns sidecar detect/ensure-serve/health, lazy-ensured at provider-env-resolution time (mirroring the `nous` precedent) with a pre-spawn health check. `pan install` gains an Ollama detect/guide step (`--skip-ollama`) plus an optional `ollama pull` of the documented default Gemma 4 12B tag. Docs cover Linux/CUDA and Apple Silicon. Scope is Pi-only, Options 1+2; Codex/Claude Code/dashboard-picker are deferred to the follow-up issue."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Route Ollama models via an `ollama:` model-id prefix detected in getProviderForModelSync, stripping it before passing the bare tag to Pi/Ollama.",
+        "rationale": "getProviderForModelSync is harness-agnostic and defaults unknown bare strings to Anthropic; OpenRouter already uses a structural signal (`/`). An explicit prefix is the cleanest unambiguous, model-agnostic disambiguator and keeps the provider tag list empty like OpenRouter."
+      },
+      {
+        "summary": "Wire Pi to localhost:11434/v1 with an OpenAI-compatible env shape (OPENAI_BASE_URL + dummy OPENAI_API_KEY), not the existing ANTHROPIC_* branch.",
+        "rationale": "The PRD's integration nuance is explicit: Ollama exposes OpenAI-compatible /v1, not Anthropic; Pi speaks OpenAI-compatible natively. Reusing ANTHROPIC_BASE_URL would mis-shape the request."
+      },
+      {
+        "summary": "Lazy-ensure the Ollama sidecar inside getProviderEnvForModel's ollama branch + a pre-spawn health check, rather than hard-wiring into `pan up`.",
+        "rationale": "Matches the established `nous` ensureOpenAICompatibleProxyRunning precedent (agents.ts:570-576) and provider-health.ts pre-spawn validation, so the sidecar starts on demand exactly when a local model is selected."
+      },
+      {
+        "summary": "Keep the default model a single documented constant (Gemma 4 12B tag), verified against ollama.com/library at implementation; provider stays model-agnostic (models: []).",
+        "rationale": "The exact Ollama tag may be gemma3:12b vs a gemma4 tag and may not yet be published; hardcoding a guess into routing risks breakage. Model-agnostic mirrors OpenRouter."
+      },
+      {
+        "summary": "Place sidecar lifecycle + shared localhost validation in a new src/lib/ollama.ts using async spawn/exec; leave the embeddings SAFE_OLLAMA_HOST_RE duplication untouched.",
+        "rationale": "The module is reachable from the spawn path (potentially server-side) where execSync is forbidden; refactoring the working embeddings copy would violate surgical-changes for no v1 benefit."
+      }
+    ],
+    "items": [
+      {
+        "id": "register-ollama-provider",
+        "title": "Register the `ollama` provider and `ollama:` model-routing convention",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1641",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "config-ollama-base-url",
+            "pi-openai-env",
+            "ollama-lifecycle-module",
+            "install-ollama-step",
+            "e2e-pi-local-gemma"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/providers.ts add `'ollama'` to the ProviderName union and a model-agnostic PROVIDERS.ollama entry (models: [], OpenAI-compatible localhost /v1 base, tested: false, description). In getProviderForModelSync, detect any model id beginning with `ollama:` and route it to PROVIDERS.ollama BEFORE the `/`-based OpenRouter heuristic so a bare-tag-with-colon never mis-routes. Confirm (with a test) that the harness policy already allows pi + ollama (provider.name !== 'anthropic') with no harness-policy.ts change. The `ollama:` prefix is a cross-cutting routing token that the env layer, launcher, config and docs all assume — this is the foundation the rest of the plan builds on."
+        },
+        "subItems": [
+          {
+            "id": "register-ollama-provider.ac1",
+            "title": "ProviderName union includes 'ollama' and PROVIDERS.ollama exists, model-agnostic (models: []), OpenAI-compatible localhost base, tested: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-ollama-provider.ac2",
+            "title": "getProviderForModelSync('ollama:gemma3:12b').name === 'ollama'; getProviderForModelSync('ollama:anything').name === 'ollama'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-ollama-provider.ac3",
+            "title": "Existing routing is unchanged: known bare models (claude-*, gpt-*, qwen/*, minimax-*, etc.) still resolve to their prior providers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-ollama-provider.ac4",
+            "title": "Unit test asserts canUseHarnessSync('pi', 'ollama:gemma3:12b', authMode) is allowed for every authMode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-ollama-provider.ac5",
+            "title": "npm run typecheck, lint and test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ollama-lifecycle-module",
+        "title": "Add src/lib/ollama.ts sidecar lifecycle (detect / ensure-serve / health)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/ollama.ts mirroring src/lib/cliproxy.ts's lifecycle shape. Export: shared OLLAMA default base-URL constant + localhost-only validation (SAFE_OLLAMA_HOST_RE pattern); resolveOllamaBaseUrl(config) honoring providers.ollama.base_url with the localhost guard; isOllamaInstalled() (via `ollama --version`); ensureOllamaServeRunning() (idempotently spawn `ollama serve` if GET /api/tags is unreachable); and a health check splitting 'endpoint reachable' from 'model <tag> present' (GET /api/tags). Use async spawn / promisified exec ONLY — never execSync (this module is reachable from the spawn path; see hazard H7). Emit a typed OllamaError. Do not modify the existing embeddings SAFE_OLLAMA_HOST_RE copy."
+        },
+        "subItems": [
+          {
+            "id": "ollama-lifecycle-module.ac1",
+            "title": "src/lib/ollama.ts exports resolveOllamaBaseUrl, isOllamaInstalled, ensureOllamaServeRunning, and a health/model-present check, plus a typed error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-lifecycle-module.ac2",
+            "title": "resolveOllamaBaseUrl rejects non-localhost base URLs via the localhost-only regex, defaulting to http://localhost:11434",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-lifecycle-module.ac3",
+            "title": "ensureOllamaServeRunning is idempotent (no-op when /api/tags already responds) and uses async spawn/exec — zero execSync in this file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-lifecycle-module.ac4",
+            "title": "Health check distinguishes 'endpoint unreachable' from 'model not pulled' and returns/throws distinct, actionable messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ollama-lifecycle-module.ac5",
+            "title": "Unit tests cover localhost validation, idempotent ensure (mocked fetch), and the two distinct health failure modes; typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-ollama-base-url",
+        "title": "Add optional providers.ollama.base_url to config.yaml",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml.ts add an optional providers.ollama config surface exposing base_url (default http://localhost:11434), resolved/validated through resolveOllamaBaseUrl from src/lib/ollama.ts. No API key is required (Ollama ignores it). Keep it additive — boolean/object normalization consistent with the other providers; absence means 'use the default localhost base'."
+        },
+        "subItems": [
+          {
+            "id": "config-ollama-base-url.ac1",
+            "title": "providers.ollama.base_url is readable from ~/.panopticon/config.yaml and defaults to http://localhost:11434 when unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-ollama-base-url.ac2",
+            "title": "A non-localhost base_url is rejected with a clear error (reuses the localhost-only validation from src/lib/ollama.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-ollama-base-url.ac3",
+            "title": "Existing config parsing for all other providers is unchanged; typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-openai-env",
+        "title": "Emit OpenAI-compatible provider env for Pi + ollama (not Anthropic)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1641",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "lazy-ensure-on-spawn",
+            "e2e-pi-local-gemma"
+          ]
+        },
+        "narrative": {
+          "Action": "Make the provider-env layer emit the OpenAI-compatible env Pi consumes for ollama models instead of the ANTHROPIC_* shape. Start with a short spike against the installed `pi` binary to confirm the exact env keys/config Pi honors for a localhost OpenAI-compatible endpoint (hazard H1). Then: in getProviderEnvSync (or a dedicated ollama branch) emit OPENAI_BASE_URL=<resolved base>/v1 and a dummy OPENAI_API_KEY (e.g. 'ollama'), with NO ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN; strip the `ollama:` prefix so the bare tag is what Pi/Ollama receive as the model. Add OPENAI_BASE_URL to PROVIDER_ENV_KEYS (agents.ts) so launcher scripts and buildSpawnEnvForModel unset/re-export it cleanly (hazard H4). The model the launcher passes via --model must be the bare tag (prefix stripped)."
+        },
+        "subItems": [
+          {
+            "id": "pi-openai-env.ac1",
+            "title": "For an ollama model, the provider env contains OPENAI_BASE_URL ending in /v1 and a (dummy) OPENAI_API_KEY, and contains NO ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-openai-env.ac2",
+            "title": "The `ollama:` prefix is stripped before the tag is used as the model id passed to Pi/Ollama",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-openai-env.ac3",
+            "title": "OPENAI_BASE_URL is added to PROVIDER_ENV_KEYS so it is unset then re-exported by getProviderExportsForModel and stripped by buildSpawnEnvForModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-openai-env.ac4",
+            "title": "The exact Pi wiring mechanism is confirmed against the real `pi` binary and documented in continue.json/decision before finalizing this bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-openai-env.ac5",
+            "title": "Unit tests assert the env shape for an ollama model and that non-ollama providers are unchanged; typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lazy-ensure-on-spawn",
+        "title": "Lazy-ensure Ollama + pre-spawn health check in getProviderEnvForModel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In getProviderEnvForModel (src/lib/agents.ts) add an `ollama` branch mirroring the `nous` branch (lines 570-576): call ensureOllamaServeRunning() and the model-present health check from src/lib/ollama.ts BEFORE returning the OpenAI-compatible env from pi-openai-env. On failure, surface the distinct actionable errors ('Ollama not running' vs 'model <tag> not pulled — run `ollama pull <tag>`'). This is the single pre-spawn gate that guarantees the endpoint is live and the model present before a Pi agent starts."
+        },
+        "subItems": [
+          {
+            "id": "lazy-ensure-on-spawn.ac1",
+            "title": "Selecting an ollama model triggers ensureOllamaServeRunning() and a model-present check before the agent spawns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lazy-ensure-on-spawn.ac2",
+            "title": "A down endpoint and a missing model produce distinct, actionable error messages (no silent fallback to a cloud provider)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lazy-ensure-on-spawn.ac3",
+            "title": "Non-ollama models are completely unaffected by the new branch; typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-ollama-step",
+        "title": "pan install: detect/guide Ollama (`--skip-ollama`) + optional model pull",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/install.ts add an Ollama step mirroring the Moonshine/beads steps: a `--skip-ollama` flag; detect via isOllamaInstalled() (`ollama --version`) / GET /api/tags; if missing, guide install per platform (curl … | sh on Linux, brew/dmg on macOS) using the existing detectPlatform branch pattern; then offer to `ollama pull <documented default Gemma 4 12B tag>`. execSync is acceptable here (CLI-only). Verify the default tag against ollama.com/library (hazard H2)."
+        },
+        "subItems": [
+          {
+            "id": "install-ollama-step.ac1",
+            "title": "`pan install` registers a `--skip-ollama` flag and skips the step when passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-ollama-step.ac2",
+            "title": "When Ollama is absent, the step prints the correct platform-specific install guidance (Linux curl|sh, macOS brew/dmg)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-ollama-step.ac3",
+            "title": "When Ollama is present, the step offers to `ollama pull` the documented default Gemma tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-ollama-step.ac4",
+            "title": "The skills/CLI lint passes (any new flag is reflected where required); typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-ollama-check",
+        "title": "pan doctor: optional Ollama presence/endpoint check",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/doctor.ts add an optional Ollama check mirroring the existing Pi check: report OK / not-installed / endpoint-unreachable with a fix message (install command + `ollama serve`). The check is advisory (does not fail doctor when Ollama is simply not installed), consistent with the Moonshine/optional-sidecar checks."
+        },
+        "subItems": [
+          {
+            "id": "doctor-ollama-check.ac1",
+            "title": "`pan doctor` reports Ollama status: installed+reachable / installed-but-down / not-installed, with an actionable fix line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-ollama-check.ac2",
+            "title": "Absent Ollama is advisory only (does not turn doctor red); typecheck/lint/test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-pi-local-gemma",
+        "title": "Verify a Pi work agent runs end-to-end on local Gemma with zero cloud calls",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Prove the full path: configure a Pi work model of `ollama:<gemma tag>`, ensure the sidecar + model are present, spawn a Pi work agent, and confirm it completes a trivial task end-to-end while making ZERO cloud calls (no Anthropic/OpenAI cloud traffic — only localhost:11434). Capture the verification (network observation + transcript evidence) in a short verification note committed under the workspace. This is the integration ground truth for the pi-openai-env / lazy-ensure work."
+        },
+        "subItems": [
+          {
+            "id": "e2e-pi-local-gemma.ac1",
+            "title": "A Pi work agent spawned with an ollama: model completes a trivial task end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pi-local-gemma.ac2",
+            "title": "Evidence shows all model traffic went to localhost:11434 with zero Anthropic/OpenAI cloud calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-pi-local-gemma.ac3",
+            "title": "A verification note documenting the run and the zero-cloud evidence is committed in the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-local-models",
+        "title": "Docs: install → pull → configure → run a Pi agent locally (Linux/CUDA + Apple Silicon)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-07T02:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1641",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Document the local-model path: extend configuration/harnesses.mdx (and/or a new local-models doc) with the end-to-end flow — install Ollama, `ollama pull <Gemma tag>`, set providers.ollama.base_url and an `ollama:<tag>` work/role model in ~/.panopticon/config.yaml, run a Pi agent locally — with both Linux/CUDA (RTX 3090 Ti) and Apple Silicon (M4 Metal) notes. State the v1 scope (Pi-only) and link the follow-up issue for Codex/Claude Code/dashboard-picker."
+        },
+        "subItems": [
+          {
+            "id": "docs-local-models.ac1",
+            "title": "Docs cover the full path: install → pull → configure config.yaml (base_url + ollama: model) → run a Pi agent locally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-local-models.ac2",
+            "title": "Both Linux/CUDA and Apple Silicon (Metal) setups are documented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-local-models.ac3",
+            "title": "v1 scope (Pi-only) is stated and the follow-up issue is linked; docs lint/build passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "register-ollama-provider",
+        "to": "ollama-lifecycle-module",
+        "type": "blocks"
+      },
+      {
+        "from": "register-ollama-provider",
+        "to": "config-ollama-base-url",
+        "type": "blocks"
+      },
+      {
+        "from": "register-ollama-provider",
+        "to": "pi-openai-env",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle-module",
+        "to": "config-ollama-base-url",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle-module",
+        "to": "lazy-ensure-on-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle-module",
+        "to": "install-ollama-step",
+        "type": "blocks"
+      },
+      {
+        "from": "ollama-lifecycle-module",
+        "to": "doctor-ollama-check",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-openai-env",
+        "to": "lazy-ensure-on-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "pi-openai-env",
+        "to": "e2e-pi-local-gemma",
+        "type": "blocks"
+      },
+      {
+        "from": "lazy-ensure-on-spawn",
+        "to": "e2e-pi-local-gemma",
+        "type": "blocks"
+      },
+      {
+        "from": "install-ollama-step",
+        "to": "docs-local-models",
+        "type": "blocks"
+      },
+      {
+        "from": "lazy-ensure-on-spawn",
+        "to": "docs-local-models",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-07-PAN-1641-local-model-support-via-ollama-sidecar-gemma-4-12b-for-the-pi-harness.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
