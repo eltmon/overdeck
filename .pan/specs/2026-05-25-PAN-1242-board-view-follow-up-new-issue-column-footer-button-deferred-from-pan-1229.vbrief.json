@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-07T05:29:28.717Z"
+    "updated": "2026-06-07T05:37:12.199Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 57,
+    "sequence": 66,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-07T05:29:28.717Z",
+    "updated": "2026-06-07T05:37:12.199Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -418,29 +418,29 @@
         "phase": "work",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:29:27.772Z",
+        "updatedAt": "2026-06-07T05:37:02.664Z",
         "work": {
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "status": "running",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T05:29:27.772Z"
+              "status": "running",
+              "at": "2026-06-07T05:37:02.664Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "notes": "Verification failed at lint",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:29:27.772Z",
+              "at": "2026-06-07T05:37:02.664Z",
               "notes": "Verification failed at lint"
             }
           ],
@@ -448,25 +448,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:29:27.772Z"
+              "at": "2026-06-07T05:37:02.664Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:29:27.772Z",
+          "updatedAt": "2026-06-07T05:37:02.664Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:29:27.772Z"
+              "at": "2026-06-07T05:37:02.664Z"
             }
           ],
           "readyForMerge": false,
