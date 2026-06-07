@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-06-07T05:34:55.158Z"
+    "updated": "2026-06-07T05:46:57.475Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 36,
+    "sequence": 40,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-06-07T05:34:55.158Z",
+    "updated": "2026-06-07T05:46:57.475Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -501,51 +501,55 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1496-bug-flywheel-settings-extra-high-effort-option-missing-from-flywheel-role-config-ui-only-low-medium-high-shown.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:34:54.712Z",
+        "updatedAt": "2026-06-07T05:46:57.450Z",
         "work": {
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "status": "failed",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
+          "notes": "Verification FAILED at lint (217076ms):\n\ns/SKILL.md:141: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:142: pan tts test \"Build is green, ready for review.\": could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:143: pan tts voices list: could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:144: pan tts voices show \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:145: pan tts voices play \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:146: pan tts voices set-default \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:147: pan tts voices map reviewStatus.passed \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:150: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-07T05:34:54.712Z"
+              "status": "failed",
+              "at": "2026-06-07T05:46:57.450Z",
+              "notes": "Verification FAILED at lint (217076ms):\n\ns/SKILL.md:141: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:142: pan tts test \"Build is green, ready for review.\": could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:143: pan tts voices list: could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:144: pan tts voices show \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:145: pan tts voices play \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:146: pan tts voices set-default \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:147: pan tts voices map reviewStatus.passed \"Vivian Voice\": could not read help for pan tts voices\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-tts/SKILL.md:150: pan tts test: could not read help for pan tts test\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1496/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
+          "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-07T05:34:54.712Z"
+              "status": "pending",
+              "at": "2026-06-07T05:46:57.450Z",
+              "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean."
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:34:54.712Z"
+              "at": "2026-06-07T05:46:57.450Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-07T05:34:54.712Z",
+          "updatedAt": "2026-06-07T05:46:57.450Z",
           "history": [],
           "readyForMerge": false
         }

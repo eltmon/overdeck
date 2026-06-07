@@ -16,7 +16,7 @@ export default defineConfig({
   outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
   deps: {
     alwaysBundle: (id) => id.startsWith('@panctl/'),
-    neverBundle: ['@homebridge/node-pty-prebuilt-multiarch'],
+    neverBundle: ['@homebridge/node-pty-prebuilt-multiarch', /^bun:/],
   },
   outDir: 'dist',
 });
