@@ -6,7 +6,7 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
@@ -56,6 +56,12 @@ type AgentIssueRecord = {
   id?: unknown;
   issueId?: unknown;
 };
+
+export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent> {
+  return Stream.succeed({ kind: 'discovering' } as ConversationEvent).pipe(
+    Stream.repeat(Schedule.fixed('2 seconds')),
+  );
+}
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
   const lookup = new Map<string, string>();
@@ -599,14 +605,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             const model = conv?.model ?? null;
 
             if (!sessionFile) {
-              // Session file not yet discovered — emit a single discovering event
-              return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
+              // Session file not yet discovered — keep the subscription alive
+              // without causing the client to reconnect in a tight loop.
+              return conversationDiscoveringStream();
             }
 
             if (isPiSessionFile(sessionFile)) {
               // Pi session files use a different JSONL schema and must not be
               // routed through the Claude-only incremental watcher.
-              return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
+              return conversationDiscoveringStream();
             }
 
             const readContextUsage = async () => {
@@ -620,9 +627,18 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
               Effect.acquireRelease(
                 Effect.promise(async () => {
+                  const offer = (event: ConversationEvent) => {
+                    try {
+                      Queue.offerUnsafe(queue, event);
+                    } catch {
+                      // The queue may be shut down if the client disconnected
+                      // while an async file watcher callback was still running.
+                    }
+                  };
+
                   // Emit current state immediately on subscribe
                   const initial = await parseConversationMessages(sessionFile, 0);
-                  Queue.offerUnsafe(queue, {
+                  offer({
                     kind: 'messages' as const,
                     messages: initial.messages,
                     workLog: initial.workLog,
@@ -636,7 +652,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   let byteOffset = initial.byteOffset;
                   const handle = watchConversation(sessionFile, async (result) => {
                     byteOffset = result.byteOffset;
-                    Queue.offerUnsafe(queue, {
+                    offer({
                       kind: 'messages' as const,
                       messages: result.messages,
                       workLog: result.workLog,

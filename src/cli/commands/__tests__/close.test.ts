@@ -66,9 +66,11 @@ describe('closeOutCommand', () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it so the
-    // function returns and these assertions run, instead of vitest trapping the exit.
-    vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => {}) as never);
+    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it with
+    // an explicit throw so the promise rejection remains observable in Vitest.
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit unexpectedly called with "${code}"`);
+    }) as never);
     installIssueState([]);
     answerConfirmation('yes');
   });
