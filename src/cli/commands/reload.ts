@@ -66,17 +66,27 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  // Refuse to hijack a running `pan dev` session into detached production mode.
-  // Vite already hot-reloads the frontend; the dev supervisor handles server
-  // restarts in its own terminal.
+  // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
+  // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
+  // place. This applies merged/edited server code without tearing down the
+  // interactive dev session or hijacking it into detached production mode. The
+  // frontend recovers via its graceful reconnect (PAN-1580). This is also the
+  // path the flywheel uses to apply its own merged server changes.
   {
-    const { readDevSupervisorMarker, devSupervisorRefusalLines } = await import('../../lib/dev-supervisor.js');
+    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
     const dev = readDevSupervisorMarker();
     if (dev) {
-      for (const line of devSupervisorRefusalLines('reload the dashboard', dev)) {
-        console.error(chalk.yellow(line));
+      try {
+        process.kill(dev.pid, 'SIGUSR2');
+        console.log(chalk.green(`✓ Signaled pan dev (pid ${dev.pid}) to rebuild + hot-restart the dashboard server in place.`));
+        console.log(chalk.dim('  Watch the pan dev terminal for "✓ Dashboard server reloaded".'));
+        await recordReloadStatus(startedAt, true, undefined);
+      } catch (err: any) {
+        const msg = `Failed to signal pan dev (pid ${dev.pid}): ${err.message}`;
+        console.error(chalk.red(msg));
+        await recordReloadStatus(startedAt, false, msg);
+        process.exitCode = 2;
       }
-      process.exitCode = 2;
       return;
     }
   }

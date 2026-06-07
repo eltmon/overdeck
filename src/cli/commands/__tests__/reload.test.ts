@@ -95,6 +95,27 @@ describe('reloadCommand', () => {
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
   });
 
+  it('signals a running pan dev supervisor (SIGUSR2) instead of refusing or restarting (PAN-1662)', async () => {
+    mocks.readDevSupervisorMarker.mockReturnValue({
+      pid: 424242,
+      dashboardPort: 3010,
+      apiPort: 3011,
+      startedAt: '2026-06-07T00:00:00.000Z',
+    });
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    await reloadCommand({});
+
+    expect(killSpy).toHaveBeenCalledWith(424242, 'SIGUSR2');
+    // It signals the dev supervisor to hot-restart in place — it must NOT run a
+    // production restart or refuse with a non-zero exit code.
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+
+    killSpy.mockRestore();
+  });
+
   it('calls restartDashboard after a successful build refreshes the dashboard bundle', async () => {
     mocks.statSync
       .mockReturnValueOnce({ mtimeMs: 1000 })
