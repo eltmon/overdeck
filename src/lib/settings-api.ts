@@ -211,6 +211,8 @@ export interface ApiSettingsConfig {
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
     claudeCodeChannelsMcp?: boolean;
+    /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
+    streamdownRenderer?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.
@@ -613,6 +615,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
       claudeCodeChannelsMcp: config.experimental?.claudeCodeChannelsMcp ?? false,
+      streamdownRenderer: config.experimental?.streamdownRenderer ?? false,
     },
     claude: {
       // Defensive — older test mocks of loadConfig may not include `claude`;
@@ -781,6 +784,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       ? {
           claudeCodeChannels: settings.experimental.claudeCodeChannels,
           claudeCodeChannelsMcp: settings.experimental.claudeCodeChannelsMcp,
+          streamdownRenderer: settings.experimental.streamdownRenderer,
         }
       : undefined,
     claude: settings.claude?.permissionMode
@@ -985,12 +989,15 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (typeof settings.experimental !== 'object' || settings.experimental === null) {
       errors.push('experimental must be an object');
     } else {
-      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown };
+      const experimental = settings.experimental as { claudeCodeChannels?: unknown; claudeCodeChannelsMcp?: unknown; streamdownRenderer?: unknown };
       if (experimental.claudeCodeChannels !== undefined && typeof experimental.claudeCodeChannels !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
       }
       if (experimental.claudeCodeChannelsMcp !== undefined && typeof experimental.claudeCodeChannelsMcp !== 'boolean') {
         errors.push('experimental.claudeCodeChannelsMcp must be a boolean');
+      }
+      if (experimental.streamdownRenderer !== undefined && typeof experimental.streamdownRenderer !== 'boolean') {
+        errors.push('experimental.streamdownRenderer must be a boolean');
       }
     }
   }

@@ -176,6 +176,8 @@ export interface SettingsConfig {
     claudeCodeChannels?: boolean;
     /** Enable legacy Claude Code Channels MCP wiring for new eligible work agents. */
     claudeCodeChannelsMcp?: boolean;
+    /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
+    streamdownRenderer?: boolean;
   };
   /**
    * Permission mode for spawned Claude Code agents.
