@@ -23,7 +23,7 @@ import { hideOverlay, showOverlay } from '../recovery'
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
 const STREAM_STALENESS_TIMEOUT_MS = 35_000
-const UNREACHABLE_OVERLAY_RETRY_ATTEMPTS = 3
+const UNREACHABLE_OVERLAY_RETRY_ATTEMPTS = 6
 
 type SequencedDomainEvent = Exclude<DomainEvent, { type: 'system.heartbeat' }>
 
@@ -189,6 +189,7 @@ export function EventRouter() {
     // ── Event handler ─────────────────────────────────────────────────────────
     function handleEvent(event: DomainEvent) {
       resetStalenessWatchdog()
+      hideOverlay()
       if (!isSequencedDomainEvent(event)) return
 
       const classification = coordinator.classifyDomainEvent(event.sequence)

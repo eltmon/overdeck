@@ -6,7 +6,7 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
+import { Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
@@ -492,9 +492,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── subscribeDomainEvents ────────────────────────────────────────────────
       [WS_METHODS.subscribeDomainEvents]: (_input) => {
         console.log('[ws-rpc] subscribeDomainEvents invoked');
-        const heartbeats = Stream.fromEffectSchedule(
-          Effect.sync(createSystemHeartbeatEvent),
-          Schedule.spaced('15 seconds'),
+        const heartbeats = Stream.tick('15 seconds').pipe(
+          Stream.map(createSystemHeartbeatEvent),
         );
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),

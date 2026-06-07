@@ -232,7 +232,7 @@ describe('EventRouter memory updates', () => {
     })
 
     act(() => {
-      wsTransport.subscribeOptions!.onRetry!(3)
+      wsTransport.subscribeOptions!.onRetry!(6)
     })
 
     expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
