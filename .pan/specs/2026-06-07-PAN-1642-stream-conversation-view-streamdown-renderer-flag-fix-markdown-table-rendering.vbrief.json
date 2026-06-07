@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-07T06:12:45.025Z"
+    "updated": "2026-06-07T06:19:58.672Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 22,
+    "sequence": 24,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-07T06:12:45.025Z",
+    "updated": "2026-06-07T06:19:58.672Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -443,58 +443,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1642-stream-conversation-view-streamdown-renderer-flag-fix-markdown-table-rendering.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T06:12:45.025Z",
+        "updatedAt": "2026-06-07T06:19:57.329Z",
         "work": {
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "status": "failed",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
+          "notes": "Verification FAILED at build (300103ms):\n\ndynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (65%)\n  - rolldown-plugin-dts:generate (28%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n\u001b[43m WARN \u001b[49m `noExternal` is deprecated. Use `deps.alwaysBundle` instead.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - vite:css (61%)\n  - vite:asset (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/components/PlanDAG.tsx is dynamically imported by src/components/vbrief/VBriefViewer.tsx but also statically imported by src/components/BeadsTasksPanel.tsx, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m ../../../node_modules/.bun/@pierre+diffs@1.1.22/node_modules/@pierre/diffs/dist/index.js is dynamically imported by src/components/chat/ChatMarkdown.tsx, src/components/chat/MarkdownFileLink.tsx but also statically imported by src/components/DiffPanel.tsx, dynamic import will not move module into another chunk.\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-07T06:12:45.025Z"
+              "status": "failed",
+              "at": "2026-06-07T06:19:57.329Z",
+              "notes": "Verification FAILED at build (300103ms):\n\ndynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (65%)\n  - rolldown-plugin-dts:generate (28%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n\u001b[43m WARN \u001b[49m `noExternal` is deprecated. Use `deps.alwaysBundle` instead.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - vite:css (61%)\n  - vite:asset (37%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/components/PlanDAG.tsx is dynamically imported by src/components/vbrief/VBriefViewer.tsx but also statically imported by src/components/BeadsTasksPanel.tsx, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m ../../../node_modules/.bun/@pierre+diffs@1.1.22/node_modules/@pierre/diffs/dist/index.js is dynamically imported by src/components/chat/ChatMarkdown.tsx, src/components/chat/MarkdownFileLink.tsx but also statically imported by src/components/DiffPanel.tsx, dynamic import will not move module into another chunk.\n\n"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
           "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-07T06:12:45.025Z",
+              "status": "pending",
+              "at": "2026-06-07T06:19:57.329Z",
               "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:12:45.025Z"
+              "at": "2026-06-07T06:19:57.329Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:12:45.025Z",
+          "updatedAt": "2026-06-07T06:19:57.329Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:12:45.025Z"
+              "at": "2026-06-07T06:19:57.329Z"
             }
           ],
           "readyForMerge": false,
