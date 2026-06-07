@@ -14,6 +14,7 @@ const MODEL_BY_PROVIDER = {
   google: 'gemini-3-pro-preview',
   minimax: 'minimax-m2.7',
   openrouter: 'qwen/qwen3.6-plus:free',
+  ollama: 'ollama:gemma3:12b',
 } as const
 
 const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'codex']
@@ -38,7 +39,7 @@ describe('canUseHarness', () => {
     expect(canUseHarnessSync('pi', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
-  it.each(['openai', 'google', 'minimax', 'openrouter'] as const)(
+  it.each(['openai', 'google', 'minimax', 'openrouter', 'ollama'] as const)(
     'allows Pi + non-Anthropic (%s) on every authMode',
     provider => {
       const model = MODEL_BY_PROVIDER[provider]
@@ -89,7 +90,13 @@ describe('canUseHarness', () => {
     }
   })
 
-  it('covers the full 3 x 5 x 3 matrix with explicit per-cell expectations', () => {
+  it('allows Pi + ollama on every authMode', () => {
+    for (const authMode of AUTH_MODES) {
+      expect(canUseHarnessSync('pi', 'ollama:gemma3:12b', authMode)).toEqual({ allowed: true })
+    }
+  })
+
+  it('covers the full 3 x 6 x 3 matrix with explicit per-cell expectations', () => {
     const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
@@ -100,7 +107,7 @@ describe('canUseHarness', () => {
         }
       }
     }
-    expect(cells).toHaveLength(3 * 5 * 3)
+    expect(cells).toHaveLength(3 * 6 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, OLLAMA_OPENAI_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -100,6 +100,29 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
       OPENROUTER_API_KEY: 'sk-or-test',
     });
+  });
+
+  it('routes ollama-prefixed models to the Ollama provider before slash-based OpenRouter routing', () => {
+    expect(PROVIDERS.ollama).toMatchObject({
+      name: 'ollama',
+      baseUrl: OLLAMA_OPENAI_BASE_URL,
+      models: [],
+      tested: false,
+    });
+    expect(getProviderForModelSync('ollama:gemma3:12b')).toBe(PROVIDERS.ollama);
+    expect(getProviderForModelSync('ollama:anything')).toBe(PROVIDERS.ollama);
+    expect(getProviderForModelSync('ollama:library/tag:latest')).toBe(PROVIDERS.ollama);
+  });
+
+  it('keeps existing model routing unchanged', () => {
+    expect(getProviderForModelSync('claude-sonnet-4-6')).toBe(PROVIDERS.anthropic);
+    expect(getProviderForModelSync('gpt-5.4')).toBe(PROVIDERS.openai);
+    expect(getProviderForModelSync('gemini-3-flash-preview')).toBe(PROVIDERS.google);
+    expect(getProviderForModelSync('minimax-m2.7')).toBe(PROVIDERS.minimax);
+    expect(getProviderForModelSync('kimi-k2.6')).toBe(PROVIDERS.kimi);
+    expect(getProviderForModelSync('glm-5.1')).toBe(PROVIDERS.zai);
+    expect(getProviderForModelSync('mimo-v2.5-pro')).toBe(PROVIDERS.mimo);
+    expect(getProviderForModelSync('qwen/qwen3.6-plus:free')).toBe(PROVIDERS.openrouter);
   });
 
   it('routes DashScope Qwen models to the DashScope provider', () => {

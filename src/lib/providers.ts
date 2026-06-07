@@ -13,7 +13,7 @@ import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, Mimo
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'ollama';
 
 /**
  * Provider configuration
@@ -50,6 +50,7 @@ export interface ProviderConfig {
  */
 export const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
 export const KIMI_PLATFORM_BASE_URL = 'https://api.moonshot.ai/anthropic';
+export const OLLAMA_OPENAI_BASE_URL = 'http://localhost:11434/v1';
 
 export function getKimiAnthropicBaseUrl(apiKey: string): string {
   return apiKey.trim().startsWith('sk-kimi-')
@@ -172,12 +173,27 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: false,
     description: 'Route Alibaba DashScope Qwen models through Panopticon’s local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).',
   },
+
+  ollama: {
+    name: 'ollama',
+    displayName: 'Ollama (Local)',
+    compatibility: 'direct',
+    baseUrl: OLLAMA_OPENAI_BASE_URL,
+    authType: 'static',
+    models: [],
+    tested: false,
+    description: 'Route model-agnostic local Ollama tags through the localhost OpenAI-compatible /v1 endpoint for the Pi harness.',
+  },
 };
 
 /**
  * Get provider for a given model ID
  */
 export function getProviderForModelSync(modelId: ModelId | string): ProviderConfig {
+  if (modelId.startsWith('ollama:')) {
+    return PROVIDERS.ollama;
+  }
+
   // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
   // except for explicitly supported slash-delimited providers such as Nous Portal.
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
