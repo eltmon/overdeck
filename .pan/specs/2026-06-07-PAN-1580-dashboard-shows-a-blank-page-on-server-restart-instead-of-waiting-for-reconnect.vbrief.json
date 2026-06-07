@@ -4,7 +4,7 @@
     "created": "2026-06-07T03:07:29Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1580: Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "updated": "2026-06-07T04:21:48.434Z"
+    "updated": "2026-06-07T04:30:34.451Z"
   },
   "plan": {
     "id": "pan-1580",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "e05658d9-aea0-49e8-8c58-3af56a8a819f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 14,
+    "sequence": 25,
     "created": "2026-06-07T03:07:29Z",
-    "updated": "2026-06-07T04:21:48.434Z",
+    "updated": "2026-06-07T04:30:34.451Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1580",
@@ -450,57 +450,55 @@
         "phase": "review",
         "issueId": "PAN-1580",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T04:21:47.419Z",
+        "updatedAt": "2026-06-07T04:30:33.667Z",
         "work": {
-          "updatedAt": "2026-06-07T04:21:47.419Z",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T04:21:47.419Z",
-          "notes": "Verification FAILED at lint (13567ms):\n\nestart/SKILL.md: pan restart exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-review/SKILL.md: pan review exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-show/SKILL.md: pan show exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-start/SKILL.md: pan start exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-status/SKILL.md: pan status exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-sync/SKILL.md: pan sync exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-sync-main/SKILL.md: pan sync-main exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tell/SKILL.md: pan tell exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md: pan tts exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n",
+          "status": "passed",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T04:21:47.419Z",
-              "notes": "Verification FAILED at lint (13567ms):\n\nestart/SKILL.md: pan restart exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-review/SKILL.md: pan review exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-show/SKILL.md: pan show exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-start/SKILL.md: pan start exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-status/SKILL.md: pan status exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-sync/SKILL.md: pan sync exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-sync-main/SKILL.md: pan sync-main exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tell/SKILL.md: pan tell exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-tts/SKILL.md: pan tts exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-unpause/SKILL.md: pan unpause exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-untroubled/SKILL.md: pan untroubled exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1580/sync-sources/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n"
+              "status": "passed",
+              "at": "2026-06-07T04:30:33.667Z"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T04:21:47.419Z",
-          "notes": "Verification failed at lint",
+          "status": "reviewing",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
+          "notes": "Verification failed at test",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T04:21:47.419Z",
-              "notes": "Verification failed at lint"
+              "status": "reviewing",
+              "at": "2026-06-07T04:30:33.667Z",
+              "notes": "Verification failed at test"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T04:21:47.419Z",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T04:21:47.419Z"
+              "at": "2026-06-07T04:30:33.667Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T04:21:47.419Z",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T04:21:47.419Z",
+          "updatedAt": "2026-06-07T04:30:33.667Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T04:21:47.419Z"
+              "at": "2026-06-07T04:30:33.667Z"
             }
           ],
           "readyForMerge": false,

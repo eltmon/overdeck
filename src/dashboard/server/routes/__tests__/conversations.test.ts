@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { parseSummaryForkFocus } from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -84,8 +85,6 @@ function decodeTextResponse(response: { body: unknown }) {
 
 describe('parseSummaryForkFocus', () => {
   it('trims handoff focus text', async () => {
-    const { parseSummaryForkFocus } = await import('../conversations.js');
-
     expect(parseSummaryForkFocus('  continue the API wiring  ')).toEqual({
       ok: true,
       focus: 'continue the API wiring',
@@ -93,21 +92,15 @@ describe('parseSummaryForkFocus', () => {
   });
 
   it('normalizes blank and absent focus to undefined', async () => {
-    const { parseSummaryForkFocus } = await import('../conversations.js');
-
     expect(parseSummaryForkFocus(undefined)).toEqual({ ok: true, focus: undefined });
     expect(parseSummaryForkFocus('   ')).toEqual({ ok: true, focus: undefined });
   });
 
   it('rejects non-string focus values', async () => {
-    const { parseSummaryForkFocus } = await import('../conversations.js');
-
     expect(parseSummaryForkFocus(42)).toEqual({ ok: false, error: 'focus must be a string' });
   });
 
   it('rejects focus values longer than 500 characters', async () => {
-    const { parseSummaryForkFocus } = await import('../conversations.js');
-
     expect(parseSummaryForkFocus('a'.repeat(501))).toEqual({
       ok: false,
       error: 'focus must be 500 characters or fewer',
@@ -115,8 +108,6 @@ describe('parseSummaryForkFocus', () => {
   });
 
   it('rejects control characters in focus', async () => {
-    const { parseSummaryForkFocus } = await import('../conversations.js');
-
     expect(parseSummaryForkFocus('continue\nthen ship')).toEqual({
       ok: false,
       error: 'focus must not contain control characters',

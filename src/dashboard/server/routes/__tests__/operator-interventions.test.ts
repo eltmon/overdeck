@@ -124,6 +124,9 @@ vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   };
 });
 
+const agentsRouteLayerPromise = import('../agents.js').then((module) => module.agentsRouteLayer);
+const issuesRouteLayerPromise = import('../issues.js').then((module) => module.issuesRouteLayer);
+
 function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
     append: (event: Record<string, unknown>) => Effect.sync(() => {
@@ -164,13 +167,11 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
 }
 
 async function requestAgents(path: string, init: RequestInit = {}) {
-  const { agentsRouteLayer } = await import('../agents.js');
-  return runRoute(agentsRouteLayer, path, init);
+  return runRoute(await agentsRouteLayerPromise, path, init);
 }
 
 async function requestIssues(path: string, init: RequestInit = {}) {
-  const { issuesRouteLayer } = await import('../issues.js');
-  return runRoute(issuesRouteLayer, path, init);
+  return runRoute(await issuesRouteLayerPromise, path, init);
 }
 
 const agentState = {
