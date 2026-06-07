@@ -41,8 +41,8 @@ export function isModuleLoadError(reasonOrError: unknown): boolean {
   );
 }
 
-function showOverlay(message: string): void {
-  if (document.getElementById(OVERLAY_ID)) return;
+export function showOverlay(message: string, action?: { label: string; onClick: () => void }): void {
+  document.getElementById(OVERLAY_ID)?.remove();
   const el = document.createElement('div');
   el.id = OVERLAY_ID;
   el.style.cssText = [
@@ -62,9 +62,21 @@ function showOverlay(message: string): void {
   el.innerHTML = `
     <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,0.18);border-top-color:#6aa0ff;border-radius:50%;animation:pan-recovery-spin 0.8s linear infinite"></div>
     <div>${message}</div>
+    ${action ? '<button type="button" data-pan-recovery-action="true" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#1b2533;color:#e6e6e6;cursor:pointer;font-size:14px"></button>' : ''}
     <style>@keyframes pan-recovery-spin{to{transform:rotate(360deg)}}</style>
   `;
+  if (action) {
+    const button = el.querySelector<HTMLButtonElement>('[data-pan-recovery-action="true"]');
+    if (button) {
+      button.textContent = action.label;
+      button.addEventListener('click', action.onClick);
+    }
+  }
   document.body.appendChild(el);
+}
+
+export function hideOverlay(): void {
+  document.getElementById(OVERLAY_ID)?.remove();
 }
 
 /**

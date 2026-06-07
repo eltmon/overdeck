@@ -11,10 +11,12 @@ const wsTransport = vi.hoisted(() => {
     subscribe: vi.fn(),
     resetTransport: vi.fn(),
     subscribed: null as ((event: DomainEvent) => void) | null,
+    subscribeOptions: null as { onReconnect?: () => void; onRetry?: (attempt: number) => void } | null,
     unsubscribe: vi.fn(),
   }
-  state.subscribe.mockImplementation((_connect, listener) => {
+  state.subscribe.mockImplementation((_connect, listener, options) => {
     state.subscribed = listener
+    state.subscribeOptions = options
     return state.unsubscribe
   })
   return state
@@ -98,6 +100,8 @@ describe('EventRouter memory updates', () => {
     resetTransport.mockClear()
     unsubscribe.mockReset()
     wsTransport.subscribed = null
+    wsTransport.subscribeOptions = null
+    document.body.innerHTML = ''
     resetDashboardStore()
   })
 
@@ -179,6 +183,49 @@ describe('EventRouter memory updates', () => {
     expect(subscribe).toHaveBeenCalledTimes(2)
     expect(request).toHaveBeenCalledTimes(2)
     warn.mockRestore()
+  })
+
+  it('shows reconnect overlay on retries and hides it after reconnect', async () => {
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(wsTransport.subscribeOptions?.onRetry).toBeTypeOf('function')
+    expect(wsTransport.subscribeOptions?.onReconnect).toBeTypeOf('function')
+
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+    })
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Reconnecting to the dashboard…')
+
+    act(() => {
+      wsTransport.subscribeOptions!.onReconnect!()
+    })
+    expect(document.getElementById('pan-recovery-overlay')).toBeNull()
+  })
+
+  it('shows an actionable retry overlay after repeated reconnect failures', async () => {
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(3)
+    })
+
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
+    const button = document.querySelector<HTMLButtonElement>('button')
+    expect(button?.textContent).toBe('Retry')
+
+    act(() => {
+      button!.click()
+    })
+
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledTimes(2)
   })
 
   it('drops deferred live events that are covered by replay', async () => {

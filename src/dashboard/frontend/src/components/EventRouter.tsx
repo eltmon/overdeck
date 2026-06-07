@@ -18,10 +18,12 @@ import type { DomainEvent, DashboardSnapshot } from '@panctl/contracts'
 import { WS_METHODS } from '@panctl/contracts'
 import { Stream } from 'effect'
 import { loadSnapshotFromCache } from '../lib/snapshotCache'
+import { hideOverlay, showOverlay } from '../recovery'
 
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
 const STREAM_STALENESS_TIMEOUT_MS = 35_000
+const UNREACHABLE_OVERLAY_RETRY_ATTEMPTS = 3
 
 type SequencedDomainEvent = Exclude<DomainEvent, { type: 'system.heartbeat' }>
 
@@ -73,16 +75,21 @@ export function EventRouter() {
       stalenessTimeout = null
     }
 
+    function reconnectDomainStream() {
+      unsubscribe?.()
+      unsubscribe = null
+      resetTransport()
+      transport = getTransport()
+      subscribeToDomainEvents()
+      bootstrap().catch(console.error)
+    }
+
     function resetStalenessWatchdog() {
       stopStalenessWatchdog()
       stalenessTimeout = setTimeout(() => {
         console.warn('[EventRouter] domain event stream stale — reconnecting')
-        unsubscribe?.()
-        unsubscribe = null
-        resetTransport()
-        transport = getTransport()
-        subscribeToDomainEvents()
-        bootstrap().catch(console.error)
+        showOverlay('Reconnecting to the dashboard…')
+        reconnectDomainStream()
       }, STREAM_STALENESS_TIMEOUT_MS)
     }
 
@@ -210,10 +217,18 @@ export function EventRouter() {
           // that were being viewed vanish with "no longer exists" errors.
           onReconnect: () => {
             console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
+            hideOverlay()
             bootstrap()
             // Broadcast to all useQuery consumers so they re-fetch stale data
             // (session trees, conversations, costs, etc.)
             window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+          },
+          onRetry: (attempt) => {
+            if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {
+              showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
+              return
+            }
+            showOverlay('Reconnecting to the dashboard…')
           },
         },
       )

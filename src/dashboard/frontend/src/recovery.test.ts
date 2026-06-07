@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isModuleLoadError, RootErrorBoundary } from './recovery';
+import { hideOverlay, isModuleLoadError, RootErrorBoundary, showOverlay } from './recovery';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -27,6 +27,22 @@ describe('isModuleLoadError', () => {
     expect(isModuleLoadError(undefined)).toBe(false);
     expect(isModuleLoadError(null)).toBe(false);
     expect(isModuleLoadError({})).toBe(false);
+  });
+});
+
+describe('recovery overlay', () => {
+  it('shows, updates, and hides the overlay idempotently', () => {
+    showOverlay('Reconnecting to the dashboard…');
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Reconnecting to the dashboard…');
+
+    showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: () => undefined });
+    expect(document.querySelectorAll('#pan-recovery-overlay')).toHaveLength(1);
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry');
+    expect(document.querySelector('button')?.textContent).toBe('Retry');
+
+    hideOverlay();
+    hideOverlay();
+    expect(document.getElementById('pan-recovery-overlay')).toBeNull();
   });
 });
 

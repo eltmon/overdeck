@@ -108,6 +108,8 @@ export interface SubscribeOptions {
   /** Called when the subscription reconnects after a failure. Use this to
    *  re-bootstrap state (e.g. re-fetch the snapshot from the new server). */
   readonly onReconnect?: () => void
+  /** Called each time a persistent subscription has to retry after a stream failure. */
+  readonly onRetry?: (attempt: number) => void
 }
 
 const DEFAULT_RETRY_DELAY = Duration.millis(250)
@@ -174,7 +176,9 @@ export class WsTransport {
     let currentCancel: (() => void) | null = null
     const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
     const onReconnect = options?.onReconnect
+    const onRetry = options?.onRetry
     let hasConnectedOnce = false
+    let reconnectAttempts = 0
 
     const run = () => {
       if (!active) return
@@ -189,9 +193,12 @@ export class WsTransport {
                 // Fire onReconnect the first time we receive data after a
                 // reconnection. This lets EventRouter re-bootstrap its
                 // snapshot from the new server instance.
-                if (hasConnectedOnce && onReconnect) {
+                if (hasConnectedOnce) {
                   hasConnectedOnce = false // reset so it only fires once per reconnect
-                  try { onReconnect() } catch { /* non-fatal */ }
+                  reconnectAttempts = 0
+                  if (onReconnect) {
+                    try { onReconnect() } catch { /* non-fatal */ }
+                  }
                 }
                 try {
                   listener(value)
@@ -208,6 +215,8 @@ export class WsTransport {
             Effect.sync(() => {
               if (active) {
                 hasConnectedOnce = true // mark that next successful data = reconnect
+                reconnectAttempts += 1
+                try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
                 console.warn('[WsTransport] subscription error, retrying:', formatError(err))
               }
             }),
@@ -219,6 +228,8 @@ export class WsTransport {
           onExit: (exit) => {
             if (active && Exit.isFailure(exit)) {
               hasConnectedOnce = true
+              reconnectAttempts += 1
+              try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
               setTimeout(run, 1000)
