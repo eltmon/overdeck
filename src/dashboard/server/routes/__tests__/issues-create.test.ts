@@ -52,7 +52,7 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 }));
 
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
-import { issuesRouteLayer } from '../issues.js';
+import { _resetNewIssueCreateRateLimitForTests, issuesRouteLayer } from '../issues.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import type { Issue } from '../../../../lib/tracker/interface.js';
 
@@ -111,6 +111,7 @@ describe('POST /api/issues', () => {
     vi.clearAllMocks();
     process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
     _resetInternalTokenCacheForTests();
+    _resetNewIssueCreateRateLimitForTests();
     loadProjectsConfigMock.mockReturnValue(Effect.succeed({
       projects: {
         pan: {
@@ -125,6 +126,12 @@ describe('POST /api/issues', () => {
           path: '/tmp/gitlab-project',
           tracker: 'gitlab',
           gitlab_repo: 'group/project',
+        },
+        prefixedLab: {
+          name: 'Prefixed GitLab project',
+          path: '/tmp/gitlab-project',
+          gitlab_repo: 'group/project',
+          issue_prefix: 'LAB',
         },
       },
     }));
@@ -235,5 +242,36 @@ describe('POST /api/issues', () => {
     expect(createTrackerMock).not.toHaveBeenCalled();
     expect(createIssueMock).not.toHaveBeenCalled();
     expect(updateShadowStateMock).not.toHaveBeenCalled();
+  });
+
+  it('infers GitLab before Linear when a GitLab project also has an issue prefix', async () => {
+    const result = await postIssue({ projectKey: 'prefixedLab', targetStatus: 'backlog', title: 'No GitLab yet' });
+
+    expect(result.status).toBe(501);
+    expect(result.body.error).toBe('GitLab issue creation is not yet supported');
+    expect(createTrackerMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a generic 500 when tracker config loading fails', async () => {
+    loadConfigNoMigrationMock.mockReturnValue(Effect.fail(new Error('/home/user/.panopticon/config.yaml: parse failed')));
+
+    const result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Config failure' });
+
+    expect(result.status).toBe(500);
+    expect(result.body.error).toBe('Failed to load tracker config');
+  });
+
+  it('rate limits repeated issue creation requests', async () => {
+    let result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Allowed 0' });
+    expect(result.status).toBe(200);
+
+    for (let i = 1; i < 10; i += 1) {
+      result = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: `Allowed ${i}` });
+      expect(result.status).toBe(200);
+    }
+
+    const blocked = await postIssue({ projectKey: 'pan', targetStatus: 'todo', title: 'Blocked' });
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error).toBe('Too many issue creation requests. Please wait and try again.');
   });
 });

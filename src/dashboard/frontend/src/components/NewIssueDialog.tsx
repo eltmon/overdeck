@@ -155,16 +155,17 @@ export function NewIssueDialog({ isOpen, onClose, defaultProjectKey, targetStatu
 
       if (!response.ok) {
         setError(await responseErrorMessage(response));
+        setIsSubmitting(false);
         return;
       }
 
       const issue = await response.json() as CreatedIssue;
       onCreated(issue);
       await refreshDashboardState(queryClient);
+      setIsSubmitting(false);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create issue');
-    } finally {
       setIsSubmitting(false);
     }
   }

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDashboardStore, selectAgents, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 import {
   DndContext,
@@ -44,6 +45,9 @@ import VerbBadge from './primitives/VerbBadge';
 import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 import { NewIssueDialog, type NewIssueTargetStatus } from './NewIssueDialog';
 
+
+const VIRTUALIZED_COLUMN_THRESHOLD = 100;
+const ESTIMATED_ISSUE_CARD_HEIGHT = 150;
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
@@ -2128,6 +2132,15 @@ function ColumnContent({
   planningStateById?: Record<string, PlanningState>;
   workspaceByIssueId?: Record<string, WorkspaceData>;
 }) {
+  const scrollParentRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: issues.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => ESTIMATED_ISSUE_CARD_HEIGHT,
+    getItemKey: (index) => issues[index]?.id ?? index,
+    overscan: 8,
+  });
+
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
   const hierarchy = hasRallyHierarchy ? buildHierarchy(issues) : null;
@@ -2179,6 +2192,33 @@ function ColumnContent({
 
   // Flat rendering (no hierarchy)
   if (!hierarchy) {
+    if (issues.length > VIRTUALIZED_COLUMN_THRESHOLD) {
+      return (
+        <div ref={scrollParentRef} className="p-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+          <div
+            className="relative"
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const issue = issues[virtualItem.index];
+              if (!issue) return null;
+              return (
+                <div
+                  key={virtualItem.key}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  className="absolute left-0 top-0 w-full pb-2"
+                  style={{ transform: `translateY(${virtualItem.start}px)` }}
+                >
+                  {renderIssueCard(issue)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
         {issues.map(renderIssueCard)}

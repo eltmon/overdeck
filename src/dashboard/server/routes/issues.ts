@@ -50,7 +50,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus, getReviewStatusSync } from '../review-status.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { validateOrigin } from './origin-validation.js';
+import { getHeaderFromMap, validateOrigin, type HeaderMap } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
@@ -626,6 +626,13 @@ type NewIssueRequestBody = {
 };
 
 const newIssueTargetStatuses = new Set<string>(['backlog', 'todo']);
+const NEW_ISSUE_CREATE_RATE_LIMIT_WINDOW_MS = 60_000;
+const NEW_ISSUE_CREATE_RATE_LIMIT_MAX = 10;
+const newIssueCreateRateLimits = new Map<string, { windowStartedAt: number; count: number }>();
+
+export function _resetNewIssueCreateRateLimitForTests(): void {
+  newIssueCreateRateLimits.clear();
+}
 
 function validateNewIssueBody(body: unknown): { ok: true; value: NewIssueRequestBody } | { ok: false; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
@@ -653,12 +660,37 @@ function validateNewIssueBody(body: unknown): { ok: true; value: NewIssueRequest
   };
 }
 
+function newIssueRateLimitKey(request: HttpServerRequest.HttpServerRequest): string {
+  const headers = request.headers as HeaderMap;
+  return getHeaderFromMap(headers, 'x-forwarded-for')?.split(',')[0]?.trim()
+    || getHeaderFromMap(headers, 'x-real-ip')?.trim()
+    || getHeaderFromMap(headers, 'origin')
+    || 'dashboard-local';
+}
+
+function rejectNewIssueCreateRateLimit(request: HttpServerRequest.HttpServerRequest): Response | null {
+  const now = Date.now();
+  const key = newIssueRateLimitKey(request);
+  const current = newIssueCreateRateLimits.get(key);
+  if (!current || now - current.windowStartedAt >= NEW_ISSUE_CREATE_RATE_LIMIT_WINDOW_MS) {
+    newIssueCreateRateLimits.set(key, { windowStartedAt: now, count: 1 });
+    return null;
+  }
+
+  if (current.count >= NEW_ISSUE_CREATE_RATE_LIMIT_MAX) {
+    return jsonResponse({ error: 'Too many issue creation requests. Please wait and try again.' }, { status: 429 });
+  }
+
+  current.count += 1;
+  return null;
+}
+
 function inferProjectTrackerType(project: ProjectConfig): TrackerType | null {
   if (project.tracker) return project.tracker;
   if (project.github_repo) return 'github';
   if (project.rally_project) return 'rally';
-  if (getIssuePrefix(project) || project.issue_prefixes?.length) return 'linear';
   if (project.gitlab_repo) return 'gitlab';
+  if (getIssuePrefix(project) || project.issue_prefixes?.length) return 'linear';
   return null;
 }
 
@@ -721,6 +753,8 @@ const postIssuesRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const mutationError = rejectUnsafeDashboardMutationRequest(request);
     if (mutationError) return mutationError;
+    const rateLimitError = rejectNewIssueCreateRateLimit(request);
+    if (rateLimitError) return rateLimitError;
 
     const body = yield* readJsonBody;
     const validation = validateNewIssueBody(body);
@@ -732,7 +766,8 @@ const postIssuesRoute = HttpRouter.add(
       Effect.catch((error) => Effect.succeed({ error } as const)),
     );
     if ('error' in projectsConfig) {
-      return jsonResponse({ error: `Failed to load projects config: ${trackerErrorMessage(projectsConfig.error)}` }, { status: 500 });
+      console.error('[issues] Failed to load projects config for issue creation:', projectsConfig.error);
+      return jsonResponse({ error: 'Failed to load projects config' }, { status: 500 });
     }
 
     const project = projectsConfig.projects[validation.value.projectKey];
@@ -752,7 +787,8 @@ const postIssuesRoute = HttpRouter.add(
       Effect.catch((error) => Effect.succeed({ error } as const)),
     );
     if ('error' in configResult) {
-      return jsonResponse({ error: `Failed to load tracker config: ${trackerErrorMessage(configResult.error)}` }, { status: 500 });
+      console.error('[issues] Failed to load tracker config for issue creation:', configResult.error);
+      return jsonResponse({ error: 'Failed to load tracker config' }, { status: 500 });
     }
 
     const trackersConfig = configResult.config.trackers;
@@ -803,8 +839,10 @@ const postIssuesRoute = HttpRouter.add(
     yield* updateShadowState(identifier, 'open', 'dashboard-new-issue', validation.value.targetStatus);
 
     const issueDataService = getIssueDataService();
-    yield* Effect.promise(() => issueDataService.refreshShadowStatesCache());
-    yield* Effect.promise(() => issueDataService.invalidateTracker(trackerType));
+    yield* Effect.promise(() => Promise.all([
+      issueDataService.refreshShadowStatesCache(),
+      issueDataService.invalidateTracker(trackerType),
+    ]));
 
     const eventStore = yield* EventStoreService;
     const displayStatus = validation.value.targetStatus === 'backlog' ? 'Backlog' : 'Todo';

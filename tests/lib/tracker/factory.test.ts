@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTracker, TrackerConfig } from '../../../src/lib/tracker/factory.js';
+import { loadConfigSync } from '../../../src/lib/config-yaml.js';
 import { LinearTracker } from '../../../src/lib/tracker/linear.js';
 import { GitHubTracker } from '../../../src/lib/tracker/github.js';
 import { GitLabTracker } from '../../../src/lib/tracker/gitlab.js';
@@ -7,18 +8,21 @@ import { TrackerAuthError } from '../../../src/lib/tracker/interface.js';
 
 // Mock config-yaml to prevent filesystem reads
 vi.mock('../../../src/lib/config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({ trackerKeys: {} })),
-  loadConfigSync: vi.fn(() => ({ trackerKeys: {} })),
+  loadConfig: vi.fn(() => ({ config: { trackerKeys: {} } })),
+  loadConfigSync: vi.fn(() => ({ config: { trackerKeys: {} } })),
 }));
 
 describe('createTracker', () => {
   const originalEnv = { ...process.env };
+  const loadConfigSyncMock = vi.mocked(loadConfigSync);
 
   beforeEach(() => {
+    vi.clearAllMocks();
     // Clear relevant env vars before each test
     delete process.env.LINEAR_API_KEY;
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITLAB_TOKEN;
+    loadConfigSyncMock.mockReturnValue({ config: { trackerKeys: {} } } as ReturnType<typeof loadConfigSync>);
   });
 
   afterEach(() => {
@@ -60,6 +64,27 @@ describe('createTracker', () => {
       expect(tracker).toBeInstanceOf(LinearTracker);
 
       delete process.env.MY_LINEAR_KEY;
+    });
+
+    it('should use config.yaml tracker keys when overrides are omitted', () => {
+      loadConfigSyncMock.mockReturnValue({
+        config: { trackerKeys: { linear: 'config-key' } },
+      } as ReturnType<typeof loadConfigSync>);
+
+      const tracker = createTracker({ type: 'linear', team: 'PAN' });
+
+      expect(tracker).toBeInstanceOf(LinearTracker);
+    });
+
+    it('should prefer explicit overrides over config.yaml tracker keys', () => {
+      loadConfigSyncMock.mockReturnValue({
+        config: { trackerKeys: { linear: 'config-key' } },
+      } as ReturnType<typeof loadConfigSync>);
+
+      const tracker = createTracker({ type: 'linear', team: 'PAN' }, { linear: 'override-key' });
+
+      expect(tracker).toBeInstanceOf(LinearTracker);
+      expect(loadConfigSyncMock).not.toHaveBeenCalled();
     });
   });
 
