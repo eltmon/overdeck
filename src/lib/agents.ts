@@ -595,6 +595,14 @@ const PROVIDER_ENV_KEYS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  // Pi-native provider env vars (bridged from Panopticon settings so Pi can auth)
+  'KIMI_API_KEY',
+  'MINIMAX_API_KEY',
+  'ZAI_API_KEY',
+  'MIMO_API_KEY',
+  'OPENROUTER_API_KEY',
+  'NOUS_API_KEY',
+  'DASHSCOPE_API_KEY',
 ] as const;
 
 export async function getProviderExportsForModel(model: string): Promise<string> {

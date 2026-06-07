@@ -69,6 +69,20 @@ After installing Pi, run `pan sync` once. Panopticon writes
 so Pi loads the same skill tree Claude Code does. Existing keys in
 `settings.json` are preserved.
 
+### Provider authentication
+
+Panopticon bridges configured API keys into Pi's environment at launch time,
+so you do **not** need to configure auth separately in Pi for most providers.
+When you spawn a Pi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
+or DashScope model, Panopticon injects the native provider env var
+(`KIMI_API_KEY`, `MINIMAX_API_KEY`, etc.) automatically from your dashboard
+Settings or `~/.panopticon.env`.
+
+Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
+still require you to log in through Pi directly (`/login` inside a Pi session)
+or via Panopticon's dedicated subscription flows (Claude Code OAuth, Codex
+CLIProxy auth).
+
 ## Where you pick the harness
 
 The harness is chosen **per spawn** at four user-initiated surfaces:

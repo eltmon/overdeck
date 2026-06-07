@@ -150,6 +150,8 @@ async function ensureTmuxRunning(): Promise<void> {
     'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
     'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
     'HUME_API_KEY', 'KIMI_API_KEY', 'KIMI_CODING_API_KEY', 'GOOGLE_API_KEY',
+    'MINIMAX_API_KEY', 'ZAI_API_KEY', 'MIMO_API_KEY',
+    'OPENROUTER_API_KEY', 'NOUS_API_KEY', 'DASHSCOPE_API_KEY',
   ];
   for (const envVar of varsToStrip) {
     try {
