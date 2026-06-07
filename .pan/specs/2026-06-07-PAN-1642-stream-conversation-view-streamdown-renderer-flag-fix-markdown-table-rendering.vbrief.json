@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-07T06:07:26.637Z"
+    "updated": "2026-06-07T06:12:45.025Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 20,
+    "sequence": 22,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-07T06:07:26.637Z",
+    "updated": "2026-06-07T06:12:45.025Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -446,29 +446,29 @@
         "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T06:07:26.626Z",
+        "updatedAt": "2026-06-07T06:12:45.025Z",
         "work": {
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T06:07:26.626Z"
+              "at": "2026-06-07T06:12:45.025Z"
             }
           ]
         },
         "review": {
           "status": "blocked",
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603",
           "history": [
             {
               "status": "blocked",
-              "at": "2026-06-07T06:07:26.626Z",
+              "at": "2026-06-07T06:12:45.025Z",
               "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603"
             }
           ],
@@ -476,25 +476,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:07:26.626Z"
+              "at": "2026-06-07T06:12:45.025Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:07:26.626Z",
+          "updatedAt": "2026-06-07T06:12:45.025Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:07:26.626Z"
+              "at": "2026-06-07T06:12:45.025Z"
             }
           ],
           "readyForMerge": false,
