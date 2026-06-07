@@ -6,7 +6,7 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
@@ -19,7 +19,7 @@ import { computeContextUsage, parseConversationMessages, watchConversation } fro
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
@@ -43,6 +43,15 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+function createSystemHeartbeatEvent(): SystemHeartbeatEvent {
+  const ts = Date.now();
+  return {
+    type: 'system.heartbeat',
+    timestamp: new Date(ts).toISOString(),
+    payload: { ts },
+  };
 }
 
 function normalizedIssueId(value: unknown) {
@@ -483,8 +492,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── subscribeDomainEvents ────────────────────────────────────────────────
       [WS_METHODS.subscribeDomainEvents]: (_input) => {
         console.log('[ws-rpc] subscribeDomainEvents invoked');
+        const heartbeats = Stream.fromEffectSchedule(
+          Effect.sync(createSystemHeartbeatEvent),
+          Schedule.spaced('15 seconds'),
+        );
         return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
+          Stream.merge(heartbeats),
         );
       },
 
