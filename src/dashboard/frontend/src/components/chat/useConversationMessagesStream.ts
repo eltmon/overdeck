@@ -34,7 +34,7 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
     const queryKey = conversationMessagesQueryKey(conversation.name);
     const unsubscribe = getTransport().subscribe(
       (client) =>
-        (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ name: conversation.name }) as unknown as Stream.Stream<ConversationEvent, Error>,
+        (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,
       (event) => {
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) => {
           if (event.kind === 'discovering') {
