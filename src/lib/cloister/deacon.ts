@@ -18,7 +18,7 @@ import { readdir, readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { homedir } from 'os';
+import { homedir, loadavg, cpus } from 'os';
 import { Effect } from 'effect';
 import {
   FsError,
@@ -5527,9 +5527,27 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
  * - Orphaned agents (tmux session missing, no stoppedByUser flag) are resumed.
  *
  * Called by runPatrol() on every patrol cycle AND during deacon startup.
+ *
+ * PAN-1665: throttled. An unfreeze used to mass-resume ~37 stopped work agents
+ * back-to-back with no cap, no load gate, and no stagger — each resume spawns a
+ * heavy `claude` process, so load spiked 5→52. The throttle below bounds resumes
+ * per patrol, bails out when system load is already high, and staggers spawns so
+ * the OS scheduler can absorb each one. Remaining candidates are picked up on the
+ * next patrol (every patrolIntervalMs), so nothing is dropped — only spread out.
  */
+const MAX_RESUMES_PER_PATROL = 3;
+// Skip the rest of this cycle once 1-minute load exceeds cores * this factor.
+const RESUME_LOAD_FACTOR = 1.5;
+// Pause between consecutive resume spawns so the herd is spread across the cycle.
+const RESUME_STAGGER_MS = 150;
+
 export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
+  // PAN-1665: count spawn attempts (not just successes) — a failed resume still
+  // forks a `claude` process, so the cap must bound attempts to curb the herd.
+  let resumeAttempts = 0;
+  const cores = cpus().length || 1;
+  const loadCeiling = cores * RESUME_LOAD_FACTOR;
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
     logDeaconEventSync('PANOPTICON_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
@@ -5700,8 +5718,26 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       }
     }
 
+    // PAN-1665 throttle: bound spawns per patrol and bail when load is high so an
+    // unfreeze doesn't thundering-herd the box. Deferred candidates are re-evaluated
+    // next patrol — they are not dropped.
+    if (resumeAttempts >= MAX_RESUMES_PER_PATROL) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: per-patrol resume cap reached (${MAX_RESUMES_PER_PATROL}); deferring remaining candidates to next patrol`);
+      break;
+    }
+    const load1 = loadavg()[0];
+    if (load1 > loadCeiling) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: load gate tripped (load1=${load1.toFixed(2)} > ${loadCeiling.toFixed(2)} = ${cores} cores * ${RESUME_LOAD_FACTOR}); deferring remaining candidates to next patrol`);
+      break;
+    }
+    // Stagger spawns so the scheduler can absorb each `claude` before the next.
+    if (resumeAttempts > 0) {
+      await new Promise(r => setTimeout(r, RESUME_STAGGER_MS));
+    }
+
     const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
     logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
+    resumeAttempts++;
     try {
       const result = await resumeAgent(agentId);
       if (result.success) {

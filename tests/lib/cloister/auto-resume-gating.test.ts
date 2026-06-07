@@ -54,6 +54,7 @@ describe('auto-resume gates', () => {
     vi.doUnmock('../../../src/lib/remote/workspace-metadata.js');
     vi.doUnmock('../../../src/lib/operator-interventions.js');
     vi.doUnmock('../../../src/lib/tmux.js');
+    vi.doUnmock('os');
     vi.doUnmock('child_process');
     vi.doUnmock('ora');
     vi.resetModules();
@@ -72,7 +73,22 @@ describe('auto-resume gates', () => {
     return workspace;
   }
 
-  async function loadDeaconWithResumeMock() {
+  async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
+    // PAN-1665: throttle tests need deterministic load/core counts. Only install
+    // the os mock when overrides are supplied so existing tests keep real values.
+    if (osOverrides) {
+      vi.doMock('os', async (importOriginal) => {
+        const actual = await importOriginal<typeof import('os')>();
+        return {
+          ...actual,
+          default: actual,
+          loadavg: osOverrides.loadavg ? () => osOverrides.loadavg! : actual.loadavg,
+          cpus: osOverrides.cpusCount
+            ? () => Array.from({ length: osOverrides.cpusCount! }, () => ({}) as ReturnType<typeof actual.cpus>[number])
+            : actual.cpus,
+        };
+      });
+    }
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();
       return {
@@ -549,6 +565,72 @@ describe('auto-resume gates', () => {
     expect(recovered).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(agents.getAgentStateSync(runningAgentId)?.status).toBe('running');
+  });
+
+  // PAN-1665: throttle so unfreezing the deacon doesn't thundering-herd the box.
+  // The resume loop schedules a 150ms stagger setTimeout *between* awaits, so a
+  // single runAllTimersAsync() can race ahead of the first scheduled timer. Advance
+  // in a loop until the promise settles to fire each stagger as it's scheduled.
+  async function settleWithStagger<T>(promise: Promise<T>): Promise<T> {
+    let done = false;
+    const wrapped = promise.finally(() => { done = true; });
+    while (!done) {
+      await vi.advanceTimersByTimeAsync(150);
+    }
+    return wrapped;
+  }
+
+  function saveCandidate(agents: typeof import('../../../src/lib/agents.js'), agentId: string) {
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+    });
+  }
+
+  it('caps resumes per patrol and defers the rest to the next patrol', async () => {
+    resumeAgentMock.mockResolvedValue({ success: true });
+    // Low load, plenty of cores → load gate stays open; only the cap should bite.
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock({
+      loadavg: [1, 1, 1],
+      cpusCount: 24,
+    });
+    const logger = await import('../../../src/lib/persistent-logger.js');
+    for (let i = 0; i < 5; i++) saveCandidate(agents, `agent-pan-1141-herd-${i}`);
+
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
+
+    // MAX_RESUMES_PER_PATROL = 3 — the other two are left for the next cycle.
+    expect(resumed).toHaveLength(3);
+    expect(resumeAgentMock).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
+      expect.stringContaining('per-patrol resume cap reached'),
+    );
+  });
+
+  it('skips all resumes when system load already exceeds the ceiling', async () => {
+    resumeAgentMock.mockResolvedValue({ success: true });
+    // load 100 on 8 cores → ceiling 12 (8 * 1.5), gate trips before any resume.
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock({
+      loadavg: [100, 100, 100],
+      cpusCount: 8,
+    });
+    const logger = await import('../../../src/lib/persistent-logger.js');
+    saveCandidate(agents, 'agent-pan-1141-loaded-0');
+    saveCandidate(agents, 'agent-pan-1141-loaded-1');
+
+    const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+    expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(
+      expect.stringContaining('load gate tripped'),
+    );
   });
 
   it('clears paused state and spawns when pan start --force is not a dry run', async () => {
