@@ -4,7 +4,7 @@
     "created": "2026-05-31T21:30:18.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-06-07T22:13:43.511Z"
+    "updated": "2026-06-07T22:16:14.900Z"
   },
   "plan": {
     "id": "pan-1395",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
     "author": "agent:claude-opus-4-8",
-    "sequence": 49,
+    "sequence": 55,
     "created": "2026-05-31T21:30:18.000Z",
-    "updated": "2026-06-07T22:13:43.511Z",
+    "updated": "2026-06-07T22:16:14.900Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
@@ -721,60 +721,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1395",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T22:13:43.485Z",
+        "updatedAt": "2026-06-07T22:16:14.890Z",
         "work": {
-          "updatedAt": "2026-06-07T22:13:43.485Z",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T22:13:43.485Z",
-          "notes": "Verification FAILED at test (25493ms):\n\nmdoes not spawn when no project is configured\n\u001b[22m\u001b[39m[test-dispatch] No project configured for PAN-503 — cannot spawn test role\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/discovered-sessions.test.ts\u001b[2m > \u001b[22mdashboard conversation route guards\u001b[2m > \u001b[22mrequires internal-token proof before minting dashboard session cookies\n\u001b[31m\u001b[1mTypeError\u001b[22m: Cannot read properties of undefined (reading '_tag')\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m _tag node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/option.ts:\u001b[2m80:76\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m isNone node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Option.ts:\u001b[2m817:56\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Function.ts:\u001b[2m285:17\u001b[22m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m isLoopbackPeer src/dashboard/server/routes/dashboard-auth.ts:\u001b[2m168:23\u001b[22m\u001b[39m\n    \u001b[90m166|\u001b[39m  */\u001b[39m\n    \u001b[90m167|\u001b[39m function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest):…\n    \u001b[90m168|\u001b[39m   \u001b[35mconst\u001b[39m addr \u001b[33m=\u001b[39m \u001b[33mOption\u001b[39m\u001b[33m.\u001b[39m\u001b[34mgetOrElse\u001b[39m(request\u001b[33m.\u001b[39mremoteAddress\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m \u001b[32m''\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                       \u001b[31m^\u001b[39m\n    \u001b[90m169|\u001b[39m   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:12…\n    \u001b[90m170|\u001b[39m }\n\u001b[90m \u001b[2m❯\u001b[22m rejectUnauthorizedDashboardSessionMintRequest src/dashboard/server/routes/dashboard-auth.ts:\u001b[2m179:47\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/discovered-sessions.test.ts:\u001b[2m260:12\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n",
+          "status": "running",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T22:13:43.485Z",
-              "notes": "Verification FAILED at test (25493ms):\n\nmdoes not spawn when no project is configured\n\u001b[22m\u001b[39m[test-dispatch] No project configured for PAN-503 — cannot spawn test role\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/discovered-sessions.test.ts\u001b[2m > \u001b[22mdashboard conversation route guards\u001b[2m > \u001b[22mrequires internal-token proof before minting dashboard session cookies\n\u001b[31m\u001b[1mTypeError\u001b[22m: Cannot read properties of undefined (reading '_tag')\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m _tag node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/option.ts:\u001b[2m80:76\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m isNone node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Option.ts:\u001b[2m817:56\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Function.ts:\u001b[2m285:17\u001b[22m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m isLoopbackPeer src/dashboard/server/routes/dashboard-auth.ts:\u001b[2m168:23\u001b[22m\u001b[39m\n    \u001b[90m166|\u001b[39m  */\u001b[39m\n    \u001b[90m167|\u001b[39m function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest):…\n    \u001b[90m168|\u001b[39m   \u001b[35mconst\u001b[39m addr \u001b[33m=\u001b[39m \u001b[33mOption\u001b[39m\u001b[33m.\u001b[39m\u001b[34mgetOrElse\u001b[39m(request\u001b[33m.\u001b[39mremoteAddress\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m \u001b[32m''\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                       \u001b[31m^\u001b[39m\n    \u001b[90m169|\u001b[39m   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:12…\n    \u001b[90m170|\u001b[39m }\n\u001b[90m \u001b[2m❯\u001b[22m rejectUnauthorizedDashboardSessionMintRequest src/dashboard/server/routes/dashboard-auth.ts:\u001b[2m179:47\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/discovered-sessions.test.ts:\u001b[2m260:12\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n"
+              "status": "running",
+              "at": "2026-06-07T22:16:14.890Z"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T22:13:43.485Z",
+          "status": "pending",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "notes": "Verification failed at test",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T22:13:43.485Z",
+              "status": "pending",
+              "at": "2026-06-07T22:16:14.890Z",
               "notes": "Verification failed at test"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T22:13:43.485Z",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T22:13:43.485Z"
+              "at": "2026-06-07T22:16:14.890Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T22:13:43.485Z",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T22:13:43.485Z",
+          "updatedAt": "2026-06-07T22:16:14.890Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T22:13:43.485Z"
+              "at": "2026-06-07T22:16:14.890Z"
             }
           ],
           "readyForMerge": false,
