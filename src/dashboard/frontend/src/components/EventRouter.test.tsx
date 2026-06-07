@@ -127,6 +127,25 @@ describe('EventRouter memory updates', () => {
     expect(useDashboardStore.getState().observationsByIssueId['PAN-1052']?.[0]?.id).toBe('obs-live')
   })
 
+  it('does not show the fallback-expired overlay after bootstrap succeeds', async () => {
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    for (let elapsed = 0; elapsed < 180_000; elapsed += 30_000) {
+      act(() => {
+        wsTransport.subscribed!(systemHeartbeatEvent())
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(Math.min(30_000, 180_000 - elapsed))
+      })
+    }
+
+    expect(document.getElementById('pan-recovery-overlay')).toBeNull()
+  })
+
   it('ignores heartbeat frames for sequencing while resetting stream staleness', async () => {
     render(<EventRouter />)
 
@@ -334,6 +353,7 @@ describe('EventRouter memory updates', () => {
       await vi.advanceTimersByTimeAsync(Math.min(30_000, 178_000 - elapsed))
     }
     const callsAtWindowEnd = request.mock.calls.length
+    expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Server unreachable — Retry')
     act(() => {
       wsTransport.subscribed!(systemHeartbeatEvent())
     })

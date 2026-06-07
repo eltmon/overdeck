@@ -67,7 +67,12 @@ export function EventRouter() {
         }
         bootstrap().catch(console.error)
       }, SNAPSHOT_FALLBACK_INTERVAL_MS)
-      fallbackTimeout = setTimeout(stopFallbackPoller, SNAPSHOT_FALLBACK_WINDOW_MS)
+      fallbackTimeout = setTimeout(() => {
+        if (!bootstrapComplete) {
+          showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
+        }
+        stopFallbackPoller()
+      }, SNAPSHOT_FALLBACK_WINDOW_MS)
     }
 
     function stopStalenessWatchdog() {
