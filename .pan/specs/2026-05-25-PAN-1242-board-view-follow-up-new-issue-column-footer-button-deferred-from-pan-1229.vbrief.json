@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-06T21:14:15.818Z"
+    "updated": "2026-06-06T21:20:26.393Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 36,
+    "sequence": 40,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-06T21:14:15.818Z",
+    "updated": "2026-06-06T21:20:26.393Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,58 +415,58 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-06T21:14:15.812Z",
+        "updatedAt": "2026-06-06T21:20:25.960Z",
         "work": {
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "status": "passed",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-06T21:14:15.812Z"
+              "status": "passed",
+              "at": "2026-06-06T21:20:25.960Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "status": "failed",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "notes": "Verification failed at lint",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-06T21:14:15.812Z",
+              "status": "failed",
+              "at": "2026-06-06T21:20:25.960Z",
               "notes": "Verification failed at lint"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T21:14:15.812Z"
+              "at": "2026-06-06T21:20:25.960Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-06T21:14:15.812Z",
+          "updatedAt": "2026-06-06T21:20:25.960Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-06T21:14:15.812Z"
+              "at": "2026-06-06T21:20:25.960Z"
             }
           ],
           "readyForMerge": false,

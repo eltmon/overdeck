@@ -6,10 +6,13 @@ cd "$(dirname "$0")/.."
 python3 - <<'PY'
 from __future__ import annotations
 
+import atexit
+import os
 import re
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import tempfile
 from pathlib import Path
 from threading import Lock
 
@@ -21,6 +24,14 @@ LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
 RUN_PAN_CACHE_LOCK = Lock()
 LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}
+LINT_HOME = tempfile.TemporaryDirectory(prefix="pan-lint-skills-")
+atexit.register(LINT_HOME.cleanup)
+PAN_ENV = {
+    **os.environ,
+    "PANOPTICON_HOME": LINT_HOME.name,
+    "PANOPTICON_DISABLE_DEACON": "1",
+    "PANOPTICON_NO_RESUME": "1",
+}
 
 
 def run_pan(*args: str) -> str:
@@ -39,6 +50,7 @@ def run_pan(*args: str) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
+            env=PAN_ENV,
         )
         if last.returncode == 0:
             with RUN_PAN_CACHE_LOCK:
