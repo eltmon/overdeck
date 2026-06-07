@@ -25,6 +25,7 @@ import { refreshCacheSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
+import { DEFAULT_OLLAMA_MODEL, checkOllamaEndpointReachable, isOllamaInstalled, resolveOllamaBaseUrl } from '../../lib/ollama.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -35,6 +36,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
+    .option('--skip-ollama', 'Skip Ollama local model sidecar guidance and model pull')
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .action(installCommand);
@@ -46,6 +48,7 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipBeads?: boolean;
+  skipOllama?: boolean;
   skipMoonshine?: boolean;
   skipTtsDaemon?: boolean;
 }
@@ -211,6 +214,52 @@ function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolea
     }
   }
   console.log('');
+}
+
+export function getOllamaInstallGuidance(platform: string): string {
+  if (platform === 'darwin') {
+    return 'Install Ollama: brew install --cask ollama (or download from https://ollama.com/download)';
+  }
+  return 'Install Ollama: curl -fsSL https://ollama.com/install.sh | sh';
+}
+
+async function installOllamaStep(spinner: ReturnType<typeof ora>, platform: string): Promise<void> {
+  spinner.start('Checking Ollama local model sidecar...');
+  const installed = await isOllamaInstalled();
+  if (!installed) {
+    spinner.warn('Ollama not installed (local Pi models will be unavailable until installed)');
+    console.log(chalk.dim(`  ${getOllamaInstallGuidance(platform)}`));
+    return;
+  }
+
+  const baseUrl = resolveOllamaBaseUrl();
+  const reachable = await checkOllamaEndpointReachable(baseUrl);
+  if (reachable) {
+    spinner.succeed(`Ollama installed and reachable at ${baseUrl}`);
+  } else {
+    spinner.warn(`Ollama installed but ${baseUrl} is not reachable`);
+    console.log(chalk.dim('  Start it with: ollama serve'));
+  }
+
+  const { pullDefaultOllamaModel } = await inquirer.prompt([{
+    type: 'confirm',
+    name: 'pullDefaultOllamaModel',
+    message: `Pull default local model ${DEFAULT_OLLAMA_MODEL}?`,
+    default: true,
+  }]);
+
+  if (!pullDefaultOllamaModel) {
+    spinner.info(`Skipping Ollama model pull (${DEFAULT_OLLAMA_MODEL})`);
+    return;
+  }
+
+  spinner.start(`Pulling Ollama model ${DEFAULT_OLLAMA_MODEL}...`);
+  try {
+    execSync(`ollama pull ${DEFAULT_OLLAMA_MODEL}`, { stdio: 'pipe', timeout: 30 * 60 * 1000 });
+    spinner.succeed(`Ollama model ready: ${DEFAULT_OLLAMA_MODEL}`);
+  } catch {
+    spinner.warn(`Ollama model pull failed — run manually: ollama pull ${DEFAULT_OLLAMA_MODEL}`);
+  }
 }
 
 async function installCommand(options: InstallOptions): Promise<void> {
@@ -481,6 +530,12 @@ async function installCommand(options: InstallOptions): Promise<void> {
       spinner.warn('beads version check or upgrade failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
     }
     }
+  }
+
+  if (options.skipOllama) {
+    spinner.info('Skipping Ollama local model setup (--skip-ollama)');
+  } else {
+    await installOllamaStep(spinner, plat);
   }
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)
