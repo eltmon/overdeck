@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent } from "./events"
+import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent, SystemHeartbeatEvent } from "./events"
+import { INITIAL_READ_MODEL_STATE, applyEvent } from "./event-reducers"
 
 const decodeAgentContextSaturationChangedEvent = Schema.decodeUnknownSync(AgentContextSaturationChangedEvent)
 const decodeOperatorInterventionEvent = Schema.decodeUnknownSync(OperatorInterventionEvent)
 const decodeSubstrateBugFiledEvent = Schema.decodeUnknownSync(SubstrateBugFiledEvent)
 const encodeSubstrateBugFiledEvent = Schema.encodeSync(SubstrateBugFiledEvent)
+const decodeSystemHeartbeatEvent = Schema.decodeUnknownSync(SystemHeartbeatEvent)
 const decodeDomainEvent = Schema.decodeUnknownSync(DomainEvent)
 
 const operatorInterventionKinds = [
@@ -55,6 +57,21 @@ describe("AgentContextSaturationChangedEvent", () => {
     expect(decodeDomainEvent(setEvent)).toEqual(setEvent)
     expect(decodeAgentContextSaturationChangedEvent(clearEvent)).toEqual(clearEvent)
     expect(decodeDomainEvent(clearEvent)).toEqual(clearEvent)
+  })
+})
+
+describe("SystemHeartbeatEvent", () => {
+  it("decodes through DomainEvent and leaves the read model unchanged", () => {
+    const event = {
+      type: "system.heartbeat",
+      timestamp: "2026-06-07T03:10:00.000Z",
+      payload: { ts: 1780792200000 },
+    }
+
+    expect(decodeSystemHeartbeatEvent(event)).toEqual(event)
+    const decoded = decodeDomainEvent(event)
+    expect(decoded).toEqual(event)
+    expect(applyEvent(INITIAL_READ_MODEL_STATE, decoded)).toBe(INITIAL_READ_MODEL_STATE)
   })
 })
 
