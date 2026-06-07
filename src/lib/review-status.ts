@@ -231,16 +231,34 @@ export function setReviewStatusSync(
   }
   while (history.length > 10) history.shift();
 
-  // PAN-1048: readyForMerge is only set explicitly by the ship role after
-  // rebase/verify/push. Auto-derivation from review+test gate status is removed —
-  // the ship role is the single authority.
+  // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
+  // write, so it flips the instant review+test+verification pass instead of waiting
+  // for a deacon patrol or a startup `fixStuckReadyForMerge` reconcile (those become
+  // redundant safety nets). This supersedes the PAN-1048 explicit-only model.
+  //
+  // Deriving from gates here does NOT bypass the "rebased onto main + verified"
+  // guarantee: `triggerMerge()` performs the authoritative post-rebase quality gate
+  // before it actually merges (see verificationSatisfied's note). The gate predicate
+  // mirrors `fixStuckReadyForMerge` so behaviour is identical — just immediate.
+  //
+  // Explicit caller intent still wins (the merge flow sets readyForMerge=false when a
+  // merge starts; mergeStatus then leaves pending/queued so the derive agrees).
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const gatesPassed =
+    merged.reviewStatus === 'passed' &&
+    (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
+    verificationSatisfied(merged) &&
+    (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&
+    (merged.mergeStatus === 'pending' ||
+      merged.mergeStatus === 'queued' ||
+      merged.mergeStatus === undefined ||
+      merged.mergeStatus === null);
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : merged.readyForMerge ?? false);
+        : gatesPassed);
 
   const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,

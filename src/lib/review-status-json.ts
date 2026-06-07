@@ -79,14 +79,26 @@ export function setReviewStatusSync(
   }
   while (history.length > 10) history.shift();
 
-  // PAN-1048: readyForMerge is only set explicitly by the ship role.
+  // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
+  // write (mirrors the SQLite path in review-status.ts and the fixStuckReadyForMerge
+  // predicate). Explicit caller intent still wins; triggerMerge() remains the
+  // authoritative post-rebase gate. Supersedes the PAN-1048 explicit-only model.
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const gatesPassed =
+    merged.reviewStatus === 'passed' &&
+    (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
+    merged.verificationStatus !== 'failed' &&
+    (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&
+    (merged.mergeStatus === 'pending' ||
+      merged.mergeStatus === 'queued' ||
+      merged.mergeStatus === undefined ||
+      merged.mergeStatus === null);
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : merged.readyForMerge ?? false);
+        : gatesPassed);
 
   const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
