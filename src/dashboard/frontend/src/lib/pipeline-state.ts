@@ -6,7 +6,7 @@ type PipelineStateLike = {
   reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus?: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
+  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   updatedAt?: string;
@@ -59,6 +59,7 @@ export function isReviewPipelineStuck(status?: PipelineStateLike | null): boolea
     status.testStatus === 'failed' ||
     status.testStatus === 'dispatch_failed' ||
     status.inspectStatus === 'failed' ||
+    status.inspectStatus === 'error' ||
     status.uatStatus === 'failed' ||
     status.verificationStatus === 'failed'
   );
@@ -155,7 +156,8 @@ export function getPipelineIssuePhase(
     reviewStatus?.verificationStatus === 'failed' ||
     reviewStatus?.inspectStatus === 'inspecting' ||
     reviewStatus?.inspectStatus === 'passed' ||
-    reviewStatus?.inspectStatus === 'failed'
+    reviewStatus?.inspectStatus === 'failed' ||
+    reviewStatus?.inspectStatus === 'error'
   ) {
     return 'review';
   }
