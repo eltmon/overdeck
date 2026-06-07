@@ -20,6 +20,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
+import { checkOllamaEndpointReachable, isOllamaInstalled, resolveOllamaBaseUrl } from '../../lib/ollama.js';
 
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
 // Bump in lockstep with packages/pi-extension API surface compatibility.
@@ -131,6 +132,41 @@ function readPiVersion(): string | null {
   } catch {
     return null;
   }
+}
+
+export async function checkOllama(): Promise<CheckResult[]> {
+  const installed = await isOllamaInstalled();
+  if (!installed) {
+    return [
+      {
+        name: 'Ollama',
+        status: 'warn',
+        message: 'Not installed (optional local model sidecar)',
+        fix: 'Install Ollama: Linux `curl -fsSL https://ollama.com/install.sh | sh`; macOS `brew install --cask ollama` or download from https://ollama.com/download',
+      },
+    ];
+  }
+
+  const baseUrl = resolveOllamaBaseUrl();
+  const reachable = await checkOllamaEndpointReachable(baseUrl);
+  if (!reachable) {
+    return [
+      {
+        name: 'Ollama',
+        status: 'warn',
+        message: `Installed but endpoint is not reachable at ${baseUrl}`,
+        fix: 'Start Ollama: `ollama serve`',
+      },
+    ];
+  }
+
+  return [
+    {
+      name: 'Ollama',
+      status: 'ok',
+      message: `Installed and reachable at ${baseUrl}`,
+    },
+  ];
 }
 
 export interface CheckResult {
@@ -597,6 +633,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
+
+  // Ollama (optional local model sidecar for Pi local-model runs).
+  for (const c of await checkOllama()) checks.push(c);
 
   // Check Panopticon directories
   const directories = [

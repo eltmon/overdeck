@@ -85,7 +85,7 @@ async function fetchOllamaTags(baseUrl: string): Promise<OllamaTagsResponse> {
   return response.json() as Promise<OllamaTagsResponse>;
 }
 
-async function isOllamaEndpointReachable(baseUrl: string): Promise<boolean> {
+export async function checkOllamaEndpointReachable(baseUrl: string = OLLAMA_BASE_URL): Promise<boolean> {
   try {
     await fetchOllamaTags(baseUrl);
     return true;
@@ -119,7 +119,7 @@ export async function ensureOllamaServeRunning(
   baseUrl: string = OLLAMA_BASE_URL,
   options: { startupTimeoutMs?: number } = {},
 ): Promise<void> {
-  if (await isOllamaEndpointReachable(baseUrl)) return;
+  if (await checkOllamaEndpointReachable(baseUrl)) return;
 
   if (!await isOllamaInstalled()) {
     throw new OllamaError({
