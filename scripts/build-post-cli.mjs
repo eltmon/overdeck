@@ -1,12 +1,24 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 
+// PAN-1659: build:docs-index is a heavy, repo-wide artifact (downloads the
+// gte-small embedding model, ~250-550% CPU per run, and 429s under HF rate
+// limiting). It indexes the docs — unrelated to whether an individual issue's
+// code is correct — yet ran on every `npm run build`, including per-issue CI.
+// Three concurrent per-issue builds once spiked the host to load 132/24 cores
+// and caused false verification failures. It is OPT-OUT: still built by default
+// (so publish/release via prepublishOnly + build-for-publish.mjs keep shipping a
+// fresh index), but skippable via SKIP_DOCS_INDEX=1 in per-issue CI/verification.
 const tasks = [
-  'build:docs-index',
   'build:scripts',
   'build:dashboard:frontend',
   'build:dashboard:server:bundle',
 ];
+if (process.env.SKIP_DOCS_INDEX !== '1') {
+  tasks.unshift('build:docs-index');
+} else {
+  console.log('[build-post-cli] SKIP_DOCS_INDEX=1 — skipping build:docs-index (PAN-1659)');
+}
 
 const children = new Map();
 let shuttingDown = false;

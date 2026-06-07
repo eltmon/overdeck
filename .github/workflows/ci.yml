@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+# PAN-1659: skip the heavy docs-index build in CI. The docs-RAG index is a
+# repo-wide, publish-time artifact (built by prepublishOnly / build-for-publish.mjs
+# on release) — it has nothing to do with verifying an individual issue's code,
+# and rebuilding it in every CI job (build/test/smoke) pegged CPU and 429'd on
+# HuggingFace. CI never publishes, so it never needs the index.
+env:
+  SKIP_DOCS_INDEX: '1'
+
 # NOTE: This workflow is a safety check ONLY. The primary verification gate runs in
 # Panopticon's verification-runner BEFORE PR creation. GitHub CI runs here for cross-developer
 # verification and as a secondary check. IMPORTANT: If tests fail here, they MUST feed back
