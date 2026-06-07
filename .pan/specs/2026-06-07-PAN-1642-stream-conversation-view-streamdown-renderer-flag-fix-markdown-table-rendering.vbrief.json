@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-07T03:19:27.101Z"
+    "updated": "2026-06-07T04:45:18.670Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 8,
+    "sequence": 18,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-07T03:19:27.101Z",
+    "updated": "2026-06-07T04:45:18.670Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -443,56 +443,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1642-stream-conversation-view-streamdown-renderer-flag-fix-markdown-table-rendering.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T03:19:27.093Z",
+        "updatedAt": "2026-06-07T04:45:18.662Z",
         "work": {
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "status": "failed",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
+          "notes": "Verification FAILED at test (28715ms):\n\nded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 2 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mwarns and asks for confirmation when the issue is not verifying-on-main\n\u001b[31m\u001b[1mAssertionError\u001b[22m: promise resolved \"undefined\" instead of rejecting\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nError {\n  \"message\": \"rejected promise\",\n}\n\n\u001b[31m+ Received:\u001b[39m\nundefined\n\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m82:50\u001b[22m\u001b[39m\n    \u001b[90m 80|\u001b[39m\n    \u001b[90m 81|\u001b[39m   it('warns and asks for confirmation when the issue is not verifying-…\n    \u001b[90m 82|\u001b[39m     await expect(closeOutCommand('PAN-1190', {})).rejects.toThrow('pro…\n    \u001b[90m   |\u001b[39m                                                  \u001b[31m^\u001b[39m\n    \u001b[90m 83|\u001b[39m\n    \u001b[90m 84|\u001b[39m     const output = vi.mocked(console.log).mock.calls.map(call => Strin…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mskips the confirmation prompt when --force is used\n\u001b[31m\u001b[1mAssertionError\u001b[22m: promise resolved \"undefined\" instead of rejecting\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nError {\n  \"message\": \"rejected promise\",\n}\n\n\u001b[31m+ Received:\u001b[39m\nundefined\n\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m96:63\u001b[22m\u001b[39m\n    \u001b[90m 94|\u001b[39m\n    \u001b[90m 95|\u001b[39m   it('skips the confirmation prompt when --force is used', async () =>…\n    \u001b[90m 96|\u001b[39m     await expect(closeOutCommand('PAN-1190', { force: true })).rejects…\n    \u001b[90m   |\u001b[39m                                                               \u001b[31m^\u001b[39m\n    \u001b[90m 97|\u001b[39m\n    \u001b[90m 98|\u001b[39m     \u001b[34mexpect\u001b[39m(mocks\u001b[33m.\u001b[39mcreateInterface)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-07T03:19:27.093Z"
+              "status": "failed",
+              "at": "2026-06-07T04:45:18.662Z",
+              "notes": "Verification FAILED at test (28715ms):\n\nded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 2 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mwarns and asks for confirmation when the issue is not verifying-on-main\n\u001b[31m\u001b[1mAssertionError\u001b[22m: promise resolved \"undefined\" instead of rejecting\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nError {\n  \"message\": \"rejected promise\",\n}\n\n\u001b[31m+ Received:\u001b[39m\nundefined\n\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m82:50\u001b[22m\u001b[39m\n    \u001b[90m 80|\u001b[39m\n    \u001b[90m 81|\u001b[39m   it('warns and asks for confirmation when the issue is not verifying-…\n    \u001b[90m 82|\u001b[39m     await expect(closeOutCommand('PAN-1190', {})).rejects.toThrow('pro…\n    \u001b[90m   |\u001b[39m                                                  \u001b[31m^\u001b[39m\n    \u001b[90m 83|\u001b[39m\n    \u001b[90m 84|\u001b[39m     const output = vi.mocked(console.log).mock.calls.map(call => Strin…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/close.test.ts\u001b[2m > \u001b[22mcloseOutCommand\u001b[2m > \u001b[22mskips the confirmation prompt when --force is used\n\u001b[31m\u001b[1mAssertionError\u001b[22m: promise resolved \"undefined\" instead of rejecting\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\nError {\n  \"message\": \"rejected promise\",\n}\n\n\u001b[31m+ Received:\u001b[39m\nundefined\n\n\u001b[36m \u001b[2m❯\u001b[22m src/cli/commands/__tests__/close.test.ts:\u001b[2m96:63\u001b[22m\u001b[39m\n    \u001b[90m 94|\u001b[39m\n    \u001b[90m 95|\u001b[39m   it('skips the confirmation prompt when --force is used', async () =>…\n    \u001b[90m 96|\u001b[39m     await expect(closeOutCommand('PAN-1190', { force: true })).rejects…\n    \u001b[90m   |\u001b[39m                                                               \u001b[31m^\u001b[39m\n    \u001b[90m 97|\u001b[39m\n    \u001b[90m 98|\u001b[39m     \u001b[34mexpect\u001b[39m(mocks\u001b[33m.\u001b[39mcreateInterface)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "status": "blocked",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
+          "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T03:19:27.093Z"
+              "status": "blocked",
+              "at": "2026-06-07T04:45:18.662Z",
+              "notes": "Tight loop: Stream.succeed discovering event spins client subscription in ws-rpc.ts:603"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T03:19:27.093Z"
+              "at": "2026-06-07T04:45:18.662Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T03:19:27.093Z",
+          "updatedAt": "2026-06-07T04:45:18.662Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T03:19:27.093Z"
+              "at": "2026-06-07T04:45:18.662Z"
             }
           ],
           "readyForMerge": false,
