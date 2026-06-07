@@ -66,6 +66,10 @@ function createAgent(name: string, status?: string, lastActivity?: string): stri
   return agentDir;
 }
 
+function writeRuntime(agentDir: string, runtime: Record<string, unknown>): void {
+  writeFileSync(join(agentDir, 'runtime.json'), JSON.stringify(runtime, null, 2));
+}
+
 // Helpers that register/deregister in the mock set (no real tmux calls)
 function createTmuxSession(name: string): void {
   activeSessions.add(name);
@@ -157,6 +161,30 @@ describe('health-api', () => {
         expect(result).not.toBeNull();
         expect(result?.status).toBe('healthy');
         expect(result?.reason).toBeUndefined();
+      } finally {
+        killTmuxSession(agentName);
+      }
+    });
+
+    it('should show wedged for alive context-saturated agents even with recent activity', async () => {
+      const agentName = 'agent-wedged-test';
+      const agentDir = createAgent(agentName, 'running', new Date().toISOString());
+      writeRuntime(agentDir, {
+        lastActivity: new Date().toISOString(),
+        contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+      });
+      createTmuxSession(agentName);
+
+      try {
+        const result = await runDetermineHealthStatus(
+          agentName,
+          join(agentDir, 'state.json'),
+          activeSessions
+        );
+
+        expect(result).not.toBeNull();
+        expect(result?.status).toBe('wedged');
+        expect(result?.reason).toContain('Context window exhausted');
       } finally {
         killTmuxSession(agentName);
       }

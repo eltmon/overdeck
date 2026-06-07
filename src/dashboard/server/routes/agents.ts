@@ -1348,6 +1348,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 //   {kind: "model_set",         model, claudeSessionId?}
 //   {kind: "resolution_set",    resolution, resolutionCount}
 //   {kind: "current_issue_set", currentIssue?}
+//   {kind: "context_saturation_changed", contextSaturatedAt?}
 
 function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
   return Effect.gen(function* () {

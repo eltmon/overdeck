@@ -53,6 +53,7 @@ const RUNTIME_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent.model_set',
   'agent.current_issue_set',
   'agent.resolution_changed',
+  'agent.context_saturation_changed',
   'agent.state_restored',
   // Lifecycle event: pan kill bypasses the Stop hook, so the reducer folds
   // agent.stopped into the runtime snapshot to prevent "idle forever" ghosts.

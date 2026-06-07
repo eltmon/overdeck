@@ -1936,6 +1936,7 @@ export interface AgentRuntimeState {
   waitingReason?: string;
   waitingStartedAt?: string;
   waitingNotification?: string;
+  contextSaturatedAt?: string;
 }
 
 function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
@@ -1963,6 +1964,7 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     waitingReason: snap.waiting?.reason,
     waitingStartedAt: snap.waiting?.startedAt,
     waitingNotification: snap.waiting?.message,
+    contextSaturatedAt: snap.contextSaturatedAt,
   };
 }
 
@@ -1982,6 +1984,29 @@ export const getAgentRuntimeState = (agentId: string): Effect.Effect<AgentRuntim
     const snap = yield* fetchAgentRuntimeSnapshot(agentId);
     return snapshotToRuntimeState(snap);
   });
+
+async function patchRuntimeJson(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
+  const agentDir = getAgentDir(agentId);
+  const runtimeFile = join(agentDir, 'runtime.json');
+  let runtime: Record<string, unknown> = {};
+
+  try {
+    runtime = JSON.parse(await readFile(runtimeFile, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    runtime = {};
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+    if (patch.contextSaturatedAt === undefined) {
+      delete runtime.contextSaturatedAt;
+    } else {
+      runtime.contextSaturatedAt = patch.contextSaturatedAt;
+    }
+  }
+
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(runtimeFile, JSON.stringify(runtime, null, 2));
+}
 
 /**
  * Emit events derived from a legacy-shape patch. Callers gradually migrate to
@@ -2031,6 +2056,14 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
         claudeSessionId: patch.claudeSessionId,
       }));
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+    await patchRuntimeJson(agentId, patch);
+    await Effect.runPromise(emitAgentEvent(agentId, {
+      kind: 'context_saturation_changed',
+      contextSaturatedAt: patch.contextSaturatedAt,
+    }));
   }
 }
 

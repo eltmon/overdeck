@@ -22,7 +22,7 @@ export type RuntimeName = 'claude-code' | 'pi' | 'codex';
 /**
  * Health state of an agent
  */
-export type HealthState = 'active' | 'stale' | 'warning' | 'stuck';
+export type HealthState = 'active' | 'stale' | 'warning' | 'stuck' | 'wedged';
 
 /**
  * Source of activity detection

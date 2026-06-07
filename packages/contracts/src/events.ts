@@ -296,6 +296,17 @@ export const AgentCurrentIssueSetEvent = Schema.Struct({
 })
 export type AgentCurrentIssueSetEvent = typeof AgentCurrentIssueSetEvent.Type
 
+export const AgentContextSaturationChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.context_saturation_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    contextSaturatedAt: Schema.optional(Schema.String),
+  }),
+})
+export type AgentContextSaturationChangedEvent = typeof AgentContextSaturationChangedEvent.Type
+
 export const AgentResolutionChangedEvent = Schema.Struct({
   type: Schema.Literal("agent.resolution_changed"),
   sequence: SequenceNumber,
@@ -1070,6 +1081,7 @@ export const DomainEvent = Schema.Union([
   AgentChannelReplyEvent,
   AgentModelSetEvent,
   AgentCurrentIssueSetEvent,
+  AgentContextSaturationChangedEvent,
   AgentResolutionChangedEvent,
   AgentStateRestoredEvent,
   AgentTurnDiffCompletedEvent,

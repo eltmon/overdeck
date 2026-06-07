@@ -106,7 +106,7 @@ describe('computeContextUsage', () => {
     expect(result).toMatchObject({
       activeBytes: buffer.length,
       estimatedTokens: 5_000,
-      contextWindow: 1_050_000,
+      contextWindow: 200_000,
     });
   });
 
