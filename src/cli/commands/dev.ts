@@ -435,15 +435,31 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // reconnect (PAN-1580) so the browser tab recovers on its own.
   const rebuildServerBundle = (): Promise<boolean> =>
     new Promise((resolve) => {
-      const build = spawn('npm', ['run', 'build:dashboard:server'], {
+      let settled = false;
+      // PAN-1664: use the NON-destructive hot build. The normal build:dashboard:server
+      // runs build:contracts which `rmrf`s packages/contracts/dist (and tsdown cleans
+      // it) — deleting index.mjs out from under the running Vite frontend, which 404s
+      // the @panctl/contracts module and wedges open tabs on "Reconnecting…".
+      // build:dashboard:server:hot + PAN_HOT_RELOAD=1 overwrites dist in place instead.
+      const build = spawn('npm', ['run', 'build:dashboard:server:hot'], {
         cwd: join(__dirname, '..', '..'),
         stdio: 'pipe',
-        env: { ...process.env, SKIP_DOCS_INDEX: '1' },
+        env: { ...process.env, SKIP_DOCS_INDEX: '1', PAN_HOT_RELOAD: '1' },
       });
+      // PAN-1664: bound the build so a hung rebuild can never leave the promise
+      // unresolved (which would wedge the reloadApi single-flight flag forever).
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        console.error(chalk.red('[pan dev] server rebuild timed out (120s) — aborting reload'));
+        try { build.kill('SIGKILL'); } catch { /* ignore */ }
+        resolve(false);
+      }, 120_000);
+      const done = (ok: boolean) => { if (settled) return; settled = true; clearTimeout(timer); resolve(ok); };
       build.stdout?.on('data', (d) => process.stdout.write(chalk.dim(`[reload] ${d}`)));
       build.stderr?.on('data', (d) => process.stderr.write(chalk.dim(`[reload] ${d}`)));
-      build.on('error', () => resolve(false));
-      build.on('close', (code) => resolve(code === 0));
+      build.on('error', () => done(false));
+      build.on('close', (code) => done(code === 0));
     });
 
   const reloadApi = async (reason: string): Promise<void> => {
