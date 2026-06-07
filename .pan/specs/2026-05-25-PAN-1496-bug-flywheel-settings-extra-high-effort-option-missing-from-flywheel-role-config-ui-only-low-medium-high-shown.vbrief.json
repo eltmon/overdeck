@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:25:39Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1496: bug(flywheel-settings): 'extra-high' effort option missing from Flywheel role config UI (only low/medium/high shown)",
-    "updated": "2026-06-07T05:59:32.852Z"
+    "updated": "2026-06-07T06:06:50.715Z"
   },
   "plan": {
     "id": "pan-1496",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ac1d906c-2a18-471f-96f1-dd6d6e860204",
     "author": "agent:claude-opus-4-7",
-    "sequence": 43,
+    "sequence": 45,
     "created": "2026-05-25T16:25:39Z",
-    "updated": "2026-06-07T06:00:56.941Z",
+    "updated": "2026-06-07T06:06:50.715Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1496",
@@ -30,8 +30,8 @@
       "bugfix"
     ],
     "narratives": {
-      "Problem": "Operators cannot select the 'extra-high' or 'max' thinking-budget tier for the Flywheel orchestrator from Settings \u2192 Roles \u2192 Flywheel. The role config dropdown renders only low/medium/high because both FlywheelEffort (Schema.Literals in @panctl/contracts) and RoleEffort (src/lib/config-yaml.ts) cap at 'high'. Meanwhile the conversation composer EffortPicker (src/dashboard/frontend/src/components/chat/EffortPicker.tsx) already exposes five tiers \u2014 low, medium, high, xhigh, max \u2014 so the Flywheel role config is the lone holdout. The chosen Flywheel effort propagates through Cloister \u2192 spawnRun \u2192 getRoleRuntimeBaseCommand which passes `--effort <level>` directly to the claude CLI, so widening the literal at the contract and config layers is enough to unlock the new tiers end-to-end.",
-      "Proposal": "Widen the effort literal across the contract package and the canonical RoleEffort type to ['low', 'medium', 'high', 'xhigh', 'max'], matching the chat EffortPicker IDs exactly. Update every validator (settings-api, config-yaml) and inline duplicate type declaration so typecheck passes. Add the two new <option> tags to the Flywheel effort <select> in RolesPanel. Keep the default Flywheel effort at 'high' so existing operators see no behavior change. Do NOT add model-aware availableLevels gating in RolesPanel (out of scope; chat composer has that, RolesPanel does not). Do NOT add a `pan flywheel start --effort` flag \u2014 Flywheel reads effort from settings; only `pan plan --effort` and `pan strike --effort` (which already exist) get their help strings widened. The work is decomposed into 9 small beads with B1 (the @panctl/contracts FlywheelEffort widening) as the inspected foundation."
+      "Problem": "Operators cannot select the 'extra-high' or 'max' thinking-budget tier for the Flywheel orchestrator from Settings → Roles → Flywheel. The role config dropdown renders only low/medium/high because both FlywheelEffort (Schema.Literals in @panctl/contracts) and RoleEffort (src/lib/config-yaml.ts) cap at 'high'. Meanwhile the conversation composer EffortPicker (src/dashboard/frontend/src/components/chat/EffortPicker.tsx) already exposes five tiers — low, medium, high, xhigh, max — so the Flywheel role config is the lone holdout. The chosen Flywheel effort propagates through Cloister → spawnRun → getRoleRuntimeBaseCommand which passes `--effort <level>` directly to the claude CLI, so widening the literal at the contract and config layers is enough to unlock the new tiers end-to-end.",
+      "Proposal": "Widen the effort literal across the contract package and the canonical RoleEffort type to ['low', 'medium', 'high', 'xhigh', 'max'], matching the chat EffortPicker IDs exactly. Update every validator (settings-api, config-yaml) and inline duplicate type declaration so typecheck passes. Add the two new <option> tags to the Flywheel effort <select> in RolesPanel. Keep the default Flywheel effort at 'high' so existing operators see no behavior change. Do NOT add model-aware availableLevels gating in RolesPanel (out of scope; chat composer has that, RolesPanel does not). Do NOT add a `pan flywheel start --effort` flag — Flywheel reads effort from settings; only `pan plan --effort` and `pan strike --effort` (which already exist) get their help strings widened. The work is decomposed into 9 small beads with B1 (the @panctl/contracts FlywheelEffort widening) as the inspected foundation."
     },
     "autoDecisions": [
       {
@@ -44,11 +44,11 @@
       },
       {
         "summary": "Keep default Flywheel effort at 'high' rather than promoting to 'xhigh'.",
-        "rationale": "The issue text explicitly says 'Not urgent \u2014 operator can run the flywheel at high for now'. Silently moving the default to a higher thinking budget would change runtime cost without operator consent."
+        "rationale": "The issue text explicitly says 'Not urgent — operator can run the flywheel at high for now'. Silently moving the default to a higher thinking budget would change runtime cost without operator consent."
       },
       {
         "summary": "No model-aware availableLevels gating in RolesPanel.",
-        "rationale": "RolesPanel currently renders the three effort options unconditionally regardless of which Flywheel model is selected; chat composer's per-model gating is not mirrored here today. Adding gating now is scope creep relative to a 'dropdown is missing two options' bug. If a model doesn't accept the chosen tier, Claude Code silently caps \u2014 pre-existing behavior. Hazard H4 documents this for follow-up."
+        "rationale": "RolesPanel currently renders the three effort options unconditionally regardless of which Flywheel model is selected; chat composer's per-model gating is not mirrored here today. Adding gating now is scope creep relative to a 'dropdown is missing two options' bug. If a model doesn't accept the chosen tier, Claude Code silently caps — pre-existing behavior. Hazard H4 documents this for follow-up."
       },
       {
         "summary": "No new `pan flywheel start --effort` CLI flag.",
@@ -81,7 +81,7 @@
           ]
         },
         "narrative": {
-          "Action": "In packages/contracts/src/flywheel.ts: (1) widen `FlywheelEffort = Schema.Literals([\"low\", \"medium\", \"high\"])` to `Schema.Literals([\"low\", \"medium\", \"high\", \"xhigh\", \"max\"])`; (2) widen the matching interface field `effort: \"low\" | \"medium\" | \"high\"` on FlywheelOrchestrator to `\"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\"`; (3) export a named type alias `FlywheelEffortValue = typeof FlywheelEffort.Type` to give downstream packages a single import surface. Then rebuild the contracts package (`cd packages/contracts && npm run build`) so the new dist is consumable by the dashboard server and the frontend. This bead is the foundation \u2014 every downstream bead consumes the widened type."
+          "Action": "In packages/contracts/src/flywheel.ts: (1) widen `FlywheelEffort = Schema.Literals([\"low\", \"medium\", \"high\"])` to `Schema.Literals([\"low\", \"medium\", \"high\", \"xhigh\", \"max\"])`; (2) widen the matching interface field `effort: \"low\" | \"medium\" | \"high\"` on FlywheelOrchestrator to `\"low\" | \"medium\" | \"high\" | \"xhigh\" | \"max\"`; (3) export a named type alias `FlywheelEffortValue = typeof FlywheelEffort.Type` to give downstream packages a single import surface. Then rebuild the contracts package (`cd packages/contracts && npm run build`) so the new dist is consumable by the dashboard server and the frontend. This bead is the foundation — every downstream bead consumes the widened type."
         },
         "subItems": [
           {
@@ -147,7 +147,7 @@
           },
           {
             "id": "b2-role-effort-config-yaml.ac3",
-            "title": "Validator error message text is updated so it no longer claims 'must be low, medium, or high' \u2014 the new text enumerates all five tiers",
+            "title": "Validator error message text is updated so it no longer claims 'must be low, medium, or high' — the new text enumerates all five tiers",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -208,7 +208,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Replace inline `effort?: 'low' | 'medium' | 'high'` declarations with `effort?: RoleEffort` imports: (1) src/lib/agents.ts line 358 (getRoleRuntimeBaseCommand parameter) and line 1990 (SpawnRunOptions field); (2) src/lib/planning/spawn-planning-session.ts line 121 and line 165. The actual runtime behavior \u2014 passing `--effort ${effort}` to the claude CLI \u2014 is unchanged; this bead is type-level alignment so typecheck passes after B1 and B2 widen the literal."
+          "Action": "Replace inline `effort?: 'low' | 'medium' | 'high'` declarations with `effort?: RoleEffort` imports: (1) src/lib/agents.ts line 358 (getRoleRuntimeBaseCommand parameter) and line 1990 (SpawnRunOptions field); (2) src/lib/planning/spawn-planning-session.ts line 121 and line 165. The actual runtime behavior — passing `--effort ${effort}` to the claude CLI — is unchanged; this bead is type-level alignment so typecheck passes after B1 and B2 widen the literal."
         },
         "subItems": [
           {
@@ -249,7 +249,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "In src/cli/index.ts: (1) update the `--effort` option description on line 369 (`Planning effort: low | medium | high`) and line 520 (`Strike effort: low | medium | high (default medium)`) to enumerate all five tiers \u2014 `low | medium | high | xhigh | max`; (2) widen the inline action signature at line 522. In src/cli/commands/plan.ts line 9 and src/cli/commands/strike.ts line 16, replace inline `'low' | 'medium' | 'high'` with `RoleEffort` import from src/lib/config-yaml. Do NOT add a `pan flywheel start --effort` flag \u2014 that does not exist today and is out of scope per D4."
+          "Action": "In src/cli/index.ts: (1) update the `--effort` option description on line 369 (`Planning effort: low | medium | high`) and line 520 (`Strike effort: low | medium | high (default medium)`) to enumerate all five tiers — `low | medium | high | xhigh | max`; (2) widen the inline action signature at line 522. In src/cli/commands/plan.ts line 9 and src/cli/commands/strike.ts line 16, replace inline `'low' | 'medium' | 'high'` with `RoleEffort` import from src/lib/config-yaml. Do NOT add a `pan flywheel start --effort` flag — that does not exist today and is out of scope per D4."
         },
         "subItems": [
           {
@@ -262,7 +262,7 @@
           },
           {
             "id": "b5-cli-effort-flag-strings.ac2",
-            "title": "`pan strike <ids\u2026> --effort xhigh` and `--effort max` parse and reach the spawnRun call site at the action handler",
+            "title": "`pan strike <ids…> --effort xhigh` and `--effort max` parse and reach the spawnRun call site at the action handler",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -290,12 +290,12 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx: (1) widen `type Effort = 'low' | 'medium' | 'high'` at line 10 to include 'xhigh' and 'max' (or import the widened type from contracts/config-yaml \u2014 pick whichever matches the existing import pattern in this file); (2) inside the Flywheel effort <select> block at lines 526-536, add two new <option> tags after the existing 'high' option: `<option value=\"xhigh\">Extra High</option>` and `<option value=\"max\">Max</option>`. Match the casing/labels used by EffortPicker.tsx so the operator sees the same choices in both places. This is the user-visible bug fix anchor."
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx: (1) widen `type Effort = 'low' | 'medium' | 'high'` at line 10 to include 'xhigh' and 'max' (or import the widened type from contracts/config-yaml — pick whichever matches the existing import pattern in this file); (2) inside the Flywheel effort <select> block at lines 526-536, add two new <option> tags after the existing 'high' option: `<option value=\"xhigh\">Extra High</option>` and `<option value=\"max\">Max</option>`. Match the casing/labels used by EffortPicker.tsx so the operator sees the same choices in both places. This is the user-visible bug fix anchor."
         },
         "subItems": [
           {
             "id": "b6-roles-panel-effort-options.ac1",
-            "title": "Settings \u2192 Roles \u2192 Flywheel role card renders a 'Flywheel effort' select with exactly five options in this order: Low, Medium, High, Extra High, Max",
+            "title": "Settings → Roles → Flywheel role card renders a 'Flywheel effort' select with exactly five options in this order: Low, Medium, High, Extra High, Max",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -311,7 +311,7 @@
           },
           {
             "id": "b6-roles-panel-effort-options.ac3",
-            "title": "Existing RolesPanel.test.tsx default-value assertion (`Flywheel effort` toHaveValue 'high') continues to pass \u2014 the saved default is unchanged",
+            "title": "Existing RolesPanel.test.tsx default-value assertion (`Flywheel effort` toHaveValue 'high') continues to pass — the saved default is unchanged",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -319,7 +319,7 @@
           },
           {
             "id": "b6-roles-panel-effort-options.ac4",
-            "title": "When the Flywheel orchestrator is then spawned via `pan flywheel start`, the resulting claude command line contains `--effort xhigh` (or `--effort max`) \u2014 verifiable by inspecting the launched tmux session's command or the spawnRun call args",
+            "title": "When the Flywheel orchestrator is then spawned via `pan flywheel start`, the resulting claude command line contains `--effort xhigh` (or `--effort max`) — verifiable by inspecting the launched tmux session's command or the spawnRun call args",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -339,7 +339,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/PlanDialog.tsx line 103 (`useState<'low' | 'medium' | 'high'>('medium')`), widen the generic to include 'xhigh' and 'max'. In src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx line 40 (`effort?: 'low' | 'medium' | 'high'`), widen the optional prop. Default values remain unchanged. PlanDialog's <select> can optionally surface the new options if it already mirrors EffortPicker, but adding UI options there is a separate concern \u2014 at minimum, type-widen so the state can hold the new values when imported from a parent. Confirm by inspection whether the picker UI already gates choices; if it does, no UI change needed; if it lists three hard-coded options, leave them as-is (out of scope for this bug)."
+          "Action": "In src/dashboard/frontend/src/components/PlanDialog.tsx line 103 (`useState<'low' | 'medium' | 'high'>('medium')`), widen the generic to include 'xhigh' and 'max'. In src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx line 40 (`effort?: 'low' | 'medium' | 'high'`), widen the optional prop. Default values remain unchanged. PlanDialog's <select> can optionally surface the new options if it already mirrors EffortPicker, but adding UI options there is a separate concern — at minimum, type-widen so the state can hold the new values when imported from a parent. Confirm by inspection whether the picker UI already gates choices; if it does, no UI change needed; if it lists three hard-coded options, leave them as-is (out of scope for this bug)."
         },
         "subItems": [
           {
@@ -400,7 +400,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Add three layers of regression coverage so a future revert of any one bead fails CI: (1) Contract decode test \u2014 packages/contracts/src/__tests__ (or wherever flywheel contract tests live) verifies `Schema.decodeUnknownSync(FlywheelEffort)` accepts all five values and rejects an unknown one like 'extreme'. (2) Settings API positive-path test \u2014 extend src/lib/__tests__/settings-api.test.ts to assert validateSettings accepts xhigh and max with zero errors. (3) UI test \u2014 extend src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx to assert the Flywheel effort select renders five <option> elements with values low/medium/high/xhigh/max and labels matching EffortPicker. Do not assert the default \u2014 the existing test already covers that."
+          "Action": "Add three layers of regression coverage so a future revert of any one bead fails CI: (1) Contract decode test — packages/contracts/src/__tests__ (or wherever flywheel contract tests live) verifies `Schema.decodeUnknownSync(FlywheelEffort)` accepts all five values and rejects an unknown one like 'extreme'. (2) Settings API positive-path test — extend src/lib/__tests__/settings-api.test.ts to assert validateSettings accepts xhigh and max with zero errors. (3) UI test — extend src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx to assert the Flywheel effort select renders five <option> elements with values low/medium/high/xhigh/max and labels matching EffortPicker. Do not assert the default — the existing test already covers that."
         },
         "subItems": [
           {
@@ -511,31 +511,29 @@
         "phase": "work",
         "issueId": "PAN-1496",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T05:59:32.833Z",
+        "updatedAt": "2026-06-07T06:06:50.712Z",
         "work": {
-          "updatedAt": "2026-06-07T05:59:32.833Z",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-07T05:59:32.833Z",
-          "notes": "Acceptance criteria check FAILED \u2014 5/26 AC incomplete:\n\n### Widen FlywheelEffort schema literal in @panctl/contracts to include 'xhigh' and 'max' (3/3 incomplete)\n  - [ ] FlywheelEffort.Schema decodes 'xhigh' and 'max' without error and continues to decode 'low', 'medium', 'high'\n  - [ ] FlywheelOrchestrator interface's `effort` field type union includes all five literals; typecheck passes against the new union in both the contracts package and any consumer that imports FlywheelOrchestrator\n  - [ ] `cd packages/contracts && npm run build` succeeds and the new dist exposes the widened literal (verifiable by importing FlywheelEffort from @panctl/contracts in a sibling file)\n\n### Widen inline effort types in PlanDialog and FlywheelConversationPane frontend components (2/2 incomplete)\n  - [ ] PlanDialog effort state type accepts 'xhigh' and 'max' at the type level; the component compiles under `npm run typecheck`\n  - [ ] FlywheelConversationPane's `effort?` prop type accepts all five tiers; consumer call sites compile",
+          "status": "passed",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-07T05:59:32.833Z",
-              "notes": "Acceptance criteria check FAILED \u2014 5/26 AC incomplete:\n\n### Widen FlywheelEffort schema literal in @panctl/contracts to include 'xhigh' and 'max' (3/3 incomplete)\n  - [ ] FlywheelEffort.Schema decodes 'xhigh' and 'max' without error and continues to decode 'low', 'medium', 'high'\n  - [ ] FlywheelOrchestrator interface's `effort` field type union includes all five literals; typecheck passes against the new union in both the contracts package and any consumer that imports FlywheelOrchestrator\n  - [ ] `cd packages/contracts && npm run build` succeeds and the new dist exposes the widened literal (verifiable by importing FlywheelEffort from @panctl/contracts in a sibling file)\n\n### Widen inline effort types in PlanDialog and FlywheelConversationPane frontend components (2/2 incomplete)\n  - [ ] PlanDialog effort state type accepts 'xhigh' and 'max' at the type level; the component compiles under `npm run typecheck`\n  - [ ] FlywheelConversationPane's `effort?` prop type accepts all five tiers; consumer call sites compile"
+              "status": "passed",
+              "at": "2026-06-07T06:06:50.712Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:59:32.833Z",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:59:32.833Z",
+              "at": "2026-06-07T06:06:50.712Z",
               "notes": "All 4 reviewers: 0 blockers, 0 findings. Requirements 100% complete (14/14 AC). Typecheck, lint, tests clean."
             }
           ],
@@ -543,20 +541,20 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-07T05:59:32.833Z",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T05:59:32.833Z"
+              "at": "2026-06-07T06:06:50.712Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T05:59:32.833Z",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-07T05:59:32.833Z",
+          "updatedAt": "2026-06-07T06:06:50.712Z",
           "history": [],
           "readyForMerge": false
         }
