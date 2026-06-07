@@ -44,6 +44,7 @@ const AGENT_STATUS_DOT: Record<Agent['status'], string> = {
   healthy: 'bg-success',
   warning: 'bg-warning',
   stuck: 'bg-warning',
+  stalled: 'bg-warning',
   dead: 'bg-destructive',
   stopped: 'bg-popover',
   starting: 'bg-signal-review',
