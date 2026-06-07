@@ -1,0 +1,117 @@
+{
+  "version": "1",
+  "issueId": "PAN-1579",
+  "created": "2026-06-04T06:06:30.480Z",
+  "updated": "2026-06-06T20:42:07.979Z",
+  "gitState": {
+    "branch": "feature/pan-1579",
+    "sha": "b8960b6dc",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Introduce ONE shared SQLite driver adapter (src/lib/database/driver.ts) exporting openDatabase(path) plus SqliteDatabase/SqliteStatement types. It selects bun:sqlite under Bun and node:sqlite under Node — both runtime-bundled, ABI-proof — and presents a better-sqlite3-compatible surface (pragma, exec, prepare->{run,get,all,iterate}, transaction, close). All DB-open sites and all type-only imports route through this single module so better-sqlite3 can be deleted entirely.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D2",
+      "summary": "There are EIGHT independent runtime DB-open sites, not two: src/lib/database/index.ts (panopticon.db), src/lib/cloister/database.ts (cloister.db), src/lib/docs/query.ts + src/lib/docs/index-builder.ts (docs index, top-level default imports), src/lib/artifacts/index-store.ts, src/dashboard/server/services/cache-service.ts, src/lib/memory/fts-db.ts, src/lib/registry/feature-registry-storage.ts. Each gets migrated to openDatabase() in its own bead. Several (docs/*, artifacts, cache, registry) currently do a Node-only require('better-sqlite3') and would already throw under Bun — the adapter fixes Bun support for them as a side benefit.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D3",
+      "summary": "node:sqlite lacks pragma() and transaction(); the adapter shims both. pragma() reuses the existing bun:sqlite shim shape (exec for sets, prepare().get() for {simple:true} reads). transaction(fn) is implemented uniformly for BOTH runtimes inside the adapter via BEGIN/COMMIT/ROLLBACK with SAVEPOINT-based nesting (verified working), so semantics are identical regardless of runtime rather than delegating to bun:sqlite's native transaction.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Node engines floor bumps from >=22.0.0 to >=22.5.0 (node:sqlite was introduced in 22.5.0). Verified on the dev machine (Node 22.22.0): node:sqlite loads WITHOUT the --experimental-sqlite flag — it only emits an ExperimentalWarning — so no launch-path flag changes are required. The adapter suppresses ONLY that specific SQLite ExperimentalWarning at import time (targeted process.emitWarning filter), leaving all other warnings intact. Docs should recommend Node 22.16+ or Node 24 where node:sqlite is most stable.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D5",
+      "summary": "node:sqlite bundles FTS5 (verified: CREATE VIRTUAL TABLE ... USING fts5 succeeds) and StatementSync.iterate() exists on Node 22.22 — so memory/docs/conversations FTS search and the single .iterate() call site (discovered-sessions-db.ts:820) keep working with no SQL or call-site logic changes.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D6",
+      "summary": "node:sqlite returns BLOB columns as Uint8Array (better-sqlite3 returns Buffer). The existing embedding-read code (discovered-sessions-db.ts:825/878/894, index-builder.ts:383) already reads via .buffer/.byteOffset/.byteLength which are present on Uint8Array (Buffer extends Uint8Array), so reads are compatible. Writes bind Buffer via float32ArrayToBuffer() which node:sqlite/bun:sqlite both accept. TypeScript column types in the adapter should be Uint8Array, not Buffer, and any helper param typed Buffer that receives a query result should widen to Uint8Array.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D7",
+      "summary": "The native-sqlite-guard.ts self-heal (ensureNativeSqliteAbi) and its two call sites (src/cli/index.ts:1407, src/dashboard/server/main.ts:58) are deleted — there is no ABI to heal once better-sqlite3 is gone. Done as its own bead, independent of the adapter.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Capstone bead removes better-sqlite3 and @types/better-sqlite3 from package.json, removes 'better-sqlite3' from the tsdown external lists (src/dashboard/server/tsdown.config.ts and any root config), and updates stale comments/rules text. It is gated behind ALL migration + type-swap + test-migration + guard-removal beads, because package.json cannot drop the dependency until nothing imports it.",
+      "recordedAt": "2026-06-04T06:10:35.762Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "node:sqlite rejects raw boolean binds ('Provided value cannot be bound') whereas bun:sqlite coerces booleans to 0/1. A current scan found no raw boolean binds in DB call sites, but the adapter (or migration) must not silently introduce one.",
+      "mitigation": "Adapter does NOT auto-coerce booleans (keeps behavior strict and uniform). Work agent greps all .run/.get/.all binds for boolean literals/variables during migration; convert any to 0/1 explicitly. Add an adapter unit test asserting a boolean bind throws so the contract is documented."
+    },
+    {
+      "id": "H2",
+      "summary": "Very early Node 22.5.x patch releases required the --experimental-sqlite flag to load node:sqlite; without it require('node:sqlite') throws. The dev machine (22.22) does not, but a user on 22.5-22.6 might.",
+      "mitigation": "Wrap the node:sqlite require in try/catch; on a flag-required error throw a clear, actionable message (recommend Node 22.16+ or Node 24). Do NOT add --experimental-sqlite to every launch path — it would be a broad, fragile change across bin shebang/pty-supervisor/launchers. Document the recommended Node versions in engines + a comment."
+    },
+    {
+      "id": "H3",
+      "summary": "transaction() nesting: better-sqlite3 nests transactions via SAVEPOINTs. fts-db.ts:266 conditionally wraps (db.transaction(execute)()), and a nested call inside an outer transaction must not issue a bare BEGIN (SQLite errors on nested BEGIN).",
+      "mitigation": "Adapter transaction shim tracks depth: depth 0 uses BEGIN/COMMIT/ROLLBACK; depth >0 uses SAVEPOINT/RELEASE/ROLLBACK TO. Unit-test commit, rollback-on-throw, and a nested transaction that commits the outer and rolls back only the inner."
+    },
+    {
+      "id": "H4",
+      "summary": "Float32Array byte-alignment: new Float32Array(buf.buffer, buf.byteOffset, dim) requires byteOffset to be a multiple of 4. better-sqlite3 returned Buffers are views into a pooled ArrayBuffer; node:sqlite Uint8Array alignment may differ and an unaligned offset throws RangeError.",
+      "mitigation": "Add an embedding blob round-trip test under node:sqlite (write Float32Array -> read back -> assert values equal). If alignment ever bites, copy via Uint8Array.slice() before constructing the Float32Array view. Keep the existing dim-validated reader (bufferToFloat32Array) as the single read path."
+    },
+    {
+      "id": "H5",
+      "summary": "ExperimentalWarning noise: node:sqlite prints '(node) ExperimentalWarning: SQLite is an experimental feature' to stderr on first use, which would appear on every dashboard/CLI start and pollute logs and the terminal panel.",
+      "mitigation": "Adapter patches process.emitWarning at import time to swallow ONLY warnings where name==='ExperimentalWarning' && /SQLite/.test(message); all other warnings pass through unchanged. Scope the message match tightly so no future ExperimentalWarning is hidden."
+    },
+    {
+      "id": "H6",
+      "summary": "Four test files reference better-sqlite3 directly (pending-auto-merges-schema.test.ts, stuck-schema.test.ts dynamic import, docs/__tests__/index-builder.test.ts) plus a string-literal command fixture in format-tool-input.test.ts. They break the moment the dependency is removed.",
+      "mitigation": "Migrate the three real test imports to openDatabase(':memory:') (or node:sqlite under Node) before the capstone removal bead. The format-tool-input.test.ts reference is a command-string fixture, not a real import — review whether it still makes sense or update it to a generic command."
+    },
+    {
+      "id": "H7",
+      "summary": "@effect/sql-sqlite-bun / Effect DB layer: code comments reference a deferred migration to @effect/sql-sqlite-bun (PAN-447). This issue is NOT that migration — it only swaps the synchronous driver. Do not pull Effect SQL layer changes into scope.",
+      "mitigation": "Keep the synchronous run/get/all/exec/pragma/transaction surface. Leave the Effect wrappers (DatabaseError/CloisterDatabaseError Effect.try variants) as-is — they wrap the sync calls and need no change beyond the type import swap."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-04T06:10:35.762Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1579. Probed node:sqlite on Node 22.22.0: loads without --experimental-sqlite (warning only), bundles FTS5, has iterate(), returns BLOB as Uint8Array, accepts Float32Array/Buffer binds, rejects raw booleans, lacks pragma()/transaction(). Enumerated 8 runtime DB-open sites (issue said 2) and 6 type-only imports. Plan: 1 foundation adapter bead + 7 per-site migration beads + residual-type-swap + guard-removal + test-migration + capstone dependency-drop.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T08:48:31.463Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T13:59:21.561Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T20:42:07.979Z"
+    }
+  ],
+  "feedback": []
+}

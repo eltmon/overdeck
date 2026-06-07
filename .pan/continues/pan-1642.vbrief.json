@@ -1,0 +1,123 @@
+{
+  "version": "1",
+  "issueId": "PAN-1642",
+  "created": "2026-06-07T02:10:48.815Z",
+  "updated": "2026-06-07T06:27:21.017Z",
+  "gitState": {
+    "branch": "feature/pan-1642",
+    "sha": "ab4ba668c",
+    "dirty": false
+  },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Part 1 streaming is primarily a FRONTEND wiring task — the server already streams. `subscribeConversationMessages` (packages/contracts/src/rpc.ts:39,187,384) + the server handler (src/dashboard/server/ws-rpc.ts:590-652) + `watchConversation()` (src/dashboard/server/services/conversation-service.ts:1239) already do fs.watch + byte-offset incremental tail and push `ConversationEvent` over /ws/rpc. The frontend has ZERO consumers (grep confirmed) and instead 2s-HTTP-polls via useQuery refetchInterval in ConversationPanel.tsx:174-178 and the ConversationView at ~1073-1078. Do NOT rebuild a tailer; consume the existing subscription.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Gate the WS subscription to `conversation.harness === 'claude-code'` AND `sessionAlive === true`. For pi/codex/unknown harness, and for ended/historical conversations, KEEP the existing HTTP fetch path (one-shot for ended; 2s poll for live non-claude). This satisfies the 'degrade gracefully' acceptance criterion without touching the Pi parser. The conversation record already carries `harness?: 'claude-code' | 'pi' | 'codex' | null` (ConversationList.tsx:45).",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Server `watchConversation`/`parseConversationMessages` always uses the Claude parser and is NOT Pi-aware (Pi parser parsePiConversationMessages has no incremental/byte-offset support). Add a server-side safety guard so `subscribeConversationMessages` never emits Claude-parsed garbage for a Pi session file (detect via isPiSessionFile and emit `{kind:'discovering'}`/stop, letting the client keep polling). This is defense-in-depth on top of the frontend gating in D2.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Message-level streaming only — explicitly NOT token-by-token. The JSONL has no intra-message deltas (one complete record per line). Document this limitation in a code comment in the stream hook so nobody later mistakes the absence of a typing effect for a bug. True token streaming would require tapping the PTY/tmux byte stream — out of scope.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Part 3 table fix is CSS-ONLY using the github-markdown-css approach: `display:block; width:max-content; min-width:100%; overflow-x:auto` on the table element for both `.chatMarkdown table` (command-deck.module.css:3499) and `.markdownContent table` (:1725). `display:block` makes the table its own scroll container so a long unbreakable cell scrolls horizontally instead of squishing neighbors — no `<table>` component-wrapper override needed in ChatMarkdown.tsx. Simpler and lower-risk than the wrapper-div approach the issue sketched.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "The `experimental.streamdownRenderer` flag must round-trip through the explicitly-enumerated config sites (no schema accepts arbitrary keys): src/lib/config-yaml.ts (ExperimentalConfig interface ~555, NormalizedExperimentalConfig ~773, defaults ~1019, merge ~2051) AND src/lib/settings-api.ts (ApiSettingsConfig type ~209, loadSettingsApi normalization ~613, save serialization ~780, validateSettings ~983) AND the frontend SettingsConfig.experimental type (Settings/types.ts:174). Mirror `claudeCodeChannels` exactly. Default false.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Streamdown integration must reuse the EXISTING customizations from ChatMarkdown.tsx, not reimplement them: the `components` map (file-link chip `a` override via resolveMarkdownFileLinkMeta + MaybeFileLinkChip; CodeBlock `pre` override), the `remarkPlugins` (remarkGfm + remarkBareFileTextLinks), and the `transformMarkdownUrl` URL transform incl. javascript:/data:/vbscript: blocking. Streamdown is a react-markdown wrapper and accepts the same `components`/`remarkPlugins` props; pass them through. Verify Streamdown's built-in rehype-harden/urlTransform does not strip our file-link hrefs (shouldPreserveMarkdownFileLinkHref).",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Routing a Pi (or codex) conversation through the Claude-only `subscribeConversationMessages`/`watchConversation` path would mis-parse the file and render corrupted messages.",
+      "mitigation": "Frontend gates subscription on harness==='claude-code' (D2); server adds isPiSessionFile guard in subscribeConversationMessages (D3). Both layers; test a Pi conversation still renders via polling."
+    },
+    {
+      "id": "H2",
+      "summary": "Double-fetch / cache contention: ConversationPanel.tsx and the inner ConversationView BOTH run the same useQuery(['conversation-messages', name]). If one switches to WS and the other keeps polling, they fight over the same react-query cache key.",
+      "mitigation": "Drive both from a single shared hook. When subscribed (live Claude), feed WS ConversationEvent payloads into the same query cache (queryClient.setQueryData) and disable refetchInterval so the components stay in sync without polling."
+    },
+    {
+      "id": "H3",
+      "summary": "WS subscription lifecycle: subscriptions must start when a live Claude conversation is opened and be torn down on close/unmount and when the session ends (sessionAlive flips false), otherwise leaked watchers accumulate on the server (each holds an fs.watch handle).",
+      "mitigation": "Tie WsTransport.subscribe()'s unsubscribe to the hook's useEffect cleanup; re-evaluate when name/harness/sessionAlive change. WsTransport.subscribe already auto-reconnects; verify reconnect re-emits initial state (handler parses from offset 0)."
+    },
+    {
+      "id": "H4",
+      "summary": "Streamdown may bundle its own Shiki highlighter / KaTeX / large deps, bloating the frontend bundle, and its rehype-harden may conflict with our transformMarkdownUrl or strip the file-link chip hrefs.",
+      "mitigation": "Flag defaults off; verify bundle build still passes. In the Streamdown path, confirm file-link chips, bare-path autolinks, issue/PR links, and URL sanitization all still work (AC). Pin streamdown to a known version."
+    },
+    {
+      "id": "H5",
+      "summary": "Browser/UAT verification of streaming must use an isolated Playwright browser instance/profile and must not depend on another agent's session or shared browser state.",
+      "mitigation": "Any UAT spins up its own isolated browser context; open a live conversation on pan.localhost and observe messages appearing incrementally without manual refresh."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session for PAN-1642 (auto mode). Discovery completed: confirmed server-side streaming infra (subscribeConversationMessages) already exists and is unconsumed by the frontend; confirmed table fix can be CSS-only; confirmed streamdown not yet installed and the settings-flag round-trip sites. Full orchestration context omitted from this summary entry.",
+      "note": "Planning session started for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
+      "timestamp": "2026-06-07T02:10:48.815Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-07T03:21:58.378Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T03:21:58.455Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:22Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T03:22:21.841Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:22Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-07T03:22:45.965Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T04:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T04:45:19.372Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T04:45:21.091Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T06:19Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T06:19:56.738Z"
+    }
+  ],
+  "feedback": []
+}
