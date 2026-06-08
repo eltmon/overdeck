@@ -135,6 +135,14 @@ interface CommandDeckProps {
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
   conversationViewMode?: ViewMode;
+  pendingConversationTarget?: {
+    conversationName: string;
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+    label: string;
+  } | null;
+  onPendingConversationTargetConsumed?: () => void;
   /** Called when the selected conversation changes so App can sync the URL */
   onConvIdChange?: (id: string | null) => void;
   onConversationViewModeChange?: (mode: ViewMode) => void;
@@ -155,6 +163,8 @@ const SECTION_SPLIT_KEY = 'mc-section-split';
 export function CommandDeck({
   issues = [],
   convId,
+  pendingConversationTarget = null,
+  onPendingConversationTargetConsumed,
   onConvIdChange,
   selectedProject = null,
   onSelectProject,
@@ -473,13 +483,24 @@ export function CommandDeck({
     else store.addPane(projectKey, { paneType: 'issue', label, issueId });
   }, []);
 
-  const openConversationTabIn = useCallback((projectKey: string, name: string, label: string) => {
+  const openConversationTabIn = useCallback((projectKey: string, name: string, label: string, target?: {
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+  }) => {
     const store = usePanesStore.getState();
     store.ensureHome(projectKey);
     const panes = store.panesByWorkspace[projectKey] ?? [];
     const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-    if (existing) store.setActivePane(projectKey, existing.paneId);
-    else store.addPane(projectKey, { paneType: 'agent', label, conversationId: name });
+    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name });
+    store.setActivePane(projectKey, paneId);
+    if (target) {
+      usePanesStore.getState().updatePane(projectKey, paneId, {
+        targetMessageId: target.messageId,
+        targetMessageIndex: target.messageIndex,
+        targetMessageNonce: target.nonce,
+      });
+    }
   }, []);
 
   const openTerminalTabIn = useCallback((projectKey: string, sessionId: string) => {
@@ -510,11 +531,19 @@ export function CommandDeck({
       setSelectedConversation(conv.name);
       setSelectedFeature(null);
       const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+      const target = pendingConversationTarget?.conversationName === conv.name
+        ? {
+            messageId: pendingConversationTarget.messageId,
+            messageIndex: pendingConversationTarget.messageIndex,
+            nonce: pendingConversationTarget.nonce,
+          }
+        : undefined;
       onSelectProject?.(projectName);
-      openConversationTabIn(projectName, conv.name, conv.title ?? 'Agent');
+      openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+      if (target) onPendingConversationTargetConsumed?.();
       appliedConvId.current = convId;
     }
-  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn]);
+  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected
   const hasAutoSelected = useRef(false);

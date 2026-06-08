@@ -70,6 +70,7 @@ vi.mock('../../config-yaml.js', () => ({
 
 vi.mock('../../claude-permissions.js', () => ({
   bypassPrefixForAgentFlagSync: vi.fn(() => ''),
+  getClaudePermissionFlagsSync: vi.fn(() => []),
 }));
 
 vi.mock('../../providers.js', () => ({

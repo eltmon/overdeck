@@ -23,6 +23,7 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
+  type ConversationSearchConfig,
   type RoleEffort,
   ROLE_EFFORTS,
 } from './config-yaml.js';
@@ -135,6 +136,7 @@ export interface ApiSettingsConfig {
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
+  conversationSearch?: ConversationSearchConfig;
   conversations?: {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
@@ -595,6 +597,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    conversationSearch: config.conversationSearch,
     conversations: conversationSettings,
     memory: {
       provider: memory.extraction.provider,
@@ -668,6 +671,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['api_keys', config.api_keys],
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
+    ['conversationSearch', config.conversationSearch],
     ['conversations', config.conversations],
     ['memory', config.memory],
     ['background_ai', config.background_ai],
@@ -764,6 +768,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    conversationSearch: settings.conversationSearch,
     conversations: settings.conversations,
     memory: settings.memory
       ? {
@@ -859,6 +864,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    conversationSearch: {
+      ...current.conversationSearch,
+      ...updates.conversationSearch,
     },
     conversations: {
       ...current.conversations,

@@ -15,8 +15,9 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { CommandPalette } from './components/CommandPalette';
+import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
+import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { PipelineView } from './components/Pipeline/PipelineView';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
@@ -70,6 +71,13 @@ interface TrackerStatus {
   primary: string;
   secondary?: string;
   configured: TrackerStatusItem[];
+}
+
+interface ConversationMessageLocator {
+  messageId: string;
+  messageIndex: number;
+  sequence: number;
+  byteOffset: number;
 }
 
 const TAB_PATHS: Record<Tab, string> = {
@@ -224,6 +232,12 @@ async function fetchBackendHealth(): Promise<{ version: string }> {
   const data = await res.json();
   if (data.supervisorUrl) cachedSupervisorUrl = data.supervisorUrl;
   return data;
+}
+
+async function fetchConversationMessageLocator(name: string, byteOffset: number): Promise<ConversationMessageLocator> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/message-locator?byteOffset=${byteOffset}`);
+  if (!res.ok) throw new Error(`Unable to locate matching message (${res.status})`);
+  return res.json();
 }
 
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
@@ -384,6 +398,7 @@ export default function App() {
     setConversationRoute(selectedConvId, viewMode);
   }, [selectedConvId, setConversationRoute]);
 
+
   const queryClient = useQueryClient();
 
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
@@ -393,6 +408,13 @@ export default function App() {
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [pendingConversationTarget, setPendingConversationTarget] = useState<{
+    conversationName: string;
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+    label: string;
+  } | null>(null);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
@@ -531,6 +553,41 @@ export default function App() {
       window.history.pushState({ tab }, '', path);
     }
   }, []);
+
+  const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
+    const conversationName = hit.conversationId || hit.sessionId;
+    const projectKey = hit.projectId || NO_PROJECT_KEY;
+    try {
+      const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset);
+      const nonce = Date.now();
+      setPendingConversationTarget({
+        conversationName,
+        messageId: locator.messageId,
+        messageIndex: locator.messageIndex,
+        nonce,
+        label: hit.label || 'Agent',
+      });
+      setActiveTab('command-deck');
+      setSelectedProjectKey(projectKey);
+      setConversationRoute(conversationName, 'conversation');
+      const panes = usePanesStore.getState();
+      panes.ensureHome(projectKey);
+      const paneId = panes.addPane(projectKey, {
+        paneType: 'agent',
+        label: hit.label || 'Agent',
+        conversationId: conversationName,
+        viewMode: 'conversation',
+      });
+      usePanesStore.getState().updatePane(projectKey, paneId, {
+        viewMode: 'conversation',
+        targetMessageId: locator.messageId,
+        targetMessageIndex: locator.messageIndex,
+        targetMessageNonce: nonce,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to open conversation hit');
+    }
+  }, [setActiveTab, setConversationRoute]);
 
   const setSessionFeedSidebarOpen = useCallback((open: boolean) => {
     setIsSessionFeedSidebarOpen(open);
@@ -1259,6 +1316,8 @@ export default function App() {
                 conversationViewMode={conversationViewMode}
                 onConvIdChange={setSelectedConvId}
                 onConversationViewModeChange={setConversationViewMode}
+                pendingConversationTarget={pendingConversationTarget}
+                onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
                 selectedProject={selectedProjectKey}
                 onSelectProject={setSelectedProjectKey}
                 onProjectPrefixChange={setSearchProjectPrefix}
@@ -1444,6 +1503,7 @@ export default function App() {
           setActiveTab(tab as Tab);
           if (issueId) openIssue(issueId);
         }}
+        onOpenConversationHit={handleOpenConversationHit}
       />
 
       {/* Toast Notifications */}

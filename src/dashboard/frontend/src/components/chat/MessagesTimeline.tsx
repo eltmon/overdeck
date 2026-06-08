@@ -216,6 +216,10 @@ export interface MessagesTimelineProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  /** Message target requested by palette conversation search. */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -239,6 +243,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   resolvedTheme,
   hideToolCalls = false,
   workingPhase,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -472,6 +479,22 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, [rows, searchQuery]);
 
   const currentMatch = searchMatches[currentMatchIndex] ?? null;
+  const targetMessageRow = useMemo(() => {
+    if (!targetMessageId && targetMessageIndex === undefined) return null;
+    const byId = targetMessageId
+      ? rows.findIndex((row) => row.kind === 'message' && row.message.id === targetMessageId)
+      : -1;
+    if (byId >= 0) return { row: rows[byId]!, index: byId };
+    if (targetMessageIndex === undefined) return null;
+    let messageIndex = 0;
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex]!;
+      if (row.kind !== 'message') continue;
+      if (messageIndex === targetMessageIndex) return { row, index: rowIndex };
+      messageIndex += 1;
+    }
+    return null;
+  }, [rows, targetMessageId, targetMessageIndex]);
   const searchHighlightTerms = useMemo(() => extractSearchHighlightTerms(searchQuery), [searchQuery]);
 
   const scrollToRow = useCallback((rowIndex: number, rowId: string) => {
@@ -502,6 +525,11 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     const match = searchMatches[normalized]!;
     scrollToRow(match.index, match.row.id);
   }, [scrollToRow, searchMatches]);
+
+  useEffect(() => {
+    if (!targetMessageRow) return;
+    scrollToRow(targetMessageRow.index, targetMessageRow.row.id);
+  }, [targetMessageRow, targetMessageNonce, scrollToRow]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -595,7 +623,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
                     background: 'var(--background)',
-                    outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                    outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
                     outlineOffset: '-2px',
                     borderRadius: 8,
                   }}
@@ -632,7 +660,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               key={row.id}
               data-search-row-id={row.id}
               style={{
-                outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
                 outlineOffset: '-2px',
                 borderRadius: 8,
               }}

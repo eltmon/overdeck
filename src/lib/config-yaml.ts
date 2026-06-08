@@ -163,6 +163,29 @@ export interface ConversationsConfig {
   };
 }
 
+export type ConversationSearchProvider = 'openai';
+
+export interface ConversationSearchConfig {
+  /** Whether conversation semantic search is enabled. Default: false. */
+  enabled?: boolean;
+  /** Embedding provider. Default: 'openai'. */
+  provider?: ConversationSearchProvider;
+  /** Embedding model. Default: 'text-embedding-3-small'. */
+  model?: string;
+  /** Name of an env var or config key holding the API key. Default: provider's standard env var. */
+  apiKeyRef?: string;
+  /** Path to the sidecar embeddings DB. Default: ~/.panopticon/conversations/embeddings.db. */
+  dbPath?: string;
+}
+
+export interface NormalizedConversationSearchConfig {
+  enabled: boolean;
+  provider: ConversationSearchProvider;
+  model: string;
+  apiKeyRef: string | undefined;
+  dbPath: string;
+}
+
 export type DocsEmbeddingProvider = 'local' | 'openai';
 export type DocsClassifierProvider = 'anthropic' | 'cliproxy';
 export type DocsPrdStatus = 'active' | 'planned' | 'completed';
@@ -485,6 +508,9 @@ export interface YamlConfig {
   /** Panopticon docs RAG configuration */
   docs?: DocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch?: ConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
 
@@ -721,6 +747,9 @@ export interface NormalizedConfig {
   /** Panopticon docs RAG behavior */
   docs: NormalizedDocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch: NormalizedConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory: {
     extraction: {
@@ -856,6 +885,11 @@ export function getConversationsConfigSync(): RuntimeConversationsConfig {
 
 
 
+export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
+  const { config } = loadConfigSync();
+  return config.conversationSearch;
+}
+
 export interface MigrationResult {
   /** List of migrated model IDs */
   migrated: Array<{
@@ -965,6 +999,13 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       threshold: 0.85,
       timeoutMs: 1500,
     },
+  },
+  conversationSearch: {
+    enabled: false,
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+    apiKeyRef: undefined,
+    dbPath: join(homedir(), '.panopticon', 'conversations', 'embeddings.db'),
   },
   memory: {
     extraction: {
@@ -1658,6 +1699,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.rtk.enabled,
     },
     docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+    conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
       lifecycle: DEFAULT_CONFIG.tts.lifecycle,
@@ -2102,6 +2144,26 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
       result.claude.permissionMode = config.claude.permissionMode;
+    }
+
+    // Merge conversationSearch configuration
+    if (config.conversationSearch) {
+      const cs = config.conversationSearch;
+      if (typeof cs.enabled === 'boolean') {
+        result.conversationSearch.enabled = cs.enabled;
+      }
+      if (cs.provider !== undefined) {
+        result.conversationSearch.provider = cs.provider;
+      }
+      if (cs.model !== undefined) {
+        result.conversationSearch.model = cs.model;
+      }
+      if (cs.apiKeyRef !== undefined) {
+        result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+      }
+      if (cs.dbPath !== undefined) {
+        result.conversationSearch.dbPath = cs.dbPath;
+      }
     }
   }
 

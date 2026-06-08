@@ -8,10 +8,8 @@
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
+ *   - Conversations                         — semantic JSONL transcript search
  *   - Memory / Observations                 — FTS over ~/.panopticon/memory
- *
- * Phase 2 (tracked separately) will add semantic conversation search with
- * excerpts that point to the relevant message inside a JSONL session.
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -55,10 +53,19 @@ interface PaletteAction {
   rank?: number;
 }
 
+export interface ConversationPaletteOpenRequest {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  byteOffset: number;
+  label: string;
+}
+
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: string, issueId?: string) => void;
+  onOpenConversationHit?: (hit: ConversationPaletteOpenRequest) => void | Promise<void>;
 }
 
 interface PanCommandEntry {
@@ -85,15 +92,29 @@ interface PaletteSearchHit {
   rank: number;
 }
 
+interface PaletteConversationHit {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  role: string;
+  ts: string | null;
+  byteOffset: number;
+  displayContent: string;
+  excerpt: string;
+  excerptSegments: Array<{ text: string; match: boolean }>;
+  rank: number;
+}
+
 interface PaletteSearchResponse {
   memory: PaletteSearchHit[];
   observations: PaletteSearchHit[];
   summaries: PaletteSearchHit[];
+  conversations: PaletteConversationHit[];
 }
 
 const EMPTY_AGENTS: Agent[] = [];
 const EMPTY_ISSUES: Issue[] = [];
-const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [] };
+const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [], conversations: [] };
 
 // ─── Server API ───────────────────────────────────────────────────────────────
 
@@ -125,6 +146,7 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
       memory: data.memory ?? [],
       observations: data.observations ?? [],
       summaries: data.summaries ?? [],
+      conversations: data.conversations ?? [],
     };
   } catch (err) {
     if ((err as { name?: string }).name === 'AbortError') return EMPTY_SEARCH;
@@ -208,7 +230,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -432,7 +454,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     },
   })), [panCommands]);
 
-  // ─── Dynamic: memory + observations + summaries ───────────────────────────
+  // ─── Dynamic: conversations + memory + observations + summaries ────────────
 
   const memoryActions = useMemo<PaletteAction[]>(() => {
     const out: PaletteAction[] = [];
@@ -462,10 +484,41 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       }
     };
     push(searchResults.observations, 'Observations', Eye);
+    for (const hit of searchResults.conversations) {
+      const label = hit.displayContent || hit.conversationId || hit.sessionId;
+      const when = hit.ts ? hit.ts.slice(0, 16).replace('T', ' ') : '';
+      const meta = [hit.projectId, hit.role, when].filter(Boolean).join(' · ');
+      out.push({
+        id: `conv-${hit.sessionId}-${hit.byteOffset}`,
+        label: label.length > 80 ? `${label.slice(0, 77)}…` : label,
+        description: meta,
+        icon: Terminal,
+        group: 'Conversations',
+        rank: hit.rank,
+        excerptSegments: hit.excerptSegments.map((seg) => ({
+          kind: seg.match ? 'match' : 'text',
+          value: seg.text,
+        })),
+        keywords: ['conversation', hit.sessionId, hit.conversationId, hit.projectId, hit.role],
+        onSelect: () => {
+          if (onOpenConversationHit) {
+            void onOpenConversationHit({
+              sessionId: hit.sessionId,
+              conversationId: hit.conversationId,
+              projectId: hit.projectId,
+              byteOffset: hit.byteOffset,
+              label,
+            });
+            return;
+          }
+          toast.message(label, { description: hit.excerpt || meta || undefined });
+        },
+      });
+    }
     push(searchResults.memory, 'Memory', Brain);
     push(searchResults.summaries, 'Memory · Summaries', Sparkles);
     return out;
-  }, [searchResults, openIssue]);
+  }, [searchResults, openIssue, onOpenConversationHit]);
 
   // ─── Filter + group ───────────────────────────────────────────────────────
 
@@ -486,9 +539,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     }
     const q = trimmed.toLowerCase();
     return allActions.filter((action) => {
-      // Server-side memory results are pre-matched against the query, so
+      // Server-side search results are pre-matched against the query, so
       // include them unconditionally (sort handles ranking).
-      if (action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
+      if (action.group === 'Conversations' || action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
         return true;
       }
       return (
@@ -511,7 +564,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }
-    for (const g of ['Observations', 'Memory', 'Memory · Summaries']) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
+    for (const g of ['Observations', 'Conversations', 'Memory', 'Memory · Summaries']) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     ordered.push(...seen);
     return ordered;
   }, [filtered]);
@@ -538,7 +591,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Search commands, issues, memory, observations…"
+              placeholder="Search commands, issues, conversations, memory…"
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
               autoFocus
             />

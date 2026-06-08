@@ -93,7 +93,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── PAN_YOLO escape hatch (explicit opt-in to bypass) ──────────────────────
+  // ── PAN_YOLO escape hatch (explicit opt-in to bypass mode, without DSP) ─────
 
   it('Kimi direct + PAN_YOLO=true (bypass): bypassPermissions present, never DSP', async () => {
     process.env.PAN_YOLO = 'true'

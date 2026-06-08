@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -59,7 +59,7 @@ import {
   SettingsRow,
   type NavItem,
 } from './primitives';
-import { ensureDashboardSession } from '../../lib/wsTransport';
+import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -92,6 +92,51 @@ async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | nul
 async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
+  return res.json();
+}
+
+interface ConversationSearchStatusResponse {
+  enabled: boolean;
+  available: boolean;
+  unavailableReason?: string;
+  dbPath: string;
+  chunkCount: number;
+  indexedFileCount: number;
+  lastIndexedAt: string | null;
+}
+
+async function fetchConversationSearchStatus(): Promise<ConversationSearchStatusResponse> {
+  const res = await fetch('/api/settings/conversation-search/status');
+  if (!res.ok) throw new Error('Failed to fetch conversation search status');
+  return res.json();
+}
+
+interface ConversationSearchCostEstimate {
+  provider: 'openai';
+  model: string;
+  tokenCount: number;
+  pricePerMillionTokens: number;
+  estimatedUsd: number;
+  filesScanned: number;
+  chunksEstimated: number;
+  disabled: boolean;
+  unavailableReason?: string;
+  confirmationNonce?: string;
+}
+
+async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
+  const res = await fetch('/api/settings/conversation-search/reindex-estimate');
+  if (!res.ok) throw new Error('Failed to estimate reindex cost');
+  return res.json();
+}
+
+async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
+  const res = await fetch('/api/settings/conversation-search/reindex', {
+    method: 'POST',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ confirmationNonce }),
+  });
+  if (!res.ok) throw new Error('Failed to reindex conversations');
   return res.json();
 }
 
@@ -319,6 +364,7 @@ export function buildMiniMaxFormData(
     api_keys: { ...(formData?.api_keys || {}) },
     agents: { ...(formData?.agents || miniMaxDefaults.agents || {}) },
     tracker_keys: { ...(formData?.tracker_keys || {}) },
+    conversationSearch: { ...(formData?.conversationSearch || miniMaxDefaults.conversationSearch || {}) },
     conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
     memory: { ...(formData?.memory || miniMaxDefaults.memory || {}) },
     tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
@@ -457,6 +503,11 @@ export function SettingsPage() {
     queryFn: fetchTtsHealth,
     refetchInterval: 10_000,
   });
+  const { data: conversationSearchStatus } = useQuery({
+    queryKey: ['conversation-search-status'],
+    queryFn: fetchConversationSearchStatus,
+    refetchInterval: 30_000,
+  });
   // Last-24h spend per background-AI source, for the Background AI section (PAN-1589).
   const { data: backgroundCost } = useQuery({
     queryKey: ['costs-background'],
@@ -564,6 +615,8 @@ export function SettingsPage() {
   const [convConfigSaving, setConvConfigSaving] = useState(false);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [testingEmbedding, setTestingEmbedding] = useState(false);
+  const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
+  const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -706,6 +759,7 @@ export function SettingsPage() {
     onSuccess: ({ response, savedVoiceSettings }) => {
       invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
       queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
       setVoiceFormData(savedVoiceSettings);
@@ -724,6 +778,46 @@ export function SettingsPage() {
       toast.error(`Failed to save settings: ${error.message}`);
     },
   });
+
+  const conversationSearchReindexMutation = useMutation({
+    mutationFn: reindexConversationSearch,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
+      if (result.disabled) {
+        toast.warning(result.unavailableReason ?? 'Conversation search is disabled');
+      } else {
+        toast.success(`Reindexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} from ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reindex conversations: ${error.message}`);
+    },
+  });
+
+  const handleConversationSearchReindex = async () => {
+    setEstimatingConversationSearch(true);
+    try {
+      const estimate = await estimateConversationSearchReindex();
+      setConversationSearchEstimate(estimate);
+      if (estimate.disabled) {
+        toast.warning(estimate.unavailableReason ?? 'Conversation search is disabled');
+        return;
+      }
+      if (estimate.estimatedUsd > 1) {
+        const confirmed = window.confirm(
+          `Reindexing is estimated to cost $${estimate.estimatedUsd.toFixed(2)} (${estimate.tokenCount.toLocaleString()} tokens). Continue?`,
+        );
+        if (!confirmed) return;
+        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+        return;
+      }
+      conversationSearchReindexMutation.mutate(undefined);
+    } catch (error) {
+      toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setEstimatingConversationSearch(false);
+    }
+  };
 
   const ttsStartMutation = useMutation({
     mutationFn: startTtsDaemonRequest,
@@ -820,6 +914,10 @@ export function SettingsPage() {
   const hasSettingsChanges = JSON.stringify(formData) !== JSON.stringify(settings);
   const hasVoiceSettingsChanges = JSON.stringify(voiceFormData) !== JSON.stringify(voiceSettings);
   const hasChanges = hasSettingsChanges || hasVoiceSettingsChanges;
+  const conversationSearch = formData.conversationSearch ?? {};
+  const conversationSearchEnabled = conversationSearch.enabled ?? false;
+  const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
+  const conversationSearchApiKeyRef = conversationSearch.apiKeyRef ?? 'OPENAI_API_KEY';
 
   const handleProviderToggle = (provider: Provider) => {
     setFormData({
@@ -1039,6 +1137,16 @@ export function SettingsPage() {
       conversations: {
         ...formData.conversations,
         rich_compaction: enabled,
+      },
+    });
+  };
+
+  const handleConversationSearchChange = (patch: Partial<ConversationSearchConfig>) => {
+    setFormData({
+      ...formData,
+      conversationSearch: {
+        ...(formData.conversationSearch ?? {}),
+        ...patch,
       },
     });
   };
@@ -2036,6 +2144,100 @@ export function SettingsPage() {
                 formData.conversations?.rich_compaction ? 'translate-x-[18px]' : 'translate-x-[3px]'
               }`} />
             </button>
+          </div>
+
+          <div className="border-t border-border my-2" />
+
+          <div className="px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Conversation Search</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Index Claude JSONL transcripts for Ctrl+K semantic search. Disabled by default; enabling sends transcript chunks to the configured embedding provider.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={conversationSearchEnabled}
+                aria-label="Toggle conversation search"
+                onClick={() => handleConversationSearchChange({ enabled: !conversationSearchEnabled })}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                  conversationSearchEnabled ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  conversationSearchEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`} />
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <label className="text-xs text-muted-foreground">
+                Provider
+                <select
+                  value={conversationSearch.provider ?? 'openai'}
+                  onChange={(e) => handleConversationSearchChange({ provider: e.target.value as 'openai' })}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                >
+                  <option value="openai">OpenAI</option>
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Model
+                <input
+                  type="text"
+                  value={conversationSearchModel}
+                  onChange={(e) => handleConversationSearchChange({ model: e.target.value })}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                  placeholder="text-embedding-3-small"
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                API key env var or config key
+                <input
+                  type="text"
+                  value={conversationSearchApiKeyRef}
+                  onChange={(e) => handleConversationSearchChange({ apiKeyRef: e.target.value || undefined })}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                  placeholder="OPENAI_API_KEY"
+                />
+              </label>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div>
+                <span>Last indexed: </span>
+                <span className="text-foreground">
+                  {conversationSearchStatus?.lastIndexedAt
+                    ? conversationSearchStatus.lastIndexedAt.slice(0, 19).replace('T', ' ')
+                    : 'Never'}
+                </span>
+                {conversationSearchStatus && (
+                  <span className="ml-2">
+                    ({conversationSearchStatus.chunkCount} chunks · {conversationSearchStatus.indexedFileCount} files)
+                  </span>
+                )}
+                {conversationSearchStatus && !conversationSearchStatus.available && (
+                  <span className="ml-2 text-destructive">{conversationSearchStatus.unavailableReason}</span>
+                )}
+                {conversationSearchEstimate && !conversationSearchEstimate.disabled && (
+                  <span className="block mt-1">
+                    Estimated reindex cost: <span className="text-foreground">${conversationSearchEstimate.estimatedUsd.toFixed(4)}</span>
+                    {' '}({conversationSearchEstimate.tokenCount.toLocaleString()} tokens · {conversationSearchEstimate.chunksEstimated} chunks)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleConversationSearchReindex()}
+                disabled={!conversationSearchEnabled || estimatingConversationSearch || conversationSearchReindexMutation.isPending}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
+              >
+                {estimatingConversationSearch || conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Estimate & reindex all conversations
+              </button>
+            </div>
           </div>
 
           <div className="border-t border-border my-2" />
