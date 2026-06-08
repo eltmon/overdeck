@@ -274,57 +274,57 @@
         "phase": "work",
         "issueId": "PAN-1614",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T07:21:26.912Z",
+        "updatedAt": "2026-06-08T15:29:47.975Z",
         "work": {
-          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "status": "failed",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
+          "notes": "Verification FAILED at test (26959ms):\n\nssue:    PAN-1145\n+   Status:   running\n+   Harness:  claude-code\n+   Model:    claude-sonnet-4-6\n+   Role:     work\n+   Duration: 0 min\n+   Workspace: /tmp/running\n+\n\n ❯ src/cli/commands/__tests__/status-harness.test.ts:240:17\n    238|     expect(out).toContain('Gate:     Paused (manual inspection)')\n    239|     expect(out).toContain('Gate:     Troubled (3 failures)')\n    240|     expect(out).toContain('Gate:     Manual')\n       |                 ^\n    241|     expect(out).not.toMatch(/agent-waiting[\\s\\S]*?Gate:/)\n    242|     expect(out).not.toMatch(/agent-running[\\s\\S]*?Gate:/)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:262:21\n    260|     const resumed = await autoResumeStoppedWorkAgents();\n    261|\n    262|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    263|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:269:21\n    267|     const resumed = await autoResumeStoppedWorkAgents();\n    268|\n    269|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    270|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    271|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-08T07:21:26.912Z"
+              "status": "failed",
+              "at": "2026-06-08T15:29:47.975Z",
+              "notes": "Verification FAILED at test (26959ms):\n\nssue:    PAN-1145\n+   Status:   running\n+   Harness:  claude-code\n+   Model:    claude-sonnet-4-6\n+   Role:     work\n+   Duration: 0 min\n+   Workspace: /tmp/running\n+\n\n ❯ src/cli/commands/__tests__/status-harness.test.ts:240:17\n    238|     expect(out).toContain('Gate:     Paused (manual inspection)')\n    239|     expect(out).toContain('Gate:     Troubled (3 failures)')\n    240|     expect(out).toContain('Gate:     Manual')\n       |                 ^\n    241|     expect(out).not.toMatch(/agent-waiting[\\s\\S]*?Gate:/)\n    242|     expect(out).not.toMatch(/agent-running[\\s\\S]*?Gate:/)\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:262:21\n    260|     const resumed = await autoResumeStoppedWorkAgents();\n    261|\n    262|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    263|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:269:21\n    267|     const resumed = await autoResumeStoppedWorkAgents();\n    268|\n    269|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    270|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    271|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-08T07:21:26.912Z",
-          "notes": "All 15 ACs implemented; zero blockers across security, correctness, performance, and requirements.",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T07:21:26.912Z",
-              "notes": "All 15 ACs implemented; zero blockers across security, correctness, performance, and requirements."
+              "at": "2026-06-08T15:29:47.975Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
           "notes": "Workspace docker stack for PAN-1614 is not healthy: No Docker containers found for workspace stack pan-1614. Run 'pan workspace rebuild PAN-1614' or retry with --host to override.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T07:21:26.912Z",
+              "at": "2026-06-08T15:29:47.975Z",
               "notes": "Workspace docker stack for PAN-1614 is not healthy: No Docker containers found for workspace stack pan-1614. Run 'pan workspace rebuild PAN-1614' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "updatedAt": "2026-06-08T15:29:47.975Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T07:21:26.912Z"
+              "at": "2026-06-08T15:29:47.975Z"
             }
           ],
           "readyForMerge": false,
