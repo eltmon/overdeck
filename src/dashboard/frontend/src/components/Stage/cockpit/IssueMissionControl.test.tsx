@@ -60,6 +60,7 @@ vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
   IssueActionDialogHost: () => null,
 }))
 
+vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
 vi.mock('../../drawer/PhaseTimeline', () => ({ default: () => <div>Phase timeline</div> }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
@@ -115,6 +116,40 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /PR & CI/ })).toBeTruthy()
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
+  })
+
+  it('renders the v3 command bar: pipeline progress, gates, and a blocked merge CTA', () => {
+    renderMissionControl()
+
+    // 7-segment pipeline progress bar (replaces the legacy lifecycle-date strip)
+    expect(screen.getByTestId('cockpit-pipeline-progress')).toBeTruthy()
+    expect(screen.getByText('CI/CD')).toBeTruthy()
+    // gates pill row
+    expect(screen.getByTestId('cockpit-gates')).toBeTruthy()
+    expect(screen.getAllByText('Merge-ready').length).toBeGreaterThan(0)
+    // primary merge CTA reflects the blocking reason
+    expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
+    // breadcrumb context
+    expect(screen.getByText('Issues')).toBeTruthy()
+  })
+
+  it('keeps the Overview faithful to the mockup: spotlight + Now / Issue cards', () => {
+    renderMissionControl()
+
+    expect(screen.getByText('Blocker spotlight')).toBeTruthy()
+    expect(screen.getByText('Now')).toBeTruthy()
+    expect(screen.getByText('Issue')).toBeTruthy()
+    expect(screen.getByText('work agent fixes → re-review')).toBeTruthy()
+  })
+
+  it('moves the launch composition into the Conversation tab', () => {
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation' }))
+
+    expect(screen.getByText('Launcher')).toBeTruthy()
+    expect(screen.getByText('Agent dock')).toBeTruthy()
+    expect(screen.getByText('Action dock')).toBeTruthy()
   })
 
   it('groups all issue actions in the mega-menu', () => {

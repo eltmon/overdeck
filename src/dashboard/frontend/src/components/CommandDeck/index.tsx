@@ -1254,6 +1254,7 @@ export function CommandDeck({
                     issueId={issueId}
                     title={info.title}
                     branch={info.branch}
+                    projectName={selectedProject ?? undefined}
                     createdAt={info.createdAt}
                     agentId={info.agentId}
                     conversations={conversations}

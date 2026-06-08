@@ -17,6 +17,8 @@ export interface IssueOverviewProps {
   title: string
   /** Feature branch; defaults to feature/<issueId>. */
   branch?: string
+  /** Active project name for the cockpit breadcrumb (e.g. "panopticon-cli"). */
+  projectName?: string
   /** Issue creation time for the age stat chip. */
   createdAt?: number | string
   /** The issue's agent id — scopes Files/Commits panes to this issue's workspace. */
@@ -41,6 +43,7 @@ export function IssueOverview({
   issueId,
   title,
   branch,
+  projectName,
   agentId,
   conversations = [],
   onCreateConversation,
@@ -111,6 +114,7 @@ export function IssueOverview({
       issueId={issueId}
       title={title}
       branch={branch ?? `feature/${issueId.toLowerCase()}`}
+      projectName={projectName}
       launcher={launcher}
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
       actionDock={<ActionDock onOpen={onAction} />}
