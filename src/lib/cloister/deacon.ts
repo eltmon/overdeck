@@ -2215,8 +2215,37 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
 
+      // PAN-1681: a live test session (idle or working) is the failsafe's job,
+      // not a re-dispatch target. Re-dispatching a fresh agent here is what burnt
+      // the 3-retry budget on idle agents that simply never signaled. Skip
+      // entirely — checkCompletedButUnsignaledTests (run just before this) nudges
+      // /auto-completes the existing agent. Only re-dispatch when NO live session.
+      const testSession = `agent-${issueId.toLowerCase()}-test`;
+      if (sessionExistsSync(testSession)) {
+        const testPaneDead = await Effect.runPromise(isPaneDead(testSession)).catch(() => true);
+        if (!testPaneDead) continue;
+      }
+
       const retryCount = status.testRetryCount ?? 0;
-      if (retryCount >= 3) continue;
+      if (retryCount >= 3) {
+        // PAN-1681: stop silently capping. With no live session to recover from
+        // (we'd have continued above) and the verdict failsafe unable to recover,
+        // the issue is genuinely stranded. Surface a one-time visible stuck marker
+        // so the operator can see it instead of it sitting at test=pending forever.
+        // Set only once — don't re-stamp every patrol.
+        if (status.stuckReason !== 'test_signal_strand') {
+          setReviewStatusSync(issueId, {
+            stuck: true,
+            stuckReason: 'test_signal_strand',
+            stuckAt: new Date().toISOString(),
+            testNotes: `Test stranded at ${status.testStatus} after ${retryCount} re-dispatches — the test agent never signaled and no verdict artifact was recovered. Inspect agent-${issueId.toLowerCase()}-test, or run: pan admin specialists done test ${issueId} --status passed|failed.`,
+          });
+          const msg = `Surfaced test strand for ${issueId}: stuck after ${retryCount} re-dispatches (test_signal_strand)`;
+          actions.push(msg);
+          console.warn(`[deacon] ${msg}`);
+        }
+        continue;
+      }
 
       // For pending, only retry if it's been >5 minutes since review passed
       if (status.testStatus === 'pending') {

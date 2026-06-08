@@ -13,18 +13,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Effect } from 'effect';
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  mkdtempSync,
-  unlinkSync,
-  rmSync,
-} from 'fs';
+import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir, tmpdir } from 'os';
+import { tmpdir } from 'os';
 
 // ── Module-level mocks ──────────────────────────────────────────────────────
 
@@ -105,11 +96,11 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 // ── Test scaffolding ──────────────────────────────────────────────────────────
 
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
-
+// Statuses are held in-memory (not on the real ~/.panopticon/review-status.json)
+// so this file never races other deacon test files that share that path.
+let currentStatuses: Record<string, unknown> = {};
 function writeStatusFile(statuses: Record<string, unknown>): void {
-  mkdirSync(join(homedir(), '.panopticon'), { recursive: true });
-  writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+  currentStatuses = statuses;
 }
 
 /** Create a temp project + workspace and (optionally) seed the verdict artifact. */
@@ -125,12 +116,13 @@ function makeWorkspace(issueLower: string, verdict?: { status: string; notes?: s
 }
 
 describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () => {
-  let originalContent: string | null = null;
   let checkCompletedButUnsignaledTests: () => Promise<string[]>;
+  let checkPendingTestDispatch: () => Promise<string[]>;
   const tmpRoots: string[] = [];
 
   beforeEach(async () => {
     vi.resetModules();
+    currentStatuses = {};
     mockSetReviewStatus.mockReset();
     mockSessionExists.mockReset().mockReturnValue(false);
     mockIsPaneDead.mockReset().mockResolvedValue(false);
@@ -138,23 +130,15 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockGetAgentRuntimeState.mockReset().mockReturnValue(null);
     mockIsIssueClosed.mockReset().mockResolvedValue(false);
     mockMessageAgent.mockReset().mockResolvedValue(undefined);
-    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
-      try {
-        return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-      } catch {
-        return {};
-      }
-    });
-
-    originalContent = existsSync(REVIEW_STATUS_FILE) ? readFileSync(REVIEW_STATUS_FILE, 'utf-8') : null;
+    mockSpawnRun.mockReset().mockResolvedValue({ id: 'agent-pan-1455-test' });
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => currentStatuses);
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkCompletedButUnsignaledTests = mod.checkCompletedButUnsignaledTests;
+    checkPendingTestDispatch = mod.checkPendingTestDispatch;
   });
 
   afterEach(() => {
-    if (originalContent !== null) writeFileSync(REVIEW_STATUS_FILE, originalContent, 'utf-8');
-    else if (existsSync(REVIEW_STATUS_FILE)) unlinkSync(REVIEW_STATUS_FILE);
     for (const r of tmpRoots.splice(0)) rmSync(r, { recursive: true, force: true });
   });
 
@@ -232,5 +216,56 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     const actions = await checkCompletedButUnsignaledTests();
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  // ── checkPendingTestDispatch strand-surfacing ──────────────────────────────
+
+  it('does NOT re-dispatch or bump the retry count while a live test session exists', async () => {
+    mockSessionExists.mockReturnValue(true); // live test session
+    mockIsPaneDead.mockResolvedValue(false);
+    writeStatusFile({
+      'PAN-1455': { issueId: 'PAN-1455', reviewStatus: 'passed', testStatus: 'pending', testRetryCount: 0 },
+    });
+
+    const actions = await checkPendingTestDispatch();
+
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled(); // no testRetryCount bump
+    expect(actions).toHaveLength(0);
+  });
+
+  it('surfaces a one-time stuck marker at retryCount>=3 instead of silently capping', async () => {
+    mockSessionExists.mockReturnValue(false); // no live session to recover from
+    writeStatusFile({
+      'PAN-1455': { issueId: 'PAN-1455', reviewStatus: 'passed', testStatus: 'pending', testRetryCount: 3 },
+    });
+
+    const actions = await checkPendingTestDispatch();
+
+    expect(mockSpawnRun).not.toHaveBeenCalled(); // capped — no fresh dispatch
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(
+      'PAN-1455',
+      expect.objectContaining({ stuck: true, stuckReason: 'test_signal_strand' }),
+    );
+    expect(actions.some(a => a.includes('Surfaced test strand for PAN-1455'))).toBe(true);
+  });
+
+  it('does not re-stamp the stuck marker once test_signal_strand is set', async () => {
+    mockSessionExists.mockReturnValue(false);
+    writeStatusFile({
+      'PAN-1455': {
+        issueId: 'PAN-1455',
+        reviewStatus: 'passed',
+        testStatus: 'pending',
+        testRetryCount: 3,
+        stuck: true,
+        stuckReason: 'test_signal_strand',
+      },
+    });
+
+    const actions = await checkPendingTestDispatch();
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(actions).toHaveLength(0);
   });
 });
