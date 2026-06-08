@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
@@ -155,6 +155,15 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   const [open, setOpen] = useState(false)
   const actions = useIssueActions(issueId)
   const actionsByKey = useMemo(() => new Map(actions.all.map((view) => [view.action.key, view])), [actions.all])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
 
   const groups = useMemo(() => {
     return GROUP_ORDER.map((group) => ({
