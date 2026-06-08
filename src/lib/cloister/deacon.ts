@@ -1049,9 +1049,67 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             continue;
           }
 
-          // Fresh overflow → first try /compact, which still works before the
-          // hard ceiling and preserves more conversation context than /clear.
+          // Fresh overflow → first try compaction, which preserves more
+          // conversation context than /clear.
           const compactAttempts = (ov?.compactAttempts ?? 0) + 1;
+
+          // PAN-1675: for agent-* sessions, recover via Panopticon-side
+          // compaction (out-of-band rewrite of the JSONL the harness resumes
+          // from) instead of the harness `/compact` — `/compact` needs a live,
+          // responsive Claude process and deadlocks on a session already wedged
+          // past the context ceiling. resumeAgent({ compact:true }) compacts the
+          // JSONL then relaunches; the resumed agent is nudged on the next
+          // patrol's 'overflow cleared' branch (phase 'compact'). On failure we
+          // fall through to the /clear + reseed tier in this same pass against
+          // the still-live wedged session. Non-agent (specialist/planning)
+          // sessions keep the harness /compact path.
+          if (issueId !== null) {
+            const { resumeAgent } = await import('../agents.js');
+            const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });
+            if (resumeResult.success) {
+              contextOverflowRecoveryState.set(sessionName, {
+                lastAttempt: now,
+                compactAttempts,
+                clearAttempts: ov?.clearAttempts ?? 0,
+                phase: 'compact',
+              });
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'warn',
+                message: `${sessionName} hit context-window overflow — recovered via Panopticon-side compaction (attempt ${compactAttempts})`,
+                issueId: issueId ?? undefined,
+              });
+              console.log(`[deacon] Agent ${sessionName} hit context-window overflow — Panopticon-side compacted + resumed (attempt ${compactAttempts})`);
+              actions.push(`Context overflow recovery: Panopticon-side compacted ${sessionName} (attempt ${compactAttempts})`);
+              continue;
+            }
+            // Compaction/resume failed — fall through to /clear + reseed in this
+            // same patrol pass (no compact attempt recorded; session still live).
+            console.warn(`[deacon] Panopticon-side compaction failed for ${sessionName} (${resumeResult.error ?? 'unknown'}); falling through to /clear`);
+            const clearAttempts = (ov?.clearAttempts ?? 0) + 1;
+            try {
+              await Effect.runPromise(sendKeys(sessionName, '/clear'));
+              await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
+              contextOverflowRecoveryState.set(sessionName, {
+                lastAttempt: now,
+                compactAttempts: ov?.compactAttempts ?? 0,
+                clearAttempts,
+                phase: 'clear',
+              });
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'warn',
+                message: `${sessionName} context-window overflow — Panopticon-side compaction failed, cleared context and sent reseed nudge (attempt ${clearAttempts})`,
+                issueId: issueId ?? undefined,
+              });
+              console.log(`[deacon] Agent ${sessionName} — compaction failed, sent /clear + reseed (attempt ${clearAttempts})`);
+              actions.push(`Context overflow recovery: compaction failed, cleared ${sessionName} and sent reseed (attempt ${clearAttempts})`);
+            } catch (err) {
+              console.error(`[deacon] Failed to send /clear reseed recovery to ${sessionName}:`, err);
+            }
+            continue;
+          }
+
           try {
             await Effect.runPromise(sendKeys(sessionName, '/compact'));
             contextOverflowRecoveryState.set(sessionName, {
