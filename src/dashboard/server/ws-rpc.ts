@@ -20,7 +20,7 @@ import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import type { AgentStatus, CompactBoundary, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
@@ -70,25 +70,6 @@ export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent
   return Stream.succeed({ kind: 'discovering' } as ConversationEvent).pipe(
     Stream.repeat(Schedule.fixed('2 seconds')),
   );
-}
-
-
-function mergeById<T extends { id: string }>(previous: T[], next: T[]): T[] {
-  if (next.length === 0) return previous;
-  const merged = new Map<string, T>();
-  for (const item of previous) merged.set(item.id, item);
-  for (const item of next) merged.set(item.id, item);
-  return Array.from(merged.values());
-}
-
-export function mergeConversationMessageSnapshot(
-  previous: Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'>,
-  next: Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'>,
-): Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'> {
-  return {
-    messages: mergeById(previous.messages, next.messages),
-    workLog: mergeById(previous.workLog, next.workLog),
-  };
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -672,12 +653,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     }
                   };
 
-                  // Emit current state immediately on subscribe
-                  const initial = await parseConversationMessages(sessionFile, 0);
-                  let currentMessages = initial.messages;
-                  let currentWorkLog = initial.workLog;
-                  let currentCompactBoundaries = initial.compactBoundaries ?? [];
-                  let currentProposedPlan = initial.proposedPlan;
+                  // Pass an explicit empty ParseState so pending tool_use entries
+                  // remain in parser state for the watcher instead of being flushed
+                  // and cleared by the non-incremental display path.
+                  const initialState: ParseState = {
+                    pendingToolUse: new Map(),
+                    unresolvedResults: new Map(),
+                    lastSequence: 0,
+                  };
+                  const initial = await parseConversationMessages(sessionFile, 0, initialState);
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = await readContextUsage();
                   const priorState: ParseState = {
@@ -695,43 +679,31 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
                   offer({
                     kind: 'messages' as const,
-                    messages: currentMessages,
-                    workLog: currentWorkLog,
+                    messages: initial.messages,
+                    workLog: [...initial.workLog, ...initial.pendingToolUse.values()],
                     streaming: initial.streaming,
-                    proposedPlan: currentProposedPlan,
-                    compactBoundaries: currentCompactBoundaries.length > 0 ? currentCompactBoundaries : undefined,
+                    snapshot: true,
+                    proposedPlan: initial.proposedPlan,
+                    compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
                     contextUsage: currentContextUsage,
                   });
 
-                  // Watch only bytes written after the initial full parse, then
-                  // merge deltas back into a full snapshot for the client cache.
+                  // Watch only bytes written after the initial full parse. Subsequent
+                  // events are deltas; the client merges them into its cache.
                   const handle = watchConversation(sessionFile, async (result) => {
                     const fileWasReset = result.byteOffset < currentByteOffset;
-                    if (fileWasReset) {
-                      currentMessages = result.messages;
-                      currentWorkLog = result.workLog;
-                      currentCompactBoundaries = result.compactBoundaries ?? [];
-                    } else {
-                      const merged = mergeConversationMessageSnapshot(
-                        { messages: currentMessages, workLog: currentWorkLog },
-                        { messages: result.messages, workLog: result.workLog },
-                      );
-                      currentMessages = merged.messages;
-                      currentWorkLog = merged.workLog;
-                      currentCompactBoundaries = mergeById<CompactBoundary>(currentCompactBoundaries, result.compactBoundaries ?? []);
-                    }
                     currentByteOffset = result.byteOffset;
-                    currentProposedPlan = result.proposedPlan ?? currentProposedPlan;
                     if (result.totalTokens > 0) {
                       currentContextUsage = await readContextUsage();
                     }
                     offer({
                       kind: 'messages' as const,
-                      messages: currentMessages,
-                      workLog: currentWorkLog,
+                      messages: result.messages,
+                      workLog: result.workLog,
                       streaming: result.streaming,
-                      proposedPlan: currentProposedPlan,
-                      compactBoundaries: currentCompactBoundaries.length > 0 ? currentCompactBoundaries : undefined,
+                      snapshot: fileWasReset,
+                      proposedPlan: result.proposedPlan,
+                      compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
                       contextUsage: currentContextUsage,
                     });
                   }, { byteOffset: initial.byteOffset, priorState });

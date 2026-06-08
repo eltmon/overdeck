@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect, Stream } from 'effect';
-import { buildEnrichSessionsJobPayload, conversationDiscoveringStream, filterDomainEventForIssue, mergeConversationMessageSnapshot } from '../ws-rpc.js';
+import { buildEnrichSessionsJobPayload, conversationDiscoveringStream, filterDomainEventForIssue } from '../ws-rpc.js';
 import type { DomainEvent } from '@panctl/contracts';
 import type { RuntimeConversationsConfig } from '../../../lib/config-yaml.js';
 
@@ -24,40 +24,6 @@ describe('conversationDiscoveringStream', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-});
-
-describe('mergeConversationMessageSnapshot', () => {
-  it('keeps prior transcript history while applying incremental updates', () => {
-    const merged = mergeConversationMessageSnapshot(
-      {
-        messages: [
-          { id: 'm1', role: 'user', text: 'hello', createdAt: '2026-06-08T00:00:00.000Z' },
-          { id: 'm2', role: 'assistant', text: 'working', createdAt: '2026-06-08T00:00:01.000Z', streaming: true },
-        ],
-        workLog: [
-          { id: 'w1', createdAt: '2026-06-08T00:00:02.000Z', label: 'Bash', tone: 'tool' },
-        ],
-      },
-      {
-        messages: [
-          { id: 'm2', role: 'assistant', text: 'done', createdAt: '2026-06-08T00:00:01.000Z', completedAt: '2026-06-08T00:00:03.000Z' },
-          { id: 'm3', role: 'user', text: 'next', createdAt: '2026-06-08T00:00:04.000Z' },
-        ],
-        workLog: [
-          { id: 'w1', createdAt: '2026-06-08T00:00:02.000Z', label: 'Bash', tone: 'tool', result: 'ok' },
-        ],
-      },
-    );
-
-    expect(merged.messages.map((message) => [message.id, message.text])).toEqual([
-      ['m1', 'hello'],
-      ['m2', 'done'],
-      ['m3', 'next'],
-    ]);
-    expect(merged.workLog).toEqual([
-      { id: 'w1', createdAt: '2026-06-08T00:00:02.000Z', label: 'Bash', tone: 'tool', result: 'ok' },
-    ]);
   });
 });
 

@@ -253,27 +253,29 @@ function transformMarkdownUrl(url: string): string {
 type ReactMarkdownRemarkPlugins = React.ComponentProps<typeof ReactMarkdown>['remarkPlugins'];
 type StreamdownComponents = NonNullable<StreamdownProps['components']>;
 
-interface ChatMarkdownUiFlags {
-  streamdownRenderer?: boolean;
+interface ChatMarkdownSettings {
+  experimental?: {
+    streamdownRenderer?: boolean;
+  };
 }
 
-async function fetchChatMarkdownUiFlags(): Promise<ChatMarkdownUiFlags> {
-  const res = await fetch('/api/settings/ui-flags');
-  if (!res.ok) throw new Error('settings UI flags fetch failed');
+async function fetchChatMarkdownSettings(): Promise<ChatMarkdownSettings> {
+  const res = await fetch('/api/settings');
+  if (!res.ok) throw new Error('settings fetch failed');
   return res.json();
 }
 
 const StreamdownRendererContext = createContext(false);
 
 export function ChatMarkdownSettingsProvider({ children }: { children: ReactNode }) {
-  const { data: flags } = useQuery({
-    queryKey: ['settings', 'ui-flags'],
-    queryFn: fetchChatMarkdownUiFlags,
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchChatMarkdownSettings,
     retry: false,
   });
 
   return (
-    <StreamdownRendererContext.Provider value={flags?.streamdownRenderer === true}>
+    <StreamdownRendererContext.Provider value={settings?.experimental?.streamdownRenderer === true}>
       {children}
     </StreamdownRendererContext.Provider>
   );

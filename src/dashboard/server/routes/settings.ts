@@ -109,22 +109,6 @@ const getSettingsRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/settings/ui-flags ───────────────────────────────────────
-
-const getSettingsUiFlagsRoute = HttpRouter.add(
-  'GET',
-  '/api/settings/ui-flags',
-  httpHandler(Effect.try({
-    try: () => {
-      const settings = loadSettingsApi();
-      return jsonResponse({
-        streamdownRenderer: settings.experimental?.streamdownRenderer === true,
-      });
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-  })),
-);
-
 // ─── Route: GET /api/settings/available-models ────────────────────────────────
 
 const getAvailableModelsRoute = HttpRouter.add(
@@ -884,7 +868,6 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 
 export const settingsRouteLayer = Layer.mergeAll(
   getSettingsRoute,
-  getSettingsUiFlagsRoute,
   getAvailableModelsRoute,
   getOptimalDefaultsRoute,
   getMiniMaxDefaultsRoute,
