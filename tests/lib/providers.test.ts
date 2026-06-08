@@ -114,6 +114,13 @@ describe('providers', () => {
     expect(getProviderForModelSync('ollama:library/tag:latest')).toBe(PROVIDERS.ollama);
   });
 
+  it('returns OpenAI-compatible env for Ollama without Anthropic routing vars', () => {
+    expect(getProviderEnvSync(PROVIDERS.ollama, 'ollama')).toEqual({
+      OPENAI_BASE_URL: OLLAMA_OPENAI_BASE_URL,
+      OPENAI_API_KEY: 'ollama',
+    });
+  });
+
   it('keeps existing model routing unchanged', () => {
     expect(getProviderForModelSync('claude-sonnet-4-6')).toBe(PROVIDERS.anthropic);
     expect(getProviderForModelSync('gpt-5.4')).toBe(PROVIDERS.openai);

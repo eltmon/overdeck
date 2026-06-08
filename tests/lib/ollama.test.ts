@@ -20,6 +20,9 @@ import {
   ensureOllamaServeRunning,
   isOllamaInstalled,
   resolveOllamaBaseUrl,
+  resolveOllamaOpenAIBaseUrl,
+  stripOllamaModelPrefix,
+  toPiOllamaModelSelector,
 } from '../../src/lib/ollama.js';
 
 type ExecCallback = (error: Error | null, stdout: string, stderr: string) => void;
@@ -52,6 +55,14 @@ describe('ollama lifecycle', () => {
   it('rejects non-localhost base URLs', () => {
     expect(() => resolveOllamaBaseUrl({ models: { providers: { ollama: { base_url: 'https://example.com' } } } })).toThrow(OllamaError);
     expect(() => resolveOllamaBaseUrl({ models: { providers: { ollama: { base_url: 'http://192.168.1.10:11434' } } } })).toThrow(/localhost/);
+  });
+
+  it('derives Pi/OpenAI-compatible Ollama identifiers from Panopticon model IDs', () => {
+    expect(resolveOllamaOpenAIBaseUrl({ models: { providers: { ollama: { base_url: 'http://127.0.0.1:11434/' } } } })).toBe('http://127.0.0.1:11434/v1');
+    expect(stripOllamaModelPrefix('ollama:gemma4:12b')).toBe('gemma4:12b');
+    expect(stripOllamaModelPrefix('gemma4:12b')).toBe('gemma4:12b');
+    expect(toPiOllamaModelSelector('ollama:gemma4:12b')).toBe('ollama/gemma4:12b');
+    expect(toPiOllamaModelSelector('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
   });
 
   it('detects whether the ollama binary is installed with async exec', async () => {

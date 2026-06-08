@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
+import { toPiOllamaModelSelector } from './ollama.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -394,7 +395,9 @@ const PROVIDER_ENV_UNSETS = [
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
+  'OPENAI_BASE_URL',
   'OPENAI_API_KEY',
+  'PANOPTICON_OLLAMA_MODEL',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
@@ -655,7 +658,7 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    tokens.push('--model', shellQuoteModelIdSync(toPiOllamaModelSelector(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {

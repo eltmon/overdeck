@@ -268,6 +268,13 @@ export function getProviderEnvSync(
     return {};
   }
 
+  if (provider.name === 'ollama') {
+    return {
+      OPENAI_BASE_URL: provider.baseUrl ?? OLLAMA_OPENAI_BASE_URL,
+      OPENAI_API_KEY: apiKey,
+    };
+  }
+
   const env: Record<string, string> = {};
 
   if (provider.name === 'kimi') {

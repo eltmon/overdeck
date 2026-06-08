@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import panopticonPiExtension, {
+  registerOllamaProviderFromEnv,
   handleSessionStart,
   handleToolExecutionEnd,
   handleTurnEnd,
@@ -458,6 +459,47 @@ describe('two extension instances with different agent IDs do not collide', () =
     expect(JSON.parse(readFileSync(b.readyPath, 'utf8')).sessionId).toBe('sess-B')
     expect(JSON.parse(readFileSync(a.heartbeatPath, 'utf8')).tool_name).toBe('Read')
     expect(JSON.parse(readFileSync(b.heartbeatPath, 'utf8')).tool_name).toBe('Bash')
+  })
+})
+
+describe('registerOllamaProviderFromEnv', () => {
+  it('registers a local OpenAI-compatible Ollama provider when launcher env is present', () => {
+    vi.stubEnv('OPENAI_BASE_URL', 'http://localhost:11434/v1')
+    vi.stubEnv('OPENAI_API_KEY', 'ollama')
+    vi.stubEnv('PANOPTICON_OLLAMA_MODEL', 'gemma4:12b')
+    const registerProvider = vi.fn()
+    const pi: PiExtensionAPI = {
+      on: () => {},
+      registerCommand: () => {},
+      registerProvider,
+    }
+
+    registerOllamaProviderFromEnv(pi)
+
+    expect(registerProvider).toHaveBeenCalledWith('ollama', expect.objectContaining({
+      name: 'Ollama (local)',
+      baseUrl: 'http://localhost:11434/v1',
+      apiKey: 'ollama',
+      api: 'openai-completions',
+      compat: {
+        supportsDeveloperRole: false,
+        supportsReasoningEffort: false,
+      },
+      models: [expect.objectContaining({ id: 'gemma4:12b' })],
+    }))
+  })
+
+  it('does nothing without both a base URL and selected model', () => {
+    const registerProvider = vi.fn()
+    const pi: PiExtensionAPI = {
+      on: () => {},
+      registerCommand: () => {},
+      registerProvider,
+    }
+
+    registerOllamaProviderFromEnv(pi)
+
+    expect(registerProvider).not.toHaveBeenCalled()
   })
 })
 

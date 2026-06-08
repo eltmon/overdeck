@@ -24,6 +24,7 @@ import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getClaudeAuthStatus } from './claude-auth.js';
 import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from './cliproxy.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
+import { stripOllamaModelPrefix, toPiOllamaModelSelector } from './ollama.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
@@ -380,7 +381,7 @@ export async function getAgentRuntimeBaseCommand(
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${quotedModel}`;
+    return `pi --mode rpc --model ${shellQuoteModelIdSync(toPiOllamaModelSelector(validatedModel))}`;
   }
   if (harness === 'codex') {
     // buildCodexCommand in launcher-generator builds the full `codex exec` line;
@@ -472,7 +473,7 @@ export async function getRoleRuntimeBaseCommand(
   const validatedModel = requireModelOverrideSync(model);
   const quotedModel = shellQuoteModelIdSync(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${quotedModel}`;
+    return `pi --mode rpc --model ${shellQuoteModelIdSync(toPiOllamaModelSelector(validatedModel))}`;
   }
   if (harness === 'codex') {
     return `codex`;
@@ -526,6 +527,14 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   if (provider.name === 'anthropic') return {};
 
   const { config } = loadYamlConfig();
+
+  if (provider.name === 'ollama') {
+    return {
+      OPENAI_BASE_URL: `${config.providerBaseUrls.ollama}/v1`,
+      OPENAI_API_KEY: 'ollama',
+      PANOPTICON_OLLAMA_MODEL: stripOllamaModelPrefix(model),
+    };
+  }
 
   // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key
   if (provider.name === 'openrouter') {
@@ -591,7 +600,9 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL',
   'CLAUDE_CODE_SUBAGENT_MODEL',
+  'OPENAI_BASE_URL',
   'OPENAI_API_KEY',
+  'PANOPTICON_OLLAMA_MODEL',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',

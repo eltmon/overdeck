@@ -11,6 +11,7 @@ const execAsync = promisify(exec);
 export const OLLAMA_BASE_URL = 'http://localhost:11434';
 export const OLLAMA_OPENAI_BASE_URL = `${OLLAMA_BASE_URL}/v1`;
 export const DEFAULT_OLLAMA_MODEL = 'gemma4:12b';
+export const OLLAMA_MODEL_PREFIX = 'ollama:';
 export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|::1)(:\d+)?\/?$/;
 
 export class OllamaError extends Data.TaggedError('OllamaError')<{
@@ -62,6 +63,18 @@ export function resolveOllamaBaseUrl(config?: OllamaConfigLike | null): string {
   }
 
   return baseUrl;
+}
+
+export function resolveOllamaOpenAIBaseUrl(config?: OllamaConfigLike | null): string {
+  return `${resolveOllamaBaseUrl(config)}/v1`;
+}
+
+export function stripOllamaModelPrefix(model: string): string {
+  return model.startsWith(OLLAMA_MODEL_PREFIX) ? model.slice(OLLAMA_MODEL_PREFIX.length) : model;
+}
+
+export function toPiOllamaModelSelector(model: string): string {
+  return model.startsWith(OLLAMA_MODEL_PREFIX) ? `ollama/${stripOllamaModelPrefix(model)}` : model;
 }
 
 export async function isOllamaInstalled(): Promise<boolean> {

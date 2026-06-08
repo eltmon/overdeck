@@ -140,7 +140,9 @@ describe('generateLauncherScript', () => {
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
+      unset OPENAI_BASE_URL
       unset OPENAI_API_KEY
+      unset PANOPTICON_OLLAMA_MODEL
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
@@ -226,7 +228,9 @@ describe('generateLauncherScript', () => {
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
+      unset OPENAI_BASE_URL
       unset OPENAI_API_KEY
+      unset PANOPTICON_OLLAMA_MODEL
       unset GEMINI_API_KEY
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
@@ -782,6 +786,20 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
       "
     `);
+  });
+
+  it('converts Panopticon Ollama model IDs to Pi provider/model selectors', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'pi',
+      model: 'ollama:gemma4:12b',
+      piExtensionPath: '/abs/ext.js',
+      piFifoPath: '/tmp/agent-x/rpc.in',
+      piSessionDir: '/tmp/agent-x/sessions',
+    });
+    expect(script).toMatch(/exec pi --mode rpc --model 'ollama\/gemma4:12b'/);
+    expect(script).not.toContain('ollama:gemma4:12b');
   });
 
   it('uses non-deadlocking <> FIFO redirection so Pi can emit ready.json before any writer attaches (PAN-1055 regression)', () => {

@@ -16,6 +16,29 @@ export interface PiExtensionAPI {
   on(event: 'turn_end', handler: (event: TurnEndEvent, ctx: unknown) => void | Promise<void>): void
   on(event: string, handler: (event: unknown, ctx: unknown) => void | Promise<void>): void
   registerCommand(name: string, command: PiCommand): void
+  registerProvider?(name: string, config: PiProviderConfig): void
+}
+
+export interface PiProviderConfig {
+  name?: string
+  baseUrl: string
+  apiKey: string
+  api: 'openai-completions'
+  compat?: {
+    supportsDeveloperRole?: boolean
+    supportsReasoningEffort?: boolean
+  }
+  models: PiModelDefinition[]
+}
+
+export interface PiModelDefinition {
+  id: string
+  name?: string
+  reasoning: boolean
+  input: string[]
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number }
+  contextWindow: number
+  maxTokens: number
 }
 
 export interface SessionStartEvent {
@@ -636,9 +659,39 @@ async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void>
   }
 }
 
+export function registerOllamaProviderFromEnv(pi: PiExtensionAPI): void {
+  if (typeof pi.registerProvider !== 'function') return
+  const baseUrl = process.env['OPENAI_BASE_URL']?.trim()
+  const apiKey = process.env['OPENAI_API_KEY']?.trim() || 'ollama'
+  const model = process.env['PANOPTICON_OLLAMA_MODEL']?.trim()
+  if (!baseUrl || !model) return
+
+  pi.registerProvider('ollama', {
+    name: 'Ollama (local)',
+    baseUrl,
+    apiKey,
+    api: 'openai-completions',
+    compat: {
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+    },
+    models: [{
+      id: model,
+      name: `Ollama ${model}`,
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 4096,
+    }],
+  })
+}
+
 export default function panopticonPiExtension(pi: PiExtensionAPI): void {
   const agentId = process.env['PANOPTICON_AGENT_ID']
   if (!agentId) return
+
+  registerOllamaProviderFromEnv(pi)
 
   const env: HookEnv = { agentId }
 

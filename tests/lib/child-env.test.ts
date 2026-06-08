@@ -11,7 +11,9 @@ describe('buildChildEnv', () => {
       WINDOW: '0',
       ANTHROPIC_BASE_URL: 'http://proxy',
       ANTHROPIC_AUTH_TOKEN: 'secret',
+      OPENAI_BASE_URL: 'http://localhost:11434/v1',
       OPENAI_API_KEY: 'sk-xxx',
+      PANOPTICON_OLLAMA_MODEL: 'gemma4:12b',
       HOME: '/home/test',
     };
     const result = buildChildEnvSync(base as NodeJS.ProcessEnv, { CUSTOM: 'value' });
@@ -26,7 +28,9 @@ describe('buildChildEnv', () => {
     expect(result.WINDOW).toBeUndefined();
     expect(result.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(result.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(result.OPENAI_BASE_URL).toBeUndefined();
     expect(result.OPENAI_API_KEY).toBeUndefined();
+    expect(result.PANOPTICON_OLLAMA_MODEL).toBeUndefined();
   });
 
   it('overrides strip keys when explicitly provided', () => {

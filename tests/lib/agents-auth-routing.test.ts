@@ -51,7 +51,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
+import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, buildSpawnEnvForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -61,6 +61,7 @@ describe('agents auth routing', () => {
       config: {
         apiKeys: {},
         providerAuth: {},
+        providerBaseUrls: { ollama: 'http://localhost:11434' },
         // Pin bypass so command-shape assertions remain explicit; Auto-mode
         // invariants are covered in permission-mode-leak.test.ts.
         claude: { permissionMode: 'bypass' },
@@ -82,6 +83,9 @@ describe('agents auth routing', () => {
       }
       if (model.startsWith('gemini-')) {
         return { name: 'google', displayName: 'Google (Gemini)', compatibility: 'direct', authType: 'static' };
+      }
+      if (model.startsWith('ollama:')) {
+        return { name: 'ollama', displayName: 'Ollama', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('mimo-')) {
         return { name: 'mimo', displayName: 'MiMo', compatibility: 'direct', authType: 'static' };
@@ -174,6 +178,51 @@ describe('agents auth routing', () => {
     );
   });
 
+  it('emits OpenAI-compatible env for Ollama models without Anthropic routing vars', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: {},
+        providerAuth: {},
+        providerBaseUrls: { ollama: 'http://127.0.0.1:11434' },
+      },
+    });
+
+    const env = await getProviderEnvForModel('ollama:gemma4:12b');
+
+    expect(env).toEqual({
+      OPENAI_BASE_URL: 'http://127.0.0.1:11434/v1',
+      OPENAI_API_KEY: 'ollama',
+      PANOPTICON_OLLAMA_MODEL: 'gemma4:12b',
+    });
+    expect(env).not.toHaveProperty('ANTHROPIC_BASE_URL');
+    expect(env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
+  });
+
+  it('strips the Panopticon Ollama prefix before selecting the Pi model', async () => {
+    expect(await getAgentRuntimeBaseCommand('ollama:gemma4:12b', undefined, undefined, 'pi')).toBe(
+      "pi --mode rpc --model 'ollama/gemma4:12b'"
+    );
+  });
+
+  it('clears stale OpenAI-compatible Ollama env before overlaying spawn env', async () => {
+    const env = await buildSpawnEnvForModel('ollama:gemma4:12b', {
+      OPENAI_BASE_URL: 'https://stale.example/v1',
+      OPENAI_API_KEY: 'stale-key',
+      PANOPTICON_OLLAMA_MODEL: 'stale:model',
+      ANTHROPIC_BASE_URL: 'https://stale-anthropic.example',
+      KEEP_ME: 'yes',
+    });
+
+    expect(env).toMatchObject({
+      KEEP_ME: 'yes',
+      OPENAI_BASE_URL: 'http://localhost:11434/v1',
+      OPENAI_API_KEY: 'ollama',
+      PANOPTICON_OLLAMA_MODEL: 'gemma4:12b',
+    });
+    expect(env).not.toHaveProperty('ANTHROPIC_BASE_URL');
+  });
+
   it('launches MiniMax models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
       "claude --permission-mode bypassPermissions --model 'minimax-m2.7'"
@@ -223,7 +272,9 @@ describe('agents auth routing', () => {
         'unset ANTHROPIC_DEFAULT_SONNET_MODEL',
         'unset ANTHROPIC_SMALL_FAST_MODEL',
         'unset CLAUDE_CODE_SUBAGENT_MODEL',
+        'unset OPENAI_BASE_URL',
         'unset OPENAI_API_KEY',
+        'unset PANOPTICON_OLLAMA_MODEL',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
         'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
