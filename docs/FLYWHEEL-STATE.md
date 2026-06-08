@@ -957,3 +957,25 @@ will not merge until PAN-1645 is fixed or all four are shipped-on-host.
 Also validated this tick: **PAN-1678's fix holds under real load** — agent-pan-1614
 built with load peaking ~14 then settling to ~9 on 24 cores (well below the 36
 storm gate), no docs-index storm. The keystone fix works in production.
+
+### RUN-15 tick 19-21 — PAN-1675 (resume --compact) LANDED; "landed != live" reaffirmed
+
+The operator's conv 2558 implemented and pushed **PAN-1675** (Panopticon-side
+`resume --compact` wedge recovery) direct to origin/main — 3 commits
+(050d2c85c CLI / 285b9fbfd deacon auto-recovery / bcdf102c2 dashboard action),
+squashed-or-rolled into origin at **b43972741**. This is the run's **2nd
+substrate fix** (after PAN-1678) and the recovery tool for the ctx-100%-wedged
+PAN-1395/1491.
+
+Reaffirmed lesson (same shape as the PAN-1678 tick-5 note): **landed != live.**
+After the push, PAN-1395/1491 stayed at ctx 100% because the running deacon still
+executes the old `dist/` — `resume --compact` recovery only takes effect after
+the operator rebuilds dist + `pan reload`s. A fix on main does not self-heal the
+running system; the reload is a required, operator-owned step.
+
+Process note for the orchestrator: when an operator worker (conv 2558) is mid
+commit-push cycle on the SHARED main worktree, the flywheel must take no git
+action — defer durable FLYWHEEL-STATE.md commits until the tree is 0-ahead of
+origin, then commit path-scoped + fast-forward push (abandon the push, don't
+fight a rebase, if origin moved). Byte-comparing the worker's session
+cost/diff/pane across ticks is the way to tell active-work from stall.
