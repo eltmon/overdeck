@@ -915,3 +915,23 @@ ship-stalled issues; conv 2558 is landing them via ship-on-host. Lesson:
 progress can be real and substantial (a keystone bug fixed) while the flywheel's
 own headline (`prsMerged`, `awaitingUat`) shows zero movement — direct-to-main
 landings by an operator worker don't touch those counters.
+
+### RUN-15 tick 7 — a delegated worker can stall on an UNSUBMITTED operator message
+
+The landing push went static for two ticks (6→7, ~24min) and I initially read it
+(tick 6) as "operator actively steering." Tick 7 byte-compared conv 2558's pane
+across the two ticks and found it **frozen identically** ($9.7753, +21/-2, ctx
+22%, "Crunched 7m 25s"): the operator's reply "#1 now, then PAN-1675…" was
+**drafted at the `❯` prompt but never submitted** (Enter not pressed). So nothing
+landed because the directive was never sent.
+
+Lessons:
+- "Operator is driving" vs "operator stepped away with an unsent message" look
+  identical in a single snapshot. **Byte-compare the worker's pane (cost/ctx/diff)
+  across two ticks** — frozen metrics = stalled, even if a reply is visible in the
+  input buffer.
+- The flywheel can only **surface** this (openQuestions: "submit the pending
+  message in conv 2558"); it must not press Enter for an operator-owned worker.
+- The dashboard health classifier shows such a worker "active" — same
+  process-alive-≠-progressing theme as the RUN-14 brakes work, but for a
+  conversation worker the flywheel doesn't own.
