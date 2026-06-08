@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1613: Substrate: agents stay live / are re-spawned on CLOSED issues (zombie agent slots)",
-    "updated": "2026-06-08T12:25:06.344Z"
+    "updated": "2026-06-08T12:33:08.266Z"
   },
   "plan": {
     "id": "pan-1613",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "66d110af-7aa0-46e7-945a-499cd4836b53",
     "author": "agent:claude-opus-4-8",
-    "sequence": 26,
+    "sequence": 32,
     "created": "2026-06-05T18:57:46.000Z",
-    "updated": "2026-06-08T12:25:06.344Z",
+    "updated": "2026-06-08T12:33:08.266Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1613",
@@ -502,60 +502,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-05-PAN-1613-substrate-agents-stay-live-are-re-spawned-on-closed-issues-zombie-agent-slots.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1613",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T12:25:06.337Z",
+        "updatedAt": "2026-06-08T12:33:08.261Z",
         "work": {
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "status": "running",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-08T12:25:06.337Z"
+              "status": "running",
+              "at": "2026-06-08T12:33:08.261Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "notes": "Closed-issue reaper misses inspect agents and lacks no-resume gate",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-08T12:25:06.337Z",
+              "status": "pending",
+              "at": "2026-06-08T12:33:08.261Z",
               "notes": "Closed-issue reaper misses inspect agents and lacks no-resume gate"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:25:06.337Z",
+              "at": "2026-06-08T12:33:08.261Z",
               "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:25:06.337Z",
+          "updatedAt": "2026-06-08T12:33:08.261Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:25:06.337Z"
+              "at": "2026-06-08T12:33:08.261Z"
             }
           ],
           "readyForMerge": false,
