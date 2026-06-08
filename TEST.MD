@@ -38,3 +38,7 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   flash in dark mode (pinned color-scheme from our side). This edit's diff is the
   one to review in the conversation diff panel — it should be dark in dark mode,
   light in light mode, with no flash on open or theme toggle.
+- 2026-06-08: Testing a custom Claude Code theme (custom:panopticon) that mutes
+  the harsh full-width diffAdded/diffRemoved bands. The green/red bands behind
+  THESE lines in the Claude terminal should now read as soft, low-saturation
+  tints rather than vivid blocks. Tunable live via ~/.claude/themes/panopticon.json.
