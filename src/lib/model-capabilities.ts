@@ -143,6 +143,19 @@ export interface ModelCapability {
    * set. Populate only where there's ground truth (see docs/research/*-work-type-fit.md).
    */
   effortLevels?: readonly EffortLevel[];
+  /**
+   * Whether this model accepts image input (vision) on the endpoint Panopticon
+   * routes it through. Tri-state by design:
+   *   - `false` — proven text-only; image attachments must be blocked.
+   *   - `true`  — proven to accept images.
+   *   - `undefined` — not yet verified; callers treat as "allow" and rely on
+   *     the harness/provider to error if unsupported. Only populate from ground
+   *     truth (a real request against the live endpoint), never from marketing
+   *     copy — e.g. mimo-v2.5-pro's architecture is multimodal but its Token-Plan
+   *     serving endpoints are text-only (PAN-1685). Most models are intentionally
+   *     left undefined pending the per-model vision audit in PAN-1685.
+   */
+  supportsImages?: boolean;
   /** Additional notes about this model's strengths */
   notes?: string;
 }
@@ -814,6 +827,10 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'MiMo V2.5 Pro',
     costPer1MTokens: 2.0,
     contextWindow: 1048576,
+    // Text-only on the Xiaomi Token-Plan serving endpoints: an image request
+    // returns 404 "No endpoints found that support image input". The model's
+    // architecture is multimodal, but the served -pro endpoints are not. PAN-1685.
+    supportsImages: false,
     skills: {
       'code-generation': 88,
       'code-review': 86,
@@ -836,6 +853,9 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'MiMo V2.5',
     costPer1MTokens: 1.0,
     contextWindow: 262144,
+    // Multimodal — verified to accept image input on the same Token-Plan
+    // endpoint where -pro rejects it. PAN-1685.
+    supportsImages: true,
     skills: {
       'code-generation': 82,
       'code-review': 80,
@@ -1003,6 +1023,18 @@ export function getModelEffortLevelsSync(model: ModelId | string): readonly Effo
 export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
   const levels = getModelEffortLevelsSync(model);
   return levels === undefined || levels.includes(effort);
+}
+
+/**
+ * Whether image attachments may be sent to a model. Permissive by design:
+ * returns `false` ONLY for models proven text-only (`supportsImages === false`);
+ * `true` and unverified (`undefined`) both allow, so the harness/provider stays
+ * the final authority for unaudited models. Resolves deprecated IDs first.
+ * See {@link ModelCapability.supportsImages} and PAN-1685.
+ */
+export function modelSupportsImagesSync(model: ModelId | string): boolean {
+  const resolved = resolveModelIdSync(String(model));
+  return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsImages !== false;
 }
 
 /**

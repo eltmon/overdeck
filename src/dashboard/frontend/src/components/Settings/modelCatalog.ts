@@ -12,6 +12,14 @@ export interface ModelDef {
   description?: string;
   /** Blended $/1M tokens for cost-awareness badges/tooltips. */
   costPer1MTokens?: number;
+  /**
+   * Whether this model accepts image input. `false` = proven text-only (block
+   * attachments); `true`/`undefined` = allow. Distinct from the `'vision'`
+   * capability tag above, which is incomplete/unreliable today (e.g. multimodal
+   * models missing the tag) — only `supportsImages` gates the attach guard.
+   * Scoped to the two MiMo models for now; full audit in PAN-1685.
+   */
+  supportsImages?: boolean;
 }
 
 interface ProviderDef {
@@ -85,8 +93,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   mimo: {
     name: 'Xiaomi MiMo',
     models: [
-      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, enhanced agent efficiency' },
-      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast'], description: 'Multimodal model, 262K context, strong agentic coding' },
+      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
+      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 262K context, strong agentic coding' },
     ],
   },
   nous: {
@@ -105,6 +113,26 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     ],
   },
 };
+
+/** Look up a model definition by id across all providers. */
+export function findModelDef(modelId: string): ModelDef | undefined {
+  for (const provider of Object.values(MODELS_BY_PROVIDER)) {
+    const def = provider.models.find((m) => m.id === modelId);
+    if (def) return def;
+  }
+  return undefined;
+}
+
+/**
+ * Whether image attachments may be sent to a model. Permissive: returns `false`
+ * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
+ * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
+ * the provider stays the final authority. Mirrors `modelSupportsImagesSync` in
+ * src/lib/model-capabilities.ts. PAN-1685.
+ */
+export function modelSupportsImages(modelId: string): boolean {
+  return findModelDef(modelId)?.supportsImages !== false;
+}
 
 export type OpenRouterFavoriteModel = {
   id: string;

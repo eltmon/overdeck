@@ -29,6 +29,7 @@ import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
+import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -790,7 +791,31 @@ export async function handleConversationMessage(
     .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
     .map((c) => c.attachmentPath);
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  let deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
+
+  // Guard: text-only models (e.g. mimo-v2.5-pro) return 404 on image input,
+  // which the harness mistranslates as "model may not exist". Drop the image
+  // attachments and continue with the text rather than failing the whole turn.
+  // The composer also blocks attach up front; this is the server-side safety
+  // net for direct API callers. PAN-1685.
+  let outboundMessage = message;
+  let effectiveAttachmentPaths = managedAttachmentPaths;
+  let droppedImageCount = 0;
+  if (managedAttachmentPaths.length > 0 && !modelSupportsImagesSync(conv.model ?? '')) {
+    for (const p of managedAttachmentPaths) {
+      outboundMessage = outboundMessage.split(`@${p}`).join('');
+    }
+    outboundMessage = outboundMessage.trim();
+    droppedImageCount = managedAttachmentPaths.length;
+    effectiveAttachmentPaths = [];
+    if (!outboundMessage) {
+      return jsonResponse(
+        { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+        { status: 422 },
+      );
+    }
+  }
+
+  let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
 
   // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
   // UserPromptSubmit hook; Pi has no such hook, so inject server-side here for
@@ -825,7 +850,7 @@ export async function handleConversationMessage(
     });
   }
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}) });
 }
 
 /** Generate a default conversation name, e.g. 20260404-1234 */
