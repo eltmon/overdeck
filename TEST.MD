@@ -34,3 +34,7 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   individual Claude terminal so its diff bands stay readable in light mode.
 - 2026-06-08: This very edit is the diff to eyeball — added/removed lines should
   render cleanly in whatever theme the terminal pane is currently set to.
+- 2026-06-08: Hardened the conversation diff view against a first-paint light
+  flash in dark mode (pinned color-scheme from our side). This edit's diff is the
+  one to review in the conversation diff panel — it should be dark in dark mode,
+  light in light mode, with no flash on open or theme toggle.
