@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-08T02:23:20.290Z"
+    "updated": "2026-06-08T21:14:30.065Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 119,
+    "sequence": 127,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-08T02:23:20.290Z",
+    "updated": "2026-06-08T21:14:30.065Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,58 +415,62 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "test",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T02:23:20.277Z",
+        "updatedAt": "2026-06-08T21:14:29.969Z",
         "work": {
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T02:23:20.277Z",
+              "at": "2026-06-08T21:14:29.969Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "status": "passed",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
+          "notes": "Approved: all reviewers ready; raw findings demoted by cycle-6 convergence gate because only vBRIEF changed since prior approved review.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-08T02:23:20.277Z"
+              "status": "passed",
+              "at": "2026-06-08T21:14:29.969Z",
+              "notes": "Approved: all reviewers ready; raw findings demoted by cycle-6 convergence gate because only vBRIEF changed since prior approved review."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "status": "passed",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
+          "notes": "Operator-persisted verdict: test agent concluded 'All code gates pass, tests pass, UI features work' but never POSTed (PAN-1681 legacy strand, predates the result.json artifact contract).",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T02:23:20.277Z"
+              "status": "passed",
+              "at": "2026-06-08T21:14:29.969Z",
+              "notes": "Operator-persisted verdict: test agent concluded 'All code gates pass, tests pass, UI features work' but never POSTed (PAN-1681 legacy strand, predates the result.json artifact contract)."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T02:23:20.277Z",
+          "updatedAt": "2026-06-08T21:14:29.969Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T02:23:20.277Z"
+              "at": "2026-06-08T21:14:29.969Z"
             }
           ],
           "readyForMerge": false,
