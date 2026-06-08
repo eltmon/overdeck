@@ -35,6 +35,20 @@ const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
 }));
 
+const ollamaMocks = vi.hoisted(() => ({
+  ensureOllamaServeRunning: vi.fn(),
+  assertOllamaModelAvailable: vi.fn(),
+}));
+
+vi.mock('../../src/lib/ollama.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/ollama.js')>();
+  return {
+    ...actual,
+    ensureOllamaServeRunning: ollamaMocks.ensureOllamaServeRunning,
+    assertOllamaModelAvailable: ollamaMocks.assertOllamaModelAvailable,
+  };
+});
+
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
   createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
@@ -128,6 +142,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       apiKeys: {},
       providerAuth: {},
       providerPlan: {},
+      providerBaseUrls: { ollama: 'http://localhost:11434' },
       openrouterFavorites: [],
       workhorses: { ...actual.DEFAULT_WORKHORSES },
       roles: { ...actual.DEFAULT_ROLES },
@@ -204,6 +219,10 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     const beadsQuery = await import('../../src/lib/beads-query.js');
     vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValue(Effect.void);
     piFifoMocks.writePiCommand.mockClear();
+    ollamaMocks.ensureOllamaServeRunning.mockReset();
+    ollamaMocks.assertOllamaModelAvailable.mockReset();
+    ollamaMocks.ensureOllamaServeRunning.mockResolvedValue(undefined);
+    ollamaMocks.assertOllamaModelAvailable.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -671,6 +690,24 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
     });
 
+    it('preflights Ollama before spawning non-work Pi role sessions', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+
+      const state = await spawnRun('PAN-PI-OLLAMA-PREFLIGHT-1', 'test', {
+        workspace: '/tmp/test-workspace',
+        harness: 'pi',
+        model: 'ollama:gemma4:12b',
+      });
+
+      expect(state.harness).toBe('pi');
+      expect(ollamaMocks.ensureOllamaServeRunning).toHaveBeenCalledWith('http://localhost:11434');
+      expect(ollamaMocks.assertOllamaModelAvailable).toHaveBeenCalledWith('gemma4:12b', 'http://localhost:11434');
+      expect(tmux.createSession).toHaveBeenCalled();
+      expect(ollamaMocks.ensureOllamaServeRunning.mock.invocationCallOrder[0]!).toBeLessThan(
+        vi.mocked(tmux.createSession).mock.invocationCallOrder[0]!,
+      );
+    });
+
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
@@ -744,6 +781,25 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       expect(state.harness).toBe('claude-code');
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
+    });
+
+    it('throws before state creation when neither requested harness nor claude-code can run the model', async () => {
+      const harnessPolicy = await import('../../src/lib/harness-policy.js');
+      vi.mocked(harnessPolicy.canUseHarnessSync).mockImplementation((harness, model) => {
+        if (model.startsWith('ollama:') && harness !== 'pi') {
+          return { allowed: false, reason: 'Ollama local models are currently supported only by the Pi harness.' };
+        }
+        return { allowed: true };
+      });
+
+      await expect(
+        spawnRun('PAN-OLLAMA-DENY-1', 'review', {
+          workspace: '/tmp/test-workspace',
+          harness: 'claude-code',
+          model: 'ollama:gemma4:12b',
+        }),
+      ).rejects.toThrow('Ollama local models are currently supported only by the Pi harness');
+      expect(getAgentStateSync('agent-pan-ollama-deny-1-review')).toBeNull();
     });
 
     // Positive case (canUseHarness allows pi → state.harness stays 'pi') is

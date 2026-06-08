@@ -323,10 +323,18 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   }
 }
 
-async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
+export async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
   const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
-  const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
-  return decision.allowed ? requested : 'claude-code';
+  const authMode = await getProviderAuthMode(model);
+  const decision = canUseHarnessSync(requested, model, authMode);
+  if (decision.allowed) return requested;
+
+  if (requested !== 'claude-code') {
+    const claudeCodeDecision = canUseHarnessSync('claude-code', model, authMode);
+    if (claudeCodeDecision.allowed) return 'claude-code';
+  }
+
+  throw new Error(decision.reason ?? `Harness ${requested} cannot run model ${model}.`);
 }
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
@@ -2972,6 +2980,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   checkAndSetupHooks();
+
+  await preflightProviderForModel(selectedModel);
 
   const provider = getProviderForModelSync(selectedModel as ModelId);
   if (provider.authType === 'credential-file') {

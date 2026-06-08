@@ -27,9 +27,8 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, preflightProviderForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel, preflightProviderForModel, resolveEffectiveHarness, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
-import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -508,8 +507,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
     const planningModel = modelOverride || settingsModel;
     const requestedHarness = opts.harness ?? 'claude-code';
-    const harnessDecision = canUseHarnessSync(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
-    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    const effectiveHarness = await resolveEffectiveHarness(requestedHarness, planningModel);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
