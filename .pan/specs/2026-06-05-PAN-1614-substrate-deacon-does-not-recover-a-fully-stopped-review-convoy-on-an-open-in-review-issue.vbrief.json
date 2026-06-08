@@ -269,7 +269,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-05-PAN-1614-substrate-deacon-does-not-recover-a-fully-stopped-review-convoy-on-an-open-in-review-issue.vbrief.json"
+      "canonicalFilename": "2026-06-05-PAN-1614-substrate-deacon-does-not-recover-a-fully-stopped-review-convoy-on-an-open-in-review-issue.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1614",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-08T07:21:26.912Z",
+        "work": {
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "history": []
+        },
+        "verification": {
+          "status": "running",
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-06-08T07:21:26.912Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "notes": "All 15 ACs implemented; zero blockers across security, correctness, performance, and requirements.",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T07:21:26.912Z",
+              "notes": "All 15 ACs implemented; zero blockers across security, correctness, performance, and requirements."
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "notes": "Workspace docker stack for PAN-1614 is not healthy: No Docker containers found for workspace stack pan-1614. Run 'pan workspace rebuild PAN-1614' or retry with --host to override.",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T07:21:26.912Z",
+              "notes": "Workspace docker stack for PAN-1614 is not healthy: No Docker containers found for workspace stack pan-1614. Run 'pan workspace rebuild PAN-1614' or retry with --host to override."
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T07:21:26.912Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T07:21:26.912Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1630"
+        }
+      }
     }
   },
   "status": "active"
