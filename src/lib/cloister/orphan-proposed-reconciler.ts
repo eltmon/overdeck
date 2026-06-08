@@ -154,7 +154,12 @@ async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
   }
 }
 
-async function isIssueClosed(issueId: string, closedIssueIds?: Set<string>): Promise<boolean> {
+// PAN-1496 (zombie-on-closed): exported so the deacon's review-dispatch patrols
+// can gate on tracker-closed state. Checks fast local shadow state first, then
+// falls back to a live tracker fetch — so it catches even old closed issues
+// that predate shadow-state. Callers that iterate many issues MUST pass a
+// prebuilt `closedIssueIds` set to avoid a per-issue tracker fetch.
+export async function isIssueClosed(issueId: string, closedIssueIds?: Set<string>): Promise<boolean> {
   if (closedIssueIds) return closedIssueIds.has(issueId);
 
   const shadowState = await Effect.runPromise(getShadowState(issueId).pipe(Effect.catch(() => Effect.succeed(null))));

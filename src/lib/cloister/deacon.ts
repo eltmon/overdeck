@@ -2082,6 +2082,29 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
       if (!existsSync(completedFile) && !existsSync(processedFile)) continue;
 
+      // PAN-1496 (zombie-on-closed): if the issue is CLOSED on the tracker, do
+      // not re-dispatch review/test against it — and REAP the stale
+      // completed/completed.processed markers so this patrol stops re-firing on
+      // it every cycle (the markers are what keep a closed issue alive here).
+      // This is API-safe: checkMissingReviewStatuses only reaches here for
+      // agent dirs that both lack a status row AND carry a completion marker —
+      // a small, bounded set — so the per-issue tracker fallback in
+      // isIssueClosed can't storm the API the way a per-open-issue check would.
+      try {
+        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+        if (await isIssueClosed(issueId)) {
+          try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
+          try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
+          actions.push(`Reaped stale completion markers for CLOSED ${issueId} (no review re-dispatch)`);
+          console.log(`[deacon] ${issueId} is closed — reaped stale completion markers, skipping review dispatch`);
+          continue;
+        }
+      } catch (closedErr) {
+        // Non-fatal: if the closed check itself errors, fall through to the
+        // normal dispatch path rather than silently dropping the issue.
+        console.warn(`[deacon] checkMissingReviewStatuses closed-check failed for ${issueId}:`, closedErr);
+      }
+
       // Work is done but no status row — auto-trigger review
       const { resolveProjectFromIssueSync } = await import('../projects.js');
       const resolved = resolveProjectFromIssueSync(issueId);
