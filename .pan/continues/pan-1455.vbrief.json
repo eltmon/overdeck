@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1455",
   "created": "2026-06-04T06:35:31.056Z",
-  "updated": "2026-06-07T05:22:36.558Z",
+  "updated": "2026-06-08T02:09:53.905Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -19,6 +19,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-04T06:35:31.129Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-08T02:09:53.905Z"
     }
   ]
 }
