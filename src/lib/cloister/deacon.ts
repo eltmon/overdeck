@@ -1010,13 +1010,32 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         );
         if (isStuckOverflow) {
           if (!hasOverflow) {
-            // The overflow is gone (recovered out-of-band, e.g. a manual
-            // `pan resume --compact`); clear the stale stuck flag so the agent
-            // rejoins the pipeline.
-            const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
-            clearWorkspaceStuck(issueId!);
-            stuckOverflowNativeRecoveryState.delete(sessionName);
-            actions.push(`Context overflow recovery: cleared stale stuck flag for ${sessionName} (overflow gone)`);
+            // The tail no longer shows the overflow error — but that is a WEAK
+            // signal: the 400 line can scroll out of the captured window while
+            // the agent is still pinned near 100% context. Only clear the stuck
+            // flag on a POSITIVE recovery signal — the agent's actual JSONL
+            // context usage is back below the proactive high-water mark.
+            // Otherwise leave it stuck: a genuinely-full agent must not be
+            // returned to the pipeline on a tail-string miss only to re-overflow
+            // on its next turn (the false-recovery flap).
+            let recoveredPct: number | null = null;
+            try {
+              const st = getAgentStateSync(sessionName);
+              const sid = st?.sessionId ?? runtimeState?.claudeSessionId;
+              if (st?.workspace && sid && st.model) {
+                const { computeContextUsage } = await import('../../dashboard/server/services/conversation-service.js');
+                const usage = await computeContextUsage(sessionFilePath(st.workspace, sid), st.model);
+                if (usage && usage.percentUsed < CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) {
+                  recoveredPct = usage.percentUsed;
+                }
+              }
+            } catch { /* treat as not-yet-recovered — leave it stuck */ }
+            if (recoveredPct !== null) {
+              const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
+              clearWorkspaceStuck(issueId!);
+              stuckOverflowNativeRecoveryState.delete(sessionName);
+              actions.push(`Context overflow recovery: cleared stuck flag for ${sessionName} (context back to ${Math.round(recoveredPct)}%)`);
+            }
             continue;
           }
           const rec = stuckOverflowNativeRecoveryState.get(sessionName) ?? { attempts: 0, lastAttempt: 0 };
@@ -1043,9 +1062,19 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             });
             console.log(`[deacon] Agent ${sessionName} recovered from stuck context-overflow via native compaction (attempt ${rec.attempts})`);
             actions.push(`Context overflow recovery: native-compacted previously-stuck ${sessionName} (attempt ${rec.attempts})`);
-          } else {
-            console.warn(`[deacon] Native compaction failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY})`);
-            actions.push(`Context overflow recovery: native compaction failed for stuck ${sessionName} (attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY})`);
+            continue;
+          }
+          // Native compaction failed — fall through to the /clear + reseed tier
+          // against the still-live session (mirroring the fresh-overflow path),
+          // so a transient compaction failure doesn't leave the agent wedged
+          // with no nudge until the next cooldown window.
+          console.warn(`[deacon] Native compaction failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY}) — falling through to /clear`);
+          try {
+            await Effect.runPromise(sendKeys(sessionName, '/clear'));
+            await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
+            actions.push(`Context overflow recovery: stuck ${sessionName} native compaction failed — sent /clear + reseed (attempt ${rec.attempts})`);
+          } catch (clearErr) {
+            console.error(`[deacon] Failed to send /clear to stuck ${sessionName}:`, clearErr);
           }
           continue;
         }
@@ -1757,6 +1786,18 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Operator-set ignore flag: skip all patrol re-dispatch for this issue
       // until the human toggles it back off via the kanban button.
       if (status.deaconIgnored) continue;
+      // PAN-1496: never re-dispatch review/test for an issue closed on the
+      // tracker (e.g. closed on GitHub mid-pipeline, bypassing close-out which
+      // clears the review_status row). isTrackerIssueClosed is TTL-cached, so
+      // checking each surviving row at most once per cache window is bounded and
+      // cannot reproduce the PAN-328 API storm.
+      {
+        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+        if (await isIssueClosed(issueId)) {
+          actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed on the tracker`);
+          continue;
+        }
+      }
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
       // History contains the ground truth; the top-level status fields
@@ -2187,6 +2228,17 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         if (reviewPassedAt && now - new Date(reviewPassedAt).getTime() < 5 * 60 * 1000) {
           continue;
         }
+      }
+
+      // PAN-1496: never re-dispatch test for an issue closed on the tracker
+      // (e.g. closed on GitHub mid-pipeline, bypassing close-out which would
+      // have cleared the review_status row). The check is reached only by the
+      // small set of issues that pass all status filters above, and
+      // isTrackerIssueClosed is TTL-cached — so this cannot storm the API.
+      const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+      if (await isIssueClosed(issueId)) {
+        actions.push(`Skipped test retry for ${issueId}: issue is closed on the tracker`);
+        continue;
       }
 
       const { resolveProjectFromIssueSync } = await import('../projects.js');

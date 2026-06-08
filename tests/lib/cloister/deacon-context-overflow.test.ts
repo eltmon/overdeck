@@ -409,15 +409,29 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
       expect(actions.some(a => /native-compacted previously-stuck/.test(a))).toBe(true);
     });
 
-    it('clears a stale stuck flag when a stuck-overflow agent no longer overflows', async () => {
+    it('clears a stuck flag only on a POSITIVE recovery signal (context back below high-water)', async () => {
       mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow' });
+      mockGetAgentState.mockReturnValue({ id: SESSION, issueId: ISSUE, workspace: '/ws', sessionId: 'sess-1', model: 'gpt-5.5', status: 'running' });
+      mockComputeContextUsage.mockResolvedValue({ percentUsed: 30, contextWindow: 150_000, estimatedTokens: 45_000 });
       mockCapturePane.mockResolvedValue(pane('all good', 'continuing work'));
 
       const actions = await checkApiErrorAgents();
 
       expect(mockClearWorkspaceStuck).toHaveBeenCalledWith('PAN-9001');
       expect(mockResumeAgent).not.toHaveBeenCalled();
-      expect(actions.some(a => /cleared stale stuck flag/.test(a))).toBe(true);
+      expect(actions.some(a => /cleared stuck flag/.test(a))).toBe(true);
+    });
+
+    it('does NOT clear the stuck flag when the tail lacks the error but context is still near 100% (no false-recovery)', async () => {
+      mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow' });
+      mockGetAgentState.mockReturnValue({ id: SESSION, issueId: ISSUE, workspace: '/ws', sessionId: 'sess-1', model: 'gpt-5.5', status: 'running' });
+      // Error scrolled out of the tail, but the agent is still pinned near 100%.
+      mockComputeContextUsage.mockResolvedValue({ percentUsed: 99, contextWindow: 150_000, estimatedTokens: 148_500 });
+      mockCapturePane.mockResolvedValue(pane('all good', 'continuing work'));
+
+      await checkApiErrorAgents();
+
+      expect(mockClearWorkspaceStuck).not.toHaveBeenCalled();
     });
 
     it('stops after MAX native-compaction attempts and leaves the agent stuck for a human', async () => {
