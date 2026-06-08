@@ -4,7 +4,7 @@
     "created": "2026-05-31T21:30:18.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-06-08T15:36:15.321Z"
+    "updated": "2026-06-08T15:53:23.672Z"
   },
   "plan": {
     "id": "pan-1395",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
     "author": "agent:claude-opus-4-8",
-    "sequence": 61,
+    "sequence": 63,
     "created": "2026-05-31T21:30:18.000Z",
-    "updated": "2026-06-08T15:36:15.321Z",
+    "updated": "2026-06-08T15:53:23.672Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
@@ -721,58 +721,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1395",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T15:36:15.317Z",
+        "updatedAt": "2026-06-08T15:53:23.606Z",
         "work": {
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "status": "failed",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/dashboard-auth.ts",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-08T15:36:15.317Z"
+              "status": "failed",
+              "at": "2026-06-08T15:53:23.606Z",
+              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/dashboard-auth.ts"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "status": "pending",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
           "notes": "Chunk offsets can point at JSON metadata instead of message payload",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-08T15:36:15.317Z",
+              "status": "pending",
+              "at": "2026-06-08T15:53:23.606Z",
               "notes": "Chunk offsets can point at JSON metadata instead of message payload"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T15:36:15.317Z"
+              "at": "2026-06-08T15:53:23.606Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T15:36:15.317Z",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T15:36:15.317Z"
+              "at": "2026-06-08T15:53:23.606Z"
             }
           ],
           "readyForMerge": false,
