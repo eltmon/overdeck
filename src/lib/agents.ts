@@ -522,6 +522,17 @@ export function normalizeAgentId(agentId: string): string {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
+export async function preflightProviderForModel(model: string): Promise<void> {
+  const provider = getProviderForModelSync(model);
+  if (provider.name !== 'ollama') return;
+
+  const { config } = loadYamlConfig();
+  const baseUrl = config.providerBaseUrls.ollama;
+  const ollamaModel = stripOllamaModelPrefix(model);
+  await ensureOllamaServeRunning(baseUrl);
+  await assertOllamaModelAvailable(ollamaModel, baseUrl);
+}
+
 export async function getProviderEnvForModel(model: string): Promise<Record<string, string>> {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
@@ -531,8 +542,6 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   if (provider.name === 'ollama') {
     const baseUrl = config.providerBaseUrls.ollama;
     const ollamaModel = stripOllamaModelPrefix(model);
-    await ensureOllamaServeRunning(baseUrl);
-    await assertOllamaModelAvailable(ollamaModel, baseUrl);
     return {
       OPENAI_BASE_URL: `${baseUrl}/v1`,
       OPENAI_API_KEY: 'ollama',
@@ -620,13 +629,16 @@ const PROVIDER_ENV_KEYS = [
   'DASHSCOPE_API_KEY',
 ] as const;
 
-export async function getProviderExportsForModel(model: string): Promise<string> {
-  const envVars = await getProviderEnvForModel(model);
+function buildProviderExports(envVars: Record<string, string>): string {
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
 
   return [...unsetLines, ...exportLines].join('\n') + '\n';
+}
+
+export async function getProviderExportsForModel(model: string): Promise<string> {
+  return buildProviderExports(await getProviderEnvForModel(model));
 }
 
 /**
@@ -2522,6 +2534,7 @@ export async function buildAgentLaunchConfig(opts: {
     console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
   }
 
+  await preflightProviderForModel(model);
   const providerEnv = await getProviderEnvForModel(model);
 
   const provider = getProviderForModelSync(model as ModelId);
@@ -2531,7 +2544,7 @@ export async function buildAgentLaunchConfig(opts: {
     clearCredentialFileAuthSync(opts.workspace);
   }
 
-  const providerExports = await getProviderExportsForModel(model);
+  const providerExports = buildProviderExports(providerEnv);
 
   // PAN-1048: resume/restart launchers must respect the agent's role.
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong

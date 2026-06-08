@@ -20,7 +20,8 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
-import { checkOllamaEndpointReachable, isOllamaInstalled, resolveOllamaBaseUrl } from '../../lib/ollama.js';
+import { checkOllamaEndpointReachable, isOllamaInstalled } from '../../lib/ollama.js';
+import { loadConfigSync } from '../../lib/config-yaml.js';
 
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
 // Bump in lockstep with packages/pi-extension API surface compatibility.
@@ -147,7 +148,8 @@ export async function checkOllama(): Promise<CheckResult[]> {
     ];
   }
 
-  const baseUrl = resolveOllamaBaseUrl();
+  const { config } = loadConfigSync();
+  const baseUrl = config.providerBaseUrls.ollama;
   const reachable = await checkOllamaEndpointReachable(baseUrl);
   if (!reachable) {
     return [

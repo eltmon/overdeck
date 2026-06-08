@@ -27,7 +27,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, preflightProviderForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -575,6 +575,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // (Pi has no agent-definition system).
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
 
+    await preflightProviderForModel(planningModel);
     const providerExports = await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────

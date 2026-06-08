@@ -9,12 +9,15 @@
  * Rules:
  *   1. gpt-5.5 requires ChatGPT subscription auth — OpenAI does not expose it
  *      via the standard API-key endpoint. (PAN-1067)
- *   2. Pi running an Anthropic model under Anthropic *subscription* auth is
+ *   2. `ollama:` models are Pi-only until Claude Code/Codex have equivalent
+ *      local-provider adapters.
+ *   3. Pi running an Anthropic model under Anthropic *subscription* auth is
  *      blocked (Claude Code subscription terms forbid using the Anthropic
  *      subscription with non-Anthropic harnesses).
  *
  * Allowed cells:
- *   - claude-code + any provider + any authMode -> allowed (modulo rule 1)
+ *   - claude-code + non-Ollama provider + any authMode -> allowed (modulo rule 1)
+ *   - codex + non-Ollama provider + any authMode -> allowed (modulo rule 1)
  *   - pi + non-Anthropic provider + any authMode -> allowed (modulo rule 1)
  *   - pi + Anthropic provider + api-key -> allowed
  *   - pi + Anthropic provider + subscription -> BLOCKED
@@ -48,6 +51,13 @@ const GPT_5_5_API_KEY_BLOCK: HarnessPolicyDecision = {
     'Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model.',
 }
 
+const OLLAMA_PI_ONLY_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason:
+    'Ollama local models are currently supported only by the Pi harness. ' +
+    'Switch the harness to Pi, or pick a non-Ollama model for Claude Code/Codex.',
+}
+
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
 const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5'])
 
@@ -75,6 +85,11 @@ export function canUseHarnessSync(
   const modelAuth = canUseModelWithAuthSync(model, authMode)
   if (!modelAuth.allowed) return modelAuth
 
+  const provider = getProviderForModelSync(model)
+  if (provider.name === 'ollama' && harness !== 'pi') {
+    return OLLAMA_PI_ONLY_BLOCK
+  }
+
   if (harness === 'claude-code') {
     return ALLOWED
   }
@@ -84,7 +99,6 @@ export function canUseHarnessSync(
   }
 
   // harness === 'pi'
-  const provider = getProviderForModelSync(model)
   if (provider.name !== 'anthropic') {
     return ALLOWED
   }

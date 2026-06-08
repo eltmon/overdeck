@@ -19,6 +19,7 @@ const MODEL_BY_PROVIDER = {
 
 const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'codex']
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
+const CLOUD_PROVIDERS = PROVIDERS.filter(provider => provider !== 'ollama')
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
 describe('canUseHarness', () => {
@@ -49,14 +50,14 @@ describe('canUseHarness', () => {
     },
   )
 
-  it.each(PROVIDERS)('allows claude-code + %s on every authMode', provider => {
+  it.each(CLOUD_PROVIDERS)('allows claude-code + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
       expect(canUseHarnessSync('claude-code', model, authMode)).toEqual({ allowed: true })
     }
   })
 
-  it.each(PROVIDERS)('allows codex + %s on every authMode', provider => {
+  it.each(CLOUD_PROVIDERS)('allows codex + %s on every authMode', provider => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
       expect(canUseHarnessSync('codex', model, authMode)).toEqual({ allowed: true })
@@ -96,13 +97,26 @@ describe('canUseHarness', () => {
     }
   })
 
+  it('blocks ollama models for non-Pi harnesses with a human-readable reason', () => {
+    for (const harness of ['claude-code', 'codex'] as const) {
+      for (const authMode of AUTH_MODES) {
+        const decision = canUseHarnessSync(harness, 'ollama:gemma3:12b', authMode)
+        expect(decision.allowed).toBe(false)
+        expect(decision.reason).toBeTruthy()
+        expect(decision.reason!.toLowerCase()).toContain('ollama')
+        expect(decision.reason!.toLowerCase()).toContain('pi')
+      }
+    }
+  })
+
   it('covers the full 3 x 6 x 3 matrix with explicit per-cell expectations', () => {
     const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
         for (const authMode of AUTH_MODES) {
           const isBlockedCell =
-            harness === 'pi' && provider === 'anthropic' && authMode === 'subscription'
+            (harness === 'pi' && provider === 'anthropic' && authMode === 'subscription')
+            || (provider === 'ollama' && harness !== 'pi')
           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
         }
       }

@@ -3,14 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isOllamaInstalled: vi.fn(),
   checkOllamaEndpointReachable: vi.fn(),
-  resolveOllamaBaseUrl: vi.fn(),
+  loadConfigSync: vi.fn(),
 }));
 
 vi.mock('../../../lib/ollama.js', async (importActual) => ({
   ...(await importActual<typeof import('../../../lib/ollama.js')>()),
   isOllamaInstalled: mocks.isOllamaInstalled,
   checkOllamaEndpointReachable: mocks.checkOllamaEndpointReachable,
-  resolveOllamaBaseUrl: mocks.resolveOllamaBaseUrl,
+}));
+
+vi.mock('../../../lib/config-yaml.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/config-yaml.js')>()),
+  loadConfigSync: mocks.loadConfigSync,
 }));
 
 import { checkOllama } from '../doctor.js';
@@ -18,7 +22,11 @@ import { checkOllama } from '../doctor.js';
 describe('doctor checkOllama', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolveOllamaBaseUrl.mockReturnValue('http://localhost:11434');
+    mocks.loadConfigSync.mockReturnValue({
+      config: {
+        providerBaseUrls: { ollama: 'http://localhost:11434' },
+      },
+    });
   });
 
   it('reports ok when Ollama is installed and reachable', async () => {
@@ -48,6 +56,24 @@ describe('doctor checkOllama', () => {
       message: 'Installed but endpoint is not reachable at http://localhost:11434',
     });
     expect(results[0].fix).toContain('ollama serve');
+  });
+
+  it('checks the configured Ollama base URL', async () => {
+    mocks.loadConfigSync.mockReturnValue({
+      config: {
+        providerBaseUrls: { ollama: 'http://127.0.0.1:11435' },
+      },
+    });
+    mocks.isOllamaInstalled.mockResolvedValue(true);
+    mocks.checkOllamaEndpointReachable.mockResolvedValue(true);
+
+    const results = await checkOllama();
+
+    expect(mocks.checkOllamaEndpointReachable).toHaveBeenCalledWith('http://127.0.0.1:11435');
+    expect(results[0]).toMatchObject({
+      status: 'ok',
+      message: 'Installed and reachable at http://127.0.0.1:11435',
+    });
   });
 
   it('reports missing Ollama as advisory with install guidance', async () => {

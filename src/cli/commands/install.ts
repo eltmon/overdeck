@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -223,6 +223,20 @@ export function getOllamaInstallGuidance(platform: string): string {
   return 'Install Ollama: curl -fsSL https://ollama.com/install.sh | sh';
 }
 
+async function pullOllamaModel(model: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('ollama', ['pull', model], { stdio: 'inherit' });
+    child.on('error', reject);
+    child.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(signal ? `ollama pull ${model} exited on ${signal}` : `ollama pull ${model} exited with code ${code}`));
+    });
+  });
+}
+
 async function installOllamaStep(spinner: ReturnType<typeof ora>, platform: string): Promise<void> {
   spinner.start('Checking Ollama local model sidecar...');
   const installed = await isOllamaInstalled();
@@ -253,9 +267,10 @@ async function installOllamaStep(spinner: ReturnType<typeof ora>, platform: stri
     return;
   }
 
-  spinner.start(`Pulling Ollama model ${DEFAULT_OLLAMA_MODEL}...`);
+  spinner.stop();
+  console.log(chalk.cyan(`Pulling Ollama model ${DEFAULT_OLLAMA_MODEL}...`));
   try {
-    execSync(`ollama pull ${DEFAULT_OLLAMA_MODEL}`, { stdio: 'pipe', timeout: 30 * 60 * 1000 });
+    await pullOllamaModel(DEFAULT_OLLAMA_MODEL);
     spinner.succeed(`Ollama model ready: ${DEFAULT_OLLAMA_MODEL}`);
   } catch {
     spinner.warn(`Ollama model pull failed — run manually: ollama pull ${DEFAULT_OLLAMA_MODEL}`);

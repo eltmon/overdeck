@@ -64,7 +64,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, buildSpawnEnvForModel } from '../../src/lib/agents.js';
+import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, buildSpawnEnvForModel, preflightProviderForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -211,15 +211,30 @@ describe('agents auth routing', () => {
     });
     expect(env).not.toHaveProperty('ANTHROPIC_BASE_URL');
     expect(env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
+    expect(mockEnsureOllamaServeRunning).not.toHaveBeenCalled();
+    expect(mockAssertOllamaModelAvailable).not.toHaveBeenCalled();
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
+  });
+
+  it('preflights Ollama sidecar and model availability separately from env construction', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: {},
+        providerAuth: {},
+        providerBaseUrls: { ollama: 'http://127.0.0.1:11434' },
+      },
+    });
+
+    await preflightProviderForModel('ollama:gemma4:12b');
+
     expect(mockEnsureOllamaServeRunning).toHaveBeenCalledWith('http://127.0.0.1:11434');
     expect(mockAssertOllamaModelAvailable).toHaveBeenCalledWith('gemma4:12b', 'http://127.0.0.1:11434');
-    expect(mockGetProviderEnv).not.toHaveBeenCalled();
   });
 
   it('surfaces Ollama health-check failures without falling back to another provider', async () => {
     mockAssertOllamaModelAvailable.mockRejectedValueOnce(new Error('Ollama model gemma4:12b is not pulled. Run `ollama pull gemma4:12b`.'));
 
-    await expect(getProviderEnvForModel('ollama:gemma4:12b')).rejects.toThrow('ollama pull gemma4:12b');
+    await expect(preflightProviderForModel('ollama:gemma4:12b')).rejects.toThrow('ollama pull gemma4:12b');
 
     expect(mockEnsureOllamaServeRunning).toHaveBeenCalledWith('http://localhost:11434');
     expect(mockAssertOllamaModelAvailable).toHaveBeenCalledWith('gemma4:12b', 'http://localhost:11434');

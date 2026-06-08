@@ -1795,7 +1795,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Ollama local sidecar (no API key required)
       const ollama = normalizeProviderConfig(providers.ollama, undefined);
-      if (providers.ollama !== undefined) {
+      if (
+        typeof providers.ollama === 'object'
+        && providers.ollama !== null
+        && typeof providers.ollama.base_url === 'string'
+        && providers.ollama.base_url.trim().length > 0
+      ) {
         result.providerBaseUrls.ollama = resolveOllamaBaseUrl(config);
       }
       if (ollama.enabled) {

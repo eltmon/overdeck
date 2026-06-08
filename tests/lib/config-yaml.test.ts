@@ -176,6 +176,28 @@ api_keys:
       })).toThrow(/localhost/);
     });
 
+    it('preserves an inherited Ollama base_url when a higher-precedence config only enables the provider', () => {
+      const { config } = mergeConfigs(
+        {
+          models: {
+            providers: {
+              ollama: { enabled: true, base_url: 'http://127.0.0.1:11435' },
+            },
+          },
+        },
+        {
+          models: {
+            providers: {
+              ollama: true,
+            },
+          },
+        },
+      );
+
+      expect(config.enabledProviders.has('ollama')).toBe(true);
+      expect(config.providerBaseUrls.ollama).toBe('http://127.0.0.1:11435');
+    });
+
     it('normalizes RTK agent config with default-off precedence', () => {
       expect(mergeRtkConfigs().enabled).toBe(false);
 
