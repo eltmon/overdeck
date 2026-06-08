@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1613: Substrate: agents stay live / are re-spawned on CLOSED issues (zombie agent slots)",
-    "updated": "2026-06-08T12:42:08.522Z"
+    "updated": "2026-06-08T12:52:40.734Z"
   },
   "plan": {
     "id": "pan-1613",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "66d110af-7aa0-46e7-945a-499cd4836b53",
     "author": "agent:claude-opus-4-8",
-    "sequence": 55,
+    "sequence": 59,
     "created": "2026-06-05T18:57:46.000Z",
-    "updated": "2026-06-08T12:42:08.522Z",
+    "updated": "2026-06-08T12:52:40.734Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1613",
@@ -505,57 +505,57 @@
         "phase": "review",
         "issueId": "PAN-1613",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T12:42:08.363Z",
+        "updatedAt": "2026-06-08T12:52:40.727Z",
         "work": {
-          "updatedAt": "2026-06-08T12:42:08.363Z",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T12:42:08.363Z",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T12:42:08.363Z"
+              "at": "2026-06-08T12:52:40.727Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-08T12:42:08.363Z",
-          "notes": "Agent re-review request (1/25): Fixed lint",
+          "status": "blocked",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
+          "notes": "Inspect-session reaping routes inspect-* through stopAgent normalization, so closed inspect tmux sessions stay live",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-08T12:42:08.363Z",
-              "notes": "Agent re-review request (1/25): Fixed lint"
+              "status": "blocked",
+              "at": "2026-06-08T12:52:40.727Z",
+              "notes": "Inspect-session reaping routes inspect-* through stopAgent normalization, so closed inspect tmux sessions stay live"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:42:08.363Z",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
           "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:42:08.363Z",
+              "at": "2026-06-08T12:52:40.727Z",
               "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T12:42:08.363Z",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:42:08.363Z",
+          "updatedAt": "2026-06-08T12:52:40.727Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:42:08.363Z"
+              "at": "2026-06-08T12:52:40.727Z"
             }
           ],
           "readyForMerge": false,
