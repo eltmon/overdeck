@@ -31,6 +31,7 @@ const mockSaveAgentRuntimeState = vi.fn();
 const mockGetAgentState = vi.fn();
 const mockComputeContextUsage = vi.fn();
 const mockResumeAgent = vi.fn();
+const mockClearWorkspaceStuck = vi.fn();
 
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
@@ -58,6 +59,7 @@ vi.mock('../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../src/lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: (...args: unknown[]) => mockMarkWorkspaceStuck(...args),
+  clearWorkspaceStuck: (...args: unknown[]) => mockClearWorkspaceStuck(...args),
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
@@ -113,6 +115,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
   let checkApiErrorAgents: () => Promise<string[]>;
   let contextOverflowRecoveryState: Map<string, { lastAttempt: number; compactAttempts: number; clearAttempts: number; phase: 'compact' | 'clear' }>;
   let contextProactiveCompactState: Map<string, { lastAttempt: number }>;
+  let stuckOverflowNativeRecoveryState: Map<string, { attempts: number; lastAttempt: number }>;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -121,6 +124,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockListSessionNames.mockReset().mockResolvedValue([SESSION]);
     mockGetReviewStatusSync.mockReset().mockReturnValue(null);
     mockMarkWorkspaceStuck.mockReset();
+    mockClearWorkspaceStuck.mockReset();
     mockEmitActivityEntry.mockReset();
     mockGetAgentRuntimeState.mockReset().mockReturnValue(null);
     mockSaveAgentRuntimeState.mockReset().mockResolvedValue(undefined);
@@ -133,8 +137,10 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     checkApiErrorAgents = mod.checkApiErrorAgents;
     contextOverflowRecoveryState = mod.contextOverflowRecoveryState;
     contextProactiveCompactState = mod.contextProactiveCompactState;
+    stuckOverflowNativeRecoveryState = mod.stuckOverflowNativeRecoveryState;
     contextOverflowRecoveryState.clear();
     contextProactiveCompactState.clear();
+    stuckOverflowNativeRecoveryState.clear();
   });
 
   it('(a) detects overflow at an idle prompt → Panopticon-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {
@@ -385,5 +391,55 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
 
     expect(mockComputeContextUsage).not.toHaveBeenCalled();
     expect(mockSendKeys).not.toHaveBeenCalled();
+  });
+
+  // ── PAN-1675 (A2): rescue agents already flagged stuck=context_overflow ──
+  describe('stuck=context_overflow native-compaction rescue', () => {
+    it('attempts native compaction on a stuck-overflow agent and clears stuck on success', async () => {
+      mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow' });
+      mockResumeAgent.mockResolvedValue({ success: true });
+      mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+
+      const actions = await checkApiErrorAgents();
+
+      expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
+      // resumeAgent clears the stuck flag internally on success; the deacon also
+      // drops its native-recovery bookkeeping.
+      expect(stuckOverflowNativeRecoveryState.has(SESSION)).toBe(false);
+      expect(actions.some(a => /native-compacted previously-stuck/.test(a))).toBe(true);
+    });
+
+    it('clears a stale stuck flag when a stuck-overflow agent no longer overflows', async () => {
+      mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow' });
+      mockCapturePane.mockResolvedValue(pane('all good', 'continuing work'));
+
+      const actions = await checkApiErrorAgents();
+
+      expect(mockClearWorkspaceStuck).toHaveBeenCalledWith('PAN-9001');
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+      expect(actions.some(a => /cleared stale stuck flag/.test(a))).toBe(true);
+    });
+
+    it('stops after MAX native-compaction attempts and leaves the agent stuck for a human', async () => {
+      mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow' });
+      mockResumeAgent.mockResolvedValue({ success: false, error: 're-overflowed' });
+      mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+      // Pre-seed the budget as exhausted (lastAttempt old enough to skip cooldown).
+      stuckOverflowNativeRecoveryState.set(SESSION, { attempts: 2, lastAttempt: Date.now() - (20 * 60 * 1000) });
+
+      await checkApiErrorAgents();
+
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('leaves a deacon-ignored stuck agent untouched', async () => {
+      mockGetReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'context_overflow', deaconIgnored: true });
+      mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+
+      await checkApiErrorAgents();
+
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+      expect(mockClearWorkspaceStuck).not.toHaveBeenCalled();
+    });
   });
 });

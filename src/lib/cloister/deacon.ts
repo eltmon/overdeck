@@ -872,6 +872,19 @@ type ContextOverflowRecovery = {
 export const contextOverflowRecoveryState: Map<string, ContextOverflowRecovery> = new Map();
 export const contextProactiveCompactState: Map<string, { lastAttempt: number }> = new Map();
 
+/**
+ * PAN-1675 (A2): bounded native-compaction recovery for agents already flagged
+ * `stuck` with reason `context_overflow`. These got stuck under the OLD
+ * /compact+/clear ladder (which predates Panopticon-side compaction), so they
+ * never received a native-compaction attempt — and the `overflowBlocked` gate
+ * would otherwise skip their recovery forever. We give them a small, bounded
+ * number of out-of-band compaction attempts; if the agent keeps overflowing
+ * after that, it stays stuck for a human.
+ */
+export const stuckOverflowNativeRecoveryState: Map<string, { attempts: number; lastAttempt: number }> = new Map();
+const MAX_STUCK_NATIVE_RECOVERY = 2;
+const STUCK_NATIVE_RECOVERY_COOLDOWN_MS = 10 * 60 * 1000;
+
 async function maybeProactivelyCompactContext(sessionName: string, now: number): Promise<string | null> {
   if (!sessionName.startsWith('agent-')) return null;
   const cooldown = contextProactiveCompactState.get(sessionName);
@@ -979,6 +992,63 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         }
       } else if (runtimeState?.contextSaturatedAt) {
         await saveAgentRuntimeState(sessionName, { contextSaturatedAt: undefined });
+      }
+
+      // PAN-1675 (A2): rescue agents already flagged stuck=context_overflow.
+      // The old /compact+/clear ladder set `stuck` and the `overflowBlocked`
+      // gate below then skips their recovery permanently — but those agents
+      // never got a Panopticon-side (out-of-band) compaction, which can recover
+      // an overflow the harness /compact could not. Give them a bounded number
+      // of native-compaction attempts BEFORE the overflowBlocked gate. A
+      // successful resumeAgent({compact:true}) clears the stuck flag (in
+      // resumeAgent), so a recovered agent re-enters the normal flow. deacon-
+      // ignored issues are still left alone.
+      {
+        const stuckStatus = issueId ? getReviewStatusSync(issueId) : null;
+        const isStuckOverflow = Boolean(
+          stuckStatus?.stuck && stuckStatus.stuckReason === 'context_overflow' && !stuckStatus.deaconIgnored,
+        );
+        if (isStuckOverflow) {
+          if (!hasOverflow) {
+            // The overflow is gone (recovered out-of-band, e.g. a manual
+            // `pan resume --compact`); clear the stale stuck flag so the agent
+            // rejoins the pipeline.
+            const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
+            clearWorkspaceStuck(issueId!);
+            stuckOverflowNativeRecoveryState.delete(sessionName);
+            actions.push(`Context overflow recovery: cleared stale stuck flag for ${sessionName} (overflow gone)`);
+            continue;
+          }
+          const rec = stuckOverflowNativeRecoveryState.get(sessionName) ?? { attempts: 0, lastAttempt: 0 };
+          if (rec.attempts >= MAX_STUCK_NATIVE_RECOVERY) {
+            // Native compaction tried its budget and the agent keeps
+            // overflowing — genuinely needs a human; leave it stuck.
+            continue;
+          }
+          if (rec.lastAttempt && (now - rec.lastAttempt) < STUCK_NATIVE_RECOVERY_COOLDOWN_MS) {
+            continue;
+          }
+          rec.attempts += 1;
+          rec.lastAttempt = now;
+          stuckOverflowNativeRecoveryState.set(sessionName, rec);
+          const { resumeAgent } = await import('../agents.js');
+          const recovered = await resumeAgent(sessionName, undefined, { compact: true });
+          if (recovered.success) {
+            stuckOverflowNativeRecoveryState.delete(sessionName);
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'warn',
+              message: `${sessionName} recovered from a stuck context-overflow via Panopticon-side compaction (attempt ${rec.attempts})`,
+              issueId: issueId ?? undefined,
+            });
+            console.log(`[deacon] Agent ${sessionName} recovered from stuck context-overflow via native compaction (attempt ${rec.attempts})`);
+            actions.push(`Context overflow recovery: native-compacted previously-stuck ${sessionName} (attempt ${rec.attempts})`);
+          } else {
+            console.warn(`[deacon] Native compaction failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY})`);
+            actions.push(`Context overflow recovery: native compaction failed for stuck ${sessionName} (attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY})`);
+          }
+          continue;
+        }
       }
 
       if (!overflowBlocked) {

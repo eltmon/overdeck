@@ -4411,6 +4411,27 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       saveAgentStateSync(agentState);
     }
 
+    // PAN-1675: a successful compaction-resume genuinely recovers a
+    // context-overflow-wedged agent — so clear a context_overflow `stuck` flag
+    // here (set by markWorkspaceStuck once the old /compact+/clear ladder
+    // exhausted). Without this the agent would stay flagged stuck forever and
+    // the deacon's overflowBlocked gate would keep skipping its recovery, even
+    // though the agent is now healthy. Only clear when the stuck reason is
+    // context_overflow (don't clobber an unrelated stuck state).
+    if (opts?.compact && agentState?.issueId) {
+      try {
+        const { getReviewStatusSync } = await import('./review-status.js');
+        const rs = getReviewStatusSync(agentState.issueId);
+        if (rs?.stuck && rs.stuckReason === 'context_overflow') {
+          const { clearWorkspaceStuck } = await import('./database/review-status-db.js');
+          clearWorkspaceStuck(agentState.issueId);
+          logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
+        }
+      } catch (clearErr) {
+        console.warn(`[agents] Could not clear stuck flag after compaction-resume for ${normalizedId}:`, clearErr);
+      }
+    }
+
     return { success: true, messageDelivered };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
