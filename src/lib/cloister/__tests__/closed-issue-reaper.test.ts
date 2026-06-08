@@ -3,8 +3,10 @@ import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
+  getNoResumeMode: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
+  listSessionNames: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -17,6 +19,14 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
 }));
 
+vi.mock('../../tmux.js', () => ({
+  listSessionNames: mocks.listSessionNames,
+}));
+
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: mocks.getNoResumeMode,
+}));
+
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
 }));
@@ -26,7 +36,9 @@ import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
 describe('reconcileClosedIssueAgents', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(false);
   });
@@ -87,10 +99,46 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.stopAgent).toHaveBeenCalledTimes(2);
 
     vi.clearAllMocks();
+    mocks.getNoResumeMode.mockReturnValue({ active: false, since: null });
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(true);
 
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+    expect(mocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('stops inspect-shaped tmux sessions whose parent issue is closed', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([
+      'inspect-pan-1613-workspace-rn3ha',
+      'inspect-pan-1614-workspace-b95lw',
+      'agent-pan-1613',
+    ]));
+    mocks.isIssueClosed.mockImplementation(async (issueId: string) => issueId === 'PAN-1613');
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
+      'Reaped inspect-pan-1613-workspace-rn3ha — parent issue PAN-1613 is closed',
+    ]);
+
+    expect(mocks.stopAgent).toHaveBeenCalledTimes(1);
+    expect(mocks.stopAgent).toHaveBeenCalledWith('inspect-pan-1613-workspace-rn3ha');
+    expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1613');
+    expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1614');
+  });
+
+  it('does not reap closed-issue agents when no-resume mode is active', async () => {
+    mocks.getNoResumeMode.mockReturnValue({ active: true, since: '2026-06-08T12:00:00.000Z' });
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-1613', issueId: 'PAN-1613', role: 'work', status: 'running' },
+    ]));
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['inspect-pan-1613-workspace-rn3ha']));
+    mocks.isIssueClosed.mockResolvedValue(true);
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.listRunningAgents).not.toHaveBeenCalled();
+    expect(mocks.listSessionNames).not.toHaveBeenCalled();
     expect(mocks.isIssueClosed).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();
   });
