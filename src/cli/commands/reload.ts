@@ -33,15 +33,31 @@ function dashboardBundleMtimeMs(): number {
   }
 }
 
-function runBuild(): Promise<number> {
+function runCommand(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npm', ['run', 'build'], {
+    const child = spawn(command, args, {
       stdio: 'inherit',
       env: process.env,
     });
     child.once('error', reject);
     child.once('close', (code) => resolve(code ?? 1));
   });
+}
+
+/**
+ * Install dependencies before building. A merge/rebase that adds a runtime dep
+ * (e.g. chokidar from PAN-1395) leaves node_modules behind package.json: the
+ * build still succeeds (the bundler externalizes the dep) but the freshly built
+ * server boot-crashes with ERR_MODULE_NOT_FOUND, taking the dashboard down.
+ * `bun install` is idempotent and ~instant on a warm cache, so running it
+ * unconditionally before every reload makes "apply my merged changes" safe.
+ */
+function runBunInstall(): Promise<number> {
+  return runCommand('bun', ['install']);
+}
+
+function runBuild(): Promise<number> {
+  return runCommand('npm', ['run', 'build']);
 }
 
 async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -107,6 +123,17 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
   try {
     if (!options.skipBuild) {
+      // Install first so a merge/rebase that added a runtime dep can't produce a
+      // server bundle that boot-crashes on a missing package (see runBunInstall).
+      const installExit = await runBunInstall();
+      if (installExit !== 0) {
+        const error = 'bun install failed — old dashboard left running';
+        console.error(chalk.red(error));
+        await recordReloadStatus(startedAt, false, error);
+        process.exitCode = 1;
+        return;
+      }
+
       const beforeMtime = dashboardBundleMtimeMs();
       const exitCode = await runBuild();
       if (exitCode !== 0) {

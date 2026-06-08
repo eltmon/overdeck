@@ -13,11 +13,13 @@ Use this after code changes that should run in the local Panopticon dashboard.
 pan reload
 ```
 
-`pan reload` runs `npm run build` first. If the build fails, it leaves the current dashboard running and exits non-zero. If the build succeeds, it restarts the dashboard and waits for `http://127.0.0.1:3011/api/health`.
+`pan reload` runs `bun install` and then `npm run build` first. If either fails, it leaves the current dashboard running and exits non-zero. If both succeed, it restarts the dashboard and waits for `http://127.0.0.1:3011/api/health`.
+
+`npm run build` already rebuilds the dashboard **server** bundle (via `build-post-cli.mjs` → `build:dashboard:server:bundle`), so `pan reload` picks up server/deacon code changes — you do **not** need a separate `npm run build:dashboard:server`. The `bun install` step runs first so a merge/rebase that added a runtime dependency (e.g. `chokidar`) can't produce a freshly-built server that boot-crashes with `ERR_MODULE_NOT_FOUND`.
 
 ## Options
 
-- `--skip-build` — restart the current bundle without running `npm run build`.
+- `--skip-build` — restart the current bundle without running `bun install` or `npm run build`.
 - `--health-timeout <ms>` — set the dashboard health-check budget. The default is `30000`.
 - `--no-deacon` — restart without Cloister/Deacon auto-start.
 
