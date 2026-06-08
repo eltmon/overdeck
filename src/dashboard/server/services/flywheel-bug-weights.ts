@@ -8,6 +8,7 @@ import { computeFlywheelStats, parseFlywheelStatsWindow } from './flywheel-telem
 import { derivePipelineRunStatsInputs } from './pipeline-run-metrics.js';
 
 const execFileAsync = promisify(execFile);
+const ISSUE_DETAILS_CONCURRENCY = 5;
 
 export interface FlywheelIssueDetails {
   body: string;
@@ -74,6 +75,26 @@ async function computeStatsForWindow(window: string, generatedAt: Date, since: s
   });
 }
 
+async function mapWithConcurrency<T, U>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<U>,
+): Promise<U[]> {
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]!);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
+}
+
 export async function computeFlywheelSubstrateBugWeights(
   window = '30d',
   deps: FlywheelSubstrateBugWeightsDeps = {},
@@ -85,12 +106,12 @@ export async function computeFlywheelSubstrateBugWeights(
   const stats = await (deps.computeStats ?? computeStatsForWindow)(parsedWindow.input, generatedAtDate, since, generatedAt);
   const bugs = (deps.listBugs ?? listInWindow)(since, generatedAt).filter((bug) => bug.status === 'open');
   const fetchIssueDetails = deps.fetchIssueDetails ?? fetchGitHubIssueDetails;
-  const weights = await Promise.all(bugs.map(async (bug) => {
+  const weights = await mapWithConcurrency(bugs, ISSUE_DETAILS_CONCURRENCY, async (bug) => {
     const issue = await fetchIssueDetails(bug.issueId);
     const criteria = parseAffectedCriteria(issue.body, issue.labels);
     const { weight, reason } = computeSubstrateBugWeight(criteria, stats);
     return { issueId: bug.issueId, criteria, weight, reason } satisfies FlywheelSubstrateBugWeightEntry;
-  }));
+  });
 
   weights.sort((left, right) => right.weight - left.weight || left.issueId.localeCompare(right.issueId));
 

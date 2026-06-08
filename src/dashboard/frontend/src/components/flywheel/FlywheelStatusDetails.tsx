@@ -120,7 +120,8 @@ function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): Flywhe
         .map((entry) => entry.suggestion)
         .filter(hasWeight)
         .sort((left, right) => right.weight - left.weight);
-      sorted.push(...group.map((entry) => hasWeight(entry.suggestion) ? weighted.shift()! : entry.suggestion));
+      let weightedIndex = 0;
+      sorted.push(...group.map((entry) => hasWeight(entry.suggestion) ? weighted[weightedIndex++]! : entry.suggestion));
       return sorted;
     }, []);
 }
