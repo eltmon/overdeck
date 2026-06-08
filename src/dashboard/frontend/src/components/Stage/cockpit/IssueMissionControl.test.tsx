@@ -61,7 +61,6 @@ vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
-vi.mock('../../drawer/PhaseTimeline', () => ({ default: () => <div>Phase timeline</div> }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
@@ -75,17 +74,8 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
 }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({ VBriefTab: () => <div>vBRIEF tab</div> }))
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
-vi.mock('./CodeCard', () => ({ CodeCard: () => <div>Code card</div> }))
-vi.mock('./PlanCard', () => ({ PlanCard: () => <div>Plan card</div> }))
-vi.mock('./CostCard', () => ({ CostCard: () => <div>Cost card</div> }))
-vi.mock('./WorkspaceCard', () => ({ WorkspaceCard: () => <div>Workspace card</div> }))
-vi.mock('./AgentActivityCards', () => ({
-  AgentCard: () => <div>Agent card</div>,
-  ActivityCard: () => <div>Activity card</div>,
-}))
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
-vi.mock('./IssueMetricStrip', () => ({ IssueMetricStrip: () => <div>Metric strip</div> }))
 
 import { IssueMissionControl } from './IssueMissionControl'
 
