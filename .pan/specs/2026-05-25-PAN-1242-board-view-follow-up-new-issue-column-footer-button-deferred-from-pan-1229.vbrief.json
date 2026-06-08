@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-07T19:27:07.454Z"
+    "updated": "2026-06-08T02:18:04.225Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 112,
+    "sequence": 116,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-07T19:27:07.454Z",
+    "updated": "2026-06-08T02:18:04.225Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,61 +415,63 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "merge",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T19:27:07.407Z",
+        "updatedAt": "2026-06-08T02:18:04.158Z",
         "work": {
-          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T19:27:07.407Z"
+              "at": "2026-06-08T02:18:04.158Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-07T19:27:07.407Z",
-          "notes": "Agent re-review request (1/25): Fixed review issues",
+          "status": "passed",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
+          "notes": "Zero blockers across all four reviewers; approved with 6 non-blocking performance/requirements notes.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-07T19:27:07.407Z",
-              "notes": "Agent re-review request (1/25): Fixed review issues"
+              "status": "passed",
+              "at": "2026-06-08T02:18:04.158Z",
+              "notes": "Zero blockers across all four reviewers; approved with 6 non-blocking performance/requirements notes."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "status": "passed",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T19:27:07.407Z"
+              "status": "passed",
+              "at": "2026-06-08T02:18:04.158Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T19:27:07.407Z",
+          "updatedAt": "2026-06-08T02:18:04.158Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T19:27:07.407Z"
+              "at": "2026-06-08T02:18:04.158Z"
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1516"
         }
       }
