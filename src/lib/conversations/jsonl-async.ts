@@ -60,6 +60,8 @@ interface ClaudeMessageWithCwd {
   cwd?: string;
   timestamp?: string;
   model?: string;
+  /** Claude Code per-API-request id. Stable across the multiple JSONL lines of one response. */
+  requestId?: string;
   /** top-level content (legacy fixture format) */
   content?: string | ContentBlock[];
   usage?: ClaudeUsage;
@@ -123,6 +125,10 @@ export function parseSessionJsonl(filePath: string): Effect.Effect<SessionMetada
     const modelCounts: Record<string, number> = {};
     const toolsSet = new Set<string>();
     const filesSet = new Set<string>();
+    // Claude Code repeats the same `usage` on every JSONL line of one API response
+    // (text line, each tool_use line, …). Dedup on requestId/message.id so a multi-block
+    // turn is counted once instead of inflating token totals ~2-3×.
+    const countedUsageIds = new Set<string>();
     let isFirstMessage = true;
     let finalized = false;
 
@@ -194,7 +200,9 @@ export function parseSessionJsonl(filePath: string): Effect.Effect<SessionMetada
 
       // Token usage — check message.usage first, then top-level usage
       const usage = msg.message?.usage ?? msg.usage;
-      if (usage) {
+      const usageId = msg.requestId ?? (msg.message?.id as string | undefined);
+      if (usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+        if (usageId !== undefined) countedUsageIds.add(usageId);
         result.tokenInput += (usage.input_tokens ?? 0)
           + (usage.cache_creation_input_tokens ?? 0)
           + (usage.cache_read_input_tokens ?? 0);

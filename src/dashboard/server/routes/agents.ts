@@ -2382,6 +2382,10 @@ const getAgentCostRoute = HttpRouter.add(
     let cacheReadTokens = 0;
     let cacheWriteTokens = 0;
     let detectedModel = agentState.model || '';
+    // Claude Code repeats the same `usage` on every JSONL line of one API response
+    // (text line, each tool_use line, …). Dedup on requestId/message.id so a multi-block
+    // turn is counted once instead of inflating tokens/cost ~2-3×.
+    const countedUsageIds = new Set<string>();
 
     const homeDir = process.env.HOME || homedir();
     const claudeProjectsDir = join(homeDir, '.claude', 'projects');
@@ -2400,7 +2404,9 @@ const getAgentCostRoute = HttpRouter.add(
             const entry = JSON.parse(line);
             const usage = entry.message?.usage || entry.usage;
             const model = entry.message?.model || entry.model;
-            if (usage) {
+            const usageId = entry.requestId ?? entry.message?.id;
+            if (usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+              if (usageId !== undefined) countedUsageIds.add(usageId);
               inputTokens += usage.input_tokens || 0;
               outputTokens += usage.output_tokens || 0;
               cacheReadTokens += usage.cache_read_input_tokens || 0;

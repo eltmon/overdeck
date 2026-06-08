@@ -399,6 +399,59 @@ describe('parseConversationMessages', () => {
     ]);
   });
 
+  it('counts usage once when one API response spans multiple JSONL lines (same requestId)', async () => {
+    // Claude Code writes one response across several lines (a text line, then a
+    // tool_use line) that each repeat the SAME usage block. Summing every line
+    // double-counts cost/tokens — dedup by requestId must count it once.
+    const usage = {
+      input_tokens: 1000,
+      output_tokens: 500,
+      cache_read_input_tokens: 200000,
+      cache_creation_input_tokens: 10000,
+    };
+    const lines = [
+      {
+        type: 'assistant',
+        uuid: 'asst-text',
+        requestId: 'req-1',
+        timestamp: '2024-01-01T00:00:01.000Z',
+        message: {
+          id: 'resp-1',
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Working on it' }],
+          stop_reason: null,
+          usage,
+        },
+      },
+      {
+        type: 'assistant',
+        uuid: 'asst-tool',
+        requestId: 'req-1',
+        timestamp: '2024-01-01T00:00:02.000Z',
+        message: {
+          id: 'resp-1',
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'tool_use', id: 'tu-1', name: 'Bash', input: { command: 'ls' } }],
+          stop_reason: 'tool_use',
+          usage,
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    // Tokens counted once: 1000 + 500 + 200000 + 10000 = 211500 (not doubled).
+    expect(result.totalTokens).toBe(211500);
+    // Cost counted once with cache-aware opus-4-8 pricing:
+    //   1000/1k*0.005 + 500/1k*0.025 + 200000/1k*0.0005 + 10000/1k*0.00625
+    //   = 0.005 + 0.0125 + 0.1 + 0.0625 = 0.18
+    expect(result.totalCost).toBeCloseTo(0.18, 6);
+  });
+
   it('marks assistant message as streaming when no stop_reason and file is fresh', async () => {
     const lines = [
       {
