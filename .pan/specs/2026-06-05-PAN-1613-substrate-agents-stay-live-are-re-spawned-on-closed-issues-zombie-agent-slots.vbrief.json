@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1613: Substrate: agents stay live / are re-spawned on CLOSED issues (zombie agent slots)",
-    "updated": "2026-06-08T13:01:14.477Z"
+    "updated": "2026-06-08T13:08:34.198Z"
   },
   "plan": {
     "id": "pan-1613",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "66d110af-7aa0-46e7-945a-499cd4836b53",
     "author": "agent:claude-opus-4-8",
-    "sequence": 76,
+    "sequence": 82,
     "created": "2026-06-05T18:57:46.000Z",
-    "updated": "2026-06-08T13:01:14.477Z",
+    "updated": "2026-06-08T13:08:34.198Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1613",
@@ -502,60 +502,62 @@
     "metadata": {
       "canonicalFilename": "2026-06-05-PAN-1613-substrate-agents-stay-live-are-re-spawned-on-closed-issues-zombie-agent-slots.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "test",
         "issueId": "PAN-1613",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T13:01:14.437Z",
+        "updatedAt": "2026-06-08T13:08:34.187Z",
         "work": {
-          "updatedAt": "2026-06-08T13:01:14.437Z",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T13:01:14.437Z",
+          "status": "passed",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T13:01:14.437Z"
+              "status": "passed",
+              "at": "2026-06-08T13:08:34.187Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T13:01:14.437Z",
-          "notes": "Inspect-session reaping routes inspect-* through stopAgent normalization, so closed inspect tmux sessions stay live",
+          "status": "passed",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
+          "notes": "Approved: all raw blockers were unchanged since prior review cycle and demoted by convergence gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T13:01:14.437Z",
-              "notes": "Inspect-session reaping routes inspect-* through stopAgent normalization, so closed inspect tmux sessions stay live"
+              "status": "passed",
+              "at": "2026-06-08T13:08:34.187Z",
+              "notes": "Approved: all raw blockers were unchanged since prior review cycle and demoted by convergence gate"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T13:01:14.437Z",
-          "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override.",
+          "status": "passed",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T13:01:14.437Z",
-              "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override."
+              "status": "passed",
+              "at": "2026-06-08T13:08:34.187Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T13:01:14.437Z",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T13:01:14.437Z",
+          "updatedAt": "2026-06-08T13:08:34.187Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T13:01:14.437Z"
+              "at": "2026-06-08T13:08:34.187Z"
             }
           ],
           "readyForMerge": false,
