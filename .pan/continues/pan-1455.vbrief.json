@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1455",
   "created": "2026-06-04T06:35:31.056Z",
-  "updated": "2026-06-08T02:09:53.905Z",
+  "updated": "2026-06-08T15:47:48.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -24,6 +24,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-08T02:09:53.905Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T15:33:37.928Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:38Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-08T15:38:39.126Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:43Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-08T15:43:49.436Z"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-06-08T04:07:30.753Z",
+  "updated": "2026-06-08T20:38:17.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -1682,6 +1682,191 @@
       "reason": "resume",
       "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
       "timestamp": "2026-06-08T04:07:30.753Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: passed → pending; test: passed → pending; merge: merged → pending",
+      "timestamp": "2026-06-08T15:25:37.301Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:26:20.595Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:27:21.735Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: merged → pending",
+      "timestamp": "2026-06-08T15:28:35.795Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:37:42.312Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:40:57.401Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:43:36.255Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:44:52.395Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:45:34.961Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:46:52.827Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:47:36.004Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:49:28.161Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:50:16.625Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:51:14.940Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:52:39.528Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:55:51.823Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:57:20.311Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T15:58:54.680Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:00:06.781Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:04:33.049Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:05:13.307Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:06:26.300Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:08:06.208Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:09:28.486Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:30:50.706Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:33:06.654Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:53:28.128Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T16:55:52.110Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:02:08.708Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: passed → pending; test: passed → pending; merge: merged → pending",
+      "timestamp": "2026-06-08T17:16:11.733Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:19:34.723Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:21:58.853Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:27:17.233Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:27:47.930Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:28:29.233Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T17:30:52.480Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-08; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-08T20:38:17.887Z"
     }
   ]
 }
