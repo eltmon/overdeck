@@ -7,12 +7,16 @@ const {
   mockGetProviderEnv,
   mockOpenAIAuthStatus,
   mockBridgeGeminiAuth,
+  mockEnsureOllamaServeRunning,
+  mockAssertOllamaModelAvailable,
 } = vi.hoisted(() => ({
   mockLoadYamlConfig: vi.fn(),
   mockGetProviderForModel: vi.fn(),
   mockGetProviderEnv: vi.fn(),
   mockOpenAIAuthStatus: vi.fn(),
   mockBridgeGeminiAuth: vi.fn(),
+  mockEnsureOllamaServeRunning: vi.fn(),
+  mockAssertOllamaModelAvailable: vi.fn(),
 }));
 
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
@@ -39,6 +43,15 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
   getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
   getOpenAIAuthStatus: (...args: unknown[]) => Effect.succeed(mockOpenAIAuthStatus(...args)),
 }));
+
+vi.mock('../../src/lib/ollama.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/ollama.js')>();
+  return {
+    ...actual,
+    ensureOllamaServeRunning: mockEnsureOllamaServeRunning,
+    assertOllamaModelAvailable: mockAssertOllamaModelAvailable,
+  };
+});
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
   CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
@@ -97,6 +110,8 @@ describe('agents auth routing', () => {
     });
 
     mockBridgeGeminiAuth.mockResolvedValue(true);
+    mockEnsureOllamaServeRunning.mockResolvedValue(undefined);
+    mockAssertOllamaModelAvailable.mockResolvedValue(undefined);
     mockGetProviderEnv.mockImplementation((_provider, authToken: string) => ({
       AUTH_TOKEN: authToken,
     }));
@@ -196,6 +211,18 @@ describe('agents auth routing', () => {
     });
     expect(env).not.toHaveProperty('ANTHROPIC_BASE_URL');
     expect(env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
+    expect(mockEnsureOllamaServeRunning).toHaveBeenCalledWith('http://127.0.0.1:11434');
+    expect(mockAssertOllamaModelAvailable).toHaveBeenCalledWith('gemma4:12b', 'http://127.0.0.1:11434');
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
+  });
+
+  it('surfaces Ollama health-check failures without falling back to another provider', async () => {
+    mockAssertOllamaModelAvailable.mockRejectedValueOnce(new Error('Ollama model gemma4:12b is not pulled. Run `ollama pull gemma4:12b`.'));
+
+    await expect(getProviderEnvForModel('ollama:gemma4:12b')).rejects.toThrow('ollama pull gemma4:12b');
+
+    expect(mockEnsureOllamaServeRunning).toHaveBeenCalledWith('http://localhost:11434');
+    expect(mockAssertOllamaModelAvailable).toHaveBeenCalledWith('gemma4:12b', 'http://localhost:11434');
     expect(mockGetProviderEnv).not.toHaveBeenCalled();
   });
 
@@ -223,10 +250,12 @@ describe('agents auth routing', () => {
     expect(env).not.toHaveProperty('ANTHROPIC_BASE_URL');
   });
 
-  it('launches MiniMax models directly with Claude Code', async () => {
+  it('launches MiniMax models directly with Claude Code without touching Ollama health checks', async () => {
     expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
       "claude --permission-mode bypassPermissions --model 'minimax-m2.7'"
     );
+    expect(mockEnsureOllamaServeRunning).not.toHaveBeenCalled();
+    expect(mockAssertOllamaModelAvailable).not.toHaveBeenCalled();
   });
 
   it('launches Kimi models directly with Claude Code', async () => {

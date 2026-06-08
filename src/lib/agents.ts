@@ -24,7 +24,7 @@ import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getClaudeAuthStatus } from './claude-auth.js';
 import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from './cliproxy.js';
 import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
-import { stripOllamaModelPrefix, toPiOllamaModelSelector } from './ollama.js';
+import { assertOllamaModelAvailable, ensureOllamaServeRunning, stripOllamaModelPrefix, toPiOllamaModelSelector } from './ollama.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
@@ -529,10 +529,14 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   const { config } = loadYamlConfig();
 
   if (provider.name === 'ollama') {
+    const baseUrl = config.providerBaseUrls.ollama;
+    const ollamaModel = stripOllamaModelPrefix(model);
+    await ensureOllamaServeRunning(baseUrl);
+    await assertOllamaModelAvailable(ollamaModel, baseUrl);
     return {
-      OPENAI_BASE_URL: `${config.providerBaseUrls.ollama}/v1`,
+      OPENAI_BASE_URL: `${baseUrl}/v1`,
       OPENAI_API_KEY: 'ollama',
-      PANOPTICON_OLLAMA_MODEL: stripOllamaModelPrefix(model),
+      PANOPTICON_OLLAMA_MODEL: ollamaModel,
     };
   }
 
