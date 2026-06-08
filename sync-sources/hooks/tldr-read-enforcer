@@ -8,6 +8,7 @@
 #   - Reads with offset/limit (targeted reads for editing)
 #   - Non-code files (configs, docs, json, etc.)
 #   - No .venv available (TLDR not installed)
+#   - TLDR disabled via PANOPTICON_TLDR_ENABLED=0 or agents.tldr.enabled: false
 #   - TLDR command fails (graceful degradation)
 #   - Summary too sparse to be useful (< 100 tokens for file > 5KB)
 #   - Recently edited files (in .tldr/dirty-files — agent needs to verify changes)
@@ -19,6 +20,56 @@ INPUT=$(cat 2>/dev/null || echo '{}')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
 if [ "$TOOL_NAME" != "Read" ]; then
   exit 0
+fi
+
+# Bypass: TLDR disabled via env override or config (read live, so the Settings
+# toggle takes effect on the very next Read — no agent restart required).
+# TLDR defaults ON: only an explicit falsy value (0/false/no/off/disabled)
+# disables it; an absent/empty value means "enabled".
+tldr_falsy() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    0|false|no|off|disabled) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+tldr_read_config_enabled() {
+  local config_path="$1"
+  [ -z "$config_path" ] && return 0
+  [ ! -f "$config_path" ] && return 0
+  awk '
+    function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
+    BEGIN { in_agents = 0; in_tldr = 0; agents_indent = -1; tldr_indent = -1 }
+    {
+      line = $0
+      sub(/#.*/, "", line)
+      if (line ~ /^[[:space:]]*$/) next
+      match(line, /^[ ]*/)
+      indent = RLENGTH
+      key = line
+      sub(/^[[:space:]]*/, "", key)
+      if (key ~ /^agents:[[:space:]]*$/) { in_agents = 1; in_tldr = 0; agents_indent = indent; next }
+      if (in_agents && indent <= agents_indent) { in_agents = 0; in_tldr = 0 }
+      if (in_agents && key ~ /^tldr:[[:space:]]*$/) { in_tldr = 1; tldr_indent = indent; next }
+      if (in_tldr && indent <= tldr_indent) { in_tldr = 0 }
+      if (in_tldr && key ~ /^enabled:[[:space:]]*/) {
+        sub(/^enabled:[[:space:]]*/, "", key)
+        gsub(/"/, "", key); gsub(/\047/, "", key)
+        print trim(key); exit
+      }
+    }
+  ' "$config_path" 2>/dev/null
+}
+tldr_config_enabled_value() {
+  if [ -n "${PANOPTICON_CONFIG:-}" ]; then
+    tldr_read_config_enabled "$PANOPTICON_CONFIG"
+  else
+    tldr_read_config_enabled "$HOME/.panopticon/config.yaml"
+  fi
+}
+if [ -n "${PANOPTICON_TLDR_ENABLED+x}" ]; then
+  tldr_falsy "$PANOPTICON_TLDR_ENABLED" && exit 0
+else
+  tldr_falsy "$(tldr_config_enabled_value)" && exit 0
 fi
 
 # Extract Read parameters

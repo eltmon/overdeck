@@ -15,7 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel, isTldrEnabledSync } from './config-yaml.js';
 import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -3329,10 +3329,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Auto-setup hooks if not configured
   checkAndSetupHooks();
 
-  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal)
+  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
+  // Gated by the operator TLDR toggle: when disabled, the daemon is not started
+  // and the agent (whose prompt reports TLDR_AVAILABLE=false) degrades to direct
+  // file reads.
   try {
     const venvPath = join(options.workspace, '.venv');
-    if (existsSync(venvPath)) {
+    if (isTldrEnabledSync() && existsSync(venvPath)) {
       const { getTldrDaemonServiceSync } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonServiceSync(options.workspace, venvPath);
       const status = await tldrService.getStatus();
