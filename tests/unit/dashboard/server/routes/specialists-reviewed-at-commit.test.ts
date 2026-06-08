@@ -71,6 +71,19 @@ vi.mock('../../../../../src/lib/activity-logger.js', () => ({
   emitActivityTtsSync: vi.fn(),
 }));
 
+// checkPostReviewCommits now gates on isIssueClosed (PAN-1613). Its tracker
+// fallback shells out to `gh issue view`, which in CI resolves the test's
+// `PAN-900` against the real repo (and reads it as closed) — making the patrol
+// skip the issue and breaking these commit-detection assertions. Mock the
+// module so the gate is deterministic (never closed) and the unit test stays
+// isolated from the network, matching the other deacon-patrol tests.
+vi.mock('../../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
+}));
+
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
   notifyPipelineSync: vi.fn(),

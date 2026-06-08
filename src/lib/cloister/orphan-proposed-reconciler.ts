@@ -1,23 +1,17 @@
-import { execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { isAbsolute, join, resolve } from 'path';
-import { promisify } from 'util';
 import { Effect } from 'effect';
 
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listProjects, type ProjectConfig } from '../projects.js';
-import { getShadowState } from '../shadow-state.js';
 import { listSessionNames } from '../tmux.js';
-import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
+import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
-const execFileAsync = promisify(execFile);
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
-const TRACKER_CLOSED_CACHE_TTL_MS = 5 * 60 * 1000;
 const attemptCooldowns = new Map<string, number>();
-const trackerClosedCache = new Map<string, { closed: boolean; checkedAt: number }>();
 let scanInFlight = false;
 
 export interface OrphanProposedReconcilerConfig {
@@ -121,53 +115,6 @@ async function countBeadsForIssue(projectPath: string, issueId: string): Promise
 
 async function defaultGetAgentState(agentId: string): Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null> {
   return Effect.runPromise(getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))));
-}
-
-async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
-  const cached = trackerClosedCache.get(issueId);
-  const now = Date.now();
-  if (cached && now - cached.checkedAt < TRACKER_CLOSED_CACHE_TTL_MS) return cached.closed;
-
-  const resolved = resolveGitHubIssueSync(issueId);
-  if (!resolved.isGitHub) {
-    trackerClosedCache.set(issueId, { closed: false, checkedAt: now });
-    return false;
-  }
-
-  try {
-    const { stdout } = await execFileAsync('gh', [
-      'issue',
-      'view',
-      String(resolved.number),
-      '--repo',
-      `${resolved.owner}/${resolved.repo}`,
-      '--json',
-      'state',
-    ], { encoding: 'utf-8', timeout: 10_000 });
-    const parsed = JSON.parse(stdout) as { state?: unknown };
-    const closed = typeof parsed.state === 'string' && parsed.state.toLowerCase() === 'closed';
-    trackerClosedCache.set(issueId, { closed, checkedAt: now });
-    return closed;
-  } catch {
-    trackerClosedCache.set(issueId, { closed: false, checkedAt: now });
-    return false;
-  }
-}
-
-// PAN-1496 (zombie-on-closed): exported so the deacon's review-dispatch patrols
-// can gate on tracker-closed state. Checks fast local shadow state first, then
-// falls back to a live tracker fetch — so it catches even old closed issues
-// that predate shadow-state. Callers that iterate many issues MUST pass a
-// prebuilt `closedIssueIds` set to avoid a per-issue tracker fetch.
-export async function isIssueClosed(issueId: string, closedIssueIds?: Set<string>): Promise<boolean> {
-  if (closedIssueIds) return closedIssueIds.has(issueId);
-
-  const shadowState = await Effect.runPromise(getShadowState(issueId).pipe(Effect.catch(() => Effect.succeed(null))));
-  return shadowState?.trackerStatus === 'closed'
-    || shadowState?.shadowStatus === 'closed'
-    || shadowState?.targetCanonicalState === 'done'
-    || shadowState?.targetCanonicalState === 'canceled'
-    || await isTrackerIssueClosed(issueId);
 }
 
 async function loadProjectsForScan(projects?: ProjectEntry[]): Promise<ProjectEntry[]> {
@@ -383,6 +330,6 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
 
 export function clearOrphanProposedAttemptCooldowns(): void {
   attemptCooldowns.clear();
-  trackerClosedCache.clear();
+  clearIssueClosedCache();
   scanInFlight = false;
 }

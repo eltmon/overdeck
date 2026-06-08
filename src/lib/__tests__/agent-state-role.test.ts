@@ -75,10 +75,11 @@ describe('AgentState role persistence', () => {
     expect(command).toContain('--effort low');
   });
 
-  it('preserves the flywheel singleton agent id during normalization', async () => {
+  it('preserves first-class runtime session ids during normalization', async () => {
     const { normalizeAgentId } = await import('../agents.js');
 
     expect(normalizeAgentId('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(normalizeAgentId('inspect-pan-1613-workspace-rn3ha')).toBe('inspect-pan-1613-workspace-rn3ha');
     expect(normalizeAgentId('PAN-1')).toBe('agent-pan-1');
   });
 

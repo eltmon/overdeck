@@ -504,7 +504,7 @@ export async function getRoleRuntimeBaseCommand(
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
 const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator']);
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */

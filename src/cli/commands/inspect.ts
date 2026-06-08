@@ -102,6 +102,11 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
   const result = await Effect.runPromise(spawnInspectAgent(context, { deep: options.deep === true }));
 
   if (result.success) {
+    if (result.skipped) {
+      console.log(chalk.yellow(`Inspect skipped: ${result.message}`));
+      return;
+    }
+
     console.log(chalk.green('✓ Inspect specialist spawned'));
     console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
     console.log(chalk.dim(`  Run ID:  ${result.runId}`));

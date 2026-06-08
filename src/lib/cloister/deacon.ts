@@ -157,8 +157,10 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { isIssueClosed } from './issue-closed.js';
 
 // ============================================================================
 // Configuration
@@ -1786,17 +1788,13 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Operator-set ignore flag: skip all patrol re-dispatch for this issue
       // until the human toggles it back off via the kanban button.
       if (status.deaconIgnored) continue;
-      // PAN-1496: never re-dispatch review/test for an issue closed on the
-      // tracker (e.g. closed on GitHub mid-pipeline, bypassing close-out which
-      // clears the review_status row). isTrackerIssueClosed is TTL-cached, so
+      // PAN-1496/PAN-1613: never re-dispatch review/test for an issue closed
+      // on the tracker or shadow-state. The shared helper is TTL-cached, so
       // checking each surviving row at most once per cache window is bounded and
       // cannot reproduce the PAN-328 API storm.
-      {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
-        if (await isIssueClosed(issueId)) {
-          actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed on the tracker`);
-          continue;
-        }
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review/test re-dispatch — issue is closed`);
+        continue;
       }
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
@@ -2132,7 +2130,6 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // a small, bounded set — so the per-issue tracker fallback in
       // isIssueClosed can't storm the API the way a per-open-issue check would.
       try {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
         if (await isIssueClosed(issueId)) {
           try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
           try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
@@ -2230,14 +2227,12 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         }
       }
 
-      // PAN-1496: never re-dispatch test for an issue closed on the tracker
-      // (e.g. closed on GitHub mid-pipeline, bypassing close-out which would
-      // have cleared the review_status row). The check is reached only by the
-      // small set of issues that pass all status filters above, and
-      // isTrackerIssueClosed is TTL-cached — so this cannot storm the API.
-      const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+      // PAN-1496/PAN-1613: never re-dispatch test for an issue closed on the
+      // tracker or shadow-state. The check is reached only by the small set of
+      // issues that pass all status filters above, and the shared helper is
+      // TTL-cached — so this cannot storm the API.
       if (await isIssueClosed(issueId)) {
-        actions.push(`Skipped test retry for ${issueId}: issue is closed on the tracker`);
+        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
         continue;
       }
 
@@ -2654,6 +2649,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       if (status.mergeStatus === 'merged') continue;
       if (!status.reviewedAtCommit) continue;
       if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
+        continue;
+      }
 
       // Resolve workspace path
       const project = resolveProjectFromIssueSync(issueId);
@@ -4715,6 +4714,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...orphanProposedActions);
   for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
 
+  const closedIssueAgentActions = await reconcileClosedIssueAgents();
+  actions.push(...closedIssueAgentActions);
+  for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
+
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
@@ -5689,6 +5692,10 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     if (!state) continue;
     if (state.status !== 'running') continue;
     if (state.role !== 'work') continue;
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} skipped — issue ${state.issueId} is closed`);
+      continue;
+    }
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await Effect.runPromise(sessionExists(agentId))) continue;
@@ -5923,10 +5930,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    const shadowState = await Effect.runPromise(getShadowState(state.issueId));
-    const issueClosed = shadowState?.trackerStatus === 'closed';
-    if (issueClosed) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is closed`);
       continue;
     }
 

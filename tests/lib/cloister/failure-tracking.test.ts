@@ -105,6 +105,16 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
       getShadowState: vi.fn(() => Effect.succeed(null)),
     }));
+    // PAN-1613: autoResumeStoppedWorkAgents now gates on isIssueClosed. With
+    // shadow-state mocked to null above, the real isIssueClosed would fall
+    // through to a live `gh issue view` — mock it so the gate is deterministic
+    // (never closed) and the test stays hermetic.
+    vi.doMock('../../../src/lib/cloister/issue-closed.js', () => ({
+      isIssueClosed: vi.fn(async () => false),
+      isTrackerIssueClosed: vi.fn(async () => false),
+      clearIssueClosedCache: vi.fn(),
+      TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
+    }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),

@@ -2948,6 +2948,10 @@ const postIssueBeadInspectRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: result.error ?? result.message }, { status: 500 });
     }
 
+    if (result.skipped) {
+      return jsonResponse({ success: true, skipped: true, message: result.message, tmuxSession: result.tmuxSession });
+    }
+
     return jsonResponse({ success: true, runId: result.runId, tmuxSession: result.tmuxSession });
   })),
 );
