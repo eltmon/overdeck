@@ -24,7 +24,7 @@ describe('SQLite driver adapter', () => {
     }
   });
 
-  it('supports better-sqlite3-style array positional bind parameters', () => {
+  it('supports array positional bind parameters', () => {
     const db = openDatabase(':memory:');
     try {
       db.exec('CREATE TABLE items (name TEXT NOT NULL, value INTEGER NOT NULL)');
@@ -32,6 +32,19 @@ describe('SQLite driver adapter', () => {
       db.prepare('INSERT INTO items (name, value) VALUES (?, ?)').run(['array-bind', 7]);
 
       expect(db.prepare('SELECT value FROM items WHERE name = ?').get(['array-bind'])).toEqual({ value: 7 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('supports unprefixed object keys for named bind parameters', () => {
+    const db = openDatabase(':memory:');
+    try {
+      db.exec('CREATE TABLE items (name TEXT NOT NULL, value INTEGER NOT NULL)');
+
+      db.prepare('INSERT INTO items (name, value) VALUES (@name, @value)').run({ name: 'named-bind', value: 11 });
+
+      expect(db.prepare('SELECT value FROM items WHERE name = @name').get({ name: 'named-bind' })).toEqual({ value: 11 });
     } finally {
       db.close();
     }

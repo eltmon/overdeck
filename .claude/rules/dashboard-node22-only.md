@@ -5,6 +5,8 @@ scope: dev
 
 `pan up` starts `dist/dashboard/server.js` under Node 22. Do NOT change this to `bun run`.
 
+The database layer now uses runtime-bundled `node:sqlite`/`bun:sqlite`; this Node-22-only rule remains for node-pty and circular-ESM constraints, not for SQLite.
+
 ### Why
 
 Two hard blockers for running the dashboard under Bun:

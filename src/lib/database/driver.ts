@@ -111,30 +111,59 @@ function validateBindParams(params: unknown[]): void {
   }
 }
 
-function normalizeBindParams(params: SqliteBindParams[]): unknown[] {
-  if (params.length === 1 && Array.isArray(params[0])) {
-    return params[0];
-  }
-  return params;
+function isBindRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Uint8Array);
 }
 
-function wrapStatement(statement: RawStatement): SqliteStatement {
+function normalizeNamedBindRecord(sql: string, record: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  let changed = false;
+
+  for (const [key, value] of Object.entries(record)) {
+    if (/^[:@$]/.test(key)) {
+      if (sql.includes(key)) {
+        normalized[key] = value;
+      } else {
+        changed = true;
+      }
+      continue;
+    }
+
+    const prefixedKey = [`@${key}`, `:${key}`, `$${key}`].find((candidate) => sql.includes(candidate));
+    if (!prefixedKey) {
+      changed = true;
+      continue;
+    }
+
+    normalized[prefixedKey] = value;
+    changed = true;
+  }
+
+  return changed ? normalized : record;
+}
+
+function normalizeBindParams(sql: string, params: SqliteBindParams[]): unknown[] {
+  const positionalParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+  return positionalParams.map((param) => (isBindRecord(param) ? normalizeNamedBindRecord(sql, param) : param));
+}
+
+function wrapStatement(sql: string, statement: RawStatement): SqliteStatement {
   return {
     run: (...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.run(...normalizeBindParams(params));
+      return statement.run(...normalizeBindParams(sql, params));
     },
     get: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.get(...normalizeBindParams(params)) as TRow | undefined;
+      return statement.get(...normalizeBindParams(sql, params)) as TRow | undefined;
     },
     all: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.all(...normalizeBindParams(params)) as TRow[];
+      return statement.all(...normalizeBindParams(sql, params)) as TRow[];
     },
     iterate: <TRow = SqliteRow>(...params: SqliteBindParams[]) => {
       validateBindParams(params);
-      return statement.iterate(...normalizeBindParams(params)) as IterableIterator<TRow>;
+      return statement.iterate(...normalizeBindParams(sql, params)) as IterableIterator<TRow>;
     },
   };
 }
@@ -167,7 +196,7 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
     exec: (sql: string) => {
       raw.exec(sql);
     },
-    prepare: (sql: string) => wrapStatement(rawPrepare(raw, sql)),
+    prepare: (sql: string) => wrapStatement(sql, rawPrepare(raw, sql)),
     pragma: (sql: string, options?: { simple?: boolean }) => {
       if (options?.simple) {
         return readPragmaScalar(db, sql);
