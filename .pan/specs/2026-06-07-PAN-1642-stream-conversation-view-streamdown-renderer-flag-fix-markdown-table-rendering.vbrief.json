@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-08T16:00:21.973Z"
+    "updated": "2026-06-08T16:10:08.276Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 61,
+    "sequence": 66,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-08T16:00:21.973Z",
+    "updated": "2026-06-08T16:10:08.276Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -443,60 +443,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1642-stream-conversation-view-streamdown-renderer-flag-fix-markdown-table-rendering.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T16:00:21.848Z",
+        "updatedAt": "2026-06-08T16:10:08.271Z",
         "work": {
-          "updatedAt": "2026-06-08T16:00:21.848Z",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-08T16:00:21.848Z",
-          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/services/conversation-service.ts\n  - src/dashboard/server/ws-rpc.ts",
+          "status": "passed",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-08T16:00:21.848Z",
-              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/services/conversation-service.ts\n  - src/dashboard/server/ws-rpc.ts"
+              "status": "passed",
+              "at": "2026-06-08T16:10:08.271Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T16:00:21.848Z",
-          "notes": "Requirements reviewer timed out; review cannot approve without all four reports",
+          "status": "reviewing",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
+          "notes": "Agent re-review request (2/25): Fixed sync-target-branch",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T16:00:21.848Z",
-              "notes": "Requirements reviewer timed out; review cannot approve without all four reports"
+              "status": "reviewing",
+              "at": "2026-06-08T16:10:08.271Z",
+              "notes": "Agent re-review request (2/25): Fixed sync-target-branch"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:00:21.848Z",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:00:21.848Z"
+              "at": "2026-06-08T16:10:08.271Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T16:00:21.848Z",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:00:21.848Z",
+          "updatedAt": "2026-06-08T16:10:08.271Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:00:21.848Z"
+              "at": "2026-06-08T16:10:08.271Z"
             }
           ],
           "readyForMerge": false,
