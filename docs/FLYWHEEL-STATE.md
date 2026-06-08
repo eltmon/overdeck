@@ -753,3 +753,43 @@ the correct orchestration move when the launchable set is empty, not the
 suggest-only failure RUN-11 was scolded for (that was *ignoring* launchable work;
 there is none here). Highest-leverage operator move: UAT-drain the 19-deep
 verifying-on-main batch.
+
+### RUN-15 tick 2 — the PR CI-rollup is a single-tick stall/ready distinguisher
+
+RUN-14's reliable progress test was a two-snapshot token/cost diff. Tick 2 added
+a faster one for **convoy/review-phase** items idle at the `❯` prompt: read the
+PR's `gh pr view <pr> --json statusCheckRollup`. It collapses the ambiguity in
+one tick:
+
+- **CI all-green + idle convoy** = done, ready for the operator merge gate
+  (correct under `require_uat_before_merge=true`, NOT a stall). Tick 2: PAN-1242
+  (#1516) and PAN-1395 (#1634) were both green — ready, just awaiting operator
+  UAT. PAN-1395's work agent was ctx-100% wedged but **irrelevant** because the
+  PR was already green (work done).
+- **CI failing + idle/wedged work** = genuinely blocked. Tick 2: PAN-1455
+  (#1611) test FAILURE with the work agent idle (watch for deacon re-dispatch);
+  PAN-1491 (#1636) lint+smoke FAILURE *and* work agent ctx-100% wedged — it
+  literally cannot fix its own CI (every turn 400s). Double-blocked.
+
+Lesson: a ctx-100% wedge only matters if the PR isn't already green. Triage
+wedged agents by their PR's CI state before treating the wedge as a blocker.
+
+### RUN-15 tick 2 — operator runs strikes directly; observe, don't touch
+
+Two operator-launched strikes appeared mid-run (Opus 4.8, role=strike):
+**PAN-1506** (strike agents missing from the frontend store — critical dashboard
+bug) and **PAN-1675** (Panopticon-side `resume --compact` to recover wedged
+agents without the harness `/compact` deadlock). PAN-1675 is the **recovery half
+of the PAN-1615 wedge story** — the merged brake *detects* the ctx-ceiling wedge;
+PAN-1675 *recovers* it. The flywheel observes and reports these in the snapshot;
+it does not touch operator strikes.
+
+### RUN-15 tick 2 — the two persistent stalls did NOT self-heal over ~30min
+
+Across the tick-1→tick-2 interval the deacon/brakes did not clear either the
+PAN-1496 zombie (review+test on a 9-day-closed issue; went idle but stayed
+present) or the PAN-1579 `.claude/**` permission hang (~90min frozen, still
+reported "active" by cloister because the heartbeat ticks at the prompt). Both
+have only orchestrator-forbidden remediations (`pan kill`, answer the prompt),
+so the disciplined output stays: fresh evidence on PAN-1613/PAN-1616 + surface,
+not hand-fix.
