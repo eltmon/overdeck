@@ -1,0 +1,83 @@
+{
+  "version": "1",
+  "issueId": "PAN-1675",
+  "created": "2026-06-08T03:53:54.486Z",
+  "updated": "2026-06-08T03:57:31.000Z",
+  "gitState": { "branch": "feature/pan-1675", "sha": "692975f2c", "dirty": false },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Reuse the EXISTING out-of-band compaction machinery rather than building new summarization. compactConversationNative() in src/dashboard/server/services/conversation-compaction.ts already does exactly what the issue describes: reads the agent's JSONL, runs generateSmartSummary() (chunked, via the configured compaction_model — default claude-haiku-4-5) completely independently of the wedged session, and appends a compact_boundary + isCompactSummary user entry to the JSONL. The harness's `--resume <sessionId>` then reads from the boundary forward, dropping the pre-boundary over-limit history. This is the proven mechanism already used for conversations via manual_compact_mode='panopticon-native'. PAN-1675 is about WIRING this into the work-agent resume path, not reimplementing it.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Introduce one new exported primitive compactAgentSession(agentId) in src/lib/agents.ts that resolves the agent's workspace + saved Claude sessionId + sessionFilePath() and calls compactConversationNative() via dynamic import (avoids the circular dependency: conversation-compaction.ts already imports from lib/agents.ts; the deacon uses the same dynamic-import pattern at deacon.ts:888). It returns { compacted: boolean; error?: string } and never throws — compactConversationNative already falls back to a heuristic summary internally, so a hard failure is rare. This single primitive is consumed by the resume option, the deacon recovery tier, and is independently unit-testable.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "resumeAgent() gains a `compact?: boolean` option. When true, it runs compactAgentSession() BEFORE killing the zombie tmux session (resumeAgent currently kills it at agents.ts:~4188). Ordering is deliberate: if compaction fails, resumeAgent returns { success:false } WITHOUT killing/relaunching, leaving the wedged-but-live session intact so the deacon can fall back to /clear against it. If compaction succeeds, the normal kill + `claude --resume` relaunch proceeds against the now-trimmed JSONL.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "The deacon's context-overflow recovery tier (checkApiErrorAgents in src/lib/cloister/deacon.ts) changes its FRESH-overflow tier for agent-* sessions from `sendKeys('/compact')` (harness, deadlock-prone) to `resumeAgent(sessionName, undefined, { compact: true })` (out-of-band). On success it records the compact attempt in contextOverflowRecoveryState (phase 'compact'); on failure it falls through to the EXISTING /clear + reseed tier. The /clear tier and the stuck-escalation ceiling are unchanged — they remain the fallback exactly as the issue specifies.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Scope the recovery change to the wedged-RECOVERY path only. The deacon's PROACTIVE 85%-high-water compaction (maybeProactivelyCompactContext, still sends harness /compact below the ceiling) is left UNCHANGED in this issue — it fires before the hard ceiling where harness /compact still works, and PAN-1672 fix #1 already lowered the window to make it fire earlier. Switching the proactive tier to native compaction is a possible follow-up, noted as a hazard, not part of this issue.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Surfaces: (a) CLI `pan resume <id> --compact` (no pan-resume wrapper skill exists, so no skill to keep in lint-sync). (b) POST /api/agents/:id/resume accepts `compact: boolean` in the body and threads it into resumeAgent opts. (c) Frontend 'Resume (compact)' action added to IssueAgentCard.tsx (work agents — the gpt-5.5/CLIProxy wedge target). SpecialistAgentCard is out of scope; specialists rarely overflow and aren't the issue's target.",
+      "recordedAt": "2026-06-08T03:57:31.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Circular import: src/dashboard/server/services/conversation-compaction.ts statically imports from ../../../lib/agents.js (getAgentRuntimeBaseCommand, getProviderExportsForModel). A static import of conversation-compaction from lib/agents.ts would create a cycle.",
+      "mitigation": "Use a dynamic `await import('../../dashboard/server/services/conversation-compaction.js')` inside compactAgentSession, exactly as the deacon already does for conversation-service.js at deacon.ts:888. Do NOT add a top-level import."
+    },
+    {
+      "id": "H2",
+      "summary": "Compaction-then-resume ordering. resumeAgent kills the zombie tmux session early (agents.ts:~4188). If compaction runs after the kill and then fails, the deacon's /clear fallback has no live session to send keys to.",
+      "mitigation": "Run compactAgentSession at the very start of resumeAgent's try block, BEFORE the zombie-kill, and return early on failure so the live wedged session survives for the /clear fallback. Covered by an explicit acceptance criterion."
+    },
+    {
+      "id": "H3",
+      "summary": "Summarizer must not itself overflow. The whole point is that summarizing the over-limit transcript never re-sends it in one over-limit call.",
+      "mitigation": "generateSmartSummary already chunks the transcript (chunkEntriesByBudget / generateChunkedSummary) to fit the summarizer model's budget, and the default compaction_model (claude-haiku-4-5) is independent of the wedged gpt-5.5/CLIProxy session. No change needed — but the work agent must NOT bypass the chunked path or pass the raw transcript to a single summarization call."
+    },
+    {
+      "id": "H4",
+      "summary": "sessionId resolution. resumeAgent already resolves the saved Claude sessionId via getLatestSessionIdSync(); compactAgentSession needs the SAME id so it compacts the file the harness will resume from.",
+      "mitigation": "compactAgentSession resolves the session file via sessionFilePath(agentState.workspace, getLatestSessionIdSync(agentId)) — the identical pair resumeAgent uses for --resume. If no sessionId is found, return { compacted:false, error } so resume falls back cleanly (a session with no saved id is not resumable anyway)."
+    },
+    {
+      "id": "H5",
+      "summary": "compactConversationNative is server-side and emits conversation.compacting events keyed by a conversationName. Work-agent sessions are not 'conversations' in that registry.",
+      "mitigation": "Call compactConversationNative(sessionFile) WITHOUT a conversationName (the param is optional) so no spurious conversation.compacting_changed events are emitted for a work-agent JSONL. Only the JSONL boundary append + smart summary are needed."
+    },
+    {
+      "id": "H6",
+      "summary": "Proactive-tier divergence. After this change the deacon recovers wedged agents out-of-band but the proactive 85% tier still uses harness /compact (D5). A reviewer may flag the inconsistency.",
+      "mitigation": "Intentional and documented in D5. The proactive tier fires below the ceiling where /compact works; converting it is a separate follow-up. Leave a code comment at the proactive tier pointing at PAN-1675 / the recovery tier so the asymmetry is explained in-situ."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-08T03:53:54.486Z",
+      "reason": "planning",
+      "note": "Initial planning session (--auto) for PAN-1675: Panopticon-side compaction (resume --compact)",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
