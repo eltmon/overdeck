@@ -408,6 +408,13 @@ export default function App() {
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [pendingConversationTarget, setPendingConversationTarget] = useState<{
+    conversationName: string;
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+    label: string;
+  } | null>(null);
   const [isSessionFeedSidebarOpen, setIsSessionFeedSidebarOpen] = useState(readSessionFeedSidebarOpen);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
@@ -552,6 +559,14 @@ export default function App() {
     const projectKey = hit.projectId || NO_PROJECT_KEY;
     try {
       const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset);
+      const nonce = Date.now();
+      setPendingConversationTarget({
+        conversationName,
+        messageId: locator.messageId,
+        messageIndex: locator.messageIndex,
+        nonce,
+        label: hit.label || 'Agent',
+      });
       setActiveTab('command-deck');
       setSelectedProjectKey(projectKey);
       setConversationRoute(conversationName, 'conversation');
@@ -567,7 +582,7 @@ export default function App() {
         viewMode: 'conversation',
         targetMessageId: locator.messageId,
         targetMessageIndex: locator.messageIndex,
-        targetMessageNonce: Date.now(),
+        targetMessageNonce: nonce,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Unable to open conversation hit');
@@ -1301,6 +1316,8 @@ export default function App() {
                 conversationViewMode={conversationViewMode}
                 onConvIdChange={setSelectedConvId}
                 onConversationViewModeChange={setConversationViewMode}
+                pendingConversationTarget={pendingConversationTarget}
+                onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
                 selectedProject={selectedProjectKey}
                 onSelectProject={setSelectedProjectKey}
                 onProjectPrefixChange={setSearchProjectPrefix}

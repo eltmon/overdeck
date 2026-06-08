@@ -49,6 +49,8 @@ describe('conversation embedding provider', () => {
     await expect(disabled.embed(['hello'])).rejects.toThrow(ConversationEmbeddingUnavailableError);
 
     const missingKey = createConversationEmbeddingProvider({ config: config({ apiKeyRef: 'MISSING_KEY' }), env: {} });
+    expect(missingKey.enabled).toBe(false);
+    expect(missingKey.unavailableReason).toBe('MISSING_KEY is not set');
     await expect(missingKey.embed(['hello'])).rejects.toThrow(/MISSING_KEY is not set/);
   });
 

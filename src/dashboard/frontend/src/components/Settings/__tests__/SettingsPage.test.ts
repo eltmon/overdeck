@@ -103,7 +103,7 @@ describe('SettingsPage role model routing panels', () => {
   it('surfaces conversation search controls', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
     expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('API key env var');
+    expect(SETTINGS_PAGE_SOURCE).toContain('API key env var or config key');
     expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
     expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
     expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');

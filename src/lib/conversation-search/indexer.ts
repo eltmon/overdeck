@@ -13,6 +13,7 @@ export interface ConversationIndexerOptions {
   provider?: ConversationEmbeddingProvider;
   roots?: string[];
   now?: () => string;
+  signal?: AbortSignal;
 }
 
 export interface IndexConversationFileOptions extends ConversationIndexerOptions {
@@ -49,11 +50,14 @@ export async function indexConversationSearch(
 ): Promise<ConversationIndexResult> {
   const config = options.config ?? getConversationSearchConfigSync();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+  const provider = options.provider ?? createConversationEmbeddingProvider({ config });
+  if (!provider.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable' };
 
-  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
+  throwIfAborted(options.signal);
+  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots(), options.signal);
   const result: ConversationIndexResult = { ...EMPTY_RESULT, filesScanned: files.length, errors: [] };
 
-  const owned = openIndexerResources(config, options);
+  const owned = openIndexerResources(config, { ...options, provider });
   if (!owned.db.available) {
     owned.close();
     return { ...result, disabled: true, unavailableReason: owned.db.unavailableReason ?? 'embeddings DB unavailable' };
@@ -61,6 +65,7 @@ export async function indexConversationSearch(
 
   try {
     for (const filePath of files) {
+      throwIfAborted(options.signal);
       const fileResult = await indexConversationFile({ ...options, config, db: owned.db, provider: owned.provider, filePath });
       result.filesIndexed += fileResult.filesIndexed;
       result.chunksIndexed += fileResult.chunksIndexed;
@@ -79,8 +84,11 @@ export async function fullReindexConversationSearch(
 ): Promise<ConversationIndexResult> {
   const config = options.config ?? getConversationSearchConfigSync();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+  const provider = options.provider ?? createConversationEmbeddingProvider({ config });
+  if (!provider.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable' };
 
-  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
+  throwIfAborted(options.signal);
+  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots(), options.signal);
   const db = options.db ?? openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
   try {
     if (!db.available) {
@@ -91,7 +99,10 @@ export async function fullReindexConversationSearch(
         unavailableReason: db.unavailableReason ?? 'embeddings DB unavailable',
       };
     }
-    for (const filePath of files) db.setCursor(filePath, 0);
+    for (const filePath of files) {
+      throwIfAborted(options.signal);
+      db.setCursor(filePath, 0);
+    }
   } finally {
     if (!options.db) db.close();
   }
@@ -114,8 +125,12 @@ export async function estimateFullReindexConversationSearchCost(
   if (!config.enabled) {
     return { ...empty, filesScanned: 0, chunksEstimated: 0, disabled: true, unavailableReason: 'conversationSearch is disabled' };
   }
+  if (!provider.enabled) {
+    return { ...empty, filesScanned: 0, chunksEstimated: 0, disabled: true, unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable' };
+  }
 
-  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots());
+  throwIfAborted(options.signal);
+  const files = await discoverConversationJsonlFiles(options.roots ?? defaultConversationRoots(), options.signal);
   let tokenCount = 0;
   let estimatedUsd = 0;
   let chunksEstimated = 0;
@@ -125,6 +140,7 @@ export async function estimateFullReindexConversationSearchCost(
       sessionId: sessionIdFromPath(filePath),
       projectId: projectIdFromPath(filePath),
       fromOffset: 0,
+      signal: options.signal,
     })) {
       const estimate = provider.estimateCost([chunk.text]);
       tokenCount += estimate.tokenCount;
@@ -143,12 +159,17 @@ export async function indexConversationFile(
 
   const owned = openIndexerResources(config, options);
   const result: ConversationIndexResult = { ...EMPTY_RESULT, filesScanned: 1, errors: [] };
+  if (!owned.provider.enabled) {
+    owned.close();
+    return { ...result, disabled: true, unavailableReason: owned.provider.unavailableReason ?? 'embedding provider unavailable' };
+  }
   if (!owned.db.available) {
     owned.close();
     return { ...result, disabled: true, unavailableReason: owned.db.unavailableReason ?? 'embeddings DB unavailable' };
   }
 
   try {
+    throwIfAborted(options.signal);
     const stat = await fs.stat(options.filePath);
     const fromOffset = options.fullReindex ? 0 : owned.db.getCursor(options.filePath);
     if (fromOffset >= stat.size) {
@@ -156,7 +177,7 @@ export async function indexConversationFile(
       return result;
     }
 
-    const lastCompleteOffset = await getLastCompleteJsonlOffset(options.filePath, fromOffset, stat.size);
+    const lastCompleteOffset = await getLastCompleteJsonlOffset(options.filePath, fromOffset, stat.size, options.signal);
     if (lastCompleteOffset <= fromOffset) {
       result.chunksSkipped += 1;
       return result;
@@ -170,16 +191,19 @@ export async function indexConversationFile(
       projectId: options.projectId ?? projectIdFromPath(options.filePath),
       fromOffset,
       toOffset: stat.size,
+      signal: options.signal,
     })) {
       batch.push(chunk);
       if (batch.length >= batchSize) {
-        await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result });
+        throwIfAborted(options.signal);
+        await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result, signal: options.signal });
         batch = [];
       }
     }
 
     if (batch.length > 0) {
-      await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result });
+      throwIfAborted(options.signal);
+      await indexBatch({ batch, db: owned.db, provider: owned.provider, filePath: options.filePath, now: options.now, result, signal: options.signal });
     }
 
     if (result.chunksIndexed === 0) {
@@ -189,6 +213,7 @@ export async function indexConversationFile(
     result.filesIndexed = result.chunksIndexed > 0 ? 1 : 0;
     return result;
   } catch (error) {
+    if (isAbortError(error)) throw error;
     result.errors.push({ filePath: options.filePath, message: error instanceof Error ? error.message : String(error) });
     return result;
   } finally {
@@ -203,8 +228,11 @@ async function indexBatch(input: {
   filePath: string;
   now?: () => string;
   result: ConversationIndexResult;
+  signal?: AbortSignal;
 }): Promise<void> {
-  const embedded = await input.provider.embed(input.batch.map((chunk) => chunk.text));
+  throwIfAborted(input.signal);
+  const texts = input.batch.map((chunk) => chunk.text);
+  const embedded = input.signal ? await input.provider.embed(texts, { signal: input.signal }) : await input.provider.embed(texts);
   const indexedAt = input.now?.() ?? new Date().toISOString();
   input.batch.forEach((chunk, index) => {
     const { sourceLineEndOffset: _sourceLineEndOffset, ...insert } = chunk;
@@ -217,13 +245,14 @@ async function indexBatch(input: {
   input.result.chunksIndexed += input.batch.length;
 }
 
-async function discoverConversationJsonlFiles(roots: string[]): Promise<string[]> {
+async function discoverConversationJsonlFiles(roots: string[], signal?: AbortSignal): Promise<string[]> {
   const files: string[] = [];
-  for (const root of roots) await collectJsonlFiles(root, files);
+  for (const root of roots) await collectJsonlFiles(root, files, signal);
   return files.sort();
 }
 
-async function collectJsonlFiles(dir: string, files: string[]): Promise<void> {
+async function collectJsonlFiles(dir: string, files: string[], signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
   let entries: import('node:fs').Dirent[];
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
@@ -232,9 +261,24 @@ async function collectJsonlFiles(dir: string, files: string[]): Promise<void> {
   }
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) await collectJsonlFiles(path, files);
+    throwIfAborted(signal);
+    if (entry.isDirectory()) await collectJsonlFiles(path, files, signal);
     else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(path);
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortError(): Error {
+  const error = new Error('Conversation search indexing aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 function openIndexerResources(config: NormalizedConversationSearchConfig, options: ConversationIndexerOptions) {

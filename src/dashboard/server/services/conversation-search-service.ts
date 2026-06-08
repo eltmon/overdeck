@@ -31,6 +31,9 @@ function getHandle(config: NormalizedConversationSearchConfig): ConversationSear
   if (activeHandle?.signature === signature) return activeHandle;
 
   closeConversationSearchService();
+  const provider = createConversationEmbeddingProvider({ config });
+  if (!provider.enabled) return null;
+
   const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
   if (!db.available) {
     db.close();
@@ -40,7 +43,7 @@ function getHandle(config: NormalizedConversationSearchConfig): ConversationSear
   activeHandle = {
     signature,
     db,
-    provider: createConversationEmbeddingProvider({ config }),
+    provider,
   };
   return activeHandle;
 }

@@ -27,6 +27,7 @@ export interface ChunkConversationJsonlOptions {
   maxTokens?: number;
   /** Approximate token overlap between long-message windows. Defaults to 64. */
   overlapTokens?: number;
+  signal?: AbortSignal;
 }
 
 interface JsonlLine {
@@ -59,7 +60,14 @@ interface TokenSpan {
 
 interface TextPayload {
   text: string;
-  byteOffset: number;
+  encodedStart: number;
+  rawOffsetsByDecodedIndex: number[];
+}
+
+interface StringToken {
+  decoded: string;
+  encodedStart: number;
+  encodedEnd: number;
 }
 
 const DEFAULT_MAX_TOKENS = 512;
@@ -79,35 +87,41 @@ export async function* chunkConversationJsonl(
   const maxTokens = normalizeMaxTokens(options.maxTokens);
   const overlapTokens = normalizeOverlapTokens(options.overlapTokens, maxTokens);
 
-  for await (const line of readCompleteJsonlLines(options.filePath, options.fromOffset ?? 0, options.toOffset)) {
+  for await (const line of readCompleteJsonlLines(options.filePath, options.fromOffset ?? 0, options.toOffset, options.signal)) {
+    throwIfAborted(options.signal);
     const parsed = parseTranscriptEntry(line.bytes);
-    if (!parsed) continue;
+    if (!parsed || parsed.type === 'tool_result') continue;
 
     const role = extractRole(parsed);
     if (!role) continue;
 
-    const payload = extractMessagePayload(line);
-    if (!payload) continue;
+    const rawLine = line.bytes.toString('utf8');
+    const payloads = extractMessagePayloads(parsed.message?.content, rawLine);
+    if (payloads.length === 0) continue;
 
-    const text = payload.text.trim();
-    if (!text) continue;
-
-    const leadingTrimChars = payload.text.length - payload.text.trimStart().length;
-    const payloadTextStart = payload.byteOffset + Buffer.byteLength(payload.text.slice(0, leadingTrimChars), 'utf8');
     const ts = extractTimestamp(parsed);
-    for (const window of splitTextIntoWindows(text, maxTokens, overlapTokens)) {
-      const byteOffset = payloadTextStart + Buffer.byteLength(text.slice(0, window.charStart), 'utf8');
-      yield {
-        sessionId: options.sessionId,
-        projectId: options.projectId,
-        role,
-        ts,
-        byteOffset,
-        charLength: Buffer.byteLength(window.text, 'utf8'),
-        text: window.text,
-        tokenCount: window.tokenCount,
-        sourceLineEndOffset: line.lineEndOffset,
-      };
+    for (const payload of payloads) {
+      const leadingTrimChars = payload.text.length - payload.text.trimStart().length;
+      const text = payload.text.trim();
+      if (!text) continue;
+
+      for (const window of splitTextIntoWindows(text, maxTokens, overlapTokens)) {
+        const decodedStart = leadingTrimChars + window.charStart;
+        const decodedEnd = decodedStart + window.charLength;
+        const rawStart = payload.encodedStart + (payload.rawOffsetsByDecodedIndex[decodedStart] ?? payload.rawOffsetsByDecodedIndex[payload.rawOffsetsByDecodedIndex.length - 1] ?? 0);
+        const rawEnd = payload.encodedStart + (payload.rawOffsetsByDecodedIndex[decodedEnd] ?? payload.rawOffsetsByDecodedIndex[payload.rawOffsetsByDecodedIndex.length - 1] ?? 0);
+        yield {
+          sessionId: options.sessionId,
+          projectId: options.projectId,
+          role,
+          ts,
+          byteOffset: line.byteOffset + Buffer.byteLength(rawLine.slice(0, rawStart), 'utf8'),
+          charLength: Buffer.byteLength(rawLine.slice(rawStart, rawEnd), 'utf8'),
+          text: window.text,
+          tokenCount: window.tokenCount,
+          sourceLineEndOffset: line.lineEndOffset,
+        };
+      }
     }
   }
 }
@@ -124,9 +138,10 @@ export async function getLastCompleteJsonlOffset(
   filePath: string,
   fromOffset = 0,
   toOffset?: number,
+  signal?: AbortSignal,
 ): Promise<number> {
   let lastCompleteOffset = Math.max(0, fromOffset);
-  for await (const line of readCompleteJsonlLines(filePath, fromOffset, toOffset)) {
+  for await (const line of readCompleteJsonlLines(filePath, fromOffset, toOffset, signal)) {
     lastCompleteOffset = line.lineEndOffset;
   }
   return lastCompleteOffset;
@@ -136,38 +151,61 @@ async function* readCompleteJsonlLines(
   filePath: string,
   fromOffset: number,
   toOffset?: number,
+  signal?: AbortSignal,
 ): AsyncGenerator<JsonlLine> {
+  throwIfAborted(signal);
   const stat = await fs.stat(filePath);
   const start = Math.max(0, Math.min(fromOffset, stat.size));
   const endExclusive = Math.max(start, Math.min(toOffset ?? stat.size, stat.size));
   if (start >= endExclusive) return;
 
-  let pending = Buffer.alloc(0);
-  let pendingOffset = start;
+  let lineChunks: Buffer[] = [];
+  let lineLength = 0;
+  let lineStartOffset = start;
   let skipFirstPartialLine = await startsInsideLine(filePath, start);
 
   const stream = createReadStream(filePath, { start, end: endExclusive - 1 });
-  for await (const rawChunk of stream) {
-    const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
-    pending = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
+  let chunkStartOffset = start;
+  try {
+    for await (const rawChunk of stream) {
+      throwIfAborted(signal);
+      const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
+      let segmentStart = 0;
 
-    let newlineIndex = pending.indexOf(0x0a);
-    while (newlineIndex !== -1) {
-      const lineBytes = pending.subarray(0, newlineIndex);
-      const nextPending = pending.subarray(newlineIndex + 1);
-      const lineStartOffset = pendingOffset;
-      const lineEndOffset = pendingOffset + newlineIndex + 1;
-      pendingOffset = lineEndOffset;
-      pending = nextPending;
+      for (;;) {
+        const newlineIndex = chunk.indexOf(0x0a, segmentStart);
+        if (newlineIndex === -1) break;
 
-      if (skipFirstPartialLine) {
-        skipFirstPartialLine = false;
-      } else if (lineBytes.some((byte) => byte !== 0x20 && byte !== 0x09 && byte !== 0x0d)) {
-        yield { byteOffset: lineStartOffset, lineEndOffset, bytes: stripTrailingCarriageReturn(lineBytes) };
+        const segment = chunk.subarray(segmentStart, newlineIndex);
+        if (segment.length > 0) {
+          lineChunks.push(segment);
+          lineLength += segment.length;
+        }
+
+        const lineEndOffset = chunkStartOffset + newlineIndex + 1;
+        const lineBytes = lineChunks.length === 1 ? lineChunks[0]! : Buffer.concat(lineChunks, lineLength);
+        lineChunks = [];
+        lineLength = 0;
+
+        if (skipFirstPartialLine) {
+          skipFirstPartialLine = false;
+        } else if (lineBytes.some((byte) => byte !== 0x20 && byte !== 0x09 && byte !== 0x0d)) {
+          yield { byteOffset: lineStartOffset, lineEndOffset, bytes: stripTrailingCarriageReturn(lineBytes) };
+        }
+
+        lineStartOffset = lineEndOffset;
+        segmentStart = newlineIndex + 1;
       }
 
-      newlineIndex = pending.indexOf(0x0a);
+      const remainder = chunk.subarray(segmentStart);
+      if (remainder.length > 0) {
+        lineChunks.push(remainder);
+        lineLength += remainder.length;
+      }
+      chunkStartOffset += chunk.length;
     }
+  } finally {
+    if (signal?.aborted) stream.destroy(abortError());
   }
 
   // Deliberately ignore a trailing partial line. Live Claude sessions append JSONL
@@ -212,52 +250,214 @@ function extractTimestamp(entry: TranscriptEntry): string | null {
   return null;
 }
 
-function extractMessagePayload(line: JsonlLine): TextPayload | null {
-  const entry = parseTranscriptEntry(line.bytes);
-  if (!entry) return null;
-  const text = extractText(entry.message?.content).join('\n');
-  if (!text) return null;
-
-  const rawLine = line.bytes.toString('utf8');
-  const encoded = JSON.stringify(text).slice(1, -1);
-  const encodedIndex = rawLine.indexOf(encoded);
-  if (encodedIndex >= 0) {
-    return { text, byteOffset: line.byteOffset + Buffer.byteLength(rawLine.slice(0, encodedIndex), 'utf8') };
-  }
-
-  // Fallback for multi-part content: locate the first text leaf and use the
-  // concatenated decoded text for indexing. This preserves stable line-local
-  // keys; common single-text Claude Code messages take the exact path above.
-  const firstText = firstTextLeaf(entry.message?.content);
-  if (!firstText) return { text, byteOffset: line.byteOffset };
-  const firstEncoded = JSON.stringify(firstText).slice(1, -1);
-  const firstIndex = rawLine.indexOf(firstEncoded);
-  return { text, byteOffset: firstIndex >= 0 ? line.byteOffset + Buffer.byteLength(rawLine.slice(0, firstIndex), 'utf8') : line.byteOffset };
+function extractMessagePayloads(content: unknown, rawLine: string): TextPayload[] {
+  if (content === undefined) return [];
+  const messageStart = findPropertyValueStart(rawLine, 0, 'message');
+  if (messageStart === null) return [];
+  const contentStart = findPropertyValueStart(rawLine, messageStart, 'content');
+  if (contentStart === null) return [];
+  return collectContentPayloads(rawLine, contentStart);
 }
 
-function extractText(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(extractText);
-  if (!isRecord(value)) return [];
-
-  if (typeof value.text === 'string' && (value.type === undefined || value.type === 'text')) return [value.text];
-  if (typeof value.content === 'string') return [value.content];
+function collectContentPayloads(raw: string, valueStart: number): TextPayload[] {
+  const index = skipWhitespace(raw, valueStart);
+  if (raw[index] === '"') {
+    const token = readStringToken(raw, index);
+    return token ? [payloadFromStringToken(raw, token)] : [];
+  }
+  if (raw[index] === '[') return collectPayloadsFromContentArray(raw, index).payloads;
+  if (raw[index] === '{') {
+    const parsed = collectPayloadsFromContentObject(raw, index);
+    return parsed.payloads;
+  }
   return [];
 }
 
-function firstTextLeaf(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = firstTextLeaf(item);
-      if (found) return found;
+function collectPayloadsFromContentArray(raw: string, arrayStart: number): { payloads: TextPayload[]; next: number } {
+  const payloads: TextPayload[] = [];
+  let index = skipWhitespace(raw, arrayStart + 1);
+  while (index < raw.length && raw[index] !== ']') {
+    const char = raw[index];
+    if (char === '"') {
+      const token = readStringToken(raw, index);
+      if (!token) return { payloads, next: raw.length };
+      payloads.push(payloadFromStringToken(raw, token));
+      index = token.encodedEnd + 1;
+    } else if (char === '{') {
+      const parsed = collectPayloadsFromContentObject(raw, index);
+      payloads.push(...parsed.payloads);
+      index = parsed.next;
+    } else if (char === '[') {
+      const parsed = collectPayloadsFromContentArray(raw, index);
+      payloads.push(...parsed.payloads);
+      index = parsed.next;
+    } else {
+      index = skipJsonValue(raw, index);
     }
-    return null;
+    index = skipWhitespace(raw, index);
+    if (raw[index] === ',') index = skipWhitespace(raw, index + 1);
   }
-  if (!isRecord(value)) return null;
-  if (typeof value.text === 'string' && (value.type === undefined || value.type === 'text')) return value.text;
-  if (typeof value.content === 'string') return value.content;
+  return { payloads, next: raw[index] === ']' ? index + 1 : index };
+}
+
+function collectPayloadsFromContentObject(raw: string, objectStart: number): { payloads: TextPayload[]; next: number } {
+  let index = skipWhitespace(raw, objectStart + 1);
+  let typeValue: string | undefined;
+  let textToken: StringToken | null = null;
+
+  while (index < raw.length && raw[index] !== '}') {
+    const key = readStringToken(raw, index);
+    if (!key) return { payloads: [], next: raw.length };
+    index = skipWhitespace(raw, key.encodedEnd + 1);
+    if (raw[index] !== ':') return { payloads: [], next: raw.length };
+    index = skipWhitespace(raw, index + 1);
+
+    if (key.decoded === 'type' && raw[index] === '"') {
+      const token = readStringToken(raw, index);
+      if (!token) return { payloads: [], next: raw.length };
+      typeValue = token.decoded;
+      index = token.encodedEnd + 1;
+    } else if (key.decoded === 'text' && raw[index] === '"') {
+      const token = readStringToken(raw, index);
+      if (!token) return { payloads: [], next: raw.length };
+      textToken = token;
+      index = token.encodedEnd + 1;
+    } else {
+      index = skipJsonValue(raw, index);
+    }
+
+    index = skipWhitespace(raw, index);
+    if (raw[index] === ',') index = skipWhitespace(raw, index + 1);
+  }
+
+  const payloads = textToken && (typeValue === undefined || typeValue === 'text')
+    ? [payloadFromStringToken(raw, textToken)]
+    : [];
+  return { payloads, next: raw[index] === '}' ? index + 1 : index };
+}
+
+function payloadFromStringToken(raw: string, token: StringToken): TextPayload {
+  return {
+    text: token.decoded,
+    encodedStart: token.encodedStart,
+    rawOffsetsByDecodedIndex: buildDecodedRawOffsets(raw.slice(token.encodedStart, token.encodedEnd), token.decoded.length),
+  };
+}
+
+function buildDecodedRawOffsets(encoded: string, decodedLength: number): number[] {
+  const offsets = new Array<number>(decodedLength + 1);
+  let decodedIndex = 0;
+  for (let rawIndex = 0; rawIndex < encoded.length && decodedIndex < decodedLength;) {
+    offsets[decodedIndex] = rawIndex;
+    const { decodedUnits, rawEnd } = readEncodedUnit(encoded, rawIndex);
+    for (let unit = 1; unit < decodedUnits && decodedIndex + unit < offsets.length; unit += 1) {
+      offsets[decodedIndex + unit] = rawIndex;
+    }
+    decodedIndex += decodedUnits;
+    rawIndex = rawEnd;
+    offsets[decodedIndex] = rawIndex;
+  }
+  offsets[decodedLength] = encoded.length;
+  return offsets;
+}
+
+function findPropertyValueStart(raw: string, objectStart: number, property: string): number | null {
+  let index = skipWhitespace(raw, objectStart);
+  if (raw[index] !== '{') return null;
+  index = skipWhitespace(raw, index + 1);
+  while (index < raw.length && raw[index] !== '}') {
+    const key = readStringToken(raw, index);
+    if (!key) return null;
+    index = skipWhitespace(raw, key.encodedEnd + 1);
+    if (raw[index] !== ':') return null;
+    const valueStart = skipWhitespace(raw, index + 1);
+    if (key.decoded === property) return valueStart;
+    index = skipJsonValue(raw, valueStart);
+    index = skipWhitespace(raw, index);
+    if (raw[index] === ',') index = skipWhitespace(raw, index + 1);
+  }
   return null;
+}
+
+function readStringToken(raw: string, quoteIndex: number): StringToken | null {
+  if (raw[quoteIndex] !== '"') return null;
+  let index = quoteIndex + 1;
+  while (index < raw.length) {
+    const char = raw[index];
+    if (char === '"') {
+      try {
+        return {
+          decoded: JSON.parse(raw.slice(quoteIndex, index + 1)) as string,
+          encodedStart: quoteIndex + 1,
+          encodedEnd: index,
+        };
+      } catch {
+        return null;
+      }
+    }
+    if (char === '\\') index += raw[index + 1] === 'u' ? 6 : 2;
+    else index += 1;
+  }
+  return null;
+}
+
+function skipJsonValue(raw: string, valueStart: number): number {
+  const index = skipWhitespace(raw, valueStart);
+  const char = raw[index];
+  if (char === '"') {
+    const token = readStringToken(raw, index);
+    return token ? token.encodedEnd + 1 : raw.length;
+  }
+  if (char === '{') return skipJsonObject(raw, index);
+  if (char === '[') return skipJsonArray(raw, index);
+  let cursor = index;
+  while (cursor < raw.length && raw[cursor] !== ',' && raw[cursor] !== '}' && raw[cursor] !== ']') cursor += 1;
+  return cursor;
+}
+
+function skipJsonObject(raw: string, objectStart: number): number {
+  let index = skipWhitespace(raw, objectStart + 1);
+  while (index < raw.length && raw[index] !== '}') {
+    const key = readStringToken(raw, index);
+    if (!key) return raw.length;
+    index = skipWhitespace(raw, key.encodedEnd + 1);
+    if (raw[index] !== ':') return raw.length;
+    index = skipJsonValue(raw, index + 1);
+    index = skipWhitespace(raw, index);
+    if (raw[index] === ',') index = skipWhitespace(raw, index + 1);
+  }
+  return raw[index] === '}' ? index + 1 : index;
+}
+
+function skipJsonArray(raw: string, arrayStart: number): number {
+  let index = skipWhitespace(raw, arrayStart + 1);
+  while (index < raw.length && raw[index] !== ']') {
+    index = skipJsonValue(raw, index);
+    index = skipWhitespace(raw, index);
+    if (raw[index] === ',') index = skipWhitespace(raw, index + 1);
+  }
+  return raw[index] === ']' ? index + 1 : index;
+}
+
+function skipWhitespace(raw: string, index: number): number {
+  let cursor = index;
+  while (cursor < raw.length && /\s/.test(raw[cursor]!)) cursor += 1;
+  return cursor;
+}
+
+function readEncodedUnit(encoded: string, rawIndex: number): { decodedUnits: number; rawEnd: number } {
+  if (encoded[rawIndex] !== '\\') return { decodedUnits: 1, rawEnd: rawIndex + 1 };
+  const escape = encoded[rawIndex + 1];
+  if (escape === 'u') {
+    const firstEnd = rawIndex + 6;
+    const code = parseInt(encoded.slice(rawIndex + 2, rawIndex + 6), 16);
+    if (code >= 0xd800 && code <= 0xdbff && encoded.slice(firstEnd, firstEnd + 2) === '\\u') {
+      const low = parseInt(encoded.slice(firstEnd + 2, firstEnd + 6), 16);
+      if (low >= 0xdc00 && low <= 0xdfff) return { decodedUnits: 2, rawEnd: firstEnd + 6 };
+    }
+    return { decodedUnits: 1, rawEnd: firstEnd };
+  }
+  return { decodedUnits: 1, rawEnd: rawIndex + 2 };
 }
 
 export function splitTextIntoWindows(
@@ -306,6 +506,14 @@ function normalizeMaxTokens(value: number | undefined): number {
 function normalizeOverlapTokens(value: number | undefined, maxTokens: number): number {
   if (!Number.isFinite(value) || value === undefined) return Math.min(DEFAULT_OVERLAP_TOKENS, maxTokens - 1);
   return Math.max(0, Math.min(Math.floor(value), maxTokens - 1));
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw abortError();
+}
+
+function abortError(): Error {
+  return new DOMException('Conversation search indexing aborted', 'AbortError');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

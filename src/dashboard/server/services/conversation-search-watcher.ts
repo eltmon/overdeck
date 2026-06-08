@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { watch as chokidarWatch, type FSWatcher } from 'chokidar';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
+import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { indexConversationFile, indexConversationSearch, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 
 interface WatcherLike {
@@ -13,8 +14,8 @@ interface WatcherLike {
 }
 
 type WatchFactory = (paths: string[], options: { ignoreInitial: boolean; awaitWriteFinish: { stabilityThreshold: number; pollInterval: number } }) => WatcherLike;
-type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[] }) => Promise<ConversationIndexResult>;
-type IndexFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig }) => Promise<ConversationIndexResult>;
+type IndexAllFn = (options: { config: NormalizedConversationSearchConfig; roots: string[]; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
+type IndexFileFn = (options: { filePath: string; config: NormalizedConversationSearchConfig; signal?: AbortSignal }) => Promise<ConversationIndexResult>;
 
 export interface ConversationSearchWatcherOptions {
   config?: NormalizedConversationSearchConfig;
@@ -23,6 +24,7 @@ export interface ConversationSearchWatcherOptions {
   watchFactory?: WatchFactory;
   indexAll?: IndexAllFn;
   indexFile?: IndexFileFn;
+  maxConcurrentIndexers?: number;
   log?: Pick<Console, 'log' | 'warn'>;
 }
 
@@ -50,11 +52,19 @@ export class ConversationSearchWatcher {
   private readonly watchFactory: WatchFactory;
   private readonly indexAll: IndexAllFn;
   private readonly indexFile: IndexFileFn;
+  private readonly maxConcurrentIndexers: number;
   private readonly log: Pick<Console, 'log' | 'warn'>;
   readonly signature: string;
   private watcher: WatcherLike | null = null;
   private stopped = false;
+  private activeIndexers = 0;
+  private abortController: AbortController | null = null;
+  private startupTask: Promise<void> | null = null;
+  private readonly activeTasks = new Set<Promise<void>>();
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly queued = new Set<string>();
+  private readonly inFlight = new Set<string>();
+  private readonly rerun = new Set<string>();
 
   constructor(options: ConversationSearchWatcherOptions = {}) {
     this.config = options.config ?? getConversationSearchConfigSync();
@@ -64,20 +74,30 @@ export class ConversationSearchWatcher {
     this.watchFactory = options.watchFactory ?? ((paths, watchOptions) => chokidarWatch(paths, watchOptions) as FSWatcher);
     this.indexAll = options.indexAll ?? indexConversationSearch;
     this.indexFile = options.indexFile ?? indexConversationFile;
+    this.maxConcurrentIndexers = Math.max(1, options.maxConcurrentIndexers ?? 1);
     this.log = options.log ?? console;
   }
 
   start(): void {
     if (this.stopped) return;
-    void this.indexAll({ config: this.config, roots: this.roots })
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+    this.startupTask = this.indexAll({ config: this.config, roots: this.roots, signal })
       .then((result) => {
+        if (signal.aborted || this.stopped) return;
         if (result.disabled) {
           this.log.warn(`[conversation-search] startup index skipped: ${result.unavailableReason ?? 'disabled'}`);
         } else {
           this.log.log(`[conversation-search] startup indexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} across ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
         }
       })
-      .catch((error) => this.log.warn('[conversation-search] startup index failed:', error));
+      .catch((error) => {
+        if (!isAbortError(error)) this.log.warn('[conversation-search] startup index failed:', error);
+      })
+      .finally(() => {
+        this.startupTask = null;
+        this.drainQueue();
+      });
 
     this.watcher = this.watchFactory(this.roots, {
       ignoreInitial: true,
@@ -97,9 +117,17 @@ export class ConversationSearchWatcher {
     this.stopped = true;
     for (const timer of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
+    this.queued.clear();
+    this.rerun.clear();
+    this.abortController?.abort();
     const watcher = this.watcher;
     this.watcher = null;
     if (watcher) await watcher.close();
+    await Promise.allSettled([
+      ...(this.startupTask ? [this.startupTask] : []),
+      ...this.activeTasks,
+    ]);
+    this.abortController = null;
   }
 
   private schedule(filePath: string): void {
@@ -109,10 +137,41 @@ export class ConversationSearchWatcher {
     const timer = setTimeout(() => {
       this.pending.delete(filePath);
       if (this.stopped) return;
-      void this.indexFile({ filePath, config: this.config })
-        .catch((error) => this.log.warn(`[conversation-search] failed to index ${filePath}:`, error));
+      this.enqueue(filePath);
     }, this.debounceMs);
     this.pending.set(filePath, timer);
+  }
+
+  private enqueue(filePath: string): void {
+    if (this.inFlight.has(filePath)) {
+      this.rerun.add(filePath);
+      return;
+    }
+    this.queued.add(filePath);
+    this.drainQueue();
+  }
+
+  private drainQueue(): void {
+    if (this.stopped || this.startupTask) return;
+    const signal = this.abortController?.signal;
+    while (this.activeIndexers < this.maxConcurrentIndexers && this.queued.size > 0) {
+      const filePath = this.queued.values().next().value as string;
+      this.queued.delete(filePath);
+      this.inFlight.add(filePath);
+      this.activeIndexers += 1;
+      const task = this.indexFile({ filePath, config: this.config, signal })
+        .catch((error) => {
+          if (!isAbortError(error)) this.log.warn(`[conversation-search] failed to index ${filePath}:`, error);
+        })
+        .finally(() => {
+          this.activeTasks.delete(task);
+          this.activeIndexers = Math.max(0, this.activeIndexers - 1);
+          this.inFlight.delete(filePath);
+          if (this.rerun.delete(filePath) && !this.stopped) this.queued.add(filePath);
+          this.drainQueue();
+        });
+      this.activeTasks.add(task);
+    }
   }
 }
 
@@ -120,6 +179,11 @@ export function startConversationSearchWatcher(options: ConversationSearchWatche
   const config = options.config ?? getConversationSearchConfigSync();
   if (!config.enabled) {
     options.log?.log?.('[conversation-search] watcher disabled by config');
+    return null;
+  }
+  const provider = createConversationEmbeddingProvider({ config });
+  if (!provider.enabled) {
+    options.log?.warn?.(`[conversation-search] watcher disabled: ${provider.unavailableReason ?? 'embedding provider unavailable'}`);
     return null;
   }
   if (activeWatcher) return activeWatcher;
@@ -142,6 +206,12 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
     options.log?.log?.('[conversation-search] watcher stopped because config is disabled');
     return null;
   }
+  const provider = createConversationEmbeddingProvider({ config });
+  if (!provider.enabled) {
+    await stopConversationSearchWatcher();
+    options.log?.warn?.(`[conversation-search] watcher stopped because embedding provider is unavailable: ${provider.unavailableReason ?? 'unknown'}`);
+    return null;
+  }
 
   const signature = watcherSignature(config, roots);
   if (activeWatcher?.signature === signature) return activeWatcher;
@@ -157,4 +227,8 @@ export async function syncConversationSearchWatcher(options: ConversationSearchW
 
 function defaultConversationRoots(): string[] {
   return [join(homedir(), '.claude', 'projects')];
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }

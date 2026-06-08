@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import type { ChatMessage } from '@panctl/contracts';
 
 import { parseConversationMessages } from './conversation-service.js';
@@ -47,31 +47,57 @@ export async function resolveConversationMessageLocator(
 }
 
 async function findJsonlSequenceForByteOffset(sessionFile: string, byteOffset: number): Promise<number | null> {
-  const buffer = await readFile(sessionFile);
-  if (byteOffset >= buffer.length) return null;
-
+  let lineChunks: Buffer[] = [];
+  let lineLength = 0;
   let lineStart = 0;
+  let chunkStart = 0;
   let sequence = 0;
-  for (let index = 0; index <= buffer.length; index++) {
-    if (index < buffer.length && buffer[index] !== 0x0a) continue;
 
-    const lineEndExclusive = index;
-    const lineEndWithNewline = index < buffer.length ? index + 1 : index;
-    const line = buffer.subarray(lineStart, stripTrailingCarriageReturn(buffer, lineStart, lineEndExclusive));
-    const isNonEmpty = line.some((byte) => byte !== 0x20 && byte !== 0x09);
+  for await (const rawChunk of createReadStream(sessionFile)) {
+    const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
+    let segmentStart = 0;
 
-    if (isNonEmpty) {
-      if (byteOffset >= lineStart && byteOffset < lineEndWithNewline) return sequence;
-      sequence += 1;
+    for (;;) {
+      const newlineIndex = chunk.indexOf(0x0a, segmentStart);
+      if (newlineIndex === -1) break;
+
+      const segment = chunk.subarray(segmentStart, newlineIndex);
+      if (segment.length > 0) {
+        lineChunks.push(segment);
+        lineLength += segment.length;
+      }
+
+      const lineEndWithNewline = chunkStart + newlineIndex + 1;
+      const line = lineChunks.length === 1 ? lineChunks[0]! : Buffer.concat(lineChunks, lineLength);
+      lineChunks = [];
+      lineLength = 0;
+
+      if (isNonEmptyJsonlLine(line)) {
+        if (byteOffset >= lineStart && byteOffset < lineEndWithNewline) return sequence;
+        sequence += 1;
+      }
+      if (byteOffset < lineEndWithNewline) return null;
+
+      lineStart = lineEndWithNewline;
+      segmentStart = newlineIndex + 1;
     }
 
-    lineStart = index + 1;
+    const remainder = chunk.subarray(segmentStart);
+    if (remainder.length > 0) {
+      lineChunks.push(remainder);
+      lineLength += remainder.length;
+    }
+    chunkStart += chunk.length;
   }
 
+  if (lineLength > 0) {
+    const line = lineChunks.length === 1 ? lineChunks[0]! : Buffer.concat(lineChunks, lineLength);
+    if (isNonEmptyJsonlLine(line) && byteOffset >= lineStart && byteOffset < lineStart + lineLength) return sequence;
+  }
   return null;
 }
 
-function stripTrailingCarriageReturn(buffer: Buffer, start: number, end: number): number {
-  if (end > start && buffer[end - 1] === 0x0d) return end - 1;
-  return end;
+function isNonEmptyJsonlLine(buffer: Buffer): boolean {
+  const end = buffer.length > 0 && buffer[buffer.length - 1] === 0x0d ? buffer.length - 1 : buffer.length;
+  return buffer.subarray(0, end).some((byte) => byte !== 0x20 && byte !== 0x09);
 }

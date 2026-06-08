@@ -203,18 +203,23 @@ export interface PaletteConversationHit {
   rank: number;
 }
 
-function routeableConversationName(sessionId: string): string {
+function routeableConversationName(sessionId: string, cache: Map<string, string>): string {
+  const cached = cache.get(sessionId);
+  if (cached) return cached;
+  let routeable = sessionId;
   try {
-    return getConversationByClaudeSessionId(sessionId)?.name ?? sessionId;
+    routeable = getConversationByClaudeSessionId(sessionId)?.name ?? sessionId;
   } catch {
-    return sessionId;
+    routeable = sessionId;
   }
+  cache.set(sessionId, routeable);
+  return routeable;
 }
 
-function toPaletteConversationHit(hit: ConversationSearchHit): PaletteConversationHit {
+function toPaletteConversationHit(hit: ConversationSearchHit, routeableNames: Map<string, string>): PaletteConversationHit {
   return {
     sessionId: hit.sessionId,
-    conversationId: routeableConversationName(hit.sessionId),
+    conversationId: routeableConversationName(hit.sessionId, routeableNames),
     projectId: hit.projectId,
     role: hit.role,
     ts: hit.ts,
@@ -228,7 +233,8 @@ function toPaletteConversationHit(hit: ConversationSearchHit): PaletteConversati
 
 async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
   const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
-  return hits.map(toPaletteConversationHit);
+  const routeableNames = new Map<string, string>();
+  return hits.map((hit) => toPaletteConversationHit(hit, routeableNames));
 }
 
 async function searchProjectMemory(

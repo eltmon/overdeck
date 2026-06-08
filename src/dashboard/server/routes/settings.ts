@@ -39,10 +39,12 @@ import {
 } from '../../../lib/claude-settings-overlay.js';
 import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
-import { syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
+import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -50,6 +52,7 @@ import { estimateFullReindexConversationSearchCost, fullReindexConversationSearc
 const REINDEX_CONFIRM_THRESHOLD_USD = 1;
 const REINDEX_CONFIRM_TTL_MS = 10 * 60 * 1000;
 const reindexConfirmationNonces = new Map<string, { estimatedUsd: number; expiresAt: number }>();
+let activeConversationSearchReindex: Promise<unknown> | null = null;
 
 function createReindexConfirmationNonce(estimatedUsd: number): string {
   const nonce = randomBytes(24).toString('base64url');
@@ -708,48 +711,77 @@ const postValidateApiKeyRoute = HttpRouter.add(
 const getConversationSearchStatusRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/status',
-  httpHandler(Effect.try({
-    try: () => {
-      const config = getConversationSearchConfigSync();
-      if (!config.enabled) {
-        return jsonResponse({
-          enabled: false,
-          available: false,
-          unavailableReason: 'conversationSearch is disabled',
-          dbPath: config.dbPath,
-          chunkCount: 0,
-          indexedFileCount: 0,
-          lastIndexedAt: null,
-        });
-      }
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
 
-      const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-      try {
-        const stats = db.getStats();
-        return jsonResponse({
-          enabled: config.enabled,
-          available: db.available,
-          unavailableReason: db.unavailableReason,
-          dbPath: config.dbPath,
-          ...stats,
-        });
-      } finally {
-        db.close();
-      }
-    },
-    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    return yield* Effect.try({
+      try: () => {
+        const config = getConversationSearchConfigSync();
+        if (!config.enabled) {
+          return jsonResponse({
+            enabled: false,
+            available: false,
+            unavailableReason: 'conversationSearch is disabled',
+            dbPath: config.dbPath,
+            chunkCount: 0,
+            indexedFileCount: 0,
+            lastIndexedAt: null,
+          });
+        }
+
+        const provider = createConversationEmbeddingProvider({ config });
+        if (!provider.enabled) {
+          return jsonResponse({
+            enabled: config.enabled,
+            available: false,
+            unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable',
+            dbPath: config.dbPath,
+            chunkCount: 0,
+            indexedFileCount: 0,
+            lastIndexedAt: null,
+          });
+        }
+
+        const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
+        try {
+          const stats = db.getStats();
+          return jsonResponse({
+            enabled: config.enabled,
+            available: db.available && provider.enabled,
+            unavailableReason: db.unavailableReason,
+            dbPath: config.dbPath,
+            ...stats,
+          });
+        } finally {
+          db.close();
+        }
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
   })),
 );
 
 const getConversationSearchReindexEstimateRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/reindex-estimate',
-  httpHandler(Effect.promise(async () => {
-    const estimate = await estimateFullReindexConversationSearchCost();
-    const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
-      ? createReindexConfirmationNonce(estimate.estimatedUsd)
-      : undefined;
-    return jsonResponse({ ...estimate, confirmationNonce });
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
+    return yield* Effect.promise(async () => {
+      const estimate = await estimateFullReindexConversationSearchCost();
+      const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
+        ? createReindexConfirmationNonce(estimate.estimatedUsd)
+        : undefined;
+      return jsonResponse({ ...estimate, confirmationNonce });
+    });
   })),
 );
 
@@ -763,21 +795,38 @@ const postConversationSearchReindexRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-      const estimate = await estimateFullReindexConversationSearchCost();
-      if (estimate.disabled) return jsonResponse(estimate);
-      if (estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD) {
-        const nonce = (body as { confirmationNonce?: unknown }).confirmationNonce;
-        if (!consumeReindexConfirmationNonce(nonce, estimate.estimatedUsd)) {
-          return jsonResponse({
-            error: 'Reindex confirmation required',
-            requiresConfirmation: true,
-            estimate,
-          }, { status: 409 });
-        }
+      if (activeConversationSearchReindex) {
+        return jsonResponse({ error: 'Conversation search reindex already in progress' }, { status: 409 });
       }
 
-      const result = await fullReindexConversationSearch();
-      return jsonResponse(result);
+      const job = (async () => {
+        const estimate = await estimateFullReindexConversationSearchCost();
+        if (estimate.disabled) return jsonResponse(estimate);
+        if (estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD) {
+          const nonce = (body as { confirmationNonce?: unknown }).confirmationNonce;
+          if (!consumeReindexConfirmationNonce(nonce, estimate.estimatedUsd)) {
+            return jsonResponse({
+              error: 'Reindex confirmation required',
+              requiresConfirmation: true,
+              estimate,
+            }, { status: 409 });
+          }
+        }
+
+        await stopConversationSearchWatcher();
+        try {
+          const result = await fullReindexConversationSearch();
+          return jsonResponse(result);
+        } finally {
+          await syncConversationSearchWatcher();
+        }
+      })();
+      activeConversationSearchReindex = job;
+      try {
+        return await job;
+      } finally {
+        if (activeConversationSearchReindex === job) activeConversationSearchReindex = null;
+      }
     });
   })),
 );

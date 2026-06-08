@@ -2175,7 +2175,7 @@ export function SettingsPage() {
                 />
               </label>
               <label className="text-xs text-muted-foreground">
-                API key env var
+                API key env var or config key
                 <input
                   type="text"
                   value={conversationSearchApiKeyRef}

@@ -32,6 +32,10 @@ function sourceSlice(filePath: string, byteOffset: number, byteLength: number): 
   return bytes.subarray(byteOffset, byteOffset + byteLength).toString('utf8');
 }
 
+function jsonStringPayload(text: string): string {
+  return JSON.stringify(text).slice(1, -1);
+}
+
 afterEach(() => {
   if (tmpDir) {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -68,7 +72,92 @@ describe('conversation JSONL chunker', () => {
       }),
     ]);
     for (const chunk of chunks) {
-      expect(sourceSlice(filePath, chunk.byteOffset, chunk.charLength)).toBe(chunk.text);
+      expect(sourceSlice(filePath, chunk.byteOffset, chunk.charLength)).toBe(jsonStringPayload(chunk.text));
+    }
+  });
+
+  it('tracks raw source byte spans for escaped JSON string content', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'escaped.jsonl');
+    const text = 'line one\nquoted "value" and backslash \\ done';
+    writeFileSync(filePath, line(message('assistant', text, '2026-06-02T01:00:00.000Z')));
+
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-escaped', projectId: 'panopticon-cli' });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.text).toBe(text);
+    expect(sourceSlice(filePath, chunks[0]!.byteOffset, chunks[0]!.charLength)).toBe(jsonStringPayload(text));
+  });
+
+  it('anchors offsets to the message content leaf when text collides with earlier metadata', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'collision.jsonl');
+    const entry = {
+      type: 'assistant',
+      timestamp: '2026-06-02T01:00:00.000Z',
+      summary: 'text',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'text' }],
+      },
+    };
+    writeFileSync(filePath, line(entry));
+
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-collision', projectId: 'panopticon-cli' });
+
+    expect(chunks).toHaveLength(1);
+    expect(sourceSlice(filePath, chunks[0]!.byteOffset, chunks[0]!.charLength)).toBe(jsonStringPayload('text'));
+    expect(chunks[0]!.byteOffset).toBeGreaterThan(readFileSync(filePath, 'utf8').indexOf('summary'));
+  });
+
+  it('does not index tool-result content that has no chat-message target', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'tool-result.jsonl');
+    const entry = {
+      type: 'assistant',
+      timestamp: '2026-06-02T01:00:00.000Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'tool_result', content: 'tool output only' },
+          { type: 'text', text: 'assistant text' },
+        ],
+      },
+    };
+    const topLevelToolResult = {
+      type: 'tool_result',
+      timestamp: '2026-06-02T01:00:01.000Z',
+      message: { role: 'tool_result', content: 'top-level tool output' },
+    };
+    writeFileSync(filePath, line(entry) + line(topLevelToolResult));
+
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-tool-result', projectId: 'panopticon-cli' });
+
+    expect(chunks.map((chunk) => chunk.text)).toEqual(['assistant text']);
+  });
+
+  it('emits multipart text leaves as separate source-contiguous chunks', async () => {
+    const dir = makeTmpDir();
+    const filePath = join(dir, 'multipart.jsonl');
+    const entry = {
+      type: 'assistant',
+      timestamp: '2026-06-02T01:00:00.000Z',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'first part' },
+          { type: 'tool_use', name: 'noop' },
+          { type: 'text', text: 'second part' },
+        ],
+      },
+    };
+    writeFileSync(filePath, line(entry));
+
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-multipart', projectId: 'panopticon-cli' });
+
+    expect(chunks.map((chunk) => chunk.text)).toEqual(['first part', 'second part']);
+    for (const chunk of chunks) {
+      expect(sourceSlice(filePath, chunk.byteOffset, chunk.charLength)).toBe(jsonStringPayload(chunk.text));
     }
   });
 
@@ -109,7 +198,7 @@ describe('conversation JSONL chunker', () => {
         charLength: Buffer.byteLength('third message', 'utf8'),
       }),
     ]);
-    expect(sourceSlice(filePath, appendedOnly[0]!.byteOffset, appendedOnly[0]!.charLength)).toBe('third message');
+    expect(sourceSlice(filePath, appendedOnly[0]!.byteOffset, appendedOnly[0]!.charLength)).toBe(jsonStringPayload('third message'));
   });
 
   it('ignores a trailing partial JSONL line until it is complete', async () => {

@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { embedMany as aiEmbedMany } from 'ai';
 
-import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
+import { getConversationSearchConfigSync, loadConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
 
 export type ConversationEmbeddingProviderName = 'openai';
 
@@ -23,7 +23,8 @@ export interface ConversationEmbeddingProvider {
   provider: ConversationEmbeddingProviderName;
   model: string;
   enabled: boolean;
-  embed(texts: string[]): Promise<ConversationEmbeddingResult>;
+  unavailableReason?: string;
+  embed(texts: string[], options?: { signal?: AbortSignal }): Promise<ConversationEmbeddingResult>;
   estimateCost(texts: string[]): ConversationEmbeddingCostEstimate;
 }
 
@@ -34,7 +35,7 @@ export interface CreateConversationEmbeddingProviderOptions {
   createOpenAI?: OpenAIFactory;
 }
 
-type AiEmbedMany = (input: { model: unknown; values: string[] }) => Promise<{
+type AiEmbedMany = (input: { model: unknown; values: string[]; abortSignal?: AbortSignal }) => Promise<{
   embeddings: number[][];
   usage?: { tokens?: number; totalTokens?: number };
 }>;
@@ -66,9 +67,9 @@ export function createConversationEmbeddingProvider(
   if (provider !== 'openai') return unavailableProvider('openai', config.model, `Unsupported conversationSearch provider: ${config.provider}`);
 
   const env = options.env ?? process.env;
-  const apiKeyName = config.apiKeyRef ?? OPENAI_DEFAULT_API_KEY_ENV;
-  const apiKey = env[apiKeyName];
-  if (!apiKey) return unavailableProvider(provider, config.model, `${apiKeyName} is not set`);
+  const apiKey = resolveOpenAiApiKey(config, env, options.env !== undefined);
+  const apiKeyValue = apiKey.value;
+  if (!apiKeyValue) return unavailableProvider(provider, config.model, apiKey.reason);
 
   const embedMany = options.embedMany ?? (aiEmbedMany as AiEmbedMany);
   const createProvider = options.createOpenAI ?? (createOpenAI as OpenAIFactory);
@@ -78,10 +79,10 @@ export function createConversationEmbeddingProvider(
     model: config.model,
     enabled: true,
     estimateCost: (texts) => estimateConversationEmbeddingCost(texts, { provider, model: config.model }),
-    embed: async (texts) => {
+    embed: async (texts, embedOptions) => {
       if (texts.length === 0) return { embeddings: [], model: config.model, tokenCount: 0 };
-      const openai = createProvider({ apiKey });
-      const result = await embedMany({ model: openai.embedding(config.model), values: texts });
+      const openai = createProvider({ apiKey: apiKeyValue });
+      const result = await embedMany({ model: openai.embedding(config.model), values: texts, abortSignal: embedOptions?.signal });
       return {
         embeddings: result.embeddings.map((embedding) => new Float32Array(embedding)),
         model: config.model,
@@ -89,6 +90,35 @@ export function createConversationEmbeddingProvider(
       };
     },
   };
+}
+
+function resolveOpenAiApiKey(
+  config: NormalizedConversationSearchConfig,
+  env: NodeJS.ProcessEnv,
+  envWasExplicit: boolean,
+): { value?: string; reason: string } {
+  const ref = config.apiKeyRef?.trim() || OPENAI_DEFAULT_API_KEY_ENV;
+  const envValue = env[ref];
+  if (envValue) return { value: envValue, reason: '' };
+
+  const configValue = envWasExplicit ? undefined : resolveConfiguredOpenAiApiKey(ref);
+  if (configValue) return { value: configValue, reason: '' };
+
+  return { reason: `${ref} is not set` };
+}
+
+function resolveConfiguredOpenAiApiKey(ref: string): string | undefined {
+  let loaded: ReturnType<typeof loadConfigSync>['config'];
+  try {
+    loaded = loadConfigSync().config;
+  } catch {
+    return undefined;
+  }
+
+  if (ref === OPENAI_DEFAULT_API_KEY_ENV || ref === 'openai' || ref === 'api_keys.openai') {
+    return loaded.apiKeys.openai;
+  }
+  return undefined;
 }
 
 export function estimateConversationEmbeddingCost(
@@ -121,6 +151,7 @@ function unavailableProvider(
     provider,
     model,
     enabled: false,
+    unavailableReason: reason,
     estimateCost: (texts) => estimateConversationEmbeddingCost(texts, { provider, model }),
     embed: async () => {
       throw new ConversationEmbeddingUnavailableError(reason);

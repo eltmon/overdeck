@@ -33,10 +33,12 @@ function config(overrides: Partial<NormalizedConversationSearchConfig> = {}): No
 describe('conversation search watcher', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test');
   });
 
   afterEach(async () => {
     await stopConversationSearchWatcher();
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -60,13 +62,75 @@ describe('conversation search watcher', () => {
     fakeWatcher.emit('change', '/tmp/conversations/session-a.jsonl');
     await vi.advanceTimersByTimeAsync(24);
 
-    expect(indexAll).toHaveBeenCalledWith({ config: config(), roots: ['/tmp/conversations'] });
+    expect(indexAll).toHaveBeenCalledWith(expect.objectContaining({ config: config(), roots: ['/tmp/conversations'] }));
     expect(indexFile).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1);
 
     expect(indexFile).toHaveBeenCalledTimes(1);
-    expect(indexFile).toHaveBeenCalledWith({ filePath: '/tmp/conversations/session-a.jsonl', config: config() });
+    expect(indexFile).toHaveBeenCalledWith(expect.objectContaining({ filePath: '/tmp/conversations/session-a.jsonl', config: config() }));
+  });
+
+  it('coalesces changes for a file while an index call is already in flight', async () => {
+    const fakeWatcher = new FakeWatcher();
+    let resolveFirst!: (value: { filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }) => void;
+    const firstResult = new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const indexFile = vi
+      .fn()
+      .mockImplementationOnce(() => firstResult)
+      .mockResolvedValue({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false });
+    const watcher = new ConversationSearchWatcher({
+      config: config(),
+      roots: ['/tmp/conversations'],
+      debounceMs: 25,
+      watchFactory: vi.fn(() => fakeWatcher),
+      indexAll: vi.fn(async () => ({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, errors: [], disabled: false })),
+      indexFile,
+      maxConcurrentIndexers: 1,
+      log: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    watcher.start();
+    fakeWatcher.emit('change', '/tmp/conversations/session-a.jsonl');
+    await vi.advanceTimersByTimeAsync(25);
+    expect(indexFile).toHaveBeenCalledTimes(1);
+
+    fakeWatcher.emit('change', '/tmp/conversations/session-a.jsonl');
+    await vi.advanceTimersByTimeAsync(25);
+    expect(indexFile).toHaveBeenCalledTimes(1);
+
+    resolveFirst({ filesScanned: 1, filesIndexed: 1, chunksIndexed: 1, chunksSkipped: 0, errors: [], disabled: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(indexFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts and awaits startup indexing when stopped', async () => {
+    const fakeWatcher = new FakeWatcher();
+    let startupSignal: AbortSignal | undefined;
+    const indexAll = vi.fn(({ signal }: { signal?: AbortSignal }) => {
+      startupSignal = signal;
+      return new Promise<{ filesScanned: number; filesIndexed: number; chunksIndexed: number; chunksSkipped: number; errors: []; disabled: false }>((resolve) => {
+        signal?.addEventListener('abort', () => resolve({ filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, chunksSkipped: 0, errors: [], disabled: false }), { once: true });
+      });
+    });
+    const watcher = new ConversationSearchWatcher({
+      config: config(),
+      roots: ['/tmp/conversations'],
+      watchFactory: vi.fn(() => fakeWatcher),
+      indexAll,
+      indexFile: vi.fn(),
+      log: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    watcher.start();
+    await watcher.stop();
+
+    expect(startupSignal?.aborted).toBe(true);
+    expect(fakeWatcher.close).toHaveBeenCalledTimes(1);
   });
 
   it('does not start while disabled and closes the active watcher on shutdown', async () => {
