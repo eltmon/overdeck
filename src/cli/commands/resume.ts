@@ -6,6 +6,7 @@ import { assertCanResumeSessionSync } from '../../lib/work-agent-lifecycle.js';
 interface ResumeOptions {
   host?: boolean;
   yes?: boolean;
+  compact?: boolean;
 }
 
 async function confirmHostOverride(options: ResumeOptions): Promise<boolean> {
@@ -43,7 +44,7 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
     process.exit(1);
   }
 
-  const result = await resumeAgent(id, undefined, { allowHost: options.host === true });
+  const result = await resumeAgent(id, undefined, { allowHost: options.host === true, compact: options.compact === true });
   if (!result.success) {
     console.error(chalk.red(result.error || `Failed to resume ${lifecycle.agentId}`));
     if ((result.error || '').includes('No saved session ID')) {

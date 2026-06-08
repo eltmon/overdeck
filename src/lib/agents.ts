@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, packageRoot } from './paths.js';
+import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -4115,7 +4115,43 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+/**
+ * PAN-1675: Out-of-band Panopticon-side compaction of a work agent's JSONL
+ * session — recovers a context-wedged agent without the harness `/compact`
+ * deadlock (which needs a live, responsive Claude process to run). Resolves the
+ * SAME session file the harness resumes from and rewrites it in place via
+ * native compaction.
+ *
+ * Never throws: every failure path returns `{ compacted:false, error }` so
+ * callers (resumeAgent's `--compact` path, the deacon's fresh-overflow tier)
+ * can fail safely and fall through to the `/clear` fallback. A missing
+ * sessionId or workspace short-circuits to `{ compacted:false }` with no
+ * compaction call.
+ */
+export async function compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }> {
+  const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentStateSync(normalizedId);
+  const sessionId = getLatestSessionIdSync(normalizedId);
+  if (!agentState?.workspace || !sessionId) {
+    return { compacted: false };
+  }
+  try {
+    const sessionFile = sessionFilePath(agentState.workspace, sessionId);
+    // Dynamic import: keep conversation-compaction out of agents.ts's top-level
+    // import graph (it pulls in dashboard server services).
+    const { compactConversationNative } = await import(
+      '../dashboard/server/services/conversation-compaction.js'
+    );
+    await compactConversationNative(sessionFile);
+    return { compacted: true };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    logAgentLifecycleSync(normalizedId, `compactAgentSession failed: ${error}`);
+    return { compacted: false, error };
+  }
+}
+
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -4182,6 +4218,20 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const reason = error instanceof Error ? error.message : String(error);
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
+  }
+
+  // PAN-1675: Optionally compact the wedged session's JSONL out-of-band BEFORE
+  // killing the live tmux session, so the fresh resume reads a compacted history
+  // instead of immediately re-overflowing. Fail-safe: if compaction fails, do
+  // NOT kill the session or build a launcher — leave the wedged session live so
+  // the caller (e.g. the deacon) can fall through to the /clear tier against it.
+  if (opts?.compact) {
+    const compactResult = await compactAgentSession(normalizedId);
+    if (!compactResult.compacted) {
+      const reason = `Pre-resume compaction failed: ${compactResult.error ?? 'unknown error'}`;
+      logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+      return { success: false, error: reason };
+    }
   }
 
   // Kill any zombie tmux session (crashed agent left behind)

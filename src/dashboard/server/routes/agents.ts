@@ -1975,7 +1975,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { message, model, harness } = body as { message?: string; model?: string; harness?: RuntimeName };
+    const { message, model, harness, compact } = body as { message?: string; model?: string; harness?: RuntimeName; compact?: boolean };
     let resumeModel: string | undefined;
     try {
       resumeModel = normalizeModelOverrideSync(model);
@@ -1999,7 +1999,9 @@ const postAgentResumeRoute = HttpRouter.add(
       harness: harness || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const resumeOpts = resumeModel || harness ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}) } : undefined;
+    const resumeOpts = resumeModel || harness || compact === true
+      ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}), ...(compact === true ? { compact: true } : {}) }
+      : undefined;
     const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
