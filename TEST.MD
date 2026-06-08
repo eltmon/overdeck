@@ -29,3 +29,8 @@ Revert or leave your edits as you see fit — this file is meant to churn.
 
 - 2026-06-08: Created to verify the terminal pane stays dark in dashboard light
   mode (Claude Code's diff bands render correctly on a pinned-dark pane).
+- 2026-06-08: Reverted the pin — terminal now follows the dashboard theme, and a
+  per-pane dark/light toggle button (sun/moon, top-right) lets you flip an
+  individual Claude terminal so its diff bands stay readable in light mode.
+- 2026-06-08: This very edit is the diff to eyeball — added/removed lines should
+  render cleanly in whatever theme the terminal pane is currently set to.
