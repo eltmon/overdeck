@@ -935,3 +935,25 @@ Lessons:
 - The dashboard health classifier shows such a worker "active" — same
   process-alive-≠-progressing theme as the RUN-14 brakes work, but for a
   conversation worker the flywheel doesn't own.
+
+### RUN-15 tick 12-13 — empirical proof that PAN-1645 (ship) is the binding constraint
+
+The 6-tick conv-2558 stall (unsubmitted directive) resolved when the operator
+returned and submitted (~tick 12). The landing then ran: agent-pan-1614
+(operator-launched) tried to land the *ready* PR #1630, iterated past two
+verification-gate feedback rounds (001+002)... and **still did not merge** — it
+exited with PAN-1614 back in-review. So even the CI-green, review-passed,
+verification-fixed PR cannot cross the finish line while PAN-1645 (workspace
+docker init / ship choke) is unfixed. This is the **empirical confirmation** of
+the tick-4 hypothesis: the binding constraint is the ship→readyForMerge step,
+not review or verification.
+
+Consequence: the operator pivoted (conv 2558 offered "park the four PRs / bank
+today's wins — main CI green, deacon ready to unfreeze"; operator chose instead
+to "implement PAN-1675 first"). So the run's banked wins are the direct-to-main
+substrate fixes (PAN-1678), not merged PRs — and the four ship-stalled issues
+will not merge until PAN-1645 is fixed or all four are shipped-on-host.
+
+Also validated this tick: **PAN-1678's fix holds under real load** — agent-pan-1614
+built with load peaking ~14 then settling to ~9 on 24 cores (well below the 36
+storm gate), no docs-index storm. The keystone fix works in production.
