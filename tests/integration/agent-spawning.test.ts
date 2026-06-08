@@ -13,7 +13,7 @@
  */
 
 import { Effect } from 'effect';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -210,6 +210,22 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testAgentsDir: string;
   let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
+  const supervisorScriptPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  let createdSupervisorStub = false;
+
+  beforeAll(() => {
+    if (!existsSync(supervisorScriptPath)) {
+      mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+      writeFileSync(supervisorScriptPath, '#!/usr/bin/env node\n');
+      createdSupervisorStub = true;
+    }
+  });
+
+  afterAll(() => {
+    if (createdSupervisorStub) {
+      rmSync(supervisorScriptPath, { force: true });
+    }
+  });
 
   beforeEach(async () => {
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
