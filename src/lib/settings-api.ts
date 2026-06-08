@@ -664,6 +664,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['tmux', config.tmux],
     ['conversations', config.conversations],
     ['memory', config.memory],
+    ['background_ai', config.background_ai],
     ['tracker_keys', config.tracker_keys],
     ['experimental', config.experimental],
     ['claude', config.claude],
