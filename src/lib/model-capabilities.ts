@@ -110,8 +110,16 @@ type CapabilityModelId = ModelId;
  * `input exceeds the context window` 400s instead of a native pre-ceiling
  * compaction. See the context-overflow recovery note in
  * `src/lib/cloister/deacon.ts` for why the deacon owns this recovery path.
+ *
+ * PAN-1672: 200k is gpt-5.5's *marketing* window, not its effective one via
+ * CLIProxy — the backend 400s with `input exceeds the context window` well
+ * before 85% of 200k (≈170k) is reached, so proactive compaction (keyed to this
+ * budget at CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) never fires in time
+ * and agents hard-wedge. Set a conservative effective ceiling so the 85%
+ * high-water (≈127.5k) lands comfortably below the real failure zone. Tune up
+ * if gpt-5.5's true CLIProxy window is later measured to be higher.
  */
-export const CLIPROXY_CODEX_CONTEXT_WINDOW = 200_000;
+export const CLIPROXY_CODEX_CONTEXT_WINDOW = 150_000;
 
 export interface ModelCapability {
   /** Model identifier */
