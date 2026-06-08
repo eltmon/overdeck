@@ -83,6 +83,83 @@ still require you to log in through Pi directly (`/login` inside a Pi session)
 or via Panopticon's dedicated subscription flows (Claude Code OAuth, Codex
 CLIProxy auth).
 
+## Running Pi agents on local Ollama models
+
+Ollama local-model support is v1 **Pi-only**. The Pi harness can talk to
+Ollama's OpenAI-compatible `/v1` endpoint directly. Claude Code and Codex local
+Ollama routing, plus a dashboard picker for local tags, are tracked separately in
+[PAN-1643](https://github.com/eltmon/panopticon-cli/issues/1643).
+
+### 1. Install Ollama
+
+Linux/CUDA machines, such as an RTX 3090 Ti workstation:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Apple Silicon machines, such as an M4 Mac, can use Homebrew or the Ollama app:
+
+```bash
+brew install --cask ollama
+# or download from https://ollama.com/download
+```
+
+Run `pan doctor` after installation. The doctor check reports whether Ollama is
+installed and whether the endpoint is reachable. `pan install` also includes the
+same guidance and can be skipped with `pan install --skip-ollama`.
+
+### 2. Pull the local model
+
+Gemma 4 12B is the documented default for this path:
+
+```bash
+ollama pull gemma4:12b
+```
+
+If the service is not already running, Panopticon attempts to start
+`ollama serve` when it spawns an `ollama:` model. A missing model fails before
+the agent starts with an actionable `ollama pull <tag>` message.
+
+### 3. Configure Panopticon
+
+Set the Ollama provider URL to a localhost-only endpoint and route the role to
+Pi with an `ollama:<tag>` model ID. The `ollama:` prefix is Panopticon's routing
+token; the Pi launcher registers provider `ollama` and selects `ollama/<tag>`,
+so Ollama receives the bare tag (`gemma4:12b`).
+
+```yaml
+# ~/.panopticon/config.yaml
+models:
+  providers:
+    ollama:
+      enabled: true
+      base_url: http://localhost:11434
+
+roles:
+  work:
+    harness: pi
+    model: ollama:gemma4:12b
+```
+
+You can also start a one-off Pi work agent from the CLI:
+
+```bash
+pan start PAN-123 --harness pi --model ollama:gemma4:12b
+```
+
+### 4. Platform notes
+
+- **Linux/CUDA:** Ollama auto-detects NVIDIA GPUs. Confirm acceleration with
+  `nvidia-smi` while the model is loaded; Gemma 4 12B Q4-class builds fit well
+  on 24 GB GPUs.
+- **Apple Silicon:** Ollama uses Metal automatically. Keep the Ollama app or
+  `ollama serve` running; 24 GB unified-memory Macs have comfortable headroom for
+  Gemma 4 12B quantized tags.
+- **Network boundary:** local Ollama launches use `OPENAI_BASE_URL` pointing at
+  `http://localhost:11434/v1` and a dummy `OPENAI_API_KEY`. They must not set
+  `ANTHROPIC_BASE_URL` or route through cloud providers.
+
 ## Where you pick the harness
 
 The harness is chosen **per spawn** at four user-initiated surfaces:
