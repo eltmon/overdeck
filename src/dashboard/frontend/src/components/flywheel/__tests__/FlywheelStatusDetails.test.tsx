@@ -153,6 +153,19 @@ describe('FlywheelStatusDetails', () => {
     expect(within(rows[2]).getByText('Weight 0.4')).toBeInTheDocument();
   });
 
+  it('does not render weight badges or reasons for unweighted suggestions', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-20', rationale: 'Operator-injected high stays in place', weightReason: 'should not render' },
+      ],
+    }} />);
+
+    const row = screen.getByTestId('flywheel-suggestion');
+    expect(within(row).queryByText(/Weight/)).not.toBeInTheDocument();
+    expect(within(row).queryByText('should not render')).not.toBeInTheDocument();
+  });
+
   it('renders the suggestions empty state', () => {
     render(<FlywheelStatusDetails status={{ ...status, suggestions: [] }} />);
 

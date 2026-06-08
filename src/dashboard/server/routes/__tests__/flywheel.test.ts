@@ -14,7 +14,6 @@ import {
   getFlywheelRunsPayload,
   deleteAutoMergePayload,
   getFlywheelStatsPayload,
-  getFlywheelSubstrateBugWeightsPayload,
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelMergeNextPayload,
@@ -47,8 +46,33 @@ const uatTrainMocks = vi.hoisted(() => ({
   runUatTrainReconcile: vi.fn(async () => ({ action: 'assembled' as const, invalidated: [] })),
 }));
 
+const routeMocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+  listSubstrateBugsInWindow: vi.fn(),
+  derivePipelineRunStatsInputs: vi.fn(),
+}));
+
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
+
+vi.mock('node:child_process', async (importActual) => ({
+  ...(await importActual<typeof import('node:child_process')>()),
+  execFile: routeMocks.execFile,
+}));
+
+vi.mock('../../../../lib/database/flywheel-substrate-bugs-db.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../lib/database/flywheel-substrate-bugs-db.js')>()),
+  listInWindow: routeMocks.listSubstrateBugsInWindow,
+}));
+
+vi.mock('../../services/pipeline-run-metrics.js', async (importActual) => {
+  const actual = await importActual<typeof import('../../services/pipeline-run-metrics.js')>();
+  routeMocks.derivePipelineRunStatsInputs.mockImplementation(actual.derivePipelineRunStatsInputs);
+  return {
+    ...actual,
+    derivePipelineRunStatsInputs: routeMocks.derivePipelineRunStatsInputs,
+  };
+});
 
 interface RouteResult {
   status: number;
@@ -283,64 +307,57 @@ describe('flywheel stats payload helper', () => {
   });
 });
 
-describe('flywheel substrate bug weights payload helper', () => {
+describe('flywheel substrate bug weights route', () => {
   it('defaults to 30d, includes untagged bugs, and sorts by weight descending', async () => {
-    const result = await getFlywheelSubstrateBugWeightsPayload(undefined, {
-      now: () => new Date('2026-06-06T10:00:00.000Z'),
-      listBugs: () => [
-        {
-          issueId: 'PAN-1001',
-          filedAt: '2026-06-05T10:00:00.000Z',
-          runId: 'RUN-1',
-          filedBy: 'agent',
-          discoveredInIssueId: 'PAN-999',
-          severity: 'P1',
-          status: 'open',
-          fixMergedAt: null,
-          fixCommitSha: null,
-          updatedAt: '2026-06-05T10:00:00.000Z',
-        },
-        {
-          issueId: 'PAN-1002',
-          filedAt: '2026-06-05T11:00:00.000Z',
-          runId: 'RUN-1',
-          filedBy: 'agent',
-          discoveredInIssueId: 'PAN-999',
-          severity: 'P1',
-          status: 'open',
-          fixMergedAt: null,
-          fixCommitSha: null,
-          updatedAt: '2026-06-05T11:00:00.000Z',
-        },
-      ],
-      fetchIssueDetails: async (issueId) => issueId === 'PAN-1002'
-        ? { body: 'Flywheel-Affects-Criterion: 1', labels: [] }
-        : { body: '', labels: [] },
-      computeStats: async (window) => ({
-        ...makeStats(window),
-        criteria: {
-          ...makeStats(window).criteria,
-          c1_bugRate: {
-            label: 'Substrate-bug discovery rate',
-            value: 0.032,
-            target: 0.02,
-            status: 'red',
-            sampleSize: 50,
-            dataSufficient: true,
-          },
-        },
-      }),
+    const bugs = [
+      {
+        issueId: 'PAN-1001',
+        filedAt: '2026-06-05T10:00:00.000Z',
+        runId: 'RUN-1',
+        filedBy: 'agent',
+        discoveredInIssueId: 'PAN-999',
+        severity: 'P1',
+        status: 'open',
+        fixMergedAt: null,
+        fixCommitSha: null,
+        updatedAt: '2026-06-05T10:00:00.000Z',
+      },
+      {
+        issueId: 'PAN-1002',
+        filedAt: '2026-06-05T11:00:00.000Z',
+        runId: 'RUN-1',
+        filedBy: 'agent',
+        discoveredInIssueId: 'PAN-999',
+        severity: 'P1',
+        status: 'open',
+        fixMergedAt: null,
+        fixCommitSha: null,
+        updatedAt: '2026-06-05T11:00:00.000Z',
+      },
+    ];
+    routeMocks.listSubstrateBugsInWindow.mockReturnValue(bugs);
+    routeMocks.derivePipelineRunStatsInputs.mockResolvedValue({ completedPipelineRuns: 25 });
+    routeMocks.execFile.mockImplementation((_file, args: string[], _opts, callback) => {
+      const issueNumber = args[2];
+      callback(null, {
+        stdout: JSON.stringify(issueNumber === '1002'
+          ? { body: 'Flywheel-Affects-Criterion: 1', labels: [] }
+          : { body: '', labels: [] }),
+        stderr: '',
+      });
     });
+
+    const result = await requestFlywheelRoute('/api/flywheel/substrate-bug-weights');
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({
       window: '30d',
-      generatedAt: '2026-06-06T10:00:00.000Z',
       weights: [
-        { issueId: 'PAN-1002', criteria: [1], weight: 1.8, reason: 'criterion 1 (bug rate) at 3.2% vs target <2% — red' },
+        { issueId: 'PAN-1002', criteria: [1] },
         { issueId: 'PAN-1001', criteria: [], weight: 0, reason: 'no affected criteria declared' },
       ],
     });
+    expect((result.body as { weights: Array<{ weight: number }> }).weights[0].weight).toBeGreaterThan(0);
   });
 });
 

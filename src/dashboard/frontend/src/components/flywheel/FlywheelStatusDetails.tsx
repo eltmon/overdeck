@@ -168,7 +168,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
                     )}
                   </div>
                   <p className="mt-2 text-sm text-foreground">{suggestion.rationale}</p>
-                  {suggestion.weightReason && <p className="mt-1 text-xs text-muted-foreground">{suggestion.weightReason}</p>}
+                  {hasWeight(suggestion) && suggestion.weightReason && <p className="mt-1 text-xs text-muted-foreground">{suggestion.weightReason}</p>}
                 </div>
               );
             })}

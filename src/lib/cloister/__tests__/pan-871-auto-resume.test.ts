@@ -186,6 +186,10 @@ vi.mock('../config.js', () => ({
   loadCloisterConfigSync: vi.fn(() => ({ patrolIntervalMs: 60000 })),
 }));
 
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: vi.fn(() => ({ active: false, since: null })),
+}));
+
 vi.mock('../../../lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
