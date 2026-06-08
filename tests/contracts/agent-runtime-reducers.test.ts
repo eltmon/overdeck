@@ -183,6 +183,42 @@ describe('PAN-800 runtime reducer', () => {
     })
   })
 
+  it('agent.context_saturation_changed sets and clears contextSaturatedAt without clobbering other runtime fields', () => {
+    let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'working', currentTool: 'Read' },
+    } as any))
+    s = applyEvent(s, at(2, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'gpt-5.5', claudeSessionId: 'sess-123' },
+    } as any))
+    s = applyEvent(s, at(3, {
+      type: 'agent.context_saturation_changed',
+      payload: { agentId: AGENT, contextSaturatedAt: '2026-06-05T12:00:00.000Z' },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT]).toMatchObject({
+      activity: 'working',
+      currentTool: 'Read',
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-123',
+      contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+    })
+
+    s = applyEvent(s, at(4, {
+      type: 'agent.context_saturation_changed',
+      payload: { agentId: AGENT },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT]).toMatchObject({
+      activity: 'working',
+      currentTool: 'Read',
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-123',
+    })
+    expect(s.agentRuntimeById[AGENT].contextSaturatedAt).toBeUndefined()
+  })
+
   it('agent.state_restored seeds a full snapshot and uses the event sequence', () => {
     const restored = {
       id: AGENT,

@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, packageRoot } from './paths.js';
+import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -15,7 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel, isTldrEnabledSync } from './config-yaml.js';
 import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -504,7 +504,7 @@ export async function getRoleRuntimeBaseCommand(
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
 const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator']);
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
@@ -738,6 +738,12 @@ export async function waitForAgentIdle(agentId: string, timeoutMs = 5000): Promi
   return getAgentRuntimeStateSync(agentId)?.state === 'idle';
 }
 
+export type DeliveryResult = {
+  ok: boolean;
+  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  failure?: string;
+};
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -750,6 +756,13 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  /**
+   * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
+   * undefined = legacy/pre-feature agent or non-applicable role;
+   * false = spawned but kickoff delivery not yet confirmed;
+   * true = kickoff delivery confirmed.
+   */
+  kickoffDelivered?: boolean;
   stoppedAt?: string;
   /** True when markAgentStopped was called (user-initiated stop). Cleared on
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
@@ -832,6 +845,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
+    kickoffDelivered: raw.kickoffDelivered,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
     stoppedByPause: raw.stoppedByPause,
@@ -1318,7 +1332,7 @@ export async function deliverAgentMessage(
   message: string,
   caller: string = 'unknown',
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
-): Promise<void> {
+): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
 
   let channelsEnabled = false;
@@ -1332,7 +1346,7 @@ export async function deliverAgentMessage(
       const { CodexRuntimeSync } = await import('./runtimes/codex.js');
       const rt = new CodexRuntimeSync();
       await rt.sendMessage(normalizedId, message);
-      return;
+      return { ok: true, path: 'codex' };
     }
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
@@ -1342,7 +1356,7 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'tmux') {
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux' };
   }
 
   let supervisorFailure: string | undefined;
@@ -1363,7 +1377,7 @@ export async function deliverAgentMessage(
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return;
+        return { ok: true, path: 'supervisor' };
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -1399,7 +1413,7 @@ export async function deliverAgentMessage(
             caller,
             ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
           });
-          return;
+          return { ok: true, path: 'channels' };
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           channelFailure = `socket-post-failed: ${reason}`;
@@ -1419,10 +1433,88 @@ export async function deliverAgentMessage(
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return;
+    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
   }
 
   await Effect.runPromise(sendKeys(normalizedId, message));
+  return { ok: true, path: 'tmux' };
+}
+
+async function deliverInitialPromptWithRetry(
+  agentId: string,
+  prompt: string,
+  caller: string,
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+): Promise<DeliveryResult> {
+  let lastFailure = 'not-attempted';
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const ready = await waitForReadySignal(agentId, 30);
+    if (!ready) {
+      lastFailure = 'ready-signal-timeout';
+      console.error(`[${agentId}] Claude did not become ready within 30s (kickoff attempt ${attempt}/2)`);
+      continue;
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    try {
+      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      if (result.ok) return result;
+      lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
+    } catch (err) {
+      lastFailure = err instanceof Error ? err.message : String(err);
+    }
+    console.error(`[${agentId}] Kickoff delivery attempt ${attempt}/2 failed: ${lastFailure}`);
+  }
+
+  return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+async function buildResumeMessageForAgent(
+  state: AgentState,
+  fallbackMessage: string,
+  callerMessage?: string,
+): Promise<{ message?: string; redeliveringKickoff: boolean; error?: string }> {
+  if (state.role !== 'work' || state.kickoffDelivered !== false) {
+    return { message: callerMessage ?? fallbackMessage, redeliveringKickoff: false };
+  }
+
+  const promptPath = join(getAgentDir(state.id), 'initial-prompt.md');
+  try {
+    const kickoffPrompt = await readFile(promptPath, 'utf-8');
+    const suffix = callerMessage
+      ? `\n\n---\n\nAdditional message delivered during resume:\n\n${callerMessage}`
+      : '';
+    return { message: `${kickoffPrompt}${suffix}`, redeliveringKickoff: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      redeliveringKickoff: true,
+      error: `kickoff prompt missing at ${promptPath}: ${reason}`,
+    };
+  }
+}
+
+function markKickoffRedelivered(state: AgentState): void {
+  state.kickoffDelivered = true;
+  saveAgentStateSync(state);
+}
+
+async function recordKickoffDeliveryFailure(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<void> {
+  await Effect.runPromise(recordAgentFailure(state.id, 'kickoff delivery failed'));
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'running';
+    failedState.kickoffDelivered = false;
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+  state.status = 'running';
+  state.kickoffDelivered = false;
+  emitActivityEntrySync({
+    source,
+    level: 'error',
+    message: `${state.id}: kickoff delivery failed`,
+    issueId,
+  });
 }
 
 export async function deliverAgentPermissionDecision(
@@ -1844,6 +1936,7 @@ export interface AgentRuntimeState {
   waitingReason?: string;
   waitingStartedAt?: string;
   waitingNotification?: string;
+  contextSaturatedAt?: string;
 }
 
 function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
@@ -1871,6 +1964,7 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     waitingReason: snap.waiting?.reason,
     waitingStartedAt: snap.waiting?.startedAt,
     waitingNotification: snap.waiting?.message,
+    contextSaturatedAt: snap.contextSaturatedAt,
   };
 }
 
@@ -1890,6 +1984,29 @@ export const getAgentRuntimeState = (agentId: string): Effect.Effect<AgentRuntim
     const snap = yield* fetchAgentRuntimeSnapshot(agentId);
     return snapshotToRuntimeState(snap);
   });
+
+async function patchRuntimeJson(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
+  const agentDir = getAgentDir(agentId);
+  const runtimeFile = join(agentDir, 'runtime.json');
+  let runtime: Record<string, unknown> = {};
+
+  try {
+    runtime = JSON.parse(await readFile(runtimeFile, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    runtime = {};
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+    if (patch.contextSaturatedAt === undefined) {
+      delete runtime.contextSaturatedAt;
+    } else {
+      runtime.contextSaturatedAt = patch.contextSaturatedAt;
+    }
+  }
+
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(runtimeFile, JSON.stringify(runtime, null, 2));
+}
 
 /**
  * Emit events derived from a legacy-shape patch. Callers gradually migrate to
@@ -1939,6 +2056,14 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
         claudeSessionId: patch.claudeSessionId,
       }));
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'contextSaturatedAt')) {
+    await patchRuntimeJson(agentId, patch);
+    await Effect.runPromise(emitAgentEvent(agentId, {
+      kind: 'context_saturation_changed',
+      contextSaturatedAt: patch.contextSaturatedAt,
+    }));
   }
 }
 
@@ -2573,7 +2698,7 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * bounded by a cooldown + attempt cap so a stack that genuinely cannot be
  * rebuilt escalates to a human instead of looping `docker compose` forever.
  */
-const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean; hostFallbackNoticed?: boolean }> =
   new Map();
 const SPAWN_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
@@ -2609,14 +2734,48 @@ export async function assertWorkspaceStackHealthyForSpawn(
     return;
   }
 
-  // PAN-1618: attempt an autonomous rebuild before failing, so a `proposed`
-  // item reaches a running work agent without a human step. Bounded by a
-  // cooldown + attempt cap (same shape as PAN-1247's orphan-test recovery).
+  // PAN-1645 + PAN-1618: an unhealthy stack must NEVER *block* the advancing
+  // roles. review/test/ship all operate on the HOST workspace — ship
+  // rebases/pushes against the host .git, review reads the committed diff, and
+  // test runs the project's quality gates (host-run unless a gate explicitly
+  // opts into a container) — so they do not need the workspace's docker
+  // containers at all. The long-standing manual `--host` workaround (PAN-1645)
+  // burned enormous effort just rediscovering that ship-on-broken-docker is a
+  // false gate. For these roles we still attempt one bounded autonomous rebuild
+  // (so a project whose test gates DO run in containers gets a healthy stack
+  // when recoverable), but if it can't be made healthy we AUTO-FALL-BACK TO
+  // HOST and proceed instead of throwing.
+  //
+  // `work` is different: a work agent may rely on the dev container's services,
+  // so silently running it on the host could build/test against a missing
+  // environment. work keeps the hard gate (rebuild → escalate to a human).
+  const hostFallbackEligible = role !== 'work';
+
   const record = spawnStackRebuildState.get(normalizedIssue)
     ?? { lastAttempt: 0, attempts: 0, escalated: false };
   const now = Date.now();
 
-  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+  const fallbackToHost = (reason: string): void => {
+    console.warn(`[agents] ${message} — auto-falling back to host for ${role} (${reason})`);
+    // Emit the host-fallback notice once per issue. Use a SEPARATE latch from
+    // the work-escalation latch (`escalated`): if review/test/ship trip the
+    // host fallback first, a later `work` spawn for the same broken-stack issue
+    // must still be able to emit its own (error-level) dead-end marker — the
+    // operator's only signal that a work agent is blocked on docker.
+    if (!record.hostFallbackNoticed) {
+      record.hostFallbackNoticed = true;
+      spawnStackRebuildState.set(normalizedIssue, record);
+      emitActivityEntrySync({
+        source: role,
+        level: 'warn',
+        issueId: normalizedIssue,
+        message: `agent-spawn-host-fallback: ${normalizedIssue}`,
+        details: `Workspace docker stack unhealthy (${details}); ${role} runs on the host (rebase/verify use host .git + host gates), so proceeding without containers. ${reason}`,
+      });
+    }
+  };
+
+  const blockWork = (markerMessage: string, errDetails: string): never => {
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
@@ -2624,24 +2783,32 @@ export async function assertWorkspaceStackHealthyForSpawn(
         source: role,
         level: 'error',
         issueId: normalizedIssue,
-        message: `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
-        details: `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+        message: markerMessage,
+        details: errDetails,
       });
     }
     throw new Error(message);
+  };
+
+  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+    if (hostFallbackEligible) {
+      fallbackToHost(`rebuild exhausted after ${record.attempts} attempts`);
+      return;
+    }
+    blockWork(
+      `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
+      `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+    );
   }
 
   if (now - record.lastAttempt < SPAWN_STACK_REBUILD_COOLDOWN_MS) {
     // A rebuild was attempted recently and the stack is still unhealthy —
-    // surface the blocker but don't hammer `docker compose` every spawn.
-    emitActivityEntrySync({
-      source: role,
-      level: 'error',
-      issueId: normalizedIssue,
-      message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
-      details,
-    });
-    throw new Error(message);
+    // don't hammer `docker compose` every spawn.
+    if (hostFallbackEligible) {
+      fallbackToHost('rebuild on cooldown');
+      return;
+    }
+    blockWork(`agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`, details);
   }
 
   record.lastAttempt = now;
@@ -2657,7 +2824,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     rebuildWorkspaceStack(issueId, {
       onProgress: (m) => console.log(`[agents]   ${normalizedIssue} stack rebuild: ${m}`),
     }),
-  );
+  ).catch((err: unknown) => ({ success: false as const, error: err instanceof Error ? err.message : String(err) }));
 
   if (result.success) {
     spawnStackRebuildState.delete(normalizedIssue);
@@ -2666,14 +2833,11 @@ export async function assertWorkspaceStackHealthyForSpawn(
   }
 
   console.warn(`[agents] Workspace stack rebuild failed for ${normalizedIssue}: ${result.error}`);
-  emitActivityEntrySync({
-    source: role,
-    level: 'error',
-    issueId: normalizedIssue,
-    message: `agent-spawn-stack-rebuild-failed: ${normalizedIssue}`,
-    details: result.error ?? details,
-  });
-  throw new Error(message);
+  if (hostFallbackEligible) {
+    fallbackToHost(`rebuild failed: ${result.error ?? 'unknown'}`);
+    return;
+  }
+  blockWork(`agent-spawn-stack-rebuild-failed: ${normalizedIssue}`, result.error ?? details);
 }
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
@@ -2940,7 +3104,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-if (prompt) {
+  if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
         await writePiAgentPrompt(agentId, prompt);
@@ -3156,15 +3320,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   if (prompt) {
     await writeFileAsync(promptFile, prompt);
+    if (role === 'work') {
+      state.kickoffDelivered = false;
+      saveAgentStateSync(state);
+    }
   }
 
   // Auto-setup hooks if not configured
   checkAndSetupHooks();
 
-  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal)
+  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
+  // Gated by the operator TLDR toggle: when disabled, the daemon is not started
+  // and the agent (whose prompt reports TLDR_AVAILABLE=false) degrades to direct
+  // file reads.
   try {
     const venvPath = join(options.workspace, '.venv');
-    if (existsSync(venvPath)) {
+    if (isTldrEnabledSync() && existsSync(venvPath)) {
       const { getTldrDaemonServiceSync } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonServiceSync(options.workspace, venvPath);
       const status = await tldrService.getStatus();
@@ -3278,6 +3449,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     } else {
       console.warn(`[${agentId}] Codex: rollout did not appear within 30s — thread-id not captured`);
     }
+    if (prompt && role === 'work') {
+      state.kickoffDelivered = true;
+      saveAgentStateSync(state);
+    }
   }
 
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
@@ -3291,19 +3466,33 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Codex agents skip this — the prompt is embedded inline in the launch command.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
-  if (prompt && resolvedHarness !== 'codex') {
+  if (prompt && resolvedHarness === 'pi') {
+    try {
+      await writePiAgentPrompt(agentId, prompt);
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } catch (err) {
+      console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      if (role === 'work') {
+        await recordKickoffDeliveryFailure(state, options.issueId, role);
+        return state;
+      }
+    }
+  } else if (prompt && resolvedHarness !== 'codex') {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
-    // PAN-1594: wait for the hook-written ready.json (session-start hook),
-    // not a tmux pane-scrape. No dependency on permission-mode footer text.
-    const ready = await waitForReadySignal(agentId, 30);
-    if (ready) {
-      // Small delay after ready to ensure Claude is fully rendered and accepting input
-      await new Promise(r => setTimeout(r, 500));
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
-    } else {
-      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
+    if (delivery.ok) {
+      if (role === 'work') {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } else if (role === 'work') {
+      await recordKickoffDeliveryFailure(state, options.issueId, role);
+      return state;
     }
   }
 
@@ -3882,9 +4071,19 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     saveAgentStateSync(agentState);
 
     const ready = await waitForReadySignal(normalizedId, 30);
-    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
-    if (ready) {
-      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+    const fallbackResumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
+    const resumeMessage = await buildResumeMessageForAgent(agentState, fallbackResumePrompt, message);
+    if (resumeMessage.error) {
+      console.error(`[agents] Fallback-restarted ${normalizedId} but ${resumeMessage.error}`);
+      emitActivityEntrySync({
+        source: 'work-agent',
+        level: 'error',
+        message: `${normalizedId}: ${resumeMessage.error}`,
+        issueId: agentState.issueId,
+      });
+    } else if (ready && resumeMessage.message) {
+      const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       await appendTellInterventionForUserSource(normalizedId, caller);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
@@ -3958,10 +4157,46 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+/**
+ * PAN-1675: Out-of-band Panopticon-side compaction of a work agent's JSONL
+ * session — recovers a context-wedged agent without the harness `/compact`
+ * deadlock (which needs a live, responsive Claude process to run). Resolves the
+ * SAME session file the harness resumes from and rewrites it in place via
+ * native compaction.
+ *
+ * Never throws: every failure path returns `{ compacted:false, error }` so
+ * callers (resumeAgent's `--compact` path, the deacon's fresh-overflow tier)
+ * can fail safely and fall through to the `/clear` fallback. A missing
+ * sessionId or workspace short-circuits to `{ compacted:false }` with no
+ * compaction call.
+ */
+export async function compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }> {
+  const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentStateSync(normalizedId);
+  const sessionId = getLatestSessionIdSync(normalizedId);
+  if (!agentState?.workspace || !sessionId) {
+    return { compacted: false };
+  }
+  try {
+    const sessionFile = sessionFilePath(agentState.workspace, sessionId);
+    // Dynamic import: keep conversation-compaction out of agents.ts's top-level
+    // import graph (it pulls in dashboard server services).
+    const { compactConversationNative } = await import(
+      '../dashboard/server/services/conversation-compaction.js'
+    );
+    await compactConversationNative(sessionFile);
+    return { compacted: true };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    logAgentLifecycleSync(normalizedId, `compactAgentSession failed: ${error}`);
+    return { compacted: false, error };
+  }
+}
+
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
-  logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
+  logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
@@ -3981,9 +4216,22 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // a system crash where tmux was killed but state.json was never updated to 'stopped'.
   const isCrashed = agentState?.status === 'running' && !(await Effect.runPromise(sessionExists(normalizedId)));
 
+  // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
+  // context-wedged agent, which is typically status='running' with a LIVE (but
+  // stuck) tmux session sitting at an overflow/idle prompt. The normal canResume
+  // gate rejects running+live-session agents — which would make
+  // resumeAgent({compact:true}) (the deacon's overflow recovery tiers AND
+  // `pan resume --compact`) a silent no-op for exactly the agents it targets.
+  // So a compact-resume of a running agent is allowed: the flow below compacts
+  // the JSONL out-of-band and then kills the wedged session before relaunch.
+  // This is safe because the only callers of {compact:true} act on agents they
+  // have already determined to be context-overflow-wedged.
+  const isCompactRecovery = opts?.compact === true && agentState?.status === 'running';
+
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
     || (agentState && allowedAgentStatuses.includes(agentState.status))
-    || isCrashed;
+    || isCrashed
+    || isCompactRecovery;
 
   if (!canResume) {
     const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
@@ -4027,6 +4275,20 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     return { success: false, error: reason };
   }
 
+  // PAN-1675: Optionally compact the wedged session's JSONL out-of-band BEFORE
+  // killing the live tmux session, so the fresh resume reads a compacted history
+  // instead of immediately re-overflowing. Fail-safe: if compaction fails, do
+  // NOT kill the session or build a launcher — leave the wedged session live so
+  // the caller (e.g. the deacon) can fall through to the /clear tier against it.
+  if (opts?.compact) {
+    const compactResult = await compactAgentSession(normalizedId);
+    if (!compactResult.compacted) {
+      const reason = `Pre-resume compaction failed: ${compactResult.error ?? 'unknown error'}`;
+      logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+      return { success: false, error: reason };
+    }
+  }
+
   // Kill any zombie tmux session (crashed agent left behind)
   if (await Effect.runPromise(sessionExists(normalizedId))) {
     try {
@@ -4065,7 +4327,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
-    const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
+    const effectiveHarness = await resolveEffectiveHarness(opts?.harness ?? agentState.harness, model);
     agentState.harness = effectiveHarness;
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
@@ -4073,9 +4335,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const effectiveMessage =
-      message ??
-      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const defaultResumeMessage = `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
+    if (resumeMessage.error) {
+      console.error(`[resumeAgent] ${resumeMessage.error}`);
+      emitActivityEntrySync({
+        source: 'work-agent',
+        level: 'error',
+        message: `${normalizedId}: ${resumeMessage.error}`,
+        issueId,
+      });
+      return { success: false, error: resumeMessage.error };
+    }
+    const effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -4121,6 +4393,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       try {
         await writePiAgentPrompt(normalizedId, effectiveMessage);
         messageDelivered = true;
+        if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
@@ -4129,12 +4402,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Codex is one-shot: message is already embedded in `codex exec resume
       // <threadId> <message>` via buildCodexCommand. No SessionStart hook fires.
       messageDelivered = true;
+      if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
-        messageDelivered = true;
+        const delivery = await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
+        messageDelivered = delivery.ok;
+        if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }
@@ -4152,6 +4427,27 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     if (agentState) {
       markAgentRunning(agentState);
       saveAgentStateSync(agentState);
+    }
+
+    // PAN-1675: a successful compaction-resume genuinely recovers a
+    // context-overflow-wedged agent — so clear a context_overflow `stuck` flag
+    // here (set by markWorkspaceStuck once the old /compact+/clear ladder
+    // exhausted). Without this the agent would stay flagged stuck forever and
+    // the deacon's overflowBlocked gate would keep skipping its recovery, even
+    // though the agent is now healthy. Only clear when the stuck reason is
+    // context_overflow (don't clobber an unrelated stuck state).
+    if (opts?.compact && agentState?.issueId) {
+      try {
+        const { getReviewStatusSync } = await import('./review-status.js');
+        const rs = getReviewStatusSync(agentState.issueId);
+        if (rs?.stuck && rs.stuckReason === 'context_overflow') {
+          const { clearWorkspaceStuck } = await import('./database/review-status-db.js');
+          clearWorkspaceStuck(agentState.issueId);
+          logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
+        }
+      } catch (clearErr) {
+        console.warn(`[agents] Could not clear stuck flag after compaction-resume for ${normalizedId}:`, clearErr);
+      }
     }
 
     return { success: true, messageDelivered };

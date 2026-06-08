@@ -125,11 +125,11 @@ describe('setReviewStatus', () => {
     expect(result.history![3]).toMatchObject({ type: 'test', status: 'passed' });
   });
 
-  it('does not auto-derive readyForMerge from review+test pass (PAN-1048: ship role is the gate)', () => {
+  it('auto-derives readyForMerge from review+test pass (PAN-1650: event-driven gate)', () => {
     setReviewStatusSync('PAN-109', { reviewStatus: 'passed' }, statusFile);
     const result = setReviewStatusSync('PAN-109', { testStatus: 'passed' }, statusFile);
-    // readyForMerge stays false until the ship role explicitly sets it
-    expect(result.readyForMerge).toBe(false);
+    // PAN-1650: readyForMerge flips true the instant both gates pass — no ship dispatch needed.
+    expect(result.readyForMerge).toBe(true);
   });
 
   it('readyForMerge is false when test fails', () => {
@@ -175,14 +175,17 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(true);
   });
 
-  it('does not auto-derive readyForMerge when verification is pending (PAN-1048: ship role sets it)', () => {
+  it('auto-derives readyForMerge=true when review+test pass and verification is pending (PAN-1650)', () => {
+    // PAN-1650: event-driven derive. verificationSatisfied only blocks on 'failed',
+    // so review+test passed with verification 'pending' yields readyForMerge=true
+    // the instant it is written — no deacon patrol / ship dispatch needed.
     const result = setReviewStatusSync('PAN-113b', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       verificationStatus: 'pending',
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(false);
+    expect(result.readyForMerge).toBe(true);
   });
 
   it('blocks readyForMerge when blockerReasons is non-empty (PAN-905)', () => {
@@ -196,16 +199,16 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(false);
   });
 
-  it('does not auto-derive readyForMerge when blockerReasons is empty (PAN-1048: ship role sets it)', () => {
-    // Without an explicit readyForMerge:true, the ship-role invariant holds: blockers=[] alone
-    // does not flip the flag. Passing readyForMerge:true explicitly still works (PAN-905 guard).
+  it('auto-derives readyForMerge=true when review+test pass and no blockers (PAN-1650)', () => {
+    // PAN-1650: event-driven derive replaces the PAN-1048 ship-role-only model.
+    // review+test passed with empty blockers flips readyForMerge=true immediately.
     const result = setReviewStatusSync('PAN-115', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       blockerReasons: [],
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(false);
+    expect(result.readyForMerge).toBe(true);
   });
 
   it('round-trips blockerReasons through getReviewStatus (PAN-905)', () => {
@@ -361,5 +364,50 @@ describe('saveReviewStatuses (JSON path)', () => {
     setReviewStatusSync('PAN-300', { reviewStatus: 'passed' }, statusFile);
     saveReviewStatusesSync({}, statusFile);
     expect(Object.keys(loadReviewStatusesSync(statusFile))).toHaveLength(0);
+  });
+});
+
+describe('PAN-1650: event-driven readyForMerge derive', () => {
+  it('flips readyForMerge=true the instant review+test both pass', () => {
+    setReviewStatusSync('PAN-1650a', { reviewStatus: 'passed' }, statusFile);
+    expect(getReviewStatusSync('PAN-1650a', statusFile)!.readyForMerge).toBe(false); // test still pending
+    const result = setReviewStatusSync('PAN-1650a', { testStatus: 'passed' }, statusFile);
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('treats testStatus=skipped as a passing gate', () => {
+    const result = setReviewStatusSync('PAN-1650b', { reviewStatus: 'passed', testStatus: 'skipped' }, statusFile);
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('does NOT flip ready when review passed but tests failed', () => {
+    const result = setReviewStatusSync('PAN-1650c', { reviewStatus: 'passed', testStatus: 'failed' }, statusFile);
+    expect(result.readyForMerge).toBe(false);
+  });
+
+  it('does NOT flip ready when review is still reviewing', () => {
+    const result = setReviewStatusSync('PAN-1650d', { reviewStatus: 'reviewing', testStatus: 'passed' }, statusFile);
+    expect(result.readyForMerge).toBe(false);
+  });
+
+  it('blocks ready when verification explicitly failed', () => {
+    const result = setReviewStatusSync('PAN-1650e', {
+      reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'failed',
+    }, statusFile);
+    expect(result.readyForMerge).toBe(false);
+  });
+
+  it('un-sets ready once a merge starts (mergeStatus leaves pending)', () => {
+    setReviewStatusSync('PAN-1650f', { reviewStatus: 'passed', testStatus: 'passed' }, statusFile);
+    expect(getReviewStatusSync('PAN-1650f', statusFile)!.readyForMerge).toBe(true);
+    const merging = setReviewStatusSync('PAN-1650f', { mergeStatus: 'merging' }, statusFile);
+    expect(merging.readyForMerge).toBe(false);
+  });
+
+  it('honors an explicit readyForMerge=false even when gates pass (merge flow override)', () => {
+    const result = setReviewStatusSync('PAN-1650g', {
+      reviewStatus: 'passed', testStatus: 'passed', readyForMerge: false,
+    }, statusFile);
+    expect(result.readyForMerge).toBe(false);
   });
 });

@@ -141,4 +141,26 @@ describe('spawnReviewRoleForIssue', () => {
       expect.objectContaining({ allowHost: true, subRole: 'security' }),
     );
   });
+
+  it('threads explicit model and harness overrides to synthesis and reviewer spawns', async () => {
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-harness',
+      branch: 'feature/pan-1194',
+      model: 'gpt-5.5',
+      harness: 'pi',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.spawnRun).toHaveBeenCalledWith(
+      'PAN-1194',
+      'review',
+      expect.objectContaining({ model: 'gpt-5.5', harness: 'pi', workspace: '/tmp/pan-review-harness' }),
+    );
+    expect(mocks.spawnRun).toHaveBeenCalledWith(
+      'PAN-1194',
+      'review',
+      expect.objectContaining({ model: 'gpt-5.5', harness: 'pi', subRole: 'security' }),
+    );
+  });
 });

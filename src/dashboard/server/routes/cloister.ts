@@ -19,6 +19,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
+import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
@@ -95,6 +96,32 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
       });
     }
     return jsonResponse({ success: true, message: 'Emergency stop executed', killedAgents });
+  })),
+);
+
+// ─── Route: POST /api/cloister/brake ─────────────────────────────────────────
+// Emergency brake — trim running work agents down to the concurrency cap. Unlike
+// emergency-stop (kills ALL agents), this stops only work agents above the cap,
+// idle-first, and leaves them resumable so the deacon re-admits them as slots free.
+
+const postCloisterBrakeRoute = HttpRouter.add(
+  'POST',
+  '/api/cloister/brake',
+  httpHandler(Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    const result = yield* Effect.try({
+      try: () => emergencyBrake(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    const ts = new Date().toISOString();
+    for (const agentId of result.stopped) {
+      yield* eventStore.append({
+        type: 'agent.stopped',
+        timestamp: ts,
+        payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
+      });
+    }
+    return jsonResponse({ success: true, message: `Trimmed ${result.before} → ${result.remaining} work agents`, ...result });
   })),
 );
 
@@ -176,6 +203,7 @@ export const cloisterRouteLayer = Layer.mergeAll(
   postCloisterStartRoute,
   postCloisterStopRoute,
   postCloisterEmergencyStopRoute,
+  postCloisterBrakeRoute,
   postCloisterResumeSpawnsRoute,
   getCloisterSpawnStatusRoute,
   getCloisterConfigRoute,

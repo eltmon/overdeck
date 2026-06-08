@@ -120,8 +120,8 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
-import { listRunningAgentsSync, getAgentStateSync, saveAgentStateSync } from '../../../lib/agents.js';
+import { checkInspectAgentTimeouts, cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
+import { listRunningAgentsSync, getAgentStateSync, messageAgent, saveAgentStateSync } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../../projects.js';
 import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
@@ -132,6 +132,7 @@ import { listSessionNames, killSession, sessionExistsSync, sessionExists } from 
 
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockMessageAgent = vi.mocked(messageAgent);
 const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListSessionNamesAsync = vi.mocked(listSessionNames);
 const mockKillSessionAsync = vi.mocked(killSession);
@@ -498,5 +499,96 @@ describe('monitorReviewConvoySignals', () => {
     expect(actions).toEqual([
       `Signaled REVIEWER_READY security ${outputPath} to agent-pan-879-review`,
     ]);
+  });
+});
+
+describe('checkInspectAgentTimeouts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-05T12:12:01.000Z'));
+    mockMessageAgent.mockResolvedValue(undefined);
+    mockKillSessionAsync.mockReturnValue(Effect.succeed(undefined) as any);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('marks a timed-out inspecting bead as error, kills the inspect session, and tells the parent exactly once', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses)
+      .mockReturnValueOnce({
+        'PAN-1616': {
+          issueId: 'PAN-1616',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          inspectStatus: 'inspecting',
+          inspectStartedAt: '2026-06-05T12:00:00.000Z',
+          inspectBeadId: 'workspace-sposy',
+          updatedAt: '2026-06-05T12:00:00.000Z',
+          readyForMerge: false,
+        },
+      } as any)
+      .mockReturnValue({
+        'PAN-1616': {
+          issueId: 'PAN-1616',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          inspectStatus: 'error',
+          inspectStartedAt: '2026-06-05T12:00:00.000Z',
+          inspectBeadId: 'workspace-sposy',
+          updatedAt: '2026-06-05T12:12:01.000Z',
+          readyForMerge: false,
+        },
+      } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(true) as any);
+
+    const first = await checkInspectAgentTimeouts();
+    const second = await checkInspectAgentTimeouts();
+
+    expect(first).toEqual([
+      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: timed out after 12m (limit 12m)',
+    ]);
+    expect(second).toEqual([]);
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({
+      inspectStatus: 'error',
+      inspectNotes: expect.stringContaining('timed out'),
+    }));
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(1);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('inspect-pan-1616-workspace-sposy');
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      'deacon:inspect-watchdog',
+    );
+  });
+
+  it('marks an inspecting bead as error when its inspect session has disappeared', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+        inspectBeadId: 'workspace-sposy',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions[0]).toContain('tmux session inspect-pan-1616-workspace-sposy exited before producing a verdict');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({ inspectStatus: 'error' }));
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      'deacon:inspect-watchdog',
+    );
   });
 });

@@ -157,3 +157,13 @@ multica/
 .cache/
 .tldr/
 .claude/mcp.json
+
+# Local junk / debugging artifacts (PAN session 2026-06-07) — never commit
+__pycache__/
+.beads/.~issues.jsonl.*
+/.brake-salvage/
+/conv-*.jpeg
+/reconnect-*.jpeg
+/deeplink-*.jpeg
+/panopticon-feature-graph.png
+/SYSTEM-RESOURCE-REPORT-*.md

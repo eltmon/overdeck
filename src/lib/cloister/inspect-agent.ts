@@ -38,6 +38,7 @@ import {
 } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState } from '../agents.js';
+import { isIssueClosed } from './issue-closed.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -134,6 +135,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
   opts: { deep?: boolean } = {},
 ): Promise<{
   success: boolean;
+  skipped?: boolean;
   runId?: string;
   tmuxSession?: string;
   message: string;
@@ -145,6 +147,17 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
   const tmuxSession = `inspect-${issueLower}-${beadSlug}`;
 
   try {
+    if (await isIssueClosed(context.issueId.toUpperCase())) {
+      const message = `${context.issueId.toUpperCase()}: skipping inspect dispatch — issue is closed`;
+      console.log(`[cloister] ${message}`);
+      return {
+        success: true,
+        skipped: true,
+        tmuxSession,
+        message,
+      };
+    }
+
     if (await Effect.runPromise(sessionExists(tmuxSession))) {
       // Stale session left behind by a previous inspection run — clear it.
       await Effect.runPromise(killSession(tmuxSession)).catch(() => {});
@@ -154,6 +167,8 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     setReviewStatusSync(context.issueId.toUpperCase(), {
       inspectStatus: 'inspecting',
       inspectNotes: `Inspecting bead ${context.beadId}`,
+      inspectStartedAt: new Date().toISOString(),
+      inspectBeadId: context.beadId,
     });
 
     // Resolve model via the role primitive: work.<inspect|inspect-deep>.
@@ -289,6 +304,7 @@ export function spawnInspectAgent(
   opts: { deep?: boolean } = {},
 ): Effect.Effect<{
   success: boolean;
+  skipped?: boolean;
   runId?: string;
   tmuxSession?: string;
   message: string;

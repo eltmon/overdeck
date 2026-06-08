@@ -2948,6 +2948,10 @@ const postIssueBeadInspectRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: result.error ?? result.message }, { status: 500 });
     }
 
+    if (result.skipped) {
+      return jsonResponse({ success: true, skipped: true, message: result.message, tmuxSession: result.tmuxSession });
+    }
+
     return jsonResponse({ success: true, runId: result.runId, tmuxSession: result.tmuxSession });
   })),
 );
@@ -3078,6 +3082,7 @@ const GH_PR_VIEW_FIELDS = [
   'isDraft',
   'baseRefName',
   'headRefName',
+  'headRefOid',
   'author',
   'createdAt',
   'updatedAt',
@@ -3101,6 +3106,7 @@ export interface IssuePullRequestData {
   isDraft: boolean;
   baseRefName: string;
   headRefName: string;
+  headRefOid?: string;
   author: { login?: string; name?: string } | null;
   createdAt: string;
   updatedAt: string;
@@ -3255,6 +3261,152 @@ export async function fetchIssuePullRequestDetails(issueId: string): Promise<Iss
   };
 }
 
+type CheckRunConclusion = 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | 'startup_failure' | null;
+type CheckRunStatus = 'queued' | 'in_progress' | 'completed' | 'requested' | 'pending' | 'waiting' | string;
+
+export interface IssueCheckRun {
+  id: number;
+  name: string;
+  status: CheckRunStatus;
+  conclusion: CheckRunConclusion;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  detailsUrl?: string | null;
+  htmlUrl?: string | null;
+  app?: string | null;
+  workflowName?: string | null;
+}
+
+export interface IssueCheckRunsSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  running: number;
+  skipped: number;
+  pending: number;
+  cancelled: number;
+}
+
+export interface IssueCheckRunsResponse {
+  issueId: string;
+  pr: Pick<IssuePullRequestData, 'number' | 'url' | 'headRefName' | 'headRefOid' | 'mergeable' | 'statusCheckRollup'> | null;
+  checkRuns: IssueCheckRun[];
+  summary: IssueCheckRunsSummary;
+  error?: string;
+}
+
+function emptyCheckRunsSummary(): IssueCheckRunsSummary {
+  return { total: 0, passed: 0, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 };
+}
+
+function summarizeCheckRuns(checkRuns: IssueCheckRun[]): IssueCheckRunsSummary {
+  const summary = emptyCheckRunsSummary();
+  summary.total = checkRuns.length;
+  for (const run of checkRuns) {
+    const status = (run.status || '').toLowerCase();
+    const conclusion = (run.conclusion || '').toLowerCase();
+    if (status !== 'completed') {
+      if (status === 'in_progress') summary.running += 1;
+      else summary.pending += 1;
+      continue;
+    }
+    if (conclusion === 'success' || conclusion === 'neutral') summary.passed += 1;
+    else if (conclusion === 'skipped') summary.skipped += 1;
+    else if (conclusion === 'cancelled') summary.cancelled += 1;
+    else if (conclusion) summary.failed += 1;
+    else summary.pending += 1;
+  }
+  return summary;
+}
+
+function normalizeCheckRun(raw: any): IssueCheckRun {
+  return {
+    id: Number(raw.id ?? 0),
+    name: String(raw.name ?? raw.workflow_name ?? 'Unnamed check'),
+    status: String(raw.status ?? 'pending'),
+    conclusion: (raw.conclusion ?? null) as CheckRunConclusion,
+    startedAt: raw.started_at ?? null,
+    completedAt: raw.completed_at ?? null,
+    detailsUrl: raw.details_url ?? null,
+    htmlUrl: raw.html_url ?? null,
+    app: typeof raw.app?.name === 'string' ? raw.app.name : null,
+    workflowName: typeof raw.workflow_name === 'string' ? raw.workflow_name : null,
+  };
+}
+
+export async function fetchIssueCheckRuns(issueId: string): Promise<IssueCheckRunsResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return {
+      issueId: prRef.issueId,
+      pr: null,
+      checkRuns: [],
+      summary: emptyCheckRunsSummary(),
+      error: (prRef as { error?: string }).error,
+    };
+  }
+
+  const prResult = await fetchIssuePullRequestFromRef(prRef);
+  if (!prResult.pr) {
+    return {
+      issueId: prRef.issueId,
+      pr: null,
+      checkRuns: [],
+      summary: emptyCheckRunsSummary(),
+      error: prResult.error,
+    };
+  }
+
+  const pr = prResult.pr;
+  const [defaultOwner, defaultRepo] = prRef.repoArg.split('/');
+  const repoOwner = defaultOwner ?? '';
+  const repoName = defaultRepo ?? '';
+  const checkRef = pr.headRefOid || pr.headRefName || `feature/${issueId.toLowerCase()}`;
+
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'api',
+        `repos/${repoOwner}/${repoName}/commits/${encodeURIComponent(checkRef)}/check-runs?per_page=100`,
+        '-H',
+        'Accept: application/vnd.github+json',
+      ],
+      { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+    );
+    const payload = JSON.parse(stdout) as { check_runs?: any[] };
+    const checkRuns = (payload.check_runs ?? []).map(normalizeCheckRun);
+    return {
+      issueId: prRef.issueId,
+      pr: {
+        number: pr.number,
+        url: pr.url,
+        headRefName: pr.headRefName,
+        headRefOid: pr.headRefOid,
+        mergeable: pr.mergeable,
+        statusCheckRollup: pr.statusCheckRollup,
+      },
+      checkRuns,
+      summary: summarizeCheckRuns(checkRuns),
+    };
+  } catch (err: any) {
+    return {
+      issueId: prRef.issueId,
+      pr: {
+        number: pr.number,
+        url: pr.url,
+        headRefName: pr.headRefName,
+        headRefOid: pr.headRefOid,
+        mergeable: pr.mergeable,
+        statusCheckRollup: pr.statusCheckRollup,
+      },
+      checkRuns: [],
+      summary: emptyCheckRunsSummary(),
+      error: `gh api check-runs failed: ${err.message}`,
+    };
+  }
+}
+
 const getIssuePrRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/pr',
@@ -3293,6 +3445,20 @@ const getIssuePrDetailsRoute = HttpRouter.add(
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
+    return jsonResponse(result);
+  })),
+);
+
+const getIssueCheckRunsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/check-runs',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    const result = yield* Effect.promise(() => fetchIssueCheckRuns(id));
     return jsonResponse(result);
   })),
 );
@@ -3797,6 +3963,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePrRoute,
   getIssuePrDiffRoute,
   getIssuePrDetailsRoute,
+  getIssueCheckRunsRoute,
   getIssueDiscussionsRoute,
 );
 

@@ -337,6 +337,14 @@ export function CommandDeck({
     });
   }, [projects, sessionTreeMap]);
 
+  useEffect(() => {
+    if (selectedProject || !onSelectProject) return;
+    const projectsWithFeatures = projectsWithSessions.filter((project) => project.features.length > 0);
+    if (projectsWithFeatures.length === 1) {
+      onSelectProject(projectsWithFeatures[0]!.name);
+    }
+  }, [onSelectProject, projectsWithSessions, selectedProject]);
+
   const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
 
   // Poll container stats every 5s when issues have containers
@@ -643,7 +651,7 @@ export function CommandDeck({
     }
   }, [queryClient]);
 
-  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => {
+  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => {
     try {
       // Find project key for this issue. Primary: resource-allocated issue list.
       // Fallback: session tree (covers issues where the work agent is done but
@@ -655,7 +663,7 @@ export function CommandDeck({
           tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
         )?.[0];
 
-      const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model });
+      const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model, harness });
       if (directRestartRequest) {
         const res = await fetch(directRestartRequest.endpoint, {
           method: 'POST',
@@ -674,7 +682,10 @@ export function CommandDeck({
       const resumeRes = await fetch(`/api/agents/${sessionId}/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(model ? { model } : {}),
+        body: JSON.stringify({
+          ...(model ? { model } : {}),
+          ...(harness ? { harness } : {}),
+        }),
       });
       const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
@@ -689,7 +700,10 @@ export function CommandDeck({
         const resumeRetryRes = await fetch(`/api/agents/${sessionId}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(model ? { model } : {}),
+          body: JSON.stringify({
+            ...(model ? { model } : {}),
+            ...(harness ? { harness } : {}),
+          }),
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
@@ -709,6 +723,7 @@ export function CommandDeck({
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       const requestBody: Record<string, unknown> = { issueId };
       if (model) requestBody.model = model;
+      if (harness) requestBody.harness = harness;
       let lastRequestBody = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -1239,6 +1254,7 @@ export function CommandDeck({
                     issueId={issueId}
                     title={info.title}
                     branch={info.branch}
+                    projectName={selectedProject ?? undefined}
                     createdAt={info.createdAt}
                     agentId={info.agentId}
                     conversations={conversations}

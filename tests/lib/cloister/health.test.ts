@@ -2,6 +2,7 @@
  * Tests for Cloister health evaluation
  */
 
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   evaluateHealthState,
@@ -19,6 +20,7 @@ import {
   getHealthLabel,
   type AgentHealth,
 } from '../../../src/lib/cloister/health.js';
+import { setAgentRuntimeMirror } from '../../../src/lib/agent-runtime-mirror.js';
 import type { AgentRuntimeSync, Heartbeat } from '../../../src/lib/runtimes/types.js';
 
 // Mock runtime for testing
@@ -127,6 +129,7 @@ describe('Cloister Health Evaluator', () => {
 
     beforeEach(() => {
       mockRuntime = new MockRuntime();
+      Effect.runSync(setAgentRuntimeMirror({}));
     });
 
     it('should return stuck state for non-running agent', () => {
@@ -169,6 +172,34 @@ describe('Cloister Health Evaluator', () => {
       expect(health.timeSinceActivity).toBeGreaterThan(0);
     });
 
+    it('should return wedged state for a context-saturated running agent even with recent heartbeat', () => {
+      const now = new Date();
+      const recentTimestamp = new Date(now.getTime() - 2 * 60 * 1000);
+      const contextSaturatedAt = '2026-06-05T12:00:00.000Z';
+
+      mockRuntime.setRunning('agent-1', true);
+      mockRuntime.setHeartbeat('agent-1', {
+        timestamp: recentTimestamp,
+        source: 'jsonl_mtime',
+      });
+      Effect.runSync(setAgentRuntimeMirror({
+        'agent-1': {
+          id: 'agent-1',
+          activity: 'idle',
+          lastActivity: recentTimestamp.toISOString(),
+          contextSaturatedAt,
+          updatedAtSequence: 1,
+        },
+      }));
+
+      const health = getAgentHealth('agent-1', mockRuntime, thresholds);
+
+      expect(health.state).toBe('wedged');
+      expect(health.contextSaturatedAt).toBe(contextSaturatedAt);
+      expect(health.isRunning).toBe(true);
+      expect(health.lastActivity).toEqual(recentTimestamp);
+    });
+
     it('should return warning state for agent with old heartbeat', () => {
       const now = new Date();
       const oldTimestamp = new Date(now.getTime() - 20 * 60 * 1000); // 20 minutes ago
@@ -196,6 +227,7 @@ describe('Cloister Health Evaluator', () => {
 
     beforeEach(() => {
       mockRuntime = new MockRuntime();
+      Effect.runSync(setAgentRuntimeMirror({}));
     });
 
     it('should return health for multiple agents', () => {
@@ -266,15 +298,25 @@ describe('Cloister Health Evaluator', () => {
           heartbeat: null,
           isRunning: false,
         },
+        {
+          agentId: 'agent-6',
+          state: 'wedged',
+          lastActivity: new Date(),
+          timeSinceActivity: 3000,
+          heartbeat: null,
+          isRunning: true,
+          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+        },
       ];
 
       const summary = generateHealthSummary(healths);
 
-      expect(summary.total).toBe(5);
+      expect(summary.total).toBe(6);
       expect(summary.active).toBe(2);
       expect(summary.stale).toBe(1);
       expect(summary.warning).toBe(1);
       expect(summary.stuck).toBe(1);
+      expect(summary.wedged).toBe(1);
     });
 
     it('should return empty summary for no agents', () => {
@@ -285,6 +327,7 @@ describe('Cloister Health Evaluator', () => {
       expect(summary.stale).toBe(0);
       expect(summary.warning).toBe(0);
       expect(summary.stuck).toBe(0);
+      expect(summary.wedged).toBe(0);
     });
   });
 
@@ -315,6 +358,18 @@ describe('Cloister Health Evaluator', () => {
       expect(
         needsAttention({
           agentId: 'agent-3',
+          state: 'wedged',
+          lastActivity: null,
+          timeSinceActivity: null,
+          heartbeat: null,
+          isRunning: true,
+          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+        })
+      ).toBe(true);
+
+      expect(
+        needsAttention({
+          agentId: 'agent-4',
           state: 'active',
           lastActivity: null,
           timeSinceActivity: null,
@@ -346,6 +401,18 @@ describe('Cloister Health Evaluator', () => {
           isRunning: false,
         })
       ).toBe(false);
+
+      expect(
+        shouldPoke({
+          agentId: 'agent-3',
+          state: 'wedged',
+          lastActivity: null,
+          timeSinceActivity: null,
+          heartbeat: null,
+          isRunning: true,
+          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+        })
+      ).toBe(false);
     });
 
     it('shouldKill should return true only for stuck', () => {
@@ -368,6 +435,18 @@ describe('Cloister Health Evaluator', () => {
           timeSinceActivity: null,
           heartbeat: null,
           isRunning: true,
+        })
+      ).toBe(false);
+
+      expect(
+        shouldKill({
+          agentId: 'agent-3',
+          state: 'wedged',
+          lastActivity: null,
+          timeSinceActivity: null,
+          heartbeat: null,
+          isRunning: true,
+          contextSaturatedAt: '2026-06-05T12:00:00.000Z',
         })
       ).toBe(false);
     });
@@ -407,13 +486,23 @@ describe('Cloister Health Evaluator', () => {
         heartbeat: null,
         isRunning: false,
       },
+      {
+        agentId: 'agent-5',
+        state: 'wedged',
+        lastActivity: null,
+        timeSinceActivity: null,
+        heartbeat: null,
+        isRunning: true,
+        contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+      },
     ];
 
     it('getAgentsNeedingAttention should filter correctly', () => {
       const needsAttention = getAgentsNeedingAttention(healths);
-      expect(needsAttention).toHaveLength(2);
+      expect(needsAttention).toHaveLength(3);
       expect(needsAttention[0].agentId).toBe('agent-3');
       expect(needsAttention[1].agentId).toBe('agent-4');
+      expect(needsAttention[2].agentId).toBe('agent-5');
     });
 
     it('getAgentsToPoke should filter correctly', () => {
@@ -451,6 +540,7 @@ describe('Cloister Health Evaluator', () => {
       expect(getHealthEmoji('stale')).toBe('🟡');
       expect(getHealthEmoji('warning')).toBe('🟠');
       expect(getHealthEmoji('stuck')).toBe('🔴');
+      expect(getHealthEmoji('wedged')).toBe('🧱');
     });
   });
 
@@ -460,6 +550,7 @@ describe('Cloister Health Evaluator', () => {
       expect(getHealthLabel('stale')).toBe('Stale');
       expect(getHealthLabel('warning')).toBe('Warning');
       expect(getHealthLabel('stuck')).toBe('Stuck');
+      expect(getHealthLabel('wedged')).toBe('Wedged');
     });
   });
 });

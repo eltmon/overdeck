@@ -139,6 +139,15 @@ export const bodyToEvent = (
           currentIssue: source['currentIssue'] as string | undefined,
         },
       };
+    case 'context_saturation_changed':
+      return {
+        type: 'agent.context_saturation_changed',
+        timestamp,
+        payload: {
+          agentId,
+          contextSaturatedAt: source['contextSaturatedAt'] as string | undefined,
+        },
+      };
     default:
       return null;
   }

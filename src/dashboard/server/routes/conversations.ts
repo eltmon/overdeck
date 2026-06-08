@@ -343,6 +343,9 @@ async function getCachedMessages(
         planToolUseIds: incremental.planToolUseIds,
         permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
         fileEditsByAssistantId: mergedFileEdits,
+        // The incremental set was seeded from the cached parseState, so it already
+        // carries every previously-counted id plus any seen in this chunk.
+        countedUsageIds: incremental.countedUsageIds,
       };
     }
   } else {
@@ -362,6 +365,7 @@ async function getCachedMessages(
       planToolUseIds: result.planToolUseIds,
       proposedPlan: result.proposedPlan,
       permissionMode: result.permissionMode,
+      countedUsageIds: result.countedUsageIds,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {

@@ -231,6 +231,13 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   // Trust mkcert CA so agent CLI commands can reach https://pan.localhost
   lines.push('command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"');
 
+  // PAN-1678: skip the heavy ~10-core build:docs-index job in any `npm run
+  // build` an agent runs in its session. The docs search index is irrelevant
+  // to whether an issue's code compiles/tests, and building it across many
+  // concurrent agent workspaces stampedes the host to OOM. Release/publish
+  // builds the index through a separate path that never sources this launcher.
+  lines.push('export SKIP_DOCS_INDEX=1');
+
   // Terminal env (TERM/COLORTERM/LANG/LC_ALL)
   if (config.setTerminalEnv) {
     lines.push('export TERM=xterm-256color');

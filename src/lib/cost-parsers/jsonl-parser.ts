@@ -18,6 +18,8 @@ export interface ClaudeMessage {
   sessionId?: string;
   timestamp?: string;
   parentMessageId?: string;
+  // Claude Code per-API-request id. Stable across the multiple JSONL lines of one response.
+  requestId?: string;
   message?: {
     id?: string;
     role?: 'user' | 'assistant';
@@ -232,6 +234,11 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
   }> = {};
   let totalCostV2 = 0;
 
+  // Claude Code repeats the same `usage` on every JSONL line of one API response
+  // (text line, each tool_use line, …). Dedup on requestId/message.id so a multi-block
+  // turn is counted once instead of inflating tokens/cost ~2-3×.
+  const countedUsageIds = new Set<string>();
+
   for (const line of lines) {
     try {
       const msg: ClaudeMessage = JSON.parse(line);
@@ -254,8 +261,10 @@ export function parseClaudeSessionSync(sessionFile: string): SessionUsage | null
       // Extract usage - can be in message.usage or top-level usage
       const usage = msg.message?.usage || msg.usage;
       const modelId = msg.message?.model || msg.model;  // Exact model ID
+      const usageId = msg.requestId ?? msg.message?.id;
 
-      if (usage) {
+      if (usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+        if (usageId !== undefined) countedUsageIds.add(usageId);
         // Accumulate total tokens (existing behavior)
         totalUsage.inputTokens += usage.input_tokens || 0;
         totalUsage.outputTokens += usage.output_tokens || 0;

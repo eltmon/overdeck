@@ -71,16 +71,21 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     process.exit(1);
   }
 
-  // Human-only guard: reject if running as an AUTONOMOUS agent.
-  // `conv-*` sessions are operator-driven conversations (the human is in the loop
-  // and explicitly asked), so they are allowed — only autonomous pipeline agents
-  // (`agent-*`, `planning-*`, `flywheel-*`, `strike-*`, `inspect-*`, …) are barred,
-  // since close-out is destructive (closes the tracker issue + tears down the
-  // workspace). Without the `conv-*` exception the operator could not close out
-  // from their own dashboard conversation and was forced to a bare terminal. PAN-1621.
+  // Close-out caller guard. Close-out is destructive (closes the tracker issue +
+  // tears down the workspace/branches), so it is gated to:
+  //   - `conv-*` — operator-driven conversations (the human is in the loop and
+  //     explicitly asked). PAN-1621.
+  //   - `flywheel-*` — the autonomous lifecycle orchestrator, now trusted to run
+  //     close-out as the final step of the pipeline it manages. The close-out's
+  //     own verify-merged step + the verifying-on-main state are the safety net
+  //     against closing unfinished work.
+  // All other autonomous pipeline agents (`agent-*`, `planning-*`, `strike-*`,
+  // `inspect-*`, …) remain barred.
   const agentId = process.env.PANOPTICON_AGENT_ID;
-  if (agentId && !agentId.startsWith('conv-')) {
-    console.error(chalk.red('Close-out is a human-only operation. Autonomous agents cannot close out issues.'));
+  const isOperatorConversation = agentId?.startsWith('conv-') ?? false;
+  const isFlywheelOrchestrator = agentId?.startsWith('flywheel-') ?? false;
+  if (agentId && !isOperatorConversation && !isFlywheelOrchestrator) {
+    console.error(chalk.red('Close-out is not permitted for this agent. Only operator conversations (conv-*) and the flywheel orchestrator may close out issues.'));
     process.exit(1);
   }
 

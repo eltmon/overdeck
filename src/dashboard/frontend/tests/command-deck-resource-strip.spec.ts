@@ -48,37 +48,6 @@ interface ResourceDetailIdentifiers {
   dockerContainerNames: string[];
 }
 
-interface ProjectData {
-  name: string;
-  path: string;
-  features: ResourceIssue[];
-}
-
-function groupProjects(issues: ResourceIssue[]): ProjectData[] {
-  const grouped = new Map<string, ProjectData>();
-
-  for (const issue of issues) {
-    const existing = grouped.get(issue.projectName);
-    if (existing) {
-      existing.features.push(issue);
-      continue;
-    }
-
-    grouped.set(issue.projectName, {
-      name: issue.projectName,
-      path: issue.projectName,
-      features: [issue],
-    });
-  }
-
-  return [...grouped.values()]
-    .map((project) => ({
-      ...project,
-      features: [...project.features].sort((a, b) => a.issueId.localeCompare(b.issueId)),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 const RESOURCE_ISSUES: ResourceIssue[] = [
   {
     issueId: 'PAN-862',
@@ -187,11 +156,11 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify(RESOURCE_ISSUES),
       });
     });
-    await page.route('**/api/command-deck/projects', async (route) => {
+    await page.route('**/api/registered-projects', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(groupProjects(RESOURCE_ISSUES)),
+        body: JSON.stringify([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp/panopticon-cli' }]),
       });
     });
     await page.route('**/api/issues/*/resource-details', async (route) => {
@@ -235,15 +204,22 @@ test.describe('Command Deck resource strip', () => {
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
 
-    const projectHeader = page.getByRole('button', { name: /panopticon-cli/ }).first();
-    if (await projectHeader.count()) {
-      await projectHeader.click().catch(() => {});
-      await projectHeader.click().catch(() => {});
-    }
+    // Select the project from the sidebar rail. This sets selectedProject, which
+    // mounts the ProjectNode (already expanded) in the Issues section.
+    // PAN-1609: wait for the sidebar entry to mount before clicking — under CI
+    // load the initial app boot (WS connect + first snapshot) can take several
+    // seconds, and a click that races the mount silently no-ops, leaving the
+    // rows un-rendered and flaking the first toBeVisible below.
+    const sidebarProject = page.getByTestId('sidebar-project-panopticon-cli');
+    await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+    await sidebarProject.click();
 
     const pan862Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-862' }).first();
     const pan777Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-777' }).first();
-    await expect(pan862Row).toBeVisible();
+    // First assertion after project selection gates on the data load + render —
+    // give it generous headroom (the remaining assertions render together once
+    // the row is present and keep the default timeout).
+    await expect(pan862Row).toBeVisible({ timeout: 20_000 });
     await expect(pan777Row).toBeVisible();
     await expect(pan777Row.locator('[class*="featureState"]').getByText('Closed', { exact: true })).toBeVisible();
 

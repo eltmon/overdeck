@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw, Pause, Unlock } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw, Pause, Unlock, Minimize2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -13,7 +13,7 @@ import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 export interface IssueAgent {
   id: string;
   issueId?: string | null;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
+  status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped';
   runtime: string;
   model: string;
   startedAt: string;
@@ -51,6 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
   healthy: 'bg-status-healthy',
   warning: 'bg-status-warning',
   stuck: 'bg-status-stuck',
+  stalled: 'bg-status-stuck',
   dead: 'bg-status-dead',
   stopped: 'bg-muted-foreground',
   running: 'bg-status-healthy',
@@ -96,11 +97,11 @@ async function pokeAgent(agentId: string): Promise<void> {
   }
 }
 
-async function resumeAgent(agentId: string, message?: string): Promise<void> {
+async function resumeAgent(agentId: string, message?: string, compact?: boolean): Promise<void> {
   const res = await fetch(`/api/agents/${agentId}/resume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, ...(compact ? { compact: true } : {}) }),
   });
   if (!res.ok) {
     const error = await res.json();
@@ -271,6 +272,19 @@ export function IssueAgentCard({
     },
   });
 
+  // PAN-1675: 'Resume (compact)' — out-of-band Panopticon-side compaction of the
+  // saved session before relaunch, to recover a context-wedged agent without the
+  // harness /compact deadlock.
+  const resumeCompactMutation = useMutation({
+    mutationFn: () => resumeAgent(agent.id, undefined, true),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to compact-resume ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
   const pauseMutation = useMutation({
     mutationFn: (reason?: string) => pauseAgent(agent.id, reason),
     onSuccess: (updated, reason) => {
@@ -373,6 +387,11 @@ export function IssueAgentCard({
     e.stopPropagation();
     // Open the workspace detail pane where the user can type a resume message
     onSelect?.();
+  };
+
+  const handleResumeCompact = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resumeCompactMutation.mutate();
   };
 
   const handleShowPauseReason = (e: React.MouseEvent) => {
@@ -623,6 +642,21 @@ export function IssueAgentCard({
                 title="Resume agent"
               >
                 <Play className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Resume (compact) — PAN-1675 out-of-band compaction recovery for
+                a context-wedged work agent (this card renders the issue's work
+                agent; same resumable gate as the plain Resume button) */}
+            {health?.state === 'suspended' && (
+              <button
+                onClick={handleResumeCompact}
+                disabled={resumeCompactMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
+                title="Resume (compact) — compact the saved session out-of-band before relaunch to recover a context-wedged agent"
+                aria-label={`Resume ${agent.id} with Panopticon-side compaction (out-of-band recovery for a context-wedged agent)`}
+              >
+                <Minimize2 className="w-4 h-4" />
               </button>
             )}
 

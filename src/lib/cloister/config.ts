@@ -53,6 +53,27 @@ export interface MonitoringConfig {
 }
 
 /**
+ * Concurrency limits for deacon auto-resume / auto-dispatch (PAN-1665).
+ *
+ * These are *gates on starting new work* — the deacon never kills a running agent
+ * to satisfy them. If the system is already over a limit (e.g. after a forced
+ * `pan start`, or a backlog at unfreeze), the deacon simply stops resuming/
+ * dispatching until natural attrition brings the count down. To forcibly trim an
+ * over-limit system back to the cap, the operator uses the explicit emergency
+ * brake — it is never automatic.
+ */
+export interface ConcurrencyConfig {
+  /** Max concurrently-running *work* agents the deacon will resume/spawn up to. */
+  max_work_agents: number;
+  /**
+   * Slots kept free above `max_work_agents` for advancing roles (review/test/ship)
+   * so the pipeline can always drain even when work is at its cap. The overall
+   * ceiling for any auto-dispatch is `max_work_agents + reserved_advancing_slots`.
+   */
+  reserved_advancing_slots: number;
+}
+
+/**
  * Startup configuration
  */
 export interface StartupConfig {
@@ -238,6 +259,7 @@ export interface CloisterConfig {
   auto_actions: AutoActions;
   stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
+  concurrency?: ConcurrencyConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
@@ -278,6 +300,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   monitoring: {
     check_interval: 60, // 1 minute
     heartbeat_sources: ['jsonl_mtime', 'tmux_activity', 'git_activity'],
+  },
+  concurrency: {
+    max_work_agents: 6,
+    reserved_advancing_slots: 3,
   },
   notifications: {
     slack_webhook: undefined,

@@ -23,6 +23,16 @@ import {
   ResetMarker,
 } from "./memory"
 
+// ─── System Events ────────────────────────────────────────────────────────────
+
+/** App-level liveness frame for the /ws/rpc domain-events stream. */
+export const SystemHeartbeatEvent = Schema.Struct({
+  type: Schema.Literal("system.heartbeat"),
+  timestamp: Schema.String,
+  payload: Schema.Struct({ ts: Schema.Number }),
+})
+export type SystemHeartbeatEvent = typeof SystemHeartbeatEvent.Type
+
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
 /** Replaces socket.io `agents:changed` (event: 'started') */
@@ -295,6 +305,17 @@ export const AgentCurrentIssueSetEvent = Schema.Struct({
   }),
 })
 export type AgentCurrentIssueSetEvent = typeof AgentCurrentIssueSetEvent.Type
+
+export const AgentContextSaturationChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.context_saturation_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    contextSaturatedAt: Schema.optional(Schema.String),
+  }),
+})
+export type AgentContextSaturationChangedEvent = typeof AgentContextSaturationChangedEvent.Type
 
 export const AgentResolutionChangedEvent = Schema.Struct({
   type: Schema.Literal("agent.resolution_changed"),
@@ -1047,6 +1068,7 @@ export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
 export const DomainEvent = Schema.Union([
+  SystemHeartbeatEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
@@ -1070,6 +1092,7 @@ export const DomainEvent = Schema.Union([
   AgentChannelReplyEvent,
   AgentModelSetEvent,
   AgentCurrentIssueSetEvent,
+  AgentContextSaturationChangedEvent,
   AgentResolutionChangedEvent,
   AgentStateRestoredEvent,
   AgentTurnDiffCompletedEvent,

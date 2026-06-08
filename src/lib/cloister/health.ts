@@ -5,6 +5,7 @@
  */
 
 import type { HealthState, Heartbeat, AgentRuntimeSync } from '../runtimes/types.js';
+import { getAgentRuntimeStateSync } from '../agents.js';
 import type { HealthThresholds } from './config.js';
 import { getHealthThresholdsMs } from './config.js';
 
@@ -18,6 +19,7 @@ export interface AgentHealth {
   timeSinceActivity: number | null; // milliseconds
   heartbeat: Heartbeat | null;
   isRunning: boolean;
+  contextSaturatedAt?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export interface HealthSummary {
   stale: number;
   warning: number;
   stuck: number;
+  wedged: number;
   total: number;
 }
 
@@ -84,16 +87,31 @@ export function getAgentHealth(
 
   // Get heartbeat
   const heartbeat = runtime.getHeartbeat(agentId);
+  const contextSaturatedAt = getAgentRuntimeStateSync(agentId)?.contextSaturatedAt;
 
   if (!heartbeat) {
     // No heartbeat available - agent might be starting up
     return {
       agentId,
-      state: 'active', // Assume active if no heartbeat yet
+      state: contextSaturatedAt ? 'wedged' : 'active', // Assume active if no heartbeat yet
       lastActivity: null,
       timeSinceActivity: null,
       heartbeat: null,
       isRunning: true,
+      contextSaturatedAt,
+    };
+  }
+
+  if (contextSaturatedAt) {
+    const timeSinceActivity = new Date().getTime() - heartbeat.timestamp.getTime();
+    return {
+      agentId,
+      state: 'wedged',
+      lastActivity: heartbeat.timestamp,
+      timeSinceActivity,
+      heartbeat,
+      isRunning: true,
+      contextSaturatedAt,
     };
   }
 
@@ -142,6 +160,7 @@ export function generateHealthSummary(agentHealths: AgentHealth[]): HealthSummar
     stale: 0,
     warning: 0,
     stuck: 0,
+    wedged: 0,
     total: agentHealths.length,
   };
 
@@ -159,7 +178,7 @@ export function generateHealthSummary(agentHealths: AgentHealth[]): HealthSummar
  * @returns True if agent needs attention
  */
 export function needsAttention(health: AgentHealth): boolean {
-  return health.state === 'warning' || health.state === 'stuck';
+  return health.state === 'warning' || health.state === 'stuck' || health.state === 'wedged';
 }
 
 /**
@@ -255,6 +274,8 @@ export function getHealthEmoji(state: HealthState): string {
       return '🟠';
     case 'stuck':
       return '🔴';
+    case 'wedged':
+      return '🧱';
   }
 }
 
@@ -274,5 +295,7 @@ export function getHealthLabel(state: HealthState): string {
       return 'Warning';
     case 'stuck':
       return 'Stuck';
+    case 'wedged':
+      return 'Wedged';
   }
 }

@@ -187,6 +187,9 @@ export interface ApiSettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
+    tldr?: {
+      enabled?: boolean;
+    };
   };
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
@@ -579,6 +582,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       rtk: {
         enabled: config.rtk?.enabled ?? false,
       },
+      tldr: {
+        enabled: config.tldr?.enabled ?? true,
+      },
     },
     tts: toApiTtsConfig(config.tts),
     tts_summarizer: {
@@ -667,6 +673,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['tmux', config.tmux],
     ['conversations', config.conversations],
     ['memory', config.memory],
+    ['background_ai', config.background_ai],
     ['tracker_keys', config.tracker_keys],
     ['experimental', config.experimental],
     ['claude', config.claude],
@@ -682,6 +689,10 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
 
   if (config.agents?.rtk !== undefined) {
     doc.setIn(['agents', 'rtk'], config.agents.rtk);
+  }
+
+  if (config.agents?.tldr !== undefined) {
+    doc.setIn(['agents', 'tldr'], config.agents.tldr);
   }
 
   if (config.tts !== undefined) {
@@ -742,8 +753,11 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
     },
-    agents: settings.agents?.rtk !== undefined
-      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
+    agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
+      ? {
+          ...(settings.agents?.rtk !== undefined ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } } : {}),
+          ...(settings.agents?.tldr !== undefined ? { tldr: { enabled: settings.agents.tldr.enabled ?? true } } : {}),
+        }
       : undefined,
     tts: settings.tts_summarizer
       ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
@@ -828,6 +842,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
       rtk: {
         ...current.agents?.rtk,
         ...updates.agents?.rtk,
+      },
+      tldr: {
+        ...current.agents?.tldr,
+        ...updates.agents?.tldr,
       },
     },
     tts: {
@@ -960,11 +978,20 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (settings.agents !== undefined) {
     if (!isRecord(settings.agents)) {
       errors.push('agents must be an object');
-    } else if (settings.agents.rtk !== undefined) {
-      if (!isRecord(settings.agents.rtk)) {
-        errors.push('agents.rtk must be an object');
-      } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
-        errors.push('agents.rtk.enabled must be a boolean');
+    } else {
+      if (settings.agents.rtk !== undefined) {
+        if (!isRecord(settings.agents.rtk)) {
+          errors.push('agents.rtk must be an object');
+        } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
+          errors.push('agents.rtk.enabled must be a boolean');
+        }
+      }
+      if (settings.agents.tldr !== undefined) {
+        if (!isRecord(settings.agents.tldr)) {
+          errors.push('agents.tldr must be an object');
+        } else if (settings.agents.tldr.enabled !== undefined && typeof settings.agents.tldr.enabled !== 'boolean') {
+          errors.push('agents.tldr.enabled must be a boolean');
+        }
       }
     }
   }

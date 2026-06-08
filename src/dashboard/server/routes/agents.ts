@@ -131,6 +131,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
+import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePane, killSession, listSessions, sessionExists } from '../../../lib/tmux.js';
@@ -1348,6 +1349,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 //   {kind: "model_set",         model, claudeSessionId?}
 //   {kind: "resolution_set",    resolution, resolutionCount}
 //   {kind: "current_issue_set", currentIssue?}
+//   {kind: "context_saturation_changed", contextSaturatedAt?}
 
 function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
   return Effect.gen(function* () {
@@ -1973,7 +1975,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { message, model } = body as any;
+    const { message, model, harness, compact } = body as { message?: string; model?: string; harness?: RuntimeName; compact?: boolean };
     let resumeModel: string | undefined;
     try {
       resumeModel = normalizeModelOverrideSync(model);
@@ -1984,7 +1986,12 @@ const postAgentResumeRoute = HttpRouter.add(
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
     const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
-    if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck) {
+    // PAN-1675: a compact-resume targets a context-wedged agent that is usually
+    // still 'running' (a live but stuck session), which the normal gate rejects.
+    // Allow it through for compact === true — resumeAgent compacts the JSONL and
+    // kills the wedged session before relaunch (its own canResume handles the
+    // running case). Non-compact resumes keep the strict gate.
+    if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck && compact !== true) {
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
         lifecycle: lifecycleBefore,
@@ -1994,9 +2001,13 @@ const postAgentResumeRoute = HttpRouter.add(
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
       model: resumeModel || undefined,
+      harness: harness || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeModel ? { model: resumeModel } : undefined));
+    const resumeOpts = resumeModel || harness || compact === true
+      ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}), ...(compact === true ? { compact: true } : {}) }
+      : undefined;
+    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
@@ -2012,6 +2023,7 @@ const postAgentResumeRoute = HttpRouter.add(
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
             workspace: agentState?.workspace,
+            runtime: agentState?.harness ?? 'claude-code',
             model: agentState?.model,
             status: 'running',
             startedAt: agentState?.startedAt,
@@ -2143,6 +2155,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
       model: restartModel || agentState.model,
+      harness: harness || undefined,
       graceful,
       hasMessage: !!message,
     }));
@@ -2376,6 +2389,10 @@ const getAgentCostRoute = HttpRouter.add(
     let cacheReadTokens = 0;
     let cacheWriteTokens = 0;
     let detectedModel = agentState.model || '';
+    // Claude Code repeats the same `usage` on every JSONL line of one API response
+    // (text line, each tool_use line, …). Dedup on requestId/message.id so a multi-block
+    // turn is counted once instead of inflating tokens/cost ~2-3×.
+    const countedUsageIds = new Set<string>();
 
     const homeDir = process.env.HOME || homedir();
     const claudeProjectsDir = join(homeDir, '.claude', 'projects');
@@ -2394,7 +2411,9 @@ const getAgentCostRoute = HttpRouter.add(
             const entry = JSON.parse(line);
             const usage = entry.message?.usage || entry.usage;
             const model = entry.message?.model || entry.model;
-            if (usage) {
+            const usageId = entry.requestId ?? entry.message?.id;
+            if (usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+              if (usageId !== undefined) countedUsageIds.add(usageId);
               inputTokens += usage.input_tokens || 0;
               outputTokens += usage.output_tokens || 0;
               cacheReadTokens += usage.cache_read_input_tokens || 0;

@@ -472,6 +472,39 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('dashscope: dashscope-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
     });
+
+    it('persists background_ai.cheap_mode: false to YAML (Low-cost mode toggle sticks)', async () => {
+      // Regression: writeYamlConfigPreservingComments omitted the background_ai
+      // section from the persisted allow-list, so toggling Low-cost mode off
+      // never reached disk and the read path defaulted cheap_mode back to true.
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        background_ai: {
+          cheap_mode: false,
+          features: { conversationTitles: true },
+        },
+      };
+      await Effect.runPromise(saveSettingsApi(settings));
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('background_ai:');
+      expect(yamlContent).toContain('cheap_mode: false');
+    });
   });
 
   describe('getDefaultConversationModelApi', () => {

@@ -108,9 +108,27 @@ export interface SubscribeOptions {
   /** Called when the subscription reconnects after a failure. Use this to
    *  re-bootstrap state (e.g. re-fetch the snapshot from the new server). */
   readonly onReconnect?: () => void
+  /** Called each time a persistent subscription has to retry after a stream failure. */
+  readonly onRetry?: (attempt: number) => void
 }
 
-const DEFAULT_RETRY_DELAY = Duration.millis(250)
+export const RECONNECT_BASE_DELAY_MS = 500
+export const RECONNECT_MAX_DELAY_MS = 10_000
+
+export function reconnectBackoffDelayMs(attempt: number): number {
+  const safeAttempt = Math.max(1, Math.floor(attempt))
+  return Math.min(RECONNECT_BASE_DELAY_MS * 2 ** (safeAttempt - 1), RECONNECT_MAX_DELAY_MS)
+}
+
+const DEFAULT_RETRY_DELAY = Duration.millis(RECONNECT_BASE_DELAY_MS)
+const MAX_RETRY_DELAY = Duration.millis(RECONNECT_MAX_DELAY_MS)
+
+function reconnectRetrySchedule(baseDelay: Duration.Input = DEFAULT_RETRY_DELAY) {
+  return Schedule.exponential(baseDelay).pipe(
+    Schedule.either(Schedule.spaced(MAX_RETRY_DELAY)),
+    Schedule.jittered,
+  )
+}
 
 function formatError(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) return error.message
@@ -174,7 +192,9 @@ export class WsTransport {
     let currentCancel: (() => void) | null = null
     const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
     const onReconnect = options?.onReconnect
+    const onRetry = options?.onRetry
     let hasConnectedOnce = false
+    let reconnectAttempts = 0
 
     const run = () => {
       if (!active) return
@@ -189,9 +209,12 @@ export class WsTransport {
                 // Fire onReconnect the first time we receive data after a
                 // reconnection. This lets EventRouter re-bootstrap its
                 // snapshot from the new server instance.
-                if (hasConnectedOnce && onReconnect) {
+                if (hasConnectedOnce) {
                   hasConnectedOnce = false // reset so it only fires once per reconnect
-                  try { onReconnect() } catch { /* non-fatal */ }
+                  reconnectAttempts = 0
+                  if (onReconnect) {
+                    try { onReconnect() } catch { /* non-fatal */ }
+                  }
                 }
                 try {
                   listener(value)
@@ -208,20 +231,24 @@ export class WsTransport {
             Effect.sync(() => {
               if (active) {
                 hasConnectedOnce = true // mark that next successful data = reconnect
+                reconnectAttempts += 1
+                try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
                 console.warn('[WsTransport] subscription error, retrying:', formatError(err))
               }
             }),
           ),
-          Effect.retry(Schedule.fixed(retryDelay)),
+          Effect.retry(reconnectRetrySchedule(retryDelay)),
           Effect.forever,
         ),
         {
           onExit: (exit) => {
             if (active && Exit.isFailure(exit)) {
               hasConnectedOnce = true
+              reconnectAttempts += 1
+              try { onRetry?.(reconnectAttempts) } catch { /* non-fatal */ }
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
-              setTimeout(run, 1000)
+              setTimeout(run, reconnectBackoffDelayMs(reconnectAttempts))
             }
           },
         },

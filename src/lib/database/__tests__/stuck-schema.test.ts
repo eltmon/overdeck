@@ -79,6 +79,38 @@ describe('stuck state schema (PAN-653)', () => {
     expect(names).toContain('session_embeddings');
   });
 
+  it('inspect status metadata persists across a read', async () => {
+    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../review-status-db.js');
+    const { getDatabase } = await import('../index.js');
+    const db = getDatabase();
+    const columns = db
+      .prepare(`PRAGMA table_info(review_status)`)
+      .all() as Array<{ name: string }>;
+    const colNames = columns.map((c) => c.name);
+    expect(colNames).toContain('inspect_status');
+    expect(colNames).toContain('inspect_notes');
+    expect(colNames).toContain('inspect_started_at');
+    expect(colNames).toContain('inspect_bead_id');
+
+    upsertReviewStatusSync({
+      issueId: 'PAN-1616',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      inspectStatus: 'error',
+      inspectNotes: 'Inspection timed out',
+      inspectStartedAt: '2026-06-05T19:00:00.000Z',
+      inspectBeadId: 'workspace-sposy',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    const row = getReviewStatusFromDbSync('pan-1616');
+    expect(row?.inspectStatus).toBe('error');
+    expect(row?.inspectNotes).toBe('Inspection timed out');
+    expect(row?.inspectStartedAt).toBe('2026-06-05T19:00:00.000Z');
+    expect(row?.inspectBeadId).toBe('workspace-sposy');
+  });
+
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
     const { getReviewStatusFromDbSync } = await import('../review-status-db.js');

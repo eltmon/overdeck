@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:59:34.680Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1615: Substrate: work agents hard-wedge at the model context ceiling (400) and are misreported 'healthy'; PAN-1415 remediation can't recover them",
-    "updated": "2026-06-05T19:02:28.039Z"
+    "updated": "2026-06-07T05:20:25.020Z"
   },
   "plan": {
     "id": "pan-1615",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "422e76d2-1995-4f6a-94bf-987d4e45d690",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 32,
     "created": "2026-06-05T18:59:34.680Z",
-    "updated": "2026-06-05T19:02:28.039Z",
+    "updated": "2026-06-07T05:20:25.020Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1615",
@@ -65,7 +65,7 @@
       {
         "id": "detect-predicate",
         "title": "Extract a shared context-overflow tail predicate with unit tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -87,7 +87,7 @@
           {
             "id": "detect-predicate.ac1",
             "title": "A pure exported predicate (e.g. isContextOverflowTail) returns true for a tail containing 'input exceeds the context window' / 'exceeds the context window of this model' in the last ~40 lines and false otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -95,7 +95,7 @@
           {
             "id": "detect-predicate.ac2",
             "title": "checkApiErrorAgents() is refactored to call the predicate and its existing overflow-handling behavior is unchanged (existing deacon tests still pass)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -103,7 +103,7 @@
           {
             "id": "detect-predicate.ac3",
             "title": "Unit tests cover a true hard-wedge tail, a benign tail that merely mentions 'context window' outside the recent window, and an empty tail",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -113,7 +113,7 @@
       {
         "id": "marker-runtime",
         "title": "Persist a self-clearing contextSaturatedAt marker on the agent runtime.json",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -134,7 +134,7 @@
           {
             "id": "marker-runtime.ac1",
             "title": "AgentRuntimeState carries an optional contextSaturatedAt timestamp persisted to and read from runtime.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -142,7 +142,7 @@
           {
             "id": "marker-runtime.ac2",
             "title": "The deacon sets contextSaturatedAt the first cycle overflow is detected (preserving the original timestamp across repeated detections) and clears it the first cycle the tail no longer overflows",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -150,7 +150,7 @@
           {
             "id": "marker-runtime.ac3",
             "title": "Writing/clearing the marker does not clobber other runtime.json fields (lastActivity, claudeSessionId, etc.) — verified by a test that round-trips a populated runtime state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -160,7 +160,7 @@
       {
         "id": "classifier-dashboard",
         "title": "Dashboard /api/health/agents reports a wedged agent as non-healthy",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -176,7 +176,7 @@
           {
             "id": "classifier-dashboard.ac1",
             "title": "An alive agent with a recent lastActivity AND contextSaturatedAt set returns a non-healthy 'wedged' status, not 'healthy'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -184,7 +184,7 @@
           {
             "id": "classifier-dashboard.ac2",
             "title": "An alive agent without the marker still returns 'healthy'/'warning'/'stuck' exactly as before (no regression)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -192,7 +192,7 @@
           {
             "id": "classifier-dashboard.ac3",
             "title": "No new per-agent tmux/capturePane call is introduced in the /api/health/agents path; the marker is read from the runtime.json already loaded",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -202,7 +202,7 @@
       {
         "id": "classifier-cloister",
         "title": "Cloister health evaluator surfaces the wedged state in summary and attention checks",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -218,7 +218,7 @@
           {
             "id": "classifier-cloister.ac1",
             "title": "getAgentHealth returns a distinct wedged/non-active state when contextSaturatedAt is present, even if the heartbeat is recent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -226,7 +226,7 @@
           {
             "id": "classifier-cloister.ac2",
             "title": "needsAttention() returns true for a wedged agent and generateHealthSummary counts it as non-active",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -234,7 +234,7 @@
           {
             "id": "classifier-cloister.ac3",
             "title": "A non-saturated agent's health classification is unchanged (existing cloister health tests pass)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -244,7 +244,7 @@
       {
         "id": "reseed-message",
         "title": "Pure builder for the post-/clear reseed nudge",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -260,7 +260,7 @@
           {
             "id": "reseed-message.ac1",
             "title": "A pure function returns a reseed message that names continue.json, beads (bd ready/bd show), and git status/diff as the reconstruction sources",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -268,7 +268,7 @@
           {
             "id": "reseed-message.ac2",
             "title": "The message explicitly tells the agent NOT to start over and that its prior conversation was cleared to recover from a context-window overflow",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -276,7 +276,7 @@
           {
             "id": "reseed-message.ac3",
             "title": "A unit test asserts the message contains the durable-artifact references and the do-not-restart instruction",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -286,7 +286,7 @@
       {
         "id": "recovery-clear-tier",
         "title": "Add the /clear + reseed recovery tier to the deacon escalation ladder",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -302,7 +302,7 @@
           {
             "id": "recovery-clear-tier.ac1",
             "title": "When /compact fails to clear the overflow after the settle window, the deacon sends /clear and then the reseed nudge (in that order) instead of only retrying /compact",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -310,7 +310,7 @@
           {
             "id": "recovery-clear-tier.ac2",
             "title": "The /clear tier never sends the prior transcript or any 'continue' message that appends context before the /clear has freed tokens",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -318,7 +318,7 @@
           {
             "id": "recovery-clear-tier.ac3",
             "title": "If the overflow persists after the /clear+reseed attempt budget is exhausted, the workspace is marked stuck with reason 'context_overflow' and the recovery state is cleared",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -326,7 +326,7 @@
           {
             "id": "recovery-clear-tier.ac4",
             "title": "Existing guards (settle window, recovery cooldown, stuck/deaconIgnored skip) and the /compact-while-under-ceiling path are preserved; tests cover the compact→clear→stuck progression",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -336,7 +336,7 @@
       {
         "id": "proactive-verify",
         "title": "Verify CLIProxy auto-compaction behavior and establish a conservative ceiling constant",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -352,7 +352,7 @@
           {
             "id": "proactive-verify.ac1",
             "title": "The PR/commit documents whether CLIProxy-routed models auto-compact and what their effective hard ceiling is, with file:line evidence",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -360,7 +360,7 @@
           {
             "id": "proactive-verify.ac2",
             "title": "A documented conservative ceiling constant (or corrected model-capabilities value) is committed for the proactive trigger to consume",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -370,7 +370,7 @@
       {
         "id": "proactive-trigger",
         "title": "High-water-mark proactive /compact before the hard ceiling",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -386,7 +386,7 @@
           {
             "id": "proactive-trigger.ac1",
             "title": "When percentUsed crosses the high-water mark and the agent is idle and not yet overflowing, the deacon sends a single /compact (cooldown-guarded)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -394,7 +394,7 @@
           {
             "id": "proactive-trigger.ac2",
             "title": "The proactive trigger is a no-op when the agent is already overflowing (recovery ladder owns that) and when within the cooldown window",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -402,7 +402,7 @@
           {
             "id": "proactive-trigger.ac3",
             "title": "Tests cover: crosses-threshold → compact, below-threshold → no-op, already-overflowing → no-op, within-cooldown → no-op",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -412,7 +412,7 @@
       {
         "id": "observability-docs",
         "title": "Surface the wedged state in the activity feed and document the new health state + recovery ladder",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-06-05T18:59:34.680Z",
         "metadata": {
@@ -428,7 +428,7 @@
           {
             "id": "observability-docs.ac1",
             "title": "An activity-feed event is emitted when contextSaturatedAt is first set for an agent, naming the agent/issue and the context-overflow cause, and is not re-emitted every patrol cycle",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -436,7 +436,7 @@
           {
             "id": "observability-docs.ac2",
             "title": "Documentation describes the wedged health state, the compact→clear→stuck recovery ladder, and the proactive trigger",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -487,7 +487,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-05-PAN-1615-substrate-detect-recover-and-prevent-context-ceiling-wedged-work-agents.vbrief.json"
+      "canonicalFilename": "2026-06-05-PAN-1615-substrate-detect-recover-and-prevent-context-ceiling-wedged-work-agents.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1615",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-07T05:20:22.564Z",
+        "work": {
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "history": []
+        },
+        "verification": {
+          "status": "failed",
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "notes": "Verification FAILED at lint (300483ms):\n\netails.\n\nsrc/dashboard/server/event-store.ts (126:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:126:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m126 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (57%)\n  - tsdown:deps (40%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-07T05:20:22.564Z",
+              "notes": "Verification FAILED at lint (300483ms):\n\netails.\n\nsrc/dashboard/server/event-store.ts (126:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:126:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m126 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (57%)\n  - tsdown:deps (40%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n"
+            }
+          ]
+        },
+        "review": {
+          "status": "failed",
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "notes": "Verification failed at lint",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-07T05:20:22.564Z",
+              "notes": "Verification failed at lint"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-07T05:20:22.564Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-07T05:20:22.564Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-07T05:20:22.564Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1632"
+        }
+      }
     }
   },
   "status": "proposed"

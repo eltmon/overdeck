@@ -1,12 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Option } from 'effect';
 
-import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import {
   DASHBOARD_SESSION_COOKIE,
   _resetDashboardSessionTokenForTests,
   dashboardSessionCookieHeader,
   hasDashboardAuthHeaders,
+  rejectUnauthorizedDashboardSessionMintRequest,
 } from '../dashboard-auth.js';
+
+/** Minimal HttpServerRequest stand-in for the mint auth gate (reads headers + remoteAddress). */
+function fakeRequest(opts: { remoteAddress?: string; headers?: Record<string, string> }) {
+  return {
+    headers: opts.headers ?? {},
+    remoteAddress: opts.remoteAddress ? Option.some(opts.remoteAddress) : Option.none(),
+  } as unknown as Parameters<typeof rejectUnauthorizedDashboardSessionMintRequest>[0];
+}
 
 /** Extract the `name=value` pair from a Set-Cookie header for use as a request cookie. */
 function requestCookie(setCookieHeader: string): string {
@@ -57,5 +67,35 @@ describe('dashboard session token persistence', () => {
     _resetDashboardSessionTokenForTests();
 
     expect(hasDashboardAuthHeaders({ cookie })).toBe(false);
+  });
+
+  it('issues a durable (Max-Age) session cookie so it survives a browser close', () => {
+    expect(dashboardSessionCookieHeader()).toMatch(/Max-Age=\d+/);
+  });
+});
+
+describe('dashboard session mint auth gate', () => {
+  beforeEach(() => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    _resetInternalTokenCacheForTests();
+  });
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    _resetInternalTokenCacheForTests();
+  });
+
+  it('auto-mints for a loopback peer with no token or cookie (zero-step bootstrap)', () => {
+    for (const addr of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+      expect(rejectUnauthorizedDashboardSessionMintRequest(fakeRequest({ remoteAddress: addr }))).toBeNull();
+    }
+  });
+
+  it('rejects a mint from a non-loopback peer without a token (LAN cannot bootstrap)', () => {
+    expect(rejectUnauthorizedDashboardSessionMintRequest(fakeRequest({ remoteAddress: '192.168.1.50' }))).not.toBeNull();
+  });
+
+  it('mints for the internal token even from a non-loopback peer (CLI / cross-process)', () => {
+    const req = fakeRequest({ remoteAddress: '192.168.1.50', headers: { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token' } });
+    expect(rejectUnauthorizedDashboardSessionMintRequest(req)).toBeNull();
   });
 });

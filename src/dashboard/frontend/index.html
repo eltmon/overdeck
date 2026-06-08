@@ -73,9 +73,16 @@
               return r.text();
             })
             .then(function (html) {
-              var m = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/);
-              if (!m) { window.location.reload(); return; } // can't locate bundle; just reload
-              return fetch(m[1], { method: 'HEAD', cache: 'no-store' }).then(function (b) {
+              // Pick the real entry module — in dev the first module script is
+              // /@vite/client (and @react-refresh), not the app entry, so skip those.
+              var all = html.match(/<script[^>]+type="module"[^>]+src="([^"]+)"/g) || [];
+              var src = null;
+              for (var i = 0; i < all.length; i++) {
+                var sm = all[i].match(/src="([^"]+)"/);
+                if (sm && sm[1].indexOf('/@vite/') === -1 && sm[1].indexOf('@react-refresh') === -1) { src = sm[1]; break; }
+              }
+              if (!src) { window.location.reload(); return; } // can't locate bundle; just reload
+              return fetch(src, { method: 'HEAD', cache: 'no-store' }).then(function (b) {
                 if (b.ok) window.location.reload(); else throw 0;
               });
             })

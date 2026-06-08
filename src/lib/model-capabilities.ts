@@ -102,6 +102,25 @@ export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
  */
 type CapabilityModelId = ModelId;
 
+/**
+ * Conservative effective ceiling for Codex/ChatGPT subscription models routed
+ * through CLIProxy into Claude Code. Claude Code's native auto-compact path does
+ * not know the proxied model's larger marketing window; the harness status line
+ * reports a 200.0k budget for gpt-5.5 sessions, and PAN-1615 observed hard
+ * `input exceeds the context window` 400s instead of a native pre-ceiling
+ * compaction. See the context-overflow recovery note in
+ * `src/lib/cloister/deacon.ts` for why the deacon owns this recovery path.
+ *
+ * PAN-1672: 200k is gpt-5.5's *marketing* window, not its effective one via
+ * CLIProxy — the backend 400s with `input exceeds the context window` well
+ * before 85% of 200k (≈170k) is reached, so proactive compaction (keyed to this
+ * budget at CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) never fires in time
+ * and agents hard-wedge. Set a conservative effective ceiling so the 85%
+ * high-water (≈127.5k) lands comfortably below the real failure zone. Tune up
+ * if gpt-5.5's true CLIProxy window is later measured to be higher.
+ */
+export const CLIPROXY_CODEX_CONTEXT_WINDOW = 150_000;
+
 export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
@@ -403,7 +422,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     provider: 'openai',
     displayName: 'GPT-5.5',
     costPer1MTokens: 10.5, // $3.00 in / $18.00 out
-    contextWindow: 1050000, // 1.05M context
+    contextWindow: CLIPROXY_CODEX_CONTEXT_WINDOW,
     minTier: 'plus', // ChatGPT Plus/Pro only
     skills: {
       'code-generation': 97,
@@ -416,9 +435,9 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       performance: 92,
       synthesis: 94,
       speed: 65,
-      'context-length': 100, // 1.05M context
+      'context-length': 95,
     },
-    notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. 1.05M context, 128K max output.',
+    notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 200K, 128K max output.',
   },
 
   'gpt-5.5-pro': {

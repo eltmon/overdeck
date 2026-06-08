@@ -75,7 +75,12 @@ projects:
         command: npm run lint
         required: true
       build:
-        command: npm run build
+        # PAN-1659: skip the heavy docs-index build in the per-issue verification
+        # gate. The docs-RAG index is a publish-time, repo-wide artifact (built by
+        # prepublishOnly / build-for-publish.mjs on release), unrelated to verifying
+        # an issue's code; three concurrent gate builds once pegged the host to load
+        # 132/24 cores and caused false failures.
+        command: SKIP_DOCS_INDEX=1 npm run build
         required: true
       test:
         # PAN-666: scope to files changed since the target branch so a feature
