@@ -26,8 +26,7 @@ import React, {
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
-import { Streamdown, defaultRehypePlugins, type StreamdownProps } from 'streamdown';
-import 'streamdown/styles.css';
+import type { StreamdownProps } from 'streamdown';
 import { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
@@ -302,13 +301,20 @@ const streamdownSanitizeSchema = {
   },
 };
 
-const streamdownRehypePlugins = [
-  defaultRehypePlugins.raw,
-  [(defaultRehypePlugins.sanitize as unknown[])[0], streamdownSanitizeSchema],
-  defaultRehypePlugins.harden,
-] as unknown as StreamdownProps['rehypePlugins'];
-
-const StreamdownRenderer = Streamdown as React.ComponentType<StreamdownProps>;
+const StreamdownRenderer = React.lazy(async () => {
+  const [{ Streamdown, defaultRehypePlugins }] = await Promise.all([
+    import('streamdown'),
+    import('streamdown/styles.css'),
+  ]);
+  const streamdownRehypePlugins = [
+    defaultRehypePlugins.raw,
+    [(defaultRehypePlugins.sanitize as unknown[])[0], streamdownSanitizeSchema],
+    defaultRehypePlugins.harden,
+  ] as unknown as StreamdownProps['rehypePlugins'];
+  const Renderer = (props: StreamdownProps) =>
+    React.createElement(Streamdown, { ...props, rehypePlugins: streamdownRehypePlugins });
+  return { default: Renderer };
+});
 
 /**
  * Gates MarkdownFileLink chip rendering on a server-side existence check
@@ -457,15 +463,22 @@ export const ChatMarkdown = memo(function ChatMarkdown({
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
       <div className={styles.chatMarkdown}>
         {renderWithStreamdown ? (
-          <StreamdownRenderer
-            mode={isStreaming ? 'streaming' : 'static'}
-            rehypePlugins={streamdownRehypePlugins}
-            remarkPlugins={remarkPlugins as StreamdownProps['remarkPlugins']}
-            components={components as StreamdownProps['components']}
-            urlTransform={(url) => transformMarkdownUrl(url)}
+          <React.Suspense
+            fallback={
+              <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
+                {text}
+              </ReactMarkdown>
+            }
           >
-            {text}
-          </StreamdownRenderer>
+            <StreamdownRenderer
+              mode={isStreaming ? 'streaming' : 'static'}
+              remarkPlugins={remarkPlugins as StreamdownProps['remarkPlugins']}
+              components={components as StreamdownProps['components']}
+              urlTransform={(url) => transformMarkdownUrl(url)}
+            >
+              {text}
+            </StreamdownRenderer>
+          </React.Suspense>
         ) : (
           <ReactMarkdown remarkPlugins={remarkPlugins} components={components} urlTransform={transformMarkdownUrl}>
             {text}

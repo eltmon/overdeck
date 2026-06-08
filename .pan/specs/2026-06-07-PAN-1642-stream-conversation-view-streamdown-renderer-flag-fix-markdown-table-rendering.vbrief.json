@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-08T16:56:19.686Z"
+    "updated": "2026-06-08T17:11:22.097Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 78,
+    "sequence": 79,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-08T16:56:19.686Z",
+    "updated": "2026-06-08T17:11:22.097Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -446,55 +446,55 @@
         "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T16:56:19.577Z",
+        "updatedAt": "2026-06-08T17:11:22.091Z",
         "work": {
-          "updatedAt": "2026-06-08T16:56:19.577Z",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T16:56:19.577Z",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T16:56:19.577Z"
+              "at": "2026-06-08T17:11:22.091Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-08T16:56:19.577Z",
-          "notes": "Agent re-review request (4/25): Fixed review issues",
+          "status": "blocked",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
+          "notes": "Live agent/session transcript panels can go stale because streaming is enabled for unresolved synthetic session names",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-08T16:56:19.577Z",
-              "notes": "Agent re-review request (4/25): Fixed review issues"
+              "status": "blocked",
+              "at": "2026-06-08T17:11:22.091Z",
+              "notes": "Live agent/session transcript panels can go stale because streaming is enabled for unresolved synthetic session names"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:56:19.577Z",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:56:19.577Z"
+              "at": "2026-06-08T17:11:22.091Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T16:56:19.577Z",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:56:19.577Z",
+          "updatedAt": "2026-06-08T17:11:22.091Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:56:19.577Z"
+              "at": "2026-06-08T17:11:22.091Z"
             }
           ],
           "readyForMerge": false,

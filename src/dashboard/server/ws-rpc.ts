@@ -693,7 +693,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   const handle = watchConversation(sessionFile, async (result) => {
                     const fileWasReset = result.byteOffset < currentByteOffset;
                     currentByteOffset = result.byteOffset;
-                    if (result.totalTokens > 0) {
+                    if (result.totalTokens > 0 || (result.compactBoundaries?.length ?? 0) > 0 || fileWasReset) {
                       currentContextUsage = await readContextUsage();
                     }
                     offer({

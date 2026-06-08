@@ -78,11 +78,11 @@ export function applyConversationMessagesEvent(
   };
 }
 
-export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'harness' | 'sessionAlive'>): boolean {
-  return conversation.sessionAlive && (conversation.harness === 'claude-code' || conversation.harness == null);
+export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'harness' | 'sessionAlive'> & { id?: number }): boolean {
+  return conversation.sessionAlive && conversation.id !== undefined && conversation.id >= 0 && (conversation.harness === 'claude-code' || conversation.harness == null);
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'>): boolean {
+export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
   const queryClient = useQueryClient();
   const enabled = shouldStreamConversationMessages(conversation);
 

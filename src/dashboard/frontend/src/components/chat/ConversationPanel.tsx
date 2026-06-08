@@ -175,7 +175,7 @@ export function ConversationPanel({
   // Query messages at this level so we can drive the header working-spinner.
   // Live claude-code conversations are pushed through useConversationMessagesStream;
   // keep the existing polling path for non-claude harnesses and historical views.
-  const { data: messagesData } = useQuery({
+  const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: conversationMessagesQueryKey(conversation.name),
     queryFn: () => fetchMessages(conversation.name),
     refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
@@ -884,6 +884,8 @@ export function ConversationPanel({
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
               streamMessagesEnabled={streamMessagesEnabled}
+              messagesData={messagesData}
+              messagesLoading={messagesLoading}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -1044,11 +1046,13 @@ interface ConversationViewProps {
   workingPhase?: WorkingPhase;
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
+  messagesData?: MessagesResponse;
+  messagesLoading?: boolean;
 }
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1077,12 +1081,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     }
   }, [conversation.forkStatus, conversation.name, queryClient]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: conversationMessagesQueryKey(conversation.name),
-    queryFn: () => fetchMessages(conversation.name),
-    enabled: !streamMessagesEnabled,
-    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
-  });
+  const data = messagesData;
+  const isLoading = messagesLoading ?? false;
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
