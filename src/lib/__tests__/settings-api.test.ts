@@ -106,6 +106,13 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         richCompaction: true,
         titleModel: 'claude-haiku-4-5',
       },
+      conversationSearch: {
+        enabled: false,
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        apiKeyRef: undefined,
+        dbPath: '/tmp/conversations/embeddings.db',
+      },
       memory: {
         extraction: { fallbackChain: [] },
         observationsEnabled: true,
@@ -460,6 +467,31 @@ describe('saveSettingsApi', () => {
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('experimental:');
     expect(written).toContain('streamdownRenderer: true');
+  });
+
+  it('persists conversation search settings', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.conversationSearch?.enabled).toBe(false);
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      conversationSearch: {
+        enabled: true,
+        provider: 'openai',
+        model: 'text-embedding-3-large',
+        apiKeyRef: 'OPENAI_SEARCH_KEY',
+        dbPath: '/tmp/search.db',
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('conversationSearch:');
+    expect(written).toContain('enabled: true');
+    expect(written).toContain('model: text-embedding-3-large');
+    expect(written).toContain('apiKeyRef: OPENAI_SEARCH_KEY');
+    expect(written).toContain('dbPath: /tmp/search.db');
   });
 
   it('persists DashScope provider enablement and API key', async () => {

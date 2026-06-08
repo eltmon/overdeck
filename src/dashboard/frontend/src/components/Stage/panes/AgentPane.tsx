@@ -29,6 +29,9 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
         conversation={data.conversation}
         viewMode={viewMode}
         onViewModeChange={(mode) => updatePane(ctx.workspaceId, pane.paneId, { viewMode: mode })}
+        targetMessageId={pane.targetMessageId}
+        targetMessageIndex={pane.targetMessageIndex}
+        targetMessageNonce={pane.targetMessageNonce}
       />
     )
   }

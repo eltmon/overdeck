@@ -44,7 +44,7 @@ describe('claude-permissions', () => {
       expect(getClaudePermissionFlagsSync('auto')).toEqual(['--permission-mode', 'auto']);
     });
 
-    it('returns bypass flags for explicit bypass mode', () => {
+    it('returns bypass permission-mode flags for explicit bypass mode', () => {
       expect(getClaudePermissionFlagsSync('bypass')).toEqual([
         '--permission-mode',
         'bypassPermissions',
@@ -73,7 +73,7 @@ describe('claude-permissions', () => {
       expect(bypassPrefixForAgentFlagSync()).toBe('');
     });
 
-    it('honors PAN_YOLO=true even with no explicit arg', () => {
+    it('does not inject DSP even when PAN_YOLO=true', () => {
       process.env.PAN_YOLO = 'true';
       expect(bypassPrefixForAgentFlagSync()).toBe('');
     });

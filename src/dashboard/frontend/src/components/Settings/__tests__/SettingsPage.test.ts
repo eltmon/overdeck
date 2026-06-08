@@ -100,6 +100,16 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
 
+  it('surfaces conversation search controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
+    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('API key env var or config key');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
+    expect(SETTINGS_PAGE_SOURCE).toContain('window.confirm');
+  });
+
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
     expect(SETTINGS_PAGE_SOURCE).toContain('PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL override these UI values');
@@ -174,6 +184,15 @@ describe('buildMiniMaxFormData', () => {
     expect(result.conversations?.compaction_model).toBe('claude-haiku-4-5');
     expect(result.conversations?.manual_compact_mode).toBe('panopticon-native');
     expect(result.conversations?.rich_compaction).toBe(true);
+  });
+
+  it('preserves existing conversation search settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      conversationSearch: { enabled: true, provider: 'openai', model: 'text-embedding-3-large', apiKeyRef: 'OPENAI_SEARCH_KEY' },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.conversationSearch).toEqual(existing.conversationSearch);
   });
 
   it('preserves existing tmux settings from formData', () => {

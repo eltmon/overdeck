@@ -85,6 +85,10 @@ interface ConversationPanelProps {
   embedded?: boolean;
   /** Agent ID for fetching turn diffs. Omit to skip diff display. */
   agentId?: string;
+  /** Message target requested by palette conversation search. */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -125,6 +129,9 @@ export function ConversationPanel({
   roundMetadata,
   embedded = false,
   agentId,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -886,6 +893,9 @@ export function ConversationPanel({
               streamMessagesEnabled={streamMessagesEnabled}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
+              targetMessageId={targetMessageId}
+              targetMessageIndex={targetMessageIndex}
+              targetMessageNonce={targetMessageNonce}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -1048,11 +1058,14 @@ interface ConversationViewProps {
   streamMessagesEnabled?: boolean;
   messagesData?: MessagesResponse;
   messagesLoading?: boolean;
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
 }
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1287,6 +1300,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           resolvedTheme={resolvedTheme}
           hideToolCalls={hideToolCalls}
           workingPhase={workingPhase}
+          targetMessageId={targetMessageId}
+          targetMessageIndex={targetMessageIndex}
+          targetMessageNonce={targetMessageNonce}
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a

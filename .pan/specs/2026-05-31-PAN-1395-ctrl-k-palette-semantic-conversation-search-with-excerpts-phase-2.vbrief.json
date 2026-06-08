@@ -4,7 +4,7 @@
     "created": "2026-05-31T21:30:18.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-05-31T22:26:09.785Z"
+    "updated": "2026-06-08T15:53:23.672Z"
   },
   "plan": {
     "id": "pan-1395",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 63,
     "created": "2026-05-31T21:30:18.000Z",
-    "updated": "2026-05-31T22:26:09.785Z",
+    "updated": "2026-06-08T15:53:23.672Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
@@ -129,7 +129,7 @@
       {
         "id": "db-schema",
         "title": "Embeddings sidecar DB: sqlite-vec + FTS5 schema and init",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-31T21:30:18.000Z",
         "metadata": {
@@ -150,7 +150,7 @@
           {
             "id": "db-schema.ac1",
             "title": "DB initializes with chunks, vec virtual table, FTS5 table, and per-file cursor table at the configured path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -158,7 +158,7 @@
           {
             "id": "db-schema.ac2",
             "title": "sqlite-vec extension load is isolated and failure degrades the feature to unavailable without crashing the server",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -166,7 +166,7 @@
           {
             "id": "db-schema.ac3",
             "title": "Upsert keyed on (sessionId, byteOffset) is idempotent — re-inserting the same chunk does not duplicate",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -719,7 +719,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json"
+      "canonicalFilename": "2026-05-31-PAN-1395-ctrl-k-palette-semantic-conversation-search-with-excerpts-phase-2.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1395",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-08T15:53:23.606Z",
+        "work": {
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "history": []
+        },
+        "verification": {
+          "status": "failed",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/dashboard-auth.ts",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-08T15:53:23.606Z",
+              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/dashboard-auth.ts"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "notes": "Chunk offsets can point at JSON metadata instead of message payload",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T15:53:23.606Z",
+              "notes": "Chunk offsets can point at JSON metadata instead of message payload"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T15:53:23.606Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T15:53:23.606Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T15:53:23.606Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1634"
+        }
+      }
     }
   },
   "status": "proposed"
