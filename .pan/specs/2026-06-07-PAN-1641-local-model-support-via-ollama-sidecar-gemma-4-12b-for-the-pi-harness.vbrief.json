@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1641: Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness",
-    "updated": "2026-06-07T02:30:32.812Z"
+    "updated": "2026-06-08T12:19:22.731Z"
   },
   "plan": {
     "id": "pan-1641",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7f3c9a2e-1b6d-4e58-9c0a-2d4f8b6e1a37",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 8,
     "created": "2026-06-07T02:40:00.000Z",
-    "updated": "2026-06-07T02:30:32.812Z",
+    "updated": "2026-06-08T12:19:22.731Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1641",
@@ -557,7 +557,64 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-07-PAN-1641-local-model-support-via-ollama-sidecar-gemma-4-12b-for-the-pi-harness.vbrief.json"
+      "canonicalFilename": "2026-06-07-PAN-1641-local-model-support-via-ollama-sidecar-gemma-4-12b-for-the-pi-harness.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1641",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-08T12:19:22.726Z",
+        "work": {
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": []
+        },
+        "verification": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T12:19:22.726Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T12:19:22.726Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T12:19:22.726Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:19:22.726Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T12:19:22.726Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1679"
+        }
+      }
     }
   },
   "status": "proposed"
