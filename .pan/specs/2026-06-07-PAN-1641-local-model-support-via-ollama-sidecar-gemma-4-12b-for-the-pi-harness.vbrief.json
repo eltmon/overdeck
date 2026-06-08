@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1641: Local model support via Ollama sidecar (Gemma 4 12B) for the Pi harness",
-    "updated": "2026-06-08T12:28:46.921Z"
+    "updated": "2026-06-08T12:44:35.895Z"
   },
   "plan": {
     "id": "pan-1641",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7f3c9a2e-1b6d-4e58-9c0a-2d4f8b6e1a37",
     "author": "agent:claude-opus-4-8",
-    "sequence": 18,
+    "sequence": 23,
     "created": "2026-06-07T02:40:00.000Z",
-    "updated": "2026-06-08T12:28:46.921Z",
+    "updated": "2026-06-08T12:44:35.895Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1641",
@@ -562,55 +562,55 @@
         "phase": "review",
         "issueId": "PAN-1641",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T12:28:46.914Z",
+        "updatedAt": "2026-06-08T12:44:35.825Z",
         "work": {
-          "updatedAt": "2026-06-08T12:28:46.914Z",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T12:28:46.914Z",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T12:28:46.914Z"
+              "at": "2026-06-08T12:44:35.825Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-08T12:28:46.914Z",
-          "notes": "Ollama models are accepted for non-Pi harnesses, but only Pi has Ollama runtime wiring",
+          "status": "reviewing",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-08T12:28:46.914Z",
-              "notes": "Ollama models are accepted for non-Pi harnesses, but only Pi has Ollama runtime wiring"
+              "status": "reviewing",
+              "at": "2026-06-08T12:44:35.825Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:28:46.914Z",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:28:46.914Z"
+              "at": "2026-06-08T12:44:35.825Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T12:28:46.914Z",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:28:46.914Z",
+          "updatedAt": "2026-06-08T12:44:35.825Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:28:46.914Z"
+              "at": "2026-06-08T12:44:35.825Z"
             }
           ],
           "readyForMerge": false,
