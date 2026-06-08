@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-07T06:27:39.346Z"
+    "updated": "2026-06-08T11:57:03.458Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 29,
+    "sequence": 56,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-07T06:27:39.346Z",
+    "updated": "2026-06-08T11:57:03.458Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -443,58 +443,62 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1642-stream-conversation-view-streamdown-renderer-flag-fix-markdown-table-rendering.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "test",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-07T06:27:39.280Z",
+        "updatedAt": "2026-06-08T11:57:03.270Z",
         "work": {
-          "updatedAt": "2026-06-07T06:27:39.280Z",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-07T06:27:39.280Z",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-07T06:27:39.280Z"
+              "at": "2026-06-08T11:57:03.270Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-07T06:27:39.280Z",
-          "notes": "Agent re-review request (1/25): Fixed build: local npm run build passes after prior overlapping request-review verification processes completed; resubmitting from clean branch.",
+          "status": "passed",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "notes": "Cycle 2 approved: 0 blockers, all 24 requirements implemented. Cycle-1 correctness blocker (discovering stream spin loop) is resolved. 13 non-blocking findings remain across correctness, performance, security, and requirements — none block merge.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-07T06:27:39.280Z",
-              "notes": "Agent re-review request (1/25): Fixed build: local npm run build passes after prior overlapping request-review verification processes completed; resubmitting from clean branch."
+              "status": "passed",
+              "at": "2026-06-08T11:57:03.270Z",
+              "notes": "Cycle 2 approved: 0 blockers, all 24 requirements implemented. Cycle-1 correctness blocker (discovering stream spin loop) is resolved. 13 non-blocking findings remain across correctness, performance, security, and requirements — none block merge."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-07T06:27:39.280Z",
+          "status": "passed",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "notes": "Workspace docker stack for PAN-1642 is not healthy: No Docker containers found for workspace stack pan-1642. Run 'pan workspace rebuild PAN-1642' or retry with --host to override.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-07T06:27:39.280Z"
+              "status": "passed",
+              "at": "2026-06-08T11:57:03.270Z",
+              "notes": "Workspace docker stack for PAN-1642 is not healthy: No Docker containers found for workspace stack pan-1642. Run 'pan workspace rebuild PAN-1642' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-07T06:27:39.280Z",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-07T06:27:39.280Z",
+          "updatedAt": "2026-06-08T11:57:03.270Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-07T06:27:39.280Z"
+              "at": "2026-06-08T11:57:03.270Z"
             }
           ],
           "readyForMerge": false,
