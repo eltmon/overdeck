@@ -3,18 +3,13 @@ import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
+import { useTheme } from '../hooks/useTheme';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 export const XTERM_BG = { dark: '#1a1a2e', light: '#ffffff' } as const;
 
-// xterm palette. The agent terminal pane is pinned to the dark palette
-// regardless of the dashboard's light/dark theme (see the call site below):
-// Claude Code emits hardcoded dark-theme block fills (user-turn boxes, diff
-// bands) that render as dark boxes on a light xterm background, and its own
-// light theme is broken upstream (anthropics/claude-code#49848, "not planned").
-// The light palette is retained so theme-following is a one-line re-enable if
-// that upstream rendering is ever fixed. The ANSI colors are tuned per-mode for
-// contrast against the background.
+// xterm palette that follows the app's light/dark theme (PAN-1561). The ANSI
+// colors are tuned per-mode for contrast against the background.
 function xtermTheme(isDark: boolean): ITheme {
   if (isDark) {
     return {
@@ -102,6 +97,9 @@ const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
 export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
+  const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
+  const isDarkRef = useRef(isDark);
+  isDarkRef.current = isDark;
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -365,8 +363,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         allowProposedApi: true,
         macOptionClickForcesSelection: true,
         rightClickSelectsWord: false,
-        // Pinned to dark regardless of dashboard theme — see XTERM_BG comment.
-        theme: xtermTheme(true),
+        theme: xtermTheme(isDarkRef.current),
       });
 
       fit = new FitAddon();
@@ -708,6 +705,13 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
   }, [sendResizeIfNeeded]);
 
+  // Recolor a live terminal when the app theme toggles (PAN-1561).
+  useEffect(() => {
+    if (terminalInstance.current) {
+      terminalInstance.current.options.theme = xtermTheme(isDark);
+    }
+  }, [isDark]);
+
   const handleClick = () => {
     terminalInstance.current?.focus();
   };
@@ -757,7 +761,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         tabIndex={0}
         style={{
           padding: '8px',
-          backgroundColor: XTERM_BG.dark,
+          backgroundColor: isDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',
         }}
