@@ -134,21 +134,27 @@ export async function estimateFullReindexConversationSearchCost(
   let tokenCount = 0;
   let estimatedUsd = 0;
   let chunksEstimated = 0;
+  let filesScanned = 0;
   for (const filePath of files) {
-    for await (const chunk of chunkConversationJsonl({
-      filePath,
-      sessionId: sessionIdFromPath(filePath),
-      projectId: projectIdFromPath(filePath),
-      fromOffset: 0,
-      signal: options.signal,
-    })) {
-      const estimate = provider.estimateCost([chunk.text]);
-      tokenCount += estimate.tokenCount;
-      estimatedUsd += estimate.estimatedUsd;
-      chunksEstimated += 1;
+    try {
+      for await (const chunk of chunkConversationJsonl({
+        filePath,
+        sessionId: sessionIdFromPath(filePath),
+        projectId: projectIdFromPath(filePath),
+        fromOffset: 0,
+        signal: options.signal,
+      })) {
+        const estimate = provider.estimateCost([chunk.text]);
+        tokenCount += estimate.tokenCount;
+        estimatedUsd += estimate.estimatedUsd;
+        chunksEstimated += 1;
+      }
+      filesScanned += 1;
+    } catch {
+      // Skip files that fail to parse (malformed JSONL, permission errors, etc.)
     }
   }
-  return { ...empty, tokenCount, estimatedUsd, filesScanned: files.length, chunksEstimated, disabled: false };
+  return { ...empty, tokenCount, estimatedUsd, filesScanned, chunksEstimated, disabled: false };
 }
 
 export async function indexConversationFile(

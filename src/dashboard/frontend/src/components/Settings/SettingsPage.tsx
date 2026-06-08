@@ -917,7 +917,6 @@ export function SettingsPage() {
   const conversationSearch = formData.conversationSearch ?? {};
   const conversationSearchEnabled = conversationSearch.enabled ?? false;
   const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
-  const conversationSearchApiKeyRef = conversationSearch.apiKeyRef ?? 'OPENAI_API_KEY';
 
   const handleProviderToggle = (provider: Provider) => {
     setFormData({
@@ -2193,16 +2192,13 @@ export function SettingsPage() {
                   placeholder="text-embedding-3-small"
                 />
               </label>
-              <label className="text-xs text-muted-foreground">
-                API key env var or config key
-                <input
-                  type="text"
-                  value={conversationSearchApiKeyRef}
-                  onChange={(e) => handleConversationSearchChange({ apiKeyRef: e.target.value || undefined })}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  placeholder="OPENAI_API_KEY"
-                />
-              </label>
+              <div className="flex items-end text-xs">
+                {formData?.api_keys?.openai ? (
+                  <span className="text-success">✓ Using OpenAI key from API Keys section</span>
+                ) : (
+                  <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
+                )}
+              </div>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">

@@ -775,12 +775,15 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return authError;
 
-    return yield* Effect.promise(async () => {
-      const estimate = await estimateFullReindexConversationSearchCost();
-      const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
-        ? createReindexConfirmationNonce(estimate.estimatedUsd)
-        : undefined;
-      return jsonResponse({ ...estimate, confirmationNonce });
+    return yield* Effect.try({
+      try: async () => {
+        const estimate = await estimateFullReindexConversationSearchCost();
+        const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
+          ? createReindexConfirmationNonce(estimate.estimatedUsd)
+          : undefined;
+        return jsonResponse({ ...estimate, confirmationNonce });
+      },
+      catch: (err) => jsonResponse({ error: `Failed to estimate reindex cost: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 }),
     });
   })),
 );
