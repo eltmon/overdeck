@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { createInterface } from 'node:readline/promises';
 import { resumeAgent } from '../../lib/agents.js';
-import { assertCanResumeSessionSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanResumeSessionSync, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 
 interface ResumeOptions {
   host?: boolean;
@@ -35,8 +35,19 @@ export async function resumeCommand(id: string, options: ResumeOptions = {}): Pr
   try {
     lifecycle = assertCanResumeSessionSync(id);
   } catch (error) {
-    console.error(chalk.red((error as Error).message));
-    process.exit(1);
+    const msg = (error as Error).message;
+    // PAN-1675: `--compact` exists to recover a context-wedged agent, which is
+    // typically still 'running' (a live but stuck session). The normal lifecycle
+    // gate rejects a running agent ("already running"); for --compact, proceed
+    // anyway — resumeAgent compacts the JSONL out-of-band and kills the wedged
+    // session before relaunch. Other lifecycle blocks (paused/troubled/no saved
+    // session) still hard-fail.
+    if (options.compact && /already running/i.test(msg)) {
+      lifecycle = getWorkAgentLifecycleStateSync(id);
+    } else {
+      console.error(chalk.red(msg));
+      process.exit(1);
+    }
   }
 
   const allowHost = await confirmHostOverride(options);

@@ -2698,7 +2698,7 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * bounded by a cooldown + attempt cap so a stack that genuinely cannot be
  * rebuilt escalates to a human instead of looping `docker compose` forever.
  */
-const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean; hostFallbackNoticed?: boolean }> =
   new Map();
 const SPAWN_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
@@ -2757,11 +2757,13 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
   const fallbackToHost = (reason: string): void => {
     console.warn(`[agents] ${message} — auto-falling back to host for ${role} (${reason})`);
-    // Emit the host-fallback notice once per issue (reuse the escalated flag as
-    // a "notice already emitted" latch). Level is warn, not error: this is an
-    // automatic, non-blocking recovery, not a dead end needing a human.
-    if (!record.escalated) {
-      record.escalated = true;
+    // Emit the host-fallback notice once per issue. Use a SEPARATE latch from
+    // the work-escalation latch (`escalated`): if review/test/ship trip the
+    // host fallback first, a later `work` spawn for the same broken-stack issue
+    // must still be able to emit its own (error-level) dead-end marker — the
+    // operator's only signal that a work agent is blocked on docker.
+    if (!record.hostFallbackNoticed) {
+      record.hostFallbackNoticed = true;
       spawnStackRebuildState.set(normalizedIssue, record);
       emitActivityEntrySync({
         source: role,
@@ -4211,9 +4213,22 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // a system crash where tmux was killed but state.json was never updated to 'stopped'.
   const isCrashed = agentState?.status === 'running' && !(await Effect.runPromise(sessionExists(normalizedId)));
 
+  // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
+  // context-wedged agent, which is typically status='running' with a LIVE (but
+  // stuck) tmux session sitting at an overflow/idle prompt. The normal canResume
+  // gate rejects running+live-session agents — which would make
+  // resumeAgent({compact:true}) (the deacon's overflow recovery tiers AND
+  // `pan resume --compact`) a silent no-op for exactly the agents it targets.
+  // So a compact-resume of a running agent is allowed: the flow below compacts
+  // the JSONL out-of-band and then kills the wedged session before relaunch.
+  // This is safe because the only callers of {compact:true} act on agents they
+  // have already determined to be context-overflow-wedged.
+  const isCompactRecovery = opts?.compact === true && agentState?.status === 'running';
+
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
     || (agentState && allowedAgentStatuses.includes(agentState.status))
-    || isCrashed;
+    || isCrashed
+    || isCompactRecovery;
 
   if (!canResume) {
     const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
