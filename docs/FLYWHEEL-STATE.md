@@ -674,3 +674,82 @@ through this one gate. If the operator can't UAT soon and PAN-1455 stays stuck, 
 right escalation is to STRIKE PAN-1213 directly (single scoped fix) so the whole
 review→ship path reopens — but first confirm PAN-1059 on main isn't already the
 fix (avoid duplicating it; a deacon restart may be all that's needed).
+
+## RUN-15 observations (tick 1, 2026-06-08)
+
+Run config: `minAgents=2`, `maxAgents=4`, `scope=pan-only`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. **The substrate
+landscape changed materially since RUN-14 — re-baseline before acting.**
+
+### The world is different now: deacon unfrozen, governor live, brakes landed
+
+- **Deacon unfrozen ~2026-06-08 22:05** with the **PAN-1665 concurrency governor
+  live** (`src/lib/cloister/concurrency.ts`): `DEFAULT_MAX_WORK_AGENTS=6` +
+  `DEFAULT_RESERVED_ADVANCING_SLOTS=3` → `totalCeiling=9`, plus load-gate
+  (cores×1.5) and 150ms resume stagger. No herd (vs 2026-06-07's load 52 / 37
+  agents). RAM healthy: 18GB/64GB, **swap 0%** (vs RUN-14's 100%-pinned swap),
+  disk recovered to 268G free (PAN-1674 .venv cleanup).
+- **The flywheel does NOT drive agent count here.** `maxAgents=4` sits *below*
+  the deacon governor's ceiling of 9 (+ convoy burst: a review convoy = 5
+  sessions per dispatch, so total live can exceed 9). At tick 1 there were ~12
+  live agents — all the deacon's auto-resume, none the flywheel's. **Correct
+  posture: hold launches, respect the governor, let the pipeline drain.** This
+  is the explicit unfreeze-plan stance ("FLYWHEEL HELD until pipeline drains").
+- **The three RUN-14 brakes MERGED + live in the running deacon:** PAN-1615
+  (ctx-ceiling wedge), PAN-1616 (inspect-hang watchdog), PAN-1617 (ghost-agent
+  kickoff detection). All `merged, verifying-on-main`. The RUN-14 dominant
+  findings are addressed at the class level.
+
+### The review→ship meta-blocker (PAN-1213) appears CLEARED in the live deacon
+
+This is the single biggest change from RUN-14. PAN-1059 (review-path refactor,
+the PAN-1213 fix) is `merged, verifying-on-main` **and running**. Live evidence:
+**PAN-1242 has a `ship` session, PAN-1455 advanced to a `test` session** — the
+exact review→ship transition that jammed every issue in RUN-14 is now firing
+automatically. UAT'ing PAN-1059 just makes it official; the path already works.
+
+### Two substrate gaps STILL bite live (not covered by the merged brakes)
+
+1. **PAN-1613 (NOT fixed — still in-review).** `agent-pan-1496-review` +
+   `agent-pan-1496-test` are actively running on **PAN-1496, CLOSED 2026-05-29**
+   — a respawn ~9 days post-close, *after* the throttle landed. The
+   `isIssueClosed()` guard added to `autoResumeStoppedWorkAgents` covers the
+   **work-agent resume** path but **not the review/test convoy dispatch** path.
+   Filed evidence on PAN-1613. This is active $/RAM/slot waste, not passive
+   lingering.
+2. **PAN-1616 class-2 (merged brake covers only class-1).** `agent-pan-1579`
+   (work) is hung on a `.claude/rules/dashboard-node22-only.md`
+   settings-protection prompt — the same file/hang as RUN-14 tick 8. The merged
+   watchdog recovers `inspect-*` sessions (class 1); a **work agent editing
+   `.claude/**` still hangs** because Claude Code's settings-file protection
+   can't be auto-approved by a PreToolUse hook. Filed evidence on PAN-1616.
+   Fix: pre-seed `permissions.allow` for workspace `.claude/**` at launch, or
+   have agents edit `sync-sources/rules/` source rather than the rendered copy.
+
+### Don't confuse paused with stalled
+
+PAN-1641 is `in-progress`-labelled with **no tmux session** — but its
+`state.json` shows `paused=true` (intentional, part of the unfreeze/drain plan).
+Not a ghost (PAN-1617), not a stall. The deacon correctly will not auto-resume a
+paused agent. Check `state.json` `paused`/`troubled` before classifying a
+session-less in-progress issue as broken.
+
+### PAN-1395 / PAN-1491 at ctx 100% but PRs already up (#1634 / #1636)
+
+Both work agents read `100% context used` — but each has already submitted its
+PR. This is a *post-submission* wedge, not a blocking one, so the PAN-1615 brake
+recovering them is lower-value than recovering an agent wedged mid-task. Note
+but don't alarm: a ctx-100% agent that already shipped its PR holds RAM but isn't
+blocking forward motion.
+
+### Tick discipline: this was a diagnose-and-surface tick, correctly
+
+No launches: `auto_pickup_backlog=false` (no fresh backlog), already ~12 agents
+vs flywheel cap 4, every in-flight item already has an agent/convoy or is
+correctly paused, and the two stuck agents (PAN-1496 zombie, PAN-1579 hang) have
+only forbidden remediations (`pan kill`, answering the prompt). The tick's output
+— two substrate-evidence comments + a ranked suggestion set + the snapshot — is
+the correct orchestration move when the launchable set is empty, not the
+suggest-only failure RUN-11 was scolded for (that was *ignoring* launchable work;
+there is none here). Highest-leverage operator move: UAT-drain the 19-deep
+verifying-on-main batch.
