@@ -157,8 +157,10 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { isIssueClosed } from './issue-closed.js';
 
 // ============================================================================
 // Configuration
@@ -872,6 +874,19 @@ type ContextOverflowRecovery = {
 export const contextOverflowRecoveryState: Map<string, ContextOverflowRecovery> = new Map();
 export const contextProactiveCompactState: Map<string, { lastAttempt: number }> = new Map();
 
+/**
+ * PAN-1675 (A2): bounded native-compaction recovery for agents already flagged
+ * `stuck` with reason `context_overflow`. These got stuck under the OLD
+ * /compact+/clear ladder (which predates Panopticon-side compaction), so they
+ * never received a native-compaction attempt — and the `overflowBlocked` gate
+ * would otherwise skip their recovery forever. We give them a small, bounded
+ * number of out-of-band compaction attempts; if the agent keeps overflowing
+ * after that, it stays stuck for a human.
+ */
+export const stuckOverflowNativeRecoveryState: Map<string, { attempts: number; lastAttempt: number }> = new Map();
+const MAX_STUCK_NATIVE_RECOVERY = 2;
+const STUCK_NATIVE_RECOVERY_COOLDOWN_MS = 10 * 60 * 1000;
+
 async function maybeProactivelyCompactContext(sessionName: string, now: number): Promise<string | null> {
   if (!sessionName.startsWith('agent-')) return null;
   const cooldown = contextProactiveCompactState.get(sessionName);
@@ -981,6 +996,92 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         await saveAgentRuntimeState(sessionName, { contextSaturatedAt: undefined });
       }
 
+      // PAN-1675 (A2): rescue agents already flagged stuck=context_overflow.
+      // The old /compact+/clear ladder set `stuck` and the `overflowBlocked`
+      // gate below then skips their recovery permanently — but those agents
+      // never got a Panopticon-side (out-of-band) compaction, which can recover
+      // an overflow the harness /compact could not. Give them a bounded number
+      // of native-compaction attempts BEFORE the overflowBlocked gate. A
+      // successful resumeAgent({compact:true}) clears the stuck flag (in
+      // resumeAgent), so a recovered agent re-enters the normal flow. deacon-
+      // ignored issues are still left alone.
+      {
+        const stuckStatus = issueId ? getReviewStatusSync(issueId) : null;
+        const isStuckOverflow = Boolean(
+          stuckStatus?.stuck && stuckStatus.stuckReason === 'context_overflow' && !stuckStatus.deaconIgnored,
+        );
+        if (isStuckOverflow) {
+          if (!hasOverflow) {
+            // The tail no longer shows the overflow error — but that is a WEAK
+            // signal: the 400 line can scroll out of the captured window while
+            // the agent is still pinned near 100% context. Only clear the stuck
+            // flag on a POSITIVE recovery signal — the agent's actual JSONL
+            // context usage is back below the proactive high-water mark.
+            // Otherwise leave it stuck: a genuinely-full agent must not be
+            // returned to the pipeline on a tail-string miss only to re-overflow
+            // on its next turn (the false-recovery flap).
+            let recoveredPct: number | null = null;
+            try {
+              const st = getAgentStateSync(sessionName);
+              const sid = st?.sessionId ?? runtimeState?.claudeSessionId;
+              if (st?.workspace && sid && st.model) {
+                const { computeContextUsage } = await import('../../dashboard/server/services/conversation-service.js');
+                const usage = await computeContextUsage(sessionFilePath(st.workspace, sid), st.model);
+                if (usage && usage.percentUsed < CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) {
+                  recoveredPct = usage.percentUsed;
+                }
+              }
+            } catch { /* treat as not-yet-recovered — leave it stuck */ }
+            if (recoveredPct !== null) {
+              const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
+              clearWorkspaceStuck(issueId!);
+              stuckOverflowNativeRecoveryState.delete(sessionName);
+              actions.push(`Context overflow recovery: cleared stuck flag for ${sessionName} (context back to ${Math.round(recoveredPct)}%)`);
+            }
+            continue;
+          }
+          const rec = stuckOverflowNativeRecoveryState.get(sessionName) ?? { attempts: 0, lastAttempt: 0 };
+          if (rec.attempts >= MAX_STUCK_NATIVE_RECOVERY) {
+            // Native compaction tried its budget and the agent keeps
+            // overflowing — genuinely needs a human; leave it stuck.
+            continue;
+          }
+          if (rec.lastAttempt && (now - rec.lastAttempt) < STUCK_NATIVE_RECOVERY_COOLDOWN_MS) {
+            continue;
+          }
+          rec.attempts += 1;
+          rec.lastAttempt = now;
+          stuckOverflowNativeRecoveryState.set(sessionName, rec);
+          const { resumeAgent } = await import('../agents.js');
+          const recovered = await resumeAgent(sessionName, undefined, { compact: true });
+          if (recovered.success) {
+            stuckOverflowNativeRecoveryState.delete(sessionName);
+            emitActivityEntrySync({
+              source: 'cloister',
+              level: 'warn',
+              message: `${sessionName} recovered from a stuck context-overflow via Panopticon-side compaction (attempt ${rec.attempts})`,
+              issueId: issueId ?? undefined,
+            });
+            console.log(`[deacon] Agent ${sessionName} recovered from stuck context-overflow via native compaction (attempt ${rec.attempts})`);
+            actions.push(`Context overflow recovery: native-compacted previously-stuck ${sessionName} (attempt ${rec.attempts})`);
+            continue;
+          }
+          // Native compaction failed — fall through to the /clear + reseed tier
+          // against the still-live session (mirroring the fresh-overflow path),
+          // so a transient compaction failure doesn't leave the agent wedged
+          // with no nudge until the next cooldown window.
+          console.warn(`[deacon] Native compaction failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY}) — falling through to /clear`);
+          try {
+            await Effect.runPromise(sendKeys(sessionName, '/clear'));
+            await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
+            actions.push(`Context overflow recovery: stuck ${sessionName} native compaction failed — sent /clear + reseed (attempt ${rec.attempts})`);
+          } catch (clearErr) {
+            console.error(`[deacon] Failed to send /clear to stuck ${sessionName}:`, clearErr);
+          }
+          continue;
+        }
+      }
+
       if (!overflowBlocked) {
         if (ov && (now - ov.lastAttempt) < CONTEXT_COMPACT_SETTLE_MS) {
           // A recovery tier is in flight — give it time to finish before judging.
@@ -1049,9 +1150,67 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             continue;
           }
 
-          // Fresh overflow → first try /compact, which still works before the
-          // hard ceiling and preserves more conversation context than /clear.
+          // Fresh overflow → first try compaction, which preserves more
+          // conversation context than /clear.
           const compactAttempts = (ov?.compactAttempts ?? 0) + 1;
+
+          // PAN-1675: for agent-* sessions, recover via Panopticon-side
+          // compaction (out-of-band rewrite of the JSONL the harness resumes
+          // from) instead of the harness `/compact` — `/compact` needs a live,
+          // responsive Claude process and deadlocks on a session already wedged
+          // past the context ceiling. resumeAgent({ compact:true }) compacts the
+          // JSONL then relaunches; the resumed agent is nudged on the next
+          // patrol's 'overflow cleared' branch (phase 'compact'). On failure we
+          // fall through to the /clear + reseed tier in this same pass against
+          // the still-live wedged session. Non-agent (specialist/planning)
+          // sessions keep the harness /compact path.
+          if (issueId !== null) {
+            const { resumeAgent } = await import('../agents.js');
+            const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });
+            if (resumeResult.success) {
+              contextOverflowRecoveryState.set(sessionName, {
+                lastAttempt: now,
+                compactAttempts,
+                clearAttempts: ov?.clearAttempts ?? 0,
+                phase: 'compact',
+              });
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'warn',
+                message: `${sessionName} hit context-window overflow — recovered via Panopticon-side compaction (attempt ${compactAttempts})`,
+                issueId: issueId ?? undefined,
+              });
+              console.log(`[deacon] Agent ${sessionName} hit context-window overflow — Panopticon-side compacted + resumed (attempt ${compactAttempts})`);
+              actions.push(`Context overflow recovery: Panopticon-side compacted ${sessionName} (attempt ${compactAttempts})`);
+              continue;
+            }
+            // Compaction/resume failed — fall through to /clear + reseed in this
+            // same patrol pass (no compact attempt recorded; session still live).
+            console.warn(`[deacon] Panopticon-side compaction failed for ${sessionName} (${resumeResult.error ?? 'unknown'}); falling through to /clear`);
+            const clearAttempts = (ov?.clearAttempts ?? 0) + 1;
+            try {
+              await Effect.runPromise(sendKeys(sessionName, '/clear'));
+              await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
+              contextOverflowRecoveryState.set(sessionName, {
+                lastAttempt: now,
+                compactAttempts: ov?.compactAttempts ?? 0,
+                clearAttempts,
+                phase: 'clear',
+              });
+              emitActivityEntrySync({
+                source: 'cloister',
+                level: 'warn',
+                message: `${sessionName} context-window overflow — Panopticon-side compaction failed, cleared context and sent reseed nudge (attempt ${clearAttempts})`,
+                issueId: issueId ?? undefined,
+              });
+              console.log(`[deacon] Agent ${sessionName} — compaction failed, sent /clear + reseed (attempt ${clearAttempts})`);
+              actions.push(`Context overflow recovery: compaction failed, cleared ${sessionName} and sent reseed (attempt ${clearAttempts})`);
+            } catch (err) {
+              console.error(`[deacon] Failed to send /clear reseed recovery to ${sessionName}:`, err);
+            }
+            continue;
+          }
+
           try {
             await Effect.runPromise(sendKeys(sessionName, '/compact'));
             contextOverflowRecoveryState.set(sessionName, {
@@ -1629,6 +1788,14 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Operator-set ignore flag: skip all patrol re-dispatch for this issue
       // until the human toggles it back off via the kanban button.
       if (status.deaconIgnored) continue;
+      // PAN-1496/PAN-1613: never re-dispatch review/test for an issue closed
+      // on the tracker or shadow-state. The shared helper is TTL-cached, so
+      // checking each surviving row at most once per cache window is bounded and
+      // cannot reproduce the PAN-328 API storm.
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review/test re-dispatch — issue is closed`);
+        continue;
+      }
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
       // History contains the ground truth; the top-level status fields
@@ -1954,6 +2121,28 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
       if (!existsSync(completedFile) && !existsSync(processedFile)) continue;
 
+      // PAN-1496 (zombie-on-closed): if the issue is CLOSED on the tracker, do
+      // not re-dispatch review/test against it — and REAP the stale
+      // completed/completed.processed markers so this patrol stops re-firing on
+      // it every cycle (the markers are what keep a closed issue alive here).
+      // This is API-safe: checkMissingReviewStatuses only reaches here for
+      // agent dirs that both lack a status row AND carry a completion marker —
+      // a small, bounded set — so the per-issue tracker fallback in
+      // isIssueClosed can't storm the API the way a per-open-issue check would.
+      try {
+        if (await isIssueClosed(issueId)) {
+          try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
+          try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
+          actions.push(`Reaped stale completion markers for CLOSED ${issueId} (no review re-dispatch)`);
+          console.log(`[deacon] ${issueId} is closed — reaped stale completion markers, skipping review dispatch`);
+          continue;
+        }
+      } catch (closedErr) {
+        // Non-fatal: if the closed check itself errors, fall through to the
+        // normal dispatch path rather than silently dropping the issue.
+        console.warn(`[deacon] checkMissingReviewStatuses closed-check failed for ${issueId}:`, closedErr);
+      }
+
       // Work is done but no status row — auto-trigger review
       const { resolveProjectFromIssueSync } = await import('../projects.js');
       const resolved = resolveProjectFromIssueSync(issueId);
@@ -2036,6 +2225,15 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         if (reviewPassedAt && now - new Date(reviewPassedAt).getTime() < 5 * 60 * 1000) {
           continue;
         }
+      }
+
+      // PAN-1496/PAN-1613: never re-dispatch test for an issue closed on the
+      // tracker or shadow-state. The check is reached only by the small set of
+      // issues that pass all status filters above, and the shared helper is
+      // TTL-cached — so this cannot storm the API.
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
+        continue;
       }
 
       const { resolveProjectFromIssueSync } = await import('../projects.js');
@@ -2451,6 +2649,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       if (status.mergeStatus === 'merged') continue;
       if (!status.reviewedAtCommit) continue;
       if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
+        continue;
+      }
 
       // Resolve workspace path
       const project = resolveProjectFromIssueSync(issueId);
@@ -4512,6 +4714,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...orphanProposedActions);
   for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
 
+  const closedIssueAgentActions = await reconcileClosedIssueAgents();
+  actions.push(...closedIssueAgentActions);
+  for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
+
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
@@ -5486,6 +5692,10 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     if (!state) continue;
     if (state.status !== 'running') continue;
     if (state.role !== 'work') continue;
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} skipped — issue ${state.issueId} is closed`);
+      continue;
+    }
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await Effect.runPromise(sessionExists(agentId))) continue;
@@ -5720,10 +5930,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    const shadowState = await Effect.runPromise(getShadowState(state.issueId));
-    const issueClosed = shadowState?.trackerStatus === 'closed';
-    if (issueClosed) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is closed`);
       continue;
     }
 

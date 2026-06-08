@@ -17,6 +17,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
@@ -35,6 +36,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
@@ -58,6 +60,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4'
@@ -83,6 +86,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -128,6 +132,7 @@ describe('generateLauncherScript', () => {
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export PANOPTICON_AGENT_ID='spec-123'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='correctness-review'
@@ -216,6 +221,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -246,6 +252,7 @@ describe('generateLauncherScript', () => {
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE
@@ -273,6 +280,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -305,6 +313,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -334,6 +343,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export PATH="/usr/local/bin:$PATH"
       prompt=$(cat '/workspace/.pan/prompts/agent.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
@@ -353,6 +363,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
@@ -372,6 +383,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
       "
@@ -409,6 +421,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       exec claude --model claude-sonnet-4-6
       "
     `);
@@ -686,6 +699,7 @@ describe('generateLauncherWrapper', () => {
           '#!/bin/bash',
           'unset TMUX TMUX_PANE STY',
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
+          'export SKIP_DOCS_INDEX=1',
           "cd -- '/workspace/project'",
           "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
           '',
@@ -762,6 +776,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/prompt.txt')
       exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'

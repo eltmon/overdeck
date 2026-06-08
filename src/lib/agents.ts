@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, packageRoot } from './paths.js';
+import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -15,7 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModelSync, getProviderEnvSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel } from './config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isClaudeCodeChannelsMcpEnabled, resolveModel, isTldrEnabledSync } from './config-yaml.js';
 import type { NormalizedCavemanConfig, RoleEffort } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -504,7 +504,7 @@ export async function getRoleRuntimeBaseCommand(
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
 const SINGLETON_AGENT_IDS = new Set(['flywheel-orchestrator']);
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
@@ -2698,7 +2698,7 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * bounded by a cooldown + attempt cap so a stack that genuinely cannot be
  * rebuilt escalates to a human instead of looping `docker compose` forever.
  */
-const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+const spawnStackRebuildState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean; hostFallbackNoticed?: boolean }> =
   new Map();
 const SPAWN_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
@@ -2734,14 +2734,48 @@ export async function assertWorkspaceStackHealthyForSpawn(
     return;
   }
 
-  // PAN-1618: attempt an autonomous rebuild before failing, so a `proposed`
-  // item reaches a running work agent without a human step. Bounded by a
-  // cooldown + attempt cap (same shape as PAN-1247's orphan-test recovery).
+  // PAN-1645 + PAN-1618: an unhealthy stack must NEVER *block* the advancing
+  // roles. review/test/ship all operate on the HOST workspace — ship
+  // rebases/pushes against the host .git, review reads the committed diff, and
+  // test runs the project's quality gates (host-run unless a gate explicitly
+  // opts into a container) — so they do not need the workspace's docker
+  // containers at all. The long-standing manual `--host` workaround (PAN-1645)
+  // burned enormous effort just rediscovering that ship-on-broken-docker is a
+  // false gate. For these roles we still attempt one bounded autonomous rebuild
+  // (so a project whose test gates DO run in containers gets a healthy stack
+  // when recoverable), but if it can't be made healthy we AUTO-FALL-BACK TO
+  // HOST and proceed instead of throwing.
+  //
+  // `work` is different: a work agent may rely on the dev container's services,
+  // so silently running it on the host could build/test against a missing
+  // environment. work keeps the hard gate (rebuild → escalate to a human).
+  const hostFallbackEligible = role !== 'work';
+
   const record = spawnStackRebuildState.get(normalizedIssue)
     ?? { lastAttempt: 0, attempts: 0, escalated: false };
   const now = Date.now();
 
-  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+  const fallbackToHost = (reason: string): void => {
+    console.warn(`[agents] ${message} — auto-falling back to host for ${role} (${reason})`);
+    // Emit the host-fallback notice once per issue. Use a SEPARATE latch from
+    // the work-escalation latch (`escalated`): if review/test/ship trip the
+    // host fallback first, a later `work` spawn for the same broken-stack issue
+    // must still be able to emit its own (error-level) dead-end marker — the
+    // operator's only signal that a work agent is blocked on docker.
+    if (!record.hostFallbackNoticed) {
+      record.hostFallbackNoticed = true;
+      spawnStackRebuildState.set(normalizedIssue, record);
+      emitActivityEntrySync({
+        source: role,
+        level: 'warn',
+        issueId: normalizedIssue,
+        message: `agent-spawn-host-fallback: ${normalizedIssue}`,
+        details: `Workspace docker stack unhealthy (${details}); ${role} runs on the host (rebase/verify use host .git + host gates), so proceeding without containers. ${reason}`,
+      });
+    }
+  };
+
+  const blockWork = (markerMessage: string, errDetails: string): never => {
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
@@ -2749,24 +2783,32 @@ export async function assertWorkspaceStackHealthyForSpawn(
         source: role,
         level: 'error',
         issueId: normalizedIssue,
-        message: `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
-        details: `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+        message: markerMessage,
+        details: errDetails,
       });
     }
     throw new Error(message);
+  };
+
+  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+    if (hostFallbackEligible) {
+      fallbackToHost(`rebuild exhausted after ${record.attempts} attempts`);
+      return;
+    }
+    blockWork(
+      `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
+      `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+    );
   }
 
   if (now - record.lastAttempt < SPAWN_STACK_REBUILD_COOLDOWN_MS) {
     // A rebuild was attempted recently and the stack is still unhealthy —
-    // surface the blocker but don't hammer `docker compose` every spawn.
-    emitActivityEntrySync({
-      source: role,
-      level: 'error',
-      issueId: normalizedIssue,
-      message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
-      details,
-    });
-    throw new Error(message);
+    // don't hammer `docker compose` every spawn.
+    if (hostFallbackEligible) {
+      fallbackToHost('rebuild on cooldown');
+      return;
+    }
+    blockWork(`agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`, details);
   }
 
   record.lastAttempt = now;
@@ -2782,7 +2824,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     rebuildWorkspaceStack(issueId, {
       onProgress: (m) => console.log(`[agents]   ${normalizedIssue} stack rebuild: ${m}`),
     }),
-  );
+  ).catch((err: unknown) => ({ success: false as const, error: err instanceof Error ? err.message : String(err) }));
 
   if (result.success) {
     spawnStackRebuildState.delete(normalizedIssue);
@@ -2791,14 +2833,11 @@ export async function assertWorkspaceStackHealthyForSpawn(
   }
 
   console.warn(`[agents] Workspace stack rebuild failed for ${normalizedIssue}: ${result.error}`);
-  emitActivityEntrySync({
-    source: role,
-    level: 'error',
-    issueId: normalizedIssue,
-    message: `agent-spawn-stack-rebuild-failed: ${normalizedIssue}`,
-    details: result.error ?? details,
-  });
-  throw new Error(message);
+  if (hostFallbackEligible) {
+    fallbackToHost(`rebuild failed: ${result.error ?? 'unknown'}`);
+    return;
+  }
+  blockWork(`agent-spawn-stack-rebuild-failed: ${normalizedIssue}`, result.error ?? details);
 }
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
@@ -3290,10 +3329,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Auto-setup hooks if not configured
   checkAndSetupHooks();
 
-  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal)
+  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
+  // Gated by the operator TLDR toggle: when disabled, the daemon is not started
+  // and the agent (whose prompt reports TLDR_AVAILABLE=false) degrades to direct
+  // file reads.
   try {
     const venvPath = join(options.workspace, '.venv');
-    if (existsSync(venvPath)) {
+    if (isTldrEnabledSync() && existsSync(venvPath)) {
       const { getTldrDaemonServiceSync } = await import('./tldr-daemon.js');
       const tldrService = getTldrDaemonServiceSync(options.workspace, venvPath);
       const status = await tldrService.getStatus();
@@ -4115,7 +4157,43 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+/**
+ * PAN-1675: Out-of-band Panopticon-side compaction of a work agent's JSONL
+ * session — recovers a context-wedged agent without the harness `/compact`
+ * deadlock (which needs a live, responsive Claude process to run). Resolves the
+ * SAME session file the harness resumes from and rewrites it in place via
+ * native compaction.
+ *
+ * Never throws: every failure path returns `{ compacted:false, error }` so
+ * callers (resumeAgent's `--compact` path, the deacon's fresh-overflow tier)
+ * can fail safely and fall through to the `/clear` fallback. A missing
+ * sessionId or workspace short-circuits to `{ compacted:false }` with no
+ * compaction call.
+ */
+export async function compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }> {
+  const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentStateSync(normalizedId);
+  const sessionId = getLatestSessionIdSync(normalizedId);
+  if (!agentState?.workspace || !sessionId) {
+    return { compacted: false };
+  }
+  try {
+    const sessionFile = sessionFilePath(agentState.workspace, sessionId);
+    // Dynamic import: keep conversation-compaction out of agents.ts's top-level
+    // import graph (it pulls in dashboard server services).
+    const { compactConversationNative } = await import(
+      '../dashboard/server/services/conversation-compaction.js'
+    );
+    await compactConversationNative(sessionFile);
+    return { compacted: true };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    logAgentLifecycleSync(normalizedId, `compactAgentSession failed: ${error}`);
+    return { compacted: false, error };
+  }
+}
+
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -4138,9 +4216,22 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // a system crash where tmux was killed but state.json was never updated to 'stopped'.
   const isCrashed = agentState?.status === 'running' && !(await Effect.runPromise(sessionExists(normalizedId)));
 
+  // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
+  // context-wedged agent, which is typically status='running' with a LIVE (but
+  // stuck) tmux session sitting at an overflow/idle prompt. The normal canResume
+  // gate rejects running+live-session agents — which would make
+  // resumeAgent({compact:true}) (the deacon's overflow recovery tiers AND
+  // `pan resume --compact`) a silent no-op for exactly the agents it targets.
+  // So a compact-resume of a running agent is allowed: the flow below compacts
+  // the JSONL out-of-band and then kills the wedged session before relaunch.
+  // This is safe because the only callers of {compact:true} act on agents they
+  // have already determined to be context-overflow-wedged.
+  const isCompactRecovery = opts?.compact === true && agentState?.status === 'running';
+
   const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
     || (agentState && allowedAgentStatuses.includes(agentState.status))
-    || isCrashed;
+    || isCrashed
+    || isCompactRecovery;
 
   if (!canResume) {
     const reason = `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`;
@@ -4182,6 +4273,20 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const reason = error instanceof Error ? error.message : String(error);
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
+  }
+
+  // PAN-1675: Optionally compact the wedged session's JSONL out-of-band BEFORE
+  // killing the live tmux session, so the fresh resume reads a compacted history
+  // instead of immediately re-overflowing. Fail-safe: if compaction fails, do
+  // NOT kill the session or build a launcher — leave the wedged session live so
+  // the caller (e.g. the deacon) can fall through to the /clear tier against it.
+  if (opts?.compact) {
+    const compactResult = await compactAgentSession(normalizedId);
+    if (!compactResult.compacted) {
+      const reason = `Pre-resume compaction failed: ${compactResult.error ?? 'unknown error'}`;
+      logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+      return { success: false, error: reason };
+    }
   }
 
   // Kill any zombie tmux session (crashed agent left behind)
@@ -4322,6 +4427,27 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     if (agentState) {
       markAgentRunning(agentState);
       saveAgentStateSync(agentState);
+    }
+
+    // PAN-1675: a successful compaction-resume genuinely recovers a
+    // context-overflow-wedged agent — so clear a context_overflow `stuck` flag
+    // here (set by markWorkspaceStuck once the old /compact+/clear ladder
+    // exhausted). Without this the agent would stay flagged stuck forever and
+    // the deacon's overflowBlocked gate would keep skipping its recovery, even
+    // though the agent is now healthy. Only clear when the stuck reason is
+    // context_overflow (don't clobber an unrelated stuck state).
+    if (opts?.compact && agentState?.issueId) {
+      try {
+        const { getReviewStatusSync } = await import('./review-status.js');
+        const rs = getReviewStatusSync(agentState.issueId);
+        if (rs?.stuck && rs.stuckReason === 'context_overflow') {
+          const { clearWorkspaceStuck } = await import('./database/review-status-db.js');
+          clearWorkspaceStuck(agentState.issueId);
+          logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
+        }
+      } catch (clearErr) {
+        console.warn(`[agents] Could not clear stuck flag after compaction-resume for ${normalizedId}:`, clearErr);
+      }
     }
 
     return { success: true, messageDelivered };

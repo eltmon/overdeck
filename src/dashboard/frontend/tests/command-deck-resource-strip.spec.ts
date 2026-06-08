@@ -206,11 +206,20 @@ test.describe('Command Deck resource strip', () => {
 
     // Select the project from the sidebar rail. This sets selectedProject, which
     // mounts the ProjectNode (already expanded) in the Issues section.
-    await page.getByTestId('sidebar-project-panopticon-cli').click();
+    // PAN-1609: wait for the sidebar entry to mount before clicking — under CI
+    // load the initial app boot (WS connect + first snapshot) can take several
+    // seconds, and a click that races the mount silently no-ops, leaving the
+    // rows un-rendered and flaking the first toBeVisible below.
+    const sidebarProject = page.getByTestId('sidebar-project-panopticon-cli');
+    await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
+    await sidebarProject.click();
 
     const pan862Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-862' }).first();
     const pan777Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-777' }).first();
-    await expect(pan862Row).toBeVisible();
+    // First assertion after project selection gates on the data load + render —
+    // give it generous headroom (the remaining assertions render together once
+    // the row is present and keep the default timeout).
+    await expect(pan862Row).toBeVisible({ timeout: 20_000 });
     await expect(pan777Row).toBeVisible();
     await expect(pan777Row.locator('[class*="featureState"]').getByText('Closed', { exact: true })).toBeVisible();
 

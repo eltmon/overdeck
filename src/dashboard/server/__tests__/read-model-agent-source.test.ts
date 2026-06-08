@@ -25,12 +25,13 @@ function writeStateFile(agentsDir: string, agentId: string): void {
   writeFileSync(join(agentDir, 'state.json'), '{}', 'utf8');
 }
 
-function agent(id: string, issueId: string): AgentSnapshot {
+function agent(id: string, issueId: string, role?: AgentSnapshot['role']): AgentSnapshot {
   return {
     id,
     issueId,
     status: 'stopped',
     startedAt: '2026-05-23T00:00:00.000Z',
+    ...(role ? { role } : {}),
   };
 }
 
@@ -71,5 +72,40 @@ describe('read model agent source pruning', () => {
 
     expect(Object.keys(pruned.agentsById)).toEqual(['agent-pan-1419-active']);
     expect(pruned.prunedCount).toBe(1);
+  });
+
+  // PAN-1506 regression. The root cause (strikes invisible on the Agents page)
+  // was upstream — isRole()/toRole() dropped role='strike' before it reached
+  // agentsById. Those guards are covered in tests/lib/agents-strike-role-parse
+  // and tests/dashboard/read-model-validators. This test guards the *other*
+  // end: pruneAgentsForReadSource is the only agent-membership filter the
+  // snapshot read path (getSnapshot) applies, and it must never drop an agent
+  // based on its role prefix. If a future change ever filters the read source
+  // by role, strikes would silently vanish from the snapshot again.
+  it('keeps strike, planning, and work agents in the read source (role parity)', () => {
+    const agentsDir = makeAgentsDir();
+    writeStateFile(agentsDir, 'strike-pan-1506');
+    writeStateFile(agentsDir, 'planning-pan-1234');
+    writeStateFile(agentsDir, 'agent-pan-1419');
+
+    const pruned = pruneAgentsForReadSource({
+      'strike-pan-1506': agent('strike-pan-1506', 'PAN-1506', 'strike'),
+      'planning-pan-1234': agent('planning-pan-1234', 'PAN-1234', 'plan'),
+      'agent-pan-1419': agent('agent-pan-1419', 'PAN-1419', 'work'),
+    }, [
+      { identifier: 'PAN-1506', status: 'in_progress' },
+      { identifier: 'PAN-1234', status: 'in_progress' },
+      { identifier: 'PAN-1419', status: 'in_progress' },
+    ], agentsDir);
+
+    expect(Object.keys(pruned.agentsById).sort()).toEqual([
+      'agent-pan-1419',
+      'planning-pan-1234',
+      'strike-pan-1506',
+    ]);
+    expect(pruned.agentsById['strike-pan-1506']?.role).toBe('strike');
+    expect(pruned.agentsById['planning-pan-1234']?.role).toBe('plan');
+    expect(pruned.agentsById['agent-pan-1419']?.role).toBe('work');
+    expect(pruned.prunedCount).toBe(0);
   });
 });

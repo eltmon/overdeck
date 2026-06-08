@@ -18,3 +18,23 @@
     grid-template-columns: 1.4fr 1fr;
   }
 }
+
+.missionWrap {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.missionBody {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@container (min-width: 980px) {
+  .missionBody {
+    grid-template-columns: minmax(280px, 344px) minmax(0, 1fr);
+  }
+}

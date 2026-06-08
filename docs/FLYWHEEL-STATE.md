@@ -674,3 +674,308 @@ through this one gate. If the operator can't UAT soon and PAN-1455 stays stuck, 
 right escalation is to STRIKE PAN-1213 directly (single scoped fix) so the whole
 review→ship path reopens — but first confirm PAN-1059 on main isn't already the
 fix (avoid duplicating it; a deacon restart may be all that's needed).
+
+## RUN-15 observations (tick 1, 2026-06-08)
+
+Run config: `minAgents=2`, `maxAgents=4`, `scope=pan-only`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. **The substrate
+landscape changed materially since RUN-14 — re-baseline before acting.**
+
+### The world is different now: deacon unfrozen, governor live, brakes landed
+
+- **Deacon unfrozen ~2026-06-08 22:05** with the **PAN-1665 concurrency governor
+  live** (`src/lib/cloister/concurrency.ts`): `DEFAULT_MAX_WORK_AGENTS=6` +
+  `DEFAULT_RESERVED_ADVANCING_SLOTS=3` → `totalCeiling=9`, plus load-gate
+  (cores×1.5) and 150ms resume stagger. No herd (vs 2026-06-07's load 52 / 37
+  agents). RAM healthy: 18GB/64GB, **swap 0%** (vs RUN-14's 100%-pinned swap),
+  disk recovered to 268G free (PAN-1674 .venv cleanup).
+- **The flywheel does NOT drive agent count here.** `maxAgents=4` sits *below*
+  the deacon governor's ceiling of 9 (+ convoy burst: a review convoy = 5
+  sessions per dispatch, so total live can exceed 9). At tick 1 there were ~12
+  live agents — all the deacon's auto-resume, none the flywheel's. **Correct
+  posture: hold launches, respect the governor, let the pipeline drain.** This
+  is the explicit unfreeze-plan stance ("FLYWHEEL HELD until pipeline drains").
+- **The three RUN-14 brakes MERGED + live in the running deacon:** PAN-1615
+  (ctx-ceiling wedge), PAN-1616 (inspect-hang watchdog), PAN-1617 (ghost-agent
+  kickoff detection). All `merged, verifying-on-main`. The RUN-14 dominant
+  findings are addressed at the class level.
+
+### The review→ship meta-blocker (PAN-1213) appears CLEARED in the live deacon
+
+This is the single biggest change from RUN-14. PAN-1059 (review-path refactor,
+the PAN-1213 fix) is `merged, verifying-on-main` **and running**. Live evidence:
+**PAN-1242 has a `ship` session, PAN-1455 advanced to a `test` session** — the
+exact review→ship transition that jammed every issue in RUN-14 is now firing
+automatically. UAT'ing PAN-1059 just makes it official; the path already works.
+
+### Two substrate gaps STILL bite live (not covered by the merged brakes)
+
+1. **PAN-1613 (NOT fixed — still in-review).** `agent-pan-1496-review` +
+   `agent-pan-1496-test` are actively running on **PAN-1496, CLOSED 2026-05-29**
+   — a respawn ~9 days post-close, *after* the throttle landed. The
+   `isIssueClosed()` guard added to `autoResumeStoppedWorkAgents` covers the
+   **work-agent resume** path but **not the review/test convoy dispatch** path.
+   Filed evidence on PAN-1613. This is active $/RAM/slot waste, not passive
+   lingering.
+2. **PAN-1616 class-2 (merged brake covers only class-1).** `agent-pan-1579`
+   (work) is hung on a `.claude/rules/dashboard-node22-only.md`
+   settings-protection prompt — the same file/hang as RUN-14 tick 8. The merged
+   watchdog recovers `inspect-*` sessions (class 1); a **work agent editing
+   `.claude/**` still hangs** because Claude Code's settings-file protection
+   can't be auto-approved by a PreToolUse hook. Filed evidence on PAN-1616.
+   Fix: pre-seed `permissions.allow` for workspace `.claude/**` at launch, or
+   have agents edit `sync-sources/rules/` source rather than the rendered copy.
+
+### Don't confuse paused with stalled
+
+PAN-1641 is `in-progress`-labelled with **no tmux session** — but its
+`state.json` shows `paused=true` (intentional, part of the unfreeze/drain plan).
+Not a ghost (PAN-1617), not a stall. The deacon correctly will not auto-resume a
+paused agent. Check `state.json` `paused`/`troubled` before classifying a
+session-less in-progress issue as broken.
+
+### PAN-1395 / PAN-1491 at ctx 100% but PRs already up (#1634 / #1636)
+
+Both work agents read `100% context used` — but each has already submitted its
+PR. This is a *post-submission* wedge, not a blocking one, so the PAN-1615 brake
+recovering them is lower-value than recovering an agent wedged mid-task. Note
+but don't alarm: a ctx-100% agent that already shipped its PR holds RAM but isn't
+blocking forward motion.
+
+### Tick discipline: this was a diagnose-and-surface tick, correctly
+
+No launches: `auto_pickup_backlog=false` (no fresh backlog), already ~12 agents
+vs flywheel cap 4, every in-flight item already has an agent/convoy or is
+correctly paused, and the two stuck agents (PAN-1496 zombie, PAN-1579 hang) have
+only forbidden remediations (`pan kill`, answering the prompt). The tick's output
+— two substrate-evidence comments + a ranked suggestion set + the snapshot — is
+the correct orchestration move when the launchable set is empty, not the
+suggest-only failure RUN-11 was scolded for (that was *ignoring* launchable work;
+there is none here). Highest-leverage operator move: UAT-drain the 19-deep
+verifying-on-main batch.
+
+### RUN-15 tick 2 — the PR CI-rollup is a single-tick stall/ready distinguisher
+
+RUN-14's reliable progress test was a two-snapshot token/cost diff. Tick 2 added
+a faster one for **convoy/review-phase** items idle at the `❯` prompt: read the
+PR's `gh pr view <pr> --json statusCheckRollup`. It collapses the ambiguity in
+one tick:
+
+- **CI all-green + idle convoy** = done, ready for the operator merge gate
+  (correct under `require_uat_before_merge=true`, NOT a stall). Tick 2: PAN-1242
+  (#1516) and PAN-1395 (#1634) were both green — ready, just awaiting operator
+  UAT. PAN-1395's work agent was ctx-100% wedged but **irrelevant** because the
+  PR was already green (work done).
+- **CI failing + idle/wedged work** = genuinely blocked. Tick 2: PAN-1455
+  (#1611) test FAILURE with the work agent idle (watch for deacon re-dispatch);
+  PAN-1491 (#1636) lint+smoke FAILURE *and* work agent ctx-100% wedged — it
+  literally cannot fix its own CI (every turn 400s). Double-blocked.
+
+Lesson: a ctx-100% wedge only matters if the PR isn't already green. Triage
+wedged agents by their PR's CI state before treating the wedge as a blocker.
+
+### RUN-15 tick 2 — operator runs strikes directly; observe, don't touch
+
+Two operator-launched strikes appeared mid-run (Opus 4.8, role=strike):
+**PAN-1506** (strike agents missing from the frontend store — critical dashboard
+bug) and **PAN-1675** (Panopticon-side `resume --compact` to recover wedged
+agents without the harness `/compact` deadlock). PAN-1675 is the **recovery half
+of the PAN-1615 wedge story** — the merged brake *detects* the ctx-ceiling wedge;
+PAN-1675 *recovers* it. The flywheel observes and reports these in the snapshot;
+it does not touch operator strikes.
+
+### RUN-15 tick 2 — the two persistent stalls did NOT self-heal over ~30min
+
+Across the tick-1→tick-2 interval the deacon/brakes did not clear either the
+PAN-1496 zombie (review+test on a 9-day-closed issue; went idle but stayed
+present) or the PAN-1579 `.claude/**` permission hang (~90min frozen, still
+reported "active" by cloister because the heartbeat ticks at the prompt). Both
+have only orchestrator-forbidden remediations (`pan kill`, answer the prompt),
+so the disciplined output stays: fresh evidence on PAN-1613/PAN-1616 + surface,
+not hand-fix.
+
+### RUN-15 tick 3 — "test FAILURE" on a PR has TWO independent signals; check both
+
+A PR carries two distinct test signals and they can disagree:
+1. **`panopticon/test`** — the test-ROLE agent's verdict, posted as a commit
+   status ("Test specialist passed").
+2. **`test`** — the GitHub Actions workflow test job.
+
+Tick 3 corrected my tick-2 read of PAN-1455 (#1611). I had flagged "test FAILURE
++ idle work agent → PAN-1614 deacon-redispatch gap." Investigating the actual
+CI log showed the opposite: `panopticon/test` = **pass** (code is fine), while
+the GHA `test` job was **stale-red from Jun-7 05:27** failing on
+`better-sqlite3` native rebuild (`error: Script not found "rebuild"`) — the exact
+ABI problem **PAN-1579** fixes — plus a 6-hour `Clean install + server smoke
+test` hang (**PAN-1651**). So PAN-1455 is blocked on **known CI-infra bugs**, not
+a code defect and not a deacon-recovery gap. **No new bug filed** — that would
+duplicate PAN-1579/1651.
+
+Lessons:
+- When a PR shows `test fail`, read (a) `panopticon/test` separately from the GHA
+  `test` job, (b) the failing run's **timestamp** (a stale run ≠ current state),
+  and (c) the actual failing step. A native-rebuild / smoke-hang infra failure is
+  PAN-1579/1651, not a code regression.
+- **Investigate before filing.** The two-tick "frozen + red" signal looked like a
+  deacon gap; the log proved it was CI staleness. Filing on the tick-2
+  hypothesis would have produced a wrong, duplicate bug. The Karpathy
+  "investigate before fixing" rule applies to *filing* too.
+- A ctx-100% wedge only matters if the PR isn't already green (tick-2 rule) — and
+  a red PR only matters if it's the *code* that's red, not stale infra CI.
+
+### RUN-15 tick 3 — PAN-1579 unstuck (manual option-2); operator escalating substrate
+
+PAN-1579's `.claude/**` settings-protection hang (PAN-1616 class-2) cleared — the
+pane shows option `2` selected and the agent resumed (ctx 62%, +91/-58). It
+needed a manual unblock, so **PAN-1616's class-2 gap is still real** (an agent
+should never hang requiring a human to pick option 2). Nice second-order effect:
+PAN-1579 is itself the better-sqlite3 fix that unblocks PAN-1455's CI.
+
+Operator continues driving substrate directly: the **PAN-1675 strike declined**
+the broad infra change and **fell through to planning** (`planning-pan-1675`) —
+the documented strike→plan reflex. A new critical **PAN-1510** (newly-filed
+issues missing from frontend store, sibling of the PAN-1506 strike) was filed and
+is planning. The flywheel notes these in the snapshot and does not touch
+operator-owned strikes/plans.
+
+### RUN-15 ticks 1–3 — the standing shape: operator-gated, not flywheel-blocked
+
+Three ticks, ~58 min, zero merges, UAT batch flat at 19. This is NOT a stalled
+flywheel — every in-flight item is either (a) CI-green and waiting on the
+operator's UAT+merge (PAN-1242/1395; can't merge — require_uat_before_merge=true),
+(b) blocked on a substrate gap with only orchestrator-forbidden remediations
+(PAN-1496 zombie, PAN-1491 wedge), or (c) operator-owned (strikes/planning). With
+16 agents live under the governor and `auto_pickup_backlog=false`, there is no
+launchable in-flight work below minAgents. Holding launches is correct; the
+deliverable is the precise ready/blocked map + the standing message that the
+UAT batch is the bottleneck.
+
+### RUN-15 tick 4 — CORRECTION: the bottleneck was ship-on-broken-docker, not UAT laziness
+
+Ticks 1–3 framed "zero merges, UAT batch flat at 19" as *operator-gated* — the
+operator just hadn't UAT'd the ready batch. **That model was wrong.** A parallel
+operator session's durable note (project memory, ~2026-06-08 00:15) revealed the
+real chain, and it reframes everything:
+
+1. **Ship chokes on broken workspace docker (PAN-1645).** Ship is the role that
+   sets `readyForMerge=true`. With docker init regressed, ship can't complete, so
+   **PAN-1642 / PAN-1613 / PAN-1614 / PAN-1455 sit review+test PASSED but
+   `readyForMerge=false`** — they never reach the UAT/merge gate. The issues
+   aren't waiting on the operator; they're stuck one stage *before* the operator.
+2. **The deacon was FROZEN AGAIN (~00:15)** as build-storm protection. So the
+   tick-1–3 rationale "hold launches because the governor is *driving* the
+   pipeline" was right to hold but wrong on the reason — the governor wasn't
+   driving, it was frozen.
+3. **PAN-1678 is the keystone:** `build:docs-index` (10-core, 3926-chunk) runs in
+   *every* agent/verification/ship build. `agent-pan-1579` triggered 8×
+   concurrent docs-index builds → host load 38 (near the 36 gate / OOM). Deacon
+   unfreeze AND any safe new agent launch are both gated on PAN-1678 landing.
+   **Under autonomy, launching an agent here would re-trigger the storm** — so
+   holding launches went from "cap-respecting" to "mandatory / actively harmful
+   to violate."
+4. **The operator delegated a manual landing push to handoff worker conv 2558**
+   (`conv-20260608-c014`, Opus): land the 4 via ship-on-host, fix PAN-1645/1678,
+   recover wedged PAN-1395/1641. The flywheel observes and stays out of its way.
+5. **The flywheel cap was deliberately lowered 30→4** (`~/.panopticon/config.yaml
+   roles.flywheel`) for exactly this stabilization window — the low cap I saw is a
+   feature, not a coincidence.
+
+**Lessons for future runs:**
+- "Zero merges + flat UAT batch" has (at least) two very different causes:
+  operator-not-UAT'ing vs **issues-can't-reach-the-gate** (ship/docker stall).
+  Distinguish them by checking `readyForMerge` and whether ship can run — don't
+  assume the human gate is the bottleneck just because nothing merged.
+- **The durable project memory can be updated by a parallel session mid-run.**
+  Re-read it each tick. A frozen deacon / active landing worker / new keystone bug
+  can completely change the correct posture, and the orchestrator won't see it in
+  `gh`/`tmux` state alone.
+- When the deacon is frozen against a build storm (PAN-1678 unfixed), "keep agents
+  working" inverts: the highest-value move is to NOT launch (and not run a full
+  `npm run build` either), because every launch's verification build re-storms the
+  host. Surface the keystone, point at the active landing worker, hold.
+
+### RUN-15 tick 5 — keystone PAN-1678 LANDED; deacon-unfreeze gate cleared
+
+The operator's landing worker (conv 2558) landed **PAN-1678** direct-to-main
+(`89a7a0d0a fix(infra): skip build:docs-index in agent/verification/ship builds`,
+04:27 UTC) — the first substrate fix to land during this run. Host load is back
+to **1.8** (from the storm's 38). Per the operator's plan, PAN-1678 was the gate
+for unfreezing the deacon, so that gate is now cleared.
+
+Two reasons the flywheel still held launches anyway, both important:
+1. **A fix landing on main != live in the running server.** The deacon/dashboard
+   runs `dist/`; until the operator rebuilds + `pan reload`s, the running
+   verification builds still execute the un-skipped `build:docs-index` and could
+   re-storm. "Keystone landed" clears the *gate*, not the *risk*, until reload.
+2. The deacon is still frozen (operator unfreezes, not the flywheel — it's not a
+   flywheel verb), and the in-flight set (14) is far above minAgents.
+
+PAN-1645 (docker init / ship choke) is now the lead keystone for the 4
+ship-stalled issues; conv 2558 is landing them via ship-on-host. Lesson:
+progress can be real and substantial (a keystone bug fixed) while the flywheel's
+own headline (`prsMerged`, `awaitingUat`) shows zero movement — direct-to-main
+landings by an operator worker don't touch those counters.
+
+### RUN-15 tick 7 — a delegated worker can stall on an UNSUBMITTED operator message
+
+The landing push went static for two ticks (6→7, ~24min) and I initially read it
+(tick 6) as "operator actively steering." Tick 7 byte-compared conv 2558's pane
+across the two ticks and found it **frozen identically** ($9.7753, +21/-2, ctx
+22%, "Crunched 7m 25s"): the operator's reply "#1 now, then PAN-1675…" was
+**drafted at the `❯` prompt but never submitted** (Enter not pressed). So nothing
+landed because the directive was never sent.
+
+Lessons:
+- "Operator is driving" vs "operator stepped away with an unsent message" look
+  identical in a single snapshot. **Byte-compare the worker's pane (cost/ctx/diff)
+  across two ticks** — frozen metrics = stalled, even if a reply is visible in the
+  input buffer.
+- The flywheel can only **surface** this (openQuestions: "submit the pending
+  message in conv 2558"); it must not press Enter for an operator-owned worker.
+- The dashboard health classifier shows such a worker "active" — same
+  process-alive-≠-progressing theme as the RUN-14 brakes work, but for a
+  conversation worker the flywheel doesn't own.
+
+### RUN-15 tick 12-13 — empirical proof that PAN-1645 (ship) is the binding constraint
+
+The 6-tick conv-2558 stall (unsubmitted directive) resolved when the operator
+returned and submitted (~tick 12). The landing then ran: agent-pan-1614
+(operator-launched) tried to land the *ready* PR #1630, iterated past two
+verification-gate feedback rounds (001+002)... and **still did not merge** — it
+exited with PAN-1614 back in-review. So even the CI-green, review-passed,
+verification-fixed PR cannot cross the finish line while PAN-1645 (workspace
+docker init / ship choke) is unfixed. This is the **empirical confirmation** of
+the tick-4 hypothesis: the binding constraint is the ship→readyForMerge step,
+not review or verification.
+
+Consequence: the operator pivoted (conv 2558 offered "park the four PRs / bank
+today's wins — main CI green, deacon ready to unfreeze"; operator chose instead
+to "implement PAN-1675 first"). So the run's banked wins are the direct-to-main
+substrate fixes (PAN-1678), not merged PRs — and the four ship-stalled issues
+will not merge until PAN-1645 is fixed or all four are shipped-on-host.
+
+Also validated this tick: **PAN-1678's fix holds under real load** — agent-pan-1614
+built with load peaking ~14 then settling to ~9 on 24 cores (well below the 36
+storm gate), no docs-index storm. The keystone fix works in production.
+
+### RUN-15 tick 19-21 — PAN-1675 (resume --compact) LANDED; "landed != live" reaffirmed
+
+The operator's conv 2558 implemented and pushed **PAN-1675** (Panopticon-side
+`resume --compact` wedge recovery) direct to origin/main — 3 commits
+(050d2c85c CLI / 285b9fbfd deacon auto-recovery / bcdf102c2 dashboard action),
+squashed-or-rolled into origin at **b43972741**. This is the run's **2nd
+substrate fix** (after PAN-1678) and the recovery tool for the ctx-100%-wedged
+PAN-1395/1491.
+
+Reaffirmed lesson (same shape as the PAN-1678 tick-5 note): **landed != live.**
+After the push, PAN-1395/1491 stayed at ctx 100% because the running deacon still
+executes the old `dist/` — `resume --compact` recovery only takes effect after
+the operator rebuilds dist + `pan reload`s. A fix on main does not self-heal the
+running system; the reload is a required, operator-owned step.
+
+Process note for the orchestrator: when an operator worker (conv 2558) is mid
+commit-push cycle on the SHARED main worktree, the flywheel must take no git
+action — defer durable FLYWHEEL-STATE.md commits until the tree is 0-ahead of
+origin, then commit path-scoped + fast-forward push (abandon the push, don't
+fight a rebase, if origin moved). Byte-comparing the worker's session
+cost/diff/pane across ticks is the way to tell active-work from stall.

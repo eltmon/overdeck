@@ -1,0 +1,58 @@
+{
+  "version": "1",
+  "issueId": "PAN-1101",
+  "created": "2026-06-04T06:06:30.499Z",
+  "updated": "2026-06-04T06:09:57.000Z",
+  "gitState": { "branch": "feature/pan-1101", "sha": "b8960b6dc", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Scope reduced to items 3 (launcher matrix property test) and 4 (runtime tripwire). Items 1 (CI grep guard), 2 (single DSP emission chokepoint), and 5 (settings.json snapshot test) are ALREADY SATISFIED by downstream work and are NOT re-implemented. Evidence: scripts/lint-permissions.sh implements item 1 (allowlist + bonus resolver-omission guard, wired into `npm run lint`, currently green); the `--dangerously-skip-permissions` CLI flag was fully removed (bypassPrefixForAgentFlagSync returns '', emission centralized in getClaudePermissionFlagsSync) so item 2's 3 inline literals no longer exist; claude-permissions.test.ts asserts the exact settings.json object for both auto and bypass modes plus a JSON-has-no-bypass check, and both provisioners (fly-provider.ts, workspace.ts) delegate to the single buildClaudeUserSettings builder (enforced by remote-settings-no-leak.test.ts), which is item 5.",
+      "recordedAt": "2026-06-04T06:09:57.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Item 4 tripwire is adapted from the issue's original $RESOLVED_MODE/$ORIGINAL_ARGS design (which assumed the launcher kept mode and args as independent runtime variables) to the CURRENT architecture, where generateLauncherScriptSync bakes a fully-resolved `exec claude ...` command at generation time. The runtime guard is emitted only when the resolved permission mode is auto (permissionFlags includes 'auto'), placed immediately before the exec line, and panics (exit 70) if a bypass token is present in the baked claude invocation.",
+      "recordedAt": "2026-06-04T06:09:57.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Item 4's forbidden-token pattern MUST be built from the BYPASS_PERMISSION_MODE constant exported by claude-permissions.ts (not a quoted string literal in launcher-generator.ts) so it does not trip scripts/lint-permissions.sh (item 1). Item 3's property assertions must target the claude invocation line / commandParts specifically — NOT a naive whole-script not.toMatch — so they stay correct alongside item 4's guard line, which legitimately mentions the bypass token in its grep pattern.",
+      "recordedAt": "2026-06-04T06:09:57.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "scripts/lint-permissions.sh fails the build if `bypassPermissions` or `--dangerously-skip-permissions` appears as a quoted string literal in src outside its allowlist. A naive item-4 implementation that writes the token literally into launcher-generator.ts will self-trip the lint.",
+      "mitigation": "Build the tripwire's grep/case pattern from the imported BYPASS_PERMISSION_MODE constant (a variable reference, not a quoted literal). Do NOT add launcher-generator.ts to the lint allowlist — keep the surgical surface. Run `bash scripts/lint-permissions.sh` after the change to confirm green."
+    },
+    {
+      "id": "H2",
+      "summary": "launcher-generator.test.ts contains ~50 tests, several asserting byte-exact generated script output. Auto-mode launchers will gain new tripwire guard lines, which can break existing byte-exact / not.toMatch expectations for AUTO-mode cases (e.g. the --agent cases around lines 436-496).",
+      "mitigation": "Bypass-mode test cases are unaffected (the guard is auto-only). Run the full launcher-generator.test.ts, identify the auto-mode cases that now include the guard, and update ONLY those expectations to include the new lines. Do not weaken assertions on bypass-mode cases."
+    },
+    {
+      "id": "H3",
+      "summary": "--agent launchers emit NO permission flags at all (permission mode is supplied via roles/<role>.md frontmatter, and bypassPrefixForAgentFlagSync returns ''). The tripwire must not assume every auto launcher carries a --permission-mode flag.",
+      "mitigation": "Derive 'emit the tripwire' from permissionFlags including the 'auto' token. --agent launchers have no permissionFlags, so they correctly skip the guard — there is no permission flag on the command to leak. Document this in the test matrix (item 3) as an explicit covered case."
+    },
+    {
+      "id": "H4",
+      "summary": "The item-3 matrix must use valid LauncherConfig shapes per combination: Pi harness requires piExtensionPath/piFifoPath/piSessionDir; review sub-role launchers require the reviewSignal block; supervisor wrapping requires supervisorScriptPath. An ill-formed config will throw rather than exercise the property.",
+      "mitigation": "Reuse the config fixtures already present in launcher-generator.test.ts for each harness/role/spawnMode shape; vary only the permission mode (auto vs bypass) across the matrix. Assert the property against generateLauncherScriptSync output."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-04T06:09:57.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1101. Discovered items 1/2/5 already shipped by downstream DSP-removal + lint-permissions.sh + existing leak tests; reduced scope to items 3 (launcher matrix property test) and 4 (runtime tripwire), with the tripwire redesigned for the current baked-command launcher architecture.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

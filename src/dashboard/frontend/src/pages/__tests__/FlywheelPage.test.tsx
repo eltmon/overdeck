@@ -131,6 +131,21 @@ describe('FlywheelPage', () => {
     expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
   });
 
+  it('shows a paused message (not "No active run") when the latest run is paused', async () => {
+    // No live snapshot (status null), but the latest run is paused.
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/flywheel/runs')) return Response.json([{ status: 'paused' }]);
+      return Response.json(null);
+    }));
+
+    renderFlywheelPage(<FlywheelPage />);
+
+    expect(await screen.findByText(/Run paused/)).toBeInTheDocument();
+    expect(screen.getByText('pan flywheel resume')).toBeInTheDocument();
+    expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
+  });
+
   it('loads Flywheel config, posts partial updates, and updates optimistically', async () => {
     let resolvePost: ((response: Response) => void) | undefined;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

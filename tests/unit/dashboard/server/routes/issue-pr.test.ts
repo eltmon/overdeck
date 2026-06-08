@@ -76,6 +76,7 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
 
 // Import the function under test after mocks.
 import {
+  fetchIssueCheckRuns,
   fetchIssuePullRequest,
   fetchIssuePullRequestDiff,
 } from '../../../../../src/dashboard/server/routes/issues.js';
@@ -219,5 +220,94 @@ describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {
 
     expect(result.diff).toBeNull();
     expect(result.error).toContain('gh pr diff failed');
+  });
+});
+
+describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
+  it('returns empty checks when the issue is not a GitHub issue', async () => {
+    mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
+
+    const result = await fetchIssueCheckRuns('PAN-830');
+
+    expect(result.pr).toBeNull();
+    expect(result.checkRuns).toEqual([]);
+    expect(result.summary.total).toBe(0);
+    expect(mockExec).not.toHaveBeenCalled();
+  });
+
+  it('returns empty checks when no PR exists for the feature branch', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'panopticon-cli',
+      number: 830,
+    });
+    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    const result = await fetchIssueCheckRuns('PAN-830');
+
+    expect(result.pr).toBeNull();
+    expect(result.checkRuns).toEqual([]);
+    expect(mockExec).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns normalized check runs and summary counts', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'panopticon-cli',
+      number: 830,
+    });
+    const prJson = {
+      number: 642,
+      url: 'https://github.com/eltmon/panopticon-cli/pull/642',
+      headRefName: 'feature/pan-830',
+      headRefOid: 'abc123def456',
+      mergeable: 'MERGEABLE',
+      statusCheckRollup: [{ name: 'lint', conclusion: 'SUCCESS' }],
+    };
+    const checksJson = {
+      total_count: 5,
+      check_runs: [
+        { id: 1, name: 'build', status: 'completed', conclusion: 'success', html_url: 'https://github/checks/1', app: { name: 'GitHub Actions' } },
+        { id: 2, name: 'lint', status: 'completed', conclusion: 'failure', html_url: 'https://github/checks/2' },
+        { id: 3, name: 'deploy', status: 'completed', conclusion: 'skipped' },
+        { id: 4, name: 'uat', status: 'in_progress', conclusion: null },
+        { id: 5, name: 'queue', status: 'queued', conclusion: null },
+      ],
+    };
+    mockExec
+      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify(prJson), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify(checksJson), stderr: '' });
+
+    const result = await fetchIssueCheckRuns('PAN-830');
+
+    expect(result.pr?.number).toBe(642);
+    expect(result.checkRuns).toHaveLength(5);
+    expect(result.checkRuns[0]).toMatchObject({ name: 'build', status: 'completed', conclusion: 'success', app: 'GitHub Actions' });
+    expect(result.summary).toMatchObject({ total: 5, passed: 1, failed: 1, skipped: 1, running: 1, pending: 1 });
+    const [, , apiCmdCall] = mockExec.mock.calls;
+    expect(apiCmdCall![0]).toContain('gh api');
+    expect(apiCmdCall![0]).toContain('repos/eltmon/panopticon-cli/commits/abc123def456/check-runs');
+  });
+
+  it('returns PR metadata and an error when gh api fails', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'panopticon-cli',
+      number: 830,
+    });
+    mockExec
+      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ number: 642, url: 'https://github/pull/642', headRefName: 'feature/pan-830', mergeable: 'UNKNOWN', statusCheckRollup: [] }), stderr: '' })
+      .mockRejectedValueOnce(new Error('gh: not authenticated'));
+
+    const result = await fetchIssueCheckRuns('PAN-830');
+
+    expect(result.pr?.number).toBe(642);
+    expect(result.checkRuns).toEqual([]);
+    expect(result.error).toContain('gh api check-runs failed');
   });
 });

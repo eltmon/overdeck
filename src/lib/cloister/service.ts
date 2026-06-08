@@ -72,6 +72,7 @@ import { Effect } from 'effect';
 
 const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
+import { isIssueClosed } from './issue-closed.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
@@ -277,6 +278,13 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   const role = stateToRole(newState);
   if (!role) {
     console.log(`[cloister] ${normalizedIssueId}: no role for issue state '${newState}'`);
+    return;
+  }
+
+  if (await isIssueClosed(normalizedIssueId)) {
+    const message = `${normalizedIssueId}: skipping ${role} dispatch — issue is closed`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 

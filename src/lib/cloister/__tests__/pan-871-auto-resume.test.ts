@@ -31,6 +31,7 @@ vi.mock('../../../lib/agents.js', async () => {
   getAgentState: effectMock(null),
   getAgentStateSync: vi.fn(),
   getAgentStateProgram: effectMock(null),
+  messageAgent: vi.fn(async () => undefined),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
@@ -58,12 +59,39 @@ vi.mock('../../../lib/shadow-state.js', async () => {
   return { getShadowState };
 });
 
+vi.mock('../issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+}));
+
+vi.mock('../concurrency.js', () => ({
+  workResumeSlotsAvailable: vi.fn(() => 6),
+  getConcurrencyLimits: vi.fn(() => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 })),
+  countRunningAgents: vi.fn(() => ({ work: 0, advancing: 0, total: 0 })),
+  resetPatrolDispatchBudget: vi.fn(),
+  tryReserveAdvancingSlot: vi.fn(() => true),
+}));
+
 vi.mock('../../../lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: vi.fn(),
 }));
 
 vi.mock('../../../lib/database/app-settings.js', () => ({
   isDeaconGloballyPaused: vi.fn(() => false),
+}));
+
+vi.mock('../agent-idle.js', () => ({
+  isAgentIdleForNudge: vi.fn(() => false),
+}));
+
+vi.mock('child_process', () => ({
+  exec: vi.fn((_cmd: string, optsOrCb: unknown, maybeCb?: unknown) => {
+    const cb = (typeof optsOrCb === 'function' ? optsOrCb : maybeCb) as (
+      error: Error | null,
+      result: { stdout: string; stderr: string },
+    ) => void;
+    cb(null, { stdout: '○ workspace-nudge ● P2 pan-871: Continue work\n', stderr: '' });
+  }),
+  execFile: vi.fn(),
 }));
 
 vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
@@ -155,17 +183,24 @@ vi.mock('fs', () => ({
   rmSync: vi.fn(),
 }));
 
-import { autoResumeStoppedWorkAgents } from '../deacon.js';
-import { getAgentStateSync, getAgentState, resumeAgent } from '../../../lib/agents.js';
+import { autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads } from '../deacon.js';
+import { getAgentStateSync, getAgentState, messageAgent, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
+import { sessionExists } from '../../../lib/tmux.js';
+import { isAgentIdleForNudge } from '../agent-idle.js';
+import { isIssueClosed } from '../issue-closed.js';
 import { existsSync } from 'fs';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
+const mockMessageAgent = messageAgent as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
 const mockGetShadowState = getShadowState as any;
+const mockSessionExists = sessionExists as any;
+const mockIsAgentIdleForNudge = isAgentIdleForNudge as any;
+const mockIsIssueClosed = isIssueClosed as any;
 const mockExistsSync = existsSync as any;
 
 // Default existsSync behaviour mirrors the module mock: no completed markers present.
@@ -196,23 +231,21 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       updatedAt: new Date().toISOString(),
     } as any);
     mockGetShadowState.mockResolvedValue(null);
+    mockSessionExists.mockResolvedValue(false);
+    mockIsAgentIdleForNudge.mockReturnValue(false);
+    mockIsIssueClosed.mockResolvedValue(false);
+    mockMessageAgent.mockResolvedValue(undefined);
     mockResumeAgent.mockResolvedValue({ success: true } as any);
     mockExistsSync.mockImplementation(noCompletedMarkers);
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {
-    mockGetShadowState.mockResolvedValue({
-      issueId: 'PAN-871',
-      shadowStatus: 'closed',
-      trackerStatus: 'closed',
-      trackerStatusUpdatedAt: new Date().toISOString(),
-      shadowedAt: new Date().toISOString(),
-      history: [],
-    } as any);
+    mockIsIssueClosed.mockResolvedValue(true);
 
     const resumed = await autoResumeStoppedWorkAgents();
 
     expect(resumed).toEqual([]);
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-871');
     expect(mockResumeAgent).not.toHaveBeenCalled();
   });
 
@@ -268,5 +301,48 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
     expect(resumed).toEqual(['agent-pan-871']);
     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');
+  });
+
+  it('does not nudge an idle work agent when the issue is closed', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    });
+    mockIsIssueClosed.mockResolvedValue(true);
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+
+    const actions = await nudgeIdleWorkAgentsWithOpenBeads();
+
+    expect(actions).toEqual([]);
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-871');
+    expect(mockSessionExists).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('still nudges an idle work agent when the issue is open', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    });
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+
+    const actions = await nudgeIdleWorkAgentsWithOpenBeads();
+
+    expect(actions).toEqual(['Nudged idle agent-pan-871 (PAN-871) — 1 open bead(s)']);
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-nudge'));
   });
 });

@@ -546,6 +546,7 @@ export function SettingsPage() {
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
+  const [reloadingTldr, setReloadingTldr] = useState(false);
   const [claudeAuth, setClaudeAuth] = useState<{
     installed: boolean;
     loggedIn: boolean;
@@ -1296,6 +1297,24 @@ export function SettingsPage() {
         ...formData.agents,
         rtk: {
           ...formData.agents?.rtk,
+          enabled,
+        },
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
+  };
+
+  const handleTldrToggle = (enabled: boolean) => {
+    const next: SettingsConfig = {
+      ...formData,
+      agents: {
+        ...formData.agents,
+        tldr: {
+          ...formData.agents?.tldr,
           enabled,
         },
       },
@@ -3459,6 +3478,58 @@ export function SettingsPage() {
                 formData.agents?.rtk?.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
               }`} />
             </button>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">TLDR code-aware reads</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Replaces large code-file reads with structured TLDR summaries to save 90–95% of context tokens.
+                Defaults on. Takes effect immediately for new reads — no agent restart needed.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                data-testid="tldr-reload-daemons"
+                title="Restart the TLDR index daemons so the daemon layer matches the toggle. Read-interception already updates live on the next read."
+                onClick={async () => {
+                  setReloadingTldr(true);
+                  try {
+                    const res = await fetch('/api/services/tldr/reload', { method: 'POST' });
+                    if (!res.ok) throw new Error(await res.text());
+                    const body = await res.json();
+                    const verb = body.enabled ? `restarted ${body.restarted}` : `stopped ${body.stopped}`;
+                    toast.success(`TLDR daemons reloaded (${verb})`);
+                    queryClient.invalidateQueries({ queryKey: ['tldr-status'] });
+                  } catch (err: any) {
+                    toast.error(`Failed to reload TLDR daemons: ${err.message}`);
+                  } finally {
+                    setReloadingTldr(false);
+                  }
+                }}
+                disabled={reloadingTldr}
+                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:border-primary/50 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {reloadingTldr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {reloadingTldr ? 'Reloading…' : 'Reload daemons'}
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.agents?.tldr?.enabled ?? true}
+                aria-label="Enable TLDR code-aware reads"
+                data-testid="experimental-tldr-toggle"
+                onClick={() => handleTldrToggle(!(formData.agents?.tldr?.enabled ?? true))}
+                disabled={saveMutation.isPending}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  (formData.agents?.tldr?.enabled ?? true) ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  (formData.agents?.tldr?.enabled ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`} />
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
             <div className="min-w-0">

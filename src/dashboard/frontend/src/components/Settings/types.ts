@@ -145,6 +145,9 @@ export interface SettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
+    tldr?: {
+      enabled?: boolean;
+    };
   };
   memory?: MemorySettingsConfig;
   background_ai?: BackgroundAiConfig;

@@ -64,7 +64,7 @@ import {
   getGitHubConfig as getGitHubConfigShared,
   getRallyConfig as getRallyConfigShared,
 } from '../services/tracker-config.js';
-import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
+import { loadConfigSync as loadYamlConfig, isTldrEnabledSync } from '../../../lib/config-yaml.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealth, determineHealthStatus } from '../../lib/health-filtering.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
@@ -1438,6 +1438,73 @@ const postTldrStopRoute = HttpRouter.add(
       }}),
 );
 
+// ─── Route: POST /api/services/tldr/reload ───────────────────────────────────
+// Reconciles every TLDR index daemon (main + each workspaces/feature-*/.venv)
+// to the current agents.tldr.enabled toggle: restart when enabled, stop when
+// disabled. Read-interception already toggles live via the read hook — this only
+// refreshes the daemon/index layer, so it never touches running agents.
+
+const postTldrReloadRoute = HttpRouter.add(
+  'POST',
+  '/api/services/tldr/reload',
+  Effect.promise(async () => {
+    try {
+      const { getTldrDaemonServiceSync } = await import('../../../lib/tldr-daemon.js');
+      const enabled = isTldrEnabledSync();
+      const projectRoot = process.cwd();
+
+      // Collect every workspace that has a .venv (main + feature-* worktrees).
+      const targets: string[] = [];
+      if (existsSync(join(projectRoot, '.venv'))) targets.push(projectRoot);
+
+      const workspacesDir = join(projectRoot, 'workspaces');
+      if (existsSync(workspacesDir)) {
+        const workspaces = (await readdir(workspacesDir, { withFileTypes: true })).filter(
+          d => d.isDirectory() && d.name.startsWith('feature-'),
+        );
+        for (const ws of workspaces) {
+          const wsPath = join(workspacesDir, ws.name);
+          if (existsSync(join(wsPath, '.venv'))) targets.push(wsPath);
+        }
+      }
+
+      let restarted = 0;
+      let stopped = 0;
+      const errors: Array<{ workspace: string; error: string }> = [];
+
+      for (const wsPath of targets) {
+        try {
+          const service = getTldrDaemonServiceSync(wsPath, join(wsPath, '.venv'));
+          if (enabled) {
+            await service.restart();
+            restarted++;
+          } else {
+            await service.stop();
+            stopped++;
+          }
+        } catch (error: unknown) {
+          errors.push({
+            workspace: wsPath,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return jsonResponse({
+        success: errors.length === 0,
+        enabled,
+        targets: targets.length,
+        restarted,
+        stopped,
+        errors,
+      });
+    }    catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Error reloading TLDR daemons:', error);
+      return jsonResponse({ error: msg }, { status: 500 });
+      }}),
+);
+
 // ─── Route: GET /api/cache-status ────────────────────────────────────────────
 
 const getCacheStatusRoute = HttpRouter.add(
@@ -1755,6 +1822,7 @@ export const miscRouteLayer = Layer.mergeAll(
   getTldrStatusRoute,
   postTldrStartRoute,
   postTldrStopRoute,
+  postTldrReloadRoute,
   getCacheStatusRoute,
   clearCacheRoute,
   getMetricsRuntimesRoute,

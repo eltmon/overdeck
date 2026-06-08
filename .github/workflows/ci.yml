@@ -24,6 +24,11 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # PAN-1651: every job MUST cap its wall-clock. Without this a hung step
+    # (an orphaned dashboard server, a never-resolving health poll) runs until
+    # GitHub's 6h default, the required check never reports, and PRs can't
+    # merge. Fail fast so a re-run can recover.
+    timeout-minutes: 20
 
     strategy:
       matrix:
@@ -68,6 +73,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20  # PAN-1651: cap wall-clock so a hung step can't wedge the required check.
 
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +99,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # PAN-1651: this is the heaviest job (build + Playwright install + full
+    # vitest + benchmark + dashboard server + Command Deck Playwright spec).
+    # 30 min is generous headroom; a hang (e.g. the server health poll never
+    # going green) fails fast instead of running to GitHub's 6h default.
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -181,6 +192,7 @@ jobs:
   clean-install:
     runs-on: ubuntu-latest
     name: Clean install + server smoke test
+    timeout-minutes: 20  # PAN-1651: the smoke-test server poll must not be able to hang the required check.
 
     steps:
       - uses: actions/checkout@v4

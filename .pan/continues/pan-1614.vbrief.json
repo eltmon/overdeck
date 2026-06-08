@@ -1,0 +1,112 @@
+{
+  "version": "1",
+  "issueId": "PAN-1614",
+  "created": "2026-06-05T18:53:09.021Z",
+  "updated": "2026-06-08T03:35:34.740Z",
+  "gitState": {
+    "branch": "feature/pan-1614",
+    "sha": "ff30c9259",
+    "dirty": false
+  },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Root cause: deacon checkOrphanedReviewStatuses re-dispatches a pending review ONLY when status.prUrl is set AND the agent's completed.processed marker exists (deacon.ts:1569-1639). When an OPEN in-review issue's whole convoy stops but that precondition is unmet, the pending path never re-dispatches, never increments reviewRetryCount, never trips the PAN-794 breaker, and never escalates — the issue silently wedges in in-review with no live agent (PAN-1242 = 9 days). Same class of bug as PAN-1247: a gate with no recovery path is an infinite stall.",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Fix shape: add a NEW dedicated patrol recoverStalledReviewConvoys() rather than further complicating the already-dense (1367-1735) checkOrphanedReviewStatuses. Keeps the recovery independently testable and mirrors the established pattern where bounded self-heal lives in its own function (recoverUnhealthyTestStack, deacon.ts:1291-1365).",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Detection predicate (conservative, low false-positive): canonical tracker state === 'in_review' (OPEN) AND reviewStatus in-flight ('reviewing' or 'pending') AND every convoy agent stopped (work agent-<id>, synthesis agent-<id>-review, and all four agent-<id>-review-<subRole> where subRole in REVIEW_SUB_ROLES) is status stopped/absent — none running/starting AND no gate (no convoy agent has paused===true or troubled===true) AND review status is not stuck and not deaconIgnored.",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Recovery action: force-re-dispatch the review convoy via spawnReviewRoleForIssue({ issueId, workspace, branch, force: true }). force:true is used deliberately because the patrol has already confirmed (via state.json) the convoy is fully stopped and stale; we want an unconditional fresh convoy against current HEAD. The idempotency guard (review-agent.ts:298-366) would otherwise keep a stale runId / idle-alive pane; force kills any leftover sessions (killAllReviewerSessions catches errors, so force-killing already-dead sessions is harmless).",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Bound the recovery EXACTLY like recoverUnhealthyTestStack: a module-level in-memory Map<issueKey,{lastAttempt:number;attempts:number;escalated:boolean}>, a cooldown window (reuse the 15-minute precedent), an attempt cap (3, matching TEST_STACK_REBUILD_MAX_ATTEMPTS / REVIEW_INFRA_BREAKER_THRESHOLD), and a single escalation when the cap is exhausted: emitActivityEntrySync(level:'error') AND mark the review status stuck with a specific reason so the patrol stops looping and the dashboard surfaces it for a human. A successful re-dispatch clears the issue's entry from the map.",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D6",
+      "summary": "OPEN check reuses the existing cached canonical-state lookup getAutoCloseOutCanonicalState() (deacon.ts:3559-3592, 10-min TTL) to avoid adding uncached gh calls on every patrol. Only call it for the small set of issues whose reviewStatus is already in-flight, bounding API usage further.",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Ordering: wire recoverStalledReviewConvoys() into runPatrol AFTER checkOrphanedReviewStatuses (deacon.ts:4342) and AFTER recoverOrphanedAgents (4285). Running after recoverOrphanedAgents means orphaned running-but-tmux-gone agents have already been reset to stopped, so reading state.json status is consistent. Running after checkOrphanedReviewStatuses means if that patrol just re-dispatched, a convoy agent will be starting/running and our 'all stopped' predicate naturally won't match — no double-dispatch.",
+      "recordedAt": "2026-06-05T18:58:00.293Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Double-dispatch race with checkOrphanedReviewStatuses' own pending re-dispatch path.",
+      "mitigation": "Order recoverStalledReviewConvoys() after checkOrphanedReviewStatuses in runPatrol; the 'every convoy agent stopped' predicate means a just-dispatched convoy (agent starting/running) won't match. spawnReviewRoleForIssue is additionally idempotent against a live convoy."
+    },
+    {
+      "id": "H2",
+      "summary": "False positive during normal spawn settling — convoy momentarily 'stopped' between dispatch and agents coming up.",
+      "mitigation": "The cooldown window plus the conservative predicate (requires canonical in_review AND in-flight reviewStatus AND ALL six agents stopped AND no gate) makes a transient window extremely unlikely to trigger; even if it does, force re-dispatch of a settling convoy is self-correcting and the attempt cap bounds it."
+    },
+    {
+      "id": "H3",
+      "summary": "Must NOT act on verifying_on_main or in_progress (also OPEN) — only genuine in-review stalls.",
+      "mitigation": "Require canonical state === 'in_review' specifically (not merely 'open'). verifying_on_main / in_progress / done / canceled all fall through untouched."
+    },
+    {
+      "id": "H4",
+      "summary": "Respect every existing gate so recovery never fights a deliberate human/operator decision.",
+      "mitigation": "Skip when any convoy agent has paused===true or troubled===true, and when the review status has stuck===true or deaconIgnored===true. These mirror the gates checkOrphanedReviewStatuses already honors (deacon.ts:1449-1452)."
+    },
+    {
+      "id": "H5",
+      "summary": "Cap exhaustion must end in a visible, non-looping terminal — not silent give-up (the very failure mode PAN-1614 reports).",
+      "mitigation": "On cap exhaustion, emit one activity-log error AND mark the review status stuck with a dedicated reason (e.g. 'review_convoy_unrecoverable'). The existing 'if (status.stuck) continue' guards then keep both patrols quiet until a human unsticks, and the dashboard renders the stuck/recovery UI."
+    },
+    {
+      "id": "H6",
+      "summary": "Workspace/project may be unresolvable (workspace reaped, project removed) when recovery fires.",
+      "mitigation": "Resolve project via resolveProjectFromIssueSync + findWorkspacePath (same as existing recovery). If workspace/project is unavailable, record an action and skip (do not crash the patrol); do not consume an attempt on an unresolvable-workspace skip so a later-restored workspace still gets the full attempt budget."
+    },
+    {
+      "id": "H7",
+      "summary": "In-memory recovery-state map resets on dashboard restart (attempts/cooldown lost).",
+      "mitigation": "Acceptable and matches recoverUnhealthyTestStack/merge-retry precedent — these cooldowns are rate-limiters, not critical state. A restart simply grants a fresh attempt budget, which is the safe direction (recover rather than stay wedged)."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-05T18:53:09.021Z",
+      "reason": "planning",
+      "note": "Initial planning session for PAN-1614 (auto mode)",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-05T20:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-05T20:21:59.171Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-05T20:25Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-05T20:25:33.115Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-05T20:27Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-05T20:27:03.012Z"
+    }
+  ],
+  "feedback": []
+}

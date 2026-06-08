@@ -27,6 +27,11 @@ const mockSendKeysAsync = vi.fn();
 const mockWriteFeedbackFile = vi.fn();
 const mockResolveProjectFromIssue = vi.fn();
 const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
+const mockIsIssueClosed = vi.fn();
+
+vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
+}));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
@@ -130,6 +135,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+    mockIsIssueClosed.mockReset().mockResolvedValue(false);
     // Default: read the real review-status.json so tests that write to it work
     mockLoadReviewStatuses.mockReset().mockImplementation(() => {
       try {
@@ -250,6 +256,24 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('checkPostReviewCommits skips review re-dispatch when the issue is closed', async () => {
+    mockIsIssueClosed.mockResolvedValue(true);
+    writeStatusFile({
+      [ISSUE_ID]: {
+        reviewStatus: 'passed',
+        readyForMerge: true,
+        reviewedAtCommit: 'deadbeef00000000000000000000000000000000',
+      },
+    });
+
+    const actions = await checkPostReviewCommits();
+
+    expect(actions).toEqual([]);
+    expect(mockResolveProjectFromIssue).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockIsIssueClosed).toHaveBeenCalledWith(ISSUE_ID);
   });
 
   it('(f) checkPostReviewCommits clears ciRetryMap on new commits, enabling retry on next patrol', async () => {

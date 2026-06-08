@@ -1,14 +1,11 @@
 import { useMemo } from 'react'
 import type { PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
-import { HomePane } from './HomePane'
-import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
-import { IssueStatusBand } from './IssueStatusBand'
 import { Launcher } from './HomePane/Launcher'
 import { AgentDock } from './HomePane/AgentDock'
 import { ActionDock } from './HomePane/ActionDock'
 import { Timeline } from './HomePane/Timeline'
-import { IssueCockpitBody } from './cockpit/IssueCockpitBody'
+import { IssueMissionControl } from './cockpit/IssueMissionControl'
 import { dispatchLauncherIntent } from './HomePane/launcherActions'
 import { readLastUsedAgent, writeLastUsedAgent } from './HomePane/launcherOrdering'
 import type { TimelineConversation } from './HomePane/timeline-utils'
@@ -20,6 +17,8 @@ export interface IssueOverviewProps {
   title: string
   /** Feature branch; defaults to feature/<issueId>. */
   branch?: string
+  /** Active project name for the cockpit breadcrumb (e.g. "panopticon-cli"). */
+  projectName?: string
   /** Issue creation time for the age stat chip. */
   createdAt?: number | string
   /** The issue's agent id — scopes Files/Commits panes to this issue's workspace. */
@@ -44,6 +43,7 @@ export function IssueOverview({
   issueId,
   title,
   branch,
+  projectName,
   agentId,
   conversations = [],
   onCreateConversation,
@@ -84,46 +84,42 @@ export function IssueOverview({
     api.openPane({ paneType: t, label: ISSUE_PANE_LABELS[t] ?? 'Pane', issueId, agentId })
   }
 
+  const launcher = (
+    <Launcher
+      lastUsedAgentId={readLastUsedAgent(issueId)}
+      onSelect={(intent, query) =>
+        dispatchLauncherIntent(intent, query, {
+          openAgent: (i, query) => onAgentSelected(i.id, query),
+          openTerminal,
+          openWeb: (_q, url) =>
+            api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),
+          onAgentRun: (id) => writeLastUsedAgent(issueId, id),
+        })
+      }
+    />
+  )
+
+  const timeline = (
+    <Timeline
+      conversations={timelineConversations}
+      onOpen={(id) => {
+        const conv = issueConversations.find((c) => c.name === id)
+        api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
+      }}
+    />
+  )
+
   return (
-    <HomePane
-      workspaceId={api.deckKey}
-      openPane={api.openPane}
-      header={
-        <>
-          <WorkspaceHeader
-            name={title}
-            branch={branch ?? `feature/${issueId.toLowerCase()}`}
-            iconLabel={title.charAt(0).toUpperCase()}
-          />
-          <IssueStatusBand issueId={issueId} />
-        </>
-      }
-      launcher={
-        <Launcher
-          lastUsedAgentId={readLastUsedAgent(issueId)}
-          onSelect={(intent, query) =>
-            dispatchLauncherIntent(intent, query, {
-              openAgent: (i, query) => onAgentSelected(i.id, query),
-              openTerminal,
-              openWeb: (_q, url) =>
-                api.openPane({ paneType: 'browser', label: 'Web', browserInitialUrl: url }),
-              onAgentRun: (id) => writeLastUsedAgent(issueId, id),
-            })
-          }
-        />
-      }
+    <IssueMissionControl
+      issueId={issueId}
+      title={title}
+      branch={branch ?? `feature/${issueId.toLowerCase()}`}
+      projectName={projectName}
+      launcher={launcher}
       agentDock={<AgentDock onSelectAgent={onAgentSelected} />}
       actionDock={<ActionDock onOpen={onAction} />}
-      timeline={
-        <Timeline
-          conversations={timelineConversations}
-          onOpen={(id) => {
-            const conv = issueConversations.find((c) => c.name === id)
-            api.openOrFocusAgentPane(id, conv?.title ?? 'Agent')
-          }}
-        />
-      }
-      detail={<IssueCockpitBody issueId={issueId} />}
+      timeline={timeline}
+      onOpenPane={onAction}
     />
   )
 }

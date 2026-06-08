@@ -1,5 +1,10 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// This file dynamically imports the full conversations route module in each test.
+// Under the full suite's parallel build/test load, those imports can exceed the
+// default 5s timeout even though each assertion path is fast once loaded.
+vi.setConfig({ testTimeout: 20_000 });
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';

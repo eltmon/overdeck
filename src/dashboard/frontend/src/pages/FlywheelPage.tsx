@@ -260,6 +260,22 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
   const configBusy = flywheelConfigMutation.isPending;
   const configError = flywheelConfigMutation.error instanceof Error ? flywheelConfigMutation.error.message : null;
 
+  // A paused orchestrator emits no live status snapshot, so `status` is null —
+  // but that must NOT read as "stopped". Fetch the latest run's lifecycle so the
+  // empty-state can tell a paused run (resume to continue) from no run at all
+  // (start to begin). Mirrors the Sidebar / FlywheelConversationPane source.
+  const { data: latestRun } = useQuery({
+    queryKey: ['flywheel-latest-run-lifecycle'],
+    queryFn: async (): Promise<{ status: 'running' | 'paused' | 'complete' | 'aborted' } | null> => {
+      const res = await fetch('/api/flywheel/runs?limit=1');
+      if (!res.ok) return null;
+      const runs = (await res.json()) as Array<{ status: 'running' | 'paused' | 'complete' | 'aborted' }> | null;
+      return Array.isArray(runs) ? (runs[0] ?? null) : null;
+    },
+    refetchInterval: 5000,
+  });
+  const isPaused = latestRun?.status === 'paused';
+
   const setLeftWidthClamped = useCallback((next: number) => {
     const container = containerRef.current;
     const containerWidth = container?.getBoundingClientRect().width ?? window.innerWidth;
@@ -458,6 +474,13 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           {activeTab === 'status' ? (
             status ? (
               <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
+            ) : isPaused ? (
+              <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <div>
+                  <p className="text-base font-medium text-foreground">Run paused — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pan flywheel resume</code> to continue.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">The orchestrator is paused; its run state is preserved. The status pane will repopulate when it resumes.</p>
+                </div>
+              </div>
             ) : (
               <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
                 <div>
