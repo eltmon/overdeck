@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1613: Substrate: agents stay live / are re-spawned on CLOSED issues (zombie agent slots)",
-    "updated": "2026-06-08T12:14:17.119Z"
+    "updated": "2026-06-08T12:15:25.279Z"
   },
   "plan": {
     "id": "pan-1613",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "66d110af-7aa0-46e7-945a-499cd4836b53",
     "author": "agent:claude-opus-4-8",
-    "sequence": 8,
+    "sequence": 14,
     "created": "2026-06-05T18:57:46.000Z",
-    "updated": "2026-06-08T12:14:17.119Z",
+    "updated": "2026-06-08T12:15:25.279Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1613",
@@ -505,29 +505,29 @@
         "phase": "work",
         "issueId": "PAN-1613",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T12:14:17.113Z",
+        "updatedAt": "2026-06-08T12:15:25.273Z",
         "work": {
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "status": "pending",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-08T12:14:17.113Z"
+              "status": "pending",
+              "at": "2026-06-08T12:15:25.273Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "notes": "PASSED — no blockers; 3 non-blocking advisories documented in synthesis",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:14:17.113Z",
+              "at": "2026-06-08T12:15:25.273Z",
               "notes": "PASSED — no blockers; 3 non-blocking advisories documented in synthesis"
             }
           ],
@@ -535,27 +535,27 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:14:17.113Z",
+              "at": "2026-06-08T12:15:25.273Z",
               "notes": "Workspace docker stack for PAN-1613 is not healthy: No Docker containers found for workspace stack pan-1613. Run 'pan workspace rebuild PAN-1613' or retry with --host to override."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T12:14:17.113Z",
+          "updatedAt": "2026-06-08T12:15:25.273Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T12:14:17.113Z"
+              "at": "2026-06-08T12:15:25.273Z"
             }
           ],
           "readyForMerge": false,
