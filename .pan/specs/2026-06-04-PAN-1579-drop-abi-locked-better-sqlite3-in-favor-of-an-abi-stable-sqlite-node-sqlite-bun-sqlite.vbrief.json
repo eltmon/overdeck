@@ -4,7 +4,7 @@
     "created": "2026-06-04T06:10:35.762Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1579: Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
-    "updated": "2026-06-04T06:14:01.802Z"
+    "updated": "2026-06-08T04:10:29.853Z"
   },
   "plan": {
     "id": "pan-1579",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f2d47439-4aa7-413e-983c-926543b7cb8e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 12,
     "created": "2026-06-04T06:10:35.762Z",
-    "updated": "2026-06-04T06:14:01.802Z",
+    "updated": "2026-06-08T04:10:29.853Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1579",
@@ -665,7 +665,64 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json"
+      "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1579",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-08T04:10:29.562Z",
+        "work": {
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": []
+        },
+        "verification": {
+          "status": "running",
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-06-08T04:10:29.562Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T04:10:29.562Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T04:10:29.562Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T04:10:29.562Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T04:10:29.562Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1677"
+        }
+      }
     }
   },
   "status": "proposed"
