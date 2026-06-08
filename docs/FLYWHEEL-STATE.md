@@ -793,3 +793,59 @@ reported "active" by cloister because the heartbeat ticks at the prompt). Both
 have only orchestrator-forbidden remediations (`pan kill`, answer the prompt),
 so the disciplined output stays: fresh evidence on PAN-1613/PAN-1616 + surface,
 not hand-fix.
+
+### RUN-15 tick 3 — "test FAILURE" on a PR has TWO independent signals; check both
+
+A PR carries two distinct test signals and they can disagree:
+1. **`panopticon/test`** — the test-ROLE agent's verdict, posted as a commit
+   status ("Test specialist passed").
+2. **`test`** — the GitHub Actions workflow test job.
+
+Tick 3 corrected my tick-2 read of PAN-1455 (#1611). I had flagged "test FAILURE
++ idle work agent → PAN-1614 deacon-redispatch gap." Investigating the actual
+CI log showed the opposite: `panopticon/test` = **pass** (code is fine), while
+the GHA `test` job was **stale-red from Jun-7 05:27** failing on
+`better-sqlite3` native rebuild (`error: Script not found "rebuild"`) — the exact
+ABI problem **PAN-1579** fixes — plus a 6-hour `Clean install + server smoke
+test` hang (**PAN-1651**). So PAN-1455 is blocked on **known CI-infra bugs**, not
+a code defect and not a deacon-recovery gap. **No new bug filed** — that would
+duplicate PAN-1579/1651.
+
+Lessons:
+- When a PR shows `test fail`, read (a) `panopticon/test` separately from the GHA
+  `test` job, (b) the failing run's **timestamp** (a stale run ≠ current state),
+  and (c) the actual failing step. A native-rebuild / smoke-hang infra failure is
+  PAN-1579/1651, not a code regression.
+- **Investigate before filing.** The two-tick "frozen + red" signal looked like a
+  deacon gap; the log proved it was CI staleness. Filing on the tick-2
+  hypothesis would have produced a wrong, duplicate bug. The Karpathy
+  "investigate before fixing" rule applies to *filing* too.
+- A ctx-100% wedge only matters if the PR isn't already green (tick-2 rule) — and
+  a red PR only matters if it's the *code* that's red, not stale infra CI.
+
+### RUN-15 tick 3 — PAN-1579 unstuck (manual option-2); operator escalating substrate
+
+PAN-1579's `.claude/**` settings-protection hang (PAN-1616 class-2) cleared — the
+pane shows option `2` selected and the agent resumed (ctx 62%, +91/-58). It
+needed a manual unblock, so **PAN-1616's class-2 gap is still real** (an agent
+should never hang requiring a human to pick option 2). Nice second-order effect:
+PAN-1579 is itself the better-sqlite3 fix that unblocks PAN-1455's CI.
+
+Operator continues driving substrate directly: the **PAN-1675 strike declined**
+the broad infra change and **fell through to planning** (`planning-pan-1675`) —
+the documented strike→plan reflex. A new critical **PAN-1510** (newly-filed
+issues missing from frontend store, sibling of the PAN-1506 strike) was filed and
+is planning. The flywheel notes these in the snapshot and does not touch
+operator-owned strikes/plans.
+
+### RUN-15 ticks 1–3 — the standing shape: operator-gated, not flywheel-blocked
+
+Three ticks, ~58 min, zero merges, UAT batch flat at 19. This is NOT a stalled
+flywheel — every in-flight item is either (a) CI-green and waiting on the
+operator's UAT+merge (PAN-1242/1395; can't merge — require_uat_before_merge=true),
+(b) blocked on a substrate gap with only orchestrator-forbidden remediations
+(PAN-1496 zombie, PAN-1491 wedge), or (c) operator-owned (strikes/planning). With
+16 agents live under the governor and `auto_pickup_backlog=false`, there is no
+launchable in-flight work below minAgents. Holding launches is correct; the
+deliverable is the precise ready/blocked map + the standing message that the
+UAT batch is the bottleneck.
