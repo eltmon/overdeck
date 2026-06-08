@@ -39,6 +39,8 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/tmux.js');
+    vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('os');
     vi.resetModules();
 
     if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
@@ -74,6 +76,23 @@ describe('agent failure tracking and auto-resume backoff', () => {
   }
 
   async function loadDeaconWithResumeMock() {
+    vi.doMock('os', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('os')>();
+      return {
+        ...actual,
+        default: actual,
+        loadavg: () => [1, 1, 1],
+        cpus: () => Array.from({ length: 24 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+      };
+    });
+    vi.doMock('../../../src/lib/cloister/concurrency.js', () => ({
+      getConcurrencyLimits: () => ({ maxWorkAgents: 999, reservedAdvancingSlots: 3, totalCeiling: 1002 }),
+      countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+      workResumeSlotsAvailable: () => 999,
+      resetPatrolDispatchBudget: vi.fn(),
+      tryReserveAdvancingSlot: () => true,
+      canDispatchAdvancing: () => true,
+    }));
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();
       return {

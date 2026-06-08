@@ -171,7 +171,7 @@ export function evaluateBurnedFromLog(
   // can still surface a later success.
   const lines = logRaw.split('\n').slice(-500);
 
-  // PAN-913 matched OpenAI's prose burn message; PAN-1455 adds the JSON code shape.
+  // PAN-913 matched `refresh token has already been used`; PAN-1455 adds `refresh_token_reused`.
   const isBurnLine = (l: string) =>
     l.includes('refresh token has already been used') || l.includes('refresh_token_reused');
   const isAuthFailure503 = (l: string) =>
