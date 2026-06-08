@@ -849,3 +849,47 @@ operator's UAT+merge (PAN-1242/1395; can't merge — require_uat_before_merge=tr
 launchable in-flight work below minAgents. Holding launches is correct; the
 deliverable is the precise ready/blocked map + the standing message that the
 UAT batch is the bottleneck.
+
+### RUN-15 tick 4 — CORRECTION: the bottleneck was ship-on-broken-docker, not UAT laziness
+
+Ticks 1–3 framed "zero merges, UAT batch flat at 19" as *operator-gated* — the
+operator just hadn't UAT'd the ready batch. **That model was wrong.** A parallel
+operator session's durable note (project memory, ~2026-06-08 00:15) revealed the
+real chain, and it reframes everything:
+
+1. **Ship chokes on broken workspace docker (PAN-1645).** Ship is the role that
+   sets `readyForMerge=true`. With docker init regressed, ship can't complete, so
+   **PAN-1642 / PAN-1613 / PAN-1614 / PAN-1455 sit review+test PASSED but
+   `readyForMerge=false`** — they never reach the UAT/merge gate. The issues
+   aren't waiting on the operator; they're stuck one stage *before* the operator.
+2. **The deacon was FROZEN AGAIN (~00:15)** as build-storm protection. So the
+   tick-1–3 rationale "hold launches because the governor is *driving* the
+   pipeline" was right to hold but wrong on the reason — the governor wasn't
+   driving, it was frozen.
+3. **PAN-1678 is the keystone:** `build:docs-index` (10-core, 3926-chunk) runs in
+   *every* agent/verification/ship build. `agent-pan-1579` triggered 8×
+   concurrent docs-index builds → host load 38 (near the 36 gate / OOM). Deacon
+   unfreeze AND any safe new agent launch are both gated on PAN-1678 landing.
+   **Under autonomy, launching an agent here would re-trigger the storm** — so
+   holding launches went from "cap-respecting" to "mandatory / actively harmful
+   to violate."
+4. **The operator delegated a manual landing push to handoff worker conv 2558**
+   (`conv-20260608-c014`, Opus): land the 4 via ship-on-host, fix PAN-1645/1678,
+   recover wedged PAN-1395/1641. The flywheel observes and stays out of its way.
+5. **The flywheel cap was deliberately lowered 30→4** (`~/.panopticon/config.yaml
+   roles.flywheel`) for exactly this stabilization window — the low cap I saw is a
+   feature, not a coincidence.
+
+**Lessons for future runs:**
+- "Zero merges + flat UAT batch" has (at least) two very different causes:
+  operator-not-UAT'ing vs **issues-can't-reach-the-gate** (ship/docker stall).
+  Distinguish them by checking `readyForMerge` and whether ship can run — don't
+  assume the human gate is the bottleneck just because nothing merged.
+- **The durable project memory can be updated by a parallel session mid-run.**
+  Re-read it each tick. A frozen deacon / active landing worker / new keystone bug
+  can completely change the correct posture, and the orchestrator won't see it in
+  `gh`/`tmux` state alone.
+- When the deacon is frozen against a build storm (PAN-1678 unfixed), "keep agents
+  working" inverts: the highest-value move is to NOT launch (and not run a full
+  `npm run build` either), because every launch's verification build re-storms the
+  host. Surface the keystone, point at the active landing worker, hold.
