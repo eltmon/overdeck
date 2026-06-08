@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-08T16:23:41.184Z"
+    "updated": "2026-06-08T16:33:33.239Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 67,
+    "sequence": 72,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-08T16:23:41.184Z",
+    "updated": "2026-06-08T16:33:33.239Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -446,55 +446,55 @@
         "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T16:23:41.180Z",
+        "updatedAt": "2026-06-08T16:33:33.210Z",
         "work": {
-          "updatedAt": "2026-06-08T16:23:41.180Z",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T16:23:41.180Z",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T16:23:41.180Z"
+              "at": "2026-06-08T16:33:33.210Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-08T16:23:41.180Z",
-          "notes": "Live conversation stream drops in-flight tool results and rebroadcasts full history on append",
+          "status": "reviewing",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "notes": "Agent re-review request (3/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-08T16:23:41.180Z",
-              "notes": "Live conversation stream drops in-flight tool results and rebroadcasts full history on append"
+              "status": "reviewing",
+              "at": "2026-06-08T16:33:33.210Z",
+              "notes": "Agent re-review request (3/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:23:41.180Z",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:23:41.180Z"
+              "at": "2026-06-08T16:33:33.210Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T16:23:41.180Z",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:23:41.180Z",
+          "updatedAt": "2026-06-08T16:33:33.210Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:23:41.180Z"
+              "at": "2026-06-08T16:33:33.210Z"
             }
           ],
           "readyForMerge": false,
