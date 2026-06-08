@@ -36,6 +36,14 @@ import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './Dif
 type DiffThemeType = 'light' | 'dark'
 
 const DIFF_PANEL_UNSAFE_CSS = `
+:host {
+  /* Pin the diff to our app theme (PAN-1520): @pierre/diffs renders into a shadow
+     DOM and switches light/dark via CSS light-dark(), which follows color-scheme.
+     Without this, the shadow tree can briefly fall back to the OS prefers-color-scheme
+     on first paint before the themeType prop applies (a light flash in dark mode).
+     This style is injected last into the shadow, so it wins. */
+  color-scheme: var(--pan-color-scheme, light dark);
+}
 [data-diffs-header],
 [data-diff],
 [data-file],
