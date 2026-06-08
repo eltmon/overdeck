@@ -411,6 +411,42 @@ describe('AgentState role persistence', () => {
     expect(emitActivityEntry).not.toHaveBeenCalled();
   });
 
+  it('PAN-1645: review/test/ship auto-fall-back to host (no throw) when the stack stays unhealthy; work still blocks', async () => {
+    const emitActivityEntry = vi.fn();
+    const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: false, error: 'init exited non-zero (1)' }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['panopticon-feature-init-1 init exited non-zero (1)'],
+        lastObserved: '2026-06-08T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+    }));
+
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    // ship/review/test operate on the host (rebase/diff/host gates) — an
+    // unhealthy stack must NOT block them: the gate resolves (host fallback).
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7001', 'ship')).resolves.toBeUndefined();
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7002', 'review')).resolves.toBeUndefined();
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7003', 'test')).resolves.toBeUndefined();
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'warn',
+      message: expect.stringContaining('agent-spawn-host-fallback'),
+    }));
+    // work, by contrast, may need the dev container — it still blocks.
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7004', 'work')).rejects.toThrow('is not healthy');
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('agent-spawn-stack-rebuild-failed'),
+    }));
+  });
+
   it('treats state.json without a valid role as missing', async () => {
     const { getAgentStateSync } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');

@@ -2734,14 +2734,46 @@ export async function assertWorkspaceStackHealthyForSpawn(
     return;
   }
 
-  // PAN-1618: attempt an autonomous rebuild before failing, so a `proposed`
-  // item reaches a running work agent without a human step. Bounded by a
-  // cooldown + attempt cap (same shape as PAN-1247's orphan-test recovery).
+  // PAN-1645 + PAN-1618: an unhealthy stack must NEVER *block* the advancing
+  // roles. review/test/ship all operate on the HOST workspace — ship
+  // rebases/pushes against the host .git, review reads the committed diff, and
+  // test runs the project's quality gates (host-run unless a gate explicitly
+  // opts into a container) — so they do not need the workspace's docker
+  // containers at all. The long-standing manual `--host` workaround (PAN-1645)
+  // burned enormous effort just rediscovering that ship-on-broken-docker is a
+  // false gate. For these roles we still attempt one bounded autonomous rebuild
+  // (so a project whose test gates DO run in containers gets a healthy stack
+  // when recoverable), but if it can't be made healthy we AUTO-FALL-BACK TO
+  // HOST and proceed instead of throwing.
+  //
+  // `work` is different: a work agent may rely on the dev container's services,
+  // so silently running it on the host could build/test against a missing
+  // environment. work keeps the hard gate (rebuild → escalate to a human).
+  const hostFallbackEligible = role !== 'work';
+
   const record = spawnStackRebuildState.get(normalizedIssue)
     ?? { lastAttempt: 0, attempts: 0, escalated: false };
   const now = Date.now();
 
-  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+  const fallbackToHost = (reason: string): void => {
+    console.warn(`[agents] ${message} — auto-falling back to host for ${role} (${reason})`);
+    // Emit the host-fallback notice once per issue (reuse the escalated flag as
+    // a "notice already emitted" latch). Level is warn, not error: this is an
+    // automatic, non-blocking recovery, not a dead end needing a human.
+    if (!record.escalated) {
+      record.escalated = true;
+      spawnStackRebuildState.set(normalizedIssue, record);
+      emitActivityEntrySync({
+        source: role,
+        level: 'warn',
+        issueId: normalizedIssue,
+        message: `agent-spawn-host-fallback: ${normalizedIssue}`,
+        details: `Workspace docker stack unhealthy (${details}); ${role} runs on the host (rebase/verify use host .git + host gates), so proceeding without containers. ${reason}`,
+      });
+    }
+  };
+
+  const blockWork = (markerMessage: string, errDetails: string): never => {
     if (!record.escalated) {
       record.escalated = true;
       spawnStackRebuildState.set(normalizedIssue, record);
@@ -2749,24 +2781,32 @@ export async function assertWorkspaceStackHealthyForSpawn(
         source: role,
         level: 'error',
         issueId: normalizedIssue,
-        message: `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
-        details: `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+        message: markerMessage,
+        details: errDetails,
       });
     }
     throw new Error(message);
+  };
+
+  if (record.attempts >= SPAWN_STACK_REBUILD_MAX_ATTEMPTS) {
+    if (hostFallbackEligible) {
+      fallbackToHost(`rebuild exhausted after ${record.attempts} attempts`);
+      return;
+    }
+    blockWork(
+      `agent-spawn-stack-rebuild-exhausted: ${normalizedIssue}`,
+      `Workspace docker stack still unhealthy after ${record.attempts} rebuild attempts: ${details}. Manual 'pan workspace rebuild ${normalizedIssue}' or retry with --host needed.`,
+    );
   }
 
   if (now - record.lastAttempt < SPAWN_STACK_REBUILD_COOLDOWN_MS) {
     // A rebuild was attempted recently and the stack is still unhealthy —
-    // surface the blocker but don't hammer `docker compose` every spawn.
-    emitActivityEntrySync({
-      source: role,
-      level: 'error',
-      issueId: normalizedIssue,
-      message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
-      details,
-    });
-    throw new Error(message);
+    // don't hammer `docker compose` every spawn.
+    if (hostFallbackEligible) {
+      fallbackToHost('rebuild on cooldown');
+      return;
+    }
+    blockWork(`agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`, details);
   }
 
   record.lastAttempt = now;
@@ -2782,7 +2822,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
     rebuildWorkspaceStack(issueId, {
       onProgress: (m) => console.log(`[agents]   ${normalizedIssue} stack rebuild: ${m}`),
     }),
-  );
+  ).catch((err: unknown) => ({ success: false as const, error: err instanceof Error ? err.message : String(err) }));
 
   if (result.success) {
     spawnStackRebuildState.delete(normalizedIssue);
@@ -2791,14 +2831,11 @@ export async function assertWorkspaceStackHealthyForSpawn(
   }
 
   console.warn(`[agents] Workspace stack rebuild failed for ${normalizedIssue}: ${result.error}`);
-  emitActivityEntrySync({
-    source: role,
-    level: 'error',
-    issueId: normalizedIssue,
-    message: `agent-spawn-stack-rebuild-failed: ${normalizedIssue}`,
-    details: result.error ?? details,
-  });
-  throw new Error(message);
+  if (hostFallbackEligible) {
+    fallbackToHost(`rebuild failed: ${result.error ?? 'unknown'}`);
+    return;
+  }
+  blockWork(`agent-spawn-stack-rebuild-failed: ${normalizedIssue}`, result.error ?? details);
 }
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
