@@ -4,7 +4,7 @@
     "created": "2026-06-04T06:10:35.762Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1579: Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
-    "updated": "2026-06-08T04:14:38.022Z"
+    "updated": "2026-06-08T04:14:44.029Z"
   },
   "plan": {
     "id": "pan-1579",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f2d47439-4aa7-413e-983c-926543b7cb8e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 31,
+    "sequence": 32,
     "created": "2026-06-04T06:10:35.762Z",
-    "updated": "2026-06-08T04:14:38.022Z",
+    "updated": "2026-06-08T04:14:44.029Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1579",
@@ -667,60 +667,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1579",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T04:14:37.938Z",
+        "updatedAt": "2026-06-08T04:14:44.009Z",
         "work": {
-          "updatedAt": "2026-06-08T04:14:37.938Z",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-06-08T04:14:37.938Z",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
           "notes": "Verification FAILED at test (45080ms):\n\nto change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1322068) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:262:21\n    260|     const resumed = await autoResumeStoppedWorkAgents();\n    261|\n    262|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    263|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:269:21\n    267|     const resumed = await autoResumeStoppedWorkAgents();\n    268|\n    269|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    270|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    271|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-08T04:14:37.938Z",
+              "at": "2026-06-08T04:14:44.009Z",
               "notes": "Verification FAILED at test (45080ms):\n\nto change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1322068) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:262:21\n    260|     const resumed = await autoResumeStoppedWorkAgents();\n    261|\n    262|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    263|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    264|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:269:21\n    267|     const resumed = await autoResumeStoppedWorkAgents();\n    268|\n    269|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    270|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    271|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T04:14:37.938Z",
-          "notes": "Verification failed at lint",
+          "status": "failed",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
+          "notes": "Verification failed at test",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-08T04:14:37.938Z",
-              "notes": "Verification failed at lint"
+              "status": "failed",
+              "at": "2026-06-08T04:14:44.009Z",
+              "notes": "Verification failed at test"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T04:14:37.938Z",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T04:14:37.938Z"
+              "at": "2026-06-08T04:14:44.009Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T04:14:37.938Z",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T04:14:37.938Z",
+          "updatedAt": "2026-06-08T04:14:44.009Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T04:14:37.938Z"
+              "at": "2026-06-08T04:14:44.009Z"
             }
           ],
           "readyForMerge": false,
