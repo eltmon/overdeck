@@ -161,6 +161,7 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
+import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 
 // ============================================================================
 // Configuration
@@ -2552,6 +2553,132 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
 }
 
 // ============================================================================
+// Completed-but-unsignaled test detection (PAN-1681)
+// ============================================================================
+
+/**
+ * Detect test agents that finished but never persisted their verdict — the test
+ * twin of {@link checkCompletedButUnsignaledReviews}. The test role narrates
+ * "tests pass" but the agent (often Haiku 4.5) sometimes never POSTs testStatus,
+ * stranding the issue at test=pending/testing with a live-but-idle session.
+ *
+ * Recovery is symmetric with the review failsafe: the test role writes a
+ * deterministic verdict artifact (.pan/test/result.json) BEFORE it POSTs, and
+ * this patrol reads it back to recover the verdict. It NEVER guesses pass/fail
+ * (continue.json D6) — auto-complete fires only from a written artifact; with no
+ * artifact it nudges once to prompt write+POST, then defers to the
+ * strand-surfacing path in checkPendingTestDispatch.
+ *
+ * Guards (hazard H4):
+ *   - Only fires when reviewStatus === 'passed' && testStatus ∈ {testing,pending}
+ *   - Skips closed issues (isIssueClosed) and stuck/ignored issues
+ *   - Gates a live session on isAgentIdleForNudge + a 5-min settle window
+ *   - Nudges at most once per test cycle (deduped by session) before completing
+ *   - Only honors an artifact newer than the current test dispatch (H3)
+ */
+const unsignaledTestNudges = new Map<string, number>();
+
+export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
+  const actions: string[] = [];
+  const TEST_SETTLE_MS = 5 * 60 * 1000; // 5 minutes — mirror SYNTHESIS_SETTLE_MS
+  const NUDGE_DEDUP_MS = 30 * 60 * 1000;
+
+  try {
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'passed') continue;
+      if (status.testStatus !== 'testing' && status.testStatus !== 'pending') continue;
+      if (status.stuck || status.deaconIgnored) continue;
+      if (await isIssueClosed(issueId)) continue;
+
+      const resolved = resolveProjectFromIssueSync(issueId);
+      if (!resolved) continue;
+      const issueLower = issueId.toLowerCase();
+      const wsPath = findWorkspacePath(resolved.projectPath, issueLower);
+      if (!wsPath) continue;
+
+      const testSession = `agent-${issueLower}-test`;
+      const sessionAlive = sessionExistsSync(testSession);
+      const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(testSession)).catch(() => true) : true;
+      const sessionLive = sessionAlive && !paneDead;
+      const idle = sessionLive ? isAgentIdleForNudge(testSession, TEST_SETTLE_MS, now) : false;
+
+      const lastNudged = unsignaledTestNudges.get(testSession);
+      const alreadyNudged = !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
+
+      // Only honor an artifact newer than the current test dispatch so a previous
+      // cycle's verdict is never read after a re-dispatch (H3). The latest
+      // test→'testing' history entry is the dispatch time.
+      const lastDispatchAt = status.history
+        ?.filter(h => h.type === 'test' && h.status === 'testing')
+        .pop()?.timestamp;
+      const minMtimeMs = lastDispatchAt ? new Date(lastDispatchAt).getTime() : undefined;
+      const artifact = readTestVerdictArtifact(wsPath, minMtimeMs);
+
+      const decision = decideUnsignaledTestAction({ sessionLive, idle, alreadyNudged, artifact });
+
+      switch (decision.action) {
+        case 'auto-complete': {
+          const fallbackNote = `Test auto-completed by deacon: ${decision.status} (verdict artifact present, agent ${sessionLive ? 'alive but unresponsive after nudge' : 'dead'})`;
+          setReviewStatusSync(issueId, {
+            testStatus: decision.status,
+            testNotes: decision.notes || fallbackNote,
+          });
+          const msg = `Auto-completed test for ${issueId}: ${decision.status} (${sessionLive ? 'alive but unresponsive after nudge' : 'dead agent'}, verdict artifact)`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+          break;
+        }
+        case 'nudge-verdict': {
+          const noteArg =
+            decision.status === 'failed'
+              ? ` --notes "${(decision.notes || 'See .pan/test/result.json').replace(/"/g, "'").slice(0, 120)}"`
+              : '';
+          const cmd = `pan admin specialists done test ${issueId} --status ${decision.status}${noteArg}`;
+          const nudge = `Your test verdict (${decision.status}) is already written to .pan/test/result.json. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(testSession, nudge);
+            unsignaledTestNudges.set(testSession, now);
+            const msg = `Nudged ${testSession} to signal ${decision.status} (verdict artifact present)`;
+            actions.push(msg);
+            console.log(`[deacon] ${msg}`);
+          } catch (err: any) {
+            console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
+          }
+          break;
+        }
+        case 'nudge-write': {
+          const nudge = `Your test run for ${issueId} looks finished but no verdict was recorded. Decide the verdict from the gates/UAT you ran, then do BOTH of these now: (1) write the workspace file .pan/test/result.json as {"status":"passed"|"failed","notes":"<evidence>"}, and (2) run: pan admin specialists done test ${issueId} --status passed|failed. Do this immediately — do not summarize or ask questions, just write the file and run the command.`;
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(testSession, nudge);
+            unsignaledTestNudges.set(testSession, now);
+            const msg = `Nudged ${testSession} to write+signal a test verdict (no artifact yet)`;
+            actions.push(msg);
+            console.log(`[deacon] ${msg}`);
+          } catch (err: any) {
+            console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
+          }
+          break;
+        }
+        case 'wait':
+        case 'none':
+        default:
+          break;
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking completed-but-unsignaled tests:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // Verification/review contradiction (PAN-796)
 // ============================================================================
 
@@ -4773,6 +4900,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1681: Recover test agents that wrote .pan/test/result.json but never
+  // POSTed testStatus (nudge once → auto-complete). Runs BEFORE the dispatcher
+  // below so a recoverable verdict is honored before any re-dispatch or stuck
+  // marker — the dispatcher's stuck path skips issues this already resolved.
+  const unsignaledTestActions = await checkCompletedButUnsignaledTests();
+  actions.push(...unsignaledTestActions);
+  for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
 
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
   const pendingTestActions = await checkPendingTestDispatch();
