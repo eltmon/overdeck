@@ -38,6 +38,7 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
       (event) => {
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) => {
           if (event.kind === 'discovering') {
+            if (previous?.discovering) return previous;
             return {
               messages: previous?.messages ?? [],
               workLog: previous?.workLog ?? [],

@@ -15,12 +15,12 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
-import { computeContextUsage, parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import { computeContextUsage, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, CompactBoundary, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
@@ -61,6 +61,25 @@ export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent
   return Stream.succeed({ kind: 'discovering' } as ConversationEvent).pipe(
     Stream.repeat(Schedule.fixed('2 seconds')),
   );
+}
+
+
+function mergeById<T extends { id: string }>(previous: T[], next: T[]): T[] {
+  if (next.length === 0) return previous;
+  const merged = new Map<string, T>();
+  for (const item of previous) merged.set(item.id, item);
+  for (const item of next) merged.set(item.id, item);
+  return Array.from(merged.values());
+}
+
+export function mergeConversationMessageSnapshot(
+  previous: Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'>,
+  next: Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'>,
+): Pick<Extract<ConversationEvent, { kind: 'messages' }>, 'messages' | 'workLog'> {
+  return {
+    messages: mergeById(previous.messages, next.messages),
+    workLog: mergeById(previous.workLog, next.workLog),
+  };
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -599,10 +618,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Effect.gen(function* () {
             const conv = getConversationByName(input.conversationName);
 
-            const sessionFile = conv?.claudeSessionId
+            if (!conv || conv.harness !== 'claude-code') {
+              return conversationDiscoveringStream();
+            }
+
+            const sessionFile = conv.claudeSessionId
               ? sessionFilePath(conv.cwd, conv.claudeSessionId)
               : null;
-            const model = conv?.model ?? null;
+            const model = conv.model ?? null;
 
             if (!sessionFile) {
               // Session file not yet discovered — keep the subscription alive
@@ -638,30 +661,66 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
                   // Emit current state immediately on subscribe
                   const initial = await parseConversationMessages(sessionFile, 0);
+                  let currentMessages = initial.messages;
+                  let currentWorkLog = initial.workLog;
+                  let currentCompactBoundaries = initial.compactBoundaries ?? [];
+                  let currentProposedPlan = initial.proposedPlan;
+                  let currentByteOffset = initial.byteOffset;
+                  let currentContextUsage = await readContextUsage();
+                  const priorState: ParseState = {
+                    pendingToolUse: initial.pendingToolUse,
+                    unresolvedResults: initial.unresolvedResults,
+                    lastSequence: initial.lastSequence,
+                    planToolUseIds: initial.planToolUseIds,
+                    proposedPlan: initial.proposedPlan,
+                    permissionMode: initial.permissionMode,
+                    fileEditsByAssistantId: initial.fileEditsByAssistantId,
+                    pendingAssistantId: initial.pendingAssistantId,
+                    orphanToolUseIds: initial.orphanToolUseIds,
+                  };
+
                   offer({
                     kind: 'messages' as const,
-                    messages: initial.messages,
-                    workLog: initial.workLog,
+                    messages: currentMessages,
+                    workLog: currentWorkLog,
                     streaming: initial.streaming,
-                    proposedPlan: initial.proposedPlan,
-                    compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
-                    contextUsage: await readContextUsage(),
+                    proposedPlan: currentProposedPlan,
+                    compactBoundaries: currentCompactBoundaries.length > 0 ? currentCompactBoundaries : undefined,
+                    contextUsage: currentContextUsage,
                   });
 
-                  // Watch for new content and stream incremental updates
-                  let byteOffset = initial.byteOffset;
+                  // Watch only bytes written after the initial full parse, then
+                  // merge deltas back into a full snapshot for the client cache.
                   const handle = watchConversation(sessionFile, async (result) => {
-                    byteOffset = result.byteOffset;
+                    const fileWasReset = result.byteOffset < currentByteOffset;
+                    if (fileWasReset) {
+                      currentMessages = result.messages;
+                      currentWorkLog = result.workLog;
+                      currentCompactBoundaries = result.compactBoundaries ?? [];
+                    } else {
+                      const merged = mergeConversationMessageSnapshot(
+                        { messages: currentMessages, workLog: currentWorkLog },
+                        { messages: result.messages, workLog: result.workLog },
+                      );
+                      currentMessages = merged.messages;
+                      currentWorkLog = merged.workLog;
+                      currentCompactBoundaries = mergeById<CompactBoundary>(currentCompactBoundaries, result.compactBoundaries ?? []);
+                    }
+                    currentByteOffset = result.byteOffset;
+                    currentProposedPlan = result.proposedPlan ?? currentProposedPlan;
+                    if (result.totalTokens > 0) {
+                      currentContextUsage = await readContextUsage();
+                    }
                     offer({
                       kind: 'messages' as const,
-                      messages: result.messages,
-                      workLog: result.workLog,
+                      messages: currentMessages,
+                      workLog: currentWorkLog,
                       streaming: result.streaming,
-                      proposedPlan: result.proposedPlan,
-                      compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
-                      contextUsage: await readContextUsage(),
+                      proposedPlan: currentProposedPlan,
+                      compactBoundaries: currentCompactBoundaries.length > 0 ? currentCompactBoundaries : undefined,
+                      contextUsage: currentContextUsage,
                     });
-                  });
+                  }, { byteOffset: initial.byteOffset, priorState });
 
                   return handle;
                 }),

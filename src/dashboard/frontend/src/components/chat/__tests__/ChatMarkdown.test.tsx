@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import { cloneElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WS_METHODS } from '@panctl/contracts';
 
@@ -31,11 +31,10 @@ function renderMarkdown(node: ReactElement, streamdownRenderer = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
-  queryClient.setQueryData(['settings'], {
-    experimental: { streamdownRenderer },
-  });
+  const withRenderer = (child: ReactElement) =>
+    cloneElement(child as ReactElement<{ useStreamdown?: boolean }>, { useStreamdown: streamdownRenderer });
   const wrap = (child: ReactElement) => (
-    <QueryClientProvider client={queryClient}>{child}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{withRenderer(child)}</QueryClientProvider>
   );
   const result = render(wrap(node));
   return {

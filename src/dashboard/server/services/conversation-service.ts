@@ -1239,9 +1239,10 @@ export interface ConversationWatchHandle {
 export function watchConversation(
   sessionFile: string,
   callback: (result: ParseResult) => void,
+  options: { byteOffset?: number; priorState?: ParseState } = {},
 ): ConversationWatchHandle {
-  let byteOffset = 0;
-  let priorState: ParseState | undefined;
+  let byteOffset = options.byteOffset ?? 0;
+  let priorState: ParseState | undefined = options.priorState;
   let stopped = false;
   let isParsing = false;
   let abortController: AbortController | null = null;
@@ -1266,6 +1267,9 @@ export function watchConversation(
             planToolUseIds: fullResult.planToolUseIds,
             proposedPlan: fullResult.proposedPlan,
             permissionMode: fullResult.permissionMode,
+            fileEditsByAssistantId: fullResult.fileEditsByAssistantId,
+            pendingAssistantId: fullResult.pendingAssistantId,
+            orphanToolUseIds: fullResult.orphanToolUseIds,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];

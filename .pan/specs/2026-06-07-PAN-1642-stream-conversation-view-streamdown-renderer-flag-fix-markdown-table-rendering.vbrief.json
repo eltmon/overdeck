@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-08T11:57:03.458Z"
+    "updated": "2026-06-08T15:46:23.673Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 56,
+    "sequence": 59,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-08T11:57:03.458Z",
+    "updated": "2026-06-08T15:46:23.673Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -443,62 +443,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-07-PAN-1642-stream-conversation-view-streamdown-renderer-flag-fix-markdown-table-rendering.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T11:57:03.270Z",
+        "updatedAt": "2026-06-08T15:46:23.661Z",
         "work": {
-          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T11:57:03.270Z",
+              "at": "2026-06-08T15:46:23.661Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-06-08T11:57:03.270Z",
-          "notes": "Cycle 2 approved: 0 blockers, all 24 requirements implemented. Cycle-1 correctness blocker (discovering stream spin loop) is resolved. 13 non-blocking findings remain across correctness, performance, security, and requirements — none block merge.",
+          "status": "blocked",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
+          "notes": "Requirements reviewer timed out; review cannot approve without all four reports",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-08T11:57:03.270Z",
-              "notes": "Cycle 2 approved: 0 blockers, all 24 requirements implemented. Cycle-1 correctness blocker (discovering stream spin loop) is resolved. 13 non-blocking findings remain across correctness, performance, security, and requirements — none block merge."
+              "status": "blocked",
+              "at": "2026-06-08T15:46:23.661Z",
+              "notes": "Requirements reviewer timed out; review cannot approve without all four reports"
             }
           ],
-          "approval": "approved"
+          "approval": "changes_requested"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-06-08T11:57:03.270Z",
-          "notes": "Workspace docker stack for PAN-1642 is not healthy: No Docker containers found for workspace stack pan-1642. Run 'pan workspace rebuild PAN-1642' or retry with --host to override.",
+          "status": "pending",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-08T11:57:03.270Z",
-              "notes": "Workspace docker stack for PAN-1642 is not healthy: No Docker containers found for workspace stack pan-1642. Run 'pan workspace rebuild PAN-1642' or retry with --host to override."
+              "status": "pending",
+              "at": "2026-06-08T15:46:23.661Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T11:57:03.270Z",
+          "updatedAt": "2026-06-08T15:46:23.661Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T11:57:03.270Z"
+              "at": "2026-06-08T15:46:23.661Z"
             }
           ],
           "readyForMerge": false,

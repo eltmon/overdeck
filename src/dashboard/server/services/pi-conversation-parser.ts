@@ -25,7 +25,8 @@ import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contrac
 import type { ParseResult } from './conversation-service.js';
 
 export function isPiSessionFile(sessionFile: string): boolean {
-  return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
+  const normalized = sessionFile.replace(/\\/g, '/');
+  return /\/\.panopticon\/agents\/[^/]+\/sessions\//.test(normalized);
 }
 
 interface PiUsage {

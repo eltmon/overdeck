@@ -1080,6 +1080,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const { data, isLoading } = useQuery({
     queryKey: conversationMessagesQueryKey(conversation.name),
     queryFn: () => fetchMessages(conversation.name),
+    enabled: !streamMessagesEnabled,
     refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
   });
 
@@ -1182,8 +1183,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   // Conversation was created but the tmux session has not started yet — the spawn is running
   // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
-  const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
+  const isFirstMessage = !isLoading && !isDiscovering && messages.length === 0 && conversation.sessionAlive;
+  const isOrphaned = !isLoading && !isDiscovering && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1211,9 +1213,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   return (
     <div className={styles.conversationView}>
-      {isLoading ? (
+      {isLoading || isDiscovering ? (
         <div className={styles.conversationConnecting}>
-          <span>Loading…</span>
+          <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
         </div>
       ) : isSpawning ? (
         <div className={styles.conversationEmptyState}>

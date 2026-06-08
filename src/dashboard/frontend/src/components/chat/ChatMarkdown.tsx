@@ -14,7 +14,9 @@
  */
 
 import React, {
+  createContext,
   memo,
+  useContext,
   useState,
   useCallback,
   useRef,
@@ -251,16 +253,30 @@ function transformMarkdownUrl(url: string): string {
 type ReactMarkdownRemarkPlugins = React.ComponentProps<typeof ReactMarkdown>['remarkPlugins'];
 type StreamdownComponents = NonNullable<StreamdownProps['components']>;
 
-interface ChatMarkdownSettings {
-  experimental?: {
-    streamdownRenderer?: boolean;
-  };
+interface ChatMarkdownUiFlags {
+  streamdownRenderer?: boolean;
 }
 
-async function fetchChatMarkdownSettings(): Promise<ChatMarkdownSettings> {
-  const res = await fetch('/api/settings');
-  if (!res.ok) throw new Error('settings fetch failed');
+async function fetchChatMarkdownUiFlags(): Promise<ChatMarkdownUiFlags> {
+  const res = await fetch('/api/settings/ui-flags');
+  if (!res.ok) throw new Error('settings UI flags fetch failed');
   return res.json();
+}
+
+const StreamdownRendererContext = createContext(false);
+
+export function ChatMarkdownSettingsProvider({ children }: { children: ReactNode }) {
+  const { data: flags } = useQuery({
+    queryKey: ['settings', 'ui-flags'],
+    queryFn: fetchChatMarkdownUiFlags,
+    retry: false,
+  });
+
+  return (
+    <StreamdownRendererContext.Provider value={flags?.streamdownRenderer === true}>
+      {children}
+    </StreamdownRendererContext.Provider>
+  );
 }
 
 interface MarkdownNode {
@@ -417,6 +433,7 @@ interface ChatMarkdownProps {
   isStreaming?: boolean;
   cwd?: string;
   issueId?: string | null;
+  useStreamdown?: boolean;
 }
 
 export const ChatMarkdown = memo(function ChatMarkdown({
@@ -424,23 +441,20 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   isStreaming = false,
   cwd,
   issueId,
+  useStreamdown,
 }: ChatMarkdownProps) {
   const components = useMemo(() => makeComponents(isStreaming, cwd, issueId), [isStreaming, cwd, issueId]);
   const remarkPlugins = useMemo(
     () => [remarkGfm, [remarkBareFileTextLinks, { cwd }]] as ReactMarkdownRemarkPlugins,
     [cwd],
   );
-  const { data: settings } = useQuery({
-    queryKey: ['settings'],
-    queryFn: fetchChatMarkdownSettings,
-    retry: false,
-  });
-  const useStreamdown = settings?.experimental?.streamdownRenderer === true;
+  const contextUseStreamdown = useContext(StreamdownRendererContext);
+  const renderWithStreamdown = useStreamdown ?? contextUseStreamdown;
 
   return (
     <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
       <div className={styles.chatMarkdown}>
-        {useStreamdown ? (
+        {renderWithStreamdown ? (
           <StreamdownRenderer
             mode={isStreaming ? 'streaming' : 'static'}
             rehypePlugins={streamdownRehypePlugins}
