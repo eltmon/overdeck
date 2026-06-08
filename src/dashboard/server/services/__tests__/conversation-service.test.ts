@@ -106,7 +106,10 @@ describe('computeContextUsage', () => {
     expect(result).toMatchObject({
       activeBytes: buffer.length,
       estimatedTokens: 5_000,
-      contextWindow: 200_000,
+      // gpt-5.5 routes through CLIProxy, whose effective ceiling is the
+      // conservative CLIPROXY_CODEX_CONTEXT_WINDOW (150k), not the 200k
+      // marketing window — see model-capabilities.ts (PAN-1672).
+      contextWindow: 150_000,
     });
   });
 
