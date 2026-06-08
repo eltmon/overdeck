@@ -26,6 +26,16 @@ vi.mock('../../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
+// PAN-1613: checkPostReviewCommits now gates on isIssueClosed, whose tracker
+// fallback shells out to `gh issue view`. Keep this a hermetic unit test (no
+// real network/tracker call) — the gate is never "closed" here.
+vi.mock('../../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
+}));
+
 // Stub pipeline notifier (no WebSocket bus in tests)
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
