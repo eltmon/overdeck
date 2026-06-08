@@ -783,7 +783,11 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
           : undefined;
         return jsonResponse({ ...estimate, confirmationNonce });
       },
-      catch: (err) => jsonResponse({ error: `Failed to estimate reindex cost: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 }),
+      catch: (err) => {
+        const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+        console.error(`[conversation-search] reindex estimate failed: ${message}`);
+        return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+      },
     });
   })),
 );

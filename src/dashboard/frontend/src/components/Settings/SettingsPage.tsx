@@ -126,7 +126,10 @@ interface ConversationSearchCostEstimate {
 
 async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
   const res = await fetch('/api/settings/conversation-search/reindex-estimate');
-  if (!res.ok) throw new Error('Failed to estimate reindex cost');
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
+  }
   return res.json();
 }
 
@@ -2184,13 +2187,15 @@ export function SettingsPage() {
               </label>
               <label className="text-xs text-muted-foreground">
                 Model
-                <input
-                  type="text"
+                <select
                   value={conversationSearchModel}
                   onChange={(e) => handleConversationSearchChange({ model: e.target.value })}
                   className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  placeholder="text-embedding-3-small"
-                />
+                >
+                  {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </label>
               <div className="flex items-end text-xs">
                 {formData?.api_keys?.openai ? (
