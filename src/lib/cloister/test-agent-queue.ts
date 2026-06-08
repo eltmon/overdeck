@@ -9,6 +9,7 @@ import { Data, Effect } from 'effect';
 import { setReviewStatusSync } from '../review-status.js';
 import { spawnRun } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
+import { clearTestVerdictArtifact } from './test-verdict.js';
 
 function dashboardApiUrl(): string {
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
@@ -40,15 +41,18 @@ Required steps:
 5. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 6. If UAT is required, build and run the dashboard from the workspace above, not from main. If a dashboard from another checkout is already running, stop it and start the workspace-built dashboard.
 7. If UAT is required, use the Playwright MCP tools available to the test role. Do not spawn or wake a separate UAT agent.
-8. On success, mark tests passed (the ship role handles merge preparation):
+8. As soon as you decide the verdict, FIRST write the deterministic verdict artifact so the pipeline can recover it even if the POST below is interrupted. Write the workspace file .pan/test/result.json with EXACTLY this shape (status is "passed" or "failed"):
+   {"status":"passed","notes":"<commands run, UAT paths exercised, concise evidence>"}
+   Create the .pan/test/ directory if it does not exist. This artifact captures BOTH the gate result and the UAT verdict, and MUST be written BEFORE the POST in the next step.
+9. On success, mark tests passed (the ship role handles merge preparation):
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
      -d '{"testStatus":"passed"}'
-9. On failure, mark tests failed with actionable notes:
+10. On failure, mark tests failed with actionable notes:
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
      -d '{"testStatus":"failed","testNotes":"<commands/UAT failures and exact unmet criteria>"}'
-10. Report TESTS PASSED or TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
+11. Report TESTS PASSED or TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
 
 Boundaries:
 - Do NOT edit code, tests, fixtures, snapshots, or configuration.
@@ -72,6 +76,10 @@ Boundaries:
       });
       return;
     }
+
+    // Clear any stale verdict artifact so a previous cycle's result.json can
+    // never be misread by the deacon failsafe as this dispatch's verdict (H3).
+    if (workspace) clearTestVerdictArtifact(workspace);
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
     const run = await spawnRun(issueId, 'test', {
@@ -156,6 +164,10 @@ export const dispatchTestAgentAndNotify = (
       });
       return { delivered: false, notified: false, reason: 'no-project' as const };
     }
+
+    // Clear any stale verdict artifact so a previous cycle's result.json can
+    // never be misread by the deacon failsafe as this dispatch's verdict (H3).
+    if (workspace) yield* Effect.sync(() => clearTestVerdictArtifact(workspace));
 
     const prompt = buildTestRolePrompt({ issueId, workspace, branch });
 
