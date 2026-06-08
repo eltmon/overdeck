@@ -1,0 +1,31 @@
+# TEST.MD — agent scratch file
+
+This is a deliberate **test / scratch file**. It is not part of the product,
+the build, or any pipeline. It exists so agents (and humans) have a safe,
+throwaway place to exercise things that need a real file change to observe.
+
+## What to use it for
+
+Use this file whenever you need a harmless diff to look at — especially for
+verifying **how changes render**, such as:
+
+- Terminal-view diff rendering (the red/green diff bands in a tmux/Claude Code
+  pane viewed through the dashboard).
+- Light-mode vs dark-mode rendering of the terminal and conversation views.
+- Conversation-mode diff panels (`/conv/<id>` → "View diff").
+- Anything else where you just need *a* change to produce *a* diff.
+
+## How to use it
+
+Edit it freely — add a line, change a line, remove a line. The content does not
+matter; the **diff it produces** is the point. Append a dated note below if you
+like, or just scribble. Nothing here is sacred and nothing depends on it.
+
+Revert or leave your edits as you see fit — this file is meant to churn.
+
+## Scratch area
+
+<!-- Add throwaway edits below this line -->
+
+- 2026-06-08: Created to verify the terminal pane stays dark in dashboard light
+  mode (Claude Code's diff bands render correctly on a pinned-dark pane).
