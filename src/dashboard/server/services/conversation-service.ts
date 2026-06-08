@@ -353,10 +353,10 @@ export async function parseConversationMessages(
   // Request/message IDs whose usage has already been counted, so a response spread across
   // multiple JSONL lines (or across incremental read boundaries) is counted exactly once.
   const countedUsageIds = priorState?.countedUsageIds ?? new Set<string>();
-  // Restore pendingAssistant ID from prior incremental parse for correct file-edit tracking
-  if (priorState?.pendingAssistantId && !pendingAssistant) {
-    pendingAssistant = { id: priorState.pendingAssistantId } as ChatMessage;
-  }
+  // Carry the prior assistant ID for file-edit association only. Do not
+  // materialize it as a ChatMessage: a later flush before user/tool-result lines
+  // would emit an invalid ID-only assistant delta.
+  const pendingAssistantIdForEdits = priorState?.pendingAssistantId;
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -530,7 +530,7 @@ export async function parseConversationMessages(
               const input = block.input as Record<string, unknown>;
               const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
               if (filePath) {
-                const asstId = pendingAssistant?.id ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+                const asstId = pendingAssistant?.id ?? pendingAssistantIdForEdits ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
                 // If no pendingAssistant, this tool_use UUID is orphaned — the text entry
                 // will merge it into the final message with a different UUID.
                 if (!pendingAssistant) {
@@ -814,7 +814,7 @@ export async function parseConversationMessages(
     compactBoundaries,
     permissionMode,
     fileEditsByAssistantId,
-    pendingAssistantId: pendingAssistant?.id,
+    pendingAssistantId: pendingAssistant?.id ?? pendingAssistantIdForEdits,
     orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
     countedUsageIds,
   };
@@ -1349,19 +1349,12 @@ export function watchConversation(
     pollInterval = setTimeout(poll, 500);
   }
 
-  // Start watch and fall back to polling if watch fails after 1s
+  // Start watch; polling is only a fallback when fs.watch itself fails.
   startWatch();
-  const watchTimeout = setTimeout(() => {
-    // If watch hasn't reported any changes by now, also start polling as backup
-    if (!stopped && pollInterval === null) {
-      startPolling();
-    }
-  }, 1000);
 
   return {
     stop() {
       stopped = true;
-      clearTimeout(watchTimeout);
       if (abortController) {
         abortController.abort();
         abortController = null;

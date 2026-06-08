@@ -612,7 +612,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Effect.gen(function* () {
             const conv = getConversationByName(input.conversationName);
 
-            if (!conv || conv.harness !== 'claude-code') {
+            if (!conv || (conv.harness !== 'claude-code' && conv.harness != null)) {
               return conversationDiscoveringStream();
             }
 

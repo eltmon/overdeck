@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyConversationMessagesEvent } from '../useConversationMessagesStream';
+import { applyConversationMessagesEvent, shouldStreamConversationMessages } from '../useConversationMessagesStream';
 
 describe('applyConversationMessagesEvent', () => {
   it('replaces cache contents for full snapshots', () => {
@@ -57,5 +57,40 @@ describe('applyConversationMessagesEvent', () => {
     expect(cache.workLog).toEqual([
       { id: 'w1', createdAt: '2026-06-08T00:00:02.000Z', label: 'Bash', tone: 'tool', result: 'ok' },
     ]);
+  });
+
+  it('clears stale context usage when the stream reports null', () => {
+    const cache = applyConversationMessagesEvent(
+      {
+        messages: [],
+        workLog: [],
+        streaming: true,
+        contextUsage: {
+          activeBytes: 100,
+          estimatedTokens: 25,
+          contextWindow: 200000,
+          percentUsed: 1,
+        },
+      },
+      {
+        kind: 'messages',
+        snapshot: false,
+        messages: [],
+        workLog: [],
+        streaming: true,
+        contextUsage: null,
+      },
+    );
+
+    expect(cache.contextUsage).toBeNull();
+  });
+});
+
+describe('shouldStreamConversationMessages', () => {
+  it('streams live Claude Code conversations and legacy null-harness conversations', () => {
+    expect(shouldStreamConversationMessages({ sessionAlive: true, harness: 'claude-code' })).toBe(true);
+    expect(shouldStreamConversationMessages({ sessionAlive: true, harness: null })).toBe(true);
+    expect(shouldStreamConversationMessages({ sessionAlive: true, harness: 'pi' })).toBe(false);
+    expect(shouldStreamConversationMessages({ sessionAlive: false, harness: null })).toBe(false);
   });
 });

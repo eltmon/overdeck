@@ -11,6 +11,17 @@ export const conversationMessagesQueryKey = (name: string) => ['conversation-mes
 
 function mergeById<T extends { id: string }>(previous: T[], next: T[]): T[] {
   if (next.length === 0) return previous;
+  if (previous.length === 0) return next;
+
+  if (next.length === 1 && previous[previous.length - 1]?.id === next[0]!.id) {
+    return [...previous.slice(0, -1), next[0]!];
+  }
+
+  const existingIds = new Set(previous.map((item) => item.id));
+  if (next.every((item) => !existingIds.has(item.id))) {
+    return [...previous, ...next];
+  }
+
   const merged = new Map<string, T>();
   for (const item of previous) merged.set(item.id, item);
   for (const item of next) merged.set(item.id, item);
@@ -44,9 +55,10 @@ export function applyConversationMessagesEvent(
     };
   }
 
-  // The first event is a full snapshot; subsequent live events are message/tool
-  // deltas from appended JSONL bytes. Merge deltas locally so the hot path does
-  // not ship the full transcript on every append.
+  // Claude Code JSONL writes complete message/tool records per line, not raw
+  // provider token chunks. The first event is a full snapshot; subsequent live
+  // events are message/tool deltas from appended JSONL bytes. Merge deltas
+  // locally so the hot path does not ship the full transcript on every append.
   const isSnapshot = event.snapshot !== false;
   return {
     ...previous,
@@ -61,13 +73,13 @@ export function applyConversationMessagesEvent(
     compactBoundaries: isSnapshot
       ? event.compactBoundaries
       : mergeById(previous?.compactBoundaries ?? [], event.compactBoundaries ?? []),
-    contextUsage: event.contextUsage ?? previous?.contextUsage,
+    contextUsage: 'contextUsage' in event ? event.contextUsage : previous?.contextUsage,
     discovering: false,
   };
 }
 
 export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'harness' | 'sessionAlive'>): boolean {
-  return conversation.sessionAlive && conversation.harness === 'claude-code';
+  return conversation.sessionAlive && (conversation.harness === 'claude-code' || conversation.harness == null);
 }
 
 export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'>): boolean {

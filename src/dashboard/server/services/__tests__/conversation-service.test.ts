@@ -812,6 +812,38 @@ describe('parseConversationMessages', () => {
     });
   });
 
+  it('does not emit an ID-only assistant placeholder from carried pendingAssistantId', async () => {
+    const userLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-2',
+      timestamp: '2024-01-01T00:00:02.000Z',
+      message: {
+        content: [
+          { type: 'tool_result', tool_use_id: 'tool-incr', content: 'result!', is_error: false },
+        ],
+      },
+    });
+    const pendingToolUse = new Map([[ 'tool-incr', {
+      id: 'tool-incr',
+      createdAt: '2024-01-01T00:00:01.000Z',
+      label: 'Bash',
+      tone: 'tool' as const,
+    } ]]);
+
+    mockReadFile.mockResolvedValue(Buffer.from(userLine + '\n'));
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl', 0, {
+      pendingToolUse,
+      unresolvedResults: new Map(),
+      lastSequence: 1,
+      pendingAssistantId: 'asst-1',
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.workLog[0]).toMatchObject({ id: 'tool-incr', result: 'result!' });
+    expect(result.pendingAssistantId).toBe('asst-1');
+  });
+
   it('uses sequence as tiebreaker when timestamps are identical', async () => {
     const lines = [
       {

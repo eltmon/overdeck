@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-08T16:33:33.239Z"
+    "updated": "2026-06-08T16:47:00.297Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 72,
+    "sequence": 73,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-08T16:33:33.239Z",
+    "updated": "2026-06-08T16:47:00.297Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -446,55 +446,55 @@
         "phase": "review",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T16:33:33.210Z",
+        "updatedAt": "2026-06-08T16:47:00.290Z",
         "work": {
-          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-08T16:33:33.210Z"
+              "at": "2026-06-08T16:47:00.290Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-08T16:33:33.210Z",
-          "notes": "Agent re-review request (3/25): Fixed review issues",
+          "status": "blocked",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
+          "notes": "Incremental stream can replace an assistant turn with an invalid placeholder",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-08T16:33:33.210Z",
-              "notes": "Agent re-review request (3/25): Fixed review issues"
+              "status": "blocked",
+              "at": "2026-06-08T16:47:00.290Z",
+              "notes": "Incremental stream can replace an assistant turn with an invalid placeholder"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:33:33.210Z"
+              "at": "2026-06-08T16:47:00.290Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-08T16:33:33.210Z",
+          "updatedAt": "2026-06-08T16:47:00.290Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-08T16:33:33.210Z"
+              "at": "2026-06-08T16:47:00.290Z"
             }
           ],
           "readyForMerge": false,
