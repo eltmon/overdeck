@@ -30,6 +30,7 @@ const mockGetAgentRuntimeState = vi.fn();
 const mockSaveAgentRuntimeState = vi.fn();
 const mockGetAgentState = vi.fn();
 const mockComputeContextUsage = vi.fn();
+const mockResumeAgent = vi.fn();
 
 vi.mock('../../../src/lib/tmux.js', async () => {
   const { Effect } = await import('effect');
@@ -91,6 +92,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentStateSync: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
+  resumeAgent: (...args: unknown[]) => mockResumeAgent(...args),
 }));
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -124,6 +126,8 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockSaveAgentRuntimeState.mockReset().mockResolvedValue(undefined);
     mockGetAgentState.mockReset().mockReturnValue(null);
     mockComputeContextUsage.mockReset().mockResolvedValue(null);
+    // PAN-1675: fresh agent-* overflow recovers via resumeAgent({compact:true}).
+    mockResumeAgent.mockReset().mockResolvedValue({ success: true });
 
     const mod = await import('../../../src/lib/cloister/deacon.js');
     checkApiErrorAgents = mod.checkApiErrorAgents;
@@ -133,7 +137,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     contextProactiveCompactState.clear();
   });
 
-  it('(a) detects overflow at an idle prompt → sends /compact and records attempt 1', async () => {
+  it('(a) detects overflow at an idle prompt → Panopticon-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {
     mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
 
     const actions = await checkApiErrorAgents();
@@ -142,9 +146,13 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
       SESSION,
       expect.objectContaining({ contextSaturatedAt: expect.any(String) }),
     );
-    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+    // PAN-1675: agent-* fresh overflow recovers via out-of-band compaction,
+    // NOT the harness /compact (which deadlocks on a wedged session).
+    expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
+    expect(mockSendKeys).not.toHaveBeenCalledWith(SESSION, '/compact');
+    expect(contextOverflowRecoveryState.get(SESSION)?.phase).toBe('compact');
     expect(contextOverflowRecoveryState.get(SESSION)?.compactAttempts).toBe(1);
-    expect(actions.some(a => /compacting/.test(a))).toBe(true);
+    expect(actions.some(a => /Panopticon-side compacted/.test(a))).toBe(true);
     expect(mockEmitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',
@@ -155,6 +163,24 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(mockEmitActivityEntry).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', issueId: ISSUE }),
     );
+  });
+
+  it('(a2) resumeAgent compaction failure → falls through to /clear + reseed in the same pass', async () => {
+    mockResumeAgent.mockResolvedValue({ success: false, error: 'compaction boom' });
+    mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
+    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/clear');
+    // reseed nudge follows the /clear
+    expect(mockSendKeys.mock.calls.some(([s, m]) => s === SESSION && m !== '/clear')).toBe(true);
+    expect(mockSendKeys).not.toHaveBeenCalledWith(SESSION, '/compact');
+    expect(contextOverflowRecoveryState.get(SESSION)?.phase).toBe('clear');
+    expect(contextOverflowRecoveryState.get(SESSION)?.clearAttempts).toBe(1);
+    // No compact attempt recorded when compaction failed.
+    expect(contextOverflowRecoveryState.get(SESSION)?.compactAttempts).toBe(0);
+    expect(actions.some(a => /compaction failed/.test(a))).toBe(true);
   });
 
   it('preserves the first contextSaturatedAt timestamp on repeated overflow detections', async () => {
@@ -169,7 +195,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
 
     expect(mockSaveAgentRuntimeState).not.toHaveBeenCalled();
     expect(mockEmitActivityEntry.mock.calls.some(([entry]) => entry.message?.includes('marked wedged'))).toBe(false);
-    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+    expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
   });
 
   it('clears contextSaturatedAt when the recent tail no longer overflows', async () => {
@@ -332,7 +358,10 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     await checkApiErrorAgents();
 
     expect(mockComputeContextUsage).not.toHaveBeenCalled();
-    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
+    // PAN-1675: fresh overflow on an agent session recovers via out-of-band
+    // compaction, not the harness /compact.
+    expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
+    expect(mockSendKeys).not.toHaveBeenCalledWith(SESSION, '/compact');
   });
 
   it('does not proactively compact within the cooldown window', async () => {
