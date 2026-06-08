@@ -893,3 +893,25 @@ real chain, and it reframes everything:
   working" inverts: the highest-value move is to NOT launch (and not run a full
   `npm run build` either), because every launch's verification build re-storms the
   host. Surface the keystone, point at the active landing worker, hold.
+
+### RUN-15 tick 5 — keystone PAN-1678 LANDED; deacon-unfreeze gate cleared
+
+The operator's landing worker (conv 2558) landed **PAN-1678** direct-to-main
+(`89a7a0d0a fix(infra): skip build:docs-index in agent/verification/ship builds`,
+04:27 UTC) — the first substrate fix to land during this run. Host load is back
+to **1.8** (from the storm's 38). Per the operator's plan, PAN-1678 was the gate
+for unfreezing the deacon, so that gate is now cleared.
+
+Two reasons the flywheel still held launches anyway, both important:
+1. **A fix landing on main != live in the running server.** The deacon/dashboard
+   runs `dist/`; until the operator rebuilds + `pan reload`s, the running
+   verification builds still execute the un-skipped `build:docs-index` and could
+   re-storm. "Keystone landed" clears the *gate*, not the *risk*, until reload.
+2. The deacon is still frozen (operator unfreezes, not the flywheel — it's not a
+   flywheel verb), and the in-flight set (14) is far above minAgents.
+
+PAN-1645 (docker init / ship choke) is now the lead keystone for the 4
+ship-stalled issues; conv 2558 is landing them via ship-on-host. Lesson:
+progress can be real and substantial (a keystone bug fixed) while the flywheel's
+own headline (`prsMerged`, `awaitingUat`) shows zero movement — direct-to-main
+landings by an operator worker don't touch those counters.
