@@ -63,6 +63,14 @@ vi.mock('../issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
 }));
 
+vi.mock('../concurrency.js', () => ({
+  workResumeSlotsAvailable: vi.fn(() => 6),
+  getConcurrencyLimits: vi.fn(() => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 })),
+  countRunningAgents: vi.fn(() => ({ work: 0, advancing: 0, total: 0 })),
+  resetPatrolDispatchBudget: vi.fn(),
+  tryReserveAdvancingSlot: vi.fn(() => true),
+}));
+
 vi.mock('../../../lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: vi.fn(),
 }));

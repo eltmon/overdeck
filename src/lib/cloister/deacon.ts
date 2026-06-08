@@ -1793,7 +1793,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // checking each surviving row at most once per cache window is bounded and
       // cannot reproduce the PAN-328 API storm.
       if (await isIssueClosed(issueId)) {
-        actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed`);
+        console.log(`[deacon] ${issueId}: skipping review/test re-dispatch — issue is closed`);
         continue;
       }
       // Skip issues that already completed their pipeline — don't reset
@@ -2116,10 +2116,6 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
     for (const dir of agentDirs) {
       const issueId = dir.name.replace('agent-', '').toUpperCase();
       if (statuses[issueId]) continue; // already has a status row
-      if (await isIssueClosed(issueId)) {
-        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
-        continue;
-      }
 
       const completedFile = join(AGENTS_DIR, dir.name, 'completed');
       const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
@@ -2134,7 +2130,6 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // a small, bounded set — so the per-issue tracker fallback in
       // isIssueClosed can't storm the API the way a per-open-issue check would.
       try {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
         if (await isIssueClosed(issueId)) {
           try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
           try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
@@ -2218,10 +2213,6 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
-      if (await isIssueClosed(issueId)) {
-        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
-        continue;
-      }
 
       const retryCount = status.testRetryCount ?? 0;
       if (retryCount >= 3) continue;
@@ -2236,14 +2227,12 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         }
       }
 
-      // PAN-1496: never re-dispatch test for an issue closed on the tracker
-      // (e.g. closed on GitHub mid-pipeline, bypassing close-out which would
-      // have cleared the review_status row). The check is reached only by the
-      // small set of issues that pass all status filters above, and
-      // isTrackerIssueClosed is TTL-cached — so this cannot storm the API.
-      const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+      // PAN-1496/PAN-1613: never re-dispatch test for an issue closed on the
+      // tracker or shadow-state. The check is reached only by the small set of
+      // issues that pass all status filters above, and the shared helper is
+      // TTL-cached — so this cannot storm the API.
       if (await isIssueClosed(issueId)) {
-        actions.push(`Skipped test retry for ${issueId}: issue is closed on the tracker`);
+        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
         continue;
       }
 
