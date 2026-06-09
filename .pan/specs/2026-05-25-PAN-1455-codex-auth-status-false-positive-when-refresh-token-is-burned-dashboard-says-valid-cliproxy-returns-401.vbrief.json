@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-06-09T04:54:44.099Z"
+    "updated": "2026-06-09T04:58:06.581Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 50,
+    "sequence": 53,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-06-09T04:54:44.099Z",
+    "updated": "2026-06-09T04:58:06.581Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -254,59 +254,55 @@
         "phase": "merge",
         "issueId": "PAN-1455",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T04:54:44.098Z",
+        "updatedAt": "2026-06-09T04:58:06.494Z",
         "work": {
-          "updatedAt": "2026-06-09T04:54:44.098Z",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-09T04:54:44.098Z",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T04:54:44.098Z",
+              "at": "2026-06-09T04:58:06.494Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-06-09T04:54:44.098Z",
-          "notes": "Approved: all four reviewers ready with zero blocking findings",
+          "status": "pending",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-09T04:54:44.098Z",
-              "notes": "Approved: all four reviewers ready with zero blocking findings"
+              "status": "pending",
+              "at": "2026-06-09T04:58:06.494Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-06-09T04:54:44.098Z",
-          "notes": "Operator-persisted verdict: test agent concluded 'All tests pass; No Browser UAT Required' but never POSTed (PAN-1681 legacy strand, predates the result.json artifact contract).",
+          "status": "pending",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-09T04:54:44.098Z",
-              "notes": "Operator-persisted verdict: test agent concluded 'All tests pass; No Browser UAT Required' but never POSTed (PAN-1681 legacy strand, predates the result.json artifact contract)."
+              "status": "pending",
+              "at": "2026-06-09T04:58:06.494Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T04:54:44.098Z",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "history": []
         },
         "merge": {
-          "status": "merging",
-          "updatedAt": "2026-06-09T04:54:44.098Z",
+          "status": "verifying",
+          "updatedAt": "2026-06-09T04:58:06.494Z",
           "history": [
             {
-              "status": "merging",
-              "at": "2026-06-09T04:54:44.098Z"
+              "status": "verifying",
+              "at": "2026-06-09T04:58:06.494Z"
             }
           ],
           "readyForMerge": false,
