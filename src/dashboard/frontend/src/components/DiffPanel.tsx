@@ -43,7 +43,55 @@ const DIFF_PANEL_UNSAFE_CSS = `
      on first paint before the themeType prop applies (a light flash in dark mode).
      This style is injected last into the shadow, so it wins. */
   color-scheme: var(--pan-color-scheme, light dark);
+
+  /* The --diffs-*-override vars MUST be declared here: the library substitutes
+     them in its own :host block (e.g. --diffs-bg-context:
+     var(--diffs-bg-context-override, <default>)). Declaring them on descendants
+     like [data-diff] is invisible to that substitution — the var resolves at
+     :host before inheritance. */
+  --diffs-bg-context-override: color-mix(in srgb, var(--background) 97%, var(--foreground));
+  --diffs-bg-hover-override: color-mix(in srgb, var(--background) 94%, var(--foreground));
+  --diffs-bg-separator-override: color-mix(in srgb, var(--background) 95%, var(--foreground));
+  --diffs-bg-buffer-override: color-mix(in srgb, var(--background) 90%, var(--foreground));
+
+  /* Add/remove colors. The library uses these as MIX TARGETS: each changed line
+     paints color-mix(in lab, <bg> var(--mix-light|--mix-dark), <target>), so
+     these must be PURE accent colors. A pre-diluted blend here gets diluted a
+     second time by the line mix and reads as virtually no tint at all. Fill
+     strength is controlled by the --mix-* knobs below, not by these colors. */
+  --diffs-bg-addition-override: #22c55e;
+  --diffs-bg-addition-number-override: #22c55e;
+  --diffs-bg-deletion-override: #ef4444;
+  --diffs-bg-deletion-number-override: #ef4444;
+
+  /* Word-level emphasis must stay a clear step above the boosted line fill. */
+  --diffs-bg-addition-emphasis-override: light-dark(rgb(34 197 94 / 0.40), rgb(34 197 94 / 0.45));
+  --diffs-bg-deletion-emphasis-override: light-dark(rgb(239 68 68 / 0.40), rgb(239 68 68 / 0.45));
 }
+
+/* Line-fill strength (GitHub-plus). Library defaults: line 88%/80%, gutter
+   91%/85%, hover 80%/75% (numbers are the BG share — higher = fainter tint).
+   unsafeCSS is injected as an unlayered <style>, so these win over the
+   library's @layer base rules; hover must therefore be re-declared to keep
+   its step-stronger highlight. */
+[data-line-type='change-addition'],
+[data-line-type='change-deletion'] {
+  --mix-light: 70%;
+  --mix-dark: 66%;
+}
+[data-line-type='change-addition']:where([data-gutter-buffer], [data-column-number]),
+[data-line-type='change-deletion']:where([data-gutter-buffer], [data-column-number]) {
+  --mix-light: 64%;
+  --mix-dark: 60%;
+}
+@media (pointer: fine) {
+  [data-line-type='change-addition'][data-hovered],
+  [data-line-type='change-deletion'][data-hovered] {
+    --mix-light: 62%;
+    --mix-dark: 58%;
+  }
+}
+
 [data-diffs-header],
 [data-diff],
 [data-file],
@@ -54,27 +102,6 @@ const DIFF_PANEL_UNSAFE_CSS = `
   --diffs-dark-bg: color-mix(in srgb, var(--card) 90%, var(--background)) !important;
   --diffs-token-light-bg: transparent;
   --diffs-token-dark-bg: transparent;
-
-  --diffs-bg-context-override: color-mix(in srgb, var(--background) 97%, var(--foreground));
-  --diffs-bg-hover-override: color-mix(in srgb, var(--background) 94%, var(--foreground));
-  --diffs-bg-separator-override: color-mix(in srgb, var(--background) 95%, var(--foreground));
-  --diffs-bg-buffer-override: color-mix(in srgb, var(--background) 90%, var(--foreground));
-
-  /* Theme-aware fill strength. Mixing the accent into WHITE (light mode)
-     desaturates far more than mixing into near-black (dark mode), so the same
-     percentage reads pastel on light and vivid on dark. light-dark() lets us
-     mix MORE accent in light mode to match dark's punch — the shadow DOM's
-     color-scheme is pinned to the app theme above, so light-dark() resolves
-     correctly. First arg = light, second = dark. */
-  --diffs-bg-addition-override: light-dark(color-mix(in srgb, var(--background) 52%, #22c55e), color-mix(in srgb, var(--background) 68%, #22c55e));
-  --diffs-bg-addition-number-override: light-dark(color-mix(in srgb, var(--background) 44%, #22c55e), color-mix(in srgb, var(--background) 62%, #22c55e));
-  --diffs-bg-addition-hover-override: light-dark(color-mix(in srgb, var(--background) 40%, #22c55e), color-mix(in srgb, var(--background) 58%, #22c55e));
-  --diffs-bg-addition-emphasis-override: light-dark(color-mix(in srgb, var(--background) 32%, #22c55e), color-mix(in srgb, var(--background) 52%, #22c55e));
-
-  --diffs-bg-deletion-override: light-dark(color-mix(in srgb, var(--background) 52%, #ef4444), color-mix(in srgb, var(--background) 68%, #ef4444));
-  --diffs-bg-deletion-number-override: light-dark(color-mix(in srgb, var(--background) 44%, #ef4444), color-mix(in srgb, var(--background) 62%, #ef4444));
-  --diffs-bg-deletion-hover-override: light-dark(color-mix(in srgb, var(--background) 40%, #ef4444), color-mix(in srgb, var(--background) 58%, #ef4444));
-  --diffs-bg-deletion-emphasis-override: light-dark(color-mix(in srgb, var(--background) 32%, #ef4444), color-mix(in srgb, var(--background) 52%, #ef4444));
 
   background-color: var(--diffs-bg) !important;
 }
