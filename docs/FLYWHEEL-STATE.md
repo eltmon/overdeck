@@ -979,3 +979,158 @@ action — defer durable FLYWHEEL-STATE.md commits until the tree is 0-ahead of
 origin, then commit path-scoped + fast-forward push (abandon the push, don't
 fight a rebase, if origin moved). Byte-comparing the worker's session
 cost/diff/pane across ticks is the way to tell active-work from stall.
+
+## RUN-17 tick 1 (2026-06-09, resumed-from-pause) — stabilization window OVER; resume aggressive launch
+
+The single most important reframe vs all of RUN-15: **the stabilization window has
+ended and the keystone blockers are resolved.** Concretely, at RUN-17 tick 1:
+
+- **PAN-1645 (workspace docker init / ship choke) is CLOSED.** This was the
+  *binding constraint* RUN-15 ticks 4/12-13 proved empirically — ship couldn't set
+  `readyForMerge=true`, so review-passed PRs never reached the merge gate. It's
+  fixed. Ship/merge path is unblocked.
+- **The deacon is RUNNING (not frozen).** `pan admin cloister status` = Running,
+  11 active / 0 stale / 0 warning / 0 stuck. The RUN-15 build-storm freeze is over.
+- **Host load 6 on 24 cores, RAM ~27/64 GB, swap 0.** No build storm (PAN-1678
+  docs-index-skip fix is holding). Plenty of headroom.
+
+Because of all three, the RUN-15 posture ("hold launches, the system is fragile")
+is no longer correct. The default aggressive-launch mandate is back in full force.
+
+### The 5 carried-over in-flight issues are DONE + operator-gated, not blocked
+
+PAN-1242 (#1516), PAN-1491 (#1636), PAN-1641 (#1679), PAN-1642 (#1648), PAN-1686
+(#1687) carried over from RUN-16, which framed them as "blocked / idle@ctx100% /
+needs Tell." **That framing is now stale — re-verify, don't trust it.** All five
+panes sit idle at the `❯` prompt AND **all five PRs are CI-all-green** (build/lint/
+test/CodeRabbit SUCCESS; #1648 and #1687 also green on Clean-install+smoke; #1687
+also green on `panopticon/review` + `panopticon/test` commit statuses). Per the
+RUN-15 tick-2 distinguisher: **CI-green + idle convoy = DONE, awaiting the operator
+merge gate** — not wedged, not needing a Tell. With `require_uat_before_merge`
+unset (defaults true), the flywheel cannot workflow-auto-merge them; they are the
+standing operator bottleneck. Ranked all 5 as `merge` suggestions (PAN-1491
+`urgent` because it's the v1.0-required substrate fix; rest `high`).
+
+Lesson: a prior run's "blocked/needs-Tell" classification of an idle convoy can go
+stale the moment CI turns green. **Always re-read the PR CI rollup before trusting
+an inherited classification.** "idle@ctx100%" only matters if the PR isn't already
+green (the tick-2 rule) — and here every PR is green, so the ctx state is moot.
+
+### Tick action: launched 2 P1 substrate items (active work was effectively 0)
+
+Every in-flight item being done-and-operator-gated meant *active work* = 0 against
+minAgents=2. System healthy → launch. Picked the two highest-leverage **unstarted,
+eltmon-authored** P1 substrate bugs:
+
+- **PAN-1682 → `pan strike`** (`strike-pan-1682`, Opus 4.8). Textbook scoped fix:
+  add `'strike-'` to the tmux-prefix allowlist at `resource-discovery.ts:471`
+  (commit 93c86224e fixed the snapshot but not discovery). By tick end: +35/-1,
+  typecheck green on main, running full test suite to verify. Strike lands direct
+  to main then verifies — correct vehicle for a one-location fix.
+- **PAN-1647 → `pan plan --auto`** (`planning-pan-1647`, Opus 4.8). **Self-relevant**
+  substrate bug: `pan start --auto` writes a synthesized vBRIEF to
+  `projectRoot/.pan/specs` but `createBeadsFromVBrief` reads it back empty (0 beads)
+  and rolls the launch back — i.e. the flywheel's *own* preferred `pan start --auto`
+  path is broken. Chose `pan plan --auto` (full planner creates beads via `bd
+  create`, bypassing the broken synthesized path) over `pan start --auto` precisely
+  because of this bug. By tick end: actively investigating workspace `.pan/specs`
+  structure with xhigh effort.
+
+Both progressing, neither pushed back → follow-through satisfied.
+
+### Gotcha: `pan strike`/`pan plan` need the `PAN-` prefix; `gh` takes bare numbers
+
+`pan strike 1682` and `pan plan 1647 --auto` both failed ("No Panopticon project
+for issue prefix in 1682" / "Invalid issue ID"). The `pan` CLI resolves the project
+from the issue *prefix*, so it needs `PAN-1682`. `gh issue view 1682` works with a
+bare number because it's GitHub-native. Always pass the `PAN-` prefix to `pan`
+verbs.
+
+### Stalled prior attempt to recover: PAN-1681
+
+PAN-1681 (test agents narrate pass but never run `pan specialists done test`) has
+BOTH a `feature/pan-1681` and a `strike/pan-1681` branch + a `workspaces/
+feature-pan-1681` directory, but **no live agent session**. A prior strike/work
+attempt that didn't land. Surfaced as `investigate` (recover vs wipe is an
+operator decision — `pan kill`/`pan wipe` are flywheel-forbidden), did NOT blindly
+relaunch on top of existing branches.
+
+### Next-tick ramp candidates (toward the cap of 4)
+
+PAN-1658 (testStatus stuck 'pending' after rebase — blocks merge, no reconciler)
+and PAN-1629 (concurrent `pan start` bd-lock contention) are the next unstarted P1
+substrate launches as the cap allows. Both directly improve merge throughput /
+flywheel saturation.
+
+## RUN-17 tick 2 (2026-06-09) — main went RED beneath the "green" PRs; the new binding constraint
+
+The big discovery: **`main` is RED** and that is now the binding constraint — the
+RUN-15-era role that PAN-1645 (ship-choke docker) used to play. Different
+mechanism, same effect: nothing downstream can complete.
+
+### Root cause of red main (PAN-1698, filed + struck this tick)
+
+`main`'s CI `test` job fails on 9 tests, all from **stale fixtures after additive
+changes**, none a real regression:
+- **Fable 5 (`claude-fable-5`) was added to the model registry** → `model-fallback`
+  / `settings` / `router-config` tests expecting **6 Anthropic / 29 total** now see
+  **7 / 30**.
+- **`pending_auto_merges` migration bumped `SCHEMA_VERSION`** (merge-train
+  PAN-1691/1692) → `pending-auto-merges-schema.test.ts` asserts the old version.
+- `flywheel-substrate-smoke.test.ts` provenance flow (PAN-1487) — flagged for
+  investigate (may be real, not just drift).
+
+Filed **PAN-1698** and launched `strike-pan-1698` to fix it. **This is the highest
+priority item in the whole system** — a red main blocks every verify/ship/strike
+gate, so it gates the 5 ready PRs (on post-merge), strike-1682's completion, and
+every future work agent's verify. Pattern to watch: **a new model or a schema
+migration that lands without updating fixtures silently reds main and stalls the
+entire pipeline.** First inventory check each tick should include `gh run list
+--branch main --workflow CI`.
+
+### A strike's code lands on main BEFORE `pan done` — so "Pending" ≠ "no work done"
+
+PAN-1682's scoped fix (`6bbf649b4`, the `strike-` tmux-prefix allowlist in
+`resource-discovery.ts`) is **already pushed to origin/main** — yet the issue shows
+**Pending** because the strike never called `pan done`. The strike flow is:
+commit+push the surgical fix to main → run the full verify → `pan done` (close
+issue / mark complete). PAN-1682 got stuck between steps 2 and 3: its post-fix
+verify hit the **pre-existing red main** (orthogonal to its change), it **correctly
+refused to fix-forward** per the strike scope contract, and parked at the prompt
+asking a question. So: code live on main, completion bookkeeping stalled.
+
+Lesson: when a strike shows "Pending," check whether its commit already reached
+origin/main (`git branch -r --contains <sha>`). If yes, the *code* shipped and the
+only thing stuck is the verify-and-done step — usually a red-main or a parked
+question, not lost work.
+
+### strike-1682 stalled SILENTLY — operator-surfaced gap → PAN-1699
+
+The orchestrator had no idea strike-1682 had pushed back; it only found out because
+the **operator asked**. The strike role prompt has no instruction to signal the
+orchestrator before parking. Filed **PAN-1699**: autonomous agents must
+`pan tell flywheel-orchestrator "<role> <issue>: what I'm NOT doing + what's needed"`
+before they self-abort / refuse-fix-forward / decide full-pipeline-needed / park on
+a question. Without it, under autonomy a pushed-back agent stalls forever and the
+orchestrator (forbidden from `pan tell`) can't even answer. This closes the loop so
+follow-through happens in the same tick.
+
+### `pan plan --auto` stops at `proposed` — it does NOT auto-spawn the work agent
+
+The brief calls `pan plan --auto` "planning + work in one chain," but observed
+behavior (PAN-1647): planning produced a `proposed` 2-item vBRIEF on main + the
+`planned` label, then the session **ended with no work agent**. Follow-through is a
+plain **`pan start <id>`** (NOT `--auto` — that's the very bug PAN-1647 tracks;
+plain `pan start` reads the planner's real beads). This may be a PAN-1509 recurrence
+(auto-promote produces proposed specs but no work agents spawn). Either way: after
+`pan plan --auto`, the next tick must `pan start` the planned issue to actually put
+an agent on it. Did this for PAN-1647 (`agent-pan-1647` up, ctx 50%, implementing).
+
+### Tick-2 launches + posture
+
+Active work was effectively 1 (only strike-1698 truly working; strike-1682 parked,
+planning-1647 done). Below minAgents=2 → launched: `pan start PAN-1647` (work) +
+`pan plan PAN-1658 --auto`. Held PAN-1629 to `low` — do NOT pile fresh strikes at
+the red-main verify gate until PAN-1698 lands (they'd stall like 1682). Planning and
+work are red-main-safe (they don't hit the verify gate until much later); fresh
+*strikes* are not. Load 15.85/24, RAM 33/64 — healthy, no storm.

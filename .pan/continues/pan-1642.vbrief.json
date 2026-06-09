@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1642",
   "created": "2026-06-07T02:10:48.815Z",
-  "updated": "2026-06-08T17:31:02.107Z",
+  "updated": "2026-06-09T22:21:33.731Z",
   "gitState": {
     "branch": "feature/pan-1642",
     "sha": "ab4ba668c",
@@ -157,6 +157,11 @@
       "reason": "feedback",
       "note": "[2026-06-08T17:23Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-06-08T17:23:11.801Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-09T22:21:33.731Z"
     }
   ],
   "feedback": []
