@@ -715,8 +715,10 @@ export const createSession = (
       // dashboard theme (conv 2547).
       try {
         const theme = await getUiTheme();
+        // window-style is a window option: the trailing ':' targets the
+        // session's (only) window — a bare '=name' fails with "no such window".
         await tmuxExecAsync(
-          ['set-option', '-t', exactSession(name), 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${TERMINAL_BG[theme]}`],
           { encoding: 'utf-8' },
         );
       } catch {
