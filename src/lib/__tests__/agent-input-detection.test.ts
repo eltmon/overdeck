@@ -63,6 +63,58 @@ Do you want to proceed?
 
     expect(detection).toBeNull()
   })
+
+  // PAN-1690 — Codex TUI approval prompts. Codex renders option descriptions
+  // and a footer hint below "3. No", which defeats the Claude trailing-line
+  // heuristics; these cases regressed before the codex-aware branch.
+  it('detects a Codex command-approval prompt despite a trailing footer hint', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+I need local copies of both repos to diff accurately.
+
+  Would you like to run the following command?
+
+  $ git clone https://github.com/eltmon/foo /tmp/foo
+
+  Reason: do you want to allow network access to clone the review target?
+
+❯ 1. Yes, proceed
+  2. Yes, and don't ask again for commands that start with \`git clone\`
+  3. No, and tell Codex what to do differently
+
+  Press enter to confirm · esc to go back
+`)
+
+    expect(detection).toMatchObject({ reason: 'tool_permission' })
+    expect(detection?.prompt).toContain('Would you like to run the following command?')
+  })
+
+  it('detects a Codex network-host grant prompt with a footer hint', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+  Would you like to grant these permissions?
+
+  Network access to github.com
+
+❯ 1. Yes, and allow this host for this conversation
+  2. Yes, and allow this host in the future
+  3. No, and block this host in the future
+
+  esc to cancel
+`)
+
+    expect(detection).toMatchObject({ reason: 'tool_permission' })
+  })
+
+  it('does not re-fire a Codex approval header that has scrolled into history', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+  Would you like to run the following command?
+  $ git clone https://github.com/eltmon/foo /tmp/foo
+❯ 1. Yes, proceed
+  3. No, and tell Codex what to do differently
+${Array.from({ length: 20 }, (_, i) => `cloning… ${i}`).join('\n')}
+`)
+
+    expect(detection).toBeNull()
+  })
 })
 
 describe('normalizeAwaitingInputPrompt', () => {

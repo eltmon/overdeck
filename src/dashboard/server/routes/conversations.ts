@@ -114,6 +114,7 @@ import { getProviderForModelSync } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
+import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -903,6 +904,30 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+}
+
+/**
+ * PAN-1690 — pending-input detection for Codex conversations.
+ *
+ * Codex is a TUI: its approval prompts ("Would you like to run the following
+ * command?") are not AskUserQuestion tool-use events in the JSONL, so the
+ * JSONL scan that powers Claude conversations misses them entirely. Detect them
+ * off the live tmux pane instead and fold the result into the same unified
+ * pending-input signal (`pendingInputKinds`) the dashboard already renders.
+ * The pane detector is cached + concurrency-limited, so this is cheap per row.
+ */
+async function codexPanePendingKinds(conv: Conversation, sessionAlive: boolean): Promise<PendingInputKind[]> {
+  if (!sessionAlive || conv.harness !== 'codex') return [];
+  try {
+    const detection = await Effect.runPromise(
+      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }),
+    );
+    if (!detection) return [];
+    return [detection.reason === 'session_resume' ? 'sessionResume' : 'permissionRequest'];
+  } catch {
+    // pane capture failure — non-fatal, treat as no pending input
+    return [];
+  }
 }
 
 /** Rewrite an outgoing conversation message so harnesses without Claude Code's
@@ -1805,6 +1830,13 @@ const getConversationsRoute = HttpRouter.add(
                 // JSONL scan failure — leave as zero/empty; non-fatal
               }
             }
+            if (pendingInputCount === 0) {
+              const codexKinds = await codexPanePendingKinds(conv, sessionAlive);
+              if (codexKinds.length > 0) {
+                pendingInputKinds = codexKinds;
+                pendingInputCount = codexKinds.length;
+              }
+            }
 
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
@@ -1932,6 +1964,13 @@ const getConversationRoute = HttpRouter.add(
             pendingInputKinds = kinds;
             pendingInputCount = kinds.length;
           } catch { /* non-fatal */ }
+        }
+        if (pendingInputCount === 0) {
+          const codexKinds = await codexPanePendingKinds(conv, sessionAlive);
+          if (codexKinds.length > 0) {
+            pendingInputKinds = codexKinds;
+            pendingInputCount = codexKinds.length;
+          }
         }
         return jsonResponse({
           ...conv,
