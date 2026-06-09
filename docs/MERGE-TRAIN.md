@@ -18,12 +18,13 @@ PAN-1213, PAN-1658**. The expensive part isn't the rebase, it's the forced
 
 | Issue | Scope | State |
 | --- | --- | --- |
-| PAN-1691 | Conflict-aware merge train (engine) | engine done; git last-mile + reconciler validation remain |
+| PAN-1691 | Conflict-aware merge train (engine) | **DONE** — engine + git last-mile (assemble/merge-next) shipped; only live-cascade validation (5d) remains |
 | PAN-1692 | Per-issue auto-merge toggle UI (4 placements) | **DONE** |
-| PAN-1693 | Project-settings panel | to build — lives in the **project cockpit view** |
-| PAN-1694 | Flywheel page redesign | **v3 mockup approved** — to build |
-| PAN-1695 | Per-project auto-merge default | **DONE** (config + resolver; UI to set it = PAN-1693) |
-| PAN-1240/1215/1213/1658 | Cascade bugs | NOT closed — fixed only when the reconciler flag is on + validated |
+| PAN-1693 | Project-settings panel | **DONE** — `ProjectSettingsSection` in the project cockpit + `GET/POST /api/projects/:key/auto-merge-default` |
+| PAN-1694 | Flywheel page redesign | **DONE** — full v3 layout shipped (commit `6dcff1983`) |
+| PAN-1695 | Per-project auto-merge default | **DONE** (config + resolver + cockpit UI) |
+| PAN-1696 | Decouple merge-train from the Flywheel | filed as future follow-up (see §7) |
+| PAN-1240/1215/1213/1658 | Cascade bugs | NOT closed — fixed only when the reconciler flag is on + validated (5d) |
 
 ## 3. Decisions made (do not re-litigate)
 
@@ -68,23 +69,24 @@ Tests: `tests/unit/lib/flywheel-merge-order.test.ts`, `tests/unit/lib/cloister/{
 
 ## 5. REMAINING WORK (the plan)
 
-### 5a. UAT git-execution (PAN-1691 last mile — the big one)
-Orchestrators (`shipMergeBatch`, `planUatCandidate`) are done. Build:
-1. **Codename generator** — `src/lib/cloister/uat-candidate-name.ts`: pick a random word from a small wordlist + `MMDD`; collision-check against existing `uat/*` branches (git). Pure core + injected date/wordlist for testing.
-2. **UAT branch assembly** (auto-merge-OFF) — create `uat/<codename>-<date>` off `origin/main`, merge each bundled feature branch onto it; report conflicts. Same orchestrator+deps pattern (pure planner already exists; add a git-deps factory, on-demand).
-3. **Ship batch / merge-next-N endpoint** — `POST /api/flywheel/merge-next { n }` (or `/ship-candidate`): `computeMergeQueue` → take first `n` of the order (or the candidate's `bundled`) → `shipMergeBatch` with a real `merge` dep. **Find the existing per-issue merge fn** the dashboard MERGE button uses (`POST /api/issues/:id/merge` / `forge-merge` / merge-agent path) and wrap it as `merge(issueId) => {ok}|{ok:false,reason}`.
-4. **UI** — "Ship batch" button + "merge next N" stepper in the merge-queue card (redesigned rail). Wire to the endpoint, optimistic + toast.
+> **Status (2026-06-09):** 5a, 5b, 5c are **DONE, committed, pushed, built, reloaded, and visually verified**. Only **5d** remains, and it is blocked on a *live* merge an operator must trigger — it cannot be synthesized.
 
-### 5b. Project-settings panel (PAN-1693)
-- **Location**: the project cockpit view (click a project in Command Deck). Find that component (search Command Deck for the project/resource node detail view).
-- **Endpoint**: `GET/POST /api/projects/:key/settings` reading/writing the project's `projects.yaml` entry — at minimum `auto_merge_default` (`auto`|`hold`|unset). Reuse `getProjectSync`/`registerProjectSync` (projects.ts) to persist.
-- **UI**: a settings section in the cockpit — start with the auto-merge default (segmented auto/hold/default), expand to other project config (repos, services) as scope allows. This is also the home for the per-project default already built in 5-done.
+### 5a. UAT git-execution (PAN-1691 last mile) — ✅ DONE
+1. **Codename generator** — `src/lib/cloister/uat-candidate-name.ts`: random word from `UAT_CODENAMES` + `MMDD`, collision-checked vs existing `uat/*` branches. Pure core + injected date/wordlist. ✅
+2. **UAT branch assembly** — `uat-assemble.ts` + `uat-assemble-deps.ts`: create `uat/<codename>-<MMDD>` off `origin/main`, merge each bundled feature branch, report conflicts. On-demand git-deps factory. ✅
+3. **Ship batch / merge-next-N endpoint** — `POST /api/flywheel/merge-next { n }` and `POST /api/flywheel/assemble-uat`. `defaultGetOrderedIssueIds` runs the real `computeMergeQueue`; `defaultMergeOne` wraps the real per-issue merge (`triggerMerge` in `workspaces.ts`). ✅
+4. **UI** — `FlywheelConversationPane.tsx`: batch/serial chips, grouped UAT-candidate line with **Assemble** button, and a **merge next [N] · Ship** stepper. Optimistic + toast. ✅
 
-### 5c. Flywheel redesign (PAN-1694 — build v3)
-Implement the approved v3 layout in `pages/FlywheelPage.tsx` + `flywheel/FlywheelConversationPane.tsx` + `MergePolicySection.tsx`. Header bar (flywheel controls), collapsible rail (reuse MergePolicySection + merge queue with grouped UAT candidate), conversation column with the full agent control bar (Pause/Resume + ⋯ More menu + Abort). Reorganize existing sections; lose nothing.
+### 5b. Project-settings panel (PAN-1693) — ✅ DONE
+- **Location**: `ProjectSettingsSection` inside `CommandDeck/ProjectOverview.tsx` (the project cockpit), threaded `projectKey` from `Stage/ProjectHome.tsx` + `CommandDeck/index.tsx`.
+- **Endpoint**: `GET/POST /api/projects/:key/auto-merge-default` reading/writing the `projects.yaml` entry via `getProjectSync` / `setProjectAutoMergeDefaultSync`.
+- **UI**: segmented auto / hold / default control. (Endpoint scoped to `auto_merge_default`; a broader `/settings` surface can expand later.)
 
-### 5d. Reconciler validation → close cascade bugs
-Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings rebase, a conflict → agent dispatched), confirm `in-flight-guard` test stays green and no loop. THEN close PAN-1240/1215/1213/1658 with evidence.
+### 5c. Flywheel redesign (PAN-1694 — v3) — ✅ DONE (commit `6dcff1983`)
+Full v3 layout in `pages/FlywheelPage.tsx`: slim flywheel-level header bar (title, run pill, docs link, config toggles, inline stats), a control rail hosting `PendingAutoMergesBanner` + `MergePolicySection` + Status/State/Stats tabs, and the conversation column with the full agent control bar. Nothing lost; 12 FlywheelPage tests green.
+
+### 5d. Reconciler validation → close cascade bugs — ⛔ BLOCKED on a live merge
+Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings rebase, a conflict → agent dispatched), confirm `in-flight-guard` test stays green and no loop. THEN close PAN-1240/1215/1213/1658 with evidence. **This is the only open item — it requires an operator to flip the flag and let one real merge happen; it cannot be synthesized in code.**
 
 ## 6. Patterns / rules for the remaining work
 - **Orchestrator pattern**: pure DI orchestrator (tested) + flag-gated/on-demand entry + lazy-loaded real git/spawn deps (isolated, not unit-tested). See merge-train.ts / merge-train-deps.ts.
