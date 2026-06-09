@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-06-09T05:04:23.718Z"
+    "updated": "2026-06-09T05:13:46.695Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 60,
+    "sequence": 61,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-06-09T05:04:23.718Z",
+    "updated": "2026-06-09T05:13:46.695Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -254,56 +254,56 @@
         "phase": "merge",
         "issueId": "PAN-1455",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T05:04:23.645Z",
+        "updatedAt": "2026-06-09T05:13:46.688Z",
         "work": {
-          "updatedAt": "2026-06-09T05:04:23.645Z",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-09T05:04:23.645Z",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T05:04:23.645Z"
+              "at": "2026-06-09T05:13:46.688Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-09T05:04:23.645Z",
-          "notes": "Agent re-review request (2/25): Fixed test",
+          "status": "blocked",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "notes": "Correctness report came from prior review run",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-09T05:04:23.645Z",
-              "notes": "Agent re-review request (2/25): Fixed test"
+              "status": "blocked",
+              "at": "2026-06-09T05:13:46.688Z",
+              "notes": "Correctness report came from prior review run"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-09T05:04:23.645Z",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T05:04:23.645Z"
+              "at": "2026-06-09T05:13:46.688Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T05:04:23.645Z",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
           "history": []
         },
         "merge": {
           "status": "failed",
-          "updatedAt": "2026-06-09T05:04:23.645Z",
+          "updatedAt": "2026-06-09T05:13:46.688Z",
           "notes": "Post-rebase verification failed at test",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-09T05:04:23.645Z",
+              "at": "2026-06-09T05:13:46.688Z",
               "notes": "Post-rebase verification failed at test"
             }
           ],
