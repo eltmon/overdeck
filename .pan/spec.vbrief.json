@@ -1,0 +1,420 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-09T00:40:00.000Z",
+    "updated": "2026-06-09T00:40:38.691Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1686: show UAT test plan + expected changes on Awaiting Merge cards"
+  },
+  "plan": {
+    "id": "pan-1686",
+    "title": "feat(dashboard): show UAT test plan + expected changes on Awaiting Merge cards",
+    "status": "proposed",
+    "uid": "f3a1c9d2-7b64-4e18-9a2f-1c5e6d8b0a44",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-09T00:40:00.000Z",
+    "updated": "2026-06-09T00:40:38.691Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1686",
+        "label": "PAN-1686",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "awaiting-merge",
+      "uat",
+      "vbrief"
+    ],
+    "narratives": {
+      "Problem": "On the Awaiting Merge page each card shows the title/description, PR link, stack health, and merge-step tracker — but not WHAT to test or WHAT changed. Before clicking merge the operator runs UAT, and today they must dig into the PR diff and the vBRIEF by hand. The context exists (vBRIEF acceptance criteria, vBRIEF deliverables, the feature branch's git diff) but is not surfaced inline.",
+      "Proposal": "Add a server-side endpoint GET /api/workspaces/:issueId/uat-context that assembles, per ready issue: (1) acceptance criteria from the vBRIEF (subItems with metadata.kind==='acceptance_criterion'), (2) deliverables (vBRIEF item titles + Action narratives), and (3) a changed-files summary from the live workspace's git diff (base...HEAD), reusing the existing private helpers in src/lib/cloister/review-context.ts (exported for this purpose). The Awaiting Merge page fetches it per row via a parallel useQueries and renders a collapsible 'What to test / Expected changes' section inside AwaitingMergeRow. Falls back to the issue description + changed files when the vBRIEF lacks acceptance data, and never blanks the card. Optional reviewer hint reuses ReviewStatusSnapshot.uatNotes already in the store. All existing card content and the merge flow are untouched.",
+      "Constraint": "Additive only — do not modify /api/workspaces/:issueId/plan (consumed by VBriefViewer/IssueDrawer) or the existing merge flow, stack-health display, or MergeStepTracker. Server git calls must be async (no execSync). Must be tracker-agnostic (PAN/MIN/KRUX/AUR/...).",
+      "Risk": "The issue claims a review_status.reviewNotes field that does not exist (only uatNotes/verificationNotes). git diff in a mid-rebuild/torn-down workspace can fail — degrade gracefully to empty changed files."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Dedicated GET /api/workspaces/:issueId/uat-context endpoint instead of enriching /plan or doing N gh calls from the browser.",
+        "rationale": "/plan is reused by VBriefViewer/IssueDrawer and must stay cheap; computing git diffs there would tax unrelated callers. A scoped endpoint keeps cost on the one page that needs it and needs server-side git access anyway."
+      },
+      {
+        "summary": "Changed files from git diff merge-base(origin/main,HEAD)...HEAD in the live workspace; no gh pr view fallback in v1.",
+        "rationale": "Awaiting-merge workspaces always have the feature branch checked out, so git is the authoritative PR diff. Empty changedFiles is tolerated if the workspace is absent; the card still renders."
+      },
+      {
+        "summary": "Reuse getDiffBase/getChangedFiles/getDiffStat by exporting them from src/lib/cloister/review-context.ts rather than duplicating or extracting a new module.",
+        "rationale": "Smallest surgical change, zero duplication; the route file already imports from cloister/merge-agent.js so the dependency direction is consistent."
+      },
+      {
+        "summary": "UAT checklist = vBRIEF subItems with metadata.kind==='acceptance_criterion'; fall back to all subItems of an item, then to issue.description ?? issue.title.",
+        "rationale": "Matches the canonical AC encoding (frontend VBriefItemCard already filters on this kind) and guarantees the card is never blank."
+      },
+      {
+        "summary": "Optional reviewer hint renders ReviewStatusSnapshot.uatNotes already present per-row in the store; no new backend field.",
+        "rationale": "The issue's claimed reviewNotes field does not exist in contracts; uatNotes is already available and free to render."
+      },
+      {
+        "summary": "Collapsible section defaults to collapsed, one click to expand.",
+        "rationale": "Preserves the scannable merge queue and the existing compact layout while keeping full UAT context one click away."
+      },
+      {
+        "summary": "Changed-files list truncated to top ~12 by risk score with a '+N more' affordance.",
+        "rationale": "Keeps cards compact while surfacing the highest-risk files first (reuses review-context's risk ordering)."
+      }
+    ],
+    "items": [
+      {
+        "id": "export-git-diff-helpers",
+        "title": "Export git changed-files helpers from review-context.ts for reuse",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/review-context.ts, add the `export` keyword to getDiffBase(cwd), getChangedFiles(cwd, base), and getDiffStat(cwd, base) so they can be reused by the new UAT-context route without duplicating git-diff logic. The ChangedFile interface is already exported. Do not change their behavior, signatures, or the existing review-context flow."
+        },
+        "subItems": [
+          {
+            "id": "export-git-diff-helpers.ac1",
+            "title": "getDiffBase, getChangedFiles, and getDiffStat are exported from review-context.ts with unchanged signatures/behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "export-git-diff-helpers.ac2",
+            "title": "Existing review-context behavior and its consumers (buildReviewContextPromise, formatTier1Summary) are unaffected; typecheck and existing review-context tests still pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-context-endpoint",
+        "title": "Add GET /api/workspaces/:issueId/uat-context endpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "frontend-fetch-wiring",
+            "frontend-what-to-test",
+            "frontend-expected-changes"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new route GET /api/workspaces/:issueId/uat-context in src/dashboard/server/routes/workspaces.ts. Resolve project/workspace exactly like the sibling state-md route (parseIssueIdSync + extractPrefixSync + getProjectPath + getWorkspacePathForIssue). Resolve the vBRIEF via the existing resolvePlanLocation() helper. From the vBRIEF doc, build: acceptanceCriteria (flatten subItems where metadata.kind==='acceptance_criterion'; if an item has subItems but none AC-tagged, include all of that item's subItems) and deliverables (one entry per item: { title, action: narrative.Action }), plus proposal (narratives.Proposal). Compute changedFiles + diffStat by calling the exported review-context helpers against the workspace path (getDiffBase then getChangedFiles/getDiffStat), mapping ChangedFile to { path, status, additions, deletions }, truncated/sorted as already done by the helper. Wrap git work in try/catch: on any failure return changedFiles:[] and a null/empty diffStat. Return a JSON payload { issueId, acceptanceCriteria, deliverables, proposal, changedFiles, diffStat, source: { plan: 'vbrief'|'none', files: 'git'|'none' } }. Register the route in the workspaces router export list alongside the other routes. Never throw to the client — return 200 with empty fields when data is unavailable (the card must never blank)."
+        },
+        "subItems": [
+          {
+            "id": "uat-context-endpoint.ac1",
+            "title": "GET /api/workspaces/:issueId/uat-context returns 200 with acceptanceCriteria[], deliverables[], proposal, changedFiles[], diffStat, and a source descriptor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-context-endpoint.ac2",
+            "title": "acceptanceCriteria are sourced from vBRIEF subItems with metadata.kind==='acceptance_criterion', with the documented fallback to all subItems of an item; deliverables list item title + Action narrative.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-context-endpoint.ac3",
+            "title": "changedFiles come from git diff base...HEAD in the workspace (reusing the exported review-context helpers); on git failure or missing workspace the route returns changedFiles:[] and source.files:'none' without erroring.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-context-endpoint.ac4",
+            "title": "Project/workspace/vBRIEF resolution is tracker-agnostic (works for PAN/MIN/KRUX/AUR/... via parseIssueIdSync/extractPrefixSync), and an invalid issue id returns 400.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-context-endpoint.ac5",
+            "title": "All git calls are async (execAsync); no execSync is introduced; the existing /plan route is unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-context-endpoint-test",
+        "title": "Unit-test the uat-context assembly and fallbacks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a vitest covering the endpoint's assembly logic: AC extraction prefers metadata.kind==='acceptance_criterion' and falls back to all subItems; deliverables derive from item title + narrative.Action; changedFiles map correctly; and the graceful path (no vBRIEF / git failure) returns empty arrays with the right source descriptor rather than throwing. Prefer testing a pure assembly helper extracted from the route handler so the test does not need a live git repo; if testing the route directly, stub git via the exported helpers."
+        },
+        "subItems": [
+          {
+            "id": "uat-context-endpoint-test.ac1",
+            "title": "Tests cover AC extraction (tagged + fallback), deliverables, changed-files mapping, and the no-data/git-failure fallback returning empty fields.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-context-endpoint-test.ac2",
+            "title": "Tests pass under `npm test` without requiring a live git repository (git is stubbed or logic is unit-tested in isolation).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-fetch-wiring",
+        "title": "Frontend: UatContext type, fetch helper, and parallel per-row query",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/AwaitingMergePage.tsx add a UatContext interface mirroring the endpoint payload and a fetchUatContext(issueId) helper (same shape as fetchWorkspace: return {} / empty on non-ok). Add a second useQueries keyed ['uat-context', rs.issueId] with staleTime ~30s, parallel to the existing workspace useQueries, over the same sortedAwaiting list. Thread the per-row result (and the row's rs.uatNotes from the store) into AwaitingMergeRow via new optional props. No rendering yet — just data plumbing and types. Do not change the existing workspace query or row actions."
+        },
+        "subItems": [
+          {
+            "id": "frontend-fetch-wiring.ac1",
+            "title": "A UatContext type and fetchUatContext helper exist; a parallel useQueries fetches uat-context per ready issue with caching, without disturbing the existing workspace query.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-fetch-wiring.ac2",
+            "title": "AwaitingMergeRow receives the uat-context data and rs.uatNotes as optional props; the page typechecks and renders unchanged (no visual change yet).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-what-to-test",
+        "title": "Frontend: collapsible 'What to test (UAT)' section",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In AwaitingMergeRow add a collapsible section below the existing row body (above/below the MergeStepTracker), default COLLAPSED, toggled by a 'What to test / Expected changes' header using the already-imported ChevronDown/ChevronUp icons and local useState. When expanded, render a 'What to test (UAT)' checklist from uatContext.acceptanceCriteria (each as a scannable line with a Circle/checkbox-style marker the operator self-verifies). If acceptanceCriteria is empty, fall back to the issue description (passed as a prop, issue.description ?? title). Render the optional reviewer hint (rs.uatNotes) when present. Show a lightweight loading line while the query is pending and degrade silently on error. Never blank the section."
+        },
+        "subItems": [
+          {
+            "id": "frontend-what-to-test.ac1",
+            "title": "Each card has a collapsible 'What to test / Expected changes' header (default collapsed) that expands/collapses on click.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-what-to-test.ac2",
+            "title": "Expanded view shows a 'What to test (UAT)' checklist sourced from vBRIEF acceptance criteria for that issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-what-to-test.ac3",
+            "title": "When acceptance criteria are missing, the section falls back to the issue description (then title) and never renders blank; uatNotes renders only when present.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-expected-changes",
+        "title": "Frontend: 'Expected changes' subsection (deliverables + changed files)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Inside the same collapsible section, add an 'Expected changes' subsection that renders uatContext.deliverables (vBRIEF item titles, optionally the Action narrative) and a changed-files summary from uatContext.changedFiles — each row showing the path with a status indicator and +additions/-deletions, truncated to the first ~12 files (already risk-sorted by the backend) with a '+N more' line when there are more. If changedFiles is empty, show a subtle 'No file changes available' note rather than blanking. If deliverables are also empty, fall back to uatContext.proposal when present."
+        },
+        "subItems": [
+          {
+            "id": "frontend-expected-changes.ac1",
+            "title": "Expanded view shows an 'Expected changes' summary listing vBRIEF deliverables and a PR changed-files summary (path + status + +/- counts).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-expected-changes.ac2",
+            "title": "Changed-files list is truncated to ~12 with a '+N more' affordance; empty changedFiles degrades to a subtle note (and empty deliverables fall back to the proposal) without blanking.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-expected-changes.ac3",
+            "title": "No regression to the merge button, stack-health display, MergeStepTracker, or row layout for issues from any tracker prefix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-tests",
+        "title": "Frontend tests for the UAT-context section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a component test (vitest + Testing Library, mirroring VBriefViewer.test.tsx) for the new section: it renders the UAT checklist from acceptance criteria, falls back to the issue description when AC is empty, renders the changed-files summary, and the collapse/expand toggle shows/hides the content. Mock the uat-context query/props; do not hit the network."
+        },
+        "subItems": [
+          {
+            "id": "frontend-tests.ac1",
+            "title": "Tests assert the UAT checklist renders from AC, the description fallback engages when AC is empty, and the changed-files summary renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-tests.ac2",
+            "title": "Tests assert the collapse/expand toggle reveals and hides the section; all tests pass under `npm test`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-awaiting-merge",
+        "title": "Document the UAT-context section on Awaiting Merge cards",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-09T00:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1686",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the flywheel / Awaiting Merge documentation referenced by AwaitingMergePage.tsx (docs/FLYWHEEL.md and/or docs/flywheel-brief.md) with a short note that each Awaiting Merge card now surfaces a collapsible 'What to test / Expected changes' section (vBRIEF acceptance criteria + deliverables + PR changed-files summary, sourced from GET /api/workspaces/:issueId/uat-context), with graceful fallback to the issue description. Keep it brief — one short subsection."
+        },
+        "subItems": [
+          {
+            "id": "docs-awaiting-merge.ac1",
+            "title": "The flywheel/Awaiting-Merge doc describes the new collapsible UAT-context section and its data source/endpoint.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "export-git-diff-helpers",
+        "to": "uat-context-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-context-endpoint",
+        "to": "uat-context-endpoint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-context-endpoint",
+        "to": "frontend-fetch-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-fetch-wiring",
+        "to": "frontend-what-to-test",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-what-to-test",
+        "to": "frontend-expected-changes",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-expected-changes",
+        "to": "frontend-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-expected-changes",
+        "to": "docs-awaiting-merge",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-09-PAN-1686-feat-dashboard-show-uat-test-plan-expected-changes-on-awaiting-merge-cards.vbrief.json"
+    }
+  }
+}
