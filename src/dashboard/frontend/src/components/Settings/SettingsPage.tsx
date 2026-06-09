@@ -648,6 +648,13 @@ export function SettingsPage() {
     estimate: ConversationSearchCostEstimate | null;
   } | null>(null);
   const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
+  const [reindexProgress, setReindexProgress] = useState<{
+    active: boolean;
+    filesScanned: number;
+    filesIndexed: number;
+    chunksIndexed: number;
+    currentFile?: string;
+  } | null>(null);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -832,6 +839,25 @@ export function SettingsPage() {
       toast.error(`Failed to reindex conversations: ${error.message}`);
     },
   });
+
+  // Poll live reindex progress while a reindex is running so the UI can show a real bar.
+  const conversationSearchReindexPending = conversationSearchReindexMutation.isPending;
+  useEffect(() => {
+    if (!conversationSearchReindexPending) {
+      setReindexProgress(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/settings/conversation-search/reindex-progress', { credentials: 'include' });
+        if (res.ok && !cancelled) setReindexProgress(await res.json());
+      } catch { /* ignore transient poll errors */ }
+    };
+    void poll();
+    const id = setInterval(poll, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [conversationSearchReindexPending]);
 
   // Open the confirm modal immediately, then fill in the cost estimate (scanning every
   // transcript can take a few seconds). `model` prices a prospective switch.
@@ -2315,6 +2341,29 @@ export function SettingsPage() {
                 Estimate & reindex all conversations
               </button>
             </div>
+
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
+              <span className="text-foreground">Estimate &amp; reindex</span> rebuilds the entire semantic-search index from your conversation transcripts: it shows the one-time embedding-API cost, asks you to confirm, then re-embeds every conversation. Run it after switching the model, or to pick up transcripts created before search was enabled.
+            </p>
+
+            {conversationSearchReindexMutation.isPending && reindexProgress && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-1">
+                  <span className="truncate">
+                    {reindexProgress.currentFile ? `Indexing ${reindexProgress.currentFile}…` : 'Finishing up…'}
+                  </span>
+                  <span className="text-foreground tabular-nums shrink-0">
+                    {reindexProgress.filesIndexed}/{reindexProgress.filesScanned || '—'} files · {reindexProgress.chunksIndexed.toLocaleString()} chunks
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${reindexProgress.filesScanned > 0 ? Math.min(100, Math.round((reindexProgress.filesIndexed / reindexProgress.filesScanned) * 100)) : 5}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border my-2" />

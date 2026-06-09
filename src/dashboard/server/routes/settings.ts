@@ -54,6 +54,21 @@ const REINDEX_CONFIRM_TTL_MS = 10 * 60 * 1000;
 const reindexConfirmationNonces = new Map<string, { estimatedUsd: number; expiresAt: number }>();
 let activeConversationSearchReindex: Promise<unknown> | null = null;
 
+interface ConversationReindexProgress {
+  active: boolean;
+  filesScanned: number;
+  filesIndexed: number;
+  chunksIndexed: number;
+  currentFile?: string;
+  startedAt?: number;
+}
+let conversationReindexProgress: ConversationReindexProgress = {
+  active: false,
+  filesScanned: 0,
+  filesIndexed: 0,
+  chunksIndexed: 0,
+};
+
 function createReindexConfirmationNonce(estimatedUsd: number): string {
   const nonce = randomBytes(24).toString('base64url');
   const now = Date.now();
@@ -815,10 +830,16 @@ const postConversationSearchReindexRoute = HttpRouter.add(
         }
 
         await stopConversationSearchWatcher();
+        conversationReindexProgress = { active: true, filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, startedAt: Date.now() };
         try {
-          const result = await fullReindexConversationSearch();
+          const result = await fullReindexConversationSearch({
+            onProgress: (p) => {
+              conversationReindexProgress = { active: true, startedAt: conversationReindexProgress.startedAt, ...p };
+            },
+          });
           return jsonResponse(result);
         } finally {
+          conversationReindexProgress = { ...conversationReindexProgress, active: false };
           await syncConversationSearchWatcher();
         }
       })();
@@ -829,6 +850,15 @@ const postConversationSearchReindexRoute = HttpRouter.add(
         if (activeConversationSearchReindex === job) activeConversationSearchReindex = null;
       }
     });
+  })),
+);
+
+// Read-only progress for the live reindex bar. Public (same rationale as the status route).
+const getConversationSearchReindexProgressRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/reindex-progress',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(conversationReindexProgress);
   })),
 );
 
@@ -1036,6 +1066,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getConversationSearchStatusRoute,
   getConversationSearchReindexEstimateRoute,
   postConversationSearchReindexRoute,
+  getConversationSearchReindexProgressRoute,
   putSettingsRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,

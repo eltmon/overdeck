@@ -7,6 +7,13 @@ import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '.
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
+export interface ConversationIndexProgress {
+  filesScanned: number;
+  filesIndexed: number;
+  chunksIndexed: number;
+  currentFile?: string;
+}
+
 export interface ConversationIndexerOptions {
   config?: NormalizedConversationSearchConfig;
   db?: EmbeddingsDbHandle;
@@ -14,6 +21,8 @@ export interface ConversationIndexerOptions {
   roots?: string[];
   now?: () => string;
   signal?: AbortSignal;
+  /** Invoked once per file (before it is embedded) and once at completion, for live progress UIs. */
+  onProgress?: (progress: ConversationIndexProgress) => void;
 }
 
 export interface IndexConversationFileOptions extends ConversationIndexerOptions {
@@ -64,14 +73,18 @@ export async function indexConversationSearch(
   }
 
   try {
+    let processed = 0;
     for (const filePath of files) {
       throwIfAborted(options.signal);
+      options.onProgress?.({ filesScanned: files.length, filesIndexed: processed, chunksIndexed: result.chunksIndexed, currentFile: basename(filePath) });
       const fileResult = await indexConversationFile({ ...options, config, db: owned.db, provider: owned.provider, filePath });
       result.filesIndexed += fileResult.filesIndexed;
       result.chunksIndexed += fileResult.chunksIndexed;
       result.chunksSkipped += fileResult.chunksSkipped;
       result.errors.push(...fileResult.errors);
+      processed += 1;
     }
+    options.onProgress?.({ filesScanned: files.length, filesIndexed: processed, chunksIndexed: result.chunksIndexed });
   } finally {
     owned.close();
   }
