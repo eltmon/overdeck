@@ -244,6 +244,20 @@ function isLiveResource(issue: MutableResourceIssue): boolean {
     || hasRecentActivity(issue.lastActivity);
 }
 
+/**
+ * tmux session-name prefixes that map a session to its issue in the Command Deck
+ * tree. `strike-` MUST be included (PAN-1682): strike sessions are named
+ * `strike-<issue>` and a strike issue is typically `todo` (not an active tracker
+ * state), so without registering the tmux resource the issue is filtered out of
+ * the tree entirely. Keep this list in sync with the agent-session prefixes the
+ * dashboard recognizes elsewhere (e.g. routes/agents.ts).
+ */
+const DISCOVERABLE_SESSION_PREFIXES = ['agent-', 'planning-', 'specialist-', 'review-', 'strike-'] as const;
+
+export function isDiscoverableAgentSession(sessionName: string): boolean {
+  return DISCOVERABLE_SESSION_PREFIXES.some((prefix) => sessionName.startsWith(prefix));
+}
+
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
   const map = new Map<string, TrackerIssueRecord>();
   try {
@@ -468,7 +482,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   for (const sessionName of tmuxSessions) {
-    if (!sessionName.startsWith('agent-') && !sessionName.startsWith('planning-') && !sessionName.startsWith('specialist-') && !sessionName.startsWith('review-')) {
+    if (!isDiscoverableAgentSession(sessionName)) {
       continue;
     }
     const issueId = parseIssueIdFromTextSync(sessionName);

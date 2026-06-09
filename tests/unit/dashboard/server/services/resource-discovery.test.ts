@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ResourceAllocatedIssue } from '../../../../../src/dashboard/server/services/resource-discovery.js';
 import {
   groupResourceAllocatedIssuesByProject,
+  isDiscoverableAgentSession,
   resetResourceAllocatedIssuesCacheForTests,
   sanitizeResourceAllocatedIssues,
 } from '../../../../../src/dashboard/server/services/resource-discovery.js';
@@ -180,6 +181,25 @@ describe('resource-discovery sanitization', () => {
     });
     expect(sanitized[0]?.resourceDetails.localBranchCount).toBe(1);
     expect(sanitized[0]?.resourceDetails.tmuxSessionCount).toBe(1);
+  });
+});
+
+describe('resource-discovery session prefix allowlist', () => {
+  it('maps strike sessions to their issue so strike work surfaces in the tree (PAN-1682)', () => {
+    expect(isDiscoverableAgentSession('strike-pan-1682')).toBe(true);
+  });
+
+  it('still recognizes the pre-existing agent/planning/specialist/review prefixes', () => {
+    expect(isDiscoverableAgentSession('agent-pan-100')).toBe(true);
+    expect(isDiscoverableAgentSession('planning-pan-100')).toBe(true);
+    expect(isDiscoverableAgentSession('specialist-pan-100')).toBe(true);
+    expect(isDiscoverableAgentSession('review-pan-100')).toBe(true);
+  });
+
+  it('ignores unrelated tmux sessions', () => {
+    expect(isDiscoverableAgentSession('conv-371')).toBe(false);
+    expect(isDiscoverableAgentSession('panopticon')).toBe(false);
+    expect(isDiscoverableAgentSession('0')).toBe(false);
   });
 });
 
