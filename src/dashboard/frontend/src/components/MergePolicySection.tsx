@@ -5,7 +5,7 @@
  * and a live auto/hold summary. Self-contained: reads the review-status
  * snapshots straight from the store and reuses the shared AutoMergeToggle.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../lib/store';
@@ -34,6 +34,17 @@ function isActive(rs: ReviewStatusSnapshot): boolean {
 
 export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
   const byId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const issuesRaw = useDashboardStore((s) => s.issuesRaw);
+  // Map issue identifier (case-insensitive) → human title, sourced from the raw
+  // issue list. ReviewStatusSnapshot carries no title, so the roster looked it
+  // up nowhere and showed only the phase.
+  const titleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const it of (issuesRaw as Array<{ identifier?: string; title?: string }> | undefined) ?? []) {
+      if (it?.identifier && it?.title) map.set(it.identifier.toUpperCase(), it.title);
+    }
+    return map;
+  }, [issuesRaw]);
   const [collapsed, setCollapsed] = useState(false);
   const rows = Object.values(byId)
     .filter(isActive)
@@ -58,15 +69,20 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
       {!collapsed && (
       <ul className="max-h-56 space-y-1 overflow-y-auto">
         {rows.map((rs) => (
-          <li key={rs.issueId} className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-accent/40">
+          <li key={rs.issueId} className="flex items-center gap-2.5 rounded-md px-2 py-1 hover:bg-accent/40">
             <button
               type="button"
               onClick={() => onNavigateIssue?.(rs.issueId)}
-              className="w-24 shrink-0 text-left font-mono text-xs text-primary hover:underline"
+              className="w-20 shrink-0 text-left font-mono text-xs text-primary hover:underline"
             >
               {rs.issueId}
             </button>
-            <span className="flex-1 truncate text-xs text-muted-foreground">{shortPhase(rs)}</span>
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate text-xs text-foreground" title={titleById.get(rs.issueId.toUpperCase())}>
+                {titleById.get(rs.issueId.toUpperCase()) ?? shortPhase(rs)}
+              </span>
+              <span className="truncate text-[10px] text-muted-foreground">{shortPhase(rs)}</span>
+            </span>
             <AutoMergeToggle issueId={rs.issueId} autoMerge={rs.autoMerge} variant="segmented" compact />
           </li>
         ))}
