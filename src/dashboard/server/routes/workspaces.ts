@@ -11,6 +11,7 @@ import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
+ *   GET    /api/workspaces/:issueId/uat-context
  *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
  *   GET    /api/workspaces/:issueId/clean/preview
  *   POST   /api/workspaces/:issueId/clean
@@ -102,6 +103,7 @@ import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
+import { getChangedFiles, getDiffBase, getDiffStat } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
@@ -1855,6 +1857,131 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
   });
 }
 
+export interface UatContextAcceptanceCriterion {
+  id: string;
+  title: string;
+  status: string;
+  itemId: string;
+  itemTitle: string;
+}
+
+export interface UatContextDeliverable {
+  id: string;
+  title: string;
+  status: string;
+  action?: string;
+}
+
+export interface UatContextChangedFile {
+  path: string;
+  status: 'M' | 'A' | 'D' | 'R' | 'C' | 'U';
+  additions: number;
+  deletions: number;
+}
+
+interface UatContextPlanFields {
+  acceptanceCriteria: UatContextAcceptanceCriterion[];
+  deliverables: UatContextDeliverable[];
+  proposal: string | null;
+}
+
+interface UatContextGitFields {
+  changedFiles: UatContextChangedFile[];
+  changedFilesTotal: number;
+  changedFilesOmitted: number;
+  diffStat: { stat: string; truncated: boolean } | null;
+  source: { files: 'git' | 'none' };
+}
+
+const MAX_UAT_CONTEXT_CHANGED_FILES = 12;
+
+export function assembleUatContextPlanFields(doc: VBriefDocument | null): UatContextPlanFields {
+  if (!doc) {
+    return { acceptanceCriteria: [], deliverables: [], proposal: null };
+  }
+
+  const acceptanceCriteria: UatContextAcceptanceCriterion[] = [];
+  const deliverables: UatContextDeliverable[] = [];
+
+  for (const item of doc.plan.items ?? []) {
+    deliverables.push({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...(item.narrative?.Action ? { action: item.narrative.Action } : {}),
+    });
+
+    const subItems = item.subItems ?? [];
+    if (subItems.length === 0) continue;
+
+    const taggedAcceptanceCriteria = subItems.filter(
+      (subItem) => subItem.metadata?.kind === 'acceptance_criterion',
+    );
+    const selectedSubItems = taggedAcceptanceCriteria.length > 0
+      ? taggedAcceptanceCriteria
+      : subItems;
+
+    for (const subItem of selectedSubItems) {
+      acceptanceCriteria.push({
+        id: subItem.id,
+        title: subItem.title,
+        status: subItem.status,
+        itemId: item.id,
+        itemTitle: item.title,
+      });
+    }
+  }
+
+  return {
+    acceptanceCriteria,
+    deliverables,
+    proposal: doc.plan.narratives?.Proposal ?? null,
+  };
+}
+
+async function readWorkspaceUatChangedFiles(workspacePath: string): Promise<UatContextGitFields> {
+  const empty: UatContextGitFields = {
+    changedFiles: [],
+    changedFilesTotal: 0,
+    changedFilesOmitted: 0,
+    diffStat: null,
+    source: { files: 'none' },
+  };
+
+  if (!existsSync(workspacePath)) return empty;
+
+  try {
+    const base = await getDiffBase(workspacePath);
+    const [changedFiles, diffStat] = await Promise.all([
+      getChangedFiles(workspacePath, base),
+      getDiffStat(workspacePath, base),
+    ]);
+
+    if (diffStat.stat === 'Unable to compute diff stat') {
+      return empty;
+    }
+
+    const limitedChangedFiles = changedFiles
+      .slice(0, MAX_UAT_CONTEXT_CHANGED_FILES)
+      .map((file) => ({
+        path: file.path,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+      }));
+
+    return {
+      changedFiles: limitedChangedFiles,
+      changedFilesTotal: changedFiles.length,
+      changedFilesOmitted: Math.max(0, changedFiles.length - limitedChangedFiles.length),
+      diffStat,
+      source: { files: 'git' },
+    };
+  } catch {
+    return empty;
+  }
+}
+
 const getWorkspacePlanRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/plan',
@@ -1877,6 +2004,42 @@ const getWorkspacePlanRoute = HttpRouter.add(
 
     const cp = criticalPath(actionableDoc(location.doc));
     return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+  }))
+);
+
+const getWorkspaceUatContextRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/uat-context',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const parsed = parseIssueIdSync(issueId);
+    if (!parsed) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const issuePrefix = parsed.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
+
+    const location = yield* Effect.promise(() =>
+      Effect.runPromise(resolvePlanLocation(projectPath, parsedIssueId)).catch(() => null)
+    );
+    const planFields = assembleUatContextPlanFields(location?.doc ?? null);
+    const gitFields = yield* Effect.promise(() => readWorkspaceUatChangedFiles(workspacePath));
+
+    return jsonResponse({
+      issueId: parsedIssueId,
+      ...planFields,
+      changedFiles: gitFields.changedFiles,
+      changedFilesTotal: gitFields.changedFilesTotal,
+      changedFilesOmitted: gitFields.changedFilesOmitted,
+      diffStat: gitFields.diffStat,
+      source: {
+        plan: location ? 'vbrief' : 'none',
+        files: gitFields.source.files,
+      },
+    });
   }))
 );
 
@@ -6221,6 +6384,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
+  getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
   getWorkspaceStashesRoute,
   postWorkspaceRecoverStashRoute,
