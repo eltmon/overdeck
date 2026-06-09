@@ -128,6 +128,7 @@ import {
 import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
   compactConversationNative,
@@ -302,7 +303,12 @@ async function getCachedMessages(
   // rest of the pipeline (cost rollup, streaming flag, etc.) is unchanged.
   // Pi files don't support the incremental-parse path — we always do a full
   // read; chat sessions are small enough that this is fine.
-  if (isPiSessionFile(sessionFile)) {
+  if (isCodexSessionFile(sessionFile)) {
+    // Codex rollout JSONL (OpenAI schema). Checked before isPiSessionFile
+    // because a Codex path (.../agents/<id>/codex-home/sessions/...) also
+    // matches the Pi detector's substrings.
+    result = await parseCodexConversationMessages(sessionFile);
+  } else if (isPiSessionFile(sessionFile)) {
     result = await parsePiConversationMessages(sessionFile);
   } else if (isSpecialist) {
     result = await parseFromLastCompactBoundary(sessionFile);
@@ -574,6 +580,16 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
 /** Detect whether a session file path is a Pi conversation JSONL. */
 function isPiSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
+}
+
+/**
+ * Detect whether a session file path is a Codex rollout JSONL. Codex writes
+ * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Panopticon the per-agent
+ * CODEX_HOME lives at .../agents/<id>/codex-home, so the path also satisfies
+ * {@link isPiSessionFile} — codex must therefore be tested first.
+ */
+function isCodexSessionFile(sessionFile: string): boolean {
+  return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
 async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
