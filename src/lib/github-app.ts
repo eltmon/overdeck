@@ -52,6 +52,41 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   checksFailed: boolean;
 }
 
+export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
+
+export interface GitHubCiCheckRunSummary {
+  id?: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  htmlUrl?: string;
+}
+
+export interface GitHubCiCheckRunsState {
+  verdict: GitHubCiCheckRunsVerdict;
+  green: boolean;
+  pending: boolean;
+  failed: boolean;
+  total: number;
+  successCount: number;
+  pendingCount: number;
+  failedCount: number;
+  checkRuns: GitHubCiCheckRunSummary[];
+  successfulRuns: GitHubCiCheckRunSummary[];
+  pendingRuns: GitHubCiCheckRunSummary[];
+  failedRuns: GitHubCiCheckRunSummary[];
+}
+
+type GitHubCheckRunApiResponse = {
+  check_runs?: Array<{
+    id?: number;
+    name?: string;
+    status?: string;
+    conclusion?: string | null;
+    html_url?: string;
+  }>;
+};
+
 /**
  * Check if the GitHub App is configured (credentials exist)
  */
@@ -196,6 +231,58 @@ export function parsePullRequestRef(input: {
   throw new Error('GitHub PR reference requires either a PR URL or repository + numeric id');
 }
 
+function summarizeCiCheckRuns(
+  runs: NonNullable<GitHubCheckRunApiResponse['check_runs']>,
+): GitHubCiCheckRunsState {
+  const checkRuns = runs.map((run) => ({
+    id: run.id,
+    name: run.name || 'GitHub check run',
+    status: run.status || 'unknown',
+    conclusion: run.conclusion ?? null,
+    htmlUrl: run.html_url,
+  }));
+
+  const pendingRuns = checkRuns.filter((run) => run.status !== 'completed');
+  const successfulRuns = checkRuns.filter(
+    (run) => run.status === 'completed' && run.conclusion === 'success',
+  );
+  const failedRuns = checkRuns.filter((run) => {
+    if (run.status !== 'completed') return false;
+    return !['success', 'neutral', 'skipped'].includes(run.conclusion || '');
+  });
+
+  const pending = pendingRuns.length > 0 || successfulRuns.length === 0;
+  const failed = failedRuns.length > 0;
+  const green = checkRuns.length > 0 && successfulRuns.length > 0 && !pending && !failed;
+  const verdict: GitHubCiCheckRunsVerdict = failed ? 'red' : green ? 'green' : 'pending';
+
+  return {
+    verdict,
+    green,
+    pending: verdict === 'pending',
+    failed,
+    total: checkRuns.length,
+    successCount: successfulRuns.length,
+    pendingCount: pendingRuns.length,
+    failedCount: failedRuns.length,
+    checkRuns,
+    successfulRuns,
+    pendingRuns,
+    failedRuns,
+  };
+}
+
+async function getCiCheckRunsStatePromise(
+  owner: string,
+  repo: string,
+  sha: string,
+): Promise<GitHubCiCheckRunsState> {
+  const checkRuns = await githubApi<GitHubCheckRunApiResponse>(
+    `/repos/${owner}/${repo}/commits/${sha}/check-runs`
+  );
+  return summarizeCiCheckRuns(checkRuns.check_runs || []);
+}
+
 async function getCommitCheckState(
   owner: string,
   repo: string,
@@ -203,7 +290,7 @@ async function getCommitCheckState(
 ): Promise<{ pending: boolean; failed: boolean }> {
   const [combinedStatus, checkRuns] = await Promise.all([
     githubApi<{ state?: string }>(`/repos/${owner}/${repo}/commits/${sha}/status`),
-    githubApi<{ check_runs?: Array<{ status?: string; conclusion?: string | null }> }>(
+    githubApi<GitHubCheckRunApiResponse>(
       `/repos/${owner}/${repo}/commits/${sha}/check-runs`
     ),
   ]);
@@ -211,17 +298,11 @@ async function getCommitCheckState(
   const statusState = combinedStatus.state || '';
   const pendingStatus = statusState === 'pending';
   const failedStatus = statusState === 'failure' || statusState === 'error';
-
-  const runs = checkRuns.check_runs || [];
-  const pendingChecks = runs.some((run) => run.status !== 'completed');
-  const failedChecks = runs.some((run) => {
-    if (run.status !== 'completed') return false;
-    return !['success', 'neutral', 'skipped'].includes(run.conclusion || '');
-  });
+  const ciState = summarizeCiCheckRuns(checkRuns.check_runs || []);
 
   return {
-    pending: pendingStatus || pendingChecks,
-    failed: failedStatus || failedChecks,
+    pending: pendingStatus || ciState.pendingRuns.length > 0,
+    failed: failedStatus || ciState.failed,
   };
 }async function getPullRequestStatePromise(
   owner: string,
@@ -501,6 +582,20 @@ export const getPullRequestState = (
   Effect.tryPromise({
     try: () => getPullRequestStatePromise(owner, repo, number),
     catch: apiCatch('getPullRequestState'),
+  });
+
+/**
+ * Effect-native check-runs-only CI verdict for one commit SHA.
+ * Unlike getPullRequestState(), this intentionally ignores commit statuses.
+ */
+export const getCiCheckRunsState = (
+  owner: string,
+  repo: string,
+  sha: string,
+): Effect.Effect<GitHubCiCheckRunsState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getCiCheckRunsStatePromise(owner, repo, sha),
+    catch: apiCatch('getCiCheckRunsState'),
   });
 
 /** Effect-native mergePullRequestWithApp — typed-error merge call. */
