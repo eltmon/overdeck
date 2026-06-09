@@ -10,6 +10,7 @@ import { getPanopticonHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
+import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -705,7 +706,23 @@ export const createSession = (
   options?: { env?: Record<string, string>; width?: number; height?: number },
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' }).then(() => undefined),
+    try: async () => {
+      await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
+      // Stamp the initial window's background with the dashboard theme so tmux
+      // answers OSC 11 background queries even with no client attached. Claude
+      // Code's `theme: auto` queries once at startup; without this, headless
+      // agents get no answer and fall back to dark regardless of the
+      // dashboard theme (conv 2547).
+      try {
+        const theme = await getUiTheme();
+        await tmuxExecAsync(
+          ['set-option', '-t', exactSession(name), 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          { encoding: 'utf-8' },
+        );
+      } catch {
+        // Best-effort: a failed theme stamp must not fail session creation.
+      }
+    },
     catch: (cause) => toTmuxError('create-session', cause),
   });
 

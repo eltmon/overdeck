@@ -28,6 +28,7 @@ import {
   updateProviderApiKey,
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
+import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { getProviderForModelSync, PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
@@ -893,6 +894,28 @@ const putSettingsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: PUT /api/settings/ui-theme ────────────────────────────────────────
+// The frontend syncs its resolved theme here on load and on toggle. New tmux
+// sessions stamp their pane background from this value so Claude Code's
+// `theme: auto` detects the dashboard theme even when started headless.
+
+const putUiThemeRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/ui-theme',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const theme = (body as { theme?: unknown } | null)?.theme;
+      if (theme !== 'light' && theme !== 'dark') {
+        return jsonResponse({ error: "theme must be 'light' or 'dark'" }, { status: 400 });
+      }
+      await setUiTheme(theme);
+      return jsonResponse({ success: true });
+    });
+  })),
+);
+
 // ─── Route: GET /api/settings/openrouter/models ──────────────────────────────
 
 const getOpenRouterModelsRoute = HttpRouter.add(
@@ -1068,6 +1091,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   postConversationSearchReindexRoute,
   getConversationSearchReindexProgressRoute,
   putSettingsRoute,
+  putUiThemeRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,
