@@ -25,8 +25,25 @@ interface WorkspaceInfo {
   stackHealth?: { healthy?: boolean; reasons?: string[] };
 }
 
+interface UatContext {
+  acceptanceCriteria?: Array<{ id: string; title: string; status: string; itemId: string; itemTitle: string }>;
+  deliverables?: Array<{ id: string; title: string; status: string; action?: string }>;
+  proposal?: string | null;
+  changedFiles?: Array<{ path: string; status: string; additions: number; deletions: number }>;
+  changedFilesTotal?: number;
+  changedFilesOmitted?: number;
+  diffStat?: { stat: string; truncated: boolean } | null;
+  source?: { plan?: 'vbrief' | 'none'; files?: 'git' | 'none' };
+}
+
 async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
   const res = await fetch(`/api/workspaces/${issueId}`);
+  if (!res.ok) return {};
+  return res.json();
+}
+
+async function fetchUatContext(issueId: string): Promise<UatContext> {
+  const res = await fetch(`/api/workspaces/${issueId}/uat-context`);
   if (!res.ok) return {};
   return res.json();
 }
@@ -147,6 +164,14 @@ export function AwaitingMergePage() {
     })),
   });
 
+  const uatContextQueries = useQueries({
+    queries: sortedAwaiting.map((rs) => ({
+      queryKey: ['uat-context', rs.issueId],
+      queryFn: () => fetchUatContext(rs.issueId),
+      staleTime: 30_000,
+    })),
+  });
+
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-5xl mx-auto p-6">
@@ -173,6 +198,7 @@ export function AwaitingMergePage() {
             {sortedAwaiting.map((rs, idx) => {
               const issue = issuesById.get(rs.issueId.toLowerCase());
               const ws = workspaceQueries[idx]?.data;
+              const uatContextQuery = uatContextQueries[idx];
               return (
                 <AwaitingMergeRow
                   key={rs.issueId}
@@ -189,6 +215,10 @@ export function AwaitingMergePage() {
                   mergeStep={rs.mergeStep}
                   mergeNotes={rs.mergeNotes}
                   autoMerge={rs.autoMerge}
+                  uatContext={uatContextQuery?.data}
+                  uatContextLoading={uatContextQuery?.isLoading}
+                  uatContextError={uatContextQuery?.isError}
+                  uatNotes={rs.uatNotes}
                   onMerged={() => {
                     queryClient.invalidateQueries({ queryKey: ['workspace', rs.issueId] });
                     queryClient.invalidateQueries({ queryKey: ['review-status', rs.issueId] });
@@ -272,6 +302,10 @@ interface RowProps {
   mergeStep?: string;
   mergeNotes?: string;
   autoMerge?: boolean;
+  uatContext?: UatContext;
+  uatContextLoading?: boolean;
+  uatContextError?: boolean;
+  uatNotes?: string;
   onMerged: () => void;
 }
 
