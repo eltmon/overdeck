@@ -59,3 +59,8 @@ Revert or leave your edits as you see fit — this file is meant to churn.
 - 2026-06-09: Second fresh addition, stacked below, to show a solid block of green.
 - 2026-06-09: Third fresh addition — note the old "Brand-new line B" line was
   deleted here, so you also get a red removal band to compare green vs red.
+- 2026-06-09: OSC 11 spawn-stamp test — this edit was made from a PRE-FIX session
+  (dark-themed Claude on a light pane), so these bands still render dark here.
+- 2026-06-09: Open a NEW conversation and edit this file again: that session will
+  detect the light pane via the stamped background and render pale light-theme
+  bands instead. Same file, same dashboard — the difference is spawn time.
