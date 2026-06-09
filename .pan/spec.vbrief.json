@@ -1,0 +1,158 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-09T22:44:41.149Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
+    "updated": "2026-06-09T22:55:13.979Z"
+  },
+  "plan": {
+    "id": "pan-1647",
+    "title": "Substrate: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
+    "status": "proposed",
+    "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-09T22:44:41.149Z",
+    "updated": "2026-06-09T22:55:13.979Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
+        "label": "PAN-1647",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "auto-start",
+      "vbrief",
+      "spec-resolution",
+      "pan-1124"
+    ],
+    "narratives": {
+      "Problem": "`pan start <id> --auto` synthesizes a minimal vBRIEF, writes it to <projectRoot>/.pan/specs/<canonical>.vbrief.json (writeAutoStartVBrief, src/lib/vbrief/auto-synthesize.ts:121-145), then immediately reads it back via createBeadsFromVBrief → readWorkspacePlanSync(workspace) → findPlanSync(workspace). The read returns null, so 0 beads are created and the whole workspace is rolled back. Root cause: findPlanSync resolves the project root via projectRootFromWorkspace(workspace) (src/lib/vbrief/io.ts:146-151), whose first branch returns the WORKSPACE itself whenever `.git` AND `.pan/specs/` exist. A git worktree ALWAYS satisfies both (.git is a gitdir-pointer file; .pan/specs/ is checked out from main, 168 tracked specs), so the read looks in <workspace>/.pan/specs/ while the write landed in <mainRoot>/.pan/specs/ — two different directories. Normal planning survives only because the planning agent leaves a draft at <workspace>/.pan/spec.vbrief.json that findPlanSync's fallback catches; auto-start writes no draft, exposing the latent resolver bug. The same resolver feeds the async findPlan used by the dashboard start-agent endpoint, so the dashboard 'auto-start / skip planning' path shares the bug.",
+      "Proposal": "Correct projectRootFromWorkspace so a workspace path resolves to its true project root (resolve(workspacePath,'..','..')) by removing the misfiring `.git && .pan/specs` short-circuit branch. Both call sites (sync findPlanSync, async findPlan) already guard on issueIdFromWorkspacePath(workspacePath) being non-null first, so the resolver is only ever reached with a genuine <projectRoot>/workspaces/feature-<id>/ worktree where two-levels-up is unconditionally the project root. This aligns the auto-start write target and read resolution on <projectRoot>/.pan/specs/, restores the documented PAN-1124 single-spec-on-main read intent, and fixes the CLI and dashboard auto-start paths together. Lock it with a round-trip regression test that reproduces the worktree shape, plus guard tests proving normal-flow reads (pre-promotion draft fallback, post-promotion main-side spec) still resolve correctly."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the read resolver (projectRootFromWorkspace) rather than the write path.",
+        "rationale": "Under PAN-1124 single-spec-on-main the canonical spec belongs in mainRoot/.pan/specs/ — exactly where writeAutoStartVBrief and complete-planning's writeSpecForIssue already write it, and where the dashboard plan viewer reads it. The write target is correct; the resolver returning the workspace is the defect. Matches the issue author's own hypothesis ('projectRootFromWorkspace resolving a different root than the projectRoot passed to writeAutoStartVBrief') and the acceptance note that the write target and read resolution should be the same projectRoot/.pan/specs/ dir."
+      },
+      {
+        "summary": "Implement the fix by removing the `.git && .pan/specs` short-circuit branch, not by adding a new discriminator.",
+        "rationale": "projectRootFromWorkspace is unreachable for non-feature-<id> paths: both findPlanSync (io.ts:187-188) and async findPlan (io.ts:487-488) return null before calling it unless issueIdFromWorkspacePath(workspacePath) is non-null. So for every reachable input the path is a <projectRoot>/workspaces/feature-<id>/ worktree and resolve(workspacePath,'..','..') is always the project root. Removing the buggy branch is the minimal, surgical change and deletes code rather than adding heuristics."
+      },
+      {
+        "summary": "Keep the regression coverage as two beads: (1) resolver fix + round-trip repro test, (2) blast-radius guard tests for normal-flow reads.",
+        "rationale": "The fix and the test that reproduces the exact null-read are one reviewable unit (TDD: failing repro → make it pass). The guard tests are a separate, test-only unit protecting the broad blast radius (read resolution flips workspace→mainRoot for all workspaces). Acceptance criterion explicitly requires a writeAutoStartVBrief → createBeadsFromVBrief round-trip test."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-resolver",
+        "title": "Correct projectRootFromWorkspace to resolve a workspace to its true project root (+ round-trip regression test)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T22:44:41.149Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1647",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "guard-tests"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/vbrief/io.ts, fix projectRootFromWorkspace (lines 146-151) so a workspace path resolves to its true project root. Remove the `if (existsSync(join(workspacePath,'.git')) && existsSync(join(workspacePath, PAN_DIRNAME,'specs'))) return workspacePath;` short-circuit branch — a git worktree always satisfies it (.git is a gitdir file; .pan/specs/ is checked out from main), which is exactly why reads were resolving to <workspace>/.pan/specs/ instead of the main root where writeAutoStartVBrief wrote the spec. The function should return resolve(workspacePath,'..','..') for the reachable case. This is safe because both callers (sync findPlanSync io.ts:189 and async findPlan io.ts:489) already return null earlier unless issueIdFromWorkspacePath(workspacePath) is non-null, i.e. the path is a genuine <projectRoot>/workspaces/feature-<id>/ worktree two levels below its project root. Removing the branch may leave the existsSync/join imports unused locally — clean up only imports YOUR change orphans. Then add a regression test (in src/lib/vbrief/__tests__/, e.g. io.test.ts or a new auto-start-roundtrip.test.ts) that reproduces the WORKTREE shape: a temp <root>/workspaces/feature-pan-<n>/ with a `.git` file and a `.pan/specs/` directory (mirror the fixtures in create-beads.test.ts), call writeAutoStartVBrief(root, workspace, issue), then assert readWorkspacePlanSync(workspace) (and findPlanSync(workspace)) returns the synthesized plan (non-null, with the expected item). With execFile/bd mocked per create-beads.test.ts, extend the test through createBeadsFromVBrief(workspace) and assert created.length >= 1. The test MUST fail before the fix and pass after."
+        },
+        "subItems": [
+          {
+            "id": "fix-resolver.ac1",
+            "title": "projectRootFromWorkspace(workspace) returns resolve(workspacePath,'..','..') (the main project root) for a feature-<id> worktree that has a .git file and a checked-out .pan/specs/ directory — it no longer returns the workspace itself.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-resolver.ac2",
+            "title": "A regression test reproduces the worktree shape (<root>/workspaces/feature-pan-<n>/ with a .git file and a .pan/specs/ dir) and asserts that after writeAutoStartVBrief(root, workspace, issue), readWorkspacePlanSync(workspace) and findPlanSync(workspace) resolve the synthesized plan (non-null). The test fails on the pre-fix code and passes on the post-fix code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-resolver.ac3",
+            "title": "With execFile/bd mocked (per create-beads.test.ts), the round-trip writeAutoStartVBrief → createBeadsFromVBrief(workspace) returns success with created.length >= 1 — proving the 0-beads rollback no longer occurs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-resolver.ac4",
+            "title": "Any import (existsSync/join) left unused in io.ts solely by removing the short-circuit branch is cleaned up; typecheck and lint pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-tests",
+        "title": "Guard tests: normal-flow spec reads still resolve correctly after the resolver change",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-09T22:44:41.149Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add test-only coverage protecting the blast radius of the projectRootFromWorkspace change (which flips read resolution from <workspace>/.pan/specs/ to <mainRoot>/.pan/specs/ for ALL workspaces). Add two cases in src/lib/vbrief/__tests__/io.test.ts (reuse the worktree-shaped temp fixtures): (1) PRE-PROMOTION — when only the workspace draft <workspace>/.pan/spec.vbrief.json exists and no spec is in <root>/.pan/specs/, findPlanSync(workspace)/readWorkspacePlanSync(workspace) still resolve the draft via the findWorkspaceDraftPlanSync fallback (planning-in-progress window unaffected). (2) POST-PROMOTION — when a canonical spec for the issue exists in <root>/.pan/specs/ (the single-spec-on-main location), findPlanSync(workspace) resolves THAT main-side spec (its path is under <root>/.pan/specs/, not <workspace>/.pan/specs/). Then run the full vbrief + dashboard planning suite to confirm no regression: src/lib/vbrief/__tests__/{io,create-beads,beads,lifecycle-io}.test.ts and src/dashboard/server/routes/__tests__/{complete-planning,auto-promote-chain.integration}.test.ts. This bead is blocked by fix-resolver (the tests assert the corrected resolver behavior)."
+        },
+        "subItems": [
+          {
+            "id": "guard-tests.ac1",
+            "title": "Pre-promotion test: with only <workspace>/.pan/spec.vbrief.json present (no <root>/.pan/specs/ entry for the issue), findPlanSync(workspace) and readWorkspacePlanSync(workspace) resolve the workspace draft via the fallback — confirming the planning-in-progress window is unaffected by the resolver change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-tests.ac2",
+            "title": "Post-promotion test: with a canonical spec for the issue present in <root>/.pan/specs/, findPlanSync(workspace) resolves the main-side spec (returned path is under <root>/.pan/specs/, not <workspace>/.pan/specs/) — confirming the intended single-spec-on-main resolution.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-tests.ac3",
+            "title": "The full vbrief unit suite and the dashboard complete-planning + auto-promote-chain integration tests pass (npm test green), demonstrating no regression in normal planned-work spec resolution.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-resolver",
+        "to": "guard-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json"
+    }
+  }
+}
