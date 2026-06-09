@@ -15,6 +15,7 @@ import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAler
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
+import { AutoMergeToggle } from './AutoMergeToggle';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
@@ -187,6 +188,7 @@ export function AwaitingMergePage() {
                   mergeStatus={rs.mergeStatus}
                   mergeStep={rs.mergeStep}
                   mergeNotes={rs.mergeNotes}
+                  autoMerge={rs.autoMerge}
                   onMerged={() => {
                     queryClient.invalidateQueries({ queryKey: ['workspace', rs.issueId] });
                     queryClient.invalidateQueries({ queryKey: ['review-status', rs.issueId] });
@@ -269,6 +271,7 @@ interface RowProps {
   mergeStatus?: string;
   mergeStep?: string;
   mergeNotes?: string;
+  autoMerge?: boolean;
   onMerged: () => void;
 }
 
@@ -338,6 +341,7 @@ function AwaitingMergeRow({
   mergeStatus,
   mergeStep,
   mergeNotes,
+  autoMerge,
   onMerged,
 }: RowProps) {
   const mergeMutation = useMutation({
@@ -453,6 +457,7 @@ function AwaitingMergeRow({
               UAT
             </span>
           )}
+          <AutoMergeToggle issueId={issueId} autoMerge={autoMerge} compact />
           <button
             onClick={() => mergeMutation.mutate()}
             disabled={isMerging}
