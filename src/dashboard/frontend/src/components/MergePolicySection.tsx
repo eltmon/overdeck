@@ -5,7 +5,8 @@
  * and a live auto/hold summary. Self-contained: reads the review-status
  * snapshots straight from the store and reuses the shared AutoMergeToggle.
  */
-import { Zap } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../lib/store';
 import { AutoMergeToggle } from './AutoMergeToggle';
@@ -33,6 +34,7 @@ function isActive(rs: ReviewStatusSnapshot): boolean {
 
 export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
   const byId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const [collapsed, setCollapsed] = useState(true);
   const rows = Object.values(byId)
     .filter(isActive)
     .sort((a, b) => a.issueId.localeCompare(b.issueId));
@@ -44,14 +46,16 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
 
   return (
     <section className="shrink-0 border-b border-border bg-background px-4 py-3" aria-label="Merge policy">
-      <div className="mb-2 flex items-center justify-between">
+      <button type="button" onClick={() => setCollapsed((c) => !c)} className="mb-2 flex w-full items-center justify-between text-left">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          {collapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           <Zap className="h-4 w-4 text-emerald-400" /> Merge policy
         </h2>
         <span className="text-xs text-muted-foreground">
           <b className="text-emerald-400">{autoCount}</b> auto · <b className="text-amber-400">{holdCount}</b> hold · {rows.length} active
         </span>
-      </div>
+      </button>
+      {!collapsed && (
       <ul className="max-h-56 space-y-1 overflow-y-auto">
         {rows.map((rs) => (
           <li key={rs.issueId} className="flex items-center gap-3 rounded-md px-2 py-1 hover:bg-accent/40">
@@ -67,6 +71,7 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }
