@@ -15,6 +15,31 @@ function issueNumber(issueId: string): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
+export interface MergeCandidateMeta {
+  issueId: string;
+  /** Number of files this branch changes vs main. */
+  footprint: number;
+  /** How many other ready branches this one overlaps files with. */
+  conflictCount: number;
+}
+
+/**
+ * PAN-1691 conflict-aware merge order. Disjoint (no-conflict) items come first
+ * so they can batch through in a single verification pass; then conflicting
+ * items broadest-file-footprint first, so the remaining cluster members rebase
+ * once onto the worst offender instead of repeatedly. Issue number is the
+ * stable tiebreak within each tier. Pure — exported for testing.
+ */
+export function orderMergeCandidates<T extends MergeCandidateMeta>(items: ReadonlyArray<T>): T[] {
+  return [...items].sort((a, b) => {
+    const aConf = a.conflictCount > 0 ? 1 : 0;
+    const bConf = b.conflictCount > 0 ? 1 : 0;
+    if (aConf !== bConf) return aConf - bConf;
+    if (aConf === 1 && a.footprint !== b.footprint) return b.footprint - a.footprint;
+    return issueNumber(a.issueId) - issueNumber(b.issueId);
+  });
+}
+
 const branchExists = (branch: string, cwd: string) =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -75,8 +100,18 @@ export const computeMergeQueue = (
       }
     }
 
-    const sorted = [...existing].sort(
-      (a, b) => issueNumber(a.item.issueId) - issueNumber(b.item.issueId),
+    // PAN-1691: conflict-aware order. Disjoint (no-conflict) items go first so
+    // they can batch through in a single verification pass; then conflicting
+    // items broadest-file-footprint first, so the remaining cluster members
+    // rebase once onto the worst offender instead of repeatedly. Issue number
+    // is the stable tiebreak within each tier.
+    const sorted = orderMergeCandidates(
+      existing.map((e, i) => ({
+        item: e.item,
+        issueId: e.item.issueId,
+        footprint: fileSets[i]!.size,
+        conflictCount: conflictsMap.get(e.item.issueId)?.size ?? 0,
+      })),
     );
 
     return sorted.map(({ item }, idx) => ({
