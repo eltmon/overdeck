@@ -48,6 +48,7 @@ import { VoiceDesignTab } from './VoiceDesignTab';
 import { VoicePresetsTab } from './VoicePresetsTab';
 import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
+import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
@@ -124,8 +125,10 @@ interface ConversationSearchCostEstimate {
   confirmationNonce?: string;
 }
 
-async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
-  const res = await fetch('/api/settings/conversation-search/reindex-estimate', { credentials: 'include' });
+async function estimateConversationSearchReindex(model?: string): Promise<ConversationSearchCostEstimate> {
+  // Pass ?model= to price a prospective model switch before it's saved.
+  const qs = model ? `?model=${encodeURIComponent(model)}` : '';
+  const res = await fetch(`/api/settings/conversation-search/reindex-estimate${qs}`, { credentials: 'include' });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
@@ -639,6 +642,12 @@ export function SettingsPage() {
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
   const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
+  const [reindexConfirm, setReindexConfirm] = useState<{
+    kind: 'manual' | 'model';
+    newModel?: string;
+    estimate: ConversationSearchCostEstimate | null;
+  } | null>(null);
+  const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -824,29 +833,59 @@ export function SettingsPage() {
     },
   });
 
-  const handleConversationSearchReindex = async () => {
+  // Open the confirm modal immediately, then fill in the cost estimate (scanning every
+  // transcript can take a few seconds). `model` prices a prospective switch.
+  const openReindexConfirm = async (kind: 'manual' | 'model', newModel?: string) => {
+    setReindexConfirm({ kind, newModel, estimate: null });
     setEstimatingConversationSearch(true);
     try {
-      const estimate = await estimateConversationSearchReindex();
+      const estimate = await estimateConversationSearchReindex(newModel);
       setConversationSearchEstimate(estimate);
-      if (estimate.disabled) {
-        toast.warning(estimate.unavailableReason ?? 'Conversation search is disabled');
-        return;
-      }
-      if (estimate.estimatedUsd > 1) {
-        const confirmed = window.confirm(
-          `Reindexing is estimated to cost $${estimate.estimatedUsd.toFixed(2)} (${estimate.tokenCount.toLocaleString()} tokens). Continue?`,
-        );
-        if (!confirmed) return;
-        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
-        return;
-      }
-      conversationSearchReindexMutation.mutate(undefined);
+      setReindexConfirm((prev) => (prev && prev.kind === kind && prev.newModel === newModel ? { ...prev, estimate } : prev));
     } catch (error) {
       toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
+      setReindexConfirm(null);
     } finally {
       setEstimatingConversationSearch(false);
     }
+  };
+
+  const handleConversationSearchReindex = () => { void openReindexConfirm('manual'); };
+
+  // Switching the embedding model invalidates every cached vector (they're model-specific)
+  // and forces a paid full reindex, so confirm before applying.
+  const handleEmbeddingModelChange = (newModel: string) => {
+    if (newModel === conversationSearchModel) return;
+    void openReindexConfirm('model', newModel);
+  };
+
+  const cancelReindexConfirm = () => { if (!reindexConfirmBusy) setReindexConfirm(null); };
+
+  const confirmReindex = async () => {
+    if (!reindexConfirm || !reindexConfirm.estimate || reindexConfirm.estimate.disabled) return;
+    const { kind, newModel, estimate } = reindexConfirm;
+    if (kind === 'model' && newModel) {
+      if (!formData || !voiceFormData) return;
+      setReindexConfirmBusy(true);
+      try {
+        const next: SettingsConfig = {
+          ...formData,
+          conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
+        };
+        setFormData(next);
+        await saveMutation.mutateAsync({ settings: next, voiceSettings: voiceFormData });
+        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+      } catch {
+        // saveMutation surfaces its own error toast; leave the modal open to retry.
+        setReindexConfirmBusy(false);
+        return;
+      }
+      setReindexConfirmBusy(false);
+      setReindexConfirm(null);
+      return;
+    }
+    conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+    setReindexConfirm(null);
   };
 
   const ttsStartMutation = useMutation({
@@ -2221,7 +2260,7 @@ export function SettingsPage() {
                 Model
                 <select
                   value={conversationSearchModel}
-                  onChange={(e) => handleConversationSearchChange({ model: e.target.value })}
+                  onChange={(e) => handleEmbeddingModelChange(e.target.value)}
                   className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
                 >
                   {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
@@ -3607,6 +3646,26 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <ReindexConfirmDialog
+        open={reindexConfirm !== null}
+        title={reindexConfirm?.kind === 'model' ? 'Switch embedding model?' : 'Reindex all conversations?'}
+        intro={reindexConfirm?.kind === 'model' ? (
+          <>
+            Switching to <span className="text-foreground font-medium">{reindexConfirm?.newModel}</span> invalidates
+            every cached embedding — vectors can&apos;t be reused across models — and runs a full reindex with the new
+            model. This is a one-time embedding-API cost:
+          </>
+        ) : (
+          <>This re-embeds every conversation transcript from scratch and replaces the existing index, calling the OpenAI embeddings API once for your whole history:</>
+        )}
+        estimate={reindexConfirm?.estimate ?? null}
+        estimating={estimatingConversationSearch && !reindexConfirm?.estimate}
+        confirmLabel={reindexConfirm?.kind === 'model' ? 'Switch & reindex' : 'Reindex now'}
+        busy={reindexConfirmBusy}
+        onConfirm={() => void confirmReindex()}
+        onCancel={cancelReindexConfirm}
+      />
 
     </SettingsLayout>
   );

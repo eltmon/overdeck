@@ -764,9 +764,14 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/reindex-estimate',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     return yield* Effect.try({
       try: async () => {
-        const estimate = await estimateFullReindexConversationSearchCost();
+        // Optional ?model= lets the UI price a *prospective* model switch before saving it.
+        const modelOverride = new URL(request.url, 'http://localhost').searchParams.get('model')?.trim();
+        const baseConfig = getConversationSearchConfigSync();
+        const config = modelOverride ? { ...baseConfig, model: modelOverride } : baseConfig;
+        const estimate = await estimateFullReindexConversationSearchCost({ config });
         const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
           ? createReindexConfirmationNonce(estimate.estimatedUsd)
           : undefined;
