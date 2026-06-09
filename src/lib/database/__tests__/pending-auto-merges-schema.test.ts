@@ -26,7 +26,7 @@ describe('pending auto-merges schema', () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
-    expect(SCHEMA_VERSION).toBe(49);
+    expect(SCHEMA_VERSION).toBe(50);
     const db = getDatabase();
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
 
