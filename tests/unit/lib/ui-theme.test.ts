@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getUiTheme, setUiTheme, TERMINAL_BG } from '../../../src/lib/ui-theme.js';
+import { getUiTheme, getUiThemeSync, setUiTheme, colorFgBgForTheme, TERMINAL_BG } from '../../../src/lib/ui-theme.js';
 
 describe('ui-theme', () => {
   let tempHome: string;
@@ -36,6 +36,17 @@ describe('ui-theme', () => {
     const { writeFile } = await import('fs/promises');
     await writeFile(join(tempHome, 'ui-theme.json'), 'not json', 'utf-8');
     expect(await getUiTheme()).toBe('dark');
+  });
+
+  it('sync read matches async read', async () => {
+    expect(getUiThemeSync()).toBe('dark');
+    await setUiTheme('light');
+    expect(getUiThemeSync()).toBe('light');
+  });
+
+  it('maps themes to COLORFGBG values Claude Code recognizes', () => {
+    expect(colorFgBgForTheme('light')).toBe('0;15');
+    expect(colorFgBgForTheme('dark')).toBe('15;0');
   });
 
   it('exposes pane backgrounds matching the frontend XTERM_BG values', () => {

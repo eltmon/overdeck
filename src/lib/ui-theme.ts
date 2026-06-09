@@ -10,6 +10,7 @@
  * Claude detect the right theme with no viewer attached (conv 2547).
  */
 import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getPanopticonHome } from './paths.js';
 
@@ -37,6 +38,25 @@ export async function getUiTheme(): Promise<UiTheme> {
   } catch {
     return 'dark';
   }
+}
+
+/** Sync variant for launcher-script generation (spawn-time only, tiny file). */
+export function getUiThemeSync(): UiTheme {
+  try {
+    const parsed = JSON.parse(readFileSync(uiThemeFile(), 'utf-8')) as { theme?: unknown };
+    return parsed.theme === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+/**
+ * COLORFGBG value ("<fg>;<bg>" ANSI indices) for a theme. Claude Code's
+ * `theme: auto` falls back to this env var when its OSC 11 background query
+ * goes unanswered — bg 7/9–15 reads as light, 0–6/8 as dark.
+ */
+export function colorFgBgForTheme(theme: UiTheme): string {
+  return theme === 'light' ? '0;15' : '15;0';
 }
 
 export async function setUiTheme(theme: UiTheme): Promise<void> {
