@@ -623,20 +623,29 @@ export function DiffPanel({
         >
           <WrapText className="size-3" />
         </ToggleButton>
-        <button
-          type="button"
-          className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:border-border hover:text-foreground/80"
-          onClick={() => {
-            const params = new URLSearchParams(window.location.search)
-            params.set('diff', '1')
-            if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
-            window.open(`${window.location.pathname}?${params.toString()}`, '_blank', 'width=1000,height=800')
-          }}
-          aria-label="Open diff in new window"
-          title="Pop out"
-        >
-          <ExternalLink className="size-3" />
-        </button>
+        {mode === 'inline' && (
+          <button
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:border-border hover:text-foreground/80"
+            onClick={() => {
+              // Pop out ONLY the diff into a standalone window — not the whole
+              // host page. The dedicated /popout/diff route re-renders a bare
+              // DiffPanel from these params (prefix = the fetch base, so the
+              // popout refetches its own summaries + diffs).
+              const params = new URLSearchParams()
+              params.set('diff', '1')
+              params.set('prefix', baseUrl)
+              params.set('agentId', agentId)
+              if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
+              if (selectedFilePath) params.set('diffFilePath', selectedFilePath)
+              window.open(`/popout/diff?${params.toString()}`, '_blank', 'width=1000,height=800')
+            }}
+            aria-label="Open diff in new window"
+            title="Pop out"
+          >
+            <ExternalLink className="size-3" />
+          </button>
+        )}
         {onClose && (
           <button
             type="button"

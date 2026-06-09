@@ -40,6 +40,9 @@ import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
+import { DiffPanel } from './components/DiffPanel';
+import { DiffWorkerPoolProvider } from './components/DiffWorkerPoolProvider';
+import type { TurnDiffSummary } from './components/chat/chat-types';
 import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { LowCostModePill } from './components/LowCostModePill';
@@ -319,6 +322,48 @@ function StandaloneFlywheelPopoutRoute() {
   );
 }
 
+/**
+ * Standalone diff popout (/popout/diff). Renders ONLY the diff — not the host
+ * conversation/agent page. The pop-out button in DiffPanel passes `prefix` (the
+ * diff fetch base, e.g. /api/conversations/<name>/diffs) plus the selected
+ * turn/file via query params; this route refetches the turn summaries from that
+ * base and mounts a bare full-width DiffPanel. Theme is applied at module load
+ * from localStorage, and diffs are REST-driven, so no EventRouter is needed.
+ */
+function StandaloneDiffPopoutRoute() {
+  useCodexAutoRetry();
+  const search = new URLSearchParams(window.location.search);
+  const prefix = search.get('prefix') ?? '';
+  const agentId = search.get('agentId') ?? prefix;
+  const { data, isError } = useQuery({
+    queryKey: ['popout-diff-summaries', prefix],
+    queryFn: async () => {
+      const res = await fetch(prefix);
+      if (!res.ok) throw new Error(`Failed to load diff summaries: ${res.status}`);
+      return (await res.json()) as { summaries: TurnDiffSummary[] };
+    },
+    enabled: prefix.length > 0,
+  });
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      {prefix.length === 0 || isError ? (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff.'}
+        </div>
+      ) : (
+        <DiffWorkerPoolProvider>
+          <DiffPanel
+            mode="sheet"
+            agentId={agentId}
+            turnDiffSummaries={data?.summaries ?? []}
+            diffUrlPrefix={prefix}
+          />
+        </DiffWorkerPoolProvider>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
@@ -335,6 +380,10 @@ export default function App() {
 
   if (terminalPath === '/popout/flywheel-conversation') {
     return <StandaloneFlywheelPopoutRoute />;
+  }
+
+  if (terminalPath === '/popout/diff') {
+    return <StandaloneDiffPopoutRoute />;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
