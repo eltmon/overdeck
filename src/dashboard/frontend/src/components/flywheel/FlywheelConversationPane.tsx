@@ -142,6 +142,12 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     refetchInterval: latestRun?.status === 'running' ? 15000 : false,
     enabled: !!latestRun,
   });
+  const uatCandidateQuery = useQuery({
+    queryKey: ['flywheel-uat-candidate'],
+    queryFn: () => fetchJson<{ branchName: string | null; bundled: string[] }>('/api/flywheel/uat-candidate'),
+    refetchInterval: latestRun?.status === 'running' ? 15000 : false,
+    enabled: !!latestRun,
+  });
 
   const run = runDetailQuery.data ?? null;
   const activeRun = run?.status === 'running' ? run : null;
@@ -149,6 +155,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
   const mergeQueue = mergeQueueQuery.data ?? [];
+  const uatCandidate = uatCandidateQuery.data;
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -442,6 +449,13 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               </span>
               <span className="text-xs text-muted-foreground">{mergeQueue.length} ready</span>
             </div>
+            {uatCandidate?.branchName && uatCandidate.bundled.length > 0 && (
+              <div className="mb-2 rounded-md border border-dashed border-emerald-500/40 bg-emerald-500/5 px-2 py-1.5 text-[11px]" title="In auto-merge-OFF mode these batch-safe features are bundled onto one branch you UAT together">
+                <span className="font-semibold text-emerald-400">UAT candidate</span>{' '}
+                <span className="font-mono text-muted-foreground">{uatCandidate.branchName}</span>
+                <span className="text-muted-foreground"> — bundles {uatCandidate.bundled.length}: {uatCandidate.bundled.join(', ')}</span>
+              </div>
+            )}
             <ol className="space-y-1">
               {mergeQueue.map((item) => (
                 <li key={item.issueId} className="flex items-start gap-2 text-xs">

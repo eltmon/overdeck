@@ -66,6 +66,28 @@ export function planMergeTrain<T extends MergeCandidateMeta>(candidates: Readonl
   };
 }
 
+export interface UatCandidatePlan {
+  /** Branch name for the on-demand UAT candidate (auto-merge-OFF mode). */
+  branchName: string;
+  /** Issue IDs bundled onto the candidate — the disjoint, mergeable-together batch. */
+  bundled: string[];
+}
+
+/**
+ * PAN-1691 on-demand UAT candidate. In auto-merge-OFF mode the disjoint "batch"
+ * (everything that can merge together in one verification pass) is bundled onto
+ * a single throwaway branch the human UATs in one sitting. Pure — `dateIso` is
+ * injected, and it reads the already-computed `batchGroup` off the merge queue.
+ */
+export function planUatCandidate(
+  queue: ReadonlyArray<MergeQueueItem>,
+  opts: { dateIso: string; label?: string },
+): UatCandidatePlan {
+  const bundled = queue.filter((i) => i.batchGroup === 'batch').map((i) => i.issueId);
+  const day = opts.dateIso.slice(0, 10);
+  return { branchName: `uat/${opts.label ?? 'candidate'}-${day}`, bundled };
+}
+
 const branchExists = (branch: string, cwd: string) =>
   Effect.gen(function*() {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

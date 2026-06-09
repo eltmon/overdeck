@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { orderMergeCandidates, planMergeTrain } from '../../../src/lib/flywheel-merge-order.js';
+import { orderMergeCandidates, planMergeTrain, planUatCandidate } from '../../../src/lib/flywheel-merge-order.js';
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
@@ -56,5 +56,33 @@ describe('planMergeTrain (PAN-1691 batch/serialize plan)', () => {
 
   it('returns empty plan for no candidates', () => {
     expect(planMergeTrain([])).toEqual({ batch: [], serialize: [], order: [] });
+  });
+});
+
+describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
+  const qi = (issueId: string, batchGroup: 'batch' | 'serialize') => ({
+    issueId,
+    title: issueId,
+    mergeOrder: 1,
+    conflictsWith: [] as string[],
+    batchGroup,
+  });
+
+  it('bundles only the batch items and dates the branch name', () => {
+    const plan = planUatCandidate(
+      [qi('PAN-1', 'batch'), qi('PAN-2', 'serialize'), qi('PAN-3', 'batch')],
+      { dateIso: '2026-06-09T12:00:00.000Z' },
+    );
+    expect(plan.bundled).toEqual(['PAN-1', 'PAN-3']);
+    expect(plan.branchName).toBe('uat/candidate-2026-06-09');
+  });
+
+  it('uses the label in the branch name', () => {
+    const plan = planUatCandidate([qi('PAN-1', 'batch')], { dateIso: '2026-06-09T00:00:00Z', label: 'pan' });
+    expect(plan.branchName).toBe('uat/pan-2026-06-09');
+  });
+
+  it('returns an empty bundle when nothing is batchable', () => {
+    expect(planUatCandidate([qi('PAN-1', 'serialize')], { dateIso: '2026-06-09T00:00:00Z' }).bundled).toEqual([]);
   });
 });
