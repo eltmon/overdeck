@@ -60,15 +60,21 @@ const DIFF_PANEL_UNSAFE_CSS = `
   --diffs-bg-separator-override: color-mix(in srgb, var(--background) 95%, var(--foreground));
   --diffs-bg-buffer-override: color-mix(in srgb, var(--background) 90%, var(--foreground));
 
-  --diffs-bg-addition-override: color-mix(in srgb, var(--background) 68%, #22c55e);
-  --diffs-bg-addition-number-override: color-mix(in srgb, var(--background) 62%, #22c55e);
-  --diffs-bg-addition-hover-override: color-mix(in srgb, var(--background) 58%, #22c55e);
-  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--background) 52%, #22c55e);
+  /* Theme-aware fill strength. Mixing the accent into WHITE (light mode)
+     desaturates far more than mixing into near-black (dark mode), so the same
+     percentage reads pastel on light and vivid on dark. light-dark() lets us
+     mix MORE accent in light mode to match dark's punch — the shadow DOM's
+     color-scheme is pinned to the app theme above, so light-dark() resolves
+     correctly. First arg = light, second = dark. */
+  --diffs-bg-addition-override: light-dark(color-mix(in srgb, var(--background) 52%, #22c55e), color-mix(in srgb, var(--background) 68%, #22c55e));
+  --diffs-bg-addition-number-override: light-dark(color-mix(in srgb, var(--background) 44%, #22c55e), color-mix(in srgb, var(--background) 62%, #22c55e));
+  --diffs-bg-addition-hover-override: light-dark(color-mix(in srgb, var(--background) 40%, #22c55e), color-mix(in srgb, var(--background) 58%, #22c55e));
+  --diffs-bg-addition-emphasis-override: light-dark(color-mix(in srgb, var(--background) 32%, #22c55e), color-mix(in srgb, var(--background) 52%, #22c55e));
 
-  --diffs-bg-deletion-override: color-mix(in srgb, var(--background) 68%, #ef4444);
-  --diffs-bg-deletion-number-override: color-mix(in srgb, var(--background) 62%, #ef4444);
-  --diffs-bg-deletion-hover-override: color-mix(in srgb, var(--background) 58%, #ef4444);
-  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--background) 52%, #ef4444);
+  --diffs-bg-deletion-override: light-dark(color-mix(in srgb, var(--background) 52%, #ef4444), color-mix(in srgb, var(--background) 68%, #ef4444));
+  --diffs-bg-deletion-number-override: light-dark(color-mix(in srgb, var(--background) 44%, #ef4444), color-mix(in srgb, var(--background) 62%, #ef4444));
+  --diffs-bg-deletion-hover-override: light-dark(color-mix(in srgb, var(--background) 40%, #ef4444), color-mix(in srgb, var(--background) 58%, #ef4444));
+  --diffs-bg-deletion-emphasis-override: light-dark(color-mix(in srgb, var(--background) 32%, #ef4444), color-mix(in srgb, var(--background) 52%, #ef4444));
 
   background-color: var(--diffs-bg) !important;
 }
