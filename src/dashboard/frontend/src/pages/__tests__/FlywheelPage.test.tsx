@@ -165,12 +165,12 @@ describe('FlywheelPage', () => {
 
     renderFlywheelPage(<FlywheelPage />);
 
-    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup' });
-    const requireUat = screen.getByRole('checkbox', { name: 'Require UAT' });
+    const autoPickup = await screen.findByRole('switch', { name: 'Auto-pickup' });
+    const requireUat = screen.getByRole('switch', { name: 'Require UAT' });
     expect(autoPickup).not.toBeChecked();
     expect(requireUat).toBeChecked();
-    expect(autoPickup.closest('label')).toHaveAttribute('title', expect.stringContaining('Off: inventory is restricted'));
-    expect(requireUat.closest('label')).toHaveAttribute('title', expect.stringContaining('On: UAT remains required'));
+    expect(autoPickup).toHaveAttribute('title', expect.stringContaining('Off: inventory is restricted'));
+    expect(requireUat).toHaveAttribute('title', expect.stringContaining('On: UAT remains required'));
 
     fireEvent.click(autoPickup);
 
@@ -202,7 +202,7 @@ describe('FlywheelPage', () => {
 
     renderFlywheelPage(<FlywheelPage />);
 
-    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup' });
+    const autoPickup = await screen.findByRole('switch', { name: 'Auto-pickup' });
     fireEvent.click(autoPickup);
 
     await waitFor(() => expect(autoPickup).not.toBeChecked());

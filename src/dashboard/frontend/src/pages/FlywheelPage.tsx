@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Activity } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelConversationPane } from '../components/flywheel/FlywheelConversationPane';
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDetails';
+import { MergeQueueCard } from '../components/flywheel/MergeQueueCard';
+import { RailCard } from '../components/flywheel/RailCard';
 import { MergePolicySection } from '../components/MergePolicySection';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
@@ -171,6 +174,41 @@ function getTabPanelLabel(activeTab: FlywheelLeftTab): string {
   if (activeTab === 'status') return 'Flywheel status';
   if (activeTab === 'state') return 'Flywheel state';
   return 'Flywheel stats';
+}
+
+/** Sliding on/off switch for the flywheel-level config toggles (v3 top bar). */
+function ToggleSwitch({ label, checked, disabled, title, onChange }: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  title?: string;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      title={title}
+      onClick={() => onChange(!checked)}
+      className="group flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
+    >
+      <span
+        className={`relative h-4 w-7 rounded-full border transition-colors ${
+          checked ? 'border-primary/60 bg-primary/25' : 'border-border bg-muted'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all ${
+            checked ? 'left-[14px] bg-primary' : 'left-0.5 bg-muted-foreground'
+          }`}
+        />
+      </span>
+      {label}
+    </button>
+  );
 }
 
 function formatAutoMergeCountdown(scheduledMergeAt: string, nowMs: number): string {
@@ -374,24 +412,18 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           docs
         </a>
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <label className="flex items-center gap-1.5 text-muted-foreground" title={AUTO_PICKUP_BACKLOG_TITLE}>
-            <input type="checkbox" checked={autoPickupBacklog} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ auto_pickup_backlog: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
-            Auto-pickup
-          </label>
-          <label className="flex items-center gap-1.5 text-muted-foreground" title={REQUIRE_UAT_BEFORE_MERGE_TITLE}>
-            <input type="checkbox" checked={requireUatBeforeMerge} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ require_uat_before_merge: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
-            Require UAT
-          </label>
-          <label className="flex items-center gap-1.5 text-muted-foreground" title={MERGE_TRAIN_TITLE}>
-            <input type="checkbox" checked={mergeTrainEnabled} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ merge_train_enabled: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
-            Merge train
-          </label>
+          <div className="flex items-center gap-3">
+            <ToggleSwitch label="Auto-pickup" checked={autoPickupBacklog} disabled={configBusy} title={AUTO_PICKUP_BACKLOG_TITLE} onChange={(next) => flywheelConfigMutation.mutate({ auto_pickup_backlog: next })} />
+            <ToggleSwitch label="Require UAT" checked={requireUatBeforeMerge} disabled={configBusy} title={REQUIRE_UAT_BEFORE_MERGE_TITLE} onChange={(next) => flywheelConfigMutation.mutate({ require_uat_before_merge: next })} />
+            <ToggleSwitch label="Merge train" checked={mergeTrainEnabled} disabled={configBusy} title={MERGE_TRAIN_TITLE} onChange={(next) => flywheelConfigMutation.mutate({ merge_train_enabled: next })} />
+          </div>
           {status && (
-            <span className="flex items-center gap-3 border-l border-border pl-4 text-muted-foreground">
-              <span><b className="text-foreground">{formatElapsed(status.elapsedMs)}</b> elapsed</span>
-              <span><b className="text-foreground">{status.ticks}</b> ticks</span>
+            <div className="flex items-center gap-4 border-l border-border pl-4">
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{status.system.agentsActive}/{status.system.agentsCap}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">agents</span></span>
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{status.activePipeline.length}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">in flight</span></span>
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{formatElapsed(status.elapsedMs)}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">{status.ticks} ticks</span></span>
               <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${freshness?.className ?? ''}`}>{freshness?.label ?? '—'}</span>
-            </span>
+            </div>
           )}
         </div>
       </header>
@@ -403,78 +435,59 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
           aria-label="Flywheel control rail"
         >
-          <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+          <MergeQueueCard active={!!status || isPaused} onNavigateIssue={onNavigateIssue} />
           <MergePolicySection onNavigateIssue={onNavigateIssue} />
-          <div className="border-b border-border px-4 py-3" role="tablist" aria-label="Flywheel left-pane tabs">
-            <div className="inline-flex rounded-lg border border-border bg-background p-1 text-xs font-medium">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'status'}
-                onClick={() => setActiveTab('status')}
-                className={
-                  activeTab === 'status'
-                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
-                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
-                }
-              >
-                Status
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'state'}
-                onClick={() => setActiveTab('state')}
-                className={
-                  activeTab === 'state'
-                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
-                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
-                }
-              >
-                State
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'stats'}
-                onClick={() => setActiveTab('stats')}
-                className={
-                  activeTab === 'stats'
-                    ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
-                    : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
-                }
-              >
-                Stats
-              </button>
-            </div>
-          </div>
+          <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
 
-        <div className="p-4" role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
-          {activeTab === 'status' ? (
-            status ? (
-              <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
-            ) : isPaused ? (
-              <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
-                <div>
-                  <p className="text-base font-medium text-foreground">Run paused — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pan flywheel resume</code> to continue.</p>
-                  <p className="mt-2 text-sm text-muted-foreground">The orchestrator is paused; its run state is preserved. The status pane will repopulate when it resumes.</p>
-                </div>
+          <RailCard icon={<Activity className="h-3.5 w-3.5 text-primary" />} label="Run status" ariaLabel="Flywheel run status">
+            <div className="mb-3" role="tablist" aria-label="Flywheel left-pane tabs">
+              <div className="inline-flex rounded-lg border border-border bg-background p-1 text-xs font-medium">
+                {(['status', 'state', 'stats'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={
+                      activeTab === tab
+                        ? 'rounded-md bg-primary px-3 py-1.5 text-primary-foreground'
+                        : 'rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground'
+                    }
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
-                <div>
-                  <p className="text-base font-medium text-foreground">No active run — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pan flywheel start</code> to begin.</p>
-                  <p className="mt-2 text-sm text-muted-foreground">The status pane will update as soon as the orchestrator emits its first snapshot.</p>
-                </div>
-              </div>
-            )
-          ) : activeTab === 'state' ? (
-            <FlywheelStatePane />
-          ) : (
-            <FlywheelStatsPanel />
-          )}
-        </div>
-      </section>
+            </div>
+
+            <div role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
+              {activeTab === 'status' ? (
+                status ? (
+                  <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
+                ) : isPaused ? (
+                  <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Run paused — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel resume</code> to continue.</p>
+                      <p className="mt-2 text-xs text-muted-foreground">The orchestrator is paused; its run state is preserved. The status pane will repopulate when it resumes.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">No active run — <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">pan flywheel start</code> to begin.</p>
+                      <p className="mt-2 text-xs text-muted-foreground">The status pane will update as soon as the orchestrator emits its first snapshot.</p>
+                    </div>
+                  </div>
+                )
+              ) : activeTab === 'state' ? (
+                <FlywheelStatePane />
+              ) : (
+                <FlywheelStatsPanel />
+              )}
+            </div>
+          </RailCard>
+        </section>
 
       <div
         role="separator"

@@ -34,7 +34,7 @@ function isActive(rs: ReviewStatusSnapshot): boolean {
 
 export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
   const byId = useDashboardStore((s) => s.reviewStatusByIssueId);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const rows = Object.values(byId)
     .filter(isActive)
     .sort((a, b) => a.issueId.localeCompare(b.issueId));
@@ -67,7 +67,7 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
               {rs.issueId}
             </button>
             <span className="flex-1 truncate text-xs text-muted-foreground">{shortPhase(rs)}</span>
-            <AutoMergeToggle issueId={rs.issueId} autoMerge={rs.autoMerge} variant="badge" compact />
+            <AutoMergeToggle issueId={rs.issueId} autoMerge={rs.autoMerge} variant="segmented" compact />
           </li>
         ))}
       </ul>
