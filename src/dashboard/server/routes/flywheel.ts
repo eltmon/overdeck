@@ -294,7 +294,12 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   }
   const issueId = body.issueId.trim().toUpperCase();
 
-  if ((deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
+  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
+
+  // PAN-1691: an issue explicitly set to ⚡ Auto-merge overrides the global
+  // "Require UAT before merge" default. undefined (follow default) and false
+  // (hold) still honor it — Auto is the only state that overrides the default.
+  if (reviewStatus?.autoMerge !== true && (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
   if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {
@@ -309,7 +314,6 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     return { status: 422, body: { error: eligibility.reason } };
   }
 
-  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
   if (!reviewStatus?.prUrl) {
     return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
   }
