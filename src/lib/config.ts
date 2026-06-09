@@ -98,10 +98,12 @@ export interface ShadowConfig {
  *   classifier to approve safe tool calls and block destructive ones (force pushes,
  *   exfiltration, `rm -rf`, etc.). Requires `skipAutoPermissionPrompt: true` in
  *   `~/.claude/settings.json` and a supporting Anthropic plan (Max/Team/Enterprise/API).
- * - `bypass`: pass `--dangerously-skip-permissions --permission-mode bypassPermissions`.
- *   The historical Panopticon behavior — fully autonomous, no approval prompts and no
- *   classifier. Use when running providers that reject the `auto` flag (some Bedrock/
- *   Vertex/Foundry setups) or when you genuinely want zero gating.
+ * - `bypass`: pass `--permission-mode bypassPermissions` (the standalone
+ *   `--dangerously-skip-permissions` flag was removed). Fully autonomous — no approval
+ *   prompts and no classifier. For the Codex harness this maps to Full Access
+ *   (`approval_policy=never` + `sandbox_mode=danger-full-access`). Use when running
+ *   providers that reject the `auto` flag (some Bedrock/Vertex/Foundry setups) or when
+ *   you genuinely want zero gating.
  *
  * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config → 'auto'.
  *

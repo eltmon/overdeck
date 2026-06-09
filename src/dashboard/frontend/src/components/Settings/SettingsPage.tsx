@@ -1793,7 +1793,7 @@ export function SettingsPage() {
           Permissions
         </h2>
         <p className="text-xs text-muted-foreground mb-4">
-          How spawned Claude Code agents are gated. Applies to work agents, specialists,
+          How spawned Claude Code and Codex agents are gated. Applies to work agents, specialists,
           conversations, and remote agents. Override per-invocation with{' '}
           <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
           <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
@@ -1806,15 +1806,17 @@ export function SettingsPage() {
               value: 'auto',
               title: 'Auto (recommended)',
               flag: '--permission-mode auto',
+              codex: 'Codex: Auto (on-request + workspace-write)',
               description:
-                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
+                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Codex runs in its Auto preset: it works freely inside the workspace but asks before escaping it (e.g. network access). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
             },
             {
               value: 'bypass',
               title: 'Bypass (yolo)',
-              flag: '--dangerously-skip-permissions --permission-mode bypassPermissions',
+              flag: '--permission-mode bypassPermissions',
+              codex: 'Codex: Full Access (danger-full-access)',
               description:
-                'Legacy Panopticon behavior. Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
+                'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Codex runs in Full Access: no approval prompts, full system + network. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
             },
           ] as const).map((opt) => {
             const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
@@ -1841,10 +1843,13 @@ export function SettingsPage() {
                   {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-foreground">{opt.title}</span>
                     <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       {opt.flag}
+                    </code>
+                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {opt.codex}
                     </code>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">

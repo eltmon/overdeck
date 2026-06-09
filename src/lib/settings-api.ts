@@ -221,7 +221,7 @@ export interface ApiSettingsConfig {
    * Permission mode for spawned Claude Code agents.
    *
    * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
-   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   * 'bypass'         → --permission-mode bypassPermissions (DSP flag removed)
    *
    * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
    * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
