@@ -167,6 +167,7 @@ function estimateContextTokens(entries: any[]): number {
         if (typeof u.output_tokens === 'number') total += u.output_tokens;
         if (typeof u.cache_creation_input_tokens === 'number') total += u.cache_creation_input_tokens;
         if (typeof u.cache_read_input_tokens === 'number') total += u.cache_read_input_tokens;
+        if (total <= 0) continue;
         // Add trailing entries after this assistant
         for (let j = i + 1; j < entries.length; j++) {
           total += estimateTokens(entries[j]);
@@ -178,6 +179,7 @@ function estimateContextTokens(entries: any[]): number {
         if (typeof u.outputTokens === 'number') total += u.outputTokens;
         if (typeof u.cacheCreationInputTokens === 'number') total += u.cacheCreationInputTokens;
         if (typeof u.cacheReadInputTokens === 'number') total += u.cacheReadInputTokens;
+        if (total <= 0) continue;
         for (let j = i + 1; j < entries.length; j++) {
           total += estimateTokens(entries[j]);
         }

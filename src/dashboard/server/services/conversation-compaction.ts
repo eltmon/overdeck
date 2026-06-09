@@ -58,9 +58,10 @@ export async function estimateContextTokens(sessionFile: string | null | undefin
         const entry = JSON.parse(line);
         const usage = entry?.message?.usage ?? entry?.usage;
         if (usage && typeof usage.input_tokens === 'number') {
-          return (usage.input_tokens ?? 0)
+          const total = (usage.input_tokens ?? 0)
             + (usage.cache_creation_input_tokens ?? 0)
             + (usage.cache_read_input_tokens ?? 0);
+          if (total > 0) return total;
         }
       } catch {
         // Skip malformed line
@@ -110,7 +111,12 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
   let summary: string;
   let summaryModel: string | null;
   try {
-    const result = await Effect.runPromise(generateSmartSummary({ jsonlPath: sessionFile, model: settings.model, richMode: settings.richCompaction }));
+    const result = await Effect.runPromise(generateSmartSummary({
+      jsonlPath: sessionFile,
+      model: settings.model,
+      richMode: settings.richCompaction,
+      mode: 'fork',
+    }));
     summary = result.summary;
     summaryModel = result.summaryModel;
   } catch (error) {
