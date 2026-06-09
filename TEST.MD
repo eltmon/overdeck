@@ -64,3 +64,4 @@ Revert or leave your edits as you see fit — this file is meant to churn.
 - 2026-06-09: Open a NEW conversation and edit this file again: that session will
   detect the light pane via the stamped background and render pale light-theme
   bands instead. Same file, same dashboard — the difference is spawn time.
+- 2026-06-09: New diff test line — added to exercise the diff view rendering.
