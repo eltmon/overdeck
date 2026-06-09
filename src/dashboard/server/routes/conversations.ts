@@ -111,6 +111,7 @@ import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
+import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
@@ -1157,6 +1158,22 @@ export async function spawnConversationSession(
     providerEnv = await getProviderEnvForModel(model);
 
     if (harness === 'pi') {
+      // Preflight: Pi GPT-5.x conversations authenticate with the user's
+      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, Pi
+      // fails mid-session with the opaque "No API key for provider:
+      // openai-codex". Proactively refresh it, and if it can't be revived,
+      // fail here with an actionable message. Stays silent (fail-open) when
+      // the auth state can't be determined (e.g. Pi's OAuth module is absent).
+      if (getProviderForModelSync(model).name === 'openai') {
+        const auth = await getPiCodexAuthStatus({ refreshIfExpired: true });
+        if (auth.status === 'missing' || auth.status === 'expired') {
+          throw new Error(
+            'Pi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
+            'Re-authenticate with `pan pi-auth login`, then retry.',
+          );
+        }
+      }
+
       // Conversations run Pi in TUI mode (the default Pi terminal UI). This
       // gives users an actual terminal in the tmux pane — they can type
       // directly into Pi, and dashboard-composer messages are delivered via

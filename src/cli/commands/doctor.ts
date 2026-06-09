@@ -17,6 +17,7 @@ import {
   packageRoot,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
@@ -118,6 +119,29 @@ export function checkPi(strict: boolean): CheckResult[] {
       status: 'ok',
       message: 'packages/pi-extension/dist/index.js present',
     });
+  }
+
+  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x Pi conversations. Only
+  // surfaced when a credential exists — users who never use codex aren't
+  // bothered. Expiry is a sync read; `pan pi-auth status` does the live
+  // refresh check.
+  const codexCred = readPiCodexCredential();
+  if (codexCred) {
+    const mins = Math.round((codexCred.expires - Date.now()) / 60_000);
+    if (mins > 1) {
+      out.push({
+        name: 'Pi ChatGPT/Codex auth',
+        status: 'ok',
+        message: `openai-codex token valid (${mins > 120 ? `~${Math.round(mins / 60)}h` : `~${mins}m`})`,
+      });
+    } else {
+      out.push({
+        name: 'Pi ChatGPT/Codex auth',
+        status: 'warn',
+        message: 'openai-codex token expired',
+        fix: 'Refresh/re-auth: pan pi-auth status (auto-refresh) or pan pi-auth login',
+      });
+    }
   }
   return out;
 }
