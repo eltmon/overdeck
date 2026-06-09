@@ -16,6 +16,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
+  setAutoMerge as dbSetAutoMerge,
   getReviewStatusFromDb,
 } from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
@@ -623,6 +624,22 @@ export function setDeaconIgnored(
     if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to set deaconIgnored for ${issueId}:`, err);
+  }
+}
+
+/**
+ * PAN-1691: set the per-issue auto-merge routing key and broadcast the change.
+ * `autoMerge === null` clears it back to the project default. Emits a
+ * status_changed pipeline event so open dashboards reflect the toggle live.
+ */
+export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
+  try {
+    dbSetAutoMerge(issueId, autoMerge);
+    console.log(`[review-status] autoMerge=${autoMerge === null ? 'default' : autoMerge} for ${issueId}`);
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
 }
 

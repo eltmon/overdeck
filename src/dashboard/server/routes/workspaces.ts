@@ -72,6 +72,7 @@ import {
   setReviewStatusSync as setReviewStatusBase,
   markWorkspaceStuck,
   setDeaconIgnored,
+  setAutoMerge,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
@@ -4523,6 +4524,43 @@ const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/workspaces/:issueId/auto-merge ─────────────────────
+
+/**
+ * PAN-1691: operator toggle for the per-issue auto-merge routing key. Body:
+ *   { autoMerge: boolean | null }
+ * `true` = auto-merge (fast lane), `false` = hold for UAT (manual lane),
+ * `null` = clear back to the project default. Emits status_changed via the
+ * setAutoMerge wrapper so open dashboards reflect the toggle live.
+ */
+const postWorkspaceAutoMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/auto-merge',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const body = (yield* readJsonBody) as { autoMerge?: unknown };
+    if (typeof body.autoMerge !== 'boolean' && body.autoMerge !== null) {
+      return jsonResponse(
+        { success: false, error: 'Body must include { autoMerge: boolean | null }' },
+        { status: 400 },
+      );
+    }
+
+    setAutoMerge(issueId, body.autoMerge);
+    const updated = getReviewStatusSync(issueId);
+    return jsonResponse({
+      success: true,
+      issueId,
+      autoMerge: updated?.autoMerge ?? null,
+    });
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/sync-main ──────────────────────────
 
 const postWorkspaceSyncMainRoute = HttpRouter.add(
@@ -6200,6 +6238,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceAbortReviewRoute,
   postWorkspaceUnstickRoute,
   postWorkspaceDeaconIgnoreRoute,
+  postWorkspaceAutoMergeRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postForgeApproveRoute,

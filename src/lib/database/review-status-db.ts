@@ -500,6 +500,31 @@ export function setDeaconIgnored(
 }
 
 /**
+ * PAN-1691: set (or clear) the per-issue auto-merge routing key.
+ * `autoMerge === null` clears it back to the project default (NULL column);
+ * `true` = auto-merge (fast lane); `false` = hold for UAT (manual lane).
+ * Mirrors setDeaconIgnored so the flag can be set on an issue that has no
+ * prior review_status row.
+ */
+export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const value = autoMerge === null ? null : autoMerge ? 1 : 0;
+
+  db.prepare(`
+    INSERT OR IGNORE INTO review_status (
+      issue_id, review_status, test_status, updated_at, ready_for_merge, auto_merge
+    ) VALUES (?, 'pending', 'pending', ?, 0, ?)
+  `).run(issueId, now, value);
+
+  db.prepare(`
+    UPDATE review_status
+    SET auto_merge = ?, updated_at = ?
+    WHERE issue_id = ?
+  `).run(value, now, issueId);
+}
+
+/**
  * Clear the stuck flag for a workspace (called when the human clicks "Unstick").
  * Re-enables Deacon patrol for this workspace.
  */

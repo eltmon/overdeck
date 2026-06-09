@@ -33,6 +33,7 @@ import {
   deleteReviewStatus,
   getReviewStatusFromDbSync,
   getAllReviewStatusesFromDb,
+  setAutoMerge,
 } from '../../../../src/lib/database/review-status-db.js';
 
 // ============== Helpers ==============
@@ -94,6 +95,15 @@ describe('upsertReviewStatus', () => {
     upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: false }));
     upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: true }));
     expect(getReviewStatusFromDbSync('PAN-AM-4')?.autoMerge).toBe(true);
+  });
+
+  it('setAutoMerge sets/clears the tri-state flag and creates a row if absent', () => {
+    setAutoMerge('PAN-SAM-1', true);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBe(true);
+    setAutoMerge('PAN-SAM-1', false);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBe(false);
+    setAutoMerge('PAN-SAM-1', null);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBeUndefined();
   });
 
   it('stores history entries', () => {
