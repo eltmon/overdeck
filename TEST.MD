@@ -49,5 +49,13 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   custom:panopticon (#1c3d24 green / #43222a maroon).
 - 2026-06-09: Mixed-edit smoke test — this block adds, changes, and deletes lines
   in one diff so you can see all three band types stacked together.
-- 2026-06-09: Fresh add to confirm the muted green band still reads cleanly after
-  the latest pull.
+- 2026-06-09: UPDATED this line — the old "fresh add" text was rewritten in place,
+  so it should render as a removed band immediately above a green added band.
+- 2026-06-09: Line A REWRITTEN in place — only these few words changed, so the
+  intra-line word emphasis should pop as a darker patch at the new 32% fill.
+- 2026-06-09: Diff-contrast bump landed — the @pierre/diffs add/remove bands now
+  fill at 32% over the background (was a barely-there 8%), so this green run
+  should read boldly against the plain context lines around it.
+- 2026-06-09: Second fresh addition, stacked below, to show a solid block of green.
+- 2026-06-09: Third fresh addition — note the old "Brand-new line B" line was
+  deleted here, so you also get a red removal band to compare green vs red.

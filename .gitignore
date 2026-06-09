@@ -128,6 +128,10 @@ temp/
 .pan/specs/*.tmp
 .pan/specs/*.writer.lock/
 
+# Scratch/temp working dir — holds throwaway mockups, draft issue notes, and a
+# machine-specific V8 node-compile-cache. Never belongs in git history.
+.tmp/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
