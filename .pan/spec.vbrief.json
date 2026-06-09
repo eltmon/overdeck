@@ -1,0 +1,265 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-09T23:14:19.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
+    "updated": "2026-06-09T23:16:27.143Z"
+  },
+  "plan": {
+    "id": "pan-1658",
+    "title": "Reconcile testStatus from green CI after rebase/force-push",
+    "status": "proposed",
+    "uid": "41568a01-5a58-4e5a-a085-023e6be11ea3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-09T23:14:19.000Z",
+    "updated": "2026-06-09T23:16:27.143Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
+        "label": "PAN-1658",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/src/lib/review-status.ts",
+        "label": "review-status.ts (review→test dispatch + readyForMerge derive)",
+        "type": "code"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/src/lib/cloister/deacon.ts",
+        "label": "deacon.ts (reconcileClosedPrReadyForMerge template + patrol wiring)",
+        "type": "code"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/src/lib/github-app.ts",
+        "label": "github-app.ts (getPullRequestState / check-run aggregation)",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "merge",
+      "deacon",
+      "reconciler",
+      "ci",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "When an approved PR's feature branch is rebased and force-pushed (e.g. to pick up a main fix), reviewStatus is already 'passed', so the review→test dispatch in setReviewStatusSync — which only fires on the pending→passed transition (review-status.ts:415-433) — never re-runs. testStatus stays 'pending', readyForMerge derives false (review-status.ts:259-272), and triggerMerge blocks with 'Cannot merge: review and tests have not passed yet' (workspaces.ts:4673-4683) — even though GitHub Actions CI (the same vitest+playwright suite) is fully green on the new HEAD. No deacon reconciler exists for pre-merge testStatus; the patrol reconciles merge status but not this.",
+      "Proposal": "Add a default-on deacon reconciler modeled directly on reconcileClosedPrReadyForMerge (deacon.ts:3333): for each issue with reviewStatus='passed' && testStatus='pending' && a non-terminal mergeStatus && a GitHub PR URL, resolve the current PR HEAD and check whether the GitHub Actions CI check-runs are all green. If so, set testStatus='passed' with testNotes citing the CI run + SHA; readyForMerge then re-derives true automatically via the existing event-driven gate logic, unblocking merge across the whole UI/auto-merge/merge-train surface. Greenness is computed from check-runs only (not the self-reported panopticon/* commit-statuses, which are stuck/absent post-rebase and would make the signal circular). The reconciler never marks passed while CI is pending or failed; triggerMerge Step 3's full re-verification remains the authoritative quality gate."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue Option 1 (deacon reconciler) over Option 2 (triggerMerge gate accepts green CI) and Option 3 (re-dispatch the test role on force-push).",
+        "rationale": "Reconciling the root testStatus makes the derived readyForMerge flip true consistently across the dashboard 'Awaiting Merge' view, the auto-merge executor, the merge-train, and triggerMerge. Option 2 patches only the merge entry gate, leaving readyForMerge=false everywhere else (the issue still looks stuck) and adds an async GitHub call to the hot merge path. Option 3 re-runs the heavy, slow, gpt-5.5-context-wedge-prone review+test convoy the issue explicitly calls out as undesirable. Option 1 also matches the existing reconciler architecture exactly."
+      },
+      {
+        "summary": "Greenness is determined from GitHub Actions check-runs, deliberately ignoring the self-reported panopticon/review and panopticon/test commit-statuses.",
+        "rationale": "After a rebase, panopticon/test is exactly the status that is stuck/absent on the new SHA, and an empty/pending combined commit-status would make getPullRequestState().checksPending permanently true — so reusing it naively would make the reconciler never fire. A check-runs-focused signal (≥1 successful CI run, none pending, none failed) breaks the circularity while still requiring real green CI."
+      },
+      {
+        "summary": "Reconciler is unconditional / default-on (no new config flag), matching reconcileMergedButReviewing and reconcileClosedPrReadyForMerge.",
+        "rationale": "Premature testStatus=passed cannot cause a bad merge: triggerMerge Step 3 (runVerificationForIssue('merge-verify')) re-runs the full typecheck/lint/test suite on the rebased branch and aborts on failure. Adding a config flag would be speculative configurability the issue did not ask for. Operators retain the existing global deacon freeze as a kill switch."
+      },
+      {
+        "summary": "The reconciler mutates ONLY testStatus (+ testNotes), never uatStatus/verificationStatus/reviewStatus/readyForMerge directly.",
+        "rationale": "readyForMerge is event-derived from the gate state, so flipping testStatus is sufficient. Leaving the other gates untouched preserves UAT and verification authority — an issue that still needs UAT stays not-ready even after testStatus flips, which is correct."
+      }
+    ],
+    "items": [
+      {
+        "id": "ci-greenness-helper",
+        "title": "Add a check-runs-driven CI greenness signal for a commit SHA in github-app.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T23:14:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1658",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "test-status-reconciler"
+          ]
+        },
+        "narrative": {
+          "Action": "Expose a reusable function in src/lib/github-app.ts that reports whether GitHub Actions CI is green on a given (owner, repo, sha), computed from the /repos/{owner}/{repo}/commits/{sha}/check-runs endpoint ONLY. It must NOT depend on the combined commit-status (/status) endpoint, because that folds in the self-reported panopticon/review and panopticon/test contexts that are stuck/absent after a rebase (see continue.json hazard H1). The existing private getCommitCheckState already fetches check-runs; refactor/extend it (or add a sibling like getCiCheckRunsState) so the reconciler can ask a single, unambiguous question: 'are the CI check-runs on this exact SHA complete and all-successful?'. Return enough detail to distinguish green (≥1 success, 0 pending, 0 failed), not-yet (any pending/incomplete), and red (any failed). Empirically confirm against a real rebased PR that an absent/empty combined commit-status does not contaminate the signal before finalizing."
+        },
+        "subItems": [
+          {
+            "id": "ci-greenness-helper.ac1",
+            "title": "An exported function in github-app.ts returns a green verdict for a SHA only when there is ≥1 successful CI check-run AND zero pending/incomplete check-runs AND zero failed check-runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-greenness-helper.ac2",
+            "title": "The greenness verdict is derived from the /commits/{sha}/check-runs endpoint only; it does NOT block on, or require, the panopticon/review or panopticon/test self-reported commit-statuses (a commit missing those statuses can still be judged green if its CI check-runs are green).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-greenness-helper.ac3",
+            "title": "Any pending/incomplete check-run yields a 'not yet green' verdict (distinct from 'failed'); any failed/timed-out/cancelled check-run yields a 'red' verdict; a commit with zero CI check-runs is NOT green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-greenness-helper.ac4",
+            "title": "Existing callers of getCommitCheckState / getPullRequestState (checksPending/checksFailed behaviour and reconcileClosedPrReadyForMerge) are unchanged — typecheck, lint, and the existing github-app/PR-state tests stay green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-status-reconciler",
+        "title": "Add a deacon reconciler that flips stuck testStatus=pending → passed from green CI, and wire it into the patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-09T23:14:19.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a reconciler function (e.g. reconcileTestStatusFromGreenCi(): Promise<string[]>) in src/lib/cloister/deacon.ts, modeled on reconcileClosedPrReadyForMerge (deacon.ts:3333). Guard on isGitHubAppConfigured(). For each entry in loadReviewStatuses() where reviewStatus==='passed' AND testStatus==='pending' (exactly) AND mergeStatus is non-terminal (pending/undefined/null — never merged/merging/queued/verifying) AND a parseable GitHub PR URL exists: resolve the current PR HEAD (getPullRequestState → headSha, the same primitive reconcileClosedPrReadyForMerge uses), skip if the PR is not OPEN or is merged, then evaluate the bead-1 CI greenness signal on that HEAD SHA. If green, call setReviewStatusSync(issueId, { testStatus: 'passed', testNotes: '<cite the CI run + short SHA>' }) — do NOT set readyForMerge or any other gate; it re-derives. Maintain a per-issue cooldown Map (set it on 'CI still pending' and on API error, like closedPrReadyReconcileCooldowns) so transient states don't burn the GitHub rate budget each patrol. Push a human-readable action string per reconciled issue and console.log it, matching the sibling reconcilers. Finally, wire the reconciler into the deacon patrol loop alongside the other reconcilers (deacon.ts ~5028-5041): call it, actions.push(...) the result, and addLog each action with state.patrolCycle."
+        },
+        "subItems": [
+          {
+            "id": "test-status-reconciler.ac1",
+            "title": "For an issue with reviewStatus='passed', testStatus='pending', non-terminal mergeStatus, an OPEN unmerged PR, and green CI check-runs on the current HEAD, the reconciler sets testStatus='passed' with testNotes citing the CI run and the HEAD short SHA.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-status-reconciler.ac2",
+            "title": "The reconciler never marks testStatus='passed' when CI on the current HEAD is pending/incomplete or failed/red; in those cases testStatus is left unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-status-reconciler.ac3",
+            "title": "The candidate filter excludes testStatus values other than 'pending' (so a running 'testing' role, or already 'passed'/'skipped'/'failed', is never disturbed) and excludes terminal mergeStatus values (merged/merging/queued/verifying). The reconciler mutates only testStatus/testNotes — uatStatus, verificationStatus, reviewStatus, and readyForMerge are never written by it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-status-reconciler.ac4",
+            "title": "After the reconciler flips testStatus='passed', the existing event-driven derivation makes readyForMerge become true (assuming no other blocker/uat gate), so triggerMerge no longer returns 'Cannot merge: review and tests have not passed yet'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-status-reconciler.ac5",
+            "title": "The reconciler is guarded by isGitHubAppConfigured(), uses a per-issue cooldown on pending-CI and API-error outcomes to throttle GitHub calls, and returns string[] action descriptions consistent with the sibling reconcilers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-status-reconciler.ac6",
+            "title": "The reconciler is invoked once per deacon patrol cycle from the patrol loop, with its actions pushed into the patrol actions list and addLog'd, placed alongside reconcileMergedButReviewing / reconcileClosedPrReadyForMerge.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-tests",
+        "title": "Unit-test the testStatus-from-green-CI reconciler",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-09T23:14:19.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a unit test (e.g. tests/unit/lib/cloister/test-status-reconciler.test.ts) for the new reconciler, mocking the GitHub PR/CI lookups and the review-status store so no network is required (follow the dependency-injection / module-mock pattern used by existing cloister reconciler tests such as merge-train-reconciler.test.ts and the github-app PR-state tests). Cover the happy path and every guard path so the reconciler can never mask a red build."
+        },
+        "subItems": [
+          {
+            "id": "reconciler-tests.ac1",
+            "title": "Test: reviewStatus=passed + testStatus=pending + non-terminal mergeStatus + OPEN PR + green CI check-runs ⇒ reconciler sets testStatus=passed (with testNotes) and reports one action.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-tests.ac2",
+            "title": "Test: CI still pending ⇒ testStatus unchanged, no action; Test: CI failed/red ⇒ testStatus unchanged, no action (the reconciler never masks a red build).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-tests.ac3",
+            "title": "Test: non-candidate states are untouched — testStatus='testing', testStatus already 'passed'/'skipped'/'failed', reviewStatus!='passed', and terminal mergeStatus (merged/merging/queued/verifying) each produce no mutation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-tests.ac4",
+            "title": "Test: greenness is judged on the CURRENT HEAD SHA (a stale/pre-rebase SHA is not used), and the per-issue cooldown suppresses repeat GitHub lookups within the throttle window on pending-CI / API-error outcomes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-tests.ac5",
+            "title": "npm run typecheck, npm run lint, and npm test all pass with the new test included.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ci-greenness-helper",
+        "to": "test-status-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "test-status-reconciler",
+        "to": "reconciler-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-09-PAN-1658-reconcile-teststatus-from-green-ci-after-rebase-force-push.vbrief.json"
+    }
+  }
+}
