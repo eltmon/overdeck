@@ -103,7 +103,7 @@ import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
-import { getChangedFiles, getDiffBase, getDiffStat } from '../../../lib/cloister/review-context.js';
+import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
@@ -1939,16 +1939,44 @@ export function assembleUatContextPlanFields(doc: VBriefDocument | null): UatCon
   };
 }
 
-async function readWorkspaceUatChangedFiles(workspacePath: string): Promise<UatContextGitFields> {
-  const empty: UatContextGitFields = {
+export function emptyUatContextGitFields(): UatContextGitFields {
+  return {
     changedFiles: [],
     changedFilesTotal: 0,
     changedFilesOmitted: 0,
     diffStat: null,
     source: { files: 'none' },
   };
+}
 
-  if (!existsSync(workspacePath)) return empty;
+export function assembleUatContextGitFields(
+  changedFiles: ChangedFile[],
+  diffStat: { stat: string; truncated: boolean },
+): UatContextGitFields {
+  if (diffStat.stat === 'Unable to compute diff stat') {
+    return emptyUatContextGitFields();
+  }
+
+  const limitedChangedFiles = changedFiles
+    .slice(0, MAX_UAT_CONTEXT_CHANGED_FILES)
+    .map((file) => ({
+      path: file.path,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+    }));
+
+  return {
+    changedFiles: limitedChangedFiles,
+    changedFilesTotal: changedFiles.length,
+    changedFilesOmitted: Math.max(0, changedFiles.length - limitedChangedFiles.length),
+    diffStat,
+    source: { files: 'git' },
+  };
+}
+
+async function readWorkspaceUatChangedFiles(workspacePath: string): Promise<UatContextGitFields> {
+  if (!existsSync(workspacePath)) return emptyUatContextGitFields();
 
   try {
     const base = await getDiffBase(workspacePath);
@@ -1957,28 +1985,9 @@ async function readWorkspaceUatChangedFiles(workspacePath: string): Promise<UatC
       getDiffStat(workspacePath, base),
     ]);
 
-    if (diffStat.stat === 'Unable to compute diff stat') {
-      return empty;
-    }
-
-    const limitedChangedFiles = changedFiles
-      .slice(0, MAX_UAT_CONTEXT_CHANGED_FILES)
-      .map((file) => ({
-        path: file.path,
-        status: file.status,
-        additions: file.additions,
-        deletions: file.deletions,
-      }));
-
-    return {
-      changedFiles: limitedChangedFiles,
-      changedFilesTotal: changedFiles.length,
-      changedFilesOmitted: Math.max(0, changedFiles.length - limitedChangedFiles.length),
-      diffStat,
-      source: { files: 'git' },
-    };
+    return assembleUatContextGitFields(changedFiles, diffStat);
   } catch {
-    return empty;
+    return emptyUatContextGitFields();
   }
 }
 
