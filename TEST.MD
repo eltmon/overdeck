@@ -50,3 +50,6 @@ Revert or leave your edits as you see fit — this file is meant to churn.
     removed-looking line A   (soft dark-maroon band when this block is edited)
   If these still look like harsh vivid blocks, the theme didn't reload — tell me
   and I'll dig in. If they're too subtle, say "more contrast" and I'll bump them.
+- 2026-06-08: Re-saved the theme (slightly more visible muted tones) to force a
+  hot-reload. This line's band is the live test of whether the running session
+  re-applied custom:panopticon (#1c3d24 green / #43222a maroon).
