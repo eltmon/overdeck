@@ -919,10 +919,28 @@ const getFlywheelUatCandidateRoute = HttpRouter.add(
         ),
       );
       const plan = planUatCandidate(queue, { dateIso: new Date().toISOString() });
-      return jsonResponse(plan.bundled.length > 0 ? plan : { branchName: null, bundled: [] });
+      if (plan.bundled.length === 0) return jsonResponse({ branchName: null, bundled: [] });
+      // Use the deterministic per-day name so the displayed branch matches the
+      // one assemble-uat actually creates (planUatCandidate's name omits the codename).
+      const label = (plan.bundled[0]!.split('-')[0] ?? 'candidate').toLowerCase();
+      return jsonResponse({ branchName: uatCandidateBranchName(label, new Date().toISOString()), bundled: plan.bundled });
     });
   })),
 );
+
+/**
+ * Stable per-(label, day) UAT candidate branch name. Deterministic — the
+ * codename is seeded by the calendar day — so (a) the name the rail shows and
+ * the branch assembly creates always agree, and (b) auto-assembly each flywheel
+ * tick rebuilds ONE branch per day (force-reset onto current main) instead of
+ * pushing a fresh `uat/<random>-<MMDD>` branch every cycle.
+ */
+function uatCandidateBranchName(label: string, dateIso: string): string {
+  const day = dateIso.slice(0, 10);
+  let h = 0;
+  for (let i = 0; i < day.length; i++) h = (h * 31 + day.charCodeAt(i)) >>> 0;
+  return makeUatCandidateName({ label, dateIso, pick: () => h, isTaken: () => false });
+}
 
 interface AssembleUatDeps {
   getCandidate?: () => Promise<{ label: string; bundled: string[] } | null>;
@@ -968,7 +986,7 @@ export async function postFlywheelAssembleUatPayload(deps: AssembleUatDeps = {})
   if (!candidate || candidate.bundled.length === 0) {
     return { status: 200, body: { branch: null, merged: [], conflicts: [] } };
   }
-  const branchName = (deps.branchName ?? ((label: string) => makeUatCandidateName({ label, dateIso: new Date().toISOString() })))(candidate.label);
+  const branchName = (deps.branchName ?? ((label: string) => uatCandidateBranchName(label, new Date().toISOString())))(candidate.label);
   const featureBranches = candidate.bundled.map((id) => `feature/${id.toLowerCase()}`);
   const result = await (deps.assemble ?? defaultAssembleUat)(branchName, featureBranches);
   return { status: 200, body: result };

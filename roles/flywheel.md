@@ -134,6 +134,15 @@ Allowed when `require_uat_before_merge=false`:
 
 - `POST /api/flywheel/auto-merge/schedule` schedules eligible auto-merges through the server-managed, operator-cancellable cooldown.
 
+Allowed when `require_uat_before_merge=true` — **auto-assemble the UAT candidate** (this is the under-UAT flow; do it, don't ask the operator to flip UAT off):
+
+- With UAT required you must **not** schedule merges — but you **should** keep a ready-to-UAT bundle assembled so the operator can review and ship a batch in one sitting. Each tick:
+  1. `GET /api/flywheel/uat-candidate` → `{ branchName, bundled }`. `bundled` is the disjoint, batch-safe set of ready features (conflicting ones serialize and are excluded).
+  2. If `bundled` is non-empty, `POST /api/flywheel/assemble-uat` (empty `{}` body). This (re)builds the per-day `uat/<label>-<codename>-<MMDD>` branch off current `origin/main` and merges the bundle onto it.
+  3. Surface the candidate in your status/report: the branch name, the bundled issue IDs, and any merge conflicts it reported. The operator UATs that one branch, then clicks **Ship batch** (or `POST /api/flywheel/merge-next`).
+- **This call is idempotent and safe to run every tick.** The branch name is deterministic per day and the branch is force-reset onto current main, so repeated assembly rebuilds the *same* branch from the current bundle rather than proliferating new ones. Assembling is *not* a merge — it never touches `main` — so the merge-policy gate below does not apply to it.
+- Do **not** ask the operator "want me to flip `require_uat_before_merge=false`?" The UAT candidate *is* the answer under UAT. Only the operator changes that toggle.
+
 Never:
 
 - Run `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`, or `pan wipe`. `pan sync-main` is also off-limits **except** for the single startup-triage resync case in "Startup pipeline triage" — and even then only on a *stopped* in-pipeline issue, never a running agent.

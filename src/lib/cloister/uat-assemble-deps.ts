@@ -32,9 +32,16 @@ export function buildUatAssembleSession(projectPath: string): UatAssembleSession
     deps: {
       createCandidateBranch: async (name) => {
         branch = name;
-        worktreePath = join(tmpdir(), `uat-${name.replace(/[^a-z0-9]/gi, '-')}-${process.pid}`);
+        // Stable worktree path (no pid) so a prior assembly of the same per-day
+        // candidate is cleaned up here rather than colliding.
+        worktreePath = join(tmpdir(), `uat-${name.replace(/[^a-z0-9]/gi, '-')}`);
         await run('git fetch origin main', projectPath);
-        await run(`git worktree add -b ${name} "${worktreePath}" origin/main`, projectPath);
+        // Idempotent re-assembly: drop any leftover worktree, then -B force-resets
+        // the candidate branch onto current origin/main so re-running rebuilds the
+        // SAME branch from the current bundle instead of creating a new one.
+        await run(`git worktree remove "${worktreePath}" --force`, projectPath).catch(() => {});
+        await run('git worktree prune', projectPath).catch(() => {});
+        await run(`git worktree add -B ${name} "${worktreePath}" origin/main`, projectPath);
       },
       mergeBranch: async (featureBranch) => {
         try {
@@ -47,10 +54,14 @@ export function buildUatAssembleSession(projectPath: string): UatAssembleSession
       },
     },
     push: async () => {
-      if (branch && worktreePath) await run(`git push -u origin ${branch}`, worktreePath);
+      // Force-push: the candidate branch is force-reset onto current main each
+      // assembly, so its history is intentionally rewritten. It is a throwaway
+      // uat/* branch, never main.
+      if (branch && worktreePath) await run(`git push -f -u origin ${branch}`, worktreePath);
     },
     cleanup: async () => {
       if (worktreePath) await run(`git worktree remove "${worktreePath}" --force`, projectPath).catch(() => {});
+      await run('git worktree prune', projectPath).catch(() => {});
     },
   };
 }
