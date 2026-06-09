@@ -5,6 +5,7 @@ import { FlywheelConversationPane } from '../components/flywheel/FlywheelConvers
 import { FlywheelStatePane } from '../components/flywheel/FlywheelStatePane';
 import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDetails';
+import { MergePolicySection } from '../components/MergePolicySection';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
 interface FlywheelPageProps {
@@ -352,6 +353,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
       <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+      <MergePolicySection onNavigateIssue={onNavigateIssue} />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
           className="relative shrink-0 overflow-y-auto border-r border-border"
