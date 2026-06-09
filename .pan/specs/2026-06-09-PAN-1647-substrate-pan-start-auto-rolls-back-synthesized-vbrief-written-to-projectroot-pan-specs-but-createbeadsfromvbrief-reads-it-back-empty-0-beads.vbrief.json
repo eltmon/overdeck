@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-09T23:35:04.615Z"
+    "updated": "2026-06-09T23:41:56.228Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 24,
+    "sequence": 26,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-09T23:35:04.615Z",
+    "updated": "2026-06-09T23:41:56.228Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -157,55 +157,57 @@
         "phase": "review",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T23:35:04.521Z",
+        "updatedAt": "2026-06-09T23:41:56.223Z",
         "work": {
-          "updatedAt": "2026-06-09T23:35:04.521Z",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-09T23:35:04.521Z",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T23:35:04.521Z"
+              "at": "2026-06-09T23:41:56.223Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-09T23:35:04.521Z",
-          "notes": "Agent re-review request (1/25): Fixed test",
+          "status": "passed",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
+          "notes": "Approved: no blocking findings; one non-blocking HOME test isolation advisory.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-09T23:35:04.521Z",
-              "notes": "Agent re-review request (1/25): Fixed test"
+              "status": "passed",
+              "at": "2026-06-09T23:41:56.223Z",
+              "notes": "Approved: no blocking findings; one non-blocking HOME test isolation advisory."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-09T23:35:04.521Z",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T23:35:04.521Z"
+              "at": "2026-06-09T23:41:56.223Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T23:35:04.521Z",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-09T23:35:04.521Z",
+          "updatedAt": "2026-06-09T23:41:56.223Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T23:35:04.521Z"
+              "at": "2026-06-09T23:41:56.223Z"
             }
           ],
           "readyForMerge": false,
