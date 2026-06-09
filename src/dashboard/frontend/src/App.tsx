@@ -605,7 +605,11 @@ export default function App() {
 
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
-    const projectKey = hit.projectId || NO_PROJECT_KEY;
+    // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
+    // hit.projectId is the encoded ~/.claude/projects dir name and is NOT a deck
+    // key, so routing on it lands on a phantom project. Fall back to the No-project
+    // bucket when the conversation is under no registered project.
+    const projectKey = hit.projectKey || NO_PROJECT_KEY;
     try {
       const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset);
       const nonce = Date.now();
