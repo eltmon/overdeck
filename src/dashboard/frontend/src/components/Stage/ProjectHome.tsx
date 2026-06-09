@@ -17,6 +17,8 @@ import type { ProjectFeature } from '../CommandDeck/ProjectTree/ProjectNode'
 export interface ProjectHomeProps {
   /** Project key/name shown as `# <projectName>`. */
   projectName: string
+  /** projects.yaml key — threaded to the cockpit settings panel (PAN-1693). */
+  projectKey?: string
   /** Project working branch; defaults to `main`. */
   branch?: string
   /** Conversations already scoped to this project. */
@@ -47,6 +49,7 @@ export interface ProjectHomeProps {
  */
 export function ProjectHome({
   projectName,
+  projectKey,
   branch = 'main',
   conversations = [],
   onCreateConversation,
@@ -151,6 +154,7 @@ export function ProjectHome({
         detail={
           <ProjectOverview
             projectName={projectName}
+            projectKey={projectKey}
             features={features}
             issueCosts={issueCosts ?? {}}
             issueCostDetails={issueCostDetails}

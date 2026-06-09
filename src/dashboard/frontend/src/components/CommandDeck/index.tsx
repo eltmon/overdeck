@@ -1267,6 +1267,7 @@ export function CommandDeck({
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
+                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   features={selectedProjectData?.features}
