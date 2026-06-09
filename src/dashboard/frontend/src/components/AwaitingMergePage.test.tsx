@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AwaitingMergeRow } from './AwaitingMergePage';
 
 vi.mock('sonner', () => ({
@@ -9,6 +9,10 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
   },
 }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function renderRow(overrides: Partial<React.ComponentProps<typeof AwaitingMergeRow>> = {}) {
   const queryClient = new QueryClient({
@@ -32,6 +36,31 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof AwaitingMergeR
 }
 
 describe('AwaitingMergeRow UAT context', () => {
+  it('lazy-loads UAT context only after the section expands', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      acceptanceCriteria: [
+        {
+          id: 'uat.ac1',
+          title: 'Fetched checklist item',
+          status: 'pending',
+          itemId: 'frontend-what-to-test',
+          itemTitle: 'Frontend checklist',
+        },
+      ],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRow();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('merge-uat-toggle-PAN-1686'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1686/uat-context');
+    expect(await screen.findByText('Fetched checklist item')).toBeTruthy();
+  });
+
   it('toggles the UAT context section and renders acceptance criteria', () => {
     renderRow({
       uatContext: {
