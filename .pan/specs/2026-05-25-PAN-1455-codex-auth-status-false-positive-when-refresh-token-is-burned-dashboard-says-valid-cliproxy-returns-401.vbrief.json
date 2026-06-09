@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-06-09T04:58:06.581Z"
+    "updated": "2026-06-09T04:59:54.420Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 53,
+    "sequence": 55,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-06-09T04:58:06.581Z",
+    "updated": "2026-06-09T04:59:54.420Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -254,55 +254,57 @@
         "phase": "merge",
         "issueId": "PAN-1455",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T04:58:06.494Z",
+        "updatedAt": "2026-06-09T04:59:54.238Z",
         "work": {
-          "updatedAt": "2026-06-09T04:58:06.494Z",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-09T04:58:06.494Z",
-          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "status": "failed",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
+          "notes": "Verification FAILED at test (31703ms):\n\n --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-conversation-search.test.ts > conversationSearch configuration > getConversationSearchConfigSync returns the normalized conversationSearch block\nAssertionError: expected true to be false // Object.is equality\n\n- Expected\n+ Received\n\n- false\n+ true\n\n ❯ src/lib/__tests__/config-yaml-conversation-search.test.ts:51:28\n     49|     expect(result).toHaveProperty('model');\n     50|     expect(result).toHaveProperty('dbPath');\n     51|     expect(result.enabled).toBe(false);\n       |                            ^\n     52|     expect(result.provider).toBe('openai');\n     53|     expect(result.model).toBe('text-embedding-3-small');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-09T04:58:06.494Z",
-              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+              "status": "failed",
+              "at": "2026-06-09T04:59:54.238Z",
+              "notes": "Verification FAILED at test (31703ms):\n\n --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/__tests__/config-yaml-conversation-search.test.ts > conversationSearch configuration > getConversationSearchConfigSync returns the normalized conversationSearch block\nAssertionError: expected true to be false // Object.is equality\n\n- Expected\n+ Received\n\n- false\n+ true\n\n ❯ src/lib/__tests__/config-yaml-conversation-search.test.ts:51:28\n     49|     expect(result).toHaveProperty('model');\n     50|     expect(result).toHaveProperty('dbPath');\n     51|     expect(result.enabled).toBe(false);\n       |                            ^\n     52|     expect(result.provider).toBe('openai');\n     53|     expect(result.model).toBe('text-embedding-3-small');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-09T04:58:06.494Z",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T04:58:06.494Z"
+              "at": "2026-06-09T04:59:54.238Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-09T04:58:06.494Z",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T04:58:06.494Z"
+              "at": "2026-06-09T04:59:54.238Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T04:58:06.494Z",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
           "history": []
         },
         "merge": {
-          "status": "verifying",
-          "updatedAt": "2026-06-09T04:58:06.494Z",
+          "status": "failed",
+          "updatedAt": "2026-06-09T04:59:54.238Z",
+          "notes": "Post-rebase verification failed at test",
           "history": [
             {
-              "status": "verifying",
-              "at": "2026-06-09T04:58:06.494Z"
+              "status": "failed",
+              "at": "2026-06-09T04:59:54.238Z",
+              "notes": "Post-rebase verification failed at test"
             }
           ],
           "readyForMerge": false,
