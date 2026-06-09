@@ -10,7 +10,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp, TriangleAlert, Circle, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
@@ -164,14 +164,6 @@ export function AwaitingMergePage() {
     })),
   });
 
-  const uatContextQueries = useQueries({
-    queries: sortedAwaiting.map((rs) => ({
-      queryKey: ['uat-context', rs.issueId],
-      queryFn: () => fetchUatContext(rs.issueId),
-      staleTime: 30_000,
-    })),
-  });
-
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-5xl mx-auto p-6">
@@ -198,12 +190,12 @@ export function AwaitingMergePage() {
             {sortedAwaiting.map((rs, idx) => {
               const issue = issuesById.get(rs.issueId.toLowerCase());
               const ws = workspaceQueries[idx]?.data;
-              const uatContextQuery = uatContextQueries[idx];
               return (
                 <AwaitingMergeRow
                   key={rs.issueId}
                   issueId={rs.issueId}
                   title={issue?.title ?? rs.issueId}
+                  description={issue?.description}
                   identifier={issue?.identifier ?? rs.issueId}
                   trackerUrl={issue?.url}
                   frontendUrl={ws?.frontendUrl}
@@ -215,9 +207,6 @@ export function AwaitingMergePage() {
                   mergeStep={rs.mergeStep}
                   mergeNotes={rs.mergeNotes}
                   autoMerge={rs.autoMerge}
-                  uatContext={uatContextQuery?.data}
-                  uatContextLoading={uatContextQuery?.isLoading}
-                  uatContextError={uatContextQuery?.isError}
                   uatNotes={rs.uatNotes}
                   onMerged={() => {
                     queryClient.invalidateQueries({ queryKey: ['workspace', rs.issueId] });
@@ -292,6 +281,7 @@ interface RowProps {
   issueId: string;
   identifier: string;
   title: string;
+  description?: string;
   trackerUrl?: string;
   frontendUrl?: string;
   stackHealthy?: boolean;
@@ -303,8 +293,6 @@ interface RowProps {
   mergeNotes?: string;
   autoMerge?: boolean;
   uatContext?: UatContext;
-  uatContextLoading?: boolean;
-  uatContextError?: boolean;
   uatNotes?: string;
   onMerged: () => void;
 }
@@ -362,10 +350,11 @@ function MergeStepTracker({ mergeStep, mergeStatus, mergeNotes }: { mergeStep?: 
   );
 }
 
-function AwaitingMergeRow({
+export function AwaitingMergeRow({
   issueId,
   identifier,
   title,
+  description,
   trackerUrl,
   frontendUrl,
   stackHealthy,
@@ -376,6 +365,8 @@ function AwaitingMergeRow({
   mergeStep,
   mergeNotes,
   autoMerge,
+  uatContext,
+  uatNotes,
   onMerged,
 }: RowProps) {
   const mergeMutation = useMutation({
@@ -401,6 +392,23 @@ function AwaitingMergeRow({
 
   const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeStatus === 'verifying' || mergeMutation.isPending;
   const isFailed = mergeStatus === 'failed';
+  const [uatExpanded, setUatExpanded] = useState(false);
+  const fetchedUatContext = useQuery({
+    queryKey: ['uat-context', issueId],
+    queryFn: () => fetchUatContext(issueId),
+    enabled: uatExpanded && !uatContext,
+    staleTime: 5 * 60_000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+  });
+  const effectiveUatContext = uatContext ?? fetchedUatContext.data;
+  const acceptanceCriteria = effectiveUatContext?.acceptanceCriteria?.filter((criterion) => criterion.title.trim()) ?? [];
+  const deliverables = effectiveUatContext?.deliverables?.filter((deliverable) => deliverable.title.trim()) ?? [];
+  const changedFiles = effectiveUatContext?.changedFiles ?? [];
+  const changedFilesOmitted = effectiveUatContext?.changedFilesOmitted ?? Math.max(0, (effectiveUatContext?.changedFilesTotal ?? 0) - changedFiles.length);
+  const proposal = effectiveUatContext?.proposal?.trim();
+  const fallbackChecklistText = description?.trim() || title;
+  const showUatLoading = Boolean(fetchedUatContext.isLoading && !fetchedUatContext.isError && !uatContext);
 
   return (
     <li className="border border-border rounded-lg bg-card p-4" data-testid={`merge-row-${identifier}`}>
@@ -507,6 +515,92 @@ function AwaitingMergeRow({
           </button>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setUatExpanded((expanded) => !expanded)}
+        className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+        data-testid={`merge-uat-toggle-${identifier}`}
+      >
+        {uatExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        What to test / Expected changes
+      </button>
+
+      {uatExpanded && (
+        <div className="mt-3 rounded-md border border-border/70 bg-muted/20 p-3" data-testid={`merge-uat-context-${identifier}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <ThumbsUp className="w-3.5 h-3.5 text-primary" />
+            <h3 className="text-xs font-semibold text-foreground">What to test (UAT)</h3>
+          </div>
+          {showUatLoading && (
+            <p className="text-[11px] text-muted-foreground mb-2">Loading UAT context…</p>
+          )}
+          {acceptanceCriteria.length > 0 ? (
+            <ul className="space-y-1.5">
+              {acceptanceCriteria.map((criterion) => (
+                <li key={criterion.id} className="flex items-start gap-2 text-xs text-foreground">
+                  <Circle className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <span>
+                    <span>{criterion.title}</span>
+                    {criterion.itemTitle && (
+                      <span className="ml-1 text-[11px] text-muted-foreground">({criterion.itemTitle})</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-foreground whitespace-pre-wrap">{fallbackChecklistText}</p>
+          )}
+
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <h3 className="text-xs font-semibold text-foreground mb-2">Expected changes</h3>
+            {deliverables.length > 0 ? (
+              <ul className="space-y-1.5 mb-3">
+                {deliverables.map((deliverable) => (
+                  <li key={deliverable.id} className="text-xs text-foreground">
+                    <span className="font-medium">{deliverable.title}</span>
+                    {deliverable.action && (
+                      <span className="block text-[11px] text-muted-foreground mt-0.5">{deliverable.action}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : proposal ? (
+              <p className="text-xs text-foreground whitespace-pre-wrap mb-3">{proposal}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mb-3">No deliverables available.</p>
+            )}
+
+            <div className="space-y-1.5">
+              {changedFiles.length > 0 ? (
+                <>
+                  {changedFiles.map((file) => (
+                    <div key={`${file.status}:${file.path}`} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="font-mono px-1 py-0.5 rounded bg-accent text-foreground">{file.status}</span>
+                      <span className="font-mono text-foreground truncate">{file.path}</span>
+                      <span className="ml-auto font-mono text-success">+{file.additions}</span>
+                      <span className="font-mono text-destructive">-{file.deletions}</span>
+                    </div>
+                  ))}
+                  {changedFilesOmitted > 0 && (
+                    <p className="text-[11px] text-muted-foreground">+{changedFilesOmitted} more files</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">No file changes available.</p>
+              )}
+            </div>
+          </div>
+
+          {uatNotes?.trim() && (
+            <div className="mt-3 rounded border border-primary/20 bg-primary/5 px-2.5 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-primary mb-1">Reviewer UAT notes</p>
+              <p className="text-xs text-foreground whitespace-pre-wrap">{uatNotes.trim()}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Inline merge step tracker — visible when merge is in progress or just failed */}
       {(isMerging || isFailed) && (
