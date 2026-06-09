@@ -120,6 +120,12 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Per-project auto-resume failure tracking and backoff overrides */
   autoResume?: Partial<AutoResumeConfig>;
+  /**
+   * PAN-1695: per-project auto-merge default for issues with no explicit
+   * per-issue setting. 'auto' = auto-merge when ready, 'hold' = hold for UAT.
+   * Unset = fall through to the global require-UAT setting.
+   */
+  auto_merge_default?: 'auto' | 'hold';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */

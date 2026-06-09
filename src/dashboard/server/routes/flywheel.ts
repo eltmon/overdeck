@@ -42,6 +42,7 @@ import {
 } from '../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -258,6 +259,7 @@ interface AutoMergeScheduleDeps {
   resolveProject?: (issueId: string) => ResolvedProject | null;
   schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
+  getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
 }
 
 interface AutoMergeCancelDeps {
@@ -305,10 +307,12 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
 
   const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
 
-  // PAN-1691: an issue explicitly set to ⚡ Auto-merge overrides the global
-  // "Require UAT before merge" default. undefined (follow default) and false
-  // (hold) still honor it — Auto is the only state that overrides the default.
-  if (reviewStatus?.autoMerge !== true && (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
+  // PAN-1691/1695: resolve the hold-for-UAT decision across three tiers —
+  // per-issue autoMerge (true=auto / false=hold) → per-project default →
+  // global require-UAT. Auto is the only state that overrides a hold default.
+  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
+  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
+  if (shouldHoldForUat(reviewStatus?.autoMerge, projectDefault, globalRequireUat)) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
   if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {

@@ -343,6 +343,7 @@ describe('flywheel auto-merge routes', () => {
 
   const eligibleDeps = (overrides: Parameters<typeof postAutoMergeSchedulePayload>[1] = {}) => ({
     isRequireUatBeforeMerge: () => false,
+    getProjectAutoMergeDefault: () => undefined,
     isFlywheelPaused: () => false,
     resolveLiveRunId: async () => 'RUN-7',
     isEligible: async () => ({ eligible: true as const }),
@@ -432,6 +433,24 @@ describe('flywheel auto-merge routes', () => {
         autoMerge: true,
         prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
       }),
+    }));
+    expect(result.status).toBe(200);
+  });
+
+  it('per-project default "hold" blocks scheduling even when global require-UAT is off', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isRequireUatBeforeMerge: () => false,
+      getProjectAutoMergeDefault: () => 'hold',
+    }))).resolves.toEqual({ status: 412, body: { error: 'UAT is still required before merge' } });
+  });
+
+  it('per-project default "auto" schedules even when global require-UAT is on', async () => {
+    const now = new Date('2026-05-25T10:00:00.000Z');
+    const result = await postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      isRequireUatBeforeMerge: () => true,
+      getProjectAutoMergeDefault: () => 'auto',
+      now: () => now,
+      announce: vi.fn(),
     }));
     expect(result.status).toBe(200);
   });
