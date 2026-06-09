@@ -62,6 +62,14 @@ export interface ReviewStatus {
   mergeNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  /**
+   * PAN-1691: per-issue merge-train routing key.
+   * `undefined` = follow the project default; `true` = auto-merge (fast lane,
+   * rides the train and ships when green); `false` = hold for UAT (manual lane,
+   * waits for human batch review). The merge-train engine reads this to decide
+   * whether a ready issue auto-advances or is held for the UAT candidate.
+   */
+  autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
   queuePosition?: number | null;

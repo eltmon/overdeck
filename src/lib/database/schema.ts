@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 49;
+export const SCHEMA_VERSION = 50;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -256,7 +256,9 @@ export function initSchema(db: Database.Database): void {
       -- PAN-938: pre-review verification gate commit SHA
       last_verified_commit    TEXT,
       -- PAN-938: current merge pipeline step
-      merge_step              TEXT
+      merge_step              TEXT,
+      -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
+      auto_merge              INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -1401,6 +1403,11 @@ export function runMigrations(db: Database.Database): void {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`); } catch { /* already exists */ }
+  }
+
+  // v49 → v50: add per-issue auto_merge routing key to review_status (PAN-1691)
+  if (currentVersion < 50) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

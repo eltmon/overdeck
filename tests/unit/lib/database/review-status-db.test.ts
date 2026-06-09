@@ -68,6 +68,34 @@ describe('upsertReviewStatus', () => {
     expect(row.ready_for_merge).toBe(1);
   });
 
+  // PAN-1691: per-issue auto-merge routing key is a tri-state (undefined/true/false).
+  it('round-trips autoMerge: undefined → NULL → undefined', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-1' }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-1') as any;
+    expect(row.auto_merge).toBeNull();
+    expect(getReviewStatusFromDbSync('PAN-AM-1')?.autoMerge).toBeUndefined();
+  });
+
+  it('round-trips autoMerge: true → 1 → true', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-2', autoMerge: true }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-2') as any;
+    expect(row.auto_merge).toBe(1);
+    expect(getReviewStatusFromDbSync('PAN-AM-2')?.autoMerge).toBe(true);
+  });
+
+  it('round-trips autoMerge: false → 0 → false', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-3', autoMerge: false }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-3') as any;
+    expect(row.auto_merge).toBe(0);
+    expect(getReviewStatusFromDbSync('PAN-AM-3')?.autoMerge).toBe(false);
+  });
+
+  it('flips autoMerge on conflict update', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: false }));
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: true }));
+    expect(getReviewStatusFromDbSync('PAN-AM-4')?.autoMerge).toBe(true);
+  });
+
   it('stores history entries', () => {
     const ts = new Date().toISOString();
     upsertReviewStatusSync(makeStatus({
