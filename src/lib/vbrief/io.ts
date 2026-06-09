@@ -144,9 +144,6 @@ export function issueIdFromWorkspacePath(workspacePath: string): string | null {
 
 /** Derive the project root from a workspace path. */
 function projectRootFromWorkspace(workspacePath: string): string {
-  if (existsSync(join(workspacePath, '.git')) && existsSync(join(workspacePath, PAN_DIRNAME, 'specs'))) {
-    return workspacePath;
-  }
   return resolve(workspacePath, '..', '..');
 }
 
