@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { Zap, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { useDashboardStore } from '../lib/store';
 
 async function postAutoMerge(issueId: string, autoMerge: boolean): Promise<void> {
@@ -42,6 +43,24 @@ function patchStore(issueId: string, autoMerge: boolean): void {
   }));
 }
 
+/**
+ * The global "Require UAT before merge" setting — what the `default` (unset)
+ * state resolves to. Cached/shared across every toggle via react-query.
+ */
+function useRequireUatDefault(): boolean | undefined {
+  const { data } = useQuery({
+    queryKey: ['flywheel', 'config', 'require-uat'],
+    queryFn: async (): Promise<boolean | undefined> => {
+      const res = await fetch('/api/flywheel/config');
+      if (!res.ok) return undefined;
+      const json = (await res.json()) as { require_uat_before_merge?: unknown };
+      return Boolean(json.require_uat_before_merge);
+    },
+    staleTime: 30_000,
+  });
+  return data;
+}
+
 export interface AutoMergeToggleProps {
   issueId: string;
   /** Current routing key. undefined = follow project default. */
@@ -61,6 +80,11 @@ export function AutoMergeToggle({
   className = '',
 }: AutoMergeToggleProps) {
   const [busy, setBusy] = useState(false);
+  const requireUatDefault = useRequireUatDefault();
+  const defaultResolvesTo =
+    requireUatDefault === undefined ? 'the project default'
+      : requireUatDefault ? 'hold for UAT'
+        : 'auto-merge';
 
   const set = async (next: boolean) => {
     if (busy || autoMerge === next) return;
@@ -94,7 +118,7 @@ export function AutoMergeToggle({
         title={
           isAuto ? 'Auto-merge ON — click to hold for UAT'
             : autoMerge === false ? 'Holding for UAT — click to auto-merge'
-              : 'Follows project default — click to auto-merge'
+              : `Follows the global default (currently: ${defaultResolvesTo}) — click to set Auto`
         }
         className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition disabled:opacity-50 hover:brightness-110 ${tone} ${className}`}
       >
@@ -113,6 +137,7 @@ export function AutoMergeToggle({
     <div
       role="group"
       aria-label="Auto-merge policy"
+      title={autoMerge === undefined ? `Default follows the global setting (currently: ${defaultResolvesTo})` : undefined}
       className={`inline-flex overflow-hidden rounded-lg border border-border bg-background ${className}`}
     >
       <button
