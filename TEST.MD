@@ -42,3 +42,11 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   the harsh full-width diffAdded/diffRemoved bands. The green/red bands behind
   THESE lines in the Claude terminal should now read as soft, low-saturation
   tints rather than vivid blocks. Tunable live via ~/.claude/themes/panopticon.json.
+- 2026-06-08: Fresh diff to eyeball the muted theme. The lines below mix adds and
+  removes so you can compare the soft green vs soft maroon bands side by side:
+    added line one   (soft dark-green band)
+    added line two   (soft dark-green band)
+    a settled line with no band at all for contrast
+    removed-looking line A   (soft dark-maroon band when this block is edited)
+  If these still look like harsh vivid blocks, the theme didn't reload — tell me
+  and I'll dig in. If they're too subtle, say "more contrast" and I'll bump them.
