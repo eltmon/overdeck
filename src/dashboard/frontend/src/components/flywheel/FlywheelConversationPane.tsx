@@ -156,6 +156,30 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   const config = resolveFlywheelConfig(settingsQuery.data);
   const mergeQueue = mergeQueueQuery.data ?? [];
   const uatCandidate = uatCandidateQuery.data;
+  const [mergeN, setMergeN] = useState(1);
+  const mergeNextMutation = useMutation({
+    mutationFn: async (n: number) => {
+      const res = await fetch('/api/flywheel/merge-next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n }),
+      });
+      if (!res.ok) {
+        const b = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(b.error ?? `merge-next failed (${res.status})`);
+      }
+      return (await res.json()) as { outcomes: Array<{ issueId: string; result: string; reason?: string }> };
+    },
+    onSuccess: (data) => {
+      const merged = data.outcomes.filter((o) => o.result === 'merged').length;
+      const failed = data.outcomes.find((o) => o.result === 'failed');
+      if (failed) toast.warning(`Merged ${merged}, then ${failed.issueId} stopped the batch: ${failed.reason ?? ''}`);
+      else toast.success(`Merged ${merged} issue${merged === 1 ? '' : 's'}`);
+      queryClient.invalidateQueries({ queryKey: ['flywheel-merge-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['flywheel-uat-candidate'] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'merge-next failed'),
+  });
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -482,6 +506,23 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
                 </li>
               ))}
             </ol>
+            <div className="mt-3 flex items-center gap-2 border-t border-dashed border-border pt-3 text-xs text-muted-foreground">
+              <span>Merge next</span>
+              <span className="inline-flex items-center overflow-hidden rounded-md border border-border">
+                <button type="button" className="h-6 w-6 bg-background hover:bg-accent" onClick={() => setMergeN((v) => Math.max(1, v - 1))}>−</button>
+                <span className="w-7 text-center font-bold text-foreground">{Math.min(mergeN, mergeQueue.length)}</span>
+                <button type="button" className="h-6 w-6 bg-background hover:bg-accent" onClick={() => setMergeN((v) => Math.min(mergeQueue.length, v + 1))}>+</button>
+              </span>
+              <span>in conflict-aware order</span>
+              <button
+                type="button"
+                disabled={mergeNextMutation.isPending}
+                onClick={() => mergeNextMutation.mutate(Math.min(mergeN, mergeQueue.length))}
+                className="ml-auto rounded-md bg-emerald-500 px-3 py-1 text-[11px] font-bold text-emerald-950 hover:brightness-110 disabled:opacity-50"
+              >
+                {mergeNextMutation.isPending ? 'Merging…' : 'Ship'}
+              </button>
+            </div>
           </div>
         )}
         <button
