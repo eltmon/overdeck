@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { orderMergeCandidates } from '../../../src/lib/flywheel-merge-order.js';
+import { orderMergeCandidates, planMergeTrain } from '../../../src/lib/flywheel-merge-order.js';
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
@@ -36,5 +36,25 @@ describe('orderMergeCandidates (PAN-1691 conflict-aware order)', () => {
       c('PAN-3', 99, 0),
     ]);
     expect(out.map((x) => x.issueId)).toEqual(['PAN-3', 'PAN-12', 'PAN-40', 'PAN-50']);
+  });
+});
+
+describe('planMergeTrain (PAN-1691 batch/serialize plan)', () => {
+  it('batches all disjoint candidates with an empty serialize list', () => {
+    const plan = planMergeTrain([c('PAN-2', 4, 0), c('PAN-1', 9, 0)]);
+    expect(plan.batch).toEqual(['PAN-1', 'PAN-2']);
+    expect(plan.serialize).toEqual([]);
+    expect(plan.order).toEqual(['PAN-1', 'PAN-2']);
+  });
+
+  it('splits disjoint into batch and conflicting into serialize (broadest first)', () => {
+    const plan = planMergeTrain([c('PAN-10', 5, 0), c('PAN-20', 3, 1), c('PAN-30', 50, 2)]);
+    expect(plan.batch).toEqual(['PAN-10']);
+    expect(plan.serialize).toEqual(['PAN-30', 'PAN-20']);
+    expect(plan.order).toEqual(['PAN-10', 'PAN-30', 'PAN-20']);
+  });
+
+  it('returns empty plan for no candidates', () => {
+    expect(planMergeTrain([])).toEqual({ batch: [], serialize: [], order: [] });
   });
 });

@@ -23,6 +23,7 @@ interface MergeQueueItem {
   pr?: number;
   mergeOrder: number;
   conflictsWith: string[];
+  batchGroup?: 'batch' | 'serialize';
 }
 
 interface FlywheelRunDetail extends FlywheelRunSummary {
@@ -449,6 +450,12 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="font-medium text-foreground">{item.issueId}</span>
+                    {item.batchGroup === 'batch' && (
+                      <span className="ml-1.5 rounded bg-emerald-500/10 px-1 text-[10px] font-semibold text-emerald-400" title="Disjoint — can merge together in one verification pass">⚡ batch</span>
+                    )}
+                    {item.batchGroup === 'serialize' && (
+                      <span className="ml-1.5 rounded bg-amber-500/10 px-1 text-[10px] font-semibold text-amber-400" title="Touches files another ready branch touches — must merge one at a time">serial</span>
+                    )}
                     {item.pr != null && (
                       <span className="ml-1 text-muted-foreground">#{item.pr}</span>
                     )}

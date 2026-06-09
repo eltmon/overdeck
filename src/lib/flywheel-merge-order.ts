@@ -8,6 +8,8 @@ export interface MergeQueueItem {
   pr?: number;
   mergeOrder: number;
   conflictsWith: string[];
+  /** PAN-1691: 'batch' = disjoint, mergeable together in one pass; 'serialize' = conflicts, must go one at a time. */
+  batchGroup?: 'batch' | 'serialize';
 }
 
 function issueNumber(issueId: string): number {
@@ -38,6 +40,30 @@ export function orderMergeCandidates<T extends MergeCandidateMeta>(items: Readon
     if (aConf === 1 && a.footprint !== b.footprint) return b.footprint - a.footprint;
     return issueNumber(a.issueId) - issueNumber(b.issueId);
   });
+}
+
+export interface MergeTrainPlan {
+  /** Disjoint candidates that can merge together in one verification pass. */
+  batch: string[];
+  /** Conflicting candidates that must serialize, broadest-footprint first. */
+  serialize: string[];
+  /** Full ordered list (batch, then serialize). */
+  order: string[];
+}
+
+/**
+ * PAN-1691 merge-train plan. Partitions the conflict-aware order into the run of
+ * disjoint candidates — which can all merge in a single verification pass — and
+ * the conflicting remainder, which must serialize broadest-footprint first.
+ * Pure; the executor consumes this once the merge-train flag is enabled.
+ */
+export function planMergeTrain<T extends MergeCandidateMeta>(candidates: ReadonlyArray<T>): MergeTrainPlan {
+  const ordered = orderMergeCandidates(candidates);
+  return {
+    batch: ordered.filter((c) => c.conflictCount === 0).map((c) => c.issueId),
+    serialize: ordered.filter((c) => c.conflictCount > 0).map((c) => c.issueId),
+    order: ordered.map((c) => c.issueId),
+  };
 }
 
 const branchExists = (branch: string, cwd: string) =>
@@ -114,11 +140,12 @@ export const computeMergeQueue = (
       })),
     );
 
-    return sorted.map(({ item }, idx) => ({
+    return sorted.map(({ item, conflictCount }, idx) => ({
       issueId: item.issueId,
       title: item.title,
       pr: item.pr,
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
+      batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
     }));
   });
