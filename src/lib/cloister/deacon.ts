@@ -161,6 +161,7 @@ import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
+import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
@@ -3306,63 +3307,19 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
 }
 
 export async function reconcileTestStatusFromGreenCi(): Promise<string[]> {
-  const actions: string[] = [];
-  try {
-    const { getCiCheckRunsState, getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
-    if (!isGitHubAppConfigured()) return actions;
-
-    const statuses = loadReviewStatuses();
-    const now = Date.now();
-    const terminalMergeStatuses = new Set(['merged', 'merging', 'queued', 'verifying']);
-
-    for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'passed') continue;
-      if (status.testStatus !== 'pending') continue;
-      if (terminalMergeStatuses.has(status.mergeStatus || '')) continue;
-      if (!status.prUrl) continue;
-
-      const cooledUntil = testStatusGreenCiReconcileCooldowns.get(issueId);
-      if (cooledUntil && now < cooledUntil) continue;
-
-      const match = status.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
-      if (!match) continue;
-      const [, owner, repo, numberStr] = match;
-      const prNumber = parseInt(numberStr, 10);
-      if (!Number.isFinite(prNumber)) continue;
-
-      try {
-        const prState = await Effect.runPromise(getPullRequestState(owner, repo, prNumber));
-        if (prState.state !== 'OPEN' || prState.merged || !prState.headSha) continue;
-
-        const ciState = await Effect.runPromise(getCiCheckRunsState(owner, repo, prState.headSha));
-        if (ciState.verdict === 'pending') {
-          testStatusGreenCiReconcileCooldowns.set(issueId, now + TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS);
-          continue;
-        }
-        if (ciState.verdict !== 'green') continue;
-
-        const firstRun = ciState.successfulRuns[0];
-        const runLabel = firstRun?.htmlUrl
-          ? `${firstRun.name} (${firstRun.htmlUrl})`
-          : (firstRun?.name || `${ciState.successCount} successful CI check-run(s)`);
-        const shortSha = prState.headSha.slice(0, 8);
-        setReviewStatusSync(issueId, {
-          testStatus: 'passed',
-          testNotes: `Reconciled from green GitHub Actions CI on ${shortSha}: ${runLabel}`,
-        });
-        testStatusGreenCiReconcileCooldowns.delete(issueId);
-        const msg = `Reconciled testStatus=pending → passed for ${issueId} from green CI on PR #${prNumber} @ ${shortSha}`;
-        actions.push(msg);
-        console.log(`[deacon] ${msg}`);
-      } catch (prErr: any) {
-        testStatusGreenCiReconcileCooldowns.set(issueId, now + TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS);
-        console.warn(`[deacon] reconcileTestStatusFromGreenCi: ${issueId} PR/CI lookup failed: ${prErr.message}`);
-      }
-    }
-  } catch (err: any) {
-    console.warn(`[deacon] Error in reconcileTestStatusFromGreenCi: ${err.message}`);
-  }
-  return actions;
+  const { getCiCheckRunsState, getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+  return reconcileTestStatusFromGreenCiWithDeps({
+    isGitHubAppConfigured,
+    loadReviewStatuses,
+    getPullRequestState,
+    getCiCheckRunsState,
+    setReviewStatusSync,
+    cooldowns: testStatusGreenCiReconcileCooldowns,
+    cooldownMs: TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS,
+    now: () => Date.now(),
+    log: (message) => console.log(`[deacon] ${message}`),
+    warn: (message) => console.warn(`[deacon] ${message}`),
+  });
 }
 
 export async function reconcileMergedButReviewing(): Promise<string[]> {

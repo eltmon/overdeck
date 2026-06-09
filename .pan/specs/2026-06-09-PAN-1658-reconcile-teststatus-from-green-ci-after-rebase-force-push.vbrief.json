@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:14:19.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
-    "updated": "2026-06-09T23:46:13.983Z"
+    "updated": "2026-06-09T23:50:05.996Z"
   },
   "plan": {
     "id": "pan-1658",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-09T23:14:19.000Z",
-    "updated": "2026-06-09T23:46:13.983Z",
+    "updated": "2026-06-09T23:50:05.996Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
@@ -190,7 +190,7 @@
       {
         "id": "reconciler-tests",
         "title": "Unit-test the testStatus-from-green-CI reconciler",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-09T23:14:19.000Z",
         "metadata": {
@@ -206,7 +206,7 @@
           {
             "id": "reconciler-tests.ac1",
             "title": "Test: reviewStatus=passed + testStatus=pending + non-terminal mergeStatus + OPEN PR + green CI check-runs ⇒ reconciler sets testStatus=passed (with testNotes) and reports one action.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -214,7 +214,7 @@
           {
             "id": "reconciler-tests.ac2",
             "title": "Test: CI still pending ⇒ testStatus unchanged, no action; Test: CI failed/red ⇒ testStatus unchanged, no action (the reconciler never masks a red build).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -222,7 +222,7 @@
           {
             "id": "reconciler-tests.ac3",
             "title": "Test: non-candidate states are untouched — testStatus='testing', testStatus already 'passed'/'skipped'/'failed', reviewStatus!='passed', and terminal mergeStatus (merged/merging/queued/verifying) each produce no mutation.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -230,7 +230,7 @@
           {
             "id": "reconciler-tests.ac4",
             "title": "Test: greenness is judged on the CURRENT HEAD SHA (a stale/pre-rebase SHA is not used), and the per-issue cooldown suppresses repeat GitHub lookups within the throttle window on pending-CI / API-error outcomes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -238,7 +238,7 @@
           {
             "id": "reconciler-tests.ac5",
             "title": "npm run typecheck, npm run lint, and npm test all pass with the new test included.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
