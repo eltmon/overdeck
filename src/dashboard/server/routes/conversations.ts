@@ -597,16 +597,26 @@ function isCodexSessionFile(sessionFile: string): boolean {
 async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
   const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
   const threadIdPath = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
-  if (!existsSync(threadIdPath)) return null;
-  try {
-    const threadId = readFileSync(threadIdPath, 'utf-8').trim();
-    if (!threadId) return null;
-    // Walk codex-home/sessions/** to find the rollout file for this thread-id.
-    const { findRolloutPath } = await import('../../../lib/runtimes/codex.js');
-    return findRolloutPath(codexHome, threadId);
-  } catch {
-    return null;
+  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
+
+  // Fast path: a persisted thread-id resolves directly to its rollout.
+  if (existsSync(threadIdPath)) {
+    try {
+      const threadId = readFileSync(threadIdPath, 'utf-8').trim();
+      if (threadId) {
+        const path = findRolloutPath(codexHome, threadId);
+        if (path) return path;
+      }
+    } catch { /* fall through to the lazy fallback */ }
   }
+
+  // PAN-1690 — lazy fallback. The spawn-time thread-id capture is a one-shot
+  // 120s wait, but Codex only writes its rollout on the first turn, so a
+  // conversation whose first message lands later never gets a persisted
+  // thread-id and the transcript stays empty. The per-conversation CODEX_HOME
+  // holds only this conversation's rollouts, so the newest one is its current
+  // thread — resolve it directly so the view works regardless of spawn timing.
+  return findLatestRollout(codexHome);
 }
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
