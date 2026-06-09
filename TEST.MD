@@ -61,7 +61,13 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   deleted here, so you also get a red removal band to compare green vs red.
 - 2026-06-09: OSC 11 spawn-stamp test — this edit was made from a PRE-FIX session
   (dark-themed Claude on a light pane), so these bands still render dark here.
-- 2026-06-09: Open a NEW conversation and edit this file again: that session will
-  detect the light pane via the stamped background and render pale light-theme
-  bands instead. Same file, same dashboard — the difference is spawn time.
-- 2026-06-09: New diff test line — added to exercise the diff view rendering.
+- 2026-06-09: New diff test line — REWRITTEN to exercise the word-level emphasis,
+  which now sits at 0.40/0.45 alpha above the boosted line fill.
+- 2026-06-09 (evening): REAL contrast fix landed (4fa4e5a1f) — the two morning
+  "boost" commits were double-diluted no-ops; line fills now mix 30% accent in
+  light mode and 34% in dark via the library's --mix-light/--mix-dark knobs.
+- 2026-06-09 (evening): This green run should now read unmistakably green in BOTH
+  themes — and the deleted "Open a NEW conversation" block above gives you the
+  matching red band to compare.
+- 2026-06-09 (evening): Pop this diff out too — the popout now shows "Loading
+  diff…" while summaries fetch instead of the bogus "No completed turns yet."
