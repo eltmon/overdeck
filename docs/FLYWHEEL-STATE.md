@@ -1134,3 +1134,58 @@ planning-1647 done). Below minAgents=2 → launched: `pan start PAN-1647` (work)
 the red-main verify gate until PAN-1698 lands (they'd stall like 1682). Planning and
 work are red-main-safe (they don't hit the verify gate until much later); fresh
 *strikes* are not. Load 15.85/24, RAM 33/64 — healthy, no storm.
+
+## RUN-17 tick 3 (2026-06-09) — main GREEN again; orchestrator survived a mid-run model switch
+
+### Main restored (PAN-1698 fixed) — ramp resumed
+
+strike-pan-1698 landed the fixture fixes; main green at `755f4969c` (CI success).
+It also filed **PAN-1702** (orthogonal host-only test-isolation bug) instead of
+fix-forwarding — correct strike scoping, properly signaled via its final summary.
+With the binding constraint cleared: launched `pan start PAN-1658` (work) +
+`pan plan PAN-1629 --auto` (ramp). Active: work-1647 (PR #1703 open), work-1658,
+planning-1629.
+
+### The orchestrator itself was model-switched mid-run (Opus 4.8 → Fable 5) — lessons
+
+The operator switched this conversation's model. What happened: Panopticon killed
+the tmux session, ran **native compaction (claude-haiku-4-5) of the 206k-token
+conversation**, and respawned with `--resume`. Run continuity held — durable state
+(this file + RUN-17 snapshots) + the compaction summary carried everything across.
+Two hard lessons:
+
+1. **Scheduled wakeups DIE with the respawn.** The tick-3 ScheduleWakeup (19:30)
+   never fired — the resumed orchestrator must re-establish the heartbeat as its
+   first order of business after any model/harness switch.
+2. **The compaction was unnecessary** — forced by `modelChanged: true` in
+   `maybeCompactBeforeRespawn` with zero context-window awareness. Fable 5 has a
+   1M window; the full 206k transcript would have fit verbatim 5× over. Filed
+   **PAN-1704** with the tiered design (window-fit + provider-routing discriminant;
+   in-session `/model` for same-provider switches; compact ONLY when context
+   exceeds the target window). Note: nothing is lost on *disk* — compaction
+   appends `compact_boundary` + summary to the JSONL, so the conversation view
+   keeps full history; what's lost is in-context verbatim recall + terminal
+   scrollback (kill+respawn draws a blank TUI — the operator read that as
+   "everything out of sync").
+
+### `pan plan --auto` stop-at-proposed is SYSTEMATIC (2nd confirmation: PAN-1658)
+
+Same pattern as PAN-1647: proposed spec on main + `planned` label, session ends,
+no work agent. This is now confirmed behavior, not a fluke. Standing rule: every
+`pan plan --auto` must be followed by plain `pan start <id>` next tick.
+
+### Gated-PR check reading: CANCELLED ≠ failed, empty conclusion = in-progress
+
+statusCheckRollup on PRs #1516/#1679 showed smoke test `CANCELLED` (stale,
+superseded runs on head commits) and #1636 showed in-progress (empty conclusion).
+Neither is a failure. Re-triggered the cancelled runs via `gh run rerun`. #1648
+and #1687 fully green → top merge suggestions. Don't misread rollup noise as a
+regression like this tick almost did.
+
+### strike-1682 parked through the entire red-main window — PAN-1699 bit again
+
+Its parked question ("file a follow-up for main breakage?") went moot the moment
+PAN-1698 was filed+fixed, but nobody could tell it (flywheel forbidden `pan tell`).
+Operator one-liner needed at its prompt: "1698 filed+fixed, main green — verify
+and pan done". The roles/*.md signal-before-parking fix (PAN-1699) remains the
+real cure.
