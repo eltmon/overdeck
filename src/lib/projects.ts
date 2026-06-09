@@ -234,6 +234,20 @@ export function registerProjectSync(key: string, projectConfig: ProjectConfig): 
 }
 
 /**
+ * PAN-1695: set or clear a project's auto-merge default. `value === null`
+ * removes the field so the project falls through to the global require-UAT
+ * setting. Preserves all other project config.
+ */
+export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  if (value === null) delete updated.auto_merge_default;
+  else updated.auto_merge_default = value;
+  registerProjectSync(key, updated);
+}
+
+/**
  * Remove a project from the registry
  */
 export function unregisterProjectSync(key: string): boolean {
