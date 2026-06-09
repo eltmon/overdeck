@@ -305,3 +305,52 @@ export const detectAwaitingInputFromPane = (
   options: { isPlanning?: boolean } = {},
 ): Effect.Effect<AwaitingInputDetection | null> =>
   Effect.sync(() => detectAwaitingInputFromPaneSync(pane, options))
+
+export interface CodexApprovalPrompt {
+  /** The "Would you like to …?" header line. */
+  header: string
+  /** Lines between the header and the first option (command, reason, etc.). */
+  detail: string
+  /** The numbered menu options, in order. */
+  options: Array<{ number: number; label: string }>
+}
+
+/**
+ * PAN-1690 — parse a Codex approval prompt (as captured by the codex-aware
+ * branch of detectAwaitingInputFromPaneSync) into its header, detail, and
+ * numbered options, so the dashboard can render the menu and answer it without
+ * the terminal. Returns null when the text doesn't contain a usable menu
+ * (fewer than two numbered options). Option lines tolerate a leading selection
+ * cursor (❯ › > etc.); the footer hint and other non-numbered lines are
+ * naturally excluded.
+ */
+export function parseCodexApprovalPrompt(text: string): CodexApprovalPrompt | null {
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  if (lines.length === 0) return null
+
+  const headerIndex = lines.findIndex((l) => looksLikeCodexApprovalHeader(l))
+  if (headerIndex < 0) return null
+
+  const optionRe = /^[^\w]*(\d+)\.\s*(.+?)\s*$/
+  const options: Array<{ number: number; label: string }> = []
+  const detailLines: string[] = []
+  let firstOptionSeen = false
+  for (let i = headerIndex + 1; i < lines.length; i += 1) {
+    const m = optionRe.exec(lines[i]!)
+    if (m) {
+      firstOptionSeen = true
+      options.push({ number: Number(m[1]), label: m[2]!.trim() })
+    } else if (!firstOptionSeen) {
+      detailLines.push(lines[i]!)
+    }
+    // Lines after the first option that aren't options (footer hints, blanks)
+    // are ignored.
+  }
+
+  if (options.length < 2) return null
+  return {
+    header: lines[headerIndex]!,
+    detail: detailLines.join('\n'),
+    options,
+  }
+}

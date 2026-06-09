@@ -931,9 +931,62 @@ export default function App() {
     },
   });
 
+  // PAN-1690 — answer a Codex TUI approval menu. The selected option's label
+  // is prefixed with its number ("1. Yes, proceed"); we send that number to the
+  // codex-approval endpoint, which drives the menu via Down×(n-1) + Enter.
+  const codexApprovalMutation = useMutation({
+    mutationFn: async ({ id, optionNumber }: {
+      id: string;
+      optionNumber: number;
+      label?: string;
+      toolUseId?: string;
+    }) => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optionNumber }),
+      });
+      if (!res.ok) {
+        let message = `Failed to send approval (${res.status})`;
+        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onMutate: ({ toolUseId }) => {
+      if (toolUseId) markAskUserQuestionAnswered(toolUseId);
+      return { toolUseId };
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`);
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.toolUseId) unmarkAskUserQuestionAnswered(context.toolUseId);
+      toast.error(`Failed to send approval: ${error.message}`);
+    },
+  });
+
   const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
     if (!currentAskUserQuestionSubject) return;
     const subject = currentAskUserQuestionSubject;
+    const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
+    // PAN-1690 — Codex approval: route the numbered choice to the keystroke
+    // endpoint instead of delivering prose into the pane.
+    if (toolUseId?.startsWith('codex-approval:')) {
+      const match = /^\s*(\d+)/.exec(answers[0] ?? '');
+      const optionNumber = match ? Number(match[1]) : NaN;
+      if (!Number.isInteger(optionNumber)) {
+        toast.error('Could not determine which option was selected');
+        return;
+      }
+      codexApprovalMutation.mutate({
+        id: subject.id,
+        optionNumber,
+        label: subject.title?.trim() || subject.id,
+        toolUseId,
+      });
+      return;
+    }
     askUserQuestionAnswerMutation.mutate({
       kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
       id: subject.id,
@@ -941,7 +994,7 @@ export default function App() {
       answers,
       questions: subject.pendingAskUserQuestion?.questions as never,
     });
-  }, [askUserQuestionAnswerMutation, currentAskUserQuestionSubject]);
+  }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
 
   const handleDismissAskUserQuestion = useCallback(() => {
     if (!currentAskUserQuestionSubject) return;
@@ -1471,7 +1524,7 @@ export default function App() {
       <AskUserQuestionDialog
         subject={currentAskUserQuestionSubject}
         isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
-        isSubmitting={askUserQuestionAnswerMutation.isPending}
+        isSubmitting={askUserQuestionAnswerMutation.isPending || codexApprovalMutation.isPending}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}
       />

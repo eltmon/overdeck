@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { detectAwaitingInputFromPaneSync, normalizeAwaitingInputPrompt } from '../agent-input-detection.js'
+import { detectAwaitingInputFromPaneSync, normalizeAwaitingInputPrompt, parseCodexApprovalPrompt } from '../agent-input-detection.js'
 
 describe('detectAwaitingInputFromPane', () => {
   it('detects Claude Code permission menus and preserves prompt text', () => {
@@ -114,6 +114,35 @@ ${Array.from({ length: 20 }, (_, i) => `cloning… ${i}`).join('\n')}
 `)
 
     expect(detection).toBeNull()
+  })
+})
+
+describe('parseCodexApprovalPrompt', () => {
+  it('parses header, detail, and numbered options from a command-approval prompt', () => {
+    const parsed = parseCodexApprovalPrompt(`Would you like to run the following command?
+$ git clone https://github.com/eltmon/foo /tmp/foo
+Reason: do you want to allow network access?
+> 1. Yes, proceed
+2. Yes, and don't ask again for commands that start with \`git clone\`
+3. No, and tell Codex what to do differently
+Press enter to confirm · esc to go back`)
+
+    expect(parsed).not.toBeNull()
+    expect(parsed?.header).toBe('Would you like to run the following command?')
+    expect(parsed?.detail).toContain('git clone')
+    expect(parsed?.options).toEqual([
+      { number: 1, label: 'Yes, proceed' },
+      { number: 2, label: "Yes, and don't ask again for commands that start with `git clone`" },
+      { number: 3, label: 'No, and tell Codex what to do differently' },
+    ])
+  })
+
+  it('returns null when there is no codex approval header', () => {
+    expect(parseCodexApprovalPrompt('1. Yes\n2. No\nsome other text')).toBeNull()
+  })
+
+  it('returns null when fewer than two options are present', () => {
+    expect(parseCodexApprovalPrompt('Would you like to run the following command?\n1. Yes')).toBeNull()
   })
 })
 

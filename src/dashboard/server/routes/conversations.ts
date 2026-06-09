@@ -114,7 +114,7 @@ import { getProviderForModelSync } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
-import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
+import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../../../lib/agent-input-detection.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -906,6 +906,9 @@ function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channe
   return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
 }
 
+/** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
+const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
+
 /**
  * PAN-1690 — pending-input detection for Codex conversations.
  *
@@ -914,20 +917,58 @@ function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channe
  * JSONL scan that powers Claude conversations misses them entirely. Detect them
  * off the live tmux pane instead and fold the result into the same unified
  * pending-input signal (`pendingInputKinds`) the dashboard already renders.
- * The pane detector is cached + concurrency-limited, so this is cheap per row.
+ * When the prompt parses into a numbered menu we also synthesize a
+ * `pendingAskUserQuestion` so the existing AskUserQuestion modal can render the
+ * options and answer them via the codex-approval endpoint. The pane detector is
+ * cached + concurrency-limited, so this is cheap per row.
  */
-async function codexPanePendingKinds(conv: Conversation, sessionAlive: boolean): Promise<PendingInputKind[]> {
-  if (!sessionAlive || conv.harness !== 'codex') return [];
+async function codexConversationPendingInput(
+  conv: Conversation,
+  sessionAlive: boolean,
+  askedAt: string,
+): Promise<{ kinds: PendingInputKind[]; approval?: PendingAskUserQuestionSnapshot }> {
+  if (!sessionAlive || conv.harness !== 'codex') return { kinds: [] };
   try {
     const detection = await Effect.runPromise(
       detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }),
     );
-    if (!detection) return [];
-    return [detection.reason === 'session_resume' ? 'sessionResume' : 'permissionRequest'];
+    if (!detection) return { kinds: [] };
+    if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
+
+    const parsed = parseCodexApprovalPrompt(detection.prompt);
+    if (parsed) {
+      const approval: PendingAskUserQuestionSnapshot = {
+        toolUseId: `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}`,
+        askedAt,
+        questions: [{
+          question: parsed.detail ? `${parsed.header}\n\n${parsed.detail}` : parsed.header,
+          header: 'Codex approval',
+          multiSelect: false,
+          options: parsed.options.map((o) => ({ label: `${o.number}. ${o.label}` })),
+        }],
+      };
+      return { kinds: ['permissionRequest'], approval };
+    }
+    // Detected an approval but couldn't parse a menu — still flag it.
+    return { kinds: ['permissionRequest'] };
   } catch {
     // pane capture failure — non-fatal, treat as no pending input
-    return [];
+    return { kinds: [] };
   }
+}
+
+/**
+ * PAN-1690 — answer a Codex approval menu from the dashboard. Codex select
+ * popups default-highlight the first option and confirm on Enter, so option N
+ * is reached with Down×(N-1) then Enter (verified against the codex 0.137 TUI).
+ * Small delays let the TUI process each keystroke.
+ */
+async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
+  for (let i = 1; i < optionNumber; i += 1) {
+    await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Down', 'codex-approval'));
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Enter', 'codex-approval'));
 }
 
 /** Rewrite an outgoing conversation message so harnesses without Claude Code's
@@ -1830,14 +1871,6 @@ const getConversationsRoute = HttpRouter.add(
                 // JSONL scan failure — leave as zero/empty; non-fatal
               }
             }
-            if (pendingInputCount === 0) {
-              const codexKinds = await codexPanePendingKinds(conv, sessionAlive);
-              if (codexKinds.length > 0) {
-                pendingInputKinds = codexKinds;
-                pendingInputCount = codexKinds.length;
-              }
-            }
-
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
 
@@ -1854,6 +1887,22 @@ const getConversationsRoute = HttpRouter.add(
                 lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
               } catch {
                 // non-fatal — fall back to lastAttachedAt/createdAt downstream
+              }
+            }
+
+            // PAN-1690 — Codex pane-detected approval fallback (TUI prompts
+            // aren't in the JSONL). Use the transcript mtime as a stable
+            // askedAt so the 4s poll doesn't churn the timestamp.
+            if (pendingInputCount === 0) {
+              const codex = await codexConversationPendingInput(
+                conv,
+                sessionAlive,
+                lastActivityAt ?? new Date().toISOString(),
+              );
+              if (codex.kinds.length > 0) {
+                pendingInputKinds = codex.kinds;
+                pendingInputCount = codex.kinds.length;
+                if (codex.approval) pendingAskUserQuestion = codex.approval;
               }
             }
 
@@ -1966,10 +2015,11 @@ const getConversationRoute = HttpRouter.add(
           } catch { /* non-fatal */ }
         }
         if (pendingInputCount === 0) {
-          const codexKinds = await codexPanePendingKinds(conv, sessionAlive);
-          if (codexKinds.length > 0) {
-            pendingInputKinds = codexKinds;
-            pendingInputCount = codexKinds.length;
+          const codex = await codexConversationPendingInput(conv, sessionAlive, new Date().toISOString());
+          if (codex.kinds.length > 0) {
+            pendingInputKinds = codex.kinds;
+            pendingInputCount = codex.kinds.length;
+            if (codex.approval) pendingAskUserQuestion = codex.approval;
           }
         }
         return jsonResponse({
@@ -2811,6 +2861,66 @@ const postConversationMessageRoute = HttpRouter.add(
             details: msg,
           }, { status: 504 });
         }
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/conversations/:id/codex-approval ────────────────────────
+//
+// PAN-1690 — answer a Codex TUI approval menu from the dashboard. The body
+// carries the 1-based option number the operator chose in the AskUserQuestion
+// modal; we re-detect the live menu (to confirm it's still up and bound the
+// choice), then drive the selection with Down×(n-1) + Enter.
+const postConversationCodexApprovalRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/codex-approval',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const optionNumber = Number((body as { optionNumber?: unknown }).optionNumber);
+        if (!Number.isInteger(optionNumber) || optionNumber < 1 || optionNumber > 9) {
+          return jsonResponse({ error: 'optionNumber must be an integer 1-9' }, { status: 400 });
+        }
+        const numericId = Number(rawId);
+        const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
+          ? getConversationById(numericId)
+          : getConversationByName(rawId);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (conv.harness !== 'codex') {
+          return jsonResponse({ error: 'Not a Codex conversation' }, { status: 400 });
+        }
+        if (!(await tmuxSessionExists(conv.tmuxSession))) {
+          return jsonResponse({ error: 'Conversation session is not running' }, { status: 409 });
+        }
+        // Re-detect uncached so we only send keystrokes when the menu is still
+        // up, and so we can bound optionNumber to the options actually shown.
+        const detection = await Effect.runPromise(
+          detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false }),
+        );
+        const parsed = detection ? parseCodexApprovalPrompt(detection.prompt) : null;
+        if (!parsed) {
+          return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
+        }
+        if (optionNumber > parsed.options.length) {
+          return jsonResponse({ error: `optionNumber out of range (1-${parsed.options.length})` }, { status: 400 });
+        }
+        await deliverCodexApprovalChoice(conv.tmuxSession, optionNumber);
+        return jsonResponse({ ok: true, optionNumber });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] codex approval failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
@@ -4117,6 +4227,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
+  postConversationCodexApprovalRoute,
   postConversationDeliveryMethodRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
