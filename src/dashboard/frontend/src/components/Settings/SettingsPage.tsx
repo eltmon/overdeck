@@ -617,6 +617,8 @@ export function SettingsPage() {
   } | null>(null);
   const [convConfigDirty, setConvConfigDirty] = useState(false);
   const [convConfigSaving, setConvConfigSaving] = useState(false);
+  const [convConfigLoading, setConvConfigLoading] = useState(true);
+  const [convConfigError, setConvConfigError] = useState<string | null>(null);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
@@ -631,13 +633,21 @@ export function SettingsPage() {
 
   useEffect(() => { void fetchClaudeAuth(); }, []);
 
-  useEffect(() => {
+  const loadConvConfig = useCallback(() => {
+    setConvConfigLoading(true);
+    setConvConfigError(null);
     ensureDashboardSession()
       .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setConvConfig(d); })
-      .catch(() => undefined);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Failed to load embedding settings (HTTP ${r.status})`);
+        return r.json();
+      })
+      .then((d) => setConvConfig(d))
+      .catch((e) => setConvConfigError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setConvConfigLoading(false));
   }, []);
+
+  useEffect(() => { loadConvConfig(); }, [loadConvConfig]);
 
   const handleConvConfigChange = (patch: Partial<typeof convConfig>) => {
     setConvConfig((prev) => prev ? { ...prev, ...patch } : null);
@@ -2249,12 +2259,24 @@ export function SettingsPage() {
 
           <div className="border-t border-border my-2" />
 
-          {!convConfig ? (
+          {convConfigLoading ? (
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Loading embedding settings…
             </div>
-          ) : (
+          ) : convConfigError ? (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-muted-foreground">{convConfigError}</span>
+              <button
+                type="button"
+                onClick={loadConvConfig}
+                className="ml-1 inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                <RefreshCw className="w-3 h-3" /> Retry
+              </button>
+            </div>
+          ) : convConfig ? (
             <>
               <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
                 <div className="min-w-0">
@@ -2389,7 +2411,7 @@ export function SettingsPage() {
                 </>
               )}
             </>
-          )}
+          ) : null}
         </div>
       </section>
 
