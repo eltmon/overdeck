@@ -195,6 +195,19 @@ function firePostMergeLifecycle(issueId: string): void {
       const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
       await postMergeLifecycle(issueId, projectPath);
       console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
+
+      // PAN-1691: roll the merge train — rebase ready siblings onto the new main,
+      // re-verify the clean ones, agent-resolve conflicts. No-op unless the
+      // flywheel.merge_train_enabled flag is on. Runs inside the in-flight guard,
+      // so it cannot re-enter postMergeLifecycle for this issue.
+      const { runMergeTrainReconcile } = await import('../../../lib/cloister/merge-train.js');
+      const outcomes = await runMergeTrainReconcile(issueId);
+      if (outcomes.length > 0) {
+        console.log(
+          `[merge-train] reconciled ${outcomes.length} sibling(s) after ${issueId}: ` +
+            outcomes.map((o) => `${o.issueId}=${o.result}`).join(', '),
+        );
+      }
     },
     (err) => console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err),
   );
