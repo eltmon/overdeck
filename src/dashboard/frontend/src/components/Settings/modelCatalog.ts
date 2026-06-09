@@ -86,6 +86,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   minimax: {
     name: 'MiniMax',
     models: [
+      { id: 'MiniMax-M3' as ModelId, name: 'M3', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
       { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
       { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],

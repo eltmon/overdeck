@@ -4147,6 +4147,13 @@ const DEFAULT_PRICING = [
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "MiniMax-M3",
+		inputPer1k: 3e-4,
+		outputPer1k: .0012,
+		currency: "USD"
 	}
 ];
 /**

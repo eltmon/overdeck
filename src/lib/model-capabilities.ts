@@ -750,6 +750,28 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
   },
 
+  'MiniMax-M3': {
+    model: 'MiniMax-M3',
+    provider: 'minimax',
+    displayName: 'MiniMax M3',
+    costPer1MTokens: 1.5, // Same $0.30/M in / $1.20/M out blended as M2.7; confirm at launch
+    contextWindow: 1024000, // 1M context via MSA architecture
+    skills: {
+      'code-generation': 93, // Top-tier coding; MSA architecture for scalable context
+      'code-review': 90,
+      debugging: 90,
+      planning: 88,
+      documentation: 88,
+      testing: 88,
+      security: 82,
+      performance: 85,
+      synthesis: 92,
+      speed: 80,
+      'context-length': 100, // 1M context
+    },
+    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7.',
+  },
+
   // Z.AI models
   'glm-5.1': {
     model: 'glm-5.1',
