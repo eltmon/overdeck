@@ -106,7 +106,7 @@ interface ConversationSearchStatusResponse {
 }
 
 async function fetchConversationSearchStatus(): Promise<ConversationSearchStatusResponse> {
-  const res = await fetch('/api/settings/conversation-search/status');
+  const res = await fetch('/api/settings/conversation-search/status', { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to fetch conversation search status');
   return res.json();
 }
@@ -125,7 +125,7 @@ interface ConversationSearchCostEstimate {
 }
 
 async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
-  const res = await fetch('/api/settings/conversation-search/reindex-estimate');
+  const res = await fetch('/api/settings/conversation-search/reindex-estimate', { credentials: 'include' });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
@@ -136,6 +136,7 @@ async function estimateConversationSearchReindex(): Promise<ConversationSearchCo
 async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
   const res = await fetch('/api/settings/conversation-search/reindex', {
     method: 'POST',
+    credentials: 'include',
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ confirmationNonce }),
   });
