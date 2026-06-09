@@ -37,6 +37,8 @@ import {
   isFlywheelRequireUatBeforeMerge,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
+  isMergeTrainEnabled,
+  setMergeTrainEnabled,
 } from '../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
@@ -70,11 +72,13 @@ interface StartRequestBody {
 interface FlywheelConfigRequestBody {
   auto_pickup_backlog?: unknown;
   require_uat_before_merge?: unknown;
+  merge_train_enabled?: unknown;
 }
 
 interface FlywheelConfigResponseBody {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
+  merge_train_enabled: boolean;
 }
 
 interface AutoMergeScheduleRequestBody {
@@ -217,6 +221,7 @@ export function getFlywheelConfigPayload(): FlywheelConfigResponseBody {
   return {
     auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
     require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
+    merge_train_enabled: isMergeTrainEnabled(),
   };
 }
 
@@ -232,9 +237,13 @@ export async function postFlywheelConfigPayload(payload: unknown) {
   if (body.require_uat_before_merge !== undefined && typeof body.require_uat_before_merge !== 'boolean') {
     return { status: 400, body: { error: 'require_uat_before_merge must be a boolean' } };
   }
+  if (body.merge_train_enabled !== undefined && typeof body.merge_train_enabled !== 'boolean') {
+    return { status: 400, body: { error: 'merge_train_enabled must be a boolean' } };
+  }
 
   if (body.auto_pickup_backlog !== undefined) setFlywheelAutoPickupBacklog(body.auto_pickup_backlog);
   if (body.require_uat_before_merge !== undefined) setFlywheelRequireUatBeforeMerge(body.require_uat_before_merge);
+  if (body.merge_train_enabled !== undefined) setMergeTrainEnabled(body.merge_train_enabled);
 
   return { status: 200, body: getFlywheelConfigPayload() };
 }

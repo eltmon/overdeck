@@ -19,11 +19,13 @@ type FlywheelLeftTab = 'status' | 'state' | 'stats';
 interface FlywheelConfig {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
+  merge_train_enabled: boolean;
 }
 
 interface FlywheelConfigPatch {
   auto_pickup_backlog?: boolean;
   require_uat_before_merge?: boolean;
+  merge_train_enabled?: boolean;
 }
 
 interface PendingAutoMerge {
@@ -42,6 +44,7 @@ const FLYWHEEL_CONFIG_QUERY_KEY = ['flywheel', 'config'] as const;
 const PENDING_AUTO_MERGES_QUERY_KEY = ['flywheel', 'auto-merge', 'pending'] as const;
 const AUTO_PICKUP_BACKLOG_TITLE = 'Off: inventory is restricted to work in progress / in review / blocked / awaiting merge. On: also include READY backlog items bounded by maxAgents.';
 const REQUIRE_UAT_BEFORE_MERGE_TITLE = 'On: UAT remains required before merge. Off: eligible merges may be scheduled through the server-managed cooldown.';
+const MERGE_TRAIN_TITLE = 'On: after a merge lands, automatically rebase every other ready branch onto the new main, re-verify the clean ones, and dispatch an agent to resolve conflicts. Off (default): siblings are left as-is. Mutates git — enable deliberately.';
 
 function getStoredSplitWidth(): number {
   const stored = localStorage.getItem(SPLIT_STORAGE_KEY);
@@ -119,6 +122,7 @@ export function useFlywheelConfigMutation() {
       queryClient.setQueryData<FlywheelConfig>(FLYWHEEL_CONFIG_QUERY_KEY, {
         auto_pickup_backlog: previous?.auto_pickup_backlog ?? false,
         require_uat_before_merge: previous?.require_uat_before_merge ?? true,
+        merge_train_enabled: previous?.merge_train_enabled ?? false,
         ...patch,
       });
       return { previous };
@@ -258,6 +262,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
   const flywheelConfigMutation = useFlywheelConfigMutation();
   const autoPickupBacklog = flywheelConfig?.auto_pickup_backlog ?? false;
   const requireUatBeforeMerge = flywheelConfig?.require_uat_before_merge ?? true;
+  const mergeTrainEnabled = flywheelConfig?.merge_train_enabled ?? false;
   const configBusy = flywheelConfigMutation.isPending;
   const configError = flywheelConfigMutation.error instanceof Error ? flywheelConfigMutation.error.message : null;
 
@@ -395,6 +400,16 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
                     className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
                   />
                   <span>Require UAT before merge</span>
+                </label>
+                <label className="mt-2 flex items-center gap-2 text-muted-foreground" title={MERGE_TRAIN_TITLE}>
+                  <input
+                    type="checkbox"
+                    checked={mergeTrainEnabled}
+                    disabled={configBusy}
+                    onChange={(event) => flywheelConfigMutation.mutate({ merge_train_enabled: event.currentTarget.checked })}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
+                  />
+                  <span>Merge train (auto-rebase ready siblings)</span>
                 </label>
                 {configError && <div className="mt-2 max-w-64 text-xs text-destructive">{configError}</div>}
               </div>

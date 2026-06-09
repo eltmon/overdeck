@@ -282,7 +282,7 @@ describe('flywheel config routes', () => {
   it('returns both flywheel config defaults without requiring origin headers', async () => {
     await expect(requestFlywheelRoute('/api/flywheel/config')).resolves.toEqual({
       status: 200,
-      body: { auto_pickup_backlog: false, require_uat_before_merge: true },
+      body: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false },
     });
   });
 
@@ -301,7 +301,7 @@ describe('flywheel config routes', () => {
       body: JSON.stringify({ auto_pickup_backlog: true }),
     })).resolves.toEqual({
       status: 200,
-      body: { auto_pickup_backlog: true, require_uat_before_merge: true },
+      body: { auto_pickup_backlog: true, require_uat_before_merge: true, merge_train_enabled: false },
     });
   });
 
@@ -314,7 +314,18 @@ describe('flywheel config routes', () => {
       body: JSON.stringify({ require_uat_before_merge: false }),
     })).resolves.toEqual({
       status: 200,
-      body: { auto_pickup_backlog: true, require_uat_before_merge: false },
+      body: { auto_pickup_backlog: true, require_uat_before_merge: false, merge_train_enabled: false },
+    });
+  });
+
+  it('toggles the merge-train flag (default off) without touching the others', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: JSON.stringify({ merge_train_enabled: true }),
+    })).resolves.toEqual({
+      status: 200,
+      body: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true },
     });
   });
 
