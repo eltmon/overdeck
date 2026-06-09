@@ -4,13 +4,12 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon } from 'lucide-react';
-import { useTheme } from '../hooks/useTheme';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 export const XTERM_BG = { dark: '#1a1a2e', light: '#ffffff' } as const;
 
-// xterm palette that follows the app's light/dark theme (PAN-1561). The ANSI
-// colors are tuned per-mode for contrast against the background.
+// xterm palette for the per-pane light/dark setting. The ANSI colors are
+// tuned per-mode for contrast against the background.
 function xtermTheme(isDark: boolean): ITheme {
   if (isDark) {
     return {
@@ -98,16 +97,19 @@ const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
 export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
-  const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
-  // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
-  // pin this one pane so Claude Code's diff bands stay readable when they clash with
-  // the dashboard theme. Persisted per session so the choice sticks across reloads.
+  // Terminal panes are dark by default regardless of the dashboard theme.
+  // Claude Code agents start headless: their one-shot OSC 11 background query
+  // at startup has no viewer to answer it, so they fall back to the dark theme
+  // and never re-detect — a pane that followed a light dashboard rendered dark
+  // Claude output as black bars on white (conv 2547). Dark pane + dark Claude
+  // always match with zero user action; the sun/moon toggle remains as a
+  // per-pane override, persisted per session.
   const themeOverrideKey = `panopticon.terminal.theme.${sessionName}`;
-  const [themeOverride, setThemeOverride] = useState<'auto' | 'dark' | 'light'>(() => {
+  const [themeOverride, setThemeOverride] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem(themeOverrideKey);
-    return stored === 'dark' || stored === 'light' ? stored : 'auto';
+    return stored === 'light' ? 'light' : 'dark';
   });
-  const effectiveIsDark = themeOverride === 'auto' ? isDark : themeOverride === 'dark';
+  const effectiveIsDark = themeOverride === 'dark';
   const effectiveIsDarkRef = useRef(effectiveIsDark);
   effectiveIsDarkRef.current = effectiveIsDark;
   const toggleTheme = useCallback(() => {
@@ -720,8 +722,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
   }, [sendResizeIfNeeded]);
 
-  // Recolor a live terminal when the effective theme changes — either the app
-  // theme toggles (PAN-1561) or the per-pane override is flipped (PAN-1520).
+  // Recolor a live terminal when the per-pane theme toggle is flipped (PAN-1520).
   useEffect(() => {
     if (terminalInstance.current) {
       terminalInstance.current.options.theme = xtermTheme(effectiveIsDark);
@@ -740,9 +741,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         <button
           onClick={toggleTheme}
           className="p-1.5 rounded bg-card/80 hover:bg-accent/80 text-muted-foreground transition-colors"
-          title={`Terminal theme: ${
-            themeOverride === 'auto' ? `auto (${isDark ? 'dark' : 'light'})` : themeOverride
-          } — click to ${effectiveIsDark ? 'lighten' : 'darken'} this pane`}
+          title={`Terminal theme: ${themeOverride} — click to ${effectiveIsDark ? 'lighten' : 'darken'} this pane`}
           aria-label="Toggle terminal light/dark theme"
         >
           {effectiveIsDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
