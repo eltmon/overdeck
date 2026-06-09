@@ -13,7 +13,7 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -149,6 +149,14 @@ export class CodexSpawnTimeout extends Error {
  *   - approvalPolicy / sandboxMode: autonomy for interactive conversations,
  *     derived from the Panopticon yolo setting. Headless `codex exec` overrides
  *     these via -c/-s flags at launch, so the defaults here only matter for TUI.
+ *
+ * In addition to the config seeding, this copies the user's global Codex
+ * credential (~/.codex/auth.json) into the per-agent CODEX_HOME. A fresh home
+ * with no auth.json makes Codex render its blocking sign-in onboarding
+ * ("Welcome to Codex … Sign in with ChatGPT … Press enter to continue") on
+ * every launch — which never writes a rollout, so nothing surfaces in the
+ * conversation view and the user is forced through the auth flow each time.
+ * Seeding auth is the credential analog of seeding folder trust above.
  */
 export interface InitCodexHomeOpts {
   trustedDir?: string
@@ -196,6 +204,22 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
+  }
+
+  // Seed auth so Codex skips its blocking sign-in onboarding on a fresh home.
+  // Copy the global ~/.codex/auth.json once, only when this home has none —
+  // Codex keeps its own copy refreshed thereafter, so on resume we must not
+  // clobber a newer token with a staler global one. Best-effort: if the user
+  // has never signed in to Codex globally there is nothing to copy, and the
+  // onboarding will (correctly) prompt for a real first-time login.
+  const homeAuthPath = join(codexHomeDir, 'auth.json')
+  if (!existsSync(homeAuthPath)) {
+    const globalAuthPath = join(homedir(), '.codex', 'auth.json')
+    if (existsSync(globalAuthPath)) {
+      copyFileSync(globalAuthPath, homeAuthPath)
+      // auth.json holds OAuth access/refresh tokens — keep it private.
+      try { chmodSync(homeAuthPath, 0o600) } catch { /* best-effort */ }
+    }
   }
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')

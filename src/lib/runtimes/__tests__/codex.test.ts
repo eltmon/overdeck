@@ -139,6 +139,34 @@ describe('initCodexHome', () => {
     expect(config).toContain('trust_level = "trusted"')
   })
 
+  it('seeds auth.json from the global ~/.codex so the TUI skips sign-in onboarding', () => {
+    // The fake HOME is the test base; withFakeCodexHome() points CODEX_HOME at
+    // <base>/.codex, which is also where homedir()/.codex resolves. Drop a fake
+    // global credential there.
+    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode } = require('node:fs')
+    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth')
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'auth.json')
+    expect(existsNode(seeded)).toBe(true)
+    expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global')
+  })
+
+  it('does not clobber an existing per-agent auth.json (refreshed token survives resume)', () => {
+    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode } = require('node:fs')
+    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global-stale"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-resume')
+    mkdirNode(codexDir, { recursive: true })
+    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-fresh"}}')
+
+    initCodexHome(codexDir) // resume — must not overwrite the home's own token
+
+    expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
+  })
+
   it('is idempotent — does not overwrite existing config', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-03')
     initCodexHome(codexDir)
