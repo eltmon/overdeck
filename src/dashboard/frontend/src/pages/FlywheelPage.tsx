@@ -357,92 +357,55 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       aria-label="Flywheel page"
       className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
-      <MergePolicySection onNavigateIssue={onNavigateIssue} />
+      {/* v3: slim flywheel-level header bar — title, run status, config toggles, stats */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card/60 px-5 py-2.5">
+        <h1 className="font-display text-base font-semibold tracking-tight text-foreground">Fix-All Flywheel</h1>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+          <span className={status ? 'h-1.5 w-1.5 rounded-full bg-success' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground'} />
+          {status ? `running · ${status.runId}` : isPaused ? 'paused' : 'idle'}
+        </span>
+        <a
+          href="https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Flywheel docs"
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          docs
+        </a>
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <label className="flex items-center gap-1.5 text-muted-foreground" title={AUTO_PICKUP_BACKLOG_TITLE}>
+            <input type="checkbox" checked={autoPickupBacklog} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ auto_pickup_backlog: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
+            Auto-pickup
+          </label>
+          <label className="flex items-center gap-1.5 text-muted-foreground" title={REQUIRE_UAT_BEFORE_MERGE_TITLE}>
+            <input type="checkbox" checked={requireUatBeforeMerge} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ require_uat_before_merge: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
+            Require UAT
+          </label>
+          <label className="flex items-center gap-1.5 text-muted-foreground" title={MERGE_TRAIN_TITLE}>
+            <input type="checkbox" checked={mergeTrainEnabled} disabled={configBusy} onChange={(event) => flywheelConfigMutation.mutate({ merge_train_enabled: event.currentTarget.checked })} className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50" />
+            Merge train
+          </label>
+          {status && (
+            <span className="flex items-center gap-3 border-l border-border pl-4 text-muted-foreground">
+              <span><b className="text-foreground">{formatElapsed(status.elapsedMs)}</b> elapsed</span>
+              <span><b className="text-foreground">{status.ticks}</b> ticks</span>
+              <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${freshness?.className ?? ''}`}>{freshness?.label ?? '—'}</span>
+            </span>
+          )}
+        </div>
+      </header>
+      {configError && <div className="border-b border-border bg-destructive/5 px-5 py-1.5 text-xs text-destructive">{configError}</div>}
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
-          className="relative shrink-0 overflow-y-auto border-r border-border"
+          className="relative flex shrink-0 flex-col overflow-y-auto border-r border-border"
           style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
-          aria-label="Flywheel status pane"
+          aria-label="Flywheel control rail"
         >
-        <header className="sticky top-0 z-10 border-b border-border bg-card/60 px-6 py-4 backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">Fix-All Flywheel</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Autonomous pipeline sweep across active Panopticon work.</p>
-              <a
-                href="https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
-              >
-                Flywheel docs
-              </a>
-            </div>
-            <div className="flex flex-wrap items-start justify-end gap-3">
-              <div className="rounded-lg border border-border bg-background px-3 py-2 text-left text-xs">
-                <label className="flex items-center gap-2 text-muted-foreground" title={AUTO_PICKUP_BACKLOG_TITLE}>
-                  <input
-                    type="checkbox"
-                    checked={autoPickupBacklog}
-                    disabled={configBusy}
-                    onChange={(event) => flywheelConfigMutation.mutate({ auto_pickup_backlog: event.currentTarget.checked })}
-                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
-                  />
-                  <span>Auto-pickup backlog</span>
-                </label>
-                <label className="mt-2 flex items-center gap-2 text-muted-foreground" title={REQUIRE_UAT_BEFORE_MERGE_TITLE}>
-                  <input
-                    type="checkbox"
-                    checked={requireUatBeforeMerge}
-                    disabled={configBusy}
-                    onChange={(event) => flywheelConfigMutation.mutate({ require_uat_before_merge: event.currentTarget.checked })}
-                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
-                  />
-                  <span>Require UAT before merge</span>
-                </label>
-                <label className="mt-2 flex items-center gap-2 text-muted-foreground" title={MERGE_TRAIN_TITLE}>
-                  <input
-                    type="checkbox"
-                    checked={mergeTrainEnabled}
-                    disabled={configBusy}
-                    onChange={(event) => flywheelConfigMutation.mutate({ merge_train_enabled: event.currentTarget.checked })}
-                    className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-50"
-                  />
-                  <span>Merge train (auto-rebase ready siblings)</span>
-                </label>
-                {configError && <div className="mt-2 max-w-64 text-xs text-destructive">{configError}</div>}
-              </div>
-              <div className="rounded-lg border border-border bg-background px-3 py-2 text-right">
-                <div className="flex items-center justify-end gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className={status ? 'h-2 w-2 rounded-full bg-success' : 'h-2 w-2 rounded-full bg-muted-foreground'} />
-                  {status ? 'Live run' : 'Idle'}
-                </div>
-                <div className="mt-1 font-mono text-sm text-foreground">{status?.runId ?? 'No run'}</div>
-              </div>
-            </div>
-          </div>
-          {status && activeTab === 'status' && (
-            <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
-              <div className="rounded-md border border-border bg-background p-3">
-                <dt className="uppercase tracking-wide text-muted-foreground">Elapsed</dt>
-                <dd className="mt-1 font-medium text-foreground">{formatElapsed(status.elapsedMs)}</dd>
-              </div>
-              <div className="rounded-md border border-border bg-background p-3">
-                <dt className="uppercase tracking-wide text-muted-foreground">Ticks</dt>
-                <dd className="mt-1 font-medium text-foreground">{status.ticks}</dd>
-              </div>
-              <div className="rounded-md border border-border bg-background p-3">
-                <dt className="uppercase tracking-wide text-muted-foreground">Last tick</dt>
-                <dd className="mt-1">
-                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${freshness?.className ?? ''}`}>
-                    {freshness?.label ?? '—'}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-          )}
-          <div className="mt-4" role="tablist" aria-label="Flywheel left-pane tabs">
+          <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+          <MergePolicySection onNavigateIssue={onNavigateIssue} />
+          <div className="border-b border-border px-4 py-3" role="tablist" aria-label="Flywheel left-pane tabs">
             <div className="inline-flex rounded-lg border border-border bg-background p-1 text-xs font-medium">
               <button
                 type="button"
@@ -485,9 +448,8 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
               </button>
             </div>
           </div>
-        </header>
 
-        <div className="p-6" role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
+        <div className="p-4" role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
           {activeTab === 'status' ? (
             status ? (
               <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />

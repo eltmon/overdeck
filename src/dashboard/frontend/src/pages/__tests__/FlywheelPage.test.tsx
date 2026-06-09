@@ -116,7 +116,7 @@ describe('FlywheelPage', () => {
 
     expect(mocks.subscribeFlywheelStatus).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Flywheel page')).toHaveClass('flex', 'overflow-hidden');
-    expect(screen.getByLabelText('Flywheel status pane')).toBeInTheDocument();
+    expect(screen.getByLabelText('Flywheel control rail')).toBeInTheDocument();
     expect(screen.getByRole('separator', { name: 'Resize flywheel panes' })).toBeInTheDocument();
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');
@@ -165,8 +165,8 @@ describe('FlywheelPage', () => {
 
     renderFlywheelPage(<FlywheelPage />);
 
-    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup backlog' });
-    const requireUat = screen.getByRole('checkbox', { name: 'Require UAT before merge' });
+    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup' });
+    const requireUat = screen.getByRole('checkbox', { name: 'Require UAT' });
     expect(autoPickup).not.toBeChecked();
     expect(requireUat).toBeChecked();
     expect(autoPickup.closest('label')).toHaveAttribute('title', expect.stringContaining('Off: inventory is restricted'));
@@ -202,7 +202,7 @@ describe('FlywheelPage', () => {
 
     renderFlywheelPage(<FlywheelPage />);
 
-    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup backlog' });
+    const autoPickup = await screen.findByRole('checkbox', { name: 'Auto-pickup' });
     fireEvent.click(autoPickup);
 
     await waitFor(() => expect(autoPickup).not.toBeChecked());
