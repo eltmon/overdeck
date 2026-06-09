@@ -113,6 +113,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // MiniMax models
   'minimax-m2.7': { apiModel: 'minimax-m2.7' },
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
+  'MiniMax-M3': { apiModel: 'MiniMax-M3' },
   // Z.AI models
   'glm-5.1': { apiModel: 'glm-5.1' },
   'glm-4.7': { apiModel: 'glm-4.7' },
@@ -712,12 +713,6 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/status',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
-    const authError = rejectUnauthorizedDashboardRequest(request);
-    if (authError) return authError;
-
     return yield* Effect.try({
       try: () => {
         const config = getConversationSearchConfigSync();
@@ -769,12 +764,6 @@ const getConversationSearchReindexEstimateRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/reindex-estimate',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
-    const authError = rejectUnauthorizedDashboardRequest(request);
-    if (authError) return authError;
-
     return yield* Effect.try({
       try: async () => {
         const estimate = await estimateFullReindexConversationSearchCost();
