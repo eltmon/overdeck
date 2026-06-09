@@ -43,13 +43,11 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   THESE lines in the Claude terminal should now read as soft, low-saturation
   tints rather than vivid blocks. Tunable live via ~/.claude/themes/panopticon.json.
 - 2026-06-08: Fresh diff to eyeball the muted theme. The lines below mix adds and
-  removes so you can compare the soft green vs soft maroon bands side by side:
-    added line one   (soft dark-green band)
-    added line two   (soft dark-green band)
-    a settled line with no band at all for contrast
-    removed-looking line A   (soft dark-maroon band when this block is edited)
-  If these still look like harsh vivid blocks, the theme didn't reload — tell me
-  and I'll dig in. If they're too subtle, say "more contrast" and I'll bump them.
-- 2026-06-08: Re-saved the theme (slightly more visible muted tones) to force a
-  hot-reload. This line's band is the live test of whether the running session
-  re-applied custom:panopticon (#1c3d24 green / #43222a maroon).
+  removes so you can compare the soft green vs soft maroon bands side by side.
+- 2026-06-08: Re-saved the theme (muted tones) to force a hot-reload. This line's
+  band is the live test of whether the running session re-applied
+  custom:panopticon (#1c3d24 green / #43222a maroon).
+- 2026-06-09: Mixed-edit smoke test — this block adds, changes, and deletes lines
+  in one diff so you can see all three band types stacked together.
+- 2026-06-09: Fresh add to confirm the muted green band still reads cleanly after
+  the latest pull.
