@@ -71,7 +71,9 @@ describe('codex conversation parser', () => {
     const result = await parseCodexConversationMessages(file);
 
     expect(result.totalTokens).toBe(60700);
-    expect(result.totalCost).toBe(0);
+    // Cost is derived from the canonical Codex cost parser (gpt-5.5 pricing on
+    // the token_count usage), so it is non-zero rather than a hardcoded 0.
+    expect(result.totalCost).toBeGreaterThan(0);
     const seqs = [...result.messages, ...result.workLog].map((x) => x.sequence ?? 0);
     const sorted = [...seqs].sort((a, b) => a - b);
     expect(seqs.length).toBeGreaterThan(0);

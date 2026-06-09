@@ -27,6 +27,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contracts';
 import type { ParseResult } from './conversation-service.js';
+import { parseCodexSessionSync } from '../../../lib/cost-parsers/codex-parser.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -195,12 +196,18 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
   // surface — the chat panel never shows a stuck typing indicator.
   const streaming = false;
 
+  // Cost is derived by the canonical Codex cost parser (single source of truth
+  // for rollout pricing) so the conversation list shows real spend rather than
+  // $0. token_count already gave us the cumulative throughput above.
+  const usage = parseCodexSessionSync(sessionFile);
+  const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
+
   return {
     messages,
     workLog,
     byteOffset: fileStats.size,
     streaming,
-    totalCost: 0,
+    totalCost,
     totalTokens,
     pendingToolUse: new Map(),
     unresolvedResults: new Map(),
