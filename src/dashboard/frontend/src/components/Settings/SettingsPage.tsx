@@ -470,10 +470,26 @@ const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
 };
 
 /** Known embedding models per provider for the embeddings picker (PAN-1589). */
-const EMBEDDING_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'],
-  voyage: ['voyage-code-3', 'voyage-3'],
-  ollama: ['nomic-embed-text', 'mxbai-embed-large'],
+interface EmbeddingModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const EMBEDDING_MODELS_BY_PROVIDER: Record<string, EmbeddingModelOption[]> = {
+  openai: [
+    { id: 'text-embedding-3-small', label: 'text-embedding-3-small', description: 'Recommended · 1536-dim · $0.02 / 1M tokens — cheap & fast' },
+    { id: 'text-embedding-3-large', label: 'text-embedding-3-large', description: 'Higher quality · 3072-dim · $0.13 / 1M tokens' },
+    { id: 'text-embedding-ada-002', label: 'text-embedding-ada-002', description: 'Legacy · 1536-dim — prefer 3-small' },
+  ],
+  voyage: [
+    { id: 'voyage-code-3', label: 'voyage-code-3', description: 'Code-optimized · $0.18 / 1M tokens' },
+    { id: 'voyage-3', label: 'voyage-3', description: 'General-purpose semantic embeddings' },
+  ],
+  ollama: [
+    { id: 'nomic-embed-text', label: 'nomic-embed-text', description: 'Local via Ollama · free · nothing leaves your machine' },
+    { id: 'mxbai-embed-large', label: 'mxbai-embed-large', description: 'Local via Ollama · free · larger, higher quality' },
+  ],
 };
 
 const SETTINGS_NAV_ITEMS: NavItem[] = [
@@ -1259,18 +1275,18 @@ export function SettingsPage() {
       case 'sessionEmbeddings': {
         const provider = formData?.conversations?.embedding_provider || 'openai';
         const models = EMBEDDING_MODELS_BY_PROVIDER[provider] ?? [];
-        const model = formData?.conversations?.embedding_model || models[0] || '';
+        const model = formData?.conversations?.embedding_model || models[0]?.id || '';
         return (
           <div className="flex items-center gap-1">
             <select value={provider}
-              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0] }); }}
+              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0]?.id }); }}
               className={`${bgSelectClass} max-w-[100px]`}>
               <option value="openai">OpenAI</option>
               <option value="voyage">Voyage</option>
               <option value="ollama">Ollama</option>
             </select>
             <select value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              {models.map((m) => <option key={m.id} value={m.id} title={m.description}>{m.label}</option>)}
             </select>
           </div>
         );
@@ -2209,9 +2225,14 @@ export function SettingsPage() {
                   className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
                 >
                   {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
                   ))}
                 </select>
+                {(() => {
+                  const desc = (EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? [])
+                    .find((m) => m.id === conversationSearchModel)?.description;
+                  return desc ? <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/80">{desc}</span> : null;
+                })()}
               </label>
               <div className="flex items-end text-xs">
                 {formData?.api_keys?.openai ? (
