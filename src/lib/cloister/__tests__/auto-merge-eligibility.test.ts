@@ -51,6 +51,26 @@ describe('auto-merge eligibility', () => {
     expect(getIssueLabels).not.toHaveBeenCalled();
   });
 
+  it('rejects issues explicitly held for UAT (autoMerge === false)', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({ autoMerge: false }));
+    const getPullRequestState = vi.fn(async () => makePrState());
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
+      .resolves.toEqual({ eligible: false, reason: 'held for UAT (auto-merge toggled off)' });
+    expect(getPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it('does not gate issues whose autoMerge is undefined (default) or true', async () => {
+    const getPullRequestState = vi.fn(async () => makePrState());
+    const getIssueLabels = vi.fn(async () => []);
+    for (const autoMerge of [undefined, true] as const) {
+      const getReviewStatus = vi.fn(() => makeReviewStatus({ autoMerge }));
+      await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
+        .resolves.toEqual({ eligible: true });
+    }
+  });
+
   it('rejects PRs whose CI checks are failing', async () => {
     const getReviewStatus = vi.fn(() => makeReviewStatus());
     const getPullRequestState = vi.fn(async () => makePrState({ checksFailed: true, headSha: 'deadbeef' }));
