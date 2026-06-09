@@ -75,6 +75,7 @@ import { queryBeadById } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
+import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { killSession } from '../../../lib/tmux.js';
@@ -173,35 +174,33 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-// ─── Track in-flight postMergeLifecycle to prevent concurrent execution ───────
-
-const _postMergeInFlight = new Set<string>();
+// ─── Idempotency guard: prevent concurrent postMergeLifecycle re-entry ────────
+// PAN-328: the loop specialists/done → onMergeComplete → postMergeLifecycle →
+// (re-trigger) → specialists/done once burned 24,626 tracker API calls. The
+// in-flight guard makes a second *concurrent* call for the same issue a no-op.
+// The invariant is enforced by tests/unit/lib/cloister/in-flight-guard.test.ts
+// — delete the guard and that suite goes red.
+const postMergeGuard = createInFlightGuard();
 
 // Track issues where the server is managing the merge lifecycle (polyrepo).
 // Exported so the workspaces route can register/unregister server-managed merges.
 export const _serverManagedMerges = new Set<string>();
 
 function firePostMergeLifecycle(issueId: string): void {
-  if (_postMergeInFlight.has(issueId)) {
-    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
-    return;
-  }
-
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-  const projectPath = getProjectPathForIssue(issuePrefix);
-
-  _postMergeInFlight.add(issueId);
-  (async () => {
-    try {
+  const started = postMergeGuard.run(
+    issueId,
+    async () => {
+      const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+      const projectPath = getProjectPathForIssue(issuePrefix);
       const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
       await postMergeLifecycle(issueId, projectPath);
       console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
-    } catch (err) {
-      console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err);
-    } finally {
-      _postMergeInFlight.delete(issueId);
-    }
-  })();
+    },
+    (err) => console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err),
+  );
+  if (!started) {
+    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
+  }
 }
 
 function getProjectPathForIssue(issuePrefix: string): string {
@@ -578,8 +577,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Use firePostMergeLifecycle directly rather than onMergeComplete: onMergeComplete
     // has a guard that checks mergeStatus !== 'merged', but setReviewStatusBase above
     // already set mergeStatus='merged' — that guard would always fire and the lifecycle
-    // would never run. firePostMergeLifecycle skips that guard and uses _postMergeInFlight
-    // (concurrency) + postMergeLifecycle's _completedPostMerge (defense-in-depth).
+    // would never run. firePostMergeLifecycle skips that guard and uses the
+    // in-flight guard (postMergeGuard, concurrency) + postMergeLifecycle's
+    // _completedPostMerge (defense-in-depth).
     if (specialist === 'merge' && status === 'passed') {
       firePostMergeLifecycle(normalizedIssueId);
     }

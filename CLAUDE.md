@@ -344,12 +344,29 @@ Work agents cannot start without beads tasks in the workspace. The start-agent e
 returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
 `bd create` before handing off to implementation.
 
-## CRITICAL: postMergeLifecycle Idempotency
+## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
-`onMergeComplete()` and `/api/specialists/done` have idempotency guards to prevent
-infinite loops. NEVER remove these guards. The loop: specialists/done → onMergeComplete
-→ postMergeLifecycle → (re-trigger) → specialists/done burned 24,626 Linear API calls
-before guards were added (PAN-328).
+`postMergeLifecycle` must run **at most once per merge**. If it can re-trigger
+itself, you get an infinite loop — that once burned 24,626 tracker API calls
+(PAN-328). The original loop was:
+specialists/done → onMergeComplete → postMergeLifecycle → (re-trigger) → specialists/done.
+
+This protection is now **structural, not advisory** — you don't have to remember
+a rule:
+
+- The concurrency guard is `createInFlightGuard()` in
+  `src/lib/cloister/in-flight-guard.ts`, used by `firePostMergeLifecycle` in
+  `src/dashboard/server/routes/specialists.ts`. A second *concurrent* call for
+  the same issue is a no-op.
+- It is locked by `tests/unit/lib/cloister/in-flight-guard.test.ts`. **Weaken or
+  delete the guard and that suite goes red** — that is the real protection.
+- `postMergeLifecycle` also checks `mergeStatus` / `_completedPostMerge`
+  (defense-in-depth).
+
+So the rule is just: if you touch the merge-completion path, keep that test
+green. A red guard test means you've reopened the loop. Adding new work to the
+post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
+idempotent and the test stays green.
 
 ## postMergeLifecycle Verify Handoff and Docker Cleanup
 
