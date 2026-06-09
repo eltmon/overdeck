@@ -21,6 +21,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minima
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Anthropic models
+  'claude-fable-5': 'anthropic',
   'claude-opus-4-8': 'anthropic',
   'claude-opus-4-7': 'anthropic',
   'claude-opus-4-6': 'anthropic',

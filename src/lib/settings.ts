@@ -4,7 +4,7 @@ import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-05-23)
   | 'gpt-5.5'
@@ -237,6 +237,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   dashscope: DashScopeModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
+    'claude-fable-5',
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
@@ -298,6 +299,9 @@ export function isAnthropicModelSync(modelId: ModelId | string): boolean {
  */
 export function getClaudeModelFlagSync(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
+    // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
+    // API model ID through to `--model`.
+    'claude-fable-5': 'claude-fable-5',
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',

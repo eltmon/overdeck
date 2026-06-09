@@ -175,6 +175,33 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'claude-fable-5': {
+    model: 'claude-fable-5',
+    provider: 'anthropic',
+    displayName: 'Claude Fable 5',
+    // Real API pricing is $10/M input, $50/M output (≈2× Opus 4.8). The blended
+    // figure mirrors the inflated Opus-4.8 baseline (45) at the same 2× ratio so
+    // cost-awareness badges order Fable above Opus. Exact per-token rates live in
+    // cost.ts DEFAULT_PRICING.
+    costPer1MTokens: 90.0,
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 95,
+      synthesis: 99,
+      speed: 42,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
+  },
+
   'claude-opus-4-8': {
     model: 'claude-opus-4-8',
     provider: 'anthropic',
