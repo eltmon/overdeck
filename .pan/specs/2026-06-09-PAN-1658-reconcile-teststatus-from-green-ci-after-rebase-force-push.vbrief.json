@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:14:19.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
-    "updated": "2026-06-09T23:16:27.143Z"
+    "updated": "2026-06-09T23:46:13.983Z"
   },
   "plan": {
     "id": "pan-1658",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "41568a01-5a58-4e5a-a085-023e6be11ea3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-09T23:14:19.000Z",
-    "updated": "2026-06-09T23:16:27.143Z",
+    "updated": "2026-06-09T23:46:13.983Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
@@ -124,7 +124,7 @@
       {
         "id": "test-status-reconciler",
         "title": "Add a deacon reconciler that flips stuck testStatus=pending → passed from green CI, and wire it into the patrol",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:14:19.000Z",
         "metadata": {
@@ -140,7 +140,7 @@
           {
             "id": "test-status-reconciler.ac1",
             "title": "For an issue with reviewStatus='passed', testStatus='pending', non-terminal mergeStatus, an OPEN unmerged PR, and green CI check-runs on the current HEAD, the reconciler sets testStatus='passed' with testNotes citing the CI run and the HEAD short SHA.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -148,7 +148,7 @@
           {
             "id": "test-status-reconciler.ac2",
             "title": "The reconciler never marks testStatus='passed' when CI on the current HEAD is pending/incomplete or failed/red; in those cases testStatus is left unchanged.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -156,7 +156,7 @@
           {
             "id": "test-status-reconciler.ac3",
             "title": "The candidate filter excludes testStatus values other than 'pending' (so a running 'testing' role, or already 'passed'/'skipped'/'failed', is never disturbed) and excludes terminal mergeStatus values (merged/merging/queued/verifying). The reconciler mutates only testStatus/testNotes — uatStatus, verificationStatus, reviewStatus, and readyForMerge are never written by it.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +164,7 @@
           {
             "id": "test-status-reconciler.ac4",
             "title": "After the reconciler flips testStatus='passed', the existing event-driven derivation makes readyForMerge become true (assuming no other blocker/uat gate), so triggerMerge no longer returns 'Cannot merge: review and tests have not passed yet'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -172,7 +172,7 @@
           {
             "id": "test-status-reconciler.ac5",
             "title": "The reconciler is guarded by isGitHubAppConfigured(), uses a per-issue cooldown on pending-CI and API-error outcomes to throttle GitHub calls, and returns string[] action descriptions consistent with the sibling reconcilers.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -180,7 +180,7 @@
           {
             "id": "test-status-reconciler.ac6",
             "title": "The reconciler is invoked once per deacon patrol cycle from the patrol loop, with its actions pushed into the patrol actions list and addLog'd, placed alongside reconcileMergedButReviewing / reconcileClosedPrReadyForMerge.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-09-PAN-1658-reconcile-teststatus-from-green-ci-after-rebase-force-push.vbrief.json"
+      "canonicalFilename": "2026-06-09-PAN-1658-reconcile-teststatus-from-green-ci-after-rebase-force-push.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1658",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-09T23:45:02.088Z",
+        "work": {
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-09T23:45:02.088Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-09T23:45:02.088Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"

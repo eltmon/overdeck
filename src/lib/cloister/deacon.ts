@@ -3227,6 +3227,8 @@ const mergedReviewingReconciled = new Set<string>();
  */
 const closedPrReadyReconcileCooldowns = new Map<string, number>();
 const CLOSED_PR_RECONCILE_COOLDOWN_MS = 10 * 60 * 1000;
+const testStatusGreenCiReconcileCooldowns = new Map<string, number>();
+const TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS = 5 * 60 * 1000;
 
 /**
  * Reconciler: issues with readyForMerge=true whose PR is no longer OPEN.
@@ -3299,6 +3301,66 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
     }
   } catch (err: any) {
     console.warn(`[deacon] Error in reconcileClosedPrReadyForMerge: ${err.message}`);
+  }
+  return actions;
+}
+
+export async function reconcileTestStatusFromGreenCi(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { getCiCheckRunsState, getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+    if (!isGitHubAppConfigured()) return actions;
+
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+    const terminalMergeStatuses = new Set(['merged', 'merging', 'queued', 'verifying']);
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'passed') continue;
+      if (status.testStatus !== 'pending') continue;
+      if (terminalMergeStatuses.has(status.mergeStatus || '')) continue;
+      if (!status.prUrl) continue;
+
+      const cooledUntil = testStatusGreenCiReconcileCooldowns.get(issueId);
+      if (cooledUntil && now < cooledUntil) continue;
+
+      const match = status.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (!match) continue;
+      const [, owner, repo, numberStr] = match;
+      const prNumber = parseInt(numberStr, 10);
+      if (!Number.isFinite(prNumber)) continue;
+
+      try {
+        const prState = await Effect.runPromise(getPullRequestState(owner, repo, prNumber));
+        if (prState.state !== 'OPEN' || prState.merged || !prState.headSha) continue;
+
+        const ciState = await Effect.runPromise(getCiCheckRunsState(owner, repo, prState.headSha));
+        if (ciState.verdict === 'pending') {
+          testStatusGreenCiReconcileCooldowns.set(issueId, now + TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS);
+          continue;
+        }
+        if (ciState.verdict !== 'green') continue;
+
+        const firstRun = ciState.successfulRuns[0];
+        const runLabel = firstRun?.htmlUrl
+          ? `${firstRun.name} (${firstRun.htmlUrl})`
+          : (firstRun?.name || `${ciState.successCount} successful CI check-run(s)`);
+        const shortSha = prState.headSha.slice(0, 8);
+        setReviewStatusSync(issueId, {
+          testStatus: 'passed',
+          testNotes: `Reconciled from green GitHub Actions CI on ${shortSha}: ${runLabel}`,
+        });
+        testStatusGreenCiReconcileCooldowns.delete(issueId);
+        const msg = `Reconciled testStatus=pending → passed for ${issueId} from green CI on PR #${prNumber} @ ${shortSha}`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+      } catch (prErr: any) {
+        testStatusGreenCiReconcileCooldowns.set(issueId, now + TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS);
+        console.warn(`[deacon] reconcileTestStatusFromGreenCi: ${issueId} PR/CI lookup failed: ${prErr.message}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileTestStatusFromGreenCi: ${err.message}`);
   }
   return actions;
 }
@@ -5148,6 +5210,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   const closedPrReadyActions = await reconcileClosedPrReadyForMerge();
   actions.push(...closedPrReadyActions);
   for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1658: after a rebase, reviewStatus may already be passed while testStatus
+  // remains pending. Reconcile from check-runs-only green CI on the current PR HEAD.
+  const greenCiTestStatusActions = await reconcileTestStatusFromGreenCi();
+  actions.push(...greenCiTestStatusActions);
+  for (const a of greenCiTestStatusActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
