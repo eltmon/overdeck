@@ -616,6 +616,43 @@ const getMergeBlockersRoute = HttpRouter.add(
   })),
 );
 
+interface MergeNextDeps {
+  getOrderedIssueIds?: () => Promise<string[]>;
+  merge?: (issueId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
+async function defaultGetOrderedIssueIds(): Promise<string[]> {
+  const status = await readCurrentFlywheelStatusForDashboard();
+  if (!status) return [];
+  const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
+  const queue = await Effect.runPromise(
+    computeMergeQueue(status.activePipeline, process.cwd()).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  return queue.map((i) => i.issueId);
+}
+
+async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const { triggerMerge } = await import('./workspaces.js');
+  const r = await triggerMerge(issueId);
+  return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
+}
+
+/**
+ * PAN-1691 "merge next N" / "ship the UAT candidate": merge the first N issues
+ * of the conflict-aware merge order, one at a time, stopping at the first
+ * failure (the rest would need re-rebasing). Pure-ish + DI for testing.
+ */
+export async function postFlywheelMergeNextPayload(payload: unknown, deps: MergeNextDeps = {}) {
+  const body = (payload ?? {}) as { n?: unknown };
+  const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
+  if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
+
+  const issueIds = (await (deps.getOrderedIssueIds ?? defaultGetOrderedIssueIds)()).slice(0, n);
+  const { shipMergeBatch } = await import('../../../lib/cloister/merge-batch.js');
+  const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
+  return { status: 200, body: { outcomes } };
+}
+
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -628,6 +665,20 @@ const postAutoMergeScheduleRoute = HttpRouter.add(
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
 
     const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const postFlywheelMergeNextRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/merge-next',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postFlywheelMergeNextPayload(parsed.body));
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -892,6 +943,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getAutoMergeProblemsRoute,
   getMergeBlockersRoute,
   postAutoMergeScheduleRoute,
+  postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelUatCandidateRoute,

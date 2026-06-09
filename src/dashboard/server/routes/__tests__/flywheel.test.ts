@@ -16,6 +16,7 @@ import {
   getFlywheelStatsPayload,
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
+  postFlywheelMergeNextPayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -776,5 +777,34 @@ describe('flywheel run payload helpers', () => {
 
   it('returns null for a missing run', async () => {
     await expect(getFlywheelRunPayload('RUN-404', { panopticonHome })).resolves.toBeNull();
+  });
+});
+
+describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', () => {
+  it('rejects a non-positive n', async () => {
+    await expect(postFlywheelMergeNextPayload({ n: 0 }))
+      .resolves.toEqual({ status: 400, body: { error: 'n must be a positive integer' } });
+    await expect(postFlywheelMergeNextPayload({}))
+      .resolves.toEqual({ status: 400, body: { error: 'n must be a positive integer' } });
+  });
+
+  it('merges the first N in order and stops at the first failure', async () => {
+    const merge = vi.fn(async (id: string) =>
+      id === 'PAN-2' ? { ok: false as const, reason: 'CI red' } : { ok: true as const });
+    const result = await postFlywheelMergeNextPayload({ n: 3 }, {
+      getOrderedIssueIds: async () => ['PAN-1', 'PAN-2', 'PAN-3', 'PAN-4'],
+      merge,
+    });
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        outcomes: [
+          { issueId: 'PAN-1', result: 'merged' },
+          { issueId: 'PAN-2', result: 'failed', reason: 'CI red' },
+          { issueId: 'PAN-3', result: 'skipped' },
+        ],
+      },
+    });
+    expect(merge).toHaveBeenCalledTimes(2); // PAN-4 not in the slice; PAN-3 skipped after the failure
   });
 });
