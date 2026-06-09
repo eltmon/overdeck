@@ -180,6 +180,27 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'merge-next failed'),
   });
+  const assembleUatMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/flywheel/assemble-uat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!res.ok) {
+        const b = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(b.error ?? `assemble failed (${res.status})`);
+      }
+      return (await res.json()) as { branch: string | null; merged: string[]; conflicts: Array<{ branch: string; reason: string }> };
+    },
+    onSuccess: (data) => {
+      if (!data.branch) { toast.info('No batch-safe bundle to assemble'); return; }
+      const c = data.conflicts.length;
+      const msg = `Assembled ${data.branch} — ${data.merged.length} merged${c ? `, ${c} conflict${c === 1 ? '' : 's'}` : ''}`;
+      if (c > 0) toast.warning(msg); else toast.success(msg);
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'assemble failed'),
+  });
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -474,10 +495,20 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               <span className="text-xs text-muted-foreground">{mergeQueue.length} ready</span>
             </div>
             {uatCandidate?.branchName && uatCandidate.bundled.length > 0 && (
-              <div className="mb-2 rounded-md border border-dashed border-emerald-500/40 bg-emerald-500/5 px-2 py-1.5 text-[11px]" title="In auto-merge-OFF mode these batch-safe features are bundled onto one branch you UAT together">
-                <span className="font-semibold text-emerald-400">UAT candidate</span>{' '}
-                <span className="font-mono text-muted-foreground">{uatCandidate.branchName}</span>
-                <span className="text-muted-foreground"> — bundles {uatCandidate.bundled.length}: {uatCandidate.bundled.join(', ')}</span>
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-dashed border-emerald-500/40 bg-emerald-500/5 px-2 py-1.5 text-[11px]" title="In auto-merge-OFF mode these batch-safe features are bundled onto one branch you UAT together">
+                <span className="min-w-0">
+                  <span className="font-semibold text-emerald-400">UAT candidate</span>{' '}
+                  <span className="text-muted-foreground">bundles {uatCandidate.bundled.length}: {uatCandidate.bundled.join(', ')}</span>
+                </span>
+                <button
+                  type="button"
+                  disabled={assembleUatMutation.isPending}
+                  onClick={() => assembleUatMutation.mutate()}
+                  className="shrink-0 rounded border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+                  title="Create the uat/<codename>-<date> branch and merge this bundle onto it for UAT"
+                >
+                  {assembleUatMutation.isPending ? 'Assembling…' : 'Assemble'}
+                </button>
               </div>
             )}
             <ol className="space-y-1">

@@ -43,6 +43,7 @@ import {
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
+import { makeUatCandidateName } from '../../../lib/cloister/uat-candidate-name.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -923,6 +924,68 @@ const getFlywheelUatCandidateRoute = HttpRouter.add(
   })),
 );
 
+interface AssembleUatDeps {
+  getCandidate?: () => Promise<{ label: string; bundled: string[] } | null>;
+  branchName?: (label: string) => string;
+  assemble?: (
+    branchName: string,
+    featureBranches: string[],
+  ) => Promise<{ branch: string; merged: string[]; conflicts: Array<{ branch: string; reason: string }> }>;
+}
+
+async function defaultGetUatCandidate(): Promise<{ label: string; bundled: string[] } | null> {
+  const status = await readCurrentFlywheelStatusForDashboard();
+  if (!status) return null;
+  const { computeMergeQueue, planUatCandidate } = await import('../../../lib/flywheel-merge-order.js');
+  const queue = await Effect.runPromise(
+    computeMergeQueue(status.activePipeline, process.cwd()).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  const plan = planUatCandidate(queue, { dateIso: new Date().toISOString() });
+  if (plan.bundled.length === 0) return null;
+  const label = (plan.bundled[0]!.split('-')[0] ?? 'candidate').toLowerCase();
+  return { label, bundled: plan.bundled };
+}
+
+async function defaultAssembleUat(branchName: string, featureBranches: string[]) {
+  const { assembleUatCandidate } = await import('../../../lib/cloister/uat-assemble.js');
+  const { buildUatAssembleSession } = await import('../../../lib/cloister/uat-assemble-deps.js');
+  const session = buildUatAssembleSession(process.cwd());
+  try {
+    const result = await assembleUatCandidate(branchName, featureBranches, session.deps);
+    await session.push();
+    return result;
+  } finally {
+    await session.cleanup();
+  }
+}
+
+/**
+ * PAN-1691 assemble the on-demand UAT candidate: create uat/<codename>-<date>
+ * off main and merge the batch-safe bundle onto it for one UAT session.
+ */
+export async function postFlywheelAssembleUatPayload(deps: AssembleUatDeps = {}) {
+  const candidate = await (deps.getCandidate ?? defaultGetUatCandidate)();
+  if (!candidate || candidate.bundled.length === 0) {
+    return { status: 200, body: { branch: null, merged: [], conflicts: [] } };
+  }
+  const branchName = (deps.branchName ?? ((label: string) => makeUatCandidateName({ label, dateIso: new Date().toISOString() })))(candidate.label);
+  const featureBranches = candidate.bundled.map((id) => `feature/${id.toLowerCase()}`);
+  const result = await (deps.assemble ?? defaultAssembleUat)(branchName, featureBranches);
+  return { status: 200, body: result };
+}
+
+const postFlywheelAssembleUatRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/assemble-uat',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const result = yield* Effect.promise(() => postFlywheelAssembleUatPayload());
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
 const getFlywheelStateRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/state',
@@ -947,6 +1010,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
   getFlywheelUatCandidateRoute,
+  postFlywheelAssembleUatRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,

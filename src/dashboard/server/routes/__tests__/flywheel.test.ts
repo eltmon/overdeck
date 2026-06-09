@@ -17,6 +17,7 @@ import {
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelMergeNextPayload,
+  postFlywheelAssembleUatPayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -806,5 +807,26 @@ describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', ()
       },
     });
     expect(merge).toHaveBeenCalledTimes(2); // PAN-4 not in the slice; PAN-3 skipped after the failure
+  });
+});
+
+describe('postFlywheelAssembleUatPayload (PAN-1691 UAT assembly)', () => {
+  it('returns an empty result when there is no candidate', async () => {
+    await expect(postFlywheelAssembleUatPayload({ getCandidate: async () => null }))
+      .resolves.toEqual({ status: 200, body: { branch: null, merged: [], conflicts: [] } });
+  });
+
+  it('assembles the bundle onto the candidate branch (feature/<id> per bundled issue)', async () => {
+    const assemble = vi.fn(async (branch: string, fbs: string[]) => ({ branch, merged: fbs, conflicts: [] }));
+    const result = await postFlywheelAssembleUatPayload({
+      getCandidate: async () => ({ label: 'pan', bundled: ['PAN-1', 'PAN-2'] }),
+      branchName: () => 'uat/pan-otter-0609',
+      assemble,
+    });
+    expect(assemble).toHaveBeenCalledWith('uat/pan-otter-0609', ['feature/pan-1', 'feature/pan-2']);
+    expect(result).toEqual({
+      status: 200,
+      body: { branch: 'uat/pan-otter-0609', merged: ['feature/pan-1', 'feature/pan-2'], conflicts: [] },
+    });
   });
 });
