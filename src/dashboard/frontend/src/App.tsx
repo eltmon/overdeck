@@ -350,12 +350,19 @@ function StandaloneDiffPopoutRoute() {
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
           {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff.'}
         </div>
+      ) : data === undefined ? (
+        // The summaries endpoint shells out to git per turn and can take seconds
+        // on a long conversation — without this gate, DiffPanel mounts with an
+        // empty summary list and shows a misleading "No completed turns yet."
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Loading diff…
+        </div>
       ) : (
         <DiffWorkerPoolProvider>
           <DiffPanel
             mode="sheet"
             agentId={agentId}
-            turnDiffSummaries={data?.summaries ?? []}
+            turnDiffSummaries={data.summaries}
             diffUrlPrefix={prefix}
           />
         </DiffWorkerPoolProvider>
