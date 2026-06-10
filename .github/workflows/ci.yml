@@ -231,7 +231,7 @@ jobs:
           SERVER_PID=$!
           ok=0
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:3011/api/health > /dev/null; then
+            if curl --connect-timeout 1 --max-time 2 -sf http://localhost:3011/api/health > /dev/null; then
               echo "Dashboard server started successfully"
               ok=1
               break

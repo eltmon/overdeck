@@ -88,6 +88,16 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
   isDeaconGloballyPaused: vi.fn(() => false),
 }));
 
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    loadavg: () => [1, 1, 1],
+    cpus: () => Array.from({ length: 24 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+  };
+});
+
 vi.mock('../agent-idle.js', () => ({
   isAgentIdleForNudge: vi.fn(() => false),
 }));
