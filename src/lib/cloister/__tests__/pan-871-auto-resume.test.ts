@@ -109,11 +109,16 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
 }));
 
-vi.mock('os', () => ({
-  homedir: vi.fn(() => '/tmp/test-home'),
-  loadavg: vi.fn(() => [0, 0, 0]),
-  cpus: vi.fn(() => [{}, {}, {}, {}]),
-}));
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    homedir: vi.fn(() => '/tmp/test-home'),
+    cpus: vi.fn(() => Array.from({ length: 8 }, () => ({}) as ReturnType<typeof actual.cpus>[number])),
+    loadavg: vi.fn(() => [0, 0, 0]),
+  };
+});
 
 vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: vi.fn(() => '/tmp/workspace'),
