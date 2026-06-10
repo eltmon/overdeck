@@ -188,10 +188,32 @@ export class FlyApiClient {
     state: string,
     timeout: number = 60
   ): Promise<void> {
-    await this.request<void>(
-      'GET',
-      `/apps/${appName}/machines/${machineId}/wait?state=${state}&timeout=${timeout}`
-    );
+    // Fly's /wait endpoint rejects timeout > 60s ("value must be inside range
+    // [1s, 1m0s]"), so longer waits poll in 60s slices. A 408 from a slice
+    // means that slice elapsed without reaching the state — keep polling
+    // until our own deadline.
+    const deadline = Date.now() + timeout * 1000;
+    for (;;) {
+      const remainingSec = Math.ceil((deadline - Date.now()) / 1000);
+      if (remainingSec <= 0) {
+        throw new FlyApiError(
+          `Timed out after ${timeout}s waiting for machine ${machineId} to reach '${state}'`,
+          408,
+          ''
+        );
+      }
+      const slice = Math.min(remainingSec, 60);
+      try {
+        await this.request<void>(
+          'GET',
+          `/apps/${appName}/machines/${machineId}/wait?state=${state}&timeout=${slice}`
+        );
+        return;
+      } catch (err) {
+        if (err instanceof FlyApiError && err.statusCode === 408) continue;
+        throw err;
+      }
+    }
   }
 
   /** Create a Fly app if it doesn't exist */
