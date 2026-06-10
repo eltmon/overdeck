@@ -49,6 +49,16 @@ Before acting, read:
 
 If the brief defines `scope`, operate only inside that scope. If it defines `maxAgents`, never exceed that cap when starting or resuming issue agents.
 
+## Dashboard API — base URL and outage protocol
+
+All `GET/POST /api/flywheel/...` calls in this doc target the dashboard server at **`http://127.0.0.1:3011`** (also reachable as `https://pan.localhost` through Traefik). Port 3010 is the Vite *frontend dev* port — it does not serve the API.
+
+If an API call returns empty or connection-refused, do not burn the tick rediscovering the endpoint or grepping source for routes. The supervisor watchdog (port 3012) health-checks the dashboard every 10s and restarts it after 3 consecutive failures, so an unresponsive API usually means a restart is already in flight. Protocol:
+
+1. Check `~/.panopticon/restart-status.json` (last restart outcome) and the tail of `~/.panopticon/logs/supervisor.log`.
+2. Wait ~15s and retry the same call against `http://127.0.0.1:3011`.
+3. If the API is still down after two retries, record it in the tick snapshot (`systemStatus`) and proceed with the parts of the tick that don't need the API (git/`gh` inventory) rather than stalling.
+
 ## Startup pipeline triage (resync vs restart)
 
 Run this ONCE at the start of a run, before the first tick — especially after the orchestrator has been paused for a while. Every in-progress issue may have been built on a `main` that has since moved on: silently resuming a stale branch causes merge thrash, and work whose foundation was remodeled out from under it should be redone rather than rebased.
