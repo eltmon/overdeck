@@ -35,6 +35,23 @@ const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
 }));
 
+const transcriptLandingMocks = vi.hoisted(() => ({
+  snapshotCount: 0,
+}));
+
+vi.mock('../../src/lib/transcript-landing.js', () => ({
+  captureTranscriptUserRecordSnapshot: vi.fn(async () => {
+    transcriptLandingMocks.snapshotCount += 1;
+    return {
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: transcriptLandingMocks.snapshotCount,
+    };
+  }),
+  hasNewTranscriptUserRecord: vi.fn((before: { userRecordCount: number }, after: { userRecordCount: number }) =>
+    after.userRecordCount > before.userRecordCount,
+  ),
+}));
+
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
   createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
@@ -184,6 +201,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     testAgentsDir = join(testPanopticonHome, 'agents');
     mkdirSync(testAgentsDir, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
+    transcriptLandingMocks.snapshotCount = 0;
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
     vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
