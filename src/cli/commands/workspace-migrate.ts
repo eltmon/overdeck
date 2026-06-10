@@ -33,7 +33,7 @@ import {
 } from '../../lib/remote/index.js';
 import { PAN_CONTEXT_FILENAME, PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
-import { stopAgentSync } from '../../lib/agents.js';
+import { stopAgentSync, setAgentPausedSync } from '../../lib/agents.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { RemoteProvider } from '../../lib/remote/interface.js';
