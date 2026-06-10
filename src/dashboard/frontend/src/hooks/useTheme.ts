@@ -40,7 +40,13 @@ function syncThemeToServer(theme: Theme) {
 }
 
 applyTheme(getStoredTheme());
-syncThemeToServer(getStoredTheme());
+// Only clients with an explicitly chosen theme may push it to the server on
+// load. Fresh profiles (Playwright UAT runs, e2e, incognito) have no stored
+// key and default to dark — letting them sync would silently clobber the
+// user's choice and spawn wrong-theme sessions.
+if (localStorage.getItem(STORAGE_KEY) !== null) {
+  syncThemeToServer(getStoredTheme());
+}
 
 interface ThemeState {
   theme: Theme;
