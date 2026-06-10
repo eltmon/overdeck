@@ -1372,7 +1372,7 @@ export async function deliverAgentMessage(
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          2000,
+          4_000,
           ptyToken,
           PTY_TOKEN_HEADER,
         );

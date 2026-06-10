@@ -32,6 +32,11 @@ const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
+const INPUT_ECHO_CONFIRM_TIMEOUT_MS = 1_500;
+const INPUT_ECHO_CONFIRM_INTERVAL_MS = 50;
+const INPUT_ECHO_CONFIRM_ATTEMPTS = 2;
+const INPUT_ECHO_CONFIRM_PREFIX_CHARS = 40;
+const INPUT_SETTLE_MS = 300;
 
 export interface PtySupervisorPayload {
   content: string;
@@ -147,6 +152,36 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(encoded);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function stripAnsi(value: string): string {
+  return value
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
+    .replace(/\x1B[@-_]/g, '');
+}
+
+function normalizePtyText(value: string): string {
+  return stripAnsi(value).replace(/\s+/g, ' ').trim();
+}
+
+function confirmationPrefix(content: string): string {
+  const lines = content.split('\n');
+  const verifyLine = ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+  return normalizePtyText(verifyLine).slice(0, INPUT_ECHO_CONFIRM_PREFIX_CHARS);
+}
+
+async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise<boolean> {
+  const deadline = Date.now() + INPUT_ECHO_CONFIRM_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (normalizePtyText(readOutput()).includes(prefix)) return true;
+    await sleep(INPUT_ECHO_CONFIRM_INTERVAL_MS);
+  }
+  return normalizePtyText(readOutput()).includes(prefix);
+}
+
 export async function injectPtyMessage(
   child: pty.IPty,
   agentId: string,
@@ -160,13 +195,40 @@ export async function injectPtyMessage(
   // paste content, wait ~300ms for Claude to fully process the paste, then
   // send `\r` as a standalone Enter keystroke arriving in its own read.
   const trimmed = payload.content.replace(/\n+$/, '');
-  child.write(trimmed);
-  await new Promise(resolve => setTimeout(resolve, 300));
-  child.write('\r');
-  if (payload.echo !== false) {
-    process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
+  const prefix = confirmationPrefix(trimmed);
+  let observedOutput = '';
+  const subscription = child.onData((data) => {
+    observedOutput = `${observedOutput}${data}`.slice(-64 * 1024);
+  });
+
+  try {
+    let confirmed = prefix.length === 0;
+    for (let attempt = 1; attempt <= INPUT_ECHO_CONFIRM_ATTEMPTS && !confirmed; attempt++) {
+      child.write(trimmed);
+      confirmed = await waitForPtyEcho(() => observedOutput, prefix);
+      if (!confirmed && attempt < INPUT_ECHO_CONFIRM_ATTEMPTS) {
+        console.warn(
+          `[pty-supervisor] Input echo not confirmed for ${agentId} after ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms ` +
+          `(attempt ${attempt}/${INPUT_ECHO_CONFIRM_ATTEMPTS}); rewriting content before Enter.`,
+        );
+      }
+    }
+
+    if (!confirmed) {
+      throw new Error(
+        `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms`,
+      );
+    }
+
+    await sleep(INPUT_SETTLE_MS);
+    child.write('\r');
+    if (payload.echo !== false) {
+      process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
+    }
+    await appendSocketWriteLog(agentId, payload);
+  } finally {
+    subscription.dispose();
   }
-  await appendSocketWriteLog(agentId, payload);
 }
 
 export function createPtySupervisorServer(agentId: string, child: pty.IPty): Server {
@@ -194,8 +256,13 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
       return;
     }
 
-    await injectPtyMessage(child, agentId, payload);
-    writeJson(res, 200, 'ok');
+    try {
+      await injectPtyMessage(child, agentId, payload);
+      writeJson(res, 200, 'ok');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      writeJson(res, 502, { error: message });
+    }
   });
 }
 

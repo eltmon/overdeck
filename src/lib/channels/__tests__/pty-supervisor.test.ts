@@ -162,18 +162,43 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     await waitForSocketPath(socketPath, () => !existsSync(socketPath), 'supervisor socket was not unlinked');
   });
 
-  it('echoes a socket-delivered message to stdout exactly once when the child is quiet', async () => {
-    const { token, socketPath } = await readySupervisor('agent-echo', 'bash', ['-lc', 'stty -echo; printf READY; sleep 30']);
-    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not disable TTY echo');
+  it('confirms child PTY output before Enter and echoes a socket-delivered message to stdout exactly once', async () => {
+    const { token, socketPath } = await readySupervisor('agent-echo', 'bash', [
+      '-lc',
+      'stty raw -echo; printf READY; dd bs=1 count=40 2>/dev/null; sleep 30',
+    ]);
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not enter raw echo mode');
     stdout = '';
+    const content = `echo-once-${'x'.repeat(80)}`;
 
-    const result = await postToUnixSocket(socketPath, token, { content: 'echo-once' });
+    const result = await postToUnixSocket(socketPath, token, { content });
 
     expect(result.status).toBe(200);
-    await waitForProcessOutput(() => stdout.includes('echo-once'), 'supervisor did not echo posted content');
-    expect(stdout.match(/echo-once/g)).toHaveLength(1);
+    await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
+    expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
+  });
+
+  it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
+    const capturePath = join(tmpHome, 'input-capture.txt');
+    const content = 'never-confirmed';
+    const { token, socketPath } = await readySupervisor('agent-no-confirm', 'bash', [
+      '-lc',
+      `stty raw -echo; printf READY; dd of=${JSON.stringify(capturePath)} bs=1 count=${content.length * 2} 2>/dev/null; sleep 30`,
+    ]);
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not enter raw capture mode');
+    stdout = '';
+    const startedAt = Date.now();
+
+    const result = await postToUnixSocket(socketPath, token, { content });
+
+    expect(result.status).toBeGreaterThanOrEqual(400);
+    expect(result.body).toContain('input echo confirmation failed');
+    expect(Date.now() - startedAt).toBeLessThan(4_500);
+    expect(readFileSync(capturePath, 'utf8')).toBe(content.repeat(2));
+    const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-confirm.log');
+    expect(existsSync(logPath)).toBe(false);
   });
 
   it('creates the supervisor socket at mode 0600', async () => {
