@@ -343,12 +343,17 @@ function StandaloneDiffPopoutRoute() {
       return (await res.json()) as { summaries: TurnDiffSummary[] };
     },
     enabled: prefix.length > 0,
+    // Same cadence as the inline panel (ConversationPanel) — keeps summaries
+    // fresh as turns complete AND self-heals after a transient backend outage
+    // (e.g. a watchdog dashboard restart) instead of dead-ending on the error
+    // state after the default 3 retries.
+    refetchInterval: 5000,
   });
   return (
     <div className="h-screen overflow-hidden bg-background">
-      {prefix.length === 0 || isError ? (
+      {prefix.length === 0 || (isError && data === undefined) ? (
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-          {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff.'}
+          {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff — retrying…'}
         </div>
       ) : data === undefined ? (
         // The summaries endpoint shells out to git per turn and can take seconds
@@ -754,8 +759,10 @@ export default function App() {
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
 
-  // PAN-1520 — poll conversations for pending AskUserQuestion. Cheaper than a
-  // dedicated WS event for now; the list endpoint already returns the field.
+  // PAN-1520 — poll conversations for pending AskUserQuestion. PAN-1705:
+  // uses the dedicated pending-input feed (scans only tmux-alive sessions,
+  // returns only rows that need attention) instead of pulling the full
+  // 0.5 MB enriched list every 4s.
   type ConvAskUserQuestionRow = {
     name: string;
     title?: string | null;
@@ -764,11 +771,10 @@ export default function App() {
   };
   const { data: convAskUserQuestionRows = [] } = useQuery({
     queryKey: ['conv-ask-user-question'],
-    queryFn: async (): Promise<ConvAskUserQuestionRow[]> => {
-      const res = await fetch('/api/conversations?limit=1000');
+    queryFn: async ({ signal }): Promise<ConvAskUserQuestionRow[]> => {
+      const res = await fetchWithTimeout('/api/conversations/pending-input', { signal });
       if (!res.ok) return [];
-      const rows: ConvAskUserQuestionRow[] = await res.json();
-      return rows.filter((r) => r.pendingAskUserQuestion != null);
+      return res.json();
     },
     refetchInterval: 4000,
     refetchIntervalInBackground: true,
