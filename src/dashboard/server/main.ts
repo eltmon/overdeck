@@ -15,6 +15,7 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -460,6 +461,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopTranscriptPoller();
+  stopRestartAnnouncer();
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
   closeMemoryFtsDatabases();
@@ -468,6 +470,12 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
 process.once('SIGTERM', () => void handleShutdownSignal('SIGTERM'));
 process.once('SIGINT', () => void handleShutdownSignal('SIGINT'));
 process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
+
+// Announce dashboard restarts (supervisor watchdog / pan reload / pan restart)
+// in the Awareness activity feed. Polls restart-status.json because the writer
+// processes can't reach this server's event store — see restart-announcer.ts.
+startRestartAnnouncer();
+console.log('[panopticon] Restart announcer started');
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
