@@ -1189,3 +1189,42 @@ PAN-1698 was filed+fixed, but nobody could tell it (flywheel forbidden `pan tell
 Operator one-liner needed at its prompt: "1698 filed+fixed, main green — verify
 and pan done". The roles/*.md signal-before-parking fix (PAN-1699) remains the
 real cure.
+
+## RUN-17 tick 4 (2026-06-10) — smoke "CANCELLED" decoded as a silent hang; full ramp to cap
+
+### Smoke-job CANCELLED ≠ flake: it's a 20-minute timeout killing a silent server-boot hang
+
+PRs #1636 (feature/pan-1491) and #1679 (feature/pan-1641) had their "Clean install
++ server smoke test" re-runs end CANCELLED *again*. Decoded: the job has
+`timeout-minutes: 20` (PAN-1651), and GitHub reports a timeout kill as
+"cancelled". The step log shows 19 silent minutes; orphan processes at kill time
+were `node` (server), `curl` (the health poll), and `cliproxy` — the server boots
+but the health poll never passes. Both hanging branches touch server-boot
+surfaces (flywheel metrics / Ollama sidecar) merged against a main that now has
+the merge-train engine; the 3 passing PRs don't. **Diagnostic rule: when a check
+shows CANCELLED, compare job duration to its timeout-minutes before calling it
+infra noise.** 2nd rerun dispatched as a reproducibility test — if it hangs
+again, file the substrate issue and demote those merges to blocked.
+
+### stop-at-proposed: third confirmation (PAN-1629) — treat as the contract
+
+`pan plan --auto` ended at `proposed` + `planned` label with no work agent for
+the third issue in a row (1647, 1658, 1629). This is the actual behavior of the
+command, full stop. The tick loop now treats "plan --auto finished" as
+synonymous with "must pan start next".
+
+### Watch: agent-pan-1658 at ctx 91% on gpt-5.5
+
+PR #1707 already open (+617/−68) so the value is banked, but gpt-5.5/CLIProxy
+sessions can deadlock near the window illusion (see PAN-1672). If it stalls:
+salvage = `pan handoff`, never resume-thrash.
+
+### Ramp + new inventory
+
+Launched `pan start PAN-1629` + `pan plan PAN-1704 --auto` → at maxAgents=4
+(1647-review convoy, 1658 work, 1629 work, 1704 planning). New operator-filed
+candidates queued at cap: PAN-1705 (conversation Loading… stall), PAN-1706
+(orphaned playwright Chromiums), PAN-1697/1700 (delivery-race family — consider
+bundling with PAN-1699's roles fix). strike-1682: THIRD tick silently parked on
+its moot question — the PAN-1699 gap measured in wall-clock. Swap crept
+2.5→5.4GB during the spawn burst (load 20/24); watching, not acting.
