@@ -4853,6 +4853,60 @@ export async function checkMergedWorkSessions(): Promise<string[]> {
   return actions;
 }
 
+/** Pane must be idle at least this long before the awaiting-test reaper kills it. */
+const AWAITING_TEST_IDLE_REAP_MS = 10 * 60 * 1000;
+
+/**
+ * PAN-1730: Reap the WORK session of an issue that's idle awaiting its test
+ * verdict (review passed, test pending).
+ *
+ * Such a work agent has handed off via `pan done` and sits idle at its prompt,
+ * yet `countRunningAgents()` keeps counting it against the PAN-1665 work
+ * ceiling. When the work pool alone meets the total ceiling (work=7/9 observed)
+ * `tryReserveAdvancingSlot()` can never admit the test that would release these
+ * agents — a livelock that zeroed pipeline throughput for hours. Killing the
+ * idle work session frees the work slot (and RAM).
+ *
+ * Unlike the PAN-1726 merged reaper this does NOT pause the agent: if the test
+ * later FAILS, the deacon's auto-resume `needsFix` gate must be free to bring it
+ * back to fix the feedback. While test stays `pending` the auto-resume
+ * "pipeline mid-flight" gate already prevents churn, so killing-without-pausing
+ * neither resurrects a still-pending agent nor strands a failed one. Runs before
+ * the dispatchers so the freed slot benefits this same cycle's test dispatch.
+ */
+export async function checkAwaitingTestWorkSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectAwaitingTestWorkSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const candidates = selectAwaitingTestWorkSessions(statuses, [...aliveSessions]);
+    const now = Date.now();
+    for (const session of candidates) {
+      // Only reap a genuinely idle pane — a work agent still finalizing right
+      // after handoff must be left alone. The work session name IS the agent id.
+      const runtime = getAgentRuntimeStateSync(session);
+      if (runtime?.state !== 'idle') continue;
+      const idleSince = Date.parse(runtime.lastActivity ?? '');
+      if (!Number.isFinite(idleSince) || now - idleSince < AWAITING_TEST_IDLE_REAP_MS) continue;
+      try {
+        // No pause: auto-resume's mid-flight gate keeps it down while test is
+        // pending, and its needsFix gate must stay free to resume it on failure.
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped idle awaiting-test work session ${session} (review passed, test pending, idle ≥10m)`);
+        console.log(`[deacon] Reaped idle awaiting-test work session ${session} (PAN-1730)`);
+        logDeaconEventSync(`checkAwaitingTestWorkSessions: reaped ${session} — review passed, test pending, idle ≥10m (PAN-1730)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap awaiting-test work session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping awaiting-test work sessions:', msg);
+  }
+  return actions;
+}
+
 /**
  * Run a single patrol cycle
  */
@@ -5007,6 +5061,15 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1730: Reap the work session of an issue idle awaiting its test verdict
+  // (review passed, test pending, pane idle ≥10m). When the work pool alone
+  // meets the PAN-1665 total ceiling, these idle agents livelock test dispatch —
+  // freeing the slot here lets this same cycle's checkPendingTestDispatch admit
+  // the test that releases them. Kill-without-pause; see the function comment.
+  const reapedAwaitingTestActions = await checkAwaitingTestWorkSessions();
+  actions.push(...reapedAwaitingTestActions);
+  for (const a of reapedAwaitingTestActions) addLog('action', a, state.patrolCycle);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
