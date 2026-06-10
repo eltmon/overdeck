@@ -572,13 +572,25 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   await Promise.all([...issueMap.values()].map(async (issue) => {
     if (issue.resourceDetails.tmuxSessions.length === 0) return;
 
-    const issueLower = issue.issueId.toLowerCase();
-    const agentId = `agent-${issueLower}`;
-    const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId)).catch(() => null);
-    if (!runtimeState) return;
+    // Runtime-state ids equal session names (agent-<issue>, strike-<issue>,
+    // planning-<issue>, ...). Probe every discovered session — not just
+    // agent-<issue> — so strike/planning sessions surface as live agents.
+    // PAN-1682 made these sessions discoverable but left attribution
+    // agent-only, which rendered a running strike as a lifeless node.
+    const states = (await Promise.all(
+      issue.resourceDetails.tmuxSessions.map((sessionName) =>
+        Effect.runPromise(getAgentRuntimeState(sessionName)).catch(() => null),
+      ),
+    )).filter((state): state is NonNullable<typeof state> => state !== null);
+    if (states.length === 0) return;
 
-    issue.agentStatus = runtimeState.state;
-    const lastActivity = Date.parse(runtimeState.lastActivity);
+    const best = states.find((state) => state.state === 'active')
+      ?? states.reduce((a, b) => (Date.parse(a.lastActivity) >= Date.parse(b.lastActivity) ? a : b));
+    issue.agentStatus = best.state;
+
+    const lastActivity = Math.max(
+      ...states.map((state) => Date.parse(state.lastActivity)).filter(Number.isFinite),
+    );
     issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
