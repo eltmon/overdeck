@@ -4,7 +4,7 @@
     "created": "2026-06-10T01:00:53.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1712: pan conv jsonl <conv-id> — first-class transcript path resolution for agents",
-    "updated": "2026-06-10T01:07:00.052Z"
+    "updated": "2026-06-10T06:19:52.802Z"
   },
   "plan": {
     "id": "pan-1712",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 5,
     "created": "2026-06-10T01:00:53.000Z",
-    "updated": "2026-06-10T01:07:00.052Z",
+    "updated": "2026-06-10T06:19:52.802Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1712",
@@ -63,7 +63,7 @@
       {
         "id": "transcript-resolver",
         "title": "Add status-aware resolveConversationTranscript() helper + tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-10T01:00:53.000Z",
         "metadata": {
@@ -83,7 +83,7 @@
           {
             "id": "transcript-resolver.ac1",
             "title": "Exported `resolveConversationTranscript(cwd, claudeSessionId)` returns `{ path: string | null, status: 'ok' | 'expired' | 'unknown' }` and derives via sessionFilePath() from src/lib/paths.ts.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -91,7 +91,7 @@
           {
             "id": "transcript-resolver.ac2",
             "title": "Returns status 'ok' with the absolute derived path when `sessionFilePath(cwd, sessionId)` exists on disk.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "transcript-resolver.ac3",
             "title": "When the derived path is absent, returns status 'ok' with the first `~/.claude/projects/*/<sessionId>.jsonl` glob match (one directory level), preserving conv-find.py's fallback for cwd-encoding drift.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "transcript-resolver.ac4",
             "title": "Returns 'expired' (path = the expected derived path) when claudeSessionId is set but no JSONL exists on disk or via glob; returns 'unknown' (path = null) when claudeSessionId is null/empty.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -115,7 +115,7 @@
           {
             "id": "transcript-resolver.ac5",
             "title": "Unit tests cover all four outcomes (ok-derived, ok-glob, expired, unknown) using a temp ~/.claude/projects fixture; `npm run typecheck` and the new test pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
