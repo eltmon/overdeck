@@ -1412,9 +1412,22 @@ if (process.argv.length === 2) {
   process.argv.push('serve');
 }
 
+const isHelpOrVersionInvocation = (argv: string[]): boolean => {
+  const args = argv.slice(2);
+  return args[0] === 'help'
+    || args.includes('--help')
+    || args.includes('-h')
+    || args.includes('--version')
+    || args.includes('-V');
+};
+
 // Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
 // under one Node major, loaded under another) before any command opens the DB.
-ensureNativeSqliteAbi();
+// Help/version rendering must stay side-effect-free: lint-skills shells out to
+// many `pan ... --help` forms, and those commands do not need SQLite.
+if (!isHelpOrVersionInvocation(process.argv)) {
+  ensureNativeSqliteAbi();
+}
 
 // Parse and execute
 await program.parseAsync();
