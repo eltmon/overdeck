@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { stopAgentSync, getAgentStateSync } from '../../lib/agents.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
-import { killRemoteAgent } from '../../lib/remote/remote-agents.js';
+import { killRemoteAgent, loadRemoteAgentState } from '../../lib/remote/remote-agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
@@ -80,7 +80,9 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   let killedAny = false;
 
   for (const agentId of agentIds) {
-    const state = getAgentStateSync(agentId) as any;
+    // Remote (fly.io) agents persist remote-state.json, not state.json —
+    // without this fallback the remote teardown branch below never fires.
+    const state = (getAgentStateSync(agentId) ?? loadRemoteAgentState(agentId)) as any;
     const isRunning = sessionExistsSync(agentId);
 
     if (!state && !isRunning) {
