@@ -245,6 +245,7 @@ export class SupervisorWatchdog {
         attempts: this.state.restartAttempts.length,
         gaveUp: true,
         reason: hardDown ? 'dashboard unreachable' : 'sustained health-probe timeouts',
+        pid: process.pid,
       }));
       return;
     }
@@ -289,6 +290,7 @@ export class SupervisorWatchdog {
       reason: hardDown
         ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
         : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`,
+      pid: process.pid,
     }));
     if (restartError) {
       await this.log(`watchdog restart failed: ${restartError}`);

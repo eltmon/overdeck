@@ -15,6 +15,9 @@ export interface RestartStatus {
   gaveUp?: boolean;
   /** Why the restart was triggered (e.g. the watchdog's probe-failure classification). */
   reason?: string;
+  /** PID of the process that wrote this entry — identifies the writer when
+   *  multiple restart flows overlap (see PAN-1714 follow-up). */
+  pid?: number;
 }
 
 function restartStatusPath(): string {
@@ -42,7 +45,8 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
       !Number.isFinite(parsed.attempts) ||
       (parsed.error !== undefined && typeof parsed.error !== 'string') ||
       (parsed.gaveUp !== undefined && typeof parsed.gaveUp !== 'boolean') ||
-      (parsed.reason !== undefined && typeof parsed.reason !== 'string')
+      (parsed.reason !== undefined && typeof parsed.reason !== 'string') ||
+      (parsed.pid !== undefined && typeof parsed.pid !== 'number')
     ) {
       return null;
     }
@@ -55,6 +59,7 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
       attempts: parsed.attempts,
       gaveUp: parsed.gaveUp,
       reason: parsed.reason,
+      pid: parsed.pid,
     };
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') return null;

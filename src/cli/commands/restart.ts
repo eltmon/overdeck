@@ -144,6 +144,7 @@ async function recordRestartStatus(startedAt: number, success: boolean, error?: 
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
+    pid: process.pid,
   }));
 }
 
