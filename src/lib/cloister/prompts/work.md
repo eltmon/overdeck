@@ -81,13 +81,14 @@ Before starting any work, you MUST read these files to understand the full conte
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
-Your workspace is at /workspace. Check for planning artifacts under `/workspace/.pan/`:
-- `/workspace/.pan/continue.json` — structured planning context (decisions, hazards, resumePoint)
-- `/workspace/.pan/spec.vbrief.json` — workspace working copy of the vBRIEF plan
+Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
+- `/workspace/.pan/continue.json` — structured planning context (decisions, hazards, resumePoint), synced from the host if planning ran there
+- `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.vbrief.json` — the canonical vBRIEF plan, committed on main. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
+- `/workspace/.beads/issues.jsonl` — beads tasks for this issue (`bd ready`, `bd show <id>`)
 
-Start by reading `.pan/continue.json` to understand the plan, then begin implementation.
-If no continue file exists, check the issue tracker for requirements.
+Start by reading `.pan/continue.json` (if present) and the spec to understand the plan, then begin implementation.
+If neither exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
 ## Playwright Isolation
@@ -438,16 +439,17 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}
 {{#REMOTE}}
-When ALL tasks are complete, commit and push everything:
+When ALL tasks are complete:
 ```bash
 npm test
-# Mark all vBRIEF acceptance criteria as completed (verification gate checks these)
-node -e "const fs=require('fs'); const p='.pan/spec.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; items.forEach(i=>{i.status='completed';(i.subItems||[]).forEach(s=>s.status='completed')}); fs.writeFileSync(p,JSON.stringify(d,null,2))}"
+bd close <bead-id>   # close every bead for this issue
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
-git status
+git status   # must show a clean tree and the branch pushed
 ```
-Only stop when ALL tasks are complete or you have exhausted all possible work.
+NEVER edit `.pan/specs/*.vbrief.json` — specs are immutable after planning. Bead closure + the pushed branch are your completion record.
+
+After the push succeeds, print a line containing exactly `PAN_REMOTE_DONE {{ISSUE_ID}}` and stop. The orchestrator polls your session output for that marker to hand the branch to review. Only stop when ALL tasks are complete or you have exhausted all possible work.
 {{/REMOTE}}
 
 **Uncommitted changes = NOT COMPLETE. Do not say you are done if `git status` shows changes.**
