@@ -173,11 +173,18 @@ export class FlyProvider implements RemoteProvider {
         auto_destroy: false,
       });
 
-      // Wait for machine to start
+      // Wait for machine to start. This must be fatal: callers exec commands
+      // immediately after createVm, and a not-yet-started machine 412s every
+      // exec. First boot pulls the full image from the registry, which can
+      // exceed two minutes — hence the generous timeout.
       try {
-        await api.waitForState(this.config.app, machine.id, 'started', 120);
-      } catch {
-        // Non-fatal: machine may still be starting
+        await api.waitForState(this.config.app, machine.id, 'started', 300);
+      } catch (cause) {
+        throw new Error(
+          `Machine ${machine.id} (${name}) did not reach 'started' within 300s — ` +
+            `likely still pulling the image. Check: fly machines list -a ${this.config.app}`,
+          { cause }
+        );
       }
 
       return {
