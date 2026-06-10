@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-06-09T05:13:46.695Z"
+    "updated": "2026-06-10T00:56:40.533Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 61,
+    "sequence": 74,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-06-09T05:13:46.695Z",
+    "updated": "2026-06-10T00:56:40.533Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -254,56 +254,60 @@
         "phase": "merge",
         "issueId": "PAN-1455",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T05:13:46.688Z",
+        "updatedAt": "2026-06-10T00:56:40.525Z",
         "work": {
-          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T05:13:46.688Z"
+              "at": "2026-06-10T00:56:40.525Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-09T05:13:46.688Z",
-          "notes": "Correctness report came from prior review run",
+          "status": "passed",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
+          "notes": "Approved: all four convoy reviewers passed with no blocking findings",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-09T05:13:46.688Z",
-              "notes": "Correctness report came from prior review run"
+              "status": "passed",
+              "at": "2026-06-10T00:56:40.525Z",
+              "notes": "Approved: all four convoy reviewers passed with no blocking findings"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-09T05:13:46.688Z"
+              "status": "passed",
+              "at": "2026-06-10T00:56:40.525Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
           "history": []
         },
         "merge": {
-          "status": "failed",
-          "updatedAt": "2026-06-09T05:13:46.688Z",
+          "status": "merging",
+          "updatedAt": "2026-06-10T00:56:40.525Z",
           "notes": "Post-rebase verification failed at test",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-09T05:13:46.688Z",
+              "status": "merging",
+              "at": "2026-06-10T00:56:40.525Z",
               "notes": "Post-rebase verification failed at test"
             }
           ],
