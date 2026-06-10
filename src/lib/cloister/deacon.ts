@@ -5072,6 +5072,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...unsignaledTestActions);
   for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-1658: after a rebase, reviewStatus may already be passed while testStatus
+  // remains pending. Run before the dispatcher so green GitHub Actions CI on the
+  // current PR HEAD can clear stale pending state instead of spawning a new test.
+  const greenCiTestStatusActions = await reconcileTestStatusFromGreenCi();
+  actions.push(...greenCiTestStatusActions);
+  for (const a of greenCiTestStatusActions) addLog('action', a, state.patrolCycle);
+
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
   const pendingTestActions = await checkPendingTestDispatch();
   actions.push(...pendingTestActions);
@@ -5167,12 +5174,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const closedPrReadyActions = await reconcileClosedPrReadyForMerge();
   actions.push(...closedPrReadyActions);
   for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-1658: after a rebase, reviewStatus may already be passed while testStatus
-  // remains pending. Reconcile from check-runs-only green CI on the current PR HEAD.
-  const greenCiTestStatusActions = await reconcileTestStatusFromGreenCi();
-  actions.push(...greenCiTestStatusActions);
-  for (const a of greenCiTestStatusActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and

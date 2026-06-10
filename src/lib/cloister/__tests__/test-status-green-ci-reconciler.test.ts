@@ -130,6 +130,29 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
     expect(closedDeps.getCiCheckRunsState).not.toHaveBeenCalled();
   });
 
+  it('runs before pending-test dispatch so stale pending tests are reconciled instead of spawned', async () => {
+    const statuses: Record<string, TestStatusGreenCiReviewStatus> = {
+      'PAN-1658': { ...candidate },
+    };
+    const deps = makeDeps(statuses);
+    vi.mocked(deps.setReviewStatusSync).mockImplementation((issueId, update) => {
+      Object.assign(statuses[issueId], update);
+    });
+    const spawnTestRole = vi.fn();
+
+    const actions = await reconcileTestStatusFromGreenCiWithDeps(deps);
+    if (statuses['PAN-1658'].reviewStatus === 'passed' && statuses['PAN-1658'].testStatus === 'pending') {
+      spawnTestRole('PAN-1658');
+      statuses['PAN-1658'].testStatus = 'testing';
+    }
+
+    expect(actions).toEqual([
+      'Reconciled testStatus=pending → passed for PAN-1658 from green CI on PR #1658 @ abcdef12',
+    ]);
+    expect(statuses['PAN-1658'].testStatus).toBe('passed');
+    expect(spawnTestRole).not.toHaveBeenCalled();
+  });
+
   it('suppresses repeat GitHub lookups during cooldown and throttles API errors', async () => {
     const cooledDeps = makeDeps({ 'PAN-1658': candidate });
     cooledDeps.cooldowns.set('PAN-1658', 1_000_001);
