@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T01:54:31.460Z"
+    "updated": "2026-06-10T02:01:02.730Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 73,
+    "sequence": 78,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T01:54:31.460Z",
+    "updated": "2026-06-10T02:01:02.730Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -444,57 +444,55 @@
         "phase": "review",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T01:51:45.466Z",
+        "updatedAt": "2026-06-10T02:01:02.643Z",
         "work": {
-          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T01:51:45.466Z",
-          "notes": "Acceptance criteria check FAILED — 9/24 AC incomplete:\n\n### Add a conservative transient/lock bd-error classifier (4/4 incomplete)\n  - [ ] isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures\n  - [ ] isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)\n  - [ ] Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case\n  - [ ] The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced\n\n### Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts) (5/5 incomplete)\n  - [ ] withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders\n  - [ ] Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock\n  - [ ] A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally\n  - [ ] runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)\n  - [ ] Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever",
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T01:51:45.466Z",
-              "notes": "Acceptance criteria check FAILED — 9/24 AC incomplete:\n\n### Add a conservative transient/lock bd-error classifier (4/4 incomplete)\n  - [ ] isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures\n  - [ ] isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)\n  - [ ] Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case\n  - [ ] The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced\n\n### Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts) (5/5 incomplete)\n  - [ ] withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders\n  - [ ] Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock\n  - [ ] A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally\n  - [ ] runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)\n  - [ ] Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever"
+              "status": "passed",
+              "at": "2026-06-10T02:01:02.643Z"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T01:51:45.466Z",
-          "notes": "Verification failed at vbrief-ac",
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues and completed acceptance criteria",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T01:51:45.466Z",
-              "notes": "Verification failed at vbrief-ac"
+              "status": "reviewing",
+              "at": "2026-06-10T02:01:02.643Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues and completed acceptance criteria"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:51:45.466Z"
+              "at": "2026-06-10T02:01:02.643Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "updatedAt": "2026-06-10T02:01:02.643Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:51:45.466Z"
+              "at": "2026-06-10T02:01:02.643Z"
             }
           ],
           "readyForMerge": false,
