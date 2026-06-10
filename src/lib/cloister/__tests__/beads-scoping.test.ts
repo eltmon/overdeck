@@ -95,8 +95,8 @@ describe('work.md template label scoping', () => {
     const templatePath = join(__dirname, '..', 'prompts', 'work.md');
     const template = readFileSync(templatePath, 'utf-8');
 
-    // Both occurrences of bd ready should include label filter
-    const bdReadyLines = template.split('\n').filter(l => l.includes('`bd ready'));
+    // Command examples for bd ready should include the issue label filter.
+    const bdReadyLines = template.split('\n').filter(l => /`bd ready\s/.test(l));
     expect(bdReadyLines.length).toBeGreaterThanOrEqual(2);
 
     for (const line of bdReadyLines) {
