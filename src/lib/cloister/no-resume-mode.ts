@@ -6,6 +6,10 @@ export function isNoResumeValueEnabled(value: string | undefined): boolean {
   return TRUTHY_NO_RESUME_VALUES.has(value?.trim().toLowerCase() ?? '');
 }
 
+export function isNoResumeCliOptionEnabled(options: { noResume?: boolean; resume?: boolean }): boolean {
+  return options.noResume === true || options.resume === false;
+}
+
 export function getNoResumeMode(): { active: boolean; since: string | null } {
   const active = isNoResumeValueEnabled(process.env.PANOPTICON_NO_RESUME);
   if (!active) {

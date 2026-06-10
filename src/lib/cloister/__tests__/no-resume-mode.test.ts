@@ -31,4 +31,19 @@ describe('no-resume mode', () => {
     delete process.env.PANOPTICON_NO_RESUME;
     expect(getNoResumeMode()).toEqual({ active: false, since: null });
   });
+
+  it('recognizes Commander negated --no-resume options', async () => {
+    const { Command } = await import('commander');
+    const { isNoResumeCliOptionEnabled } = await import('../no-resume-mode.js');
+    const command = new Command()
+      .exitOverride()
+      .option('--no-resume');
+
+    command.parse(['node', 'pan', '--no-resume']);
+
+    expect(isNoResumeCliOptionEnabled(command.opts())).toBe(true);
+    expect(isNoResumeCliOptionEnabled({ noResume: true })).toBe(true);
+    expect(isNoResumeCliOptionEnabled({ resume: true })).toBe(false);
+    expect(isNoResumeCliOptionEnabled({})).toBe(false);
+  });
 });

@@ -105,6 +105,7 @@ import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { ensureNativeSqliteAbi } from '../lib/native-sqlite-guard.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
@@ -598,6 +599,7 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(async (options) => {
+    const noResume = isNoResumeCliOptionEnabled(options);
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
@@ -646,10 +648,6 @@ program
       }
     }
 
-    // Commander negation semantics: `--no-resume` sets `options.resume = false`
-    // (there is no `options.noResume` property). PAN-1743: reading the wrong
-    // property meant PANOPTICON_NO_RESUME was never threaded to the server.
-    const noResume = options.resume === false;
     if (noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
