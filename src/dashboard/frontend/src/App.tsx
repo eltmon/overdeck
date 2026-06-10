@@ -59,6 +59,7 @@ import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion
 import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
 import { usePanesStore } from './lib/panesStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
+import { fetchWithTimeout } from './lib/apiFetch';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 

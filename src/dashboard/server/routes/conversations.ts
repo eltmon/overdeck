@@ -1790,31 +1790,77 @@ export async function handleArchivedConversationsList(options: ArchivedConversat
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
-const getConversationsRoute = HttpRouter.add(
-  'GET',
-  '/api/conversations',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    return yield* Effect.promise(async () => {
-    try {
-        const url = new URL(request.url, 'http://localhost');
-        const limitParam = url.searchParams.get('limit');
-        const offsetParam = url.searchParams.get('offset');
-        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
-        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
-        const conversations = listConversations({ limit, offset });
-        const favoritedNames = getCachedFavoritedIds();
+/** PAN-1520/PAN-1705 — build the AskUserQuestion snapshot from a pending-input
+ *  scan. Shared by the enriched list and the lightweight pending-input feed. */
+function askUserQuestionSnapshotFromScan(
+  scan: Awaited<ReturnType<typeof scanPendingInputsPromise>>,
+): PendingAskUserQuestionSnapshot | undefined {
+  if (scan.askUserQuestions.length === 0) return undefined;
+  const first = scan.askUserQuestions[0];
+  return {
+    toolUseId: first.toolId,
+    askedAt: first.timestamp,
+    questions: first.questions.map(q => ({
+      question: q.question,
+      header: q.header,
+      multiSelect: q.multiSelect,
+      options: q.options.map(o => ({ label: o.label, description: o.description })),
+    })),
+  };
+}
 
-        // Enrich with live tmux status
-        // Grace period removed (PAN-826): POST /api/conversations now waits for
-        // Claude to be ready before returning 201, so newly-created conversations
-        // are always live by the time they appear in the list.
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
-        const enriched = await Effect.runPromise(withConcurrencyLimit(
+// PAN-1705 — coalesce concurrent list enrichments. Several dashboard clients
+// poll this endpoint on overlapping intervals; each request used to run its
+// own full per-row enrichment (session-file resolution, stats, JSONL scans
+// for alive sessions). Under machine load (verification gates) the
+// overlapping enrichments queue-collapsed the event loop and pushed even
+// trivial endpoints to 10s+. One enrichment per short window serves all
+// concurrent pollers; ≤2s staleness is invisible at the 4-10s poll cadence.
+const LIST_ENRICHMENT_TTL_MS = 2_000;
+interface ListEnrichmentEntry {
+  settledAt: number | null; // null while the enrichment is still running
+  promise: Promise<unknown[]>;
+}
+const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
+
+function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
+  const key = `${limit}:${offset}`;
+  const now = Date.now();
+  const hit = listEnrichmentInFlight.get(key);
+  // Reuse while still running (never two concurrent enrichments per key —
+  // that's the whole point) or within the TTL after it settled.
+  if (hit && (hit.settledAt === null || now - hit.settledAt < LIST_ENRICHMENT_TTL_MS)) {
+    return hit.promise;
+  }
+  const entry: ListEnrichmentEntry = {
+    settledAt: null,
+    promise: enrichConversationList(limit, offset),
+  };
+  listEnrichmentInFlight.set(key, entry);
+  entry.promise
+    .then(() => { entry.settledAt = Date.now(); })
+    // Drop failed enrichments immediately so the next poll retries fresh.
+    .catch(() => {
+      if (listEnrichmentInFlight.get(key) === entry) listEnrichmentInFlight.delete(key);
+    });
+  for (const [k, v] of listEnrichmentInFlight) {
+    if (k !== key && v.settledAt !== null && now - v.settledAt >= LIST_ENRICHMENT_TTL_MS) {
+      listEnrichmentInFlight.delete(k);
+    }
+  }
+  return entry.promise;
+}
+
+async function enrichConversationList(limit: number, offset: number): Promise<unknown[]> {
+  const conversations = listConversations({ limit, offset });
+  const favoritedNames = getCachedFavoritedIds();
+
+  // Enrich with live tmux status
+  // Grace period removed (PAN-826): POST /api/conversations now waits for
+  // Claude to be ready before returning 201, so newly-created conversations
+  // are always live by the time they appear in the list.
+  const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+  return Effect.runPromise(withConcurrencyLimit(
           conversations.map((conv) => Effect.promise(async () => {
             const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
             let isWorking = false;
@@ -1859,19 +1905,10 @@ const getConversationsRoute = HttpRouter.add(
               try {
                 const scan = await scanPendingInputsPromise(convSf);
                 const kinds: PendingInputKind[] = [];
-                if (scan.askUserQuestions.length > 0) {
+                const auqSnapshot = askUserQuestionSnapshotFromScan(scan);
+                if (auqSnapshot) {
                   kinds.push('askUserQuestion');
-                  const first = scan.askUserQuestions[0];
-                  pendingAskUserQuestion = {
-                    toolUseId: first.toolId,
-                    askedAt: first.timestamp,
-                    questions: first.questions.map(q => ({
-                      question: q.question,
-                      header: q.header,
-                      multiSelect: q.multiSelect,
-                      options: q.options.map(o => ({ label: o.label, description: o.description })),
-                    })),
-                  };
+                  pendingAskUserQuestion = auqSnapshot;
                 }
                 if (scan.exitPlanModePending) kinds.push('exitPlanMode');
                 if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
@@ -1933,14 +1970,103 @@ const getConversationsRoute = HttpRouter.add(
             };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
-        ));
+  ));
+}
 
+const getConversationsRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const url = new URL(request.url, 'http://localhost');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
+        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
+        const enriched = await getEnrichedConversationList(limit, offset);
         return jsonResponse(enriched);
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] list conversations failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-        }})
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/pending-input ─────────────────────────────
+
+// PAN-1705 — lightweight feed for the needs-you modal (PAN-1520). The previous
+// implementation polled the full enriched list (≈0.5 MB, full per-row
+// enrichment server-side) every 4s per client just to filter for
+// pendingAskUserQuestion. Only tmux-alive conversations can have a pending
+// blocking surface, so this endpoint scans just those few JSONLs and returns
+// only the rows that actually need attention.
+const getConversationsPendingInputRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/pending-input',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const conversations = listConversations({ limit: 1000 });
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+        const alive = conversations.filter(
+          (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
+        );
+        const rows = await Effect.runPromise(withConcurrencyLimit(
+          alive.map((conv) => Effect.promise(async () => {
+            const convSf = await resolveSessionFile(conv);
+            let pending: PendingAskUserQuestionSnapshot | undefined;
+            let lastActivityAt: string | null = null;
+            if (convSf && existsSync(convSf)) {
+              try {
+                lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
+              } catch {
+                // non-fatal — askedAt falls back to now for the codex path
+              }
+              try {
+                pending = askUserQuestionSnapshotFromScan(await scanPendingInputsPromise(convSf));
+              } catch {
+                // JSONL scan failure — non-fatal
+              }
+            }
+            if (!pending) {
+              // PAN-1690 — Codex pane-detected approval fallback.
+              const codex = await codexConversationPendingInput(
+                conv,
+                true,
+                lastActivityAt ?? new Date().toISOString(),
+              );
+              if (codex.approval) pending = codex.approval;
+            }
+            if (!pending) return null;
+            return {
+              name: conv.name,
+              title: conv.title ?? null,
+              issueId: conv.issueId ?? null,
+              pendingAskUserQuestion: pending,
+            };
+          })),
+          CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
+        ));
+        return jsonResponse(rows.filter((row) => row !== null));
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] pending-input feed failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
   }),
 );
 
@@ -4220,6 +4346,7 @@ const getConversationAboutRoute = HttpRouter.add(
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
+  getConversationsPendingInputRoute,
   getArchivedConversationsRoute,
   getConversationRoute,
   getConversationHandoffDocRoute,
