@@ -6,17 +6,23 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const {
+  capturePaneMock,
   createSessionMock,
+  deliverAgentMessageMock,
   getProviderExportsForModelMock,
   getProviderAuthModeMock,
+  killSessionMock,
 } = vi.hoisted(() => ({
+  capturePaneMock: vi.fn(),
   createSessionMock: vi.fn(),
+  deliverAgentMessageMock: vi.fn(),
   getProviderExportsForModelMock: vi.fn(),
   getProviderAuthModeMock: vi.fn(),
+  killSessionMock: vi.fn(),
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
-  deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+  deliverAgentMessage: deliverAgentMessageMock,
   writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
   dismissDevChannelsDialog: vi.fn().mockResolvedValue(undefined),
   clearReadySignal: vi.fn(),
@@ -52,10 +58,10 @@ vi.mock('../../../../lib/workspace-manager.js', () => ({
 vi.mock('../../../../lib/tmux.js', () => ({
   sendRawKeystroke: vi.fn(),
   MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: capturePaneMock,
   sessionExists: vi.fn(() => Effect.succeed(true)),
   isHarnessProcessAlive: vi.fn(() => Effect.succeed(true)),
-  killSession: vi.fn(() => Effect.succeed(undefined)),
+  killSession: killSessionMock,
   createSession: createSessionMock,
   setOption: vi.fn(() => Effect.succeed(undefined)),
   listSessionNames: vi.fn(() => Effect.succeed([])),
@@ -105,8 +111,11 @@ describe('POST /api/conversations/:name/switch-model', () => {
     process.env.PANOPTICON_HOME = join(testHome, '.panopticon');
     mkdirSync(process.env.PANOPTICON_HOME, { recursive: true });
 
+    capturePaneMock.mockImplementation(() => Effect.succeed('statusline: Claude Fable 5'));
+    deliverAgentMessageMock.mockResolvedValue({ ok: true, path: 'supervisor' });
     getProviderExportsForModelMock.mockResolvedValue('');
     getProviderAuthModeMock.mockResolvedValue('anthropic');
+    killSessionMock.mockImplementation(() => Effect.succeed(undefined));
     createSessionMock.mockImplementation((session: string) => Effect.sync(() => {
       const socketDir = join(process.env.PANOPTICON_HOME!, 'sockets');
       mkdirSync(socketDir, { recursive: true, mode: 0o700 });
@@ -167,6 +176,55 @@ describe('POST /api/conversations/:name/switch-model', () => {
       harness: 'claude-code',
       sessionAlive: true,
     });
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+      'conv-switch-regression',
+      '/model claude-fable-5',
+      'conversation-switch-model',
+      'auto',
+    );
+    expect(killSessionMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+  });
+
+  it('falls back to respawn when Tier 1 delivery fails', async () => {
+    deliverAgentMessageMock.mockRejectedValueOnce(new Error('MessageDeliveryFailed: socket missing'));
+    const cwd = join(testHome, 'fallback-workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const sessionId = 'fallback-session';
+    const sessionFile = sessionFilePath(cwd, sessionId);
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Keep context' }] } }),
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-06-10T00:00:00.000Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Still in context' }],
+          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+
+    createConversation({
+      name: 'switch-fallback',
+      tmuxSession: 'conv-switch-fallback',
+      cwd,
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      claudeSessionId: sessionId,
+    });
+
+    const response = await postSwitchModel('switch-fallback', { model: 'claude-fable-5' });
+
+    expect(response.status).toBe(200);
+    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-fallback');
+    expect(createSessionMock).toHaveBeenCalled();
     expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
   });
 });

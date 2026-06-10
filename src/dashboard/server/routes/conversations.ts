@@ -191,15 +191,24 @@ function shellQuote(str: string): string {
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
+const SWITCH_MODEL_STATUSLINE_TIMEOUT_MS = 5_000;
+const SWITCH_MODEL_STATUSLINE_POLL_MS = 250;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 
-function registryContextWindowForModel(model: string | null | undefined): number {
-  if (!model) return DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+function modelCapabilityForModel(model: string | null | undefined) {
+  if (!model) return undefined;
   const resolvedModel = resolveModelIdSync(model);
-  const capability = Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
     ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
     : undefined;
-  return capability?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+}
+
+function registryContextWindowForModel(model: string | null | undefined): number {
+  return modelCapabilityForModel(model)?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+}
+
+function displayNameForModel(model: string): string {
+  return modelCapabilityForModel(model)?.displayName ?? model;
 }
 
 async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
@@ -216,6 +225,24 @@ async function hasProviderRoutingChanged(currentModel: string | null | undefined
   ]);
   return currentExports.trim() !== targetExports.trim();
 }
+
+async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
+  const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
+  const targetModelId = targetModel.toLowerCase();
+  const start = Date.now();
+  while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
+    const pane = await Effect.runPromise(
+      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+    );
+    const normalizedPane = pane.toLowerCase();
+    if (normalizedPane.includes(targetDisplayName) || normalizedPane.includes(targetModelId)) {
+      return true;
+    }
+    await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
+  }
+  return false;
+}
+
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
@@ -2641,6 +2668,26 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           contextTokens,
           effectiveTargetWindow,
         });
+
+        if (harness === 'claude-code' && switchStrategy.useModelCommand && targetModel) {
+          if (model) setConversationModel(name, model);
+          try {
+            await deliverAgentMessage(
+              tmuxSession,
+              `/model ${targetModel}`,
+              'conversation-switch-model',
+              resolveConversationDeliveryMethod(conv),
+            );
+            if (await waitForModelStatusline(tmuxSession, targetModel)) {
+              markConversationActive(name);
+              return jsonResponse({ ...conv, status: 'active', model: targetModel, harness, reattached: false, sessionAlive: true });
+            }
+            console.warn(`[conversations] switch-model Tier 1 statusline verification timed out for ${name}; falling back to respawn`);
+          } catch (deliveryErr: unknown) {
+            const msg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+            console.warn(`[conversations] switch-model Tier 1 delivery failed for ${name}; falling back to respawn: ${msg}`);
+          }
+        }
 
         // Mark the session as mid-respawn BEFORE killing it so terminal
         // WS reconnects landing in the kill→spawn gap don't get a fatal
