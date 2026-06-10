@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T01:14:09.084Z"
+    "updated": "2026-06-10T01:16:20.033Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 36,
+    "sequence": 42,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T01:14:09.084Z",
+    "updated": "2026-06-10T01:16:20.033Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -441,58 +441,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T01:14:07.412Z",
+        "updatedAt": "2026-06-10T01:16:20.031Z",
         "work": {
-          "updatedAt": "2026-06-10T01:14:07.412Z",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-10T01:14:07.412Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-10T01:14:07.412Z"
+              "status": "passed",
+              "at": "2026-06-10T01:16:20.031Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T01:14:07.412Z",
-          "notes": "Verification failed at test",
+          "status": "failed",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
+          "notes": "Verification failed at lint",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T01:14:07.412Z",
-              "notes": "Verification failed at test"
+              "status": "failed",
+              "at": "2026-06-10T01:16:20.031Z",
+              "notes": "Verification failed at lint"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:14:07.412Z",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:14:07.412Z"
+              "at": "2026-06-10T01:16:20.031Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T01:14:07.412Z",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:14:07.412Z",
+          "updatedAt": "2026-06-10T01:16:20.031Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:14:07.412Z"
+              "at": "2026-06-10T01:16:20.031Z"
             }
           ],
           "readyForMerge": false,
