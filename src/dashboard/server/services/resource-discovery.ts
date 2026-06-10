@@ -748,6 +748,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
+      remoteAgent: issue.resourceDetails.remoteAgent ?? null,
     },
   }));
 }
