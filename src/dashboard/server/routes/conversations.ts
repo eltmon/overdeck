@@ -29,7 +29,11 @@ import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
-import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
+import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
+import {
+  decideSwitchStrategy,
+  getEffectiveTargetWindow,
+} from '../../../lib/conversations/switch-strategy.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -186,7 +190,32 @@ function shellQuote(str: string): string {
 }
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+
+function registryContextWindowForModel(model: string | null | undefined): number {
+  if (!model) return DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+  const resolvedModel = resolveModelIdSync(model);
+  const capability = Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
+    : undefined;
+  return capability?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+}
+
+async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
+  if (!model) return false;
+  return getProviderForModelSync(model).name === 'openai'
+    && (await getProviderAuthMode(model)) === 'subscription';
+}
+
+async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
+  if (!currentModel || !targetModel || currentModel === targetModel) return false;
+  const [currentExports, targetExports] = await Promise.all([
+    getProviderExportsForModel(currentModel),
+    getProviderExportsForModel(targetModel),
+  ]);
+  return currentExports.trim() !== targetExports.trim();
+}
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
@@ -2574,37 +2603,59 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         }
         const harnessChanged = harness !== currentHarness;
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.claudeSessionId;
+
+        // Resolve the transcript before the kill→spawn gap so the route can decide
+        // whether compaction is actually needed for the target window.
+        const sessionFile = await resolveSessionFile(conv);
+        const cwd = conv.cwd;
+        const tmuxSession = conv.tmuxSession;
+        const effort = conv.effort ?? undefined;
+        const issueId = conv.issueId ?? undefined;
+        const targetModel = model ?? conv.model ?? undefined;
+        const providerRoutingChanged = await hasProviderRoutingChanged(conv.model, targetModel);
+        const contextUsage = sessionFile && existsSync(sessionFile)
+          ? await computeContextUsage(sessionFile, conv.model ?? targetModel ?? null)
+          : null;
+        const contextTokens = contextUsage?.estimatedTokens ?? 0;
+        const currentObservedCeiling = Math.max(contextUsage?.maxObservedInputTokens ?? 0, contextTokens);
+        const effectiveTargetWindow = getEffectiveTargetWindow({
+          registryWindow: registryContextWindowForModel(targetModel),
+          currentObservedCeiling,
+          cliproxyRouted: await isCliproxyRoutedModel(targetModel),
+          providerRoutingChanged,
+        });
+        const switchStrategy = decideSwitchStrategy({
+          harnessChanged,
+          providerRoutingChanged,
+          contextTokens,
+          effectiveTargetWindow,
+        });
+
         // Mark the session as mid-respawn BEFORE killing it so terminal
         // WS reconnects landing in the kill→spawn gap don't get a fatal
         // 4404. The marker is cleared in the `finally` below regardless
         // of which branch returns or throws.
-        const respawn = markRespawnPending(conv.tmuxSession);
+        const respawn = markRespawnPending(tmuxSession);
         try {
-          // Always kill the existing session first (if alive) so the model change takes effect
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-          if (!(await validateCwdContainment(conv.cwd))) {
-            return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-          }
-
-          // Validate model before persisting so invalid values never reach the DB.
-          if (model && !SAFE_MODEL_PATTERN.test(model)) {
-            return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-          }
+          // Tier 1 (/model in-session) is wired by the follow-up bead. Until then,
+          // every switch still respawns; the tier decision already owns whether
+          // this respawn compacts.
+          await Effect.runPromise(killSession(tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
           // Persist the new model and harness
           if (model) setConversationModel(name, model);
           if (harnessChanged) setConversationHarness(name, harness);
-
-          // Extract the session UUID from the existing session file path
-          const oldSessionId = conv.claudeSessionId;
-
-          // Compact (if needed) then respawn with the new model before reporting success.
-          const sessionFile = await resolveSessionFile(conv);
-          const cwd = conv.cwd;
-          const tmuxSession = conv.tmuxSession;
-          const effort = conv.effort ?? undefined;
-          const issueId = conv.issueId ?? undefined;
 
           // Only resume if the session JSONL actually exists — Claude Code's --resume
           // fails with "No conversation found" if the file is missing (e.g., first
@@ -2648,8 +2699,9 @@ const postConversationSwitchModelRoute = HttpRouter.add(
               canResume = false;
             }
           } else if (harness === 'claude-code') {
-            // Same harness, Claude Code: native (Claude-format) compaction is correct.
-            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+            // Same harness, Claude Code: native (Claude-format) compaction is correct
+            // only when the tier decision says the active context will not fit.
+            await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
           }
           // Pi staying on Pi: skip native compaction — it is Claude-format only and
           // would corrupt the Pi JSONL. Pi manages its own context.

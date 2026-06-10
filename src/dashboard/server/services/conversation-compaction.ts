@@ -11,8 +11,6 @@ import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../..
 import { getEventStore } from '../event-store.js';
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 
-const COMPACT_TOKEN_THRESHOLD = 100_000;
-
 const activeCompactions = new Set<string>();
 export function isCompacting(sessionFile: string): boolean {
   return activeCompactions.has(sessionFile);
@@ -28,7 +26,7 @@ export interface NativeCompactionResult {
 export interface MaybeCompactBeforeRespawnOptions {
   sessionFile: string | null | undefined;
   cwd: string;
-  modelChanged: boolean;
+  shouldCompact: boolean;
 }
 
 export function getConversationCompactionSettings() {
@@ -175,18 +173,16 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
 export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnOptions): Promise<void> {
   if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
+  if (!opts.shouldCompact) {
+    console.log('[conversation-compaction] Skipping compact (shouldCompact=false)');
+    return;
+  }
   // Background AI gate: low-cost mode (or the summaryFork toggle) skips
   // automatic LLM compaction before respawn.
   if (!isBackgroundFeatureEnabled('summaryFork')) return;
 
   const tokens = await estimateContextTokens(opts.sessionFile);
-  const overThreshold = tokens > COMPACT_TOKEN_THRESHOLD;
-  if (!opts.modelChanged && !overThreshold) {
-    console.log(`[conversation-compaction] Skipping compact (modelChanged=false, tokens=${tokens})`);
-    return;
-  }
-
-  console.log(`[conversation-compaction] Compacting before respawn (modelChanged=${opts.modelChanged}, tokens=${tokens})`);
+  console.log(`[conversation-compaction] Compacting before respawn (shouldCompact=true, tokens=${tokens})`);
   await compactConversationNative(opts.sessionFile);
 }
 
