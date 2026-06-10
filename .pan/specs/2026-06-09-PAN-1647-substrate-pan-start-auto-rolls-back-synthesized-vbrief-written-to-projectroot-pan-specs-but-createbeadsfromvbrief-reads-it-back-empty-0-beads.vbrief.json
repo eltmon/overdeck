@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:06:57.992Z"
+    "updated": "2026-06-10T00:10:10.931Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 45,
+    "sequence": 52,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:06:57.992Z",
+    "updated": "2026-06-10T00:10:10.931Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -163,58 +163,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:06:56.848Z",
+        "updatedAt": "2026-06-10T00:10:10.796Z",
         "work": {
-          "updatedAt": "2026-06-10T00:06:56.848Z",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T00:06:56.848Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T00:06:56.848Z"
+              "status": "passed",
+              "at": "2026-06-10T00:10:10.796Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T00:06:56.848Z",
-          "notes": "Verification failed at vbrief-ac",
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "notes": "Verification failed at lint",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T00:06:56.848Z",
-              "notes": "Verification failed at vbrief-ac"
+              "status": "reviewing",
+              "at": "2026-06-10T00:10:10.796Z",
+              "notes": "Verification failed at lint"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:06:56.848Z",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:06:56.848Z"
+              "at": "2026-06-10T00:10:10.796Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:06:56.848Z",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:06:56.848Z",
+          "updatedAt": "2026-06-10T00:10:10.796Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:06:56.848Z"
+              "at": "2026-06-10T00:10:10.796Z"
             }
           ],
           "readyForMerge": false,
