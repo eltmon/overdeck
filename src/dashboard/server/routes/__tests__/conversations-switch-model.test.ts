@@ -239,6 +239,56 @@ describe('POST /api/conversations/:name/switch-model', () => {
     expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
   });
 
+  it('keeps default-model Anthropic switches in Tier 1 when provider exports only unset env', async () => {
+    getProviderExportsForModelMock.mockResolvedValue([
+      'unset ANTHROPIC_BASE_URL',
+      'unset ANTHROPIC_AUTH_TOKEN',
+      'unset OPENAI_API_KEY',
+    ].join('\n') + '\n');
+    const cwd = join(testHome, 'default-model-anthropic-workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const sessionId = 'default-model-anthropic-session';
+    const sessionFile = sessionFilePath(cwd, sessionId);
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Default Anthropic conversation' }] } }),
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-06-10T00:00:00.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Still in context' }],
+          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+
+    createConversation({
+      name: 'switch-default-anthropic',
+      tmuxSession: 'conv-switch-default-anthropic',
+      cwd,
+      model: null,
+      harness: 'claude-code',
+      claudeSessionId: sessionId,
+    });
+
+    const response = await postSwitchModel('switch-default-anthropic', { model: 'claude-fable-5' });
+
+    expect(response.status).toBe(200);
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+      'conv-switch-default-anthropic',
+      '/model claude-fable-5',
+      'conversation-switch-model',
+      'auto',
+    );
+    expect(killSessionMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+  });
+
   it('respawns default-model conversations when switching to a routed provider target', async () => {
     getProviderExportsForModelMock.mockImplementation(async (model: string) => (
       model === 'gpt-5.5' ? 'export ANTHROPIC_BASE_URL=http://127.0.0.1:4545\nexport ANTHROPIC_AUTH_TOKEN=proxy-token' : ''

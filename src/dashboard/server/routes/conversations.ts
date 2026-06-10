@@ -217,14 +217,22 @@ async function isCliproxyRoutedModel(model: string | null | undefined): Promise<
     && (await getProviderAuthMode(model)) === 'subscription';
 }
 
+function providerRoutingSignature(exports: string): string {
+  return exports
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('unset '))
+    .join('\n');
+}
+
 async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
   if (!targetModel || currentModel === targetModel) return false;
 
-  const targetExports = await getProviderExportsForModel(targetModel);
-  if (!currentModel) return targetExports.trim() !== '';
+  const targetSignature = providerRoutingSignature(await getProviderExportsForModel(targetModel));
+  if (!currentModel) return targetSignature !== '';
 
-  const currentExports = await getProviderExportsForModel(currentModel);
-  return currentExports.trim() !== targetExports.trim();
+  const currentSignature = providerRoutingSignature(await getProviderExportsForModel(currentModel));
+  return currentSignature !== targetSignature;
 }
 
 const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
