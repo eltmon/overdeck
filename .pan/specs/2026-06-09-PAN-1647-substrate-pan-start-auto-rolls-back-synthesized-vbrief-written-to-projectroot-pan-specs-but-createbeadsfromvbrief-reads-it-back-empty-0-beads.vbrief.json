@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:20:10.352Z"
+    "updated": "2026-06-10T00:20:13.445Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 58,
+    "sequence": 59,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:20:10.352Z",
+    "updated": "2026-06-10T00:20:13.445Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -166,29 +166,29 @@
         "phase": "work",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:20:08.764Z",
+        "updatedAt": "2026-06-10T00:20:08.766Z",
         "work": {
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "status": "running",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T00:20:08.764Z"
+              "status": "running",
+              "at": "2026-06-10T00:20:08.766Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "notes": "Approved: all four convoy reviewers were ready and no blocking findings remain.",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:20:08.764Z",
+              "at": "2026-06-10T00:20:08.766Z",
               "notes": "Approved: all four convoy reviewers were ready and no blocking findings remain."
             }
           ],
@@ -196,25 +196,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:20:08.764Z"
+              "at": "2026-06-10T00:20:08.766Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:20:08.764Z",
+          "updatedAt": "2026-06-10T00:20:08.766Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:20:08.764Z"
+              "at": "2026-06-10T00:20:08.766Z"
             }
           ],
           "readyForMerge": false,
