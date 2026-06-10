@@ -440,9 +440,23 @@ export async function migrateLocalToRemote(
       result.steps.push(`Warning: ${planningResult.errors.join(', ')}`);
     }
 
+    // Safety: never delete the local workspace if the continue state failed
+    // to reach the VM — it's gitignored, so the local copy is the only one.
+    const localContinue = join(localPath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+    let keepLocal = options.keep;
+    if (!keepLocal && existsSync(localContinue)) {
+      const check = await Effect.runPromise(
+        provider.ssh(metadata.vmName, `[ -f /workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME} ] && echo present`)
+      );
+      if (!check.stdout.trim()) {
+        result.steps.push('Warning: continue.json did not reach the VM — keeping local workspace');
+        keepLocal = true;
+      }
+    }
+
     // 10. Cleanup local (unless --keep)
     // Docker containers are stopped by removeWorkspace() via stopWorkspaceDocker()
-    if (!options.keep) {
+    if (!keepLocal) {
       spinner.text = 'Cleaning up local workspace...';
       try {
         if (projectConfig) {

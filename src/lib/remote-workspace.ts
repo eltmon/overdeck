@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { Data, Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
+import { writeRemoteFile } from './remote/remote-agents.js';
 import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
@@ -155,10 +156,9 @@ export interface CreateRemoteWorkspaceOptions {
     ];
     for (const [localPath, remotePath] of artifacts) {
       if (!existsSync(localPath)) continue;
-      const b64 = Buffer.from(readFileSync(localPath)).toString('base64');
-      await Effect.runPromise(
-        fly.ssh(vmName, `mkdir -p $(dirname ${remotePath}) && echo '${b64}' | base64 -d > ${remotePath}`)
-      );
+      // Chunked + size-verified: a single base64 exec silently truncates past
+      // the ~16KB payload cap, and these files are the agent's resume state.
+      await writeRemoteFile(fly, vmName, remotePath, readFileSync(localPath, 'utf-8'));
     }
   }
 

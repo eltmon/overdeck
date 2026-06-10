@@ -137,7 +137,7 @@ async function ensureRemoteTmuxContext(provider: FlyProvider, vmName: string): P
  * Throws on any failed write: a missing prompt file produces an agent that
  * silently starts with no instructions.
  */
-async function writeRemoteFile(
+export async function writeRemoteFile(
   provider: FlyProvider,
   vmName: string,
   remotePath: string,
