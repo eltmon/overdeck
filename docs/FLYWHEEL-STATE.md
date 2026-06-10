@@ -1525,3 +1525,24 @@ unreapable — PAN-1699 class); 1242/1491 fast test FAILURES (suspect broken
 workspace docker stacks, not code); PAN-1658 issue still open drawing
 reconciler attention (operator close/re-scope pending); strike-1682 parked 20+
 ticks (code long since on main).
+
+## RUN-18 ticks 33-41 (2026-06-10 morning) — 3rd red main, test starvation named, FIVE at the gate
+
+- **3rd red main** (69fb3239f doc line tripping beads-scoping) filed PAN-1732,
+  struck, fixed (+1/-1, 48a6ffd3b), closed with evidence — diagnosis-to-green
+  ~25 min. Recurring class: any line matching `` `bd ready `` in
+  src/lib/cloister/prompts/work.md MUST carry `-l {{ISSUE_ID_LOWER}}`.
+  NOTE: roles/work.md ≠ src/lib/cloister/prompts/work.md (the test reads the
+  latter; a pan-tell corrected an early mis-pointer).
+- **Test-dispatch STARVATION is a design gap** (documented on PAN-1730): freed
+  slots are instantly out-competed by eager review-convoy dispatch; tests
+  waited 6-10h across multiple ceiling configurations. Fix direction: reserved
+  test slot or queue priority. The pause-gambit (pan pause the idle
+  review-passed work agent so its OWN test can dispatch) works as manual relief
+  — unpause if the test then fails.
+- **Morning state: FIVE merge-ready** (1700 keystone, 1704, 1719 first-fly.io,
+  1629, 1712 remote) — from a pipeline that was fully frozen at 02:00. PAN-1712
+  = first full remote (fly.io) execution through plan→work→review→test, adopted
+  into the pipeline via pan-tell from its wrangler.
+- 1641 test=failed (suspect its PAN-1710 boot-surface regression vs new main,
+  or broken workspace docker stack) — feedback cycle owns it.
