@@ -1,20 +1,23 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-06-10T12:56:28.000Z",
+    "created": "2026-06-10T14:29:53.682Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1737: feat(dashboard): merge-queue UX overhaul — branch names, honest control labels, UAT instructions + live UAT-frontend link",
-    "updated": "2026-06-10T12:59:56.266Z"
+    "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
+    "updated": "2026-06-10T14:37:18.306Z"
   },
   "plan": {
     "id": "pan-1737",
-    "title": "merge-queue UX overhaul — branch names, honest control labels, UAT instructions + live UAT-frontend link",
+    "title": "UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
     "status": "proposed",
-    "uid": "e50a6883-99f6-43d2-bf6f-d8abdaabdf20",
-    "author": "agent:claude-opus-4-8",
-    "sequence": 2,
-    "created": "2026-06-10T12:56:28.000Z",
-    "updated": "2026-06-10T12:59:56.266Z",
+    "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
+    "author": "agent:claude-fable-5",
+    "sequence": 3,
+    "created": "2026-06-10T14:29:53.682Z",
+    "updated": "2026-06-10T14:37:18.306Z",
+    "metadata": {
+      "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json"
+    },
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1737",
@@ -22,96 +25,72 @@
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1691",
-        "label": "PAN-1691 (merge train)",
-        "type": "related"
+        "uri": ".pan/drafts/PAN-1737.md",
+        "label": "PRD: UAT Batch Trains",
+        "type": "prd"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1694",
-        "label": "PAN-1694 (flywheel IA)",
-        "type": "related"
-      },
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1686",
-        "label": "PAN-1686 (UAT plan surfacing)",
-        "type": "related"
-      },
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1736",
-        "label": "PAN-1736 (verb contract)",
-        "type": "related"
-      },
-      {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1738",
-        "label": "PAN-1738 (split-out: UAT-candidate preview stack)",
-        "type": "related"
+        "uri": "docs/design/pan-1737-uat-batch-trains.html",
+        "label": "Approved 3-state mockup",
+        "type": "design"
       }
     ],
     "tags": [
-      "dashboard",
       "flywheel",
-      "merge-queue",
-      "ux",
-      "frontend"
+      "merge-train",
+      "uat",
+      "dashboard",
+      "frontend",
+      "backend"
     ],
     "narratives": {
-      "Problem": "The Flywheel MergeQueueCard has misleading controls and missing context. (1) The action button reads 'Ship batch' but actually calls /api/flywheel/merge-next, which sequentially merges N queue items to main with full ceremony and stops on the first failure — the label hides what it does. (2) The assemble control (calls /api/flywheel/assemble-uat to build the UAT-candidate branch) only appears when batch-safe items exist, so with an all-serialize queue the operator never learns the capability or why it is unavailable. (3) Rows show only the issue id — no feature branch name and no clickable PR link. (4) Before merging, the operator must UAT but the card never says WHAT to test. (5) There is no one-click path to a running frontend serving the work under test.",
-      "Proposal": "Overhaul the card in place using existing dashboard primitives and a trivial backend enrichment. (a) Make controls honest: rename the assemble control to 'Assemble UAT branch' and render it always — disabled with an explanatory tooltip when there are no batch-safe items; drop the 'Ship batch' label, label the merge action 'Merge N to main', and gate it behind a useConfirm() dialog (the MergeButton.tsx pattern) whose message states it merges N queue items to main in order and stops on the first failure. (b) Enrich the backend MergeQueueItem with branchName (already computed as feature/<id>) and prUrl, and render feature/pan-XXXX plus a clickable PR link per row. (c) Add a collapsible 'What to UAT' section for the queue head sourced from the SAME vBRIEF acceptance-criteria extractor PAN-1686 uses (src/lib/vbrief/acceptance-criteria.ts via GET /api/workspaces/:issueId/plan) — never a new parser. (d) Give each ready row a one-click link to its existing workspace frontendUrl for live UAT (reusing /api/workspaces/:issueId, the AwaitingMergePage pattern). (e) Reorganize the card into three clear zones (UAT candidate / serialized queue / controls). Spinning a UNIFIED preview stack for the assembled uat/<codename> candidate branch is a separate ~300-500 LOC infra subsystem with docker-network and single-deacon hazards; it is split into a follow-up issue, not built here."
+      "Problem": "Operator could not use the merge queue: no idea what it meant, what to UAT, or where to UAT it. The PAN-1691 model only bundles conflict-free features, never resolves conflicts, has a misleading manual 'Ship batch' control, and offers no live environment serving the assembled candidate. Re-planned 2026-06-10 (operator design session): this spec supersedes the original 7-bead merge-queue card UX scope; the old decision to split live-UAT-stack work into PAN-1738 is reversed — PAN-1738's core is absorbed here.",
+      "Proposal": "UAT batch trains per .pan/drafts/PAN-1737.md: an assembly engine builds throwaway uat/<codename>-<MMDD> branches off main containing as many ready features as possible in merge order, with cross-feature conflicts resolved inside the batch by a timeboxed headless assembly agent (unresolvable -> feature held out with visible reason). Generations accumulate; a new one assembles in the background while the current stays testable. Promote-the-batch is the primary merge (main receives exactly the tested tree); single-feature merge remains an escape hatch that invalidates live batches. Each generation gets an on-demand live stack at uat-<codename>-<mmdd>.pan.localhost (max 2 concurrent, mandatory teardown). The Flywheel rail card is rebuilt around batches with per-issue What-to-UAT checklists from the shared vBRIEF AC extractor."
     },
-    "autoDecisions": [
-      {
-        "summary": "Split the assembled-UAT-candidate unified preview stack (a running frontend serving the uat/<codename> branch) into follow-up issue PAN-1738; PAN-1737 delivers the per-feature live frontend link using each ready issue's existing workspace stack.",
-        "rationale": "Spinning a stack for an arbitrary uat/* branch requires new infra (worktree + devcontainer render + docker compose up + Traefik host, ~300-500 LOC) and carries real hazards (Docker's ~31-network bridge pool exhaustion documented in CLAUDE.md; the single-deacon invariant). It is cleanly separable from a frontend card-UX overhaul. Linking each ready feature to its already-running workspace frontend delivers the bulk of the UAT value with zero new infra and no dead UI, satisfying the no-partial-implementation rule."
-      },
-      {
-        "summary": "Source UAT guidance from the existing GET /api/workspaces/:issueId/plan endpoint plus the shared src/lib/vbrief/acceptance-criteria.ts extractor, rather than hard-depending on PAN-1686's in-flight /api/workspaces/:issueId/uat-context endpoint.",
-        "rationale": "The shared extractor is already on main; the /uat-context endpoint lives on the unmerged feature/pan-1686 branch. Reusing the extractor shares the data source (the issue's explicit ask — 'same data source, don't duplicate') without blocking PAN-1737 on another branch. If /uat-context has merged by implementation time, consume it instead."
-      },
-      {
-        "summary": "Render the 'Assemble UAT branch' control always — disabled with a tooltip when no batch-safe items exist — instead of hiding it.",
-        "rationale": "The issue explicitly asks for disable-with-tooltip so the operator learns the capability and understands why it is unavailable on an all-serialize queue, rather than seeing a silently-absent button."
-      },
-      {
-        "summary": "Use the existing useConfirm() dialog (DialogProvider) for the merge-to-main confirmation, matching MergeButton.tsx, rather than window.confirm.",
-        "rationale": "Keeps the dashboard's confirm-dialog convention consistent and themable; MergeButton.tsx is the exact merge-to-main analog."
-      }
-    ],
+    "autoDecisions": [],
     "items": [
       {
-        "id": "enrich-merge-queue-item",
-        "title": "Backend: add branchName + prUrl to MergeQueueItem and return from /api/flywheel/merge-queue",
+        "id": "uat-generations-store",
+        "title": "SQLite generation store: uat_generations table + CRUD module",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-10T12:56:28.000Z",
+        "created": "2026-06-10T14:29:53.682Z",
         "metadata": {
-          "difficulty": "simple",
+          "difficulty": "medium",
           "issueLabel": "pan-1737",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "assembly-engine",
+            "uat-reconciler",
+            "promote-path",
+            "uat-stack-lifecycle",
+            "uat-generations-api"
+          ]
         },
         "narrative": {
-          "Action": "Enrich the MergeQueueItem contract in src/lib/flywheel-merge-order.ts so the frontend does not re-derive branch names or construct PR URLs in the browser. Add branchName (already computed internally as feature/<issueId lowercased> near line 119) and an optional prUrl resolved server-side (reuse the existing review-status prUrl / workspace mrUrl resolution the dashboard already uses, or construct from the issue's GitHub repo slug via resolveProjectFromIssue + the pr number). Return both fields from GET /api/flywheel/merge-queue (src/dashboard/server/routes/flywheel.ts ~line 892). Leave all existing fields unchanged."
+          "Action": "Add a uat_generations table to ~/.panopticon/panopticon.db via the schema.ts migration chain (bump schema version): name (PK, e.g. uat/calm-otter-0610), branch, worktreePath, baseSha, members JSON (issueId, title, branch, headSha, mergeOrder), heldOut JSON (issueId, reason), resolutions JSON (issueIds, files, commitSha), status (assembling|ready|superseded|invalidated|promoted|failed), stackStartedAt nullable, createdAt/updatedAt. Build src/lib/database/uat-generations-db.ts following the app-settings.ts / review-status-db.ts sync-wrapper pattern: insert, getByName, listChain (newest first), updateStatus, setStackStartedAt, clearStack. Unit tests for CRUD + chain ordering."
         },
         "subItems": [
           {
-            "id": "enrich-merge-queue-item.ac1",
-            "title": "MergeQueueItem gains branchName: string, populated as feature/<issueId lowercased> for every item; existing flywheel-merge-order unit tests updated/added to assert it.",
+            "id": "uat-generations-store.ac1",
+            "title": "Schema migration creates uat_generations with the fields above; migration is idempotent and existing DBs upgrade cleanly",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "enrich-merge-queue-item.ac2",
-            "title": "MergeQueueItem gains optional prUrl?: string resolved server-side; present whenever a PR exists for the issue, absent otherwise. No browser-side repo-slug guessing required.",
+            "id": "uat-generations-store.ac2",
+            "title": "CRUD module exposes sync insert/getByName/listChain/updateStatus/stack-state functions in the established database module style; no execSync anywhere",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "enrich-merge-queue-item.ac3",
-            "title": "GET /api/flywheel/merge-queue response includes branchName and prUrl on each item; all previously-returned fields are unchanged; typecheck/lint/tests pass.",
+            "id": "uat-generations-store.ac3",
+            "title": "Unit tests cover insert -> listChain ordering (newest first), status transitions, and JSON round-trip of members/heldOut/resolutions",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -120,40 +99,54 @@
         ]
       },
       {
-        "id": "honest-assemble-label",
-        "title": "Frontend: rename assemble control to 'Assemble UAT branch' + disable-with-tooltip when no batch-safe items",
+        "id": "assembly-engine",
+        "title": "Assembly engine: persistent worktree, ordered merges, held-out fallback, generation recording",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-10T12:56:28.000Z",
+        "created": "2026-06-10T14:29:53.682Z",
         "metadata": {
-          "difficulty": "simple",
+          "difficulty": "complex",
           "issueLabel": "pan-1737",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conflict-agent",
+            "uat-reconciler",
+            "promote-path",
+            "uat-stack-lifecycle"
+          ]
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/flywheel/MergeQueueCard.tsx, make the assemble control honest. Rename it to 'Assemble UAT branch' and render it ALWAYS (move it out of the candidate-box-only conditional) so it is visible even on an all-serialize queue, in a disabled state with a tooltip explaining why (e.g. 'No batch-safe items to bundle — all ready items must merge one at a time'). When batch-safe items exist, clicking still POSTs /api/flywheel/assemble-uat exactly as today. Keep the assemble action visually distinct from the merge-to-main action so it never reads as a merge."
+          "Action": "Build src/lib/cloister/uat-generation-engine.ts (pure orchestrator with injected deps, modeled on uat-assemble.ts) + uat-generation-deps.ts (real git). Given the ready set (ordered members with branches), assemble a new generation: unique codename via makeUatCandidateName seeded per generation (not per day), persistent worktree at <projectRoot>/workspaces/uat-<codename>-<mmdd>/ on branch uat/<codename>-<mmdd> off origin/main, merge each feature branch in order with --no-edit, on conflict call the injected resolveConflict hook, on hook failure git merge --abort and record the feature as held out with reason, push -u origin at the end, record the generation row (members with headShas, resolutions, heldOut, baseSha). All git via async exec. Old uat worktrees/branches beyond the newest 3 non-promoted generations are removed (worktree remove + branch delete local+origin)."
         },
         "subItems": [
           {
-            "id": "honest-assemble-label.ac1",
-            "title": "The control's label reads 'Assemble UAT branch' (no bare 'Assemble', no 'Ship batch').",
+            "id": "assembly-engine.ac1",
+            "title": "Assembling with zero conflicts produces a pushed uat/<codename>-<mmdd> branch off origin/main whose tree contains every member branch merge, in queue order, and a ready generation row with baseSha and member headShas",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "honest-assemble-label.ac2",
-            "title": "When uat-candidate has no batch-safe items, the control is shown but disabled, with a tooltip stating no batch-safe items exist; when items exist it is enabled and POSTs /api/flywheel/assemble-uat as before.",
+            "id": "assembly-engine.ac2",
+            "title": "A conflicting member invokes the resolveConflict hook; hook failure aborts that merge only — the member lands in heldOut with a human-readable reason and assembly continues with remaining members",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "honest-assemble-label.ac3",
-            "title": "The assemble control is visually distinct from the merge-to-main action (different placement/treatment) so it cannot be mistaken for a merge.",
+            "id": "assembly-engine.ac3",
+            "title": "Generation codenames never collide with existing rows (isTaken consults the store); worktree folder name matches the branch (slash -> dash) so the Traefik host pattern applies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "assembly-engine.ac4",
+            "title": "Cleanup keeps at most the newest 3 non-promoted generations' worktrees/branches; engine unit tests with fake deps cover happy path, conflict-resolved, held-out, and cleanup",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -162,95 +155,11 @@
         ]
       },
       {
-        "id": "honest-merge-next-label",
-        "title": "Frontend: replace 'Ship batch' with 'Merge N to main' + confirm dialog stating exact semantics",
+        "id": "conflict-agent",
+        "title": "Assembly-agent conflict resolution: timeboxed headless run in the generation worktree",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-10T12:56:28.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1737",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In MergeQueueCard.tsx, drop the misleading 'Ship batch' label on the merge-next action button. Label it 'Merge {n} to main' (correct singular/plural). Before firing mergeNextMutation, open a useConfirm() dialog (import from DialogProvider, matching MergeButton.tsx) whose message states exactly what happens: it merges {n} queue items to main, in order, and stops on the first failure. Confirming triggers merge-next; cancelling does nothing. Keep the existing N stepper and the existing toast handling."
-        },
-        "subItems": [
-          {
-            "id": "honest-merge-next-label.ac1",
-            "title": "The merge action button no longer contains the text 'Ship batch'; it reads 'Merge {n} to main' with correct pluralization.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "honest-merge-next-label.ac2",
-            "title": "Clicking the button opens a useConfirm() dialog whose message states it merges {n} queue items to main in order and stops on the first failure; confirming POSTs /api/flywheel/merge-next with n, cancelling makes no request.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "honest-merge-next-label.ac3",
-            "title": "Uses the existing useConfirm hook from DialogProvider (no window.confirm); existing stepper and toast-on-result behavior preserved.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "branch-and-pr-per-row",
-        "title": "Frontend: show feature/pan-XXXX branch name + clickable PR link on every queue row",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-10T12:56:28.000Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1737",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In MergeQueueCard.tsx, render the branch name and a clickable PR link on each queue row (both the candidate-bundled rows and the serialized rows). Use item.branchName (from the enriched backend item) shown in monospace alongside the issue id. Where item.prUrl exists, render a clickable link that opens the PR in a new tab (mirror AwaitingMergePage's prUrl link treatment); the existing bare #pr number can become that link's label. Preserve the existing IdLink navigate-to-issue behavior."
-        },
-        "subItems": [
-          {
-            "id": "branch-and-pr-per-row.ac1",
-            "title": "Every queue row (candidate-bundled and serialized) displays its branch name feature/pan-XXXX in monospace, taken from item.branchName.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "branch-and-pr-per-row.ac2",
-            "title": "Rows with a PR show a clickable link (target=_blank, rel=noreferrer) to item.prUrl; rows without a PR omit the link gracefully.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "branch-and-pr-per-row.ac3",
-            "title": "The existing IdLink (click issue id → onNavigateIssue) behavior is unchanged.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "uat-guidance-section",
-        "title": "Frontend: collapsible 'What to UAT' section for the queue head, sourced from the shared vBRIEF AC extractor (no duplication of PAN-1686)",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-10T12:56:28.000Z",
+        "created": "2026-06-10T14:29:53.682Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1737",
@@ -258,28 +167,28 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a collapsible 'What to UAT' section to MergeQueueCard.tsx for the queue head (the next item to merge — mergeOrder 1). Populate it with that issue's acceptance criteria pulled from the vBRIEF. CRITICAL: reuse the SAME data source PAN-1686 uses — fetch GET /api/workspaces/:issueId/plan and extract criteria with the shared extractor in src/lib/vbrief/acceptance-criteria.ts (extractACFromDocument / extractAcceptanceCriteriaSync). Do NOT add a new vBRIEF-parsing path. If PAN-1686's GET /api/workspaces/:issueId/uat-context endpoint has merged by implementation time, prefer consuming it. Fetch lazily (on expand or for the head only) to avoid N+1 queries."
+          "Action": "Implement the resolveConflict hook as a headless agent run (claude -p, async execFile with timeout/AbortSignal, never execSync): cwd = generation worktree mid-conflict, mission = resolve THIS merge only (no behavior changes beyond resolution), then stage and commit with a 'uat-assembly: resolve <issueId> <-> <conflictingIds>' subject. Post-run verification in code: no unmerged paths, merge concluded with a commit. Timebox (default 5 min) or verification failure -> git merge --abort -> held out. Record resolution files+commit in the generation row."
         },
         "subItems": [
           {
-            "id": "uat-guidance-section.ac1",
-            "title": "The card shows a collapsible 'What to UAT' section for the queue head listing that issue's acceptance criteria from the vBRIEF.",
+            "id": "conflict-agent.ac1",
+            "title": "A resolvable conflict between two member branches yields a resolution commit on the uat branch with the uat-assembly: marker, and the resolution (issueIds, files, commitSha) is recorded on the generation",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "uat-guidance-section.ac2",
-            "title": "Acceptance criteria are obtained via GET /api/workspaces/:issueId/plan + the shared src/lib/vbrief/acceptance-criteria.ts extractor (or /uat-context if present); NO new vBRIEF-parsing code is introduced — verifiable from the diff.",
+            "id": "conflict-agent.ac2",
+            "title": "Agent timeout or leftover unmerged paths results in merge --abort and held-out — the assembly never wedges and the server event loop is never blocked",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "uat-guidance-section.ac3",
-            "title": "Graceful fallback: when the plan has no acceptance criteria, the section shows the issue title/proposal or a 'No UAT steps in plan' note rather than erroring or rendering empty.",
+            "id": "conflict-agent.ac3",
+            "title": "Tests use fake timers / fake runner for the timebox path (no real multi-second waits) per the fake-timers rule",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -288,11 +197,153 @@
         ]
       },
       {
-        "id": "per-feature-live-frontend-link",
-        "title": "Frontend: one-click 'Open frontend' link to each ready issue's existing workspace frontendUrl for live UAT",
+        "id": "uat-reconciler",
+        "title": "Reconciler: auto-assemble on ready-set change, invalidate stale generations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-reconciler.ts + interval wiring in the dashboard server (60s, gated per-tick on isMergeTrainEnabled, single-flight). Each tick: compute the ready set from the flywheel merge queue (null-safe when no run is active — no-op); compare against the newest live generation (members ∪ heldOut issue sets, member branch headShas, baseSha vs origin/main). On difference: assemble the next generation (one assembly in flight at a time). Mark ready/superseded generations invalidated when baseSha no longer matches origin/main or a member left the queue / changed head; invalidation tears down that generation's stack. Newest ready generation supersedes older ready ones. Also export a force-reassemble entry for the API."
+        },
+        "subItems": [
+          {
+            "id": "uat-reconciler.ac1",
+            "title": "With merge_train_enabled on and >=1 ready feature, a generation exists within one tick with zero human action; with the flag off or no active flywheel run the tick is a no-op",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac2",
+            "title": "A new ready feature triggers background assembly of a superset generation while the current generation row stays ready (status only flips to superseded when the new one reaches ready)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac3",
+            "title": "main advancing past baseSha, a member leaving the queue, or a member branch gaining commits marks affected generations invalidated and tears down their stacks; reassembly follows automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-reconciler.ac4",
+            "title": "Reconciler unit tests with fake deps cover: no-op tick, first assembly, superset assembly, invalidation cascade; interval tests use fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-path",
+        "title": "Promote: merge the tested batch to main, per-member post-merge exactly once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-promote.ts: precondition generation.status in (ready|superseded) AND baseSha == origin/main HEAD (else reject with a 'stale — reassemble' error). Merge --no-ff the uat branch into main in a temporary worktree (NEVER the primary checkout), push main, then for each member issue run the existing per-issue post-merge lifecycle through the PAN-328 in-flight guard exactly once (GitHub auto-marks the per-feature PRs merged because their commits become reachable from main). Mark the generation promoted, tear down its stack, invalidate all other live generations (main moved), let the reconciler rebuild from the remaining queue."
+        },
+        "subItems": [
+          {
+            "id": "promote-path.ac1",
+            "title": "Promoting a ready generation whose baseSha matches origin/main produces one no-ff merge commit on main whose tree equals the uat branch tree, and pushes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac2",
+            "title": "Every member issue goes through the post-merge lifecycle exactly once (in-flight guard respected; tests/unit/lib/cloister/in-flight-guard.test.ts stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac3",
+            "title": "Promoting with a stale baseSha is rejected with an explanatory error and no git mutation; promoting an older superseded generation works when its baseSha still matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-path.ac4",
+            "title": "After promotion the generation is promoted, its stack is torn down, other live generations are invalidated, and unit tests with fake deps cover success/stale/partial-failure reporting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-stack-lifecycle",
+        "title": "On-demand live UAT stack per generation: max 2 concurrent, mandatory teardown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/cloister/uat-stack.ts: ensureUatStack(generation) renders the devcontainer on the generation worktree (ensureDevcontainerSync — folder uat-<codename>-<mmdd> yields host uat-<codename>-<mmdd>.pan.localhost via the FEATURE_FOLDER template) and runs docker compose up -d --build via async exec; records stackStartedAt. Enforce max 2 running UAT stacks: starting a third tears down the oldest first. teardownUatStack(generation) = compose down -v --remove-orphans + clear stack state; invoked on invalidation, promotion, and generation cleanup. Status probe for the API (running/starting/absent + frontendUrl)."
+        },
+        "subItems": [
+          {
+            "id": "uat-stack-lifecycle.ac1",
+            "title": "Ensuring a stack on a ready generation yields a reachable frontend at uat-<codename>-<mmdd>.pan.localhost serving that generation's tree; the API reports its status and URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-stack-lifecycle.ac2",
+            "title": "A third concurrent stack request tears down the oldest running UAT stack first — at no point do more than 2 UAT stacks run (Docker network pool protection)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-stack-lifecycle.ac3",
+            "title": "Invalidation and promotion always tear the generation's stack down (compose down -v --remove-orphans); no orphaned uat networks/containers accumulate; all exec is async",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-generations-api",
+        "title": "API: uat-generations chain (with per-member ACs), stack ensure, promote, force-rebuild",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-10T12:56:28.000Z",
+        "created": "2026-06-10T14:29:53.682Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1737",
@@ -300,28 +351,28 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Give each queue row (at minimum the queue head) a one-click link to that issue's running workspace frontend so the operator can exercise the change before merging. Reuse the existing pattern: fetch /api/workspaces/:issueId and read frontendUrl (the same field AwaitingMergePage uses). Render an 'Open frontend' link (target=_blank) only when frontendUrl is available; otherwise show a disabled/absent affordance with an explanatory tooltip (mirror AwaitingMergePage's `frontendUrl ? link : disabled` handling). Use the established per-issue workspace fetch (e.g. useQueries) bounded by queue size — no new backend endpoint. NOTE: this covers the per-feature live frontend; a unified preview stack for the assembled uat/<codename> candidate is the split-out follow-up issue, not this bead."
+          "Action": "routes/flywheel.ts: GET /api/flywheel/uat-generations returns the chain newest-first — per generation: name, branch, status, createdAt, members (issueId, title, branch, prUrl), heldOut with reasons, resolutions, stack {status, frontendUrl}, and per-member acceptance criteria resolved server-side via findSpecByIssue + extractACFromDocument from the shared src/lib/vbrief/acceptance-criteria.ts (NO new vBRIEF parser). POST /api/flywheel/uat-generations/:name/stack ensures the stack; POST /api/flywheel/uat-generations/:name/promote promotes; POST /api/flywheel/assemble-uat repurposed to force-reassembly via the reconciler. GET /api/flywheel/merge-queue keeps the branchName/prUrl enrichment; POST /merge-next unchanged (escape hatch)."
         },
         "subItems": [
           {
-            "id": "per-feature-live-frontend-link.ac1",
-            "title": "The queue head (and each row) exposes a one-click 'Open frontend' link to that issue's workspace frontendUrl, opening in a new tab.",
+            "id": "uat-generations-api.ac1",
+            "title": "GET /api/flywheel/uat-generations returns the documented shape including per-member ACs from the shared extractor, with graceful [] when no generations or no flywheel run exist",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "per-feature-live-frontend-link.ac2",
-            "title": "The link renders only when a frontendUrl is available; when absent, a disabled/absent affordance with a tooltip is shown (mirroring AwaitingMergePage). No errors on missing workspace data.",
+            "id": "uat-generations-api.ac2",
+            "title": "Stack and promote POSTs return structured success/error payloads (stale-base promote returns the reassemble guidance); assemble-uat now force-rebuilds and reports the new generation",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "per-feature-live-frontend-link.ac3",
-            "title": "Implemented by reusing the existing /api/workspaces/:issueId fetch pattern (no new backend route); requests are bounded by queue size.",
+            "id": "uat-generations-api.ac3",
+            "title": "No second vBRIEF-parsing path is introduced (verifiable from the diff: only acceptance-criteria.ts/extractACFromDocument is used); merge-queue response is unchanged apart from the existing enrichment",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -330,11 +381,61 @@
         ]
       },
       {
-        "id": "card-layout-hierarchy",
-        "title": "Frontend: reorganize the card into three clear zones (UAT candidate / serialized queue / controls)",
+        "id": "uat-batches-card",
+        "title": "Frontend: UAT batches card per approved mockup (batches, checklists, honest dialogs, escape hatch)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T14:29:53.682Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1737",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rebuild MergeQueueCard.tsx as the UAT batches card per docs/design/pan-1737-uat-batch-trains.html: plain-language intro; batches newest-first (ready: Open UAT frontend + Merge batch (N) to main + rebuild; assembling: live status line incl. conflict-resolution progress; superseded: still testable/promotable; held-out chips with reasons); What-to-UAT section grouped per member issue from the API's ACs with explicit verify-the-touchpoint items for resolutions; ready-features reference rows (order, IdLink, monospace branch, PR link, status chips); escape hatch 'Merge one feature to main…' via useConfirm naming exact semantics; promote confirm dialog naming every member and 'lands exactly the tree you tested'. All confirms via DialogProvider useConfirm. The string 'Ship batch' must not appear anywhere in the frontend."
+        },
+        "subItems": [
+          {
+            "id": "uat-batches-card.ac1",
+            "title": "The card renders the three mockup states from API data: steady (ready + superseded), assembling-in-background, and empty queue with the explanatory empty state — never an error on missing data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac2",
+            "title": "Promote and escape-hatch actions open useConfirm dialogs that name the exact members/branches and consequences; confirming fires the API call, cancelling fires nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac3",
+            "title": "grep -r 'Ship batch' over src/dashboard/frontend returns nothing; What-to-UAT renders per-member ACs with a 'No UAT steps in plan' fallback and touchpoint items for resolved conflicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-batches-card.ac4",
+            "title": "Open-UAT-frontend button reflects stack status (start-with-progress when absent, plain link when running) and component tests cover the state branches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-verification",
+        "title": "Quality gates + Playwright visual pass of the three card states",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-10T12:56:28.000Z",
+        "created": "2026-06-10T14:29:53.682Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1737",
@@ -342,28 +443,20 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Final pass over MergeQueueCard.tsx layout: establish a clear visual hierarchy with three zones — (1) the UAT candidate group, (2) the serialized queue, (3) the controls (Assemble UAT branch + Merge to main), with adequate spacing and headers rather than the current stacked elements. This is presentation only: do not drop any action or data added by the prior beads (branch names, PR links, What-to-UAT section, live-frontend links, both controls). Keep it readable at the rail width."
+          "Action": "npm run typecheck, npm run lint, npm test all green in the workspace. Playwright (isolated browser profile) screenshots of the card in steady/assembling/empty states against the dev dashboard; verify no overflow/truncation at rail width and that labels match the approved mockup language."
         },
         "subItems": [
           {
-            "id": "card-layout-hierarchy.ac1",
-            "title": "The card presents three visually distinct zones — UAT candidate, serialized queue, and controls — with clear headers/spacing and no stacked-banner glob.",
+            "id": "visual-verification.ac1",
+            "title": "typecheck, lint, and the full test suite pass in the workspace; delay-based tests use fake timers",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "card-layout-hierarchy.ac2",
-            "title": "No actions or data from prior beads are removed: branch names, PR links, the What-to-UAT section, live-frontend links, and both the Assemble and Merge-to-main controls all remain present and functional.",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "card-layout-hierarchy.ac3",
-            "title": "Visual verification (isolated Playwright profile / screenshot) confirms the card renders without overflow or truncation regressions at the rail width.",
+            "id": "visual-verification.ac2",
+            "title": "Screenshots of the three states exist and match the approved mockup's structure (zones, labels, dialogs) with no overflow at rail width",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -374,39 +467,76 @@
     ],
     "edges": [
       {
-        "from": "enrich-merge-queue-item",
-        "to": "branch-and-pr-per-row",
+        "from": "uat-generations-store",
+        "to": "assembly-engine",
         "type": "blocks"
       },
       {
-        "from": "honest-assemble-label",
-        "to": "honest-merge-next-label",
+        "from": "uat-generations-store",
+        "to": "uat-reconciler",
         "type": "blocks"
       },
       {
-        "from": "honest-merge-next-label",
-        "to": "branch-and-pr-per-row",
+        "from": "uat-generations-store",
+        "to": "promote-path",
         "type": "blocks"
       },
       {
-        "from": "branch-and-pr-per-row",
-        "to": "uat-guidance-section",
+        "from": "uat-generations-store",
+        "to": "uat-stack-lifecycle",
         "type": "blocks"
       },
       {
-        "from": "uat-guidance-section",
-        "to": "per-feature-live-frontend-link",
+        "from": "uat-generations-store",
+        "to": "uat-generations-api",
         "type": "blocks"
       },
       {
-        "from": "per-feature-live-frontend-link",
-        "to": "card-layout-hierarchy",
+        "from": "assembly-engine",
+        "to": "conflict-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "uat-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "promote-path",
+        "type": "blocks"
+      },
+      {
+        "from": "assembly-engine",
+        "to": "uat-stack-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-stack-lifecycle",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-path",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-reconciler",
+        "to": "uat-generations-api",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-generations-api",
+        "to": "uat-batches-card",
+        "type": "blocks"
+      },
+      {
+        "from": "uat-batches-card",
+        "to": "visual-verification",
         "type": "blocks"
       }
-    ],
-    "metadata": {
-      "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json"
-    }
+    ]
   },
   "status": "proposed"
 }
