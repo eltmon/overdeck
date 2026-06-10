@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-05-25T08:23:52.720Z"
+    "updated": "2026-06-10T02:01:12.655Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 89,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-05-25T08:23:52.720Z",
+    "updated": "2026-06-10T02:01:12.655Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -64,7 +64,7 @@
       {
         "id": "widen-burn-matcher",
         "title": "Widen applyBurnedTokenOverride to detect 'refresh_token_reused' in addition to 'refresh token has already been used'",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:22:12.000Z",
         "metadata": {
@@ -80,7 +80,7 @@
           {
             "id": "widen-burn-matcher.ac1",
             "title": "Both literals are present in the source: 'refresh token has already been used' AND 'refresh_token_reused'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -88,7 +88,7 @@
           {
             "id": "widen-burn-matcher.ac2",
             "title": "A comment above the matcher names both phrasings and cites PAN-913 and PAN-1455.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -96,7 +96,7 @@
           {
             "id": "widen-burn-matcher.ac3",
             "title": "The burn-then-200-success suppression at lines 163-173 is unchanged.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -104,7 +104,7 @@
           {
             "id": "widen-burn-matcher.ac4",
             "title": "Typecheck (`npm run typecheck`) and lint (`npm run lint`) pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -114,7 +114,7 @@
       {
         "id": "lib-codex-auth-tests",
         "title": "Add lib-level tests for checkCodexAuthStatus covering both burn phrasings and the suppression cases",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:22:12.000Z",
         "metadata": {
@@ -130,7 +130,7 @@
           {
             "id": "lib-codex-auth-tests.ac1",
             "title": "Test file exists at src/lib/__tests__/codex-auth.test.ts.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -138,7 +138,7 @@
           {
             "id": "lib-codex-auth-tests.ac2",
             "title": "Test case asserts status: 'burned' when log tail contains 'refresh_token_reused' inside the staleness window with no later 200 on /v1/messages.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -146,7 +146,7 @@
           {
             "id": "lib-codex-auth-tests.ac3",
             "title": "Test case asserts status: 'burned' when log tail contains 'refresh token has already been used' (PAN-913 regression guard).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -154,7 +154,7 @@
           {
             "id": "lib-codex-auth-tests.ac4",
             "title": "Test case asserts status: 'valid' when a 'refresh_token_reused' burn line is followed by a 200 on /v1/messages (suppression preserved).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -162,7 +162,7 @@
           {
             "id": "lib-codex-auth-tests.ac5",
             "title": "Test case asserts status: 'valid' when the burn line is older than BURN_STALENESS_MS (60 min).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -170,7 +170,7 @@
           {
             "id": "lib-codex-auth-tests.ac6",
             "title": "All tests pass under `npm test` (root vitest run).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -180,7 +180,7 @@
       {
         "id": "route-codex-auth-test",
         "title": "Add route-level integration test asserting GET /api/settings/codex-auth returns 'burned' when log tail contains 'refresh_token_reused'",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-25T08:22:12.000Z",
         "metadata": {
@@ -196,7 +196,7 @@
           {
             "id": "route-codex-auth-test.ac1",
             "title": "Test file exists at src/dashboard/server/routes/__tests__/codex-auth.test.ts.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -204,7 +204,7 @@
           {
             "id": "route-codex-auth-test.ac2",
             "title": "Test exercises the route (or its handler Effect) end-to-end with a temp cliproxy log fixture; does NOT mutate the host's real ~/.panopticon/cliproxy directory.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -212,7 +212,7 @@
           {
             "id": "route-codex-auth-test.ac3",
             "title": "With log tail containing a fresh 'refresh_token_reused' line and a JWT whose exp is in the future, the response JSON has status === 'burned'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -220,7 +220,7 @@
           {
             "id": "route-codex-auth-test.ac4",
             "title": "Companion case: with no burn lines in the log, the same setup returns status === 'valid' (negative control).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -228,7 +228,7 @@
           {
             "id": "route-codex-auth-test.ac5",
             "title": "Test passes under `npm test`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -249,7 +249,72 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1455-codex-auth-status-false-positive-when-refresh-token-is-burned-dashboard-says-valid-cliproxy-returns-401.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1455-codex-auth-status-false-positive-when-refresh-token-is-burned-dashboard-says-valid-cliproxy-returns-401.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-1455",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-10T02:01:12.414Z",
+        "work": {
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Approved: all four reviewers ready; no blocking or advisory findings.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Approved: all four reviewers ready; no blocking or advisory findings."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "history": []
+        },
+        "merge": {
+          "status": "merging",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Post-rebase verification failed at test",
+          "history": [
+            {
+              "status": "merging",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Post-rebase verification failed at test"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1611"
+        }
+      }
     }
   },
   "status": "proposed"
