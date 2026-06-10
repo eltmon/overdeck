@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 from collections import Counter, deque
@@ -20,6 +21,45 @@ from pathlib import Path
 from typing import Any
 
 DB_PATH = os.path.expanduser("~/.panopticon/panopticon.db")
+PROJECTS_DIR = Path.home() / ".claude" / "projects"
+
+
+def encode_claude_project_dir(cwd: str) -> str:
+    """Mirror encodeClaudeProjectDir() in src/lib/paths.ts."""
+    return re.sub(r"[^a-zA-Z0-9-]", "-", cwd or "")
+
+
+def resolve_session_file(info: dict[str, Any]) -> tuple[str | None, str]:
+    """Resolve the transcript JSONL path for a conversation.
+
+    The session_file column is deprecated (PAN-451) and NULL for all
+    conversations created since 2026-05. The canonical source is
+    claude_session_id + cwd:
+
+        ~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl
+
+    Returns (path, status) where status is one of:
+        ok       - path exists on disk
+        expired  - session id known, but the JSONL is gone
+                   (Claude Code retention deletes old transcripts)
+        unknown  - no session id or file recorded at all
+    """
+    legacy = info.get("session_file")
+    if legacy and Path(legacy).expanduser().exists():
+        return legacy, "ok"
+
+    session_id = info.get("claude_session_id")
+    if session_id:
+        derived = PROJECTS_DIR / encode_claude_project_dir(info.get("cwd") or "") / f"{session_id}.jsonl"
+        if derived.exists():
+            return str(derived), "ok"
+        for match in PROJECTS_DIR.glob(f"*/{session_id}.jsonl"):
+            return str(match), "ok"
+        return str(derived), "expired"
+
+    if legacy:
+        return legacy, "expired"
+    return None, "unknown"
 
 
 def get_db():
@@ -40,6 +80,7 @@ def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "cwd": row["cwd"],
         "issue_id": row["issue_id"] if "issue_id" in row.keys() else None,
         "session_file": row["session_file"],
+        "claude_session_id": row["claude_session_id"] if "claude_session_id" in row.keys() else None,
         "title": row["title"] if "title" in row.keys() else None,
         "title_source": row["title_source"] if "title_source" in row.keys() else None,
         "title_seed": row["title_seed"] if "title_seed" in row.keys() else None,
@@ -62,7 +103,7 @@ def format_cost(value: Any) -> str:
 def list_recent(n=20, *, as_json=False):
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
         "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations ORDER BY id DESC LIMIT ?",
         (n,),
@@ -87,7 +128,7 @@ def list_recent(n=20, *, as_json=False):
 def find_by_id(conv_id):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
         "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations WHERE id = ?",
         (conv_id,),
@@ -105,8 +146,8 @@ def search(query, *, as_json=False):
     conn = get_db()
     q = f"%{query}%"
     rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, title, title_source, title_seed, "
-        "total_cost, model, effort, created_at, ended_at "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
+        "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations "
         "WHERE title LIKE ? OR cwd LIKE ? OR model LIKE ? OR name LIKE ? "
         "ORDER BY id DESC LIMIT 50",
@@ -342,10 +383,23 @@ def main():
         search(args.search, as_json=args.json)
     elif args.conv_id:
         info = find_by_id(args.conv_id)
-        summary = get_session_summary(info["session_file"]) if info.get("session_file") else None
+        resolved, resolve_status = resolve_session_file(info)
+        info["resolved_session_file"] = resolved
+        info["session_file_status"] = resolve_status
+        summary = get_session_summary(resolved) if resolve_status == "ok" else None
         if args.jsonl:
-            print(info["session_file"] or "")
-            sys.exit(0 if info["session_file"] else 1)
+            if resolve_status == "ok":
+                print(resolved)
+                sys.exit(0)
+            if resolve_status == "expired":
+                print(
+                    f"Transcript JSONL not on disk (expected at {resolved}). "
+                    "Claude Code retention deletes old transcripts.",
+                    file=sys.stderr,
+                )
+            else:
+                print("No claude_session_id or session_file recorded for this conversation.", file=sys.stderr)
+            sys.exit(1)
         if args.json:
             payload = dict(info)
             payload["session_summary"] = summary
@@ -364,7 +418,12 @@ def main():
         print(f"  Created:       {info['created_at']}")
         if info['ended_at']:
             print(f"  Ended:         {info['ended_at']}")
-        print(f"  Session file:  {info['session_file'] or 'N/A'}")
+        if resolve_status == "ok":
+            print(f"  Session file:  {resolved}")
+        elif resolve_status == "expired":
+            print(f"  Session file:  {resolved}  (not on disk — transcript expired)")
+        else:
+            print("  Session file:  N/A (no claude_session_id recorded)")
         if summary:
             print()
             print_session_summary(summary)

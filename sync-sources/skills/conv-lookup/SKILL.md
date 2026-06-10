@@ -50,7 +50,17 @@ same way.
 
 ## How it works
 
-Every Panopticon conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Each row maps to a Claude Code JSONL session file in `~/.claude/projects/-home-eltmon-Projects/`.
+Every Panopticon conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Each row maps to a Claude Code JSONL session file at:
+
+```
+~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl
+```
+
+where `<encoded-cwd>` is the conversation's `cwd` with every character outside `[a-zA-Z0-9-]` replaced by `-` (mirrors `encodeClaudeProjectDir()` in `src/lib/paths.ts`).
+
+**The `session_file` column is deprecated (PAN-451) and NULL for all conversations created since 2026-05.** Never conclude "no session file recorded" from a NULL `session_file` — resolve the path from `claude_session_id` + `cwd` instead. `conv-find.py` does this automatically; `--jsonl` prints the resolved path.
+
+If the resolved path does not exist, the transcript has usually been deleted by Claude Code's session retention (older transcripts are cleaned up after a few weeks). The script reports this as `expired` rather than guessing.
 
 ## Running commands
 
@@ -180,7 +190,8 @@ The `conversations` table has these useful columns:
 - `status` — `active` or `ended`
 - `cwd` — working directory when spawned
 - `issue_id` — associated issue (null for manual convs)
-- `session_file` — full path to the JSONL session file
+- `claude_session_id` — Claude Code session UUID; combine with `cwd` to derive the JSONL path (see "How it works")
+- `session_file` — **deprecated (PAN-451)**: full JSONL path on legacy rows only; NULL since 2026-05
 - `title` — auto/AI-set title from first message
 - `title_seed` — original user message that started the conversation
 - `total_cost` — cached total cost in USD
@@ -190,14 +201,17 @@ The `conversations` table has these useful columns:
 
 ## Quick SQL queries
 
-For direct database queries:
+For direct database queries, use Python's built-in sqlite3 CLI — the standalone `sqlite3` binary is NOT installed on all machines:
+
 ```bash
 # Find conversation by ID
-sqlite3 ~/.panopticon/panopticon.db "SELECT id, name, status, session_file, title, model, created_at FROM conversations WHERE id = 108;"
+python3 -m sqlite3 ~/.panopticon/panopticon.db "SELECT id, name, status, claude_session_id, cwd, title, model, created_at FROM conversations WHERE id = 108;"
 
 # Search by keyword in title
-sqlite3 ~/.panopticon/panopticon.db "SELECT id, session_file, title FROM conversations WHERE title LIKE '%lexerra%';"
+python3 -m sqlite3 ~/.panopticon/panopticon.db "SELECT id, claude_session_id, cwd, title FROM conversations WHERE title LIKE '%lexerra%';"
 ```
+
+(`python3 -m sqlite3 <db> "<sql>"` requires Python ≥3.12, which is the baseline here. If a plain `sqlite3` binary happens to be on PATH it works the same.)
 
 ## Comparing two conversations
 
