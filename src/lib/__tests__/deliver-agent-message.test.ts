@@ -45,7 +45,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
-import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
@@ -125,6 +125,66 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
     server.listen(socketPath, () => resolveServer(server));
   });
 }
+
+describe('resume auto-continue transcript confirmation', () => {
+  const baseArgs = {
+    agentId: 'agent-resume-confirm',
+    workspace: '/tmp/workspace',
+    sessionId: 'session-1',
+    message: 'continue',
+    caller: 'resumeAgent:auto-continue',
+    timeoutMs: 300,
+    intervalMs: 100,
+  };
+
+  it('confirms landing on first delivery without redelivery', async () => {
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
+    const deliver = vi.fn(async () => {
+      userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    await expect(deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot })).resolves.toMatchObject({
+      delivered: true,
+      attempts: 1,
+    });
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('redelivers exactly once and reports false when no user record lands', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({ delivered: false, attempts: 2 });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports delivered when the user record lands after the one redelivery', async () => {
+    vi.useFakeTimers();
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
+    const deliver = vi.fn(async () => {
+      if (deliver.mock.calls.length === 2) userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+
+    await expect(result).resolves.toMatchObject({ delivered: true, attempts: 2 });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('channel bridge delivery', () => {
   beforeEach(() => {

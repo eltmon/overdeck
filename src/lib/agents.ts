@@ -48,6 +48,7 @@ import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.j
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
 import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
+import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -1438,6 +1439,65 @@ export async function deliverAgentMessage(
 
   await Effect.runPromise(sendKeys(normalizedId, message));
   return { ok: true, path: 'tmux' };
+}
+
+const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 3_000;
+const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
+
+async function waitForTranscriptUserRecordLanding(
+  workspace: string,
+  sessionId: string,
+  before: TranscriptUserRecordSnapshot,
+  snapshot: typeof captureTranscriptUserRecordSnapshot,
+  timeoutMs = RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS,
+  intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const after = await snapshot(workspace, sessionId);
+    if (hasNewTranscriptUserRecord(before, after)) return true;
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  } while (Date.now() < deadline);
+
+  const after = await snapshot(workspace, sessionId);
+  return hasNewTranscriptUserRecord(before, after);
+}
+
+export async function deliverResumeMessageWithTranscriptConfirmation(args: {
+  agentId: string;
+  workspace: string;
+  sessionId: string;
+  message: string;
+  caller: string;
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
+  timeoutMs?: number;
+  intervalMs?: number;
+  deliver?: typeof deliverAgentMessage;
+  snapshot?: typeof captureTranscriptUserRecordSnapshot;
+}): Promise<{ delivered: boolean; attempts: number; lastDelivery?: DeliveryResult }> {
+  const snapshot = args.snapshot ?? captureTranscriptUserRecordSnapshot;
+  const deliver = args.deliver ?? deliverAgentMessage;
+  const before = await snapshot(args.workspace, args.sessionId);
+  let lastDelivery: DeliveryResult | undefined;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
+    if (lastDelivery.ok && await waitForTranscriptUserRecordLanding(
+      args.workspace,
+      args.sessionId,
+      before,
+      snapshot,
+      args.timeoutMs,
+      args.intervalMs,
+    )) {
+      return { delivered: true, attempts: attempt, lastDelivery };
+    }
+    if (attempt < 2) {
+      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
+    }
+  }
+
+  return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
 }
 
 async function deliverInitialPromptWithRetry(
@@ -4407,9 +4467,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        const delivery = await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
-        messageDelivered = delivery.ok;
-        if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+          agentId: normalizedId,
+          workspace: agentState.workspace,
+          sessionId,
+          message: effectiveMessage,
+          caller: 'resumeAgent:auto-continue',
+          deliveryMethod: agentState.deliveryMethod,
+        });
+        messageDelivered = delivery.delivered;
+        if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        if (!delivery.delivered) {
+          console.error(`[resumeAgent] Auto-continue prompt did not land after ${delivery.attempts} delivery attempts`);
+        }
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }
