@@ -160,6 +160,7 @@ import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 
@@ -5095,6 +5096,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const reaperActions = await reapOrphanedDashboardServers();
     actions.push(...reaperActions);
     for (const a of reaperActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // PAN-1706: reap leftover playwright-mcp trees / stale headless browsers.
+  // Each ghost browser keeps a full dashboard page polling at full rate,
+  // multiplying server load. Same ~10 min cadence as the server reaper.
+  if (state.patrolCycle % serverReaperEveryCycles === 0) {
+    const playwrightActions = await reapLeftoverPlaywrightBrowsers();
+    actions.push(...playwrightActions);
+    for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
   // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
