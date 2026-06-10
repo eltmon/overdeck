@@ -1,7 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
+  generateSmartSummary: vi.fn(() => Effect.succeed({
+    summary: 'Compact bug work was summarized.',
+    summaryModel: 'claude-haiku-4-5',
+  })),
+}));
+
+vi.mock('../../../../lib/conversations/summary-fork.js', () => ({
+  generateFallbackSummary: vi.fn(() => Effect.succeed('Fallback compact bug summary.')),
+}));
 
 let TEST_HOME: string;
 let CONFIG_HOME: string;
