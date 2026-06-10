@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
+import { runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -73,7 +74,13 @@ function beadIdsFromList(beads: any[]): string[] {
     .map(id => String(id));
 }
 
-async function listBeadsForIssue(workspacePath: string, issueLabel: string): Promise<any[]> {
+type BdRetryOptions = Omit<RunBdWithRetryOptions, 'workspacePath'>;
+
+type ClearBeadsOptions = BdRetryOptions & {
+  lockAlreadyHeld?: boolean;
+};
+
+async function listBeadsForIssueRaw(workspacePath: string, issueLabel: string): Promise<any[]> {
   const { stdout } = await execFileAsync(
     'bd',
     ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
@@ -82,10 +89,29 @@ async function listBeadsForIssue(workspacePath: string, issueLabel: string): Pro
   return parseBdList(stdout);
 }
 
-export async function clearBeadsForIssue(workspacePath: string, issueLabel: string): Promise<ClearBeadsResult> {
+async function listBeadsForIssue(workspacePath: string, issueLabel: string, options: ClearBeadsOptions = {}): Promise<any[]> {
+  if (options.lockAlreadyHeld) return listBeadsForIssueRaw(workspacePath, issueLabel);
+  return runBdWithRetry(
+    `list beads for ${issueLabel}`,
+    () => listBeadsForIssueRaw(workspacePath, issueLabel),
+    { ...options, workspacePath },
+  );
+}
+
+async function deleteBeadForIssue(workspacePath: string, issueLabel: string, id: string, options: ClearBeadsOptions = {}): Promise<void> {
+  const deleteBead = async () => {
+    await execFileAsync('bd', ['delete', id, '--force'], {
+      encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+    });
+  };
+  if (options.lockAlreadyHeld) return deleteBead();
+  return runBdWithRetry(`delete bead ${id} for ${issueLabel}`, deleteBead, { ...options, workspacePath });
+}
+
+export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, options: ClearBeadsOptions = {}): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
-    existingBeads = await listBeadsForIssue(workspacePath, issueLabel);
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
   }
@@ -94,9 +120,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await execFileAsync('bd', ['delete', id, '--force'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
-      });
+      await deleteBeadForIssue(workspacePath, issueLabel, id, options);
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
@@ -105,7 +129,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
 
   let residualBeads: any[];
   try {
-    residualBeads = await listBeadsForIssue(workspacePath, issueLabel);
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
     return { cleared, errors };
@@ -132,7 +156,9 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
 }
 
 async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
-  return withBdMutexPromise(async () => {
+  return withBdMutexPromise(() => withBdProcessLock(
+    `createBeadsFromVBrief ${workspacePath}`,
+    async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -246,7 +272,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel);
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, { lockAlreadyHeld: true });
   if (clearResult.errors.length > 0) {
     return {
       success: false,
@@ -389,7 +415,9 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
   }
 
   return { success: errors.length === 0, created, errors, beadIds };
-  });
+    },
+    { workspacePath },
+  ));
 }
 
 /**

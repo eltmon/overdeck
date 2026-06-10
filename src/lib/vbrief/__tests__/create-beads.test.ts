@@ -24,7 +24,9 @@ vi.mock('util', async (importOriginal) => {
 });
 
 // Import after mocks are registered
-import { createBeadsFromVBrief } from '../beads.js';
+import { clearBeadsForIssue, createBeadsFromVBrief } from '../beads.js';
+
+const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,9 +96,16 @@ describe('createBeadsFromVBrief', () => {
     const ws = createWorkspace('PAN-500');
     projectRoot = ws.projectRoot;
     WORKSPACE_DIR = ws.workspacePath;
+    process.env.PANOPTICON_HOME = join(projectRoot, '.panopticon-home');
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    if (originalPanopticonHome === undefined) {
+      delete process.env.PANOPTICON_HOME;
+    } else {
+      process.env.PANOPTICON_HOME = originalPanopticonHome;
+    }
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
@@ -108,6 +117,26 @@ describe('createBeadsFromVBrief', () => {
     expect(result.success).toBe(false);
     expect(result.errors).toContain('bd (beads) CLI not found in PATH');
     expect(result.created).toHaveLength(0);
+  });
+
+  it('retries transient list failures while clearing existing beads', async () => {
+    vi.useFakeTimers();
+    setupRedirect(WORKSPACE_DIR);
+    mockExecAsync
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce({ stdout: '[]' })
+      .mockResolvedValueOnce({ stdout: '[]' });
+
+    const result = await clearBeadsForIssue(WORKSPACE_DIR, 'pan-500', {
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    });
+
+    expect(result).toEqual({ cleared: 0, errors: [] });
+    expect(mockExecAsync).toHaveBeenCalledTimes(3);
   });
 
   it('creates beads from the workspace draft before a canonical spec exists', async () => {
