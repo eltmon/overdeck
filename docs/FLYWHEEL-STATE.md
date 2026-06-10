@@ -1454,3 +1454,36 @@ Multiple `node dist/dashboard/server.js` processes with containerd-shim
 parents are workspace-container UI peers (deacon-disabled), not host
 dashboards. Check ppid before declaring a restart storm. Also: `ps -o etime`
 is MM:SS under an hour — 02:28 is 2.5 MINUTES, not hours (misread once).
+
+## RUN-18 ticks 8-9 (2026-06-10) — ceiling backpressure quantified; fix verified live after double-reload
+
+### The deacon's deferred-dispatch log line is the definitive stall/queue distinguisher
+
+`checkPendingTestDispatch: deferred test for PAN-X — advancing ceiling reached
+(PAN-1665) — counts: work=7 advancing=6 total=13/9 | advancing=[...] work=[...]`
+— grep deacon.log for `deferred` before classifying review/test non-dispatch
+as a bug. The queue drains serially: one review convoy (5 sessions) at a time,
+then tests. Idle work sessions on merged/done issues count against `work=` and
+slow the drain — extending the PAN-1716 reaper to merged-issue work agents is
+the obvious next substrate improvement.
+
+### Verifying a merged fix is live takes THREE checks, in order
+
+1. Squash is ancestor of local HEAD (`git merge-base --is-ancestor <sha> HEAD`)
+2. Marker string present in src (`grep src/...`)
+3. Marker present in **ANY dist chunk** (`grep -rl dist/` — NOT just
+   server.js; rolldown splits chunks, codex-auth lands in `workspaces-*.js`)
+
+RUN-18 hit a triple-stale sequence: deploy built behind-origin tree
+(PAN-1723), then the first manual reload built mid-sync (squash landed
+between build and check), then the marker grep targeted the wrong file. Only
+the third reload + full-dist grep confirmed live. A sync can land BETWEEN a
+build and its health check — sha logging in the deploy (PAN-1723 fix) is the
+real cure.
+
+### `pan unpause` → deacon resume → session can still silently not appear
+
+agent-pan-1579's resume logged 'resuming' at 02:38 but produced no tmux
+session 20+ min later — second gate (work-slot ceiling or unhealthy docker
+stack from its pause reason) swallowed the spawn after the resume decision.
+Resume-decision ≠ session-up; verify has-session after a resume claim.
