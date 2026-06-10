@@ -87,3 +87,37 @@ export function selectTerminalAdvancingSessions(
   }
   return [...kill];
 }
+
+/**
+ * Whether an issue's WORK session is safe to reap (PAN-1726).
+ *
+ * Once the issue has merged, its work agent (`agent-<id>`) has no remaining
+ * work — it sits idle at the prompt yet `countRunningAgents()` still counts it
+ * against the PAN-1665 work ceiling, throttling dispatch for every live issue.
+ * `postMergeLifecycle` pauses + kills it at merge time, but a server restart
+ * mid-lifecycle (PAN-1723) or a deacon read-modify-write race on state.json can
+ * resurrect it. This is the work-role sibling of the advancing reaper above.
+ */
+export function isWorkReapable(status: ReapableStatus): boolean {
+  return status.mergeStatus === 'merged';
+}
+
+/**
+ * Across every issue, the alive WORK sessions whose issue has merged — the
+ * deacon janitor's work-role kill list. Matches only the canonical work session
+ * `agent-<id>` (never the `agent-<id>-<role>` advancing sub-sessions, which the
+ * advancing reaper owns). Exact-name matching against the alive set.
+ */
+export function selectMergedWorkSessions(
+  statuses: Record<string, ReapableStatus>,
+  aliveSessions: readonly string[],
+): string[] {
+  const alive = new Set(aliveSessions);
+  const kill: string[] = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (!isWorkReapable(status)) continue;
+    const session = `agent-${issueId.toLowerCase()}`;
+    if (alive.has(session)) kill.push(session);
+  }
+  return kill;
+}

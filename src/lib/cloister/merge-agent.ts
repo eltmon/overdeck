@@ -342,14 +342,36 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
-      const { setAgentPaused } = await import('../agents.js');
+      const { setAgentPaused, getAgentState } = await import('../agents.js');
       const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-        const paused = await Effect.runPromise(setAgentPaused(agentId, reason, true));
-        if (paused) {
+        // Pause, then VERIFY the gate actually persisted to state.json. A server
+        // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
+        // pending-post-merge.json) or a concurrent deacon read-modify-write on
+        // state.json can silently drop the pause. An unpaused merged work agent
+        // sits idle at its prompt yet still counts against the PAN-1665 work
+        // ceiling, throttling dispatch for every live issue (PAN-1726). Assert
+        // paused=true after the write; retry once, then fail loudly.
+        const initial = await Effect.runPromise(setAgentPaused(agentId, reason, true));
+        if (initial === null) {
+          // No state.json for this agent — nothing to pause (e.g. planning never ran).
+          continue;
+        }
+        let verify = await Effect.runPromise(getAgentState(agentId));
+        if (verify?.paused !== true) {
+          await Effect.runPromise(setAgentPaused(agentId, reason, true));
+          verify = await Effect.runPromise(getAgentState(agentId));
+        }
+        if (verify?.paused === true) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
+        } else {
+          console.error(
+            `[merge-agent] ✗ FAILED to persist pause for ${agentId} after merge — state.json paused=${verify?.paused}. ` +
+            `Idle merged work agent may hold a PAN-1665 work slot and throttle dispatch (PAN-1726).`,
+          );
+          logActivity('agent_pause_failed', `Could not persist pause for ${agentId} after merge — may throttle dispatch (PAN-1726)`);
         }
         if (await Effect.runPromise(sessionExists(agentId))) {
           await Effect.runPromise(killSession(agentId));

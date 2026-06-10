@@ -4813,6 +4813,47 @@ export async function checkTerminalAdvancingSessions(): Promise<string[]> {
 }
 
 /**
+ * PAN-1726: Defense-in-depth reaper for the WORK session of a merged issue.
+ *
+ * `postMergeLifecycle` pauses + kills `agent-<id>` at merge time, but a server
+ * restart mid-lifecycle (the PAN-1723 deploy re-runs the lifecycle from
+ * pending-post-merge.json) or a deacon read-modify-write race on state.json can
+ * leave the work session alive with `paused: null`. An idle merged work agent
+ * sits at its prompt yet still counts against the PAN-1665 work ceiling,
+ * throttling test/work dispatch for every live issue — the work-role sibling of
+ * the PAN-1716 advancing reaper. We re-pause (so auto-resume can't resurrect it)
+ * THEN kill the session; state.json is preserved so reopen still works.
+ */
+export async function checkMergedWorkSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectMergedWorkSessions } = await import('./reap-terminal-sessions.js');
+    const { setAgentPaused } = await import('../agents.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectMergedWorkSessions(statuses, [...aliveSessions]);
+    for (const session of toKill) {
+      try {
+        // The work session name is the agent id (`agent-<id>`). Re-assert the
+        // pause gate before killing so the next patrol's auto-resume won't bring
+        // it back; killing alone would just churn it stopped→running forever.
+        await Effect.runPromise(setAgentPaused(session, 'merged — awaiting close-out (verify on main)', true));
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped merged work session ${session} (issue merged, session idle)`);
+        console.log(`[deacon] Reaped merged work session ${session} (PAN-1726)`);
+        logDeaconEventSync(`checkMergedWorkSessions: paused + reaped ${session} — issue merged but work session alive (PAN-1726)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap merged work session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping merged work sessions:', msg);
+  }
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -4959,6 +5000,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedTerminalActions = await checkTerminalAdvancingSessions();
   actions.push(...reapedTerminalActions);
   for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1726: Reap the work session of an already-merged issue (work-role
+  // sibling of the PAN-1716 advancing reaper). An idle merged work agent holds a
+  // PAN-1665 work slot; re-pause + kill it so the slot frees for live work.
+  const reapedWorkActions = await checkMergedWorkSessions();
+  actions.push(...reapedWorkActions);
+  for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
