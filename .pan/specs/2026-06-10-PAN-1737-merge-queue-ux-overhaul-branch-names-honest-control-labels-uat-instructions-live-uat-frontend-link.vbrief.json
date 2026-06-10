@@ -4,7 +4,7 @@
     "created": "2026-06-10T14:29:53.682Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
-    "updated": "2026-06-10T18:05:17.236Z"
+    "updated": "2026-06-10T18:10:51.413Z"
   },
   "plan": {
     "id": "pan-1737",
@@ -12,64 +12,64 @@
     "status": "proposed",
     "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
     "author": "agent:claude-fable-5",
-    "sequence": 39,
+    "sequence": 44,
     "created": "2026-06-10T14:29:53.682Z",
-    "updated": "2026-06-10T18:05:17.236Z",
+    "updated": "2026-06-10T18:10:51.413Z",
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json",
       "pipeline": {
         "phase": "review",
         "issueId": "PAN-1737",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T18:05:17.228Z",
+        "updatedAt": "2026-06-10T18:10:51.390Z",
         "work": {
-          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T18:05:17.228Z"
+              "at": "2026-06-10T18:10:51.390Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-10T18:05:17.228Z",
-          "notes": "Performance: UAT generations poll still rebuilds the vBRIEF index every 15s",
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
+          "notes": "Agent re-review request (4/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-10T18:05:17.228Z",
-              "notes": "Performance: UAT generations poll still rebuilds the vBRIEF index every 15s"
+              "status": "reviewing",
+              "at": "2026-06-10T18:10:51.390Z",
+              "notes": "Agent re-review request (4/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T18:05:17.228Z"
+              "at": "2026-06-10T18:10:51.390Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "updatedAt": "2026-06-10T18:10:51.390Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T18:05:17.228Z"
+              "at": "2026-06-10T18:10:51.390Z"
             }
           ],
           "readyForMerge": false,
