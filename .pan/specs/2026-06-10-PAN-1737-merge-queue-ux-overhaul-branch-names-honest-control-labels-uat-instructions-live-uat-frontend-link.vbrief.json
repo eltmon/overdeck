@@ -4,7 +4,7 @@
     "created": "2026-06-10T14:29:53.682Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
-    "updated": "2026-06-10T16:43:00.678Z"
+    "updated": "2026-06-10T17:05:40.173Z"
   },
   "plan": {
     "id": "pan-1737",
@@ -12,64 +12,64 @@
     "status": "proposed",
     "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
     "author": "agent:claude-fable-5",
-    "sequence": 21,
+    "sequence": 26,
     "created": "2026-06-10T14:29:53.682Z",
-    "updated": "2026-06-10T16:43:00.678Z",
+    "updated": "2026-06-10T17:05:40.173Z",
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json",
       "pipeline": {
         "phase": "review",
         "issueId": "PAN-1737",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T16:43:00.674Z",
+        "updatedAt": "2026-06-10T17:05:40.146Z",
         "work": {
-          "updatedAt": "2026-06-10T16:43:00.674Z",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T16:43:00.674Z",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T16:43:00.674Z"
+              "at": "2026-06-10T17:05:40.146Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-10T16:43:00.674Z",
-          "notes": "Security blocker: shell-string git exec in UAT generation/promotion permits command injection",
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-10T16:43:00.674Z",
-              "notes": "Security blocker: shell-string git exec in UAT generation/promotion permits command injection"
+              "status": "reviewing",
+              "at": "2026-06-10T17:05:40.146Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T16:43:00.674Z",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T16:43:00.674Z"
+              "at": "2026-06-10T17:05:40.146Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T16:43:00.674Z",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T16:43:00.674Z",
+          "updatedAt": "2026-06-10T17:05:40.146Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T16:43:00.674Z"
+              "at": "2026-06-10T17:05:40.146Z"
             }
           ],
           "readyForMerge": false,
