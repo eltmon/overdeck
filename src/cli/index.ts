@@ -321,6 +321,7 @@ const review = program
 review
   .command('pending')
   .description('List completed work awaiting review')
+  .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
   .action(pendingCommand);
 
 review
