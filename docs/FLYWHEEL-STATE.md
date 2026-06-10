@@ -1332,3 +1332,46 @@ work-role agents were live against the governor's 6-slot work ceiling, so the
 deacon correctly deferred. Check live work-agent count against
 DEFAULT_MAX_WORK_AGENTS before suspecting the resume path. The fallback is an
 explicit `pan start <id>` once slots free.
+
+## RUN-18 ticks 3-4 (2026-06-10) — operator merge failed on a hidden red main; bisect-by-run-history
+
+### A failed post-rebase verification can be MAIN's fault — always cross-check main CI
+
+The operator clicked MERGE on PAN-1455 (the run's only ready issue). The merge
+rebased clean, then **failed post-rebase verification on 3 e2e tests**
+(styleguide-conformance /agents page). First read: branch regression or
+load-flake (host was swap-100%, load 28). Real answer came from checking main's
+own CI: **main had gone red at ec57001eb with the EXACT same 3 failures** —
+the branch was innocent; verification ran main's broken code underneath it.
+
+**Standing rule: when a post-rebase verification fails, diff the failure list
+against main's latest CI run BEFORE blaming the branch.** Identical failures =
+main-side; file + strike the main bug and tell the operator to hold the merge
+re-click. (PAN-1717 filed; strike dispatched; PAN-1455 re-passed review+test
+within ~20 min via the feedback loop and now just waits on green main.)
+
+### Bisect-by-run-history is fast and conclusive
+
+`gh run list --branch main --json conclusion,createdAt,headSha` gives a
+green→red boundary in one command; when only chore commits sit between the last
+green sha and the first red sha, the breaking commit is identified without a
+local bisect. ec57001eb ("diff popout self-heals after transient backend
+outage") broke /agents rendering under e2e; c3a0452b6 (PAN-1705 fetch
+coalescing) touches the same paths and may compound — noted in PAN-1717.
+
+### Parallel-channel duplicate-work risk: direct-to-main fixes vs planning agents
+
+While planning-pan-1705/1706 were producing proposed specs, an operator-side
+session landed direct-to-main commits citing the same issues (c3a0452b6,
+cba5579e9). Under multi-channel operation (flywheel + operator strikes +
+operator conversations) the same issue can be fixed twice. Before `pan start`
+on a freshly-planned issue, `git log --grep <issue>` main first; if commits
+already cite it, surface a reconcile decision instead of starting work.
+
+### Review-cycle bulk reset at 01:08 (observed, unexplained)
+
+review_status for 1242/1491/1641/1647 all flipped passed→pending within 2s.
+Likely a deacon patrol or merge-train action re-requesting review after the
+failed merge. Didn't trace the writer this tick; if it recurs and strands
+reviews, trace via status_history and file. (1455's monitor showed its review
+re-dispatched and re-passed quickly, so the reset path at least re-drives.)
