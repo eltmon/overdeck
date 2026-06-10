@@ -270,23 +270,32 @@ export class FlyProvider implements RemoteProvider {
 
   private async sshImpl(vm: string, command: string): Promise<ExecResult> {
     const { appName, machineId } = await this.resolveVm(vm);
-    try {
-      const result = await this.getApi().execCommand(
-        appName,
-        machineId,
-        ['/bin/sh', '-c', command],
-        60
-      );
-      return {
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
-        exitCode: result.exit_code ?? 0,
-      };
-    } catch (err) {
-      if (err instanceof FlyApiError) {
-        return { stdout: '', stderr: err.message, exitCode: 1 };
+    // The Machines exec API rate-limits per-machine actions; bursts of execs
+    // (e.g. chunked file writes) hit 429 resource_exhausted. Back off and
+    // retry before surfacing the error.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const result = await this.getApi().execCommand(
+          appName,
+          machineId,
+          ['/bin/sh', '-c', command],
+          60
+        );
+        return {
+          stdout: result.stdout ?? '',
+          stderr: result.stderr ?? '',
+          exitCode: result.exit_code ?? 0,
+        };
+      } catch (err) {
+        if (err instanceof FlyApiError) {
+          if (err.statusCode === 429 && attempt < 4) {
+            await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+            continue;
+          }
+          return { stdout: '', stderr: err.message, exitCode: 1 };
+        }
+        throw err;
       }
-      throw err;
     }
   }
 

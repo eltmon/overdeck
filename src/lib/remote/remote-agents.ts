@@ -149,12 +149,17 @@ async function writeRemoteFile(
   if (init.exitCode !== 0) {
     throw new Error(`Failed to create ${tmp} on ${vmName}: ${init.stderr}`);
   }
-  const CHUNK = 4096;
+  // ~16KB HTTP body ceiling on the exec API; 8KB chunks leave headroom.
+  // Pace writes — per-machine exec actions are rate-limited (429 on bursts).
+  const CHUNK = 8192;
   for (let i = 0; i < b64.length; i += CHUNK) {
     const chunk = b64.slice(i, i + CHUNK);
     const res = await runSsh(provider, vmName, `printf %s '${chunk}' >> ${tmp}`);
     if (res.exitCode !== 0) {
       throw new Error(`Failed writing chunk ${i / CHUNK} of ${remotePath} on ${vmName}: ${res.stderr}`);
+    }
+    if (i + CHUNK < b64.length) {
+      await new Promise((r) => setTimeout(r, 350));
     }
   }
   const fin = await runSsh(provider, vmName, `base64 -d < ${tmp} > ${remotePath} && rm ${tmp} && wc -c < ${remotePath}`);
