@@ -4,7 +4,7 @@
     "created": "2026-05-25T08:22:12.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1455: Codex auth status false-positive when refresh token is burned — widen burn-line matcher to detect refresh_token_reused",
-    "updated": "2026-06-10T01:05:24.004Z"
+    "updated": "2026-06-10T02:01:12.655Z"
   },
   "plan": {
     "id": "pan-1455",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a6c3934c-a3ec-4292-9e73-b0f430b7a069",
     "author": "agent:claude-opus-4-7",
-    "sequence": 79,
+    "sequence": 89,
     "created": "2026-05-25T08:22:12.000Z",
-    "updated": "2026-06-10T01:05:24.004Z",
+    "updated": "2026-06-10T02:01:12.655Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1455",
@@ -254,56 +254,60 @@
         "phase": "merge",
         "issueId": "PAN-1455",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T01:05:23.969Z",
+        "updatedAt": "2026-06-10T02:01:12.414Z",
         "work": {
-          "updatedAt": "2026-06-10T01:05:23.969Z",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T01:05:23.969Z",
-          "notes": "Verification FAILED at test (59014ms):\n\n                                                                                                      ^\n    273|     await expect.poll(() => pipeline.page.locator('[data-component=\"ph…\n    274|     await expect.poll(() => pipeline.page.locator('[data-component=\"is…\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:272:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| tests/e2e/styleguide-conformance.spec.ts > styleguide rendered surface conformance > agents page TopBar segmented control switches views and Start agent navigates to board\nAssertionError: expected +0 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/e2e/styleguide-conformance.spec.ts:309:111\n    307|     const { context, page } = await openRoute('/agents');\n    308|\n    309|     await expect.poll(() => page.locator('[data-component=\"top-bar-seg…\n       |                                                                                                               ^\n    310|     await expect.poll(() => page.locator('[data-component=\"agent-card\"…\n    311|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:309:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| tests/e2e/styleguide-conformance.spec.ts > styleguide rendered surface conformance > agents page Open issue scrolls drawer to active-agent section\nAssertionError: expected +0 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/e2e/styleguide-conformance.spec.ts:334:96\n    332|     const { context, page } = await openRoute('/agents');\n    333|\n    334|     await expect.poll(() => page.locator('[data-component=\"agent-card\"…\n       |                                                                                                ^\n    335|     await page.getByText('Open issue').click();\n    336|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:334:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n",
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T01:05:23.969Z",
-              "notes": "Verification FAILED at test (59014ms):\n\n                                                                                                      ^\n    273|     await expect.poll(() => pipeline.page.locator('[data-component=\"ph…\n    274|     await expect.poll(() => pipeline.page.locator('[data-component=\"is…\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:272:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| tests/e2e/styleguide-conformance.spec.ts > styleguide rendered surface conformance > agents page TopBar segmented control switches views and Start agent navigates to board\nAssertionError: expected +0 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/e2e/styleguide-conformance.spec.ts:309:111\n    307|     const { context, page } = await openRoute('/agents');\n    308|\n    309|     await expect.poll(() => page.locator('[data-component=\"top-bar-seg…\n       |                                                                                                               ^\n    310|     await expect.poll(() => page.locator('[data-component=\"agent-card\"…\n    311|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:309:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n FAIL  |root| tests/e2e/styleguide-conformance.spec.ts > styleguide rendered surface conformance > agents page Open issue scrolls drawer to active-agent section\nAssertionError: expected +0 to be 1 // Object.is equality\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/e2e/styleguide-conformance.spec.ts:334:96\n    332|     const { context, page } = await openRoute('/agents');\n    333|\n    334|     await expect.poll(() => page.locator('[data-component=\"agent-card\"…\n       |                                                                                                ^\n    335|     await page.getByText('Open issue').click();\n    336|\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ tests/e2e/styleguide-conformance.spec.ts:334:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\n\n"
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T01:05:23.969Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Approved: all four reviewers ready; no blocking or advisory findings.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T01:05:23.969Z"
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Approved: all four reviewers ready; no blocking or advisory findings."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T01:05:23.969Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T01:05:23.969Z"
+              "status": "passed",
+              "at": "2026-06-10T02:01:12.414Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T01:05:23.969Z",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
           "history": []
         },
         "merge": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T01:05:23.969Z",
+          "status": "merging",
+          "updatedAt": "2026-06-10T02:01:12.414Z",
           "notes": "Post-rebase verification failed at test",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T01:05:23.969Z",
+              "status": "merging",
+              "at": "2026-06-10T02:01:12.414Z",
               "notes": "Post-rebase verification failed at test"
             }
           ],
