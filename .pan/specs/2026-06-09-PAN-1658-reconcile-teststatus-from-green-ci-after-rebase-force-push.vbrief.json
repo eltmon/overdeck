@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:14:19.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
-    "updated": "2026-06-09T23:50:05.996Z"
+    "updated": "2026-06-10T00:01:06.568Z"
   },
   "plan": {
     "id": "pan-1658",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "41568a01-5a58-4e5a-a085-023e6be11ea3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 18,
     "created": "2026-06-09T23:14:19.000Z",
-    "updated": "2026-06-09T23:50:05.996Z",
+    "updated": "2026-06-10T00:01:06.568Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
@@ -261,47 +261,64 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1658-reconcile-teststatus-from-green-ci-after-rebase-force-push.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1658",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T23:45:02.088Z",
+        "updatedAt": "2026-06-10T00:01:04.989Z",
         "work": {
-          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-06-09T23:45:02.088Z",
-          "history": []
-        },
-        "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "status": "failed",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "notes": "Verification FAILED at test (34663ms):\n\nticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js:684:49\n    at ~effect/Utils/internal (file:///home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js:79:12)\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: pty-supervisor build artifact missing — run `npm run build`.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m prepareSupervisorForFreshLaunch src/lib/agents.ts:\u001b[2m1624:11\u001b[22m\u001b[39m\n    \u001b[90m1622|\u001b[39m   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    \u001b[90m1623|\u001b[39m   if (!existsSync(supervisorScriptPath)) {\n    \u001b[90m1624|\u001b[39m     throw new Error('pty-supervisor build artifact missing — run `npm …\n    \u001b[90m   |\u001b[39m           \u001b[31m^\u001b[39m\n    \u001b[90m1625|\u001b[39m   }\n    \u001b[90m1626|\u001b[39m   await writePtyToken(agentId);\n\u001b[90m \u001b[2m❯\u001b[22m Module.spawnAgent src/lib/agents.ts:\u001b[2m3237:34\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m738:21\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-09T23:45:02.088Z"
+              "status": "failed",
+              "at": "2026-06-10T00:01:04.989Z",
+              "notes": "Verification FAILED at test (34663ms):\n\nticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js:684:49\n    at ~effect/Utils/internal (file:///home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js:79:12)\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: pty-supervisor build artifact missing — run `npm run build`.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m prepareSupervisorForFreshLaunch src/lib/agents.ts:\u001b[2m1624:11\u001b[22m\u001b[39m\n    \u001b[90m1622|\u001b[39m   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    \u001b[90m1623|\u001b[39m   if (!existsSync(supervisorScriptPath)) {\n    \u001b[90m1624|\u001b[39m     throw new Error('pty-supervisor build artifact missing — run `npm …\n    \u001b[90m   |\u001b[39m           \u001b[31m^\u001b[39m\n    \u001b[90m1625|\u001b[39m   }\n    \u001b[90m1626|\u001b[39m   await writePtyToken(agentId);\n\u001b[90m \u001b[2m❯\u001b[22m Module.spawnAgent src/lib/agents.ts:\u001b[2m3237:34\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m738:21\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n"
+            }
+          ]
+        },
+        "review": {
+          "status": "failed",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "notes": "Verification failed at test",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-10T00:01:04.989Z",
+              "notes": "Verification failed at test"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T23:45:02.088Z"
+              "at": "2026-06-10T00:01:04.989Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T23:45:02.088Z",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-09T23:45:02.088Z",
-          "history": [],
-          "readyForMerge": false
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T00:01:04.989Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1707"
         }
       }
     }
