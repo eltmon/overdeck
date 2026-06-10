@@ -1,0 +1,219 @@
+{
+  "version": "1",
+  "issueId": "PAN-1704",
+  "created": "2026-06-10T00:01:47.676Z",
+  "updated": "2026-06-10T02:21:02.547Z",
+  "gitState": {
+    "branch": "feature/pan-1704",
+    "sha": "789207297",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Tier discriminant is window-fit + provider routing, computed by a NEW pure module src/lib/conversations/switch-strategy.ts exporting getEffectiveTargetWindow(...) and decideSwitchStrategy(...). The route computes the async inputs (context tokens, observed ceiling, provider-routing-changed, cliproxy-routed) and feeds the pure function so the decision is unit-testable in isolation.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Resolve the issue's 'Fable 5 has a 1M window' premise vs the registry (claude-fable-5 contextWindow = 200000, deliberately conservative) by REUSING the extended-context inference already in computeContextUsage (conversation-service.ts:1148-1152): when the live source session's observedCeiling exceeds the target's registry window AND provider routing is unchanged, effective target window = max(1_000_000, registryWindow). The 206k incident is exactly a session whose observed ceiling already proves extended-context mode is active. Do NOT globally bump Fable's registry contextWindow — that would change proactive-compaction high-water math everywhere (gpt-5.5-style wedging risk).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "CLIProxy-routed targets (provider openai + authMode subscription) always use CLIPROXY_CODEX_CONTEXT_WINDOW (150000) as the effective window, never the marketing 1.05M — per PAN-1672. getEffectiveTargetWindow short-circuits to this before the extended-context inference.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Window-fit gate moves into the route's tier decision. maybeCompactBeforeRespawn is updated in place: its modelChanged force-flag and internal 100k threshold are replaced by a caller-supplied shouldCompact boolean (= tier===3). The summaryFork background-feature gate stays inside maybeCompactBeforeRespawn so 'flag off ⇒ no compaction' semantics are preserved. Compaction runs ONLY in Tier 3.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Provider-routing-changed discriminant = string inequality of getProviderExportsForModel(currentModel) vs getProviderExportsForModel(targetModel). Identical exports ⇒ same routing ⇒ Tier 1 eligible (e.g. Opus 4.8 → Fable 5, both Anthropic). Different ⇒ Tier 2.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "safetyFactor = 0.8 as a single module constant in switch-strategy.ts (matches the issue example). No config knob, no per-conversation tolerance setting (Karpathy: no speculative config).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Tier 1 (in-session /model) delivers `/model <targetModel>` via deliverAgentMessage(conv.tmuxSession, ..., resolveConversationDeliveryMethod(conv)) WITHOUT killing the tmux session, persists the new model in the DB, then verifies acceptance by polling capturePane for the target model's displayName in the statusline within a bounded timeout. On miss/timeout/delivery failure it falls back to Tier 2 (kill + respawn --resume). Tier 1 must not call markRespawnPending (there is no respawn).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Tier 4 (harness change) is untouched — the existing convertConversationTranscript flow stays as-is. decideSwitchStrategy returns Tier 4 first (before any window/provider checks) when harnessChanged is true.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "claude-fable-5 registry contextWindow is 200000, not 1M. Relying on the registry value alone would make the 206k incident STILL compact (Tier 3). The fix depends on the extended-context inference keyed on the live session's observed ceiling.",
+      "mitigation": "getEffectiveTargetWindow lifts to max(1M, registryWindow) only when !providerRoutingChanged AND currentObservedCeiling > registryWindow. Source observedCeiling comes from computeContextUsage / readLatestAssistantUsage on the current session JSONL. Never globally edit Fable's contextWindow."
+    },
+    {
+      "id": "H2",
+      "summary": "Cross-provider switches into CLIProxy-routed gpt models must use the 150k effective ceiling, not 1.05M, or they will skip needed compaction and hard-wedge (PAN-1672 / PAN-1615).",
+      "mitigation": "getEffectiveTargetWindow returns CLIPROXY_CODEX_CONTEXT_WINDOW first when the target is openai+subscription. Unit-test this branch."
+    },
+    {
+      "id": "H3",
+      "summary": "Tier 1 /model acceptance verification is fragile: statusline echo timing and format are not guaranteed, and the correct `/model` argument form (full model id vs alias) must match what Claude Code's slash command accepts.",
+      "mitigation": "Bounded capturePane poll for the target displayName; on any miss/timeout/delivery error fall back to Tier 2. Never assume success. Confirm the /model arg format against a live Claude Code session during implementation; encode the chosen form and timeout in the Tier 1 bead."
+    },
+    {
+      "id": "H4",
+      "summary": "The current route kills the session unconditionally at conversations.ts:2458 BEFORE any decision and sets markRespawnPending. Tier 1 must not kill and must not mark respawn-pending.",
+      "mitigation": "Compute the tier BEFORE the kill. markRespawnPending only on Tier 2/3/4 (respawn tiers). Keep the existing markRespawnPending/finally semantics intact for those tiers."
+    },
+    {
+      "id": "H5",
+      "summary": "The summaryFork feature flag currently gates whether ANY compaction runs. Losing that gate would force compaction when the operator has the feature off.",
+      "mitigation": "Keep isBackgroundFeatureEnabled('summaryFork') inside maybeCompactBeforeRespawn; Tier 3 with the flag off respawns --resume with no compaction (accepting potential overflow), matching today's behavior."
+    },
+    {
+      "id": "H6",
+      "summary": "The extended-context 'carry over' inference is only valid for same-family (same provider routing) switches. Applying it to a cross-provider non-CLIProxy target (e.g. claude → google) could wrongly lift the target window based on the source session's ceiling.",
+      "mitigation": "Gate the max(1M, registryWindow) lift on !providerRoutingChanged. Cross-provider targets fall through to CLIProxy clamp (if applicable) or the plain registry window. Unit-test the claude→google-style case."
+    },
+    {
+      "id": "H7",
+      "summary": "harnessChanged (Tier 4) must remain the converter path; native Claude-format compaction must never run for a harness change (it would corrupt a Pi/Codex JSONL).",
+      "mitigation": "decideSwitchStrategy returns Tier 4 first when harnessChanged. The route keeps the existing harnessChanged branch verbatim; the tier logic only governs the same-harness claude-code path."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-10T00:01:47.676Z",
+      "reason": "planning",
+      "note": "Initial planning session (--auto) for PAN-1704: window-aware tiered conversation model switch.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:01Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-10T01:01:53.509Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:01:53.586Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:09:58.271Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:10:42.562Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:13:31.831Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:13:32.498Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:27Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T01:27:41.496Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:27:41.764Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:28Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-10T01:28:01.619Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:29Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-10T01:29:45.667Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:37Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-06-10T01:37:48.909Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:51Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-10T01:51:32.855Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:51:33.989Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:58Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T01:58:40.618Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T01:58:40.688Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T02:07Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-10T02:07:02.856Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T02:07:03.858Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T02:09Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-10T02:09:29.171Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T02:21Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-10T02:21:02.547Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-10T02:07:02Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1704 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/__tests__/config-yaml-conversation-search.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1704 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-10T02:09:29Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1704\n\n# Review Synthesis — PAN-1704 — 2026-06-10T02:08:29Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/context.json`\n- Branch: `feature/1704` (workspace branch observed during synthesis: `feature/pan-1704`)\n- Workspace: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704`\n- HEAD reviewed: `aead4197098b261969fda3b67e890e824d8cfd84`\n- Cycle number: 2\n- Prior cycle SHA: `bbe4d36a11a92241495520655e3d7cb67a47317e`\n- Synthesis note: the workspace HEAD observed during synthesis was `0224e6d5f8887b2793d9d82c3dccfe0fa49c27b9`; post-context changes touched `.pan/specs/2026-06-10-PAN-1704-conversation-model-switch-compacts-unconditionally-add-window-aware-tiered-switching.vbrief.json` and `src/cli/index.ts`, not the cited blocker locations. This synthesis evaluates the convoy-reviewed manifest SHA above.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Tier 1 verification can succeed on the echoed `/model` command instead of the statusline — `src/dashboard/server/routes/conversations.ts:229`\n`waitForModelStatusline()` searches the last 10 pane lines for either `displayNameForModel(targetModel)` or the raw `targetModel` string. Tier 1 delivers `/model ${targetModel}` and then trusts that helper before returning success without respawn. Both the PTY-supervisor path and tmux fallback can echo the submitted `/model` command into the pane, so the raw target model can be present even when Claude Code rejected, ignored, or has not yet applied the switch. That can persist the target model in the database and return `{ sessionAlive: true, model: targetModel }` while the live TUI remains on the old model, bypassing the intended timeout/fallback respawn path.\n\nScope gate: the cited route file is in the PR diff and the finding is in PR-introduced Tier 1 verification logic, so it remains blocking.\n\nRequired fix: make verification statusline-specific and immune to command echoes, for example by parsing only a known statusline/status marker and ignoring lines containing the submitted `/model` command. If no statusline-shaped confirmation appears, keep the Tier 2 respawn fallback.\n\n### [requirements] Missing over-window contrast test for switch-model compaction — vBRIEF `switch-regression-test.ac2`\nThe vBRIEF acceptance criteria require a contrast test proving that a context exceeding `effectiveTargetWindow * 0.8` appends a `compact_boundary`. The new route tests cover the 206k same-routing no-compaction case and Tier 1 delivery-failure fallback, while the strategy unit test proves the Tier 3 decision object and the existing compaction service test proves direct compaction appends a boundary. No changed route/service-level switch-model test connects the over-window switch decision to an appended JSONL boundary.\n\nScope gate: the requirements reviewer classified this as `Scope: in_pr_scope`, and the missing test is an explicit promised-test deliverable for this PR, so it remains blocking.\n\nRequired fix: add a route/service-level switch-model test, likely in `src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts`, that creates an over-threshold session, enables/mocks the `summaryFork` native-compaction path consistently with existing compaction tests, posts the switch request, and asserts the session JSONL contains a new `\"subtype\":\"compact_boundary\"` without real-wall-clock sleeps.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1704/.pan/review/agent-pan-1704-review-aead4197/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1704 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-10T02:21:02Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1704 (attempt 2/10):\n\nFailed check: test\n\nVerification FAILED at test (32398ms):\n\nress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts > POST /api/conversations/:name/switch-model > does not treat an echoed /model command as Tier 1 statusline confirmation\nAssertionError: expected \"vi.fn()\" to be called at least once\n ❯ src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts:286:31\n    284|         await Promise.resolve();\n    285|       }\n    286|       expect(capturePaneMock).toHaveBeenCalled();\n       |                               ^\n    287|       await vi.advanceTimersByTimeAsync(5_500);\n    288|       const response = await responsePromise;\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1704 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1704 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
+}
