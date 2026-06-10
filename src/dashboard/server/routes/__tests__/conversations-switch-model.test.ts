@@ -1,0 +1,172 @@
+import { Effect } from 'effect';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+const {
+  createSessionMock,
+  getProviderExportsForModelMock,
+  getProviderAuthModeMock,
+} = vi.hoisted(() => ({
+  createSessionMock: vi.fn(),
+  getProviderExportsForModelMock: vi.fn(),
+  getProviderAuthModeMock: vi.fn(),
+}));
+
+vi.mock('../../../../lib/agents.js', () => ({
+  deliverAgentMessage: vi.fn().mockResolvedValue(undefined),
+  writeChannelsBridgeMcpConfig: vi.fn().mockResolvedValue(undefined),
+  dismissDevChannelsDialog: vi.fn().mockResolvedValue(undefined),
+  clearReadySignal: vi.fn(),
+  waitForReadySignal: vi.fn().mockResolvedValue(true),
+  getAgentRuntimeBaseCommand: vi.fn().mockResolvedValue('claude --model claude-fable-5'),
+  getProviderExportsForModel: getProviderExportsForModelMock,
+  getProviderEnvForModel: vi.fn().mockResolvedValue({}),
+  getProviderAuthMode: getProviderAuthModeMock,
+}));
+
+vi.mock('../../../../lib/config-yaml.js', () => ({
+  isClaudeCodeChannelsEnabled: vi.fn(() => false),
+  loadConfigSync: vi.fn(() => ({
+    config: {
+      conversations: {
+        titleModel: 'claude-haiku-4-5',
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'panopticon-native',
+        richCompaction: false,
+      },
+    },
+  })),
+}));
+
+vi.mock('../../../../lib/providers.js', () => ({
+  getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+}));
+
+vi.mock('../../../../lib/workspace-manager.js', () => ({
+  preTrustDirectory: vi.fn(),
+}));
+
+vi.mock('../../../../lib/tmux.js', () => ({
+  sendRawKeystroke: vi.fn(),
+  MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
+  capturePane: vi.fn(() => Effect.succeed('')),
+  sessionExists: vi.fn(() => Effect.succeed(true)),
+  isHarnessProcessAlive: vi.fn(() => Effect.succeed(true)),
+  killSession: vi.fn(() => Effect.succeed(undefined)),
+  createSession: createSessionMock,
+  setOption: vi.fn(() => Effect.succeed(undefined)),
+  listSessionNames: vi.fn(() => Effect.succeed([])),
+}));
+
+let testHome: string;
+let originalHome: string | undefined;
+
+function decodeJsonResponse(response: { status: number; body: unknown }) {
+  const payload = response.body as { body: Uint8Array } | null;
+  const text = payload?.body ? new TextDecoder().decode(payload.body) : '{}';
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+async function postSwitchModel(conversationName: string, body: Record<string, unknown>) {
+  const { conversationsRouteLayer } = await import('../conversations.js');
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/conversations/${conversationName}/switch-model`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:3011' },
+    body: JSON.stringify(body),
+  }));
+
+  return Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(conversationsRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+      ),
+    ),
+  );
+}
+
+async function resetDb() {
+  const { resetDatabase } = await import('../../../../lib/database/index.js');
+  resetDatabase();
+}
+
+describe('POST /api/conversations/:name/switch-model', () => {
+  beforeEach(async () => {
+    await resetDb();
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    testHome = join(tmpdir(), `pan-switch-model-route-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testHome, { recursive: true });
+    originalHome = process.env.HOME;
+    process.env.HOME = testHome;
+    process.env.PANOPTICON_HOME = join(testHome, '.panopticon');
+    mkdirSync(process.env.PANOPTICON_HOME, { recursive: true });
+
+    getProviderExportsForModelMock.mockResolvedValue('');
+    getProviderAuthModeMock.mockResolvedValue('anthropic');
+    createSessionMock.mockImplementation((session: string) => Effect.sync(() => {
+      const socketDir = join(process.env.PANOPTICON_HOME!, 'sockets');
+      mkdirSync(socketDir, { recursive: true, mode: 0o700 });
+      const socketPath = join(socketDir, `pty-${session}.sock`);
+      writeFileSync(socketPath, '');
+      chmodSync(socketPath, 0o600);
+    }));
+  });
+
+  afterEach(async () => {
+    await resetDb();
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    delete process.env.PANOPTICON_HOME;
+    rmSync(testHome, { recursive: true, force: true });
+  });
+
+  it('does not append a compact boundary for a 206k-token same-harness switch that fits the inferred target window', async () => {
+    const cwd = join(testHome, 'workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const sessionId = '206k-session';
+    const sessionFile = sessionFilePath(cwd, sessionId);
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: 'Keep all of this context' }] },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-06-10T00:00:00.000Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Still in context' }],
+          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+
+    createConversation({
+      name: 'switch-regression',
+      tmuxSession: 'conv-switch-regression',
+      cwd,
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      claudeSessionId: sessionId,
+    });
+
+    const response = await postSwitchModel('switch-regression', { model: 'claude-fable-5' });
+
+    expect(response.status).toBe(200);
+    expect(decodeJsonResponse(response)).toMatchObject({
+      model: 'claude-fable-5',
+      harness: 'claude-code',
+      sessionAlive: true,
+    });
+    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+  });
+});
