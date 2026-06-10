@@ -81,8 +81,8 @@ describe('agent failure tracking and auto-resume backoff', () => {
       return {
         ...actual,
         default: actual,
-        loadavg: () => [1, 1, 1],
-        cpus: () => Array.from({ length: 24 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+        loadavg: () => [0, 0, 0],
+        cpus: () => Array.from({ length: 4 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
       };
     });
     vi.doMock('../../../src/lib/cloister/concurrency.js', () => ({
@@ -99,7 +99,6 @@ describe('agent failure tracking and auto-resume backoff', () => {
         ...actual,
         resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
         listRunningAgents: vi.fn(() => []),
-  listRunningAgentsSync: vi.fn(() => []),
         listRunningAgentsSync: vi.fn(() => []),
       };
     });
@@ -118,7 +117,6 @@ describe('agent failure tracking and auto-resume backoff', () => {
       }),
       loadReviewStatuses: vi.fn().mockReturnValue({}),
       setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
       setReviewStatusSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
@@ -136,9 +134,9 @@ describe('agent failure tracking and auto-resume backoff', () => {
     }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
+      emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
@@ -163,7 +161,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
       createSessionAsync: vi.fn(),
       isPaneDeadAsync: vi.fn().mockResolvedValue(false),
       killSession: vi.fn(),
-  killSessionSync: vi.fn(),
+      killSessionSync: vi.fn(),
       killSessionAsync: vi.fn().mockResolvedValue(undefined),
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),

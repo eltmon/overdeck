@@ -47,6 +47,10 @@ describe('conversationSearch configuration', () => {
     const expected = loadConfigSync().config.conversationSearch;
 
     expect(result).toEqual(expected);
+    expect(result).toHaveProperty('enabled');
+    expect(result).toHaveProperty('provider');
+    expect(result).toHaveProperty('model');
+    expect(result).toHaveProperty('dbPath');
     expect(typeof result.enabled).toBe('boolean');
     expect(result.provider).toBe('openai');
     expect(typeof result.model).toBe('string');
