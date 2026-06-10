@@ -218,11 +218,12 @@ async function isCliproxyRoutedModel(model: string | null | undefined): Promise<
 }
 
 async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
-  if (!currentModel || !targetModel || currentModel === targetModel) return false;
-  const [currentExports, targetExports] = await Promise.all([
-    getProviderExportsForModel(currentModel),
-    getProviderExportsForModel(targetModel),
-  ]);
+  if (!targetModel || currentModel === targetModel) return false;
+
+  const targetExports = await getProviderExportsForModel(targetModel);
+  if (!currentModel) return targetExports.trim() !== '';
+
+  const currentExports = await getProviderExportsForModel(currentModel);
   return currentExports.trim() !== targetExports.trim();
 }
 

@@ -239,6 +239,49 @@ describe('POST /api/conversations/:name/switch-model', () => {
     expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
   });
 
+  it('respawns default-model conversations when switching to a routed provider target', async () => {
+    getProviderExportsForModelMock.mockImplementation(async (model: string) => (
+      model === 'gpt-5.5' ? 'export ANTHROPIC_BASE_URL=http://127.0.0.1:4545\nexport ANTHROPIC_AUTH_TOKEN=proxy-token' : ''
+    ));
+    const cwd = join(testHome, 'default-model-routed-workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const sessionId = 'default-model-routed-session';
+    const sessionFile = sessionFilePath(cwd, sessionId);
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Default model conversation' }] } }),
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-06-10T00:00:00.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Small context' }],
+          usage: { input_tokens: 1_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+
+    createConversation({
+      name: 'switch-default-routed',
+      tmuxSession: 'conv-switch-default-routed',
+      cwd,
+      model: null,
+      harness: 'claude-code',
+      claudeSessionId: sessionId,
+    });
+
+    const response = await postSwitchModel('switch-default-routed', { model: 'gpt-5.5' });
+
+    expect(response.status).toBe(200);
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-default-routed');
+    expect(createSessionMock).toHaveBeenCalled();
+    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+  });
+
   it('does not treat an echoed /model command as Tier 1 statusline confirmation', async () => {
     vi.useFakeTimers();
     try {
