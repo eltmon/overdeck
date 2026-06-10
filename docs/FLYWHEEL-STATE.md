@@ -1487,3 +1487,41 @@ agent-pan-1579's resume logged 'resuming' at 02:38 but produced no tmux
 session 20+ min later — second gate (work-slot ceiling or unhealthy docker
 stack from its pause reason) swallowed the spawn after the resume decision.
 Resume-decision ≠ session-up; verify has-session after a resume claim.
+
+## RUN-18 ticks 20-26 (2026-06-10, overnight) — the livelock arc: diagnose → jam-break → strike×2 → drain
+
+The defining arc of RUN-18. After PAN-1455 merged (02:06Z), NOTHING else landed
+for 5+ hours. Operator escalated ("nothing is landing"). Root cause was a
+three-layer livelock, broken in stages:
+
+1. **Frozen sessions masquerading as running** (eaten kickoffs, PAN-1700 class):
+   1491 work + 1686/1704 review convoys sat inert with instructions pasted but
+   never executed. Counter-move: `pan review restart <id>` (official surface)
+   recycled the frozen convoys → both passed within ~10-25 min.
+2. **Idle sessions counted against the governor** until `total=9/9` deferred
+   every test dispatch. Counter-moves: `pan pause PAN-1455` (merged, never
+   paused — PAN-1726), `pan pause PAN-1658` (reconciler misfire spawn on a
+   superseded issue — PAN-1709 materialized). Each freed slot produced an
+   immediate dispatch.
+3. **Structural fixes via strike×2, both landed same night:** fb9524bb8
+   (PAN-1726: verify post-merge pause + reap merged work sessions) and
+   04669ad0a (PAN-1730: reap idle awaiting-test work sessions). Both required
+   `pan reload` to go live (landed ≠ live, always).
+
+**Outcome:** test dispatches resumed (first: agent-pan-1242-test, seconds after
+the slot freed), and by 08:13Z BOTH PAN-1704 and PAN-1700 (the keystone
+delivery-ack fix) reached ready_for_merge=1.
+
+**The orchestrator playbook that worked (in order):**
+- `grep deacon.log for 'deferred'` → quantifies the ceiling (work=N advancing=M total/9)
+- byte-identical pane across 2 ticks → frozen, not working
+- `pan review restart` for frozen convoys; `pan pause <id> --reason` for
+  misfire/orphaned work agents (both official surfaces, NOT hand-fixes)
+- strike the structural gap the moment it's precisely characterized; reload after landing
+- every freed slot dispatches within one patrol (~60s) — instant feedback loop
+
+**Open residue for next runs:** agent-pan-1491-ship zombie (refused-and-parked,
+unreapable — PAN-1699 class); 1242/1491 fast test FAILURES (suspect broken
+workspace docker stacks, not code); PAN-1658 issue still open drawing
+reconciler attention (operator close/re-scope pending); strike-1682 parked 20+
+ticks (code long since on main).
