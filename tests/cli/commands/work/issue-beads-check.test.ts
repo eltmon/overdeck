@@ -77,6 +77,39 @@ describe('hasBeadsTasks', () => {
     );
   });
 
+  it('marks lock-contention failures as transient instead of genuine missing beads', async () => {
+    childProcessMocks.execFileSync.mockImplementation(() => {
+      throw { stderr: 'database is locked' };
+    });
+    const { countBeadsTasksDetailed } = await import('../../../../src/cli/commands/start.js');
+
+    expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
+      count: 0,
+      source: 'jsonl-fallback',
+      transientFailure: expect.anything(),
+    });
+  });
+
+  it('keeps known jsonl beads when a live bd read has transient lock contention', async () => {
+    childProcessMocks.execFileSync.mockImplementation(() => {
+      throw { stderr: 'database is locked' };
+    });
+    mkdirSync(join(tmpDir, '.beads'), { recursive: true });
+    writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
+      id: 'panopticon-2',
+      title: 'PAN-1094: Task',
+      labels: ['pan-1094'],
+    }) + '\n');
+    const { countBeadsTasksDetailed, hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
+
+    expect(countBeadsTasksDetailed(tmpDir, 'PAN-1094')).toMatchObject({
+      count: 1,
+      source: 'jsonl-fallback',
+      transientFailure: expect.anything(),
+    });
+    expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
+  });
+
   it('detects when beads do not cover every vBRIEF item', async () => {
     const { validateBeadsMatchPlan } = await import('../../../../src/cli/commands/start.js');
     const workspace = join(tmpDir, 'workspaces', 'feature-pan-1094');

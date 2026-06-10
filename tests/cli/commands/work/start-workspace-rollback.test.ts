@@ -122,4 +122,19 @@ describe('pan start post-create validation rollback', () => {
 
     expect(warnSpy.mock.calls.flat().join('\n')).toContain('failed to roll back workspace for PAN-1094');
   });
+
+  it('exits retryably for transient bead lock failures without planning guidance or rollback', async () => {
+    const { __testInternals, RETRYABLE_BD_LOCK_EXIT_CODE } = await import('../../../../src/cli/commands/start.js');
+
+    expect(() => __testInternals.failTransientBeadsValidation(
+      spinner as never,
+      'PAN-1094',
+      { stderr: 'database is locked' },
+    )).toThrow(`process.exit:${RETRYABLE_BD_LOCK_EXIT_CODE}`);
+
+    expect(spinner.fail).toHaveBeenCalledWith('Beads database was temporarily locked while checking PAN-1094');
+    expect(childProcessMocks.execFile).not.toHaveBeenCalled();
+    expect(logSpy.mock.calls.flat().join('\n')).toContain('retryable');
+    expect(logSpy.mock.calls.flat().join('\n')).not.toContain('Planning must create');
+  });
 });

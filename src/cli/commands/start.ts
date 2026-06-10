@@ -22,6 +22,9 @@ import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
+import { isTransientBdError, BdTransientFailure } from '../../lib/bd-process-lock.js';
+
+export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -533,12 +536,37 @@ import {
   readBeadsTasks,
 } from '../../lib/cloister/work-agent-prompt.js';
 
+export type BeadsTaskCountResult = {
+  count: number;
+  source: 'bd' | 'jsonl-fallback';
+  transientFailure?: unknown;
+};
+
+function countBeadsTasksFromJsonl(workspacePath: string, label?: string): number {
+  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  if (!existsSync(jsonlPath)) return 0;
+  if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
+
+  let count = 0;
+  for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
+      if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
+        count += 1;
+      }
+    } catch { /* skip malformed lines */ }
+  }
+  return count;
+}
+
 /**
  * Check whether a workspace has beads tasks (planning must create them before work begins).
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function countBeadsTasks(workspacePath: string, issueId?: string): number {
+export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
   const label = issueId?.toLowerCase();
   try {
     const args = label
@@ -551,25 +579,18 @@ export function countBeadsTasks(workspacePath: string, issueId?: string): number
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const tasks = JSON.parse(output.trim() || '[]');
-    return Array.isArray(tasks) ? tasks.length : 0;
-  } catch {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return 0;
-    if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
-
-    let count = 0;
-    for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
-        if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-          count += 1;
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    return count;
+    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
+  } catch (error) {
+    return {
+      count: countBeadsTasksFromJsonl(workspacePath, label),
+      source: 'jsonl-fallback',
+      transientFailure: isTransientBdError(error) ? error : undefined,
+    };
   }
+}
+
+export function countBeadsTasks(workspacePath: string, issueId?: string): number {
+  return countBeadsTasksDetailed(workspacePath, issueId).count;
 }
 
 export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
@@ -602,19 +623,25 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   return { valid: true };
 }
 
-export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number } {
+function withTransientFailure<T extends object>(result: T, transientFailure: unknown): T & { transientFailure?: unknown } {
+  if (transientFailure === undefined) return result;
+  return { ...result, transientFailure };
+}
+
+export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number; transientFailure?: unknown } {
   const planPath = findPlanSync(workspacePath);
-  const beadCount = countBeadsTasks(workspacePath, issueId);
-  if (!planPath) return { valid: true, beadCount, planItemCount: 0 };
+  const beadCountResult = countBeadsTasksDetailed(workspacePath, issueId);
+  const beadCount = beadCountResult.count;
+  if (!planPath) return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
 
   try {
     const raw = readFileSync(planPath, 'utf-8');
     const parsed = JSON.parse(raw);
     const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
-    if (planItemCount === 0) return { valid: true, beadCount, planItemCount };
-    return { valid: beadCount === planItemCount, beadCount, planItemCount };
+    if (planItemCount === 0) return withTransientFailure({ valid: true, beadCount, planItemCount }, beadCountResult.transientFailure);
+    return withTransientFailure({ valid: beadCount === planItemCount, beadCount, planItemCount }, beadCountResult.transientFailure);
   } catch {
-    return { valid: true, beadCount, planItemCount: 0 };
+    return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
   }
 }
 
@@ -681,6 +708,21 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
   }
 
   process.exit(1);
+}
+
+function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
+  if (cause instanceof BdTransientFailure) {
+    return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times`;
+  }
+  return `Beads database was temporarily locked while checking ${issueId}`;
+}
+
+function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
+  spinner.fail(transientBeadsFailureMessage(issueId, cause));
+  console.log('');
+  console.log(chalk.yellow('The beads database is being used by another Panopticon process.'));
+  console.log(chalk.dim(`This is retryable; re-run ${chalk.cyan(`pan start ${issueId}`)} shortly.`));
+  process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
@@ -982,7 +1024,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    if (!hasBeadsTasks(workspace, id)) {
+    const beadsTaskCount = countBeadsTasksDetailed(workspace, id);
+    if (beadsTaskCount.transientFailure && beadsTaskCount.count === 0) {
+      failTransientBeadsValidation(spinner, id, beadsTaskCount.transientFailure);
+    }
+    if (beadsTaskCount.count === 0) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
       const hasPlanningState = findPlanSync(workspace) !== null;
       if (!hasPlanningState) {
@@ -1052,6 +1098,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     let beadCoverage = validateBeadsMatchPlan(workspace, id);
+    if (beadCoverage.transientFailure) {
+      failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
+    }
     if (!beadCoverage.valid) {
       // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
       // existing beads for the issue before recreating from spec, so it's safe to
@@ -1063,6 +1112,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         if (recovery.success && recovery.created.length > 0) {
           spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
           beadCoverage = validateBeadsMatchPlan(workspace, id);
+          if (beadCoverage.transientFailure) {
+            failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
+          }
         }
       } catch (recoveryErr) {
         // Fall through to the existing failure path below
@@ -1151,4 +1203,5 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
+  failTransientBeadsValidation,
 };

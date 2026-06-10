@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-09T23:46:47.423Z"
+    "updated": "2026-06-10T00:28:16.472Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-09T23:46:47.423Z",
+    "updated": "2026-06-10T00:28:16.472Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -257,7 +257,7 @@
       {
         "id": "honest-transient-error-messaging",
         "title": "Never report 'planning must create beads' on a transient bd failure; emit an honest locked-retry message",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -273,7 +273,7 @@
           {
             "id": "honest-transient-error-messaging.ac1",
             "title": "A transient/lock failure during gate or recovery prints a 'temporarily locked — retry' message, NOT 'Planning must create a task breakdown'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -281,7 +281,7 @@
           {
             "id": "honest-transient-error-messaging.ac2",
             "title": "A transient read failure does NOT trigger destructive vBRIEF re-materialization (no bead deletion on a lock error)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -289,7 +289,7 @@
           {
             "id": "honest-transient-error-messaging.ac3",
             "title": "'planning must create beads' guidance still appears only when beads are genuinely absent (live query returned empty AND JSONL empty)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -297,7 +297,7 @@
           {
             "id": "honest-transient-error-messaging.ac4",
             "title": "The transient-failure exit code is distinct from the genuine-no-beads exit code so callers/Flywheel can distinguish retryable from re-plan",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -439,7 +439,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json"
+      "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1629",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-10T00:19:42.603Z",
+        "work": {
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T00:19:42.603Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T00:19:42.603Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"
