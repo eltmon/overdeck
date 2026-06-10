@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T01:19:47.764Z"
+    "updated": "2026-06-10T01:23:55.376Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 48,
+    "sequence": 56,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T01:19:47.764Z",
+    "updated": "2026-06-10T01:23:55.376Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -444,55 +444,57 @@
         "phase": "work",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T01:19:47.757Z",
+        "updatedAt": "2026-06-10T01:23:54.778Z",
         "work": {
-          "updatedAt": "2026-06-10T01:19:47.757Z",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-10T01:19:47.757Z",
+          "status": "failed",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
+          "notes": "Verification FAILED at test (67930ms):\n\ns a compact boundary and continuation summary\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversation-compaction.test.ts:47:3\n     45|\n     46| describe('conversation compaction service', () => {\n     47|   it('appends a compact boundary and continuation summary', async () =…\n       |   ^\n     48|     const sessionFile = join(TEST_HOME, 'session.jsonl');\n     49|     writeFileSync(sessionFile, [\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/operator-interventions.test.ts > operator.intervention dashboard routes > emits pause from the successful dashboard pause route\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/operator-interventions.test.ts:216:3\n    214|   });\n    215|\n    216|   it('emits pause from the successful dashboard pause route', async ()…\n       |   ^\n    217|     const { response, appendedEvents } = await requestAgents('/api/age…\n    218|       body: JSON.stringify({ reason: 'operator' }),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/issue-lifecycle.test.ts > IssueLifecycle Effect service > transitionTo — Linear > transitions to \"in_progress\" on Linear\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:122:5\n    120|\n    121|   describe('transitionTo — Linear', () => {\n    122|     it('transitions to \"in_progress\" on Linear', async () => {\n       |     ^\n    123|       const { IssueLifecycle } = await import('../issue-lifecycle.js');\n    124|       const layer = await makeTestLayer();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯\n\n",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-10T01:19:47.757Z"
+              "status": "failed",
+              "at": "2026-06-10T01:23:54.778Z",
+              "notes": "Verification FAILED at test (67930ms):\n\ns a compact boundary and continuation summary\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/conversation-compaction.test.ts:47:3\n     45|\n     46| describe('conversation compaction service', () => {\n     47|   it('appends a compact boundary and continuation summary', async () =…\n       |   ^\n     48|     const sessionFile = join(TEST_HOME, 'session.jsonl');\n     49|     writeFileSync(sessionFile, [\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/operator-interventions.test.ts > operator.intervention dashboard routes > emits pause from the successful dashboard pause route\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/operator-interventions.test.ts:216:3\n    214|   });\n    215|\n    216|   it('emits pause from the successful dashboard pause route', async ()…\n       |   ^\n    217|     const { response, appendedEvents } = await requestAgents('/api/age…\n    218|       body: JSON.stringify({ reason: 'operator' }),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/issue-lifecycle.test.ts > IssueLifecycle Effect service > transitionTo — Linear > transitions to \"in_progress\" on Linear\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/services/__tests__/issue-lifecycle.test.ts:122:5\n    120|\n    121|   describe('transitionTo — Linear', () => {\n    122|     it('transitions to \"in_progress\" on Linear', async () => {\n       |     ^\n    123|       const { IssueLifecycle } = await import('../issue-lifecycle.js');\n    124|       const layer = await makeTestLayer();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯\n\n"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:19:47.757Z",
-          "notes": "Verification failed at lint",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
+          "notes": "Verification failed at test",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:19:47.757Z",
-              "notes": "Verification failed at lint"
+              "at": "2026-06-10T01:23:54.778Z",
+              "notes": "Verification failed at test"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:19:47.757Z",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:19:47.757Z"
+              "at": "2026-06-10T01:23:54.778Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T01:19:47.757Z",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:19:47.757Z",
+          "updatedAt": "2026-06-10T01:23:54.778Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:19:47.757Z"
+              "at": "2026-06-10T01:23:54.778Z"
             }
           ],
           "readyForMerge": false,
