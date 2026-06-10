@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-09T23:59:30.734Z"
+    "updated": "2026-06-10T00:03:11.907Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 35,
+    "sequence": 37,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-09T23:59:30.734Z",
+    "updated": "2026-06-10T00:03:11.907Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -163,60 +163,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T23:58:50.042Z",
+        "updatedAt": "2026-06-10T00:03:11.861Z",
         "work": {
-          "updatedAt": "2026-06-09T23:58:50.042Z",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-06-09T23:58:50.042Z",
-          "notes": "Acceptance criteria check FAILED — 7/7 AC incomplete:\n\n### Correct projectRootFromWorkspace to resolve a workspace to its true project root (+ round-trip regression test) (4/4 incomplete)\n  - [ ] projectRootFromWorkspace(workspace) returns resolve(workspacePath,'..','..') (the main project root) for a feature-<id> worktree that has a .git file and a checked-out .pan/specs/ directory — it no longer returns the workspace itself.\n  - [ ] A regression test reproduces the worktree shape (<root>/workspaces/feature-pan-<n>/ with a .git file and a .pan/specs/ dir) and asserts that after writeAutoStartVBrief(root, workspace, issue), readWorkspacePlanSync(workspace) and findPlanSync(workspace) resolve the synthesized plan (non-null). The test fails on the pre-fix code and passes on the post-fix code.\n  - [ ] With execFile/bd mocked (per create-beads.test.ts), the round-trip writeAutoStartVBrief → createBeadsFromVBrief(workspace) returns success with created.length >= 1 — proving the 0-beads rollback no longer occurs.\n  - [ ] Any import (existsSync/join) left unused in io.ts solely by removing the short-circuit branch is cleaned up; typecheck and lint pass.\n\n### Guard tests: normal-flow spec reads still resolve correctly after the resolver change (3/3 incomplete)\n  - [ ] Pre-promotion test: with only <workspace>/.pan/spec.vbrief.json present (no <root>/.pan/specs/ entry for the issue), findPlanSync(workspace) and readWorkspacePlanSync(workspace) resolve the workspace draft via the fallback — confirming the planning-in-progress window is unaffected by the resolver change.\n  - [ ] Post-promotion test: with a canonical spec for the issue present in <root>/.pan/specs/, findPlanSync(workspace) resolves the main-side spec (returned path is under <root>/.pan/specs/, not <workspace>/.pan/specs/) — confirming the intended single-spec-on-main resolution.\n  - [ ] The full vbrief unit suite and the dashboard complete-planning + auto-promote-chain integration tests pass (npm test green), demonstrating no regression in normal planned-work spec resolution.",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "notes": "Verification FAILED at test (57352ms):\n\nompleted marker + stoppedByUser) when the review came back blocked (PAN-1614)\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m295:21\u001b[22m\u001b[39m\n    \u001b[90m293|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m294|\u001b[39m\n    \u001b[90m295|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m296|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m297|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts\u001b[2m > \u001b[22mautoResumeStoppedWorkAgents (PAN-871)\u001b[2m > \u001b[22mstill auto-resumes an open issue with pending review feedback when not deliberately stopped\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m302:21\u001b[22m\u001b[39m\n    \u001b[90m300|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m304|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-09T23:58:50.042Z",
-              "notes": "Acceptance criteria check FAILED — 7/7 AC incomplete:\n\n### Correct projectRootFromWorkspace to resolve a workspace to its true project root (+ round-trip regression test) (4/4 incomplete)\n  - [ ] projectRootFromWorkspace(workspace) returns resolve(workspacePath,'..','..') (the main project root) for a feature-<id> worktree that has a .git file and a checked-out .pan/specs/ directory — it no longer returns the workspace itself.\n  - [ ] A regression test reproduces the worktree shape (<root>/workspaces/feature-pan-<n>/ with a .git file and a .pan/specs/ dir) and asserts that after writeAutoStartVBrief(root, workspace, issue), readWorkspacePlanSync(workspace) and findPlanSync(workspace) resolve the synthesized plan (non-null). The test fails on the pre-fix code and passes on the post-fix code.\n  - [ ] With execFile/bd mocked (per create-beads.test.ts), the round-trip writeAutoStartVBrief → createBeadsFromVBrief(workspace) returns success with created.length >= 1 — proving the 0-beads rollback no longer occurs.\n  - [ ] Any import (existsSync/join) left unused in io.ts solely by removing the short-circuit branch is cleaned up; typecheck and lint pass.\n\n### Guard tests: normal-flow spec reads still resolve correctly after the resolver change (3/3 incomplete)\n  - [ ] Pre-promotion test: with only <workspace>/.pan/spec.vbrief.json present (no <root>/.pan/specs/ entry for the issue), findPlanSync(workspace) and readWorkspacePlanSync(workspace) resolve the workspace draft via the fallback — confirming the planning-in-progress window is unaffected by the resolver change.\n  - [ ] Post-promotion test: with a canonical spec for the issue present in <root>/.pan/specs/, findPlanSync(workspace) resolves the main-side spec (returned path is under <root>/.pan/specs/, not <workspace>/.pan/specs/) — confirming the intended single-spec-on-main resolution.\n  - [ ] The full vbrief unit suite and the dashboard complete-planning + auto-promote-chain integration tests pass (npm test green), demonstrating no regression in normal planned-work spec resolution."
+              "at": "2026-06-10T00:03:11.861Z",
+              "notes": "Verification FAILED at test (57352ms):\n\nompleted marker + stoppedByUser) when the review came back blocked (PAN-1614)\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m295:21\u001b[22m\u001b[39m\n    \u001b[90m293|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m294|\u001b[39m\n    \u001b[90m295|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m296|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m297|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts\u001b[2m > \u001b[22mautoResumeStoppedWorkAgents (PAN-871)\u001b[2m > \u001b[22mstill auto-resumes an open issue with pending review feedback when not deliberately stopped\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m302:21\u001b[22m\u001b[39m\n    \u001b[90m300|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m304|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n"
             }
           ]
         },
         "review": {
-          "status": "failed",
-          "updatedAt": "2026-06-09T23:58:50.042Z",
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
           "notes": "Verification failed at vbrief-ac",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-09T23:58:50.042Z",
+              "status": "pending",
+              "at": "2026-06-10T00:03:11.861Z",
               "notes": "Verification failed at vbrief-ac"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-09T23:58:50.042Z",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T23:58:50.042Z"
+              "at": "2026-06-10T00:03:11.861Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T23:58:50.042Z",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-09T23:58:50.042Z",
+          "updatedAt": "2026-06-10T00:03:11.861Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T23:58:50.042Z"
+              "at": "2026-06-10T00:03:11.861Z"
             }
           ],
           "readyForMerge": false,
