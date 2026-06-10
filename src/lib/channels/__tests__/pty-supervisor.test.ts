@@ -1,10 +1,12 @@
+import type * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
+import { createPtySupervisorServer, injectPtyMessage } from '../pty-supervisor.js';
 
 const REPO_ROOT = process.cwd();
 const SUPERVISOR_ENTRY = join(REPO_ROOT, 'dist/pty-supervisor.js');
@@ -114,7 +116,26 @@ async function readySupervisor(agentId: string, command = 'cat', args: string[] 
   return { token, socketPath };
 }
 
+function createFakePty(): { child: pty.IPty; writes: string[]; emit: (data: string) => void } {
+  const listeners = new Set<(data: string) => void>();
+  const writes: string[] = [];
+  return {
+    writes,
+    emit: (data: string) => {
+      for (const listener of listeners) listener(data);
+    },
+    child: {
+      write: (data: string) => writes.push(data),
+      onData: (listener: (data: string) => void) => {
+        listeners.add(listener);
+        return { dispose: () => listeners.delete(listener) };
+      },
+    } as unknown as pty.IPty,
+  };
+}
+
 afterEach(async () => {
+  vi.useRealTimers();
   if (proc && !proc.killed) {
     proc.kill('SIGTERM');
     await waitForExit(proc);
@@ -129,6 +150,57 @@ beforeEach(() => {
   stdout = '';
   stderr = '';
   proc = null;
+});
+
+describe.skipIf(isBun)('injectPtyMessage', () => {
+  it('waits for a normalized child PTY echo before sending Enter', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-confirm', { content: 'hello   world', echo: false });
+    expect(fake.writes).toEqual(['hello   world']);
+    fake.emit('[32mhello world[0m');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual(['hello   world', '\r']);
+  });
+
+  it('retries content once and rejects without Enter when the child PTY never echoes input', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content: 'missing echo', echo: false });
+    const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+    expect(fake.writes).toEqual(['missing echo']);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(fake.writes).toEqual(['missing echo', 'missing echo']);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await rejected;
+    expect(fake.writes).toEqual(['missing echo', 'missing echo']);
+  });
+
+  it('returns non-2xx from the supervisor server when echo confirmation fails', async () => {
+    vi.useFakeTimers();
+    const agentId = 'agent-server-no-confirm';
+    const token = await writePtyToken(agentId);
+    const fake = createFakePty();
+    const server = createPtySupervisorServer(agentId, fake.child);
+    const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
+    mkdirSync(join(tmpHome, 'sockets'), { recursive: true, mode: 0o700 });
+    await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
+
+    try {
+      const posted = postToUnixSocket(socketPath, token, { content: 'never echoed', echo: false });
+      await vi.waitFor(() => expect(fake.writes).toEqual(['never echoed']));
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expect(posted).resolves.toMatchObject({ status: 502 });
+      expect(fake.writes).toEqual(['never echoed', 'never echoed']);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });
 
 describe.skipIf(isBun)('pty-supervisor subprocess', () => {
@@ -178,27 +250,6 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
-  });
-
-  it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
-    const capturePath = join(tmpHome, 'input-capture.txt');
-    const content = 'never-confirmed';
-    const { token, socketPath } = await readySupervisor('agent-no-confirm', 'bash', [
-      '-lc',
-      `stty raw -echo; printf READY; dd of=${JSON.stringify(capturePath)} bs=1 count=${content.length * 2} 2>/dev/null; sleep 30`,
-    ]);
-    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not enter raw capture mode');
-    stdout = '';
-    const startedAt = Date.now();
-
-    const result = await postToUnixSocket(socketPath, token, { content });
-
-    expect(result.status).toBeGreaterThanOrEqual(400);
-    expect(result.body).toContain('input echo confirmation failed');
-    expect(Date.now() - startedAt).toBeLessThan(4_500);
-    expect(readFileSync(capturePath, 'utf8')).toBe(content.repeat(2));
-    const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-confirm.log');
-    expect(existsSync(logPath)).toBe(false);
   });
 
   it('creates the supervisor socket at mode 0600', async () => {

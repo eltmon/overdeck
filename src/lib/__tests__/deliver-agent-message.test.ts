@@ -167,30 +167,37 @@ describe('channel bridge delivery', () => {
   });
 
   it('supervisor POST can take longer than the old timeout without spurious fallback', async () => {
+    vi.useFakeTimers();
     const agentId = 'agent-supervisor-budget';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
+    const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'ok',
       delayMs: 2_500,
+      capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
       status: 200,
       body: 'channel should not be used',
     });
     try {
-      await expect(deliverAgentMessage(agentId, 'confirmed within budget', 'caller-budget')).resolves.toEqual({ ok: true, path: 'supervisor' });
+      const delivered = deliverAgentMessage(agentId, 'confirmed within budget', 'caller-budget');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(2_500);
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'supervisor' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
     } finally {
+      vi.useRealTimers();
       await Promise.all([
         new Promise<void>((r) => supervisor.close(() => r())),
         new Promise<void>((r) => channel.close(() => r())),
       ]);
     }
-  }, 8_000);
+  });
 
   it('plain fork conversation delivery routes to supervisor without Channels state', async () => {
     const agentId = 'conv-plain-fork';
@@ -313,32 +320,39 @@ describe('channel bridge delivery', () => {
     }
   });
 
-  it('supervisor POST timeout: falls through to channels', async () => {
+  it('supervisor POST timeout: falls through to channels using fake timers', async () => {
+    vi.useFakeTimers();
     const agentId = 'agent-supervisor-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
+    const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'late',
       delayMs: 4_500,
+      capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
       status: 200,
       body: 'ok',
     });
     try {
-      await expect(deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout')).resolves.toEqual({ ok: true, path: 'channels' });
+      const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(4_100);
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
       expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
     } finally {
+      vi.useRealTimers();
       await Promise.all([
         new Promise<void>((r) => supervisor.close(() => r())),
         new Promise<void>((r) => channel.close(() => r())),
       ]);
     }
-  }, 10_000);
+  });
 
   it('deliveryMethod supervisor is strict when the PTY socket is missing', async () => {
     const agentId = 'agent-supervisor-strict';
