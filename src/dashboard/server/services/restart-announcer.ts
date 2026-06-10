@@ -26,6 +26,23 @@ export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_t
 const POLL_MS = 15_000;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
 
+/** Dashboard route for the restart's initiator: flywheel orchestrator → the
+ *  flywheel page, conversations → their conversation page. Issue agents route
+ *  via the entry's issueId instead (same destination as the issue tree). */
+export function initiatorLink(initiator: string | undefined): string | undefined {
+  if (!initiator) return undefined;
+  if (initiator === 'conv-flywheel-orchestrator') return '/flywheel';
+  if (initiator.startsWith('conv-')) return `/conv/${encodeURIComponent(initiator.slice('conv-'.length))}`;
+  return undefined;
+}
+
+function describeInitiator(initiator: string | undefined): string {
+  if (!initiator) return '';
+  if (initiator === 'conv-flywheel-orchestrator') return ' by the flywheel orchestrator';
+  if (initiator.startsWith('conv-')) return ` by conversation ${initiator.slice('conv-'.length)}`;
+  return ` by ${initiator}`;
+}
+
 /** Map a restart-status entry to an activity-feed entry. Pure; exported for tests. */
 export function describeRestart(status: RestartStatus): EmitActivityOptions {
   const seconds = (status.durationMs / 1000).toFixed(1);
@@ -52,13 +69,16 @@ export function describeRestart(status: RestartStatus): EmitActivityOptions {
       message: `Supervisor watchdog restarted the dashboard (attempt ${status.attempts}, ${seconds}s)${status.reason ? ` — ${status.reason}` : ''}`,
     };
   }
+  const actor = describeInitiator(status.initiator);
   return {
     source: 'dashboard',
     level: status.success ? 'info' : 'error',
     message: status.success
-      ? `Dashboard restarted via ${status.trigger} (${seconds}s)`
-      : `Dashboard restart via ${status.trigger} failed`,
+      ? `Dashboard restarted via ${status.trigger}${actor} (${seconds}s)`
+      : `Dashboard restart via ${status.trigger}${actor} failed`,
     details: status.error,
+    issueId: status.issueId,
+    link: initiatorLink(status.initiator),
   };
 }
 
