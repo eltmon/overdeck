@@ -79,12 +79,12 @@ describe('auto-resume gates', () => {
   }
 
   async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
-    // PAN-1665: throttle tests need deterministic load/core counts. Default to a
-    // low-load host so ordinary auto-resume gates don't depend on the real machine.
+    // PAN-1665: throttle tests need deterministic load/core counts. Default to
+    // low load so unrelated auto-resume tests do not depend on the host machine.
     vi.doMock('os', async (importOriginal) => {
       const actual = await importOriginal<typeof import('os')>();
-      const loadavg = osOverrides?.loadavg ?? [1, 1, 1];
-      const cpusCount = osOverrides?.cpusCount ?? 24;
+      const loadavg = osOverrides?.loadavg ?? [0, 0, 0];
+      const cpusCount = osOverrides?.cpusCount ?? 4;
       return {
         ...actual,
         default: actual,

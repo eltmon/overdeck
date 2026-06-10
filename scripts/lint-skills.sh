@@ -114,6 +114,17 @@ def usage_allows_positional_arg(help_text: str) -> bool:
     return any(placeholder not in {"[options]", "[command]", "<command>"} for placeholder in placeholders)
 
 
+def subcommand_help(verb: str, subcommand: str) -> str:
+    last: subprocess.CalledProcessError | None = None
+    for args in ((verb, subcommand, "--help"), (verb, "help", subcommand), ("help", verb, subcommand)):
+        try:
+            return run_pan(*args)
+        except subprocess.CalledProcessError as error:
+            last = error
+    assert last is not None
+    raise last
+
+
 def validate_legacy_redirects() -> list[str]:
     errors: list[str] = []
     for legacy, canonical in LEGACY_REDIRECTS.items():
@@ -154,13 +165,15 @@ def validate_command(
             break
 
     if first_arg and subcommands and first_arg in subcommands and first_arg != "help":
+        flag_tokens = tokens[3:]
+        has_flag_tokens = any(token.startswith("-") for token in flag_tokens)
         try:
-            sub_help = run_pan(verb, first_arg, "--help")
+            sub_help = subcommand_help(verb, first_arg)
         except subprocess.CalledProcessError:
-            errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
+            if has_flag_tokens:
+                errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
             return errors
         flags = option_names(sub_help) | global_flags
-        flag_tokens = tokens[3:]
     else:
         flags = set(verb_flags) | set(global_flags)
         flag_tokens = tokens[2:]

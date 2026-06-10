@@ -104,6 +104,12 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock('os', () => ({
+  homedir: vi.fn(() => '/tmp/test-home'),
+  loadavg: vi.fn(() => [0, 0, 0]),
+  cpus: vi.fn(() => [{}, {}, {}, {}]),
+}));
+
 vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: vi.fn(() => '/tmp/workspace'),
 }));
