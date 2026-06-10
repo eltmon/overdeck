@@ -95,11 +95,7 @@ export interface CreateRemoteWorkspaceOptions {
   if (options.spinner) {
     options.spinner.text = 'Syncing credentials to VM...';
   }
-  const creds = await fly.syncAllCredentials(vmName);
-  if (creds.github) {
-    // Wire gh as the git credential helper so https clone/push authenticate.
-    await Effect.runPromise(fly.ssh(vmName, 'gh auth setup-git 2>&1 || true'));
-  }
+  await fly.syncAllCredentials(vmName);
 
   // Step 3: Clone repository on VM into /workspace (the image WORKDIR — the
   // agent spawn path and prompt both assume /workspace, never ~/workspace).

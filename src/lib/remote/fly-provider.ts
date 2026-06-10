@@ -395,16 +395,26 @@ export class FlyProvider implements RemoteProvider {
     }
   }
 
-  /** Sync GitHub CLI authentication to the remote VM */
+  /**
+   * Sync GitHub CLI authentication to the remote VM.
+   *
+   * Copying hosts.yml is not enough: gh commonly stores the token in the OS
+   * keyring, leaving hosts.yml token-less. Export the live token via
+   * `gh auth token` and log in on the VM, then wire gh as the git https
+   * credential helper so clone/push authenticate.
+   */
   async syncGitHubAuth(vmName: string): Promise<boolean> {
-    const ghConfigPath = join(homedir(), '.config', 'gh', 'hosts.yml');
-    if (!existsSync(ghConfigPath)) return false;
-
     try {
-      const content = readFileSync(ghConfigPath, 'utf-8');
-      const b64 = Buffer.from(content).toString('base64');
-      await this.sshImpl(vmName, `mkdir -p ~/.config/gh && echo '${b64}' | base64 -d > ~/.config/gh/hosts.yml`);
-      return true;
+      const { stdout } = await execAsync('gh auth token', { timeout: 10000 });
+      const token = stdout.trim();
+      if (!token) return false;
+
+      const b64 = Buffer.from(token).toString('base64');
+      const result = await this.sshImpl(
+        vmName,
+        `echo '${b64}' | base64 -d | gh auth login --with-token && gh auth setup-git`
+      );
+      return result.exitCode === 0;
     } catch {
       return false;
     }
