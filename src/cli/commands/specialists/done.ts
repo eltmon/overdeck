@@ -201,6 +201,33 @@ export async function doneCommand(
     console.log(`  Merge:  ${formatStatus(status.mergeStatus)}`);
   }
   console.log(`  Ready:  ${status.readyForMerge ? chalk.green('Yes') : chalk.dim('No')}`);
+
+  // PAN-1716: a completed advancing-role (review/test/ship) session sits idle at
+  // its Claude prompt forever after recording its verdict, counting against the
+  // PAN-1665 advancing ceiling and eventually livelocking the pipeline. The
+  // /api/specialists/done HTTP route already kills the session (PAN-846); this CLI
+  // override path never did. Reap the role's session(s) — including the review
+  // convoy sub-sessions — now that the verdict is persisted. This is the LAST
+  // action: `pan specialists done` is usually run from inside the role's own tmux
+  // session, so killing it terminates this process; all state writes and feedback
+  // delivery above have already completed.
+  const advancingRole =
+    specialist === 'review' ? 'review' :
+    specialist === 'test' ? 'test' :
+    specialist === 'ship' ? 'ship' : null;
+  if (advancingRole) {
+    try {
+      const { listSessionNames, killSession } = await import('../../../lib/tmux.js');
+      const { sessionsToReapForRole } = await import('../../../lib/cloister/reap-terminal-sessions.js');
+      const alive = await Effect.runPromise(listSessionNames());
+      const targets = sessionsToReapForRole(normalizedIssueId, advancingRole, alive);
+      for (const session of targets) {
+        await Effect.runPromise(killSession(session)).catch(() => {});
+      }
+    } catch {
+      // Best effort — the deacon janitor reaps any missed terminal session.
+    }
+  }
 }
 
 function formatStatus(status: string): string {

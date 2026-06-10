@@ -177,7 +177,8 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
       if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Panopticon', path: '/tmp/panopticon' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
-      if (path === '/api/conversations' || path === '/api/conversations/pending-input') return json([]);
+      if (path === '/api/conversations') return json([]);
+      if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
       if (path === '/api/flywheel/runs') return json([]);

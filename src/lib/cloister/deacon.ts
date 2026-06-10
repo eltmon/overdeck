@@ -126,7 +126,7 @@ export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
-import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot } from './concurrency.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -1961,7 +1961,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             // PAN-1665: at the concurrency ceiling — defer (leave status untouched
             // so a later patrol retries once a slot frees). Never fail the review.
             actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
           } else if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
             // PAN-1048 R4: deacon recovery routes through the role primitive.
@@ -2035,7 +2035,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             // PAN-1665: at the concurrency ceiling — defer without touching status
             // so a later patrol retries once a slot frees.
             actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
           } else {
             try {
               const run = await spawnRun(issueId, 'test', {
@@ -2164,7 +2164,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // row exists yet, so leaving it untouched lets a later patrol retry cleanly.
       if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred missing-status review for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
 
@@ -2286,7 +2286,7 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
       // pending/dispatch_failed so a later patrol retries once a slot frees.
       if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred test retry for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
 
@@ -2896,7 +2896,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // PAN-1665: at the ceiling — status is already reset to pending above, so
         // the orphan-review path will re-dispatch on a later patrol once a slot frees.
         actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
       } else if (freshStatus?.reviewStatus === 'pending') {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const branch = `feature/${issueId.toLowerCase()}`;
@@ -4776,6 +4776,43 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 }
 
 /**
+ * PAN-1716: Defense-in-depth reaper for completed advancing-role sessions.
+ *
+ * Every review/test/ship session whose phase verdict is already terminal but is
+ * still tmux-alive is a zombie: Claude sits idle at its prompt forever, yet
+ * `countRunningAgents()` keeps counting it against the PAN-1665 advancing
+ * ceiling. Enough of them starve every new dispatch and livelock the pipeline.
+ *
+ * The completion paths (`pan specialists done`, the HTTP route) kill the session
+ * directly; this janitor catches any they miss so a single dropped kill can't
+ * accumulate into a livelock. Runs early in the patrol so freed ceiling slots
+ * benefit this same cycle's dispatchers.
+ */
+export async function checkTerminalAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
+    for (const session of toKill) {
+      try {
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped terminal advancing session ${session} (verdict recorded, session idle)`);
+        console.log(`[deacon] Reaped terminal advancing session ${session} (PAN-1716)`);
+        logDeaconEventSync(`checkTerminalAdvancingSessions: reaped ${session} — phase verdict terminal but session alive (PAN-1716)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap terminal session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping terminal advancing sessions:', msg);
+  }
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -4915,6 +4952,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   } catch (err: any) {
     console.warn(`[deacon] Failed to check workspace existence: ${err.message}`);
   }
+
+  // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
+  // still tmux-alive before the dispatchers run, so freed ceiling slots are
+  // available to this same cycle's review/test/ship re-dispatch below.
+  const reapedTerminalActions = await checkTerminalAdvancingSessions();
+  actions.push(...reapedTerminalActions);
+  for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
