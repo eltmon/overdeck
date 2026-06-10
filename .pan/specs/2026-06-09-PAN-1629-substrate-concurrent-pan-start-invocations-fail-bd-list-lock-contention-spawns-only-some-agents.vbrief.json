@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T00:42:09.798Z"
+    "updated": "2026-06-10T01:02:07.797Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 10,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T00:42:09.798Z",
+    "updated": "2026-06-10T01:02:07.797Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -444,44 +444,57 @@
         "phase": "work",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:19:42.603Z",
+        "updatedAt": "2026-06-10T01:02:07.755Z",
         "work": {
-          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-06-10T00:19:42.603Z",
-          "history": []
+          "status": "running",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-06-10T01:02:07.755Z"
+            }
+          ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:19:42.603Z"
+              "at": "2026-06-10T01:02:07.755Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:19:42.603Z"
+              "at": "2026-06-10T01:02:07.755Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:19:42.603Z",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-06-10T00:19:42.603Z",
-          "history": [],
-          "readyForMerge": false
+          "status": "pending",
+          "updatedAt": "2026-06-10T01:02:07.755Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T01:02:07.755Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1715"
         }
       }
     }
