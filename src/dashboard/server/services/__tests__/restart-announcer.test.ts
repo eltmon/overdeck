@@ -4,6 +4,7 @@ import type { RestartStatus } from '../../../../lib/restart-status.js';
 import {
   announceNewRestart,
   describeRestart,
+  initiatorLink,
   startRestartAnnouncer,
   stopRestartAnnouncer,
 } from '../restart-announcer.js';
@@ -90,6 +91,53 @@ describe('describeRestart', () => {
     expect(entry.source).toBe('dashboard');
     expect(entry.level).toBe('info');
     expect(entry.message).toBe('Dashboard restarted via pan reload (13.5s)');
+    expect(entry.link).toBeUndefined();
+  });
+
+  it('attributes a conversation-initiated reload and links to its conversation page', () => {
+    const entry = describeRestart({
+      ...watchdogSuccess,
+      trigger: 'pan reload',
+      reason: undefined,
+      initiator: 'conv-20260610-8858',
+    });
+    expect(entry.message).toBe('Dashboard restarted via pan reload by conversation 20260610-8858 (13.5s)');
+    expect(entry.link).toBe('/conv/20260610-8858');
+  });
+
+  it('links flywheel-orchestrator reloads to the flywheel page', () => {
+    const entry = describeRestart({
+      ...watchdogSuccess,
+      trigger: 'pan reload',
+      reason: undefined,
+      initiator: 'conv-flywheel-orchestrator',
+    });
+    expect(entry.message).toContain('by the flywheel orchestrator');
+    expect(entry.link).toBe('/flywheel');
+  });
+
+  it('attributes agent-initiated restarts via issueId so the feed routes to the issue', () => {
+    const entry = describeRestart({
+      ...watchdogSuccess,
+      trigger: 'pan restart',
+      reason: undefined,
+      initiator: 'agent-pan-1647-review',
+      issueId: 'PAN-1647',
+    });
+    expect(entry.message).toContain('by agent-pan-1647-review');
+    expect(entry.issueId).toBe('PAN-1647');
+    expect(entry.link).toBeUndefined();
+  });
+});
+
+describe('initiatorLink', () => {
+  it.each([
+    [undefined, undefined],
+    ['conv-flywheel-orchestrator', '/flywheel'],
+    ['conv-20260610-8858', '/conv/20260610-8858'],
+    ['agent-pan-1647', undefined],
+  ])('%s -> %s', (initiator, expected) => {
+    expect(initiatorLink(initiator)).toBe(expected);
   });
 });
 

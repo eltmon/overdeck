@@ -1375,3 +1375,31 @@ Likely a deacon patrol or merge-train action re-requesting review after the
 failed merge. Didn't trace the writer this tick; if it recurs and strands
 reviews, trace via status_history and file. (1455's monitor showed its review
 re-dispatched and re-passed quickly, so the reset path at least re-drives.)
+
+## RUN-18 tick 5 (2026-06-10) — red main fixed in ~25 min; the file→strike reflex worked end-to-end
+
+The PAN-1717 strike landed `2b0bcc6f0` (mock `/api/conversations/pending-input`
+in the styleguide e2e) ~25 min after the red was diagnosed; main green twice.
+Flywheel closed PAN-1717 with evidence (fix sha + 2 green runs) under the
+durable close-verified-done authorization.
+
+**Bisect correction worth remembering:** first-red-run headSha ≠ breaking
+commit. The run @00:46 executed at ec57001eb, but the true culprit was the
+OLDER c3a0452b6 (PAN-1705 pending-input feed) that no run had executed alone —
+runs are batched under push bursts. The strike's root-cause (unmocked new API
+call → /agents page stuck in loading) identified it precisely. When bisecting
+by run history, list ALL commits since the last green sha, not just the first
+red run's sha.
+
+**E2e-breakage class:** a frontend perf/data change that adds a new API call
+breaks styleguide-conformance e2e unless the e2e env mocks it. Recurs (this is
+the same shape as the PAN-1698 fixture-staleness class but for e2e mocks): a
+test-env contract that additive changes silently violate.
+
+**Strike completion bookkeeping is now a 2-for-2 gap:** strike-1717, like
+strike-1682, landed its fix and parked WITHOUT `pan done` (it cited residual
+host-only test issues #1719/#1720 it had filed). PAN-1699 should cover
+completion bookkeeping, not just parking signals. Note: strike-1717 ALSO
+handled the shared-worktree case correctly — it pushed its fast-forward
+directly to origin/main rather than checking out main in the primary worktree
+(live .pan/continues writes), an explicitly good pattern to repeat.

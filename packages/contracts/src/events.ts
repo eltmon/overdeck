@@ -728,6 +728,8 @@ export const ActivityEntryEvent = Schema.Struct({
     message: Schema.String,
     details: Schema.optional(Schema.String),
     issueId: Schema.optional(IssueId),
+    /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
+    link: Schema.optional(Schema.String),
   }),
 })
 export type ActivityEntryEvent = typeof ActivityEntryEvent.Type
