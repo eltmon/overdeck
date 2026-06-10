@@ -1,6 +1,8 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@panctl/contracts';
+import { getReviewStatusSync } from './review-status.js';
+import { resolveGitHubIssueSync } from './tracker-utils.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -112,6 +114,24 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
 
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+}
+
+/**
+ * Server-side PR URL resolution for merge-queue items: prefer the review
+ * status record, fall back to the GitHub repo + PR number — the browser never
+ * guesses repo slugs.
+ */
+export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
+  const issueId = item.issueId.toUpperCase();
+  const reviewStatus = getReviewStatusSync(issueId);
+  if (reviewStatus?.prUrl) return reviewStatus.prUrl;
+
+  const prNumber = reviewStatus?.prNumber ?? item.pr;
+  if (prNumber === undefined) return undefined;
+
+  const githubIssue = resolveGitHubIssueSync(issueId);
+  if (!githubIssue.isGitHub) return undefined;
+  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
 }
 
 export const computeMergeQueue = (
