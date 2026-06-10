@@ -6,6 +6,9 @@
  * Auth: FLY_API_TOKEN environment variable
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError } from '../errors.js';
 
@@ -234,12 +237,28 @@ export class FlyApiClient {
   }
 }
 
-/** Create a FlyApiClient from env or explicit token */
+/**
+ * Read the flyctl CLI's stored access token from ~/.fly/config.yml.
+ * Lets every pan surface (CLI, dashboard server) work after `fly auth login`
+ * without separately exporting FLY_API_TOKEN.
+ */
+function readFlyctlConfigToken(): string | undefined {
+  try {
+    const configPath = join(homedir(), '.fly', 'config.yml');
+    if (!existsSync(configPath)) return undefined;
+    const match = readFileSync(configPath, 'utf-8').match(/^access_token:\s*(\S+)/m);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+/** Create a FlyApiClient from an explicit token, env, or flyctl's stored auth */
 export function createFlyApiClientSync(token?: string): FlyApiClient {
-  const tok = token ?? process.env.FLY_API_TOKEN;
+  const tok = token ?? process.env.FLY_API_TOKEN ?? readFlyctlConfigToken();
   if (!tok) {
     throw new Error(
-      'Fly API token not found. Set FLY_API_TOKEN environment variable or run: fly auth login'
+      'Fly API token not found. Run `fly auth login`, or set FLY_API_TOKEN.'
     );
   }
   return new FlyApiClient(tok);
