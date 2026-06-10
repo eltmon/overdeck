@@ -112,6 +112,15 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
     );
   });
 
+/**
+ * Verbs that mean "at the merge gate" (PAN-1736). Orchestrators have
+ * legitimately emitted both 'shipping' and 'merging' for merge-ready issues;
+ * filtering on one alone silently rendered an empty queue with five ready
+ * items in RUN-18. Contract documented next to FlywheelPipelineVerb in
+ * packages/contracts/src/flywheel.ts — extend BOTH places together.
+ */
+export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
+
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
 }
@@ -140,7 +149,7 @@ export const computeMergeQueue = (
   options: ComputeMergeQueueOptions = {},
 ) =>
   Effect.gen(function*() {
-    const candidates = items.filter((item) => item.verb === 'shipping');
+    const candidates = items.filter((item) => MERGE_GATE_VERBS.has(item.verb));
     if (candidates.length === 0) return [] as MergeQueueItem[];
 
     const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
