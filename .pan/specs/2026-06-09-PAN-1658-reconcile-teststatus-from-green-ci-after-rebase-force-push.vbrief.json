@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:14:19.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
-    "updated": "2026-06-10T00:09:52.453Z"
+    "updated": "2026-06-10T00:11:45.933Z"
   },
   "plan": {
     "id": "pan-1658",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "41568a01-5a58-4e5a-a085-023e6be11ea3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 32,
+    "sequence": 34,
     "created": "2026-06-09T23:14:19.000Z",
-    "updated": "2026-06-10T00:09:52.453Z",
+    "updated": "2026-06-10T00:11:45.933Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
@@ -264,31 +264,31 @@
         "phase": "review",
         "issueId": "PAN-1658",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:09:52.371Z",
+        "updatedAt": "2026-06-10T00:11:45.677Z",
         "work": {
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "notes": "Verification FAILED at test (55287ms):\n\n  line: 619,\n      column: 25\n    },\n    {\n      line: 993,\n      column: 46,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'catcher'\n    },\n    {\n      line: 244,\n      column: 11,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts',\n      method: 'body'\n    },\n    {\n      line: 993,\n      column: 27,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'internalCall'\n    }\n  ]\n}\n\u001b[36m \u001b[2m❯\u001b[22m catch src/lib/cloister/config.ts:\u001b[2m619:25\u001b[22m\u001b[39m\n    \u001b[90m617|\u001b[39m     \u001b[35myield\u001b[39m\u001b[33m*\u001b[39m \u001b[33mEffect\u001b[39m\u001b[33m.\u001b[39m\u001b[34mtryPromise\u001b[39m({\n    \u001b[90m618|\u001b[39m       \u001b[35mtry\u001b[39m\u001b[33m:\u001b[39m () \u001b[33m=>\u001b[39m \u001b[34mmkdir\u001b[39m(\u001b[33mPANOPTICON_HOME\u001b[39m\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m,\u001b[39m\n    \u001b[90m619|\u001b[39m       catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation…\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m620|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m621|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m catcher node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:46\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts:\u001b[2m244:11\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m internalCall node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:27\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: ENOENT: no such file or directory, mkdir '/tmp/panopticon-wf-test-home'\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\u001b[22m\u001b[39m\n\u001b[31m\u001b[1mSerialized Error:\u001b[22m\u001b[39m \u001b[90m{ errno: -2, code: 'ENOENT', syscall: 'mkdir', path: '/tmp/panopticon-wf-test-home' }\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T00:09:52.371Z",
+              "status": "pending",
+              "at": "2026-06-10T00:11:45.677Z",
               "notes": "Verification FAILED at test (55287ms):\n\n  line: 619,\n      column: 25\n    },\n    {\n      line: 993,\n      column: 46,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'catcher'\n    },\n    {\n      line: 244,\n      column: 11,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts',\n      method: 'body'\n    },\n    {\n      line: 993,\n      column: 27,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'internalCall'\n    }\n  ]\n}\n\u001b[36m \u001b[2m❯\u001b[22m catch src/lib/cloister/config.ts:\u001b[2m619:25\u001b[22m\u001b[39m\n    \u001b[90m617|\u001b[39m     \u001b[35myield\u001b[39m\u001b[33m*\u001b[39m \u001b[33mEffect\u001b[39m\u001b[33m.\u001b[39m\u001b[34mtryPromise\u001b[39m({\n    \u001b[90m618|\u001b[39m       \u001b[35mtry\u001b[39m\u001b[33m:\u001b[39m () \u001b[33m=>\u001b[39m \u001b[34mmkdir\u001b[39m(\u001b[33mPANOPTICON_HOME\u001b[39m\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m,\u001b[39m\n    \u001b[90m619|\u001b[39m       catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation…\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m620|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m621|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m catcher node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:46\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts:\u001b[2m244:11\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m internalCall node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:27\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: ENOENT: no such file or directory, mkdir '/tmp/panopticon-wf-test-home'\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\u001b[22m\u001b[39m\n\u001b[31m\u001b[1mSerialized Error:\u001b[22m\u001b[39m \u001b[90m{ errno: -2, code: 'ENOENT', syscall: 'mkdir', path: '/tmp/panopticon-wf-test-home' }\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\u001b[22m\u001b[39m\n\n"
             }
           ]
         },
         "review": {
           "status": "failed",
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "notes": "Verification failed at test",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-10T00:09:52.371Z",
+              "at": "2026-06-10T00:11:45.677Z",
               "notes": "Verification failed at test"
             }
           ],
@@ -296,25 +296,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:09:52.371Z"
+              "at": "2026-06-10T00:11:45.677Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "updatedAt": "2026-06-10T00:11:45.677Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:09:52.371Z"
+              "at": "2026-06-10T00:11:45.677Z"
             }
           ],
           "readyForMerge": false,
