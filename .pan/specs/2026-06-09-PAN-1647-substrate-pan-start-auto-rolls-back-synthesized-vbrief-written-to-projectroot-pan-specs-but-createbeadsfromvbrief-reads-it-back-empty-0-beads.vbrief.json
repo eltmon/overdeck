@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:31:43.968Z"
+    "updated": "2026-06-10T00:34:02.940Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 81,
+    "sequence": 84,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:31:43.968Z",
+    "updated": "2026-06-10T00:34:02.940Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -163,32 +163,32 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:31:43.962Z",
+        "updatedAt": "2026-06-10T00:34:00.823Z",
         "work": {
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "history": []
         },
         "verification": {
-          "status": "running",
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "history": [
             {
-              "status": "running",
-              "at": "2026-06-10T00:31:43.962Z"
+              "status": "passed",
+              "at": "2026-06-10T00:34:00.823Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "status": "reviewing",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "notes": "Review stale: branch advanced after reviewed head with unreviewed scripts/lint-skills.sh change",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T00:31:43.962Z",
+              "status": "reviewing",
+              "at": "2026-06-10T00:34:00.823Z",
               "notes": "Review stale: branch advanced after reviewed head with unreviewed scripts/lint-skills.sh change"
             }
           ],
@@ -196,25 +196,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:31:43.962Z"
+              "at": "2026-06-10T00:34:00.823Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:31:43.962Z",
+          "updatedAt": "2026-06-10T00:34:00.823Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:31:43.962Z"
+              "at": "2026-06-10T00:34:00.823Z"
             }
           ],
           "readyForMerge": false,
