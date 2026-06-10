@@ -847,6 +847,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
+    lastResumeAt: raw.lastResumeAt,
     kickoffDelivered: raw.kickoffDelivered,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,

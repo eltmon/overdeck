@@ -4,7 +4,7 @@
     "created": "2026-06-10T04:05:43.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1700: Work-agent auto-continue prompt after resume is eaten during Claude startup — agent sits idle forever",
-    "updated": "2026-06-10T05:59:50.777Z"
+    "updated": "2026-06-10T06:10:09.744Z"
   },
   "plan": {
     "id": "pan-1700",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ce968bae-1802-4fa7-9d14-0b628e089d4a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 10,
     "created": "2026-06-10T04:05:43.000Z",
-    "updated": "2026-06-10T05:59:50.777Z",
+    "updated": "2026-06-10T06:10:09.744Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1700",
@@ -353,60 +353,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1700-work-agent-auto-continue-prompt-after-resume-is-eaten-during-claude-startup-agent-sits-idle-forever.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1700",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T05:58:07.615Z",
+        "updatedAt": "2026-06-10T06:10:09.739Z",
         "work": {
-          "updatedAt": "2026-06-10T05:58:07.615Z",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T05:58:07.615Z",
-          "notes": "Acceptance criteria check FAILED — 24/24 AC incomplete:\n\n### Supervisor echo-confirmation before Enter (shared root-cause fix; also resolves #1697) (7/7 incomplete)\n  - [ ] After writing content, injectPtyMessage waits for a normalized (ANSI-stripped, whitespace-collapsed) prefix of the message to appear in the child PTY output before sending \\r.\n  - [ ] On confirmation timeout the content write is retried exactly once; on a second timeout the POST returns a non-2xx status (not 200).\n  - [ ] When confirmation succeeds, the success path is byte-for-byte unchanged: content written, ~300ms settle, standalone \\r sent, message echoed to stdout exactly once, socket_write logged.\n  - [ ] deliverAgentMessage's supervisor POST timeout is raised to exceed the supervisor confirmation window so a confirmed delivery returns { ok:true, path:'supervisor' } within budget (no spurious tmux fallback).\n  - [ ] Subprocess tests (extending src/lib/channels/__tests__/pty-supervisor.test.ts) cover both cases: a child that echoes its input → POST 200 and the message is delivered; a child whose PTY output never reflects the input → POST non-2xx after one retry, within budget.\n  - [ ] deliver-agent-message tests assert that a non-2xx supervisor response is surfaced as a supervisor failure (strict 'supervisor' method throws; 'auto' falls through to tmux).\n  - [ ] npm run build, typecheck, lint, and the supervisor + delivery test suites pass.\n\n### Shared helper: detect whether a user record landed in a session JSONL after a snapshot point (5/5 incomplete)\n  - [ ] A helper resolves the Claude session JSONL from (workspace, sessionId) via sessionFilePath and returns a snapshot of user-record presence (count or last-user-record identity).\n  - [ ] Given a 'before' snapshot, the helper reports whether a NEW user record was appended after it; an assistant-only or tool-only append does not count as a landed user message.\n  - [ ] The helper never throws on a missing, empty, or mid-write JSONL (malformed trailing line) — it returns a safe default and is exercised by a unit test for each of those cases.\n  - [ ] The helper has no import dependency on dashboard-server services (verified by it living in a lib module importable from both agents.ts and deacon.ts without cycles).\n  - [ ] Unit tests cover: no new record, a new user record, an assistant-only append, and the three not-throwing cases; typecheck + lint pass.\n\n### resumeAgent: verify the auto-continue prompt landed and redeliver once before flagging success (6/6 incomplete)\n  - [ ] Before delivering the auto-continue prompt on resume, a 'before' transcript snapshot is captured via the shared helper.\n  - [ ] After delivery, the code polls (bounded) for a new user record; if none lands, it redelivers the same message exactly once and polls again.\n  - [ ] messageDelivered=true and markKickoffRedelivered() are set ONLY after a landed user record is confirmed; if landing never confirms, messageDelivered=false and the failure is logged (no phantom success).\n  - [ ] The pi and codex resume branches and the existing waitForReadySignal gate are unchanged.\n  - [ ] Tests (using vi.useFakeTimers for the bounded poll/redelivery) assert: landing-on-first-delivery → no redelivery + messageDelivered true; never-lands → exactly one redelivery + messageDelivered false; lands-after-redelivery → messageDelivered true and markKickoffRedelivered called once when redeliveringKickoff.\n  - [ ] typecheck, lint, and the resume tests pass.\n\n### Deacon backstop: re-send the continue prompt to a work agent stalled since resume with zero user records (6/6 incomplete)\n  - [ ] A new patrol identifies a stalled resume: status=running, role=work, live tmux, isAgentIdleForNudge, and ZERO user records in the session JSONL since the agent's last resume.\n  - [ ] On detection it re-sends the continue prompt (not a generic ping), using the redelivered kickoff prompt when kickoffDelivered===false, otherwise the default resume continue message.\n  - [ ] A per-agent cooldown (own marker file) prevents re-sending more than once per cooldown window; an agent with ANY user record since resume is skipped.\n  - [ ] Orphans (no live tmux), closed issues, and paused/troubled agents are skipped — consistent with the existing patrol's gating.\n  - [ ] The patrol is registered in runPatrol and its actions are logged like the sibling patrols.\n  - [ ] Tests assert: a zero-user-record idle resumed agent is re-sent once then cooled down; an agent with a user record since resume is never re-sent; an orphan/closed/paused agent is skipped. typecheck + lint pass.",
+          "status": "passed",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T05:58:07.615Z",
-              "notes": "Acceptance criteria check FAILED — 24/24 AC incomplete:\n\n### Supervisor echo-confirmation before Enter (shared root-cause fix; also resolves #1697) (7/7 incomplete)\n  - [ ] After writing content, injectPtyMessage waits for a normalized (ANSI-stripped, whitespace-collapsed) prefix of the message to appear in the child PTY output before sending \\r.\n  - [ ] On confirmation timeout the content write is retried exactly once; on a second timeout the POST returns a non-2xx status (not 200).\n  - [ ] When confirmation succeeds, the success path is byte-for-byte unchanged: content written, ~300ms settle, standalone \\r sent, message echoed to stdout exactly once, socket_write logged.\n  - [ ] deliverAgentMessage's supervisor POST timeout is raised to exceed the supervisor confirmation window so a confirmed delivery returns { ok:true, path:'supervisor' } within budget (no spurious tmux fallback).\n  - [ ] Subprocess tests (extending src/lib/channels/__tests__/pty-supervisor.test.ts) cover both cases: a child that echoes its input → POST 200 and the message is delivered; a child whose PTY output never reflects the input → POST non-2xx after one retry, within budget.\n  - [ ] deliver-agent-message tests assert that a non-2xx supervisor response is surfaced as a supervisor failure (strict 'supervisor' method throws; 'auto' falls through to tmux).\n  - [ ] npm run build, typecheck, lint, and the supervisor + delivery test suites pass.\n\n### Shared helper: detect whether a user record landed in a session JSONL after a snapshot point (5/5 incomplete)\n  - [ ] A helper resolves the Claude session JSONL from (workspace, sessionId) via sessionFilePath and returns a snapshot of user-record presence (count or last-user-record identity).\n  - [ ] Given a 'before' snapshot, the helper reports whether a NEW user record was appended after it; an assistant-only or tool-only append does not count as a landed user message.\n  - [ ] The helper never throws on a missing, empty, or mid-write JSONL (malformed trailing line) — it returns a safe default and is exercised by a unit test for each of those cases.\n  - [ ] The helper has no import dependency on dashboard-server services (verified by it living in a lib module importable from both agents.ts and deacon.ts without cycles).\n  - [ ] Unit tests cover: no new record, a new user record, an assistant-only append, and the three not-throwing cases; typecheck + lint pass.\n\n### resumeAgent: verify the auto-continue prompt landed and redeliver once before flagging success (6/6 incomplete)\n  - [ ] Before delivering the auto-continue prompt on resume, a 'before' transcript snapshot is captured via the shared helper.\n  - [ ] After delivery, the code polls (bounded) for a new user record; if none lands, it redelivers the same message exactly once and polls again.\n  - [ ] messageDelivered=true and markKickoffRedelivered() are set ONLY after a landed user record is confirmed; if landing never confirms, messageDelivered=false and the failure is logged (no phantom success).\n  - [ ] The pi and codex resume branches and the existing waitForReadySignal gate are unchanged.\n  - [ ] Tests (using vi.useFakeTimers for the bounded poll/redelivery) assert: landing-on-first-delivery → no redelivery + messageDelivered true; never-lands → exactly one redelivery + messageDelivered false; lands-after-redelivery → messageDelivered true and markKickoffRedelivered called once when redeliveringKickoff.\n  - [ ] typecheck, lint, and the resume tests pass.\n\n### Deacon backstop: re-send the continue prompt to a work agent stalled since resume with zero user records (6/6 incomplete)\n  - [ ] A new patrol identifies a stalled resume: status=running, role=work, live tmux, isAgentIdleForNudge, and ZERO user records in the session JSONL since the agent's last resume.\n  - [ ] On detection it re-sends the continue prompt (not a generic ping), using the redelivered kickoff prompt when kickoffDelivered===false, otherwise the default resume continue message.\n  - [ ] A per-agent cooldown (own marker file) prevents re-sending more than once per cooldown window; an agent with ANY user record since resume is skipped.\n  - [ ] Orphans (no live tmux), closed issues, and paused/troubled agents are skipped — consistent with the existing patrol's gating.\n  - [ ] The patrol is registered in runPatrol and its actions are logged like the sibling patrols.\n  - [ ] Tests assert: a zero-user-record idle resumed agent is re-sent once then cooled down; an agent with a user record since resume is never re-sent; an orphan/closed/paused agent is skipped. typecheck + lint pass."
+              "status": "passed",
+              "at": "2026-06-10T06:10:09.739Z"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T05:58:07.615Z",
-          "notes": "Transcript landing helper uses tail-only counts, so successful resume prompts can be reported unlanded.",
+          "status": "blocked",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "notes": "lastResumeAt is not persisted, disabling stalled-resume recovery",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T05:58:07.615Z",
-              "notes": "Transcript landing helper uses tail-only counts, so successful resume prompts can be reported unlanded."
+              "status": "blocked",
+              "at": "2026-06-10T06:10:09.739Z",
+              "notes": "lastResumeAt is not persisted, disabling stalled-resume recovery"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T05:58:07.615Z",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T05:58:07.615Z"
+              "at": "2026-06-10T06:10:09.739Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T05:58:07.615Z",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T05:58:07.615Z",
+          "updatedAt": "2026-06-10T06:10:09.739Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T05:58:07.615Z"
+              "at": "2026-06-10T06:10:09.739Z"
             }
           ],
           "readyForMerge": false,
