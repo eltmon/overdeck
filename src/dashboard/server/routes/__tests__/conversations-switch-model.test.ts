@@ -279,11 +279,9 @@ describe('POST /api/conversations/:name/switch-model', () => {
       });
 
       const responsePromise = postSwitchModel('switch-echo', { model: 'claude-fable-5' });
-      for (let i = 0; i < 50 && capturePaneMock.mock.calls.length === 0; i++) {
-        await vi.advanceTimersByTimeAsync(0);
-        await Promise.resolve();
-      }
-      expect(capturePaneMock).toHaveBeenCalled();
+      await vi.waitFor(() => {
+        expect(capturePaneMock).toHaveBeenCalled();
+      });
       await vi.advanceTimersByTimeAsync(5_500);
       const response = await responsePromise;
 
