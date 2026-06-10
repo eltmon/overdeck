@@ -4,7 +4,7 @@
     "created": "2026-06-10T04:05:43.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1700: Work-agent auto-continue prompt after resume is eaten during Claude startup — agent sits idle forever",
-    "updated": "2026-06-10T06:10:09.744Z"
+    "updated": "2026-06-10T06:16:57.428Z"
   },
   "plan": {
     "id": "pan-1700",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ce968bae-1802-4fa7-9d14-0b628e089d4a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 10,
+    "sequence": 12,
     "created": "2026-06-10T04:05:43.000Z",
-    "updated": "2026-06-10T06:10:09.744Z",
+    "updated": "2026-06-10T06:16:57.428Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1700",
@@ -353,58 +353,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1700-work-agent-auto-continue-prompt-after-resume-is-eaten-during-claude-startup-agent-sits-idle-forever.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1700",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T06:10:09.739Z",
+        "updatedAt": "2026-06-10T06:16:57.271Z",
         "work": {
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "status": "failed",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
+          "notes": "Verification FAILED at typecheck (12865ms):\n\n/cli@0.21.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @panctl/contracts@0.21.0 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1700/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m157.39 kB\u001b[22m \u001b[2m│ gzip: 26.54 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 157.39 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3481ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m134.48 kB\u001b[22m \u001b[2m│ gzip: 24.70 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m253.64 kB\u001b[22m \u001b[2m│ gzip: 42.61 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 35.89 kB\u001b[22m \u001b[2m│ gzip:  4.13 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m617.02 kB\u001b[22m \u001b[2m│ gzip: 57.51 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.04 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3762ms\u001b[39m\n\n> @panctl/cli@0.21.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks\n\nsrc/cli/commands/workspace-migrate.ts(385,5): error TS2304: Cannot find name 'setAgentPausedSync'.\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (64%)\n  - tsdown:report (36%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (68%)\n  - rolldown-plugin-dts:fake-js (22%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-10T06:10:09.739Z"
+              "status": "failed",
+              "at": "2026-06-10T06:16:57.271Z",
+              "notes": "Verification FAILED at typecheck (12865ms):\n\n/cli@0.21.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @panctl/contracts@0.21.0 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1700/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m157.39 kB\u001b[22m \u001b[2m│ gzip: 26.54 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 157.39 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3481ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m134.48 kB\u001b[22m \u001b[2m│ gzip: 24.70 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m253.64 kB\u001b[22m \u001b[2m│ gzip: 42.61 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 35.89 kB\u001b[22m \u001b[2m│ gzip:  4.13 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m617.02 kB\u001b[22m \u001b[2m│ gzip: 57.51 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.04 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3762ms\u001b[39m\n\n> @panctl/cli@0.21.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks\n\nsrc/cli/commands/workspace-migrate.ts(385,5): error TS2304: Cannot find name 'setAgentPausedSync'.\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (64%)\n  - tsdown:report (36%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (68%)\n  - rolldown-plugin-dts:fake-js (22%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "status": "pending",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
           "notes": "lastResumeAt is not persisted, disabling stalled-resume recovery",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-10T06:10:09.739Z",
+              "status": "pending",
+              "at": "2026-06-10T06:16:57.271Z",
               "notes": "lastResumeAt is not persisted, disabling stalled-resume recovery"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T06:10:09.739Z"
+              "at": "2026-06-10T06:16:57.271Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T06:10:09.739Z",
+          "updatedAt": "2026-06-10T06:16:57.271Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T06:10:09.739Z"
+              "at": "2026-06-10T06:16:57.271Z"
             }
           ],
           "readyForMerge": false,
