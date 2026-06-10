@@ -150,7 +150,7 @@ describe('idle matching', () => {
     const proj = freshProject();
     const g = gen(proj, 'uat/pan-otter-0610', 'ready', {
       members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
-      heldOut: [{ issueId: 'PAN-2', reason: 'unresolvable conflict' }],
+      heldOut: [{ issueId: 'PAN-2', branch: 'feature/pan-2', headSha: 'h2', reason: 'unresolvable conflict' }],
     });
     const deps = makeDeps(proj, { rows: [g] });
     const result = await reconcileUatGenerations(proj, deps);
@@ -203,6 +203,19 @@ describe('growth and invalidation', () => {
     const r2 = await reconcileUatGenerations(proj2, deps2);
     expect(r2.invalidated).toEqual(['uat/pan-moved-0610']);
   });
+
+  it('invalidates when a held-out branch gains commits', async () => {
+    const proj = freshProject();
+    const heldOut = gen(proj, 'uat/pan-held-0610', 'ready', {
+      members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
+      heldOut: [{ issueId: 'PAN-2', branch: 'feature/pan-2', headSha: 'h2', reason: 'unresolvable conflict' }],
+    });
+    const deps = makeDeps(proj, { rows: [heldOut], headShas: { 'feature/pan-2': 'h2-NEW' } });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.invalidated).toEqual(['uat/pan-held-0610']);
+  });
 });
 
 describe('single-flight, stuck assemblies, backoff', () => {
@@ -231,6 +244,19 @@ describe('single-flight, stuck assemblies, backoff', () => {
   it('backs off after a recent failure for the same desired input', async () => {
     const proj = freshProject();
     const failed = gen(proj, 'uat/pan-failed-0610', 'failed', {
+      updatedAt: new Date(T0 - FAILED_RETRY_BACKOFF_MS / 2).toISOString(),
+    });
+    const deps = makeDeps(proj, { rows: [failed] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('backoff');
+    expect(deps.assembled).toHaveLength(0);
+  });
+
+  it('backs off after a recent held-out failure for the same branch heads', async () => {
+    const proj = freshProject();
+    const failed = gen(proj, 'uat/pan-held-failed-0610', 'failed', {
+      members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
+      heldOut: [{ issueId: 'PAN-2', branch: 'feature/pan-2', headSha: 'h2', reason: 'unresolvable conflict' }],
       updatedAt: new Date(T0 - FAILED_RETRY_BACKOFF_MS / 2).toISOString(),
     });
     const deps = makeDeps(proj, { rows: [failed] });

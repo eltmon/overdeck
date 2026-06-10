@@ -198,7 +198,12 @@ describe('assembleUatGeneration — conflicts', () => {
 
     const gen = await assembleUatGeneration(input(), deps(git, store));
 
-    expect(gen.heldOut[0]).toEqual({ issueId: 'PAN-2', reason: 'fatal: bad object' });
+    expect(gen.heldOut[0]).toMatchObject({
+      issueId: 'PAN-2',
+      branch: 'feature/pan-2',
+      headSha: 'sha-of-feature/pan-2',
+      reason: 'fatal: bad object',
+    });
     expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1', 'PAN-3']);
   });
 });
@@ -261,11 +266,32 @@ describe('cleanupUatGenerations', () => {
     expect(store.rows.get('uat/pan-c-0610')!.status).toBe('superseded');
     // 4th live generation trimmed: stack torn down, branch+worktree gone, invalidated
     expect(store.rows.get('uat/pan-d-0610')!.status).toBe('invalidated');
+    expect(store.rows.get('uat/pan-d-0610')!.cleanedAt).toBeTruthy();
     expect(teardowns).toEqual(['uat/pan-d-0610']);
-    // dead rows reaped but statuses preserved
+    // dead rows reaped but statuses preserved and marked cleaned so future ticks skip them
     expect(store.rows.get('uat/pan-e-0610')!.status).toBe('promoted');
+    expect(store.rows.get('uat/pan-e-0610')!.cleanedAt).toBeTruthy();
     expect(store.rows.get('uat/pan-f-0610')!.status).toBe('failed');
+    expect(store.rows.get('uat/pan-f-0610')!.cleanedAt).toBeTruthy();
     expect(deleted.sort()).toEqual(['uat/pan-d-0610', 'uat/pan-e-0610', 'uat/pan-f-0610']);
     expect(removed).toHaveLength(3);
+  });
+
+  it('does not reprocess dead generations already marked cleaned', async () => {
+    const store = makeFakeStore([
+      liveGen('uat/pan-done-0610', 'promoted', '2026-06-10T01:00:00.000Z', false),
+    ]);
+    store.rows.set('uat/pan-done-0610', { ...store.rows.get('uat/pan-done-0610')!, cleanedAt: '2026-06-10T02:00:00.000Z' });
+    const removed: string[] = [];
+    const deleted: string[] = [];
+
+    await cleanupUatGenerations('/proj', {
+      store,
+      removeWorktree: async (p) => { removed.push(p); },
+      deleteBranch: async (b) => { deleted.push(b); },
+    });
+
+    expect(removed).toEqual([]);
+    expect(deleted).toEqual([]);
   });
 });

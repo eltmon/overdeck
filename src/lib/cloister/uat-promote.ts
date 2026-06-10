@@ -18,11 +18,18 @@
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import type { UatGeneration, UatGenerationStatus } from '../database/uat-generations-db.js';
 import type { GenerationStorePort } from './uat-generation-engine.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+function safeUatBranchName(branchName: string): string {
+  if (!/^uat\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(branchName)) {
+    throw new Error(`unsafe UAT branch name: ${branchName}`);
+  }
+  return branchName;
+}
 
 export interface UatPromoteGitDeps {
   /** `git fetch origin main` and return the origin/main head SHA. */
@@ -148,30 +155,31 @@ export async function promoteUatGeneration(
 
 /** Real git wiring: throwaway detached worktree off origin/main, no-ff merge, push. */
 export function buildUatPromoteGitDeps(projectRoot: string): UatPromoteGitDeps {
-  const run = (cmd: string, cwd: string) =>
-    execAsync(cmd, { cwd, maxBuffer: 16 * 1024 * 1024 });
+  const runGit = (args: string[], cwd: string) =>
+    execFileAsync('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 });
 
   return {
     fetchMain: async () => {
-      await run('git fetch origin main', projectRoot);
-      return (await run('git rev-parse origin/main', projectRoot)).stdout.trim();
+      await runGit(['fetch', 'origin', 'main'], projectRoot);
+      return (await runGit(['rev-parse', 'origin/main'], projectRoot)).stdout.trim();
     },
     mergeIntoMain: async (branchName, message) => {
-      const worktreePath = join(tmpdir(), `uat-promote-${branchName.replace(/[^a-z0-9]/gi, '-')}`);
-      await run(`git worktree remove "${worktreePath}" --force`, projectRoot).catch(() => {});
-      await run('git worktree prune', projectRoot).catch(() => {});
-      await run(`git worktree add --detach "${worktreePath}" origin/main`, projectRoot);
+      const safeBranch = safeUatBranchName(branchName);
+      const worktreePath = join(tmpdir(), `uat-promote-${safeBranch.replace(/[^a-z0-9]/gi, '-')}`);
+      await runGit(['worktree', 'remove', '--force', worktreePath], projectRoot).catch(() => {});
+      await runGit(['worktree', 'prune'], projectRoot).catch(() => {});
+      await runGit(['worktree', 'add', '--detach', worktreePath, 'origin/main'], projectRoot);
       try {
-        const ref = await run(`git rev-parse --verify "origin/${branchName}"`, worktreePath)
-          .then(() => `origin/${branchName}`)
-          .catch(() => branchName);
-        const escapedMessage = message.replace(/"/g, '\\"');
-        await run(`git merge --no-ff "${ref}" -m "${escapedMessage}"`, worktreePath);
-        await run('git push origin HEAD:main', worktreePath);
-        return (await run('git rev-parse HEAD', worktreePath)).stdout.trim();
+        const originRef = `origin/${safeBranch}`;
+        const ref = await runGit(['rev-parse', '--verify', originRef], worktreePath)
+          .then(() => originRef)
+          .catch(() => safeBranch);
+        await runGit(['merge', '--no-ff', ref, '-m', message], worktreePath);
+        await runGit(['push', 'origin', 'HEAD:main'], worktreePath);
+        return (await runGit(['rev-parse', 'HEAD'], worktreePath)).stdout.trim();
       } finally {
-        await run(`git worktree remove "${worktreePath}" --force`, projectRoot).catch(() => {});
-        await run('git worktree prune', projectRoot).catch(() => {});
+        await runGit(['worktree', 'remove', '--force', worktreePath], projectRoot).catch(() => {});
+        await runGit(['worktree', 'prune'], projectRoot).catch(() => {});
       }
     },
   };

@@ -86,6 +86,7 @@ describe('insert + get round-trip', () => {
     expect(loaded!.baseSha).toBe('abc123');
     expect(loaded!.status).toBe('assembling');
     expect(loaded!.stackStartedAt).toBeNull();
+    expect(loaded!.cleanedAt).toBeNull();
   });
 
   it('returns null for an unknown name', () => {
@@ -148,14 +149,16 @@ describe('updateUatGenerationSync patch', () => {
 
     updateUatGenerationSync(gen.name, {
       status: 'ready',
-      heldOut: [{ issueId: 'PAN-9', reason: 'agent timeout' }],
+      heldOut: [{ issueId: 'PAN-9', branch: 'feature/pan-9', headSha: 'hhh999', reason: 'agent timeout' }],
       resolutions: [{ issueIds: ['PAN-2', 'PAN-1'], files: ['x.ts', 'y.ts'], commitSha: 'ddd444' }],
+      cleanedAt: '2026-06-10T03:00:00.000Z',
     });
 
     const loaded = getUatGenerationSync(gen.name)!;
     expect(loaded.status).toBe('ready');
-    expect(loaded.heldOut).toEqual([{ issueId: 'PAN-9', reason: 'agent timeout' }]);
+    expect(loaded.heldOut).toEqual([{ issueId: 'PAN-9', branch: 'feature/pan-9', headSha: 'hhh999', reason: 'agent timeout' }]);
     expect(loaded.resolutions[0]!.files).toEqual(['x.ts', 'y.ts']);
+    expect(loaded.cleanedAt).toBe('2026-06-10T03:00:00.000Z');
     // untouched fields preserved
     expect(loaded.members).toHaveLength(2);
     expect(loaded.baseSha).toBe('abc123');

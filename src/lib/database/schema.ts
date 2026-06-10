@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 51;
+export const SCHEMA_VERSION = 52;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -362,6 +362,7 @@ export function initSchema(db: Database.Database): void {
       held_out         TEXT NOT NULL DEFAULT '[]',
       resolutions      TEXT NOT NULL DEFAULT '[]',
       stack_started_at TEXT,
+      cleaned_at       TEXT,
       created_at       TEXT NOT NULL,
       updated_at       TEXT NOT NULL
     );
@@ -1457,6 +1458,11 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
         ON uat_generations(project_root, created_at DESC);
     `);
+  }
+
+  // v51 → v52: mark UAT generation artifacts as cleaned after branch/worktree cleanup (PAN-1737)
+  if (currentVersion < 52) {
+    try { db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

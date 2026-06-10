@@ -27,9 +27,12 @@ function makeDeps(overrides: Partial<ConflictAgentDeps> = {}): ConflictAgentDeps
   return {
     commits,
     listConflictedFiles: async () => ['src/x.ts', 'src/y.ts'],
+    stagedFiles: async () => ['src/auto-merged.ts'],
     runAgent: async () => {},
     filesWithConflictMarkers: async () => [],
-    stageAll: async () => {},
+    unsafeChangedFiles: async () => [],
+    discardFiles: async () => {},
+    stageFiles: async () => {},
     hasUnmergedEntries: async () => false,
     commitMerge: async (_cwd, message) => { commits.push(message); },
     headSha: async () => 'resolved-sha-123',
@@ -88,6 +91,35 @@ describe('buildConflictAgentHook — failure paths all return null (never throw)
     const deps = makeDeps({ hasUnmergedEntries: async () => true });
     const hook = buildConflictAgentHook({ deps });
     await expect(hook(CTX)).resolves.toBeNull();
+    expect(deps.commits).toHaveLength(0);
+  });
+
+  it('rejects and cleans agent edits outside the conflicted-file allowlist', async () => {
+    const discarded: string[][] = [];
+    const deps = makeDeps({
+      unsafeChangedFiles: async () => ['src/prompt-injected.ts'],
+      discardFiles: async (_cwd, files) => { discarded.push([...files]); },
+    });
+    const hook = buildConflictAgentHook({ deps });
+
+    await expect(hook(CTX)).resolves.toBeNull();
+
+    expect(discarded).toEqual([['src/prompt-injected.ts']]);
+    expect(deps.commits).toHaveLength(0);
+  });
+
+  it('rejects cached diffs that newly stage non-conflicted paths', async () => {
+    let calls = 0;
+    const deps = makeDeps({
+      stagedFiles: async () => {
+        calls += 1;
+        return calls === 1 ? ['src/auto-merged.ts'] : ['src/auto-merged.ts', 'src/prompt-injected.ts'];
+      },
+    });
+    const hook = buildConflictAgentHook({ deps });
+
+    await expect(hook(CTX)).resolves.toBeNull();
+
     expect(deps.commits).toHaveLength(0);
   });
 

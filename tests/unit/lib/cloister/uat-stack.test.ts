@@ -98,6 +98,28 @@ describe('ensureUatStack', () => {
     expect(deps.ups).toEqual(['panopticon-uat-pan-c-0610']);
   });
 
+  it('serializes concurrent starts so the cap is enforced against the re-read stack set', async () => {
+    const oldest = gen('uat/pan-a-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' });
+    const first = gen('uat/pan-b-0610');
+    const second = gen('uat/pan-c-0610');
+    const byName = new Map([oldest, first, second].map((g) => [g.name, g]));
+    const running = new Set([oldest.name]);
+    const deps = makeDeps();
+    deps.store.listWithStacks = () => [...running].map((name) => byName.get(name)!).filter(Boolean);
+    deps.store.setStack = (name, startedAt) => {
+      deps.stackWrites.push([name, startedAt]);
+      if (startedAt) running.add(name);
+      else running.delete(name);
+    };
+
+    const [r1, r2] = await Promise.all([ensureUatStack(first, deps), ensureUatStack(second, deps)]);
+
+    expect(r1.success).toBe(true);
+    expect(r2.success).toBe(true);
+    expect([...running].sort()).toEqual(['uat/pan-b-0610', 'uat/pan-c-0610']);
+    expect(deps.downs).toEqual(['panopticon-uat-pan-a-0610']);
+  });
+
   it('re-ensuring a generation that already has a stack does not evict others below cap', async () => {
     const self = gen('uat/pan-self-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' });
     const other = gen('uat/pan-other-0610', { stackStartedAt: '2026-06-10T02:00:00.000Z' });

@@ -48,6 +48,10 @@ export interface UatGenerationMember {
 /** A feature excluded from a generation, with the human-readable reason. */
 export interface UatGenerationHeldOut {
   issueId: string;
+  /** Feature branch attempted when the generation held this issue out. */
+  branch?: string;
+  /** Head SHA of the attempted feature branch at assembly time. */
+  headSha?: string;
   reason: string;
 }
 
@@ -72,6 +76,8 @@ export interface UatGeneration {
   resolutions: UatGenerationResolution[];
   /** ISO timestamp while this generation's live stack is up, else null. */
   stackStartedAt: string | null;
+  /** ISO timestamp once branch/worktree/stack artifacts have been cleaned. */
+  cleanedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +92,7 @@ interface UatGenerationRow {
   held_out: string;
   resolutions: string;
   stack_started_at: string | null;
+  cleaned_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -101,6 +108,7 @@ function rowToGeneration(row: UatGenerationRow): UatGeneration {
     heldOut: JSON.parse(row.held_out) as UatGenerationHeldOut[],
     resolutions: JSON.parse(row.resolutions) as UatGenerationResolution[],
     stackStartedAt: row.stack_started_at,
+    cleanedAt: row.cleaned_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -116,8 +124,8 @@ export function insertUatGenerationSync(
   db.prepare(`
     INSERT INTO uat_generations (
       name, worktree_path, project_root, base_sha, status,
-      members, held_out, resolutions, stack_started_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      members, held_out, resolutions, stack_started_at, cleaned_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     gen.name,
     gen.worktreePath,
@@ -128,6 +136,7 @@ export function insertUatGenerationSync(
     JSON.stringify(gen.heldOut),
     JSON.stringify(gen.resolutions),
     gen.stackStartedAt,
+    gen.cleanedAt ?? null,
     createdAt,
     now,
   );
@@ -196,7 +205,7 @@ export function updateUatGenerationStatusSync(name: string, status: UatGeneratio
  */
 export function updateUatGenerationSync(
   name: string,
-  patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions'>>,
+  patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
 ): void {
   const db = getDatabase();
   const sets: string[] = [];
@@ -206,6 +215,7 @@ export function updateUatGenerationSync(
   if (patch.members !== undefined) { sets.push('members = ?'); params.push(JSON.stringify(patch.members)); }
   if (patch.heldOut !== undefined) { sets.push('held_out = ?'); params.push(JSON.stringify(patch.heldOut)); }
   if (patch.resolutions !== undefined) { sets.push('resolutions = ?'); params.push(JSON.stringify(patch.resolutions)); }
+  if (patch.cleanedAt !== undefined) { sets.push('cleaned_at = ?'); params.push(patch.cleanedAt); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   params.push(new Date().toISOString(), name);

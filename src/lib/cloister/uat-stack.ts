@@ -38,6 +38,23 @@ const COMPOSE_FILES = [
   'compose.yaml',
 ];
 
+const stackMutationLocks = new Map<string, Promise<void>>();
+
+async function withStackMutationLock<T>(projectRoot: string, fn: () => Promise<T>): Promise<T> {
+  const previous = stackMutationLocks.get(projectRoot) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.catch(() => {}).then(() => current);
+  stackMutationLocks.set(projectRoot, tail);
+  await previous.catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (stackMutationLocks.get(projectRoot) === tail) stackMutationLocks.delete(projectRoot);
+  }
+}
+
 export interface UatStackDeps {
   /** Render `.devcontainer/` if missing; issueId only resolves project config. */
   ensureDevcontainer(workspacePath: string, issueId: string): { ok: boolean; error?: string };
@@ -159,44 +176,57 @@ export interface EnsureUatStackResult {
  * oldest running UAT stack(s) first.
  */
 export async function ensureUatStack(gen: UatGeneration, deps: Partial<UatStackDeps> = {}): Promise<EnsureUatStackResult> {
-  const d = { ...defaultDeps(), ...deps };
-  const log = d.log ?? (() => {});
-  const evicted: string[] = [];
+  return withStackMutationLock(gen.projectRoot, async () => {
+    const d = { ...defaultDeps(), ...deps };
+    const log = d.log ?? (() => {});
+    const evicted: string[] = [];
 
-  const member = gen.members[0];
-  if (!member) return { success: false, error: 'generation has no members', evicted };
+    const member = gen.members[0];
+    if (!member) return { success: false, error: 'generation has no members', evicted };
 
-  // Cap enforcement BEFORE starting: at no point may more than MAX run.
-  const others = d.store.listWithStacks().filter((g) => g.name !== gen.name);
-  while (others.length > 0 && others.length >= MAX_UAT_STACKS) {
-    const oldest = others.shift()!;
-    log(`[uat-stack] cap ${MAX_UAT_STACKS} reached — tearing down oldest stack ${oldest.name}`);
-    await teardownUatStack(oldest, d);
-    evicted.push(oldest.name);
-  }
+    // Cap enforcement happens inside the lock and re-reads the live stack set so
+    // concurrent start requests cannot both observe the same stale pre-start set.
+    const others = d.store.listWithStacks().filter((g) => g.name !== gen.name);
+    while (others.length > 0 && others.length >= MAX_UAT_STACKS) {
+      const oldest = others.shift()!;
+      log(`[uat-stack] cap ${MAX_UAT_STACKS} reached — tearing down oldest stack ${oldest.name}`);
+      await teardownUatStackUnlocked(oldest, d);
+      evicted.push(oldest.name);
+    }
 
-  const rendered = d.ensureDevcontainer(gen.worktreePath, member.issueId);
-  if (!rendered.ok) return { success: false, error: rendered.error ?? 'devcontainer render failed', evicted };
+    const rendered = d.ensureDevcontainer(gen.worktreePath, member.issueId);
+    if (!rendered.ok) return { success: false, error: rendered.error ?? 'devcontainer render failed', evicted };
 
+    const composeFile = d.findComposeFile(gen.worktreePath);
+    if (!composeFile) {
+      return { success: false, error: `no compose file under ${gen.worktreePath}/.devcontainer`, evicted };
+    }
+
+    try {
+      await d.composeUp(composeFile, composeProjectName(gen));
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? (err.message.split('\n')[0] ?? 'compose up failed') : String(err),
+        evicted,
+      };
+    }
+
+    d.store.setStack(gen.name, new Date().toISOString());
+    const frontendUrl = await uatFrontendUrl(gen, d);
+    log(`[uat-stack] ${gen.name}: stack up at ${frontendUrl}`);
+    return { success: true, frontendUrl, evicted };
+  });
+}
+
+async function teardownUatStackUnlocked(gen: UatGeneration, d: UatStackDeps): Promise<void> {
   const composeFile = d.findComposeFile(gen.worktreePath);
-  if (!composeFile) {
-    return { success: false, error: `no compose file under ${gen.worktreePath}/.devcontainer`, evicted };
+  if (composeFile) {
+    await d.composeDown(composeFile, composeProjectName(gen)).catch((err) => {
+      d.log?.(`[uat-stack] ${gen.name}: compose down failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
+    });
   }
-
-  try {
-    await d.composeUp(composeFile, composeProjectName(gen));
-  } catch (err) {
-    return {
-      success: false,
-      error: err instanceof Error ? (err.message.split('\n')[0] ?? 'compose up failed') : String(err),
-      evicted,
-    };
-  }
-
-  d.store.setStack(gen.name, new Date().toISOString());
-  const frontendUrl = await uatFrontendUrl(gen, d);
-  log(`[uat-stack] ${gen.name}: stack up at ${frontendUrl}`);
-  return { success: true, frontendUrl, evicted };
+  try { d.store.setStack(gen.name, null); } catch { /* row may be gone */ }
 }
 
 /**
@@ -205,12 +235,8 @@ export async function ensureUatStack(gen: UatGeneration, deps: Partial<UatStackD
  * orphaned uat networks eventually block all workspace creation.
  */
 export async function teardownUatStack(gen: UatGeneration, deps: Partial<UatStackDeps> = {}): Promise<void> {
-  const d = { ...defaultDeps(), ...deps };
-  const composeFile = d.findComposeFile(gen.worktreePath);
-  if (composeFile) {
-    await d.composeDown(composeFile, composeProjectName(gen)).catch((err) => {
-      d.log?.(`[uat-stack] ${gen.name}: compose down failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
-    });
-  }
-  try { d.store.setStack(gen.name, null); } catch { /* row may be gone */ }
+  await withStackMutationLock(gen.projectRoot, async () => {
+    const d = { ...defaultDeps(), ...deps };
+    await teardownUatStackUnlocked(gen, d);
+  });
 }

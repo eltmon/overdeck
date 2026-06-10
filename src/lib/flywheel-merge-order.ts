@@ -121,8 +121,11 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
  */
 export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
 
+export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
+
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+  gitConcurrency?: number;
 }
 
 /**
@@ -151,12 +154,13 @@ export const computeMergeQueue = (
   Effect.gen(function*() {
     const candidates = items.filter((item) => MERGE_GATE_VERBS.has(item.verb));
     if (candidates.length === 0) return [] as MergeQueueItem[];
+    const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 
     const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
 
     const existsFlags = yield* Effect.all(
       branches.map((branch) => branchExists(branch, projectRoot)),
-      { concurrency: 'unbounded' },
+      { concurrency: gitConcurrency },
     );
 
     const existing = candidates
@@ -167,7 +171,7 @@ export const computeMergeQueue = (
 
     const fileSets = yield* Effect.all(
       existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
-      { concurrency: 'unbounded' },
+      { concurrency: gitConcurrency },
     );
 
     const conflictsMap = new Map<string, Set<string>>();

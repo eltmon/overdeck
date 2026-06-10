@@ -31,12 +31,18 @@ export const DEFAULT_CONFLICT_TIMEOUT_MS = 5 * 60 * 1000;
 export interface ConflictAgentDeps {
   /** Paths with unmerged index entries (`git diff --name-only --diff-filter=U`). */
   listConflictedFiles(cwd: string): Promise<string[]>;
+  /** Staged paths before/after the agent run (`git diff --cached --name-only`). */
+  stagedFiles(cwd: string): Promise<string[]>;
   /** Run the headless resolution agent; throws on spawn failure or timeout. */
   runAgent(args: { prompt: string; cwd: string; timeoutMs: number }): Promise<void>;
   /** Subset of `files` still containing conflict markers after the agent ran. */
   filesWithConflictMarkers(cwd: string, files: readonly string[]): Promise<string[]>;
-  /** `git add -A`. */
-  stageAll(cwd: string): Promise<void>;
+  /** Unstaged or untracked paths outside the conflicted-file allowlist. */
+  unsafeChangedFiles(cwd: string, allowedFiles: readonly string[]): Promise<string[]>;
+  /** Discard untrusted worktree/untracked changes outside the allowlist. */
+  discardFiles(cwd: string, files: readonly string[]): Promise<void>;
+  /** Stage only the conflicted files that the agent was allowed to edit. */
+  stageFiles(cwd: string, files: readonly string[]): Promise<void>;
   /** True if unmerged index entries remain after staging. */
   hasUnmergedEntries(cwd: string): Promise<boolean>;
   /** Conclude the in-progress merge with the given message. */
@@ -48,6 +54,14 @@ export interface ConflictAgentDeps {
 export interface ConflictAgentOptions {
   timeoutMs?: number;
   deps?: Partial<ConflictAgentDeps>;
+}
+
+function splitNul(stdout: string): string[] {
+  return stdout.split('\0').filter((p) => p.length > 0);
+}
+
+function allowlist(files: readonly string[]): ReadonlySet<string> {
+  return new Set(files.map((f) => f.replace(/\\/g, '/')));
 }
 
 export function buildConflictResolutionPrompt(ctx: ConflictContext, conflictedFiles: readonly string[]): string {
@@ -94,6 +108,10 @@ function defaultDeps(): ConflictAgentDeps {
       const { stdout } = await run('git', ['diff', '--name-only', '--diff-filter=U'], cwd);
       return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
     },
+    stagedFiles: async (cwd) => {
+      const { stdout } = await run('git', ['diff', '--cached', '--name-only', '-z'], cwd);
+      return splitNul(stdout);
+    },
     runAgent: async ({ prompt, cwd, timeoutMs }) => {
       await run('claude', ['-p', prompt, '--permission-mode', 'acceptEdits'], cwd, timeoutMs);
     },
@@ -109,7 +127,24 @@ function defaultDeps(): ConflictAgentDeps {
       });
       return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
     },
-    stageAll: async (cwd) => { await run('git', ['add', '-A'], cwd); },
+    unsafeChangedFiles: async (cwd, files) => {
+      const allowed = allowlist(files);
+      const [{ stdout: unstaged }, { stdout: untracked }] = await Promise.all([
+        run('git', ['diff', '--name-only', '-z'], cwd),
+        run('git', ['ls-files', '--others', '--exclude-standard', '-z'], cwd),
+      ]);
+      return [...new Set([...splitNul(unstaged), ...splitNul(untracked)])]
+        .filter((file) => !allowed.has(file.replace(/\\/g, '/')));
+    },
+    discardFiles: async (cwd, files) => {
+      if (files.length === 0) return;
+      await run('git', ['restore', '--staged', '--worktree', '--', ...files], cwd).catch(() => {});
+      await run('git', ['clean', '-fd', '--', ...files], cwd).catch(() => {});
+    },
+    stageFiles: async (cwd, files) => {
+      if (files.length === 0) return;
+      await run('git', ['add', '--', ...files], cwd);
+    },
     hasUnmergedEntries: async (cwd) => {
       const { stdout } = await run('git', ['ls-files', '-u'], cwd);
       return stdout.trim().length > 0;
@@ -136,10 +171,12 @@ export function buildConflictAgentHook(
   return async (ctx) => {
     const tag = `[uat-conflict-agent] ${ctx.branchName} ${ctx.feature.issueId}`;
     let files: string[];
+    let stagedBefore: string[];
     try {
       files = await deps.listConflictedFiles(ctx.worktreePath);
+      stagedBefore = await deps.stagedFiles(ctx.worktreePath);
     } catch (err) {
-      log(`${tag}: could not list conflicted files: ${err instanceof Error ? err.message : String(err)}`);
+      log(`${tag}: could not inspect conflicted state: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
     if (files.length === 0) {
@@ -159,16 +196,37 @@ export function buildConflictAgentHook(
     }
 
     try {
+      const unsafe = await deps.unsafeChangedFiles(ctx.worktreePath, files);
+      if (unsafe.length > 0) {
+        log(`${tag}: agent touched non-conflicted path(s): ${unsafe.join(', ')}`);
+        await deps.discardFiles(ctx.worktreePath, unsafe).catch((err) => {
+          log(`${tag}: cleanup of non-conflicted path(s) failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+        return null;
+      }
+
       const unresolved = await deps.filesWithConflictMarkers(ctx.worktreePath, files);
       if (unresolved.length > 0) {
         log(`${tag}: conflict markers remain in ${unresolved.join(', ')}`);
         return null;
       }
-      await deps.stageAll(ctx.worktreePath);
+      await deps.stageFiles(ctx.worktreePath, files);
       if (await deps.hasUnmergedEntries(ctx.worktreePath)) {
         log(`${tag}: unmerged index entries remain after staging`);
         return null;
       }
+
+      const stagedBeforeSet = new Set(stagedBefore);
+      const allowed = allowlist(files);
+      const stagedAfter = await deps.stagedFiles(ctx.worktreePath);
+      const newlyStagedOutsideAllowlist = stagedAfter.filter((file) =>
+        !stagedBeforeSet.has(file) && !allowed.has(file.replace(/\\/g, '/')),
+      );
+      if (newlyStagedOutsideAllowlist.length > 0) {
+        log(`${tag}: cached diff includes non-conflicted path(s): ${newlyStagedOutsideAllowlist.join(', ')}`);
+        return null;
+      }
+
       await deps.commitMerge(ctx.worktreePath, buildMergeCommitMessage(ctx, files));
       const commitSha = await deps.headSha(ctx.worktreePath);
       log(`${tag}: resolved ${files.length} file(s) at ${commitSha.slice(0, 9)}`);

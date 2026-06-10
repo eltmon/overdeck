@@ -78,7 +78,7 @@ export interface GenerationStorePort {
   insert(gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'>): void;
   update(
     name: string,
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions'>>,
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
   ): void;
   /** Every generation name ever used — codename collision check. */
   listNames(): string[];
@@ -144,6 +144,7 @@ export async function assembleUatGeneration(
     heldOut: [],
     resolutions: [],
     stackStartedAt: null,
+    cleanedAt: null,
   });
 
   const members: UatGeneration['members'] = [];
@@ -154,7 +155,7 @@ export async function assembleUatGeneration(
     return {
       name, worktreePath, projectRoot: input.projectRoot, baseSha,
       status, members, heldOut, resolutions,
-      stackStartedAt: null, createdAt: '', updatedAt: '',
+      stackStartedAt: null, cleanedAt: null, createdAt: '', updatedAt: '',
     };
   };
 
@@ -167,25 +168,26 @@ export async function assembleUatGeneration(
 
   for (const feature of input.features) {
     const mergedIssueIds = members.map((m) => m.issueId);
+    const attemptedHeadSha = async () => deps.git.branchHeadSha(feature.branch).catch(() => 'unknown');
     const recordMember = async (): Promise<UatGenerationMember> => ({
       issueId: feature.issueId,
       title: feature.title,
       branch: feature.branch,
-      headSha: await deps.git.branchHeadSha(feature.branch).catch(() => 'unknown'),
+      headSha: await attemptedHeadSha(),
       mergeOrder: members.length + 1,
       ...(feature.pr !== undefined ? { pr: feature.pr } : {}),
       ...(feature.prUrl !== undefined ? { prUrl: feature.prUrl } : {}),
     });
+    const holdOut = async (reason: string): Promise<void> => {
+      heldOut.push({ issueId: feature.issueId, branch: feature.branch, headSha: await attemptedHeadSha(), reason });
+    };
 
     let result: Awaited<ReturnType<GenerationGitDeps['mergeBranch']>>;
     try {
       result = await deps.git.mergeBranch(feature.branch);
     } catch (err) {
       await deps.git.abortMerge().catch(() => {});
-      heldOut.push({
-        issueId: feature.issueId,
-        reason: `merge failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`,
-      });
+      await holdOut(`merge failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
       deps.store.update(name, { members, heldOut, resolutions });
       continue;
     }
@@ -198,12 +200,9 @@ export async function assembleUatGeneration(
 
     if (!result.conflict || !deps.resolveConflict) {
       await deps.git.abortMerge().catch(() => {});
-      heldOut.push({
-        issueId: feature.issueId,
-        reason: result.conflict
-          ? `conflicts with ${conflictingWith(feature, mergedIssueIds).join(', ') || 'an earlier member'} — no assembly agent available`
-          : result.reason,
-      });
+      await holdOut(result.conflict
+        ? `conflicts with ${conflictingWith(feature, mergedIssueIds).join(', ') || 'an earlier member'} — no assembly agent available`
+        : result.reason);
       deps.store.update(name, { members, heldOut, resolutions });
       continue;
     }
@@ -233,10 +232,7 @@ export async function assembleUatGeneration(
       });
     } else {
       await deps.git.abortMerge().catch(() => {});
-      heldOut.push({
-        issueId: feature.issueId,
-        reason: `conflict with ${conflictingIssueIds.join(', ') || 'an earlier member'} could not be auto-resolved — waits for the next generation`,
-      });
+      await holdOut(`conflict with ${conflictingIssueIds.join(', ') || 'an earlier member'} could not be auto-resolved — waits for the next generation`);
     }
     deps.store.update(name, { members, heldOut, resolutions });
   }
@@ -296,19 +292,32 @@ export async function cleanupUatGenerations(
 
   const live = deps.store.listChain(projectRoot, ['ready', 'superseded']);
   const trimmed = live.slice(keep);
-  const dead = deps.store.listChain(projectRoot, ['invalidated', 'promoted', 'failed']);
+  const dead = deps.store.listChain(projectRoot, ['invalidated', 'promoted', 'failed'])
+    .filter((gen) => !gen.cleanedAt);
 
   for (const gen of [...trimmed, ...dead]) {
+    let cleaned = true;
     if (gen.stackStartedAt && deps.teardownStack) {
       await deps.teardownStack(gen).catch((err) => {
+        cleaned = false;
         log(`[uat-generation] cleanup ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
-    await deps.removeWorktree(gen.worktreePath).catch(() => {});
-    await deps.deleteBranch(gen.name).catch(() => {});
+    await deps.removeWorktree(gen.worktreePath).catch((err) => {
+      cleaned = false;
+      log(`[uat-generation] cleanup ${gen.name}: worktree removal failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+    await deps.deleteBranch(gen.name).catch((err) => {
+      cleaned = false;
+      log(`[uat-generation] cleanup ${gen.name}: branch deletion failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+    if (!cleaned) continue;
+    const cleanedAt = new Date().toISOString();
     if (gen.status === 'ready' || gen.status === 'superseded') {
-      deps.store.update(gen.name, { status: 'invalidated' });
+      deps.store.update(gen.name, { status: 'invalidated', cleanedAt });
       log(`[uat-generation] cleanup: trimmed ${gen.name} (beyond newest ${keep})`);
+    } else {
+      deps.store.update(gen.name, { cleanedAt });
     }
   }
 }

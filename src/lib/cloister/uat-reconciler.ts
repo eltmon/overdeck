@@ -74,11 +74,7 @@ function desiredSignature(features: readonly ReadyFeature[], headShas: ReadonlyM
 function generationSignature(gen: UatGeneration): string {
   const parts = [
     ...gen.members.map((m) => `${m.issueId.toUpperCase()}@${m.headSha}`),
-    // Held-out features are part of what this generation "answered" — a new
-    // attempt for the same input would hold them out again. Their branch heads
-    // aren't recorded, so retries for held-out-only changes go through the
-    // forced rebuild (documented v1 limitation).
-    ...gen.heldOut.map((h) => `${h.issueId.toUpperCase()}@held`),
+    ...gen.heldOut.map((h) => `${h.issueId.toUpperCase()}@${h.headSha ?? 'held'}`),
   ].sort();
   return `${gen.baseSha}|${parts.join(',')}`;
 }
@@ -99,7 +95,12 @@ function liveSignatureMatches(
   for (const id of desiredIds) if (!genIds.has(id)) return false;
   for (const member of gen.members) {
     const current = headShas.get(member.branch);
-    if (current !== undefined && current !== member.headSha) return false;
+    if (current !== member.headSha) return false;
+  }
+  for (const held of gen.heldOut) {
+    if (!held.branch || !held.headSha) return false;
+    const current = headShas.get(held.branch);
+    if (current !== held.headSha) return false;
   }
   return true;
 }
@@ -117,8 +118,20 @@ function isStale(
       return `${member.issueId} left the ready queue`;
     }
     const current = headShas.get(member.branch);
-    if (current !== undefined && current !== member.headSha) {
+    if (current !== member.headSha) {
       return `${member.issueId} branch gained commits`;
+    }
+  }
+  for (const held of gen.heldOut) {
+    if (!desiredIds.has(held.issueId.toUpperCase())) {
+      return `${held.issueId} left the ready queue`;
+    }
+    if (!held.branch || !held.headSha) {
+      return `${held.issueId} held-out branch metadata missing`;
+    }
+    const current = headShas.get(held.branch);
+    if (current !== held.headSha) {
+      return `${held.issueId} branch gained commits`;
     }
   }
   return null;

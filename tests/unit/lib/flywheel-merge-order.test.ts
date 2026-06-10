@@ -63,6 +63,7 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
   const qi = (issueId: string, batchGroup: 'batch' | 'serialize') => ({
     issueId,
     title: issueId,
+    branchName: `feature/${issueId.toLowerCase()}`,
     mergeOrder: 1,
     conflictsWith: [] as string[],
     batchGroup,

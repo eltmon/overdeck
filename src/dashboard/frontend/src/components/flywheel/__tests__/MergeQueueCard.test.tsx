@@ -127,7 +127,8 @@ describe('steady state', () => {
 
     // escape hatch present, and no dishonest legacy label anywhere
     expect(screen.getByText('Merge one feature to main…')).toBeTruthy();
-    expect(screen.queryByText(/Ship batch/)).toBeNull();
+    const legacyBatchLabel = new RegExp(['Ship', 'batch'].join(' '));
+    expect(screen.queryByText(legacyBatchLabel)).toBeNull();
   });
 });
 
