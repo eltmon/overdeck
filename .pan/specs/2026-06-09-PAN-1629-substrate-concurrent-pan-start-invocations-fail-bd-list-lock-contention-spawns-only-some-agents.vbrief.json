@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T00:38:17.462Z"
+    "updated": "2026-06-10T00:40:27.741Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T00:38:17.462Z",
+    "updated": "2026-06-10T00:40:27.741Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -341,7 +341,7 @@
       {
         "id": "concurrency-regression-test",
         "title": "Regression test: N concurrent beads operations all succeed (reproduces the RUN-14 failure)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -357,7 +357,7 @@
           {
             "id": "concurrency-regression-test.ac1",
             "title": "Test fires >=5 concurrent start-path beads operations and all succeed (no 'list failed', no spurious 'no beads')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -365,7 +365,7 @@
           {
             "id": "concurrency-regression-test.ac2",
             "title": "Test injects transient lock errors on early attempts and asserts retry recovers (deterministic, fake timers)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -373,7 +373,7 @@
           {
             "id": "concurrency-regression-test.ac3",
             "title": "Test fails against the pre-fix code path (guards the regression) and passes after the fix",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

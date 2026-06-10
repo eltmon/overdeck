@@ -131,6 +131,32 @@ describe('hasBeadsTasks', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
+  it('regression: five concurrent start gate reads all recover from transient lock contention', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      calls += 1;
+      if (calls <= 5) {
+        callback(new Error('database is locked'), '', 'database is locked');
+        return;
+      }
+      callback(null, { stdout: JSON.stringify([{ id: `panopticon-${calls}` }]) }, '');
+    });
+    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
+
+    const results = await Promise.all(Array.from({ length: 5 }, () => countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    })));
+
+    expect(results).toHaveLength(5);
+    expect(results.every(result => result.count === 1 && result.source === 'bd' && result.transientFailure === undefined)).toBe(true);
+    expect(childProcessMocks.execFile).toHaveBeenCalledTimes(10);
+  });
+
   it('detects when beads do not cover every vBRIEF item', async () => {
     const { validateBeadsMatchPlan } = await import('../../../../src/cli/commands/start.js');
     const workspace = join(tmpDir, 'workspaces', 'feature-pan-1094');
