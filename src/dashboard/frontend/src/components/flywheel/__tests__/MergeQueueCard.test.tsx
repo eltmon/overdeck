@@ -24,6 +24,7 @@ type FetchResponses = Record<string, unknown>;
 function mockFetch(responses: FetchResponses): ReturnType<typeof vi.fn> {
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes('/api/dashboard/session')) return { ok: true, status: 200, json: async () => ({ csrfToken: 'test-csrf-token' }) } as Response;
     const method = init?.method ?? 'GET';
     const key = Object.keys(responses).find((k) => url.includes(k.split(' ').pop()!) && (k.includes(' ') ? k.startsWith(method) : method === 'GET'));
     if (!key) return { ok: true, json: async () => ({}) } as Response;
@@ -155,8 +156,8 @@ describe('confirm gating', () => {
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1));
     const options = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
     expect(options.title).toContain('pan-otter-0610');
-    expect(options.message).toContain('PAN-1 — Loading-wedge fix');
-    expect(options.message).toContain('PAN-2 — Transcript paths');
+    expect(options.message).toContain('PAN-1 (feature/pan-1) — Loading-wedge fix');
+    expect(options.message).toContain('PAN-2 (feature/pan-2) — Transcript paths');
     expect(options.message).toContain('exactly the tree you tested');
     // cancelled → no POST fired
     const posts = fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');

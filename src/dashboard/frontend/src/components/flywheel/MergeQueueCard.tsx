@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GitMerge, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { RailCard } from './RailCard';
 import { useConfirm } from '../DialogProvider';
 
@@ -62,7 +63,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 async function postJson<T>(url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await dashboardMutationJsonHeaders(),
     body: body === undefined ? '{}' : JSON.stringify(body),
   });
   const payload = (await res.json().catch(() => ({}))) as T & { error?: string; message?: string };
@@ -146,7 +147,7 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
   });
 
   const onPromote = async (gen: UatGenerationPayload) => {
-    const lines = gen.members.map((m, i) => `${i + 1}. ${m.issueId} — ${m.title}`).join('\n');
+    const lines = gen.members.map((m, i) => `${i + 1}. ${m.issueId} (${m.branch}) — ${m.title}`).join('\n');
     const resolutionNote = gen.resolutions.length > 0
       ? `\n\nIncludes ${gen.resolutions.length} conflict resolution${gen.resolutions.length === 1 ? '' : 's'} you tested (${gen.resolutions.map((r) => r.issueIds.join(' ↔ ')).join('; ')}).`
       : '';

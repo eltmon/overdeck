@@ -170,11 +170,11 @@ describe('teardownUatStack', () => {
     expect(deps.stackWrites).toEqual([['uat/pan-gone-0610', null]]);
   });
 
-  it('clears the record even when compose down fails', async () => {
+  it('leaves the record intact and rejects when compose down fails', async () => {
     const deps = makeDeps();
     deps.composeDown = async () => { throw new Error('docker daemon gone'); };
-    await teardownUatStack(gen('uat/pan-err-0610'), deps);
-    expect(deps.stackWrites).toEqual([['uat/pan-err-0610', null]]);
+    await expect(teardownUatStack(gen('uat/pan-err-0610'), deps)).rejects.toThrow('docker daemon gone');
+    expect(deps.stackWrites).toEqual([]);
   });
 });
 

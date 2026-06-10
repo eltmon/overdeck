@@ -171,6 +171,8 @@ export interface DevcontainerRenderOptions {
   projectConfig: ProjectConfig;
   /** Feature name without the `feature-` prefix (e.g. `min-846`). */
   featureName: string;
+  /** Optional caller-owned overrides for non-feature workspaces such as UAT batches. */
+  placeholderOverrides?: Partial<TemplatePlaceholders>;
 }
 
 /**
@@ -212,6 +214,7 @@ export function renderDevcontainerSync(
     opts.projectConfig,
     opts.featureName,
     opts.workspacePath,
+    opts.placeholderOverrides,
   );
 
   // 1. Render every *.template file.

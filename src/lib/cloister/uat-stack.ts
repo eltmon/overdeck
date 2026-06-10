@@ -190,7 +190,15 @@ export async function ensureUatStack(gen: UatGeneration, deps: Partial<UatStackD
     while (others.length > 0 && others.length >= MAX_UAT_STACKS) {
       const oldest = others.shift()!;
       log(`[uat-stack] cap ${MAX_UAT_STACKS} reached — tearing down oldest stack ${oldest.name}`);
-      await teardownUatStackUnlocked(oldest, d);
+      try {
+        await teardownUatStackUnlocked(oldest, d);
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? (err.message.split('\n')[0] ?? 'stack teardown failed') : String(err),
+          evicted,
+        };
+      }
       evicted.push(oldest.name);
     }
 
@@ -222,9 +230,12 @@ export async function ensureUatStack(gen: UatGeneration, deps: Partial<UatStackD
 async function teardownUatStackUnlocked(gen: UatGeneration, d: UatStackDeps): Promise<void> {
   const composeFile = d.findComposeFile(gen.worktreePath);
   if (composeFile) {
-    await d.composeDown(composeFile, composeProjectName(gen)).catch((err) => {
+    try {
+      await d.composeDown(composeFile, composeProjectName(gen));
+    } catch (err) {
       d.log?.(`[uat-stack] ${gen.name}: compose down failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
-    });
+      throw err;
+    }
   }
   try { d.store.setStack(gen.name, null); } catch { /* row may be gone */ }
 }

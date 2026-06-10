@@ -17,7 +17,7 @@ import {
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
-import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { sessionExists } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
@@ -929,8 +929,8 @@ const postUatGenerationStackRoute = HttpRouter.add(
   '/api/flywheel/uat-generations/:name/stack',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const params = yield* HttpRouter.params;
     const name = uatGenerationNameFromParam(params['name'] ?? '');
     const { postUatGenerationStackPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
@@ -945,8 +945,8 @@ const postUatGenerationPromoteRoute = HttpRouter.add(
   '/api/flywheel/uat-generations/:name/promote',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const params = yield* HttpRouter.params;
     const name = uatGenerationNameFromParam(params['name'] ?? '');
     const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
@@ -970,8 +970,8 @@ const postFlywheelAssembleUatRoute = HttpRouter.add(
   '/api/flywheel/assemble-uat',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const { runUatTrainReconcile } = yield* Effect.promise(() => import('../services/uat-train.js'));
     const result = yield* Effect.promise(() => runUatTrainReconcile({ force: true }));
     return jsonResponse(result);

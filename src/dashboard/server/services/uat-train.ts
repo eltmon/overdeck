@@ -37,7 +37,7 @@ import {
 } from '../../../lib/database/uat-generations-db.js';
 import { isMergeTrainEnabled } from '../../../lib/database/app-settings.js';
 import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
-import { listSpecs } from '../../../lib/pan-dir/specs.js';
+import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
@@ -166,26 +166,29 @@ export interface UatGenerationPayload {
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
-async function loadAcceptanceCriteriaCache(): Promise<Map<string, Array<{ title: string; status: string }>>> {
+async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, Array<{ title: string; status: string }>>> {
   const cache = new Map<string, Array<{ title: string; status: string }>>();
-  try {
-    const entries = await Effect.runPromise(listSpecs(projectRoot()));
-    for (const entry of entries) {
-      cache.set(
-        entry.issueId.toUpperCase(),
-        extractACFromDocument(entry.document).map((ac) => ({ title: ac.title, status: ac.status })),
-      );
+  if (issueIds.size === 0) return cache;
+
+  await Promise.all([...issueIds].map(async (issueId) => {
+    try {
+      const found = await Effect.runPromise(findVBriefByIssue(projectRoot(), issueId));
+      if (!found) return;
+      const document = await Effect.runPromise(readVBriefDocument(found.path));
+      cache.set(issueId.toUpperCase(), extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status })));
+    } catch {
+      cache.set(issueId.toUpperCase(), []);
     }
-  } catch {
-    // Missing/corrupt specs should not break the UAT batches card.
-  }
+  }));
   return cache;
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
   const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
-  const acCache = await loadAcceptanceCriteriaCache();
+  if (chain.length === 0) return [];
+  const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
+  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
