@@ -214,7 +214,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }));
       details.push('Wrote completion marker for cloister pickup');
 
-      // 6. Stop the machine; mark remote state stopped.
+      // 6. Retire the remote workspace entirely: from review onward the
+      // pipeline runs against the local worktree, and lingering remote
+      // metadata makes getWorkspaceInfoForIssue() route review operations
+      // at the (now-idle) VM. Destroying the machine also closes the
+      // run-forever cost leak.
       try {
         const config = loadConfigSync();
         const fly = createFlyProviderFromConfig(config.remote);
@@ -222,11 +226,14 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
           const { killRemoteAgent } = await import('./remote-agents.js');
           await killRemoteAgent(agentId, vmName).catch(() => undefined);
         }
-        await Effect.runPromise(fly.stopVm(vmName));
-        details.push(`Stopped machine ${vmName}`);
+        await Effect.runPromise(fly.deleteVm(vmName));
+        details.push(`Destroyed machine ${vmName}`);
       } catch (err: any) {
-        details.push(`Warning: could not stop machine: ${err.message}`);
+        details.push(`Warning: could not destroy machine: ${err.message}`);
       }
+      const { deleteWorkspaceMetadataSync } = await import('./workspace-metadata.js');
+      deleteWorkspaceMetadataSync(issueId);
+      details.push('Removed remote workspace metadata (pipeline is local from here)');
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
 
       results.push({ agentId, issueId, status: 'handed-off', details });
