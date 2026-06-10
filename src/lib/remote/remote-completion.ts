@@ -25,7 +25,7 @@
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -36,6 +36,7 @@ import {
   saveRemoteAgentState,
   isRemoteAgentRunning,
   listActiveRemoteAgentStates,
+  getRemoteAgentOutput,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
@@ -62,6 +63,51 @@ async function branchExistsOnOrigin(projectRoot: string, branch: string): Promis
     return stdout.trim().length > 0;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Preserve the remote session's observable state into the local agent dir
+ * BEFORE the machine goes away: the final tmux pane (remote-output.log) and
+ * the Claude Code session JSONLs (remote-sessions/). The JSONLs are the only
+ * record of the remote conversation — destroying a machine without them
+ * loses the transcript irrecoverably (learned on the first migrated issue).
+ */
+async function captureRemoteForensics(agentId: string, vmName: string, details: string[]): Promise<void> {
+  const agentDir = join(AGENTS_DIR, agentId);
+  mkdirSync(agentDir, { recursive: true });
+  const config = loadConfigSync();
+  const fly = createFlyProviderFromConfig(config.remote);
+
+  try {
+    const output = await getRemoteAgentOutput(agentId, vmName, 2000);
+    if (output.trim()) {
+      writeFileSync(join(agentDir, 'remote-output.log'), output);
+      details.push('Captured final remote pane to remote-output.log');
+    }
+  } catch {
+    details.push('Could not capture remote pane');
+  }
+
+  // The Machines exec API runs with HOME=/, so Claude's session JSONLs live
+  // under /.claude/projects on the VM.
+  try {
+    const list = await Effect.runPromise(fly.ssh(vmName, 'ls /.claude/projects/*/*.jsonl 2>/dev/null'));
+    const files = list.stdout.trim().split('\n').filter(Boolean);
+    if (files.length > 0) {
+      const destDir = join(agentDir, 'remote-sessions');
+      mkdirSync(destDir, { recursive: true });
+      for (const remotePath of files) {
+        try {
+          await fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath)));
+        } catch {
+          // per-file best effort
+        }
+      }
+      details.push(`Copied ${files.length} session JSONL(s) to remote-sessions/`);
+    }
+  } catch {
+    details.push('Could not copy session JSONLs');
   }
 }
 
@@ -122,18 +168,32 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         results.push({ agentId, issueId, status: 'still-running', details });
         continue;
       }
-      if (!pushed) {
-        details.push(`Session ${sessionAlive ? 'signaled done' : 'ended'} but ${branch} is not on origin — not reaping`);
-        if (!sessionAlive) {
-          // Terminal: dead session, no pushed work. Persist error so the
-          // deacon patrol doesn't re-report every cycle; recover manually
-          // via `pan admin remote reap --issue <id>` after inspecting the VM.
-          saveRemoteAgentState({ ...remoteState, status: 'error', lastActivity: new Date().toISOString() });
+
+      // Only the sentinel hands off. A dead session WITHOUT the sentinel is a
+      // crash, not a completion — migrated issues always have a pushed branch,
+      // so "session ended + branch pushed" would false-positive every crash
+      // straight into review (observed live on the first migrated issue).
+      // Park as error with forensics; the machine stays (stopped) for
+      // inspection and manual recovery via `pan admin remote reap --issue`.
+      if (!sentinelSeen || !pushed) {
+        const reason = !sentinelSeen
+          ? 'session ended without the REMOTE_DONE sentinel — treating as crash, not completion'
+          : `sentinel present but ${branch} is not on origin`;
+        details.push(reason);
+        await captureRemoteForensics(agentId, vmName, details);
+        try {
+          const config = loadConfigSync();
+          const fly = createFlyProviderFromConfig(config.remote);
+          await Effect.runPromise(fly.stopVm(vmName));
+          details.push(`Stopped machine ${vmName} (preserved for inspection)`);
+        } catch (err: any) {
+          details.push(`Warning: could not stop machine: ${err.message}`);
         }
+        saveRemoteAgentState({ ...remoteState, status: 'error', lastActivity: new Date().toISOString() });
         results.push({ agentId, issueId, status: 'error', details });
         continue;
       }
-      details.push(sentinelSeen ? `REMOTE_DONE sentinel present for ${issueId}` : `Session ended; ${branch} is pushed`);
+      details.push(`REMOTE_DONE sentinel present for ${issueId}`);
 
       if (opts.dryRun) {
         details.push('Dry run — would hand off to review');
@@ -220,6 +280,9 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         comment: `Remote agent completed on ${vmName} (reaped)`,
       }));
       details.push('Wrote completion marker for cloister pickup');
+
+      // 5.5. Preserve the transcript and final pane before the machine goes.
+      await captureRemoteForensics(agentId, vmName, details);
 
       // 6. Retire the remote workspace entirely: from review onward the
       // pipeline runs against the local worktree, and lingering remote
