@@ -757,6 +757,7 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  lastResumeAt?: string;
   /**
    * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
    * undefined = legacy/pre-feature agent or non-applicable role;
@@ -1527,6 +1528,10 @@ async function deliverInitialPromptWithRetry(
   }
 
   return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+export function buildDefaultResumeContinueMessage(issueId: string): string {
+  return `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 }
 
 async function buildResumeMessageForAgent(
@@ -4379,6 +4384,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   }
 
   try {
+    const resumeStartedAt = new Date().toISOString();
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
@@ -4395,7 +4401,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const defaultResumeMessage = `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
     const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
@@ -4495,6 +4501,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     // Update agent state
     if (agentState) {
+      agentState.lastResumeAt = resumeStartedAt;
       markAgentRunning(agentState);
       saveAgentStateSync(agentState);
     }
