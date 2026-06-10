@@ -208,7 +208,13 @@ describe('auto-resume gates', () => {
       return {
         ...actual,
         exec: vi.fn(),
-        execFile: vi.fn(),
+        execFile: vi.fn((file: string, args: string[], _options: unknown, callback: Function) => {
+          if (file === 'bd' && args[0] === 'list') {
+            callback(null, { stdout: '[{"id":"PAN-1141","labels":["pan-1141"]}]' }, '');
+            return;
+          }
+          callback(null, { stdout: '' }, '');
+        }),
         execFileSync: vi.fn(),
         execSync: vi.fn().mockReturnValue('feature/pan-1141\n'),
       };
