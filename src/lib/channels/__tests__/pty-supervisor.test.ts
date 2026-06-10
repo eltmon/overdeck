@@ -36,19 +36,26 @@ function startSupervisor(agentId: string, command: string, args: string[] = []):
   return proc;
 }
 
-async function waitForProcessOutput(predicate: () => boolean, message: string): Promise<void> {
+async function waitForProcessOutput(predicate: () => boolean, message: string, timeoutMs = 5_000): Promise<void> {
   if (predicate()) return;
-  await new Promise<void>((resolve) => {
-    const check = () => {
-      if (!predicate()) return;
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
       proc?.stdout?.off('data', check);
       proc?.stderr?.off('data', check);
+    };
+    const check = () => {
+      if (!predicate()) return;
+      cleanup();
       resolve();
     };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`));
+    }, timeoutMs);
     proc?.stdout?.on('data', check);
     proc?.stderr?.on('data', check);
   });
-  if (!predicate()) throw new Error(`${message}. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`);
 }
 
 async function waitForSocketPath(socketPath: string, predicate: () => boolean, message: string): Promise<void> {
@@ -251,6 +258,28 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
   });
+
+  it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
+    const content = `swallowed-${'x'.repeat(32)}`;
+    const byteCount = Buffer.byteLength(content, 'utf8') * 2;
+    const { token, socketPath } = await readySupervisor('agent-no-echo', 'bash', [
+      '-lc',
+      `stty raw -echo; printf READY; dd bs=1 count=${byteCount} of=/dev/null 2>/dev/null; printf READ_TWO; sleep 30`,
+    ]);
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not enter raw no-echo mode');
+    stdout = '';
+    const started = Date.now();
+
+    const result = await postToUnixSocket(socketPath, token, { content, echo: false });
+
+    expect(result.status).toBe(502);
+    expect(result.body).toContain('input echo confirmation failed');
+    expect(Date.now() - started).toBeLessThan(6_000);
+    await waitForProcessOutput(() => stdout.includes('READ_TWO'), 'child did not consume both supervisor write attempts');
+    expect(stdout).not.toContain(content);
+    const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-echo.log');
+    expect(existsSync(logPath)).toBe(false);
+  }, 10_000);
 
   it('creates the supervisor socket at mode 0600', async () => {
     const { socketPath } = await readySupervisor('agent-mode');

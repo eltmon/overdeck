@@ -70,6 +70,23 @@ describe('transcript landing snapshots', () => {
     expect(after).toMatchObject({ userRecordCount: 2, lastUserRecord: { uuid: 'u2' } });
   });
 
+  it('detects appended user records from the pre-delivery byte offset even when the tail count is unchanged', async () => {
+    const first = JSON.stringify(userRecord('first', 'u1'));
+    const second = JSON.stringify(userRecord('second', 'u2'));
+    writeSession(`${first}\n`);
+    const before = await captureTranscriptUserRecordSnapshot(workspace, sessionId, { tailBytes: 256 });
+
+    const filler = JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: 'x'.repeat(1024) } });
+    writeSession(`${first}\n${filler}\n${second}\n`);
+    const tailOnly = await captureTranscriptUserRecordSnapshot(workspace, sessionId, { tailBytes: 256 });
+    const after = await captureTranscriptUserRecordSnapshot(workspace, sessionId, { fromByteOffset: before.readOffset });
+
+    expect(tailOnly.userRecordCount).toBe(before.userRecordCount);
+    expect(hasNewTranscriptUserRecord(before, tailOnly)).toBe(false);
+    expect(hasNewTranscriptUserRecord(before, after)).toBe(true);
+    expect(after).toMatchObject({ userRecordCount: 1, lastUserRecord: { uuid: 'u2' } });
+  });
+
   it('does not count assistant-only or tool-result-only appends as landed user messages', async () => {
     writeSession([userRecord('first', 'u1')]);
     const before = await captureTranscriptUserRecordSnapshot(workspace, sessionId);

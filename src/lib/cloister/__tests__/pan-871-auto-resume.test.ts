@@ -391,6 +391,31 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     expect(mockWriteFileSync).toHaveBeenCalledWith('/tmp/test-agents/agent-pan-871/.last-stalled-resume-nudge', expect.any(String), 'utf-8');
   });
 
+  it('does not re-send a stalled resume prompt when the issue is closed', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    });
+    mockIsIssueClosed.mockResolvedValue(true);
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+
+    const actions = await nudgeStalledResumeWorkAgents();
+
+    expect(actions).toEqual([]);
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-871');
+    expect(mockSessionExists).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
   it('does not re-send when a user record landed after the last resume', async () => {
     mockGetAgentState.mockReturnValue({
       id: 'agent-pan-871',

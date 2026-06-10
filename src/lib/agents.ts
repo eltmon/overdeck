@@ -1454,13 +1454,14 @@ async function waitForTranscriptUserRecordLanding(
   intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
+  const fromByteOffset = before.readOffset ?? before.fileSize;
   do {
-    const after = await snapshot(workspace, sessionId);
+    const after = await snapshot(workspace, sessionId, { fromByteOffset });
     if (hasNewTranscriptUserRecord(before, after)) return true;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   } while (Date.now() < deadline);
 
-  const after = await snapshot(workspace, sessionId);
+  const after = await snapshot(workspace, sessionId, { fromByteOffset });
   return hasNewTranscriptUserRecord(before, after);
 }
 
@@ -4147,10 +4148,34 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
         issueId: agentState.issueId,
       });
     } else if (ready && resumeMessage.message) {
-      const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
-      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
-      await appendTellInterventionForUserSource(normalizedId, caller);
-      console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
+      let delivered = false;
+      if (fallbackHarness === 'claude-code') {
+        const fallbackSessionId = getLatestSessionIdSync(normalizedId);
+        if (fallbackSessionId) {
+          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+            agentId: normalizedId,
+            workspace: agentState.workspace,
+            sessionId: fallbackSessionId,
+            message: resumeMessage.message,
+            caller: 'resumeAgent:resume-prompt',
+            deliveryMethod: agentState.deliveryMethod,
+          });
+          delivered = delivery.delivered;
+          if (!delivery.delivered) {
+            console.error(`[agents] Fallback resume prompt did not land after ${delivery.attempts} delivery attempts`);
+          }
+        } else {
+          console.error(`[agents] Fallback-restarted ${normalizedId} but no session id was recorded — feedback in mail queue`);
+        }
+      } else {
+        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+        delivered = delivery.ok;
+      }
+      if (delivered) {
+        if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        await appendTellInterventionForUserSource(normalizedId, caller);
+        console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
+      }
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
     }
