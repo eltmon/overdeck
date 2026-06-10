@@ -108,7 +108,8 @@ import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
-import { loadWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadataSync, listWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { loadConfigSync } from '../../../lib/config.js';
 import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
@@ -1073,8 +1074,17 @@ async function ensurePRExists(
 }
 
 function getFlyAppName(vmName: string): string {
-  const match = vmName.match(/^([^-]+-[^-]+)/);
-  return match ? match[1] : vmName;
+  // Resolve via workspace metadata — deriving from the vmName prefix is wrong
+  // ('pan-pan-1712-ws' → 'pan-pan'). Fall back to the configured app.
+  try {
+    const meta = listWorkspaceMetadataSync().find((m) => m.vmName === vmName);
+    if (meta?.appName) return meta.appName;
+  } catch { /* fall through */ }
+  try {
+    return loadConfigSync().remote?.fly?.app ?? 'pan-workspaces';
+  } catch {
+    return 'pan-workspaces';
+  }
 }
 
 function shellQuote(value: string): string {
@@ -3417,9 +3427,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const branchName = `feature/${numericSuffix}`;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const workspacePath = workspaceInfo.isRemote
-      ? workspaceInfo.remotePath!
-      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
+    // Review runs against the local worktree only. Remote (fly.io) workspaces
+    // exist for the work phase; the reap flow retires them and materializes
+    // the local worktree before review (PAN-1676).
+    if (workspaceInfo.isRemote) {
+      return jsonResponse({
+        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${issueId}' after the agent finishes, then review.`,
+      }, { status: 409 });
+    }
+    const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
     const existingStatus = getReviewStatusSync(issueId);
 
@@ -3504,20 +3520,10 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             });
 
             try {
-              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-                await execAsync(
-                  flyExecCmd(
-                    workspaceInfo.vmName,
-                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
-                  ),
-                  { encoding: 'utf-8', timeout: 30000 }
-                );
-              } else {
-                await execAsync(`git push origin ${branchName}`, {
-                  cwd: workspacePath,
-                  encoding: 'utf-8',
-                });
-              }
+              await execAsync(`git push origin ${branchName}`, {
+                cwd: workspacePath,
+                encoding: 'utf-8',
+              });
             } catch (pushErr: any) {
               console.log(`Feature branch push note: ${pushErr.message}`);
             }
@@ -3729,20 +3735,21 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
       const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
       const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
-      const workspacePathRerun = wsInfoRerun.isRemote
-        ? wsInfoRerun.remotePath!
-        : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+      // Review runs against the local worktree only (PAN-1676) — see the
+      // matching guard in /api/review/:issueId/trigger.
+      if (wsInfoRerun.isRemote) {
+        return jsonResponse({
+          success: false,
+          message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
+        }, { status: 409 });
+      }
+      const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
       if (existingStatus.reviewedAtCommit && !forceReview) {
         let currentHeadSha: string | undefined;
         const headResult = yield* Effect.promise(async () => {
           try {
-            const result = wsInfoRerun.isRemote && wsInfoRerun.vmName
-              ? await execAsync(
-                  flyExecCmd(wsInfoRerun.vmName!, `cd ${shellQuote(workspacePathRerun)} && git rev-parse HEAD`),
-                  { encoding: 'utf-8', timeout: 30000 },
-                )
-              : await execAsync('git rev-parse HEAD', {
+            const result = await execAsync('git rev-parse HEAD', {
                   cwd: workspacePathRerun,
                   encoding: 'utf-8',
                 });
@@ -3806,20 +3813,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             });
 
             try {
-              if (wsInfoRerun.isRemote && wsInfoRerun.vmName) {
-                await execAsync(
-                  flyExecCmd(
-                    wsInfoRerun.vmName,
-                    `cd ${shellQuote(workspacePathRerun)} && git push origin ${branchNameRerun} 2>&1 || true`
-                  ),
-                  { encoding: 'utf-8', timeout: 30000 }
-                );
-              } else {
-                await execAsync(`git push origin ${branchNameRerun}`, {
-                  cwd: workspacePathRerun,
-                  encoding: 'utf-8',
-                });
-              }
+              await execAsync(`git push origin ${branchNameRerun}`, {
+                cwd: workspacePathRerun,
+                encoding: 'utf-8',
+              });
             } catch (pushErr: any) {
               console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
             }
