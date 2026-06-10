@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T00:40:27.741Z"
+    "updated": "2026-06-10T00:42:09.798Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T00:40:27.741Z",
+    "updated": "2026-06-10T00:42:09.798Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -307,7 +307,7 @@
       {
         "id": "verify-host-yes-prompt-return",
         "title": "Verify `pan start --host --yes` returns promptly after spawn (the Related note)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -323,7 +323,7 @@
           {
             "id": "verify-host-yes-prompt-return.ac1",
             "title": "N parallel `pan start --host --yes` invocations each return within a bounded time and all N work agents are spawned",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -331,7 +331,7 @@
           {
             "id": "verify-host-yes-prompt-return.ac2",
             "title": "The cause of any residual delay is identified as bd-lock blocking (now bounded) — or a separate bug is fixed; the finding is documented",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
