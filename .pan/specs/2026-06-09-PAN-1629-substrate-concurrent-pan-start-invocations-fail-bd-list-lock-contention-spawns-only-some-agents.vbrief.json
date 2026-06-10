@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T01:43:51.945Z"
+    "updated": "2026-06-10T01:54:31.460Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 63,
+    "sequence": 73,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T01:43:51.945Z",
+    "updated": "2026-06-10T01:54:31.460Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -60,7 +60,7 @@
       {
         "id": "transient-bd-classifier",
         "title": "Add a conservative transient/lock bd-error classifier",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -76,7 +76,7 @@
           {
             "id": "transient-bd-classifier.ac1",
             "title": "isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -84,7 +84,7 @@
           {
             "id": "transient-bd-classifier.ac2",
             "title": "isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -92,7 +92,7 @@
           {
             "id": "transient-bd-classifier.ac3",
             "title": "Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -100,7 +100,7 @@
           {
             "id": "transient-bd-classifier.ac4",
             "title": "The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -110,7 +110,7 @@
       {
         "id": "cross-process-bd-lock",
         "title": "Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -131,7 +131,7 @@
           {
             "id": "cross-process-bd-lock.ac1",
             "title": "withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -139,7 +139,7 @@
           {
             "id": "cross-process-bd-lock.ac2",
             "title": "Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -147,7 +147,7 @@
           {
             "id": "cross-process-bd-lock.ac3",
             "title": "A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -155,7 +155,7 @@
           {
             "id": "cross-process-bd-lock.ac4",
             "title": "runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -163,7 +163,7 @@
           {
             "id": "cross-process-bd-lock.ac5",
             "title": "Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -441,60 +441,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T01:43:51.661Z",
+        "updatedAt": "2026-06-10T01:51:45.466Z",
         "work": {
-          "updatedAt": "2026-06-10T01:43:51.661Z",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-06-10T01:43:51.661Z",
-          "notes": "Verification FAILED at test (51737ms):\n\nStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:295:21\n    293|     const resumed = await autoResumeStoppedWorkAgents();\n    294|\n    295|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    296|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    297|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:302:21\n    300|     const resumed = await autoResumeStoppedWorkAgents();\n    301|\n    302|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    303|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    304|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/operator-interventions.test.ts > operator.intervention dashboard routes > emits pause from the successful dashboard pause route\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/operator-interventions.test.ts:216:3\n    214|   });\n    215|\n    216|   it('emits pause from the successful dashboard pause route', async ()…\n       |   ^\n    217|     const { response, appendedEvents } = await requestAgents('/api/age…\n    218|       body: JSON.stringify({ reason: 'operator' }),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\n\n",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "notes": "Acceptance criteria check FAILED — 9/24 AC incomplete:\n\n### Add a conservative transient/lock bd-error classifier (4/4 incomplete)\n  - [ ] isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures\n  - [ ] isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)\n  - [ ] Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case\n  - [ ] The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced\n\n### Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts) (5/5 incomplete)\n  - [ ] withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders\n  - [ ] Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock\n  - [ ] A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally\n  - [ ] runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)\n  - [ ] Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-10T01:43:51.661Z",
-              "notes": "Verification FAILED at test (51737ms):\n\nStoppedWorkAgents (PAN-871) > auto-resumes a done-handoff agent (completed marker + stoppedByUser) when the review came back blocked (PAN-1614)\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:295:21\n    293|     const resumed = await autoResumeStoppedWorkAgents();\n    294|\n    295|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    296|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    297|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/pan-871-auto-resume.test.ts > autoResumeStoppedWorkAgents (PAN-871) > still auto-resumes an open issue with pending review feedback when not deliberately stopped\nAssertionError: expected [] to deeply equal [ 'agent-pan-871' ]\n\n- Expected\n+ Received\n\n- [\n-   \"agent-pan-871\",\n- ]\n+ []\n\n ❯ src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:302:21\n    300|     const resumed = await autoResumeStoppedWorkAgents();\n    301|\n    302|     expect(resumed).toEqual(['agent-pan-871']);\n       |                     ^\n    303|     expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-871');\n    304|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/operator-interventions.test.ts > operator.intervention dashboard routes > emits pause from the successful dashboard pause route\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ src/dashboard/server/routes/__tests__/operator-interventions.test.ts:216:3\n    214|   });\n    215|\n    216|   it('emits pause from the successful dashboard pause route', async ()…\n       |   ^\n    217|     const { response, appendedEvents } = await requestAgents('/api/age…\n    218|       body: JSON.stringify({ reason: 'operator' }),\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯\n\n"
+              "at": "2026-06-10T01:51:45.466Z",
+              "notes": "Acceptance criteria check FAILED — 9/24 AC incomplete:\n\n### Add a conservative transient/lock bd-error classifier (4/4 incomplete)\n  - [ ] isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures\n  - [ ] isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)\n  - [ ] Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case\n  - [ ] The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced\n\n### Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts) (5/5 incomplete)\n  - [ ] withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders\n  - [ ] Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock\n  - [ ] A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally\n  - [ ] runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)\n  - [ ] Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T01:43:51.661Z",
-          "notes": "Verification failed at test",
+          "status": "failed",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
+          "notes": "Verification failed at vbrief-ac",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T01:43:51.661Z",
-              "notes": "Verification failed at test"
+              "status": "failed",
+              "at": "2026-06-10T01:51:45.466Z",
+              "notes": "Verification failed at vbrief-ac"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:43:51.661Z",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:43:51.661Z"
+              "at": "2026-06-10T01:51:45.466Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T01:43:51.661Z",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T01:43:51.661Z",
+          "updatedAt": "2026-06-10T01:51:45.466Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T01:43:51.661Z"
+              "at": "2026-06-10T01:51:45.466Z"
             }
           ],
           "readyForMerge": false,

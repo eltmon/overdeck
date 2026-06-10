@@ -170,9 +170,25 @@ export async function resolveSharedBeadsDir(workspacePath = process.cwd()): Prom
   try {
     const target = (await readFile(redirectPath, 'utf8')).trim();
     if (target.length > 0) {
-      const redirected = isAbsolute(target) ? target : resolve(beadsDir, target);
+      // bd resolves .beads/redirect relative to the worktree root (the parent of
+      // .beads/), not relative to the .beads directory itself. Panopticon must
+      // mirror that exactly so every worktree sharing ../../.beads hashes to the
+      // same process lock as the canonical project-root Dolt store.
+      const redirected = isAbsolute(target) ? target : resolve(workspacePath, target);
       return realpathIfExists(redirected);
     }
+  } catch (error) {
+    if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
+  }
+
+  // Standard Panopticon workspaces live at <projectRoot>/workspaces/feature-* and
+  // normally contain .beads/redirect -> ../../.beads. During first materialization
+  // that gitignored redirect may not exist yet; key the lock to the project-root
+  // .beads directory when it is already present so redirect recovery itself is
+  // serialized across sibling worktrees.
+  const projectRootBeadsDir = resolve(workspacePath, '..', '..', '.beads');
+  try {
+    return await realpath(projectRootBeadsDir);
   } catch (error) {
     if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
   }

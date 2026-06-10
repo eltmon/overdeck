@@ -89,14 +89,24 @@ describe('bd process lock', () => {
   });
 
   it('derives the same lock path from worktrees that redirect to the same shared .beads dir', async () => {
-    const mainWorkspace = join(testRoot, 'main');
-    const featureWorkspace = join(testRoot, 'workspaces', 'feature-pan-1629');
-    mkdirSync(join(mainWorkspace, '.beads'), { recursive: true });
+    const projectRoot = join(testRoot, 'panopticon-cli');
+    const featureWorkspace = join(projectRoot, 'workspaces', 'feature-pan-1629');
+    mkdirSync(join(projectRoot, '.beads'), { recursive: true });
     mkdirSync(join(featureWorkspace, '.beads'), { recursive: true });
-    writeFileSync(join(featureWorkspace, '.beads', 'redirect'), '../../../main/.beads\n', 'utf8');
+    writeFileSync(join(featureWorkspace, '.beads', 'redirect'), '../../.beads\n', 'utf8');
 
-    await expect(resolveSharedBeadsDir(featureWorkspace)).resolves.toBe(join(mainWorkspace, '.beads'));
-    await expect(bdProcessLockPath(featureWorkspace)).resolves.toBe(await bdProcessLockPath(mainWorkspace));
+    await expect(resolveSharedBeadsDir(featureWorkspace)).resolves.toBe(join(projectRoot, '.beads'));
+    await expect(bdProcessLockPath(featureWorkspace)).resolves.toBe(await bdProcessLockPath(projectRoot));
+  });
+
+  it('keys a standard worktree without redirect to the project-root .beads dir before recovery creates it', async () => {
+    const projectRoot = join(testRoot, 'panopticon-cli');
+    const featureWorkspace = join(projectRoot, 'workspaces', 'feature-pan-1629');
+    mkdirSync(join(projectRoot, '.beads'), { recursive: true });
+    mkdirSync(join(featureWorkspace, '.beads'), { recursive: true });
+
+    await expect(resolveSharedBeadsDir(featureWorkspace)).resolves.toBe(join(projectRoot, '.beads'));
+    await expect(bdProcessLockPath(featureWorkspace)).resolves.toBe(await bdProcessLockPath(projectRoot));
   });
 
   it('acquires and releases the lock in finally when the operation throws', async () => {

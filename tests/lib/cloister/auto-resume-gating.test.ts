@@ -717,6 +717,42 @@ describe('auto-resume gates', () => {
     expect(state?.stoppedByUser).toBeUndefined();
   });
 
+  it('lets parallel pan start --host --yes flows return after spawning every work agent', async () => {
+    vi.useRealTimers();
+    const stdinIsTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
+    try {
+      const { agents, issueCommand } = await loadStartCommand();
+      const workspace = join(projectRoot, 'workspaces', 'feature-pan-1141');
+      mkdirSync(join(workspace, '.beads'), { recursive: true });
+      writeFileSync(join(workspace, '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+
+      const startedAt = Date.now();
+      await Promise.all(Array.from({ length: 5 }, () => issueCommand('PAN-1141', {
+        model: '',
+        host: true,
+        yes: true,
+      } as any)));
+
+      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      expect(agents.spawnAgent).toHaveBeenCalledTimes(5);
+      for (const call of vi.mocked(agents.spawnAgent).mock.calls) {
+        expect(call[0]).toEqual(expect.objectContaining({
+          issueId: 'PAN-1141',
+          workspace,
+          role: 'work',
+          allowHost: true,
+        }));
+      }
+    } finally {
+      if (stdinIsTTYDescriptor) {
+        Object.defineProperty(process.stdin, 'isTTY', stdinIsTTYDescriptor);
+      } else {
+        delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
+      }
+    }
+  });
+
   it('keeps paused state when pan start --force is only a dry run', async () => {
     const { agents, issueCommand } = await loadStartCommand();
     const agentId = 'agent-pan-1141';
