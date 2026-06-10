@@ -50,7 +50,7 @@ interface FeatureItemProps {
 
 // ContextMenuState removed — migrated to Radix UI ContextMenu
 
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
 
 function resourceColor(feature: ProjectFeature): string {
   const state = feature.stateLabel.toLowerCase();
@@ -93,6 +93,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
         : null;
     case 'docker':
       return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
+    case 'remote-agent':
+      return details.remoteAgent ? { label: 'fly.io', detail: `${details.remoteAgent.vmName} (${details.remoteAgent.status})` } : null;
     default:
       return null;
   }
@@ -194,6 +196,10 @@ function ResourceStrip({
       }
     } else if (details.tmuxSessionCount > 0) {
       rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
+    }
+
+    if (details.remoteAgent) {
+      rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
     }
 
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
@@ -857,7 +863,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     feature.resourceDetails.dockerContainerCount > 0 ||
     feature.resourceDetails.prs.length > 0 ||
     feature.resourceDetails.localBranchCount > 0 ||
-    feature.resourceDetails.remoteBranchCount > 0
+    feature.resourceDetails.remoteBranchCount > 0 ||
+    Boolean(feature.resourceDetails.remoteAgent)
   );
 
   // Derive best session once per data change instead of on every click (PAN-821 review)

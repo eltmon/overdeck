@@ -35,6 +35,7 @@ import {
   loadRemoteAgentState,
   saveRemoteAgentState,
   isRemoteAgentRunning,
+  listActiveRemoteAgentStates,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
@@ -52,11 +53,7 @@ export interface RemoteReapResult {
 
 /** List agent IDs that have a remote-state.json in running/starting state. */
 function listActiveRemoteAgents(): string[] {
-  if (!existsSync(AGENTS_DIR)) return [];
-  return readdirSync(AGENTS_DIR).filter((agentId) => {
-    const state = loadRemoteAgentState(agentId);
-    return state?.location === 'remote' && (state.status === 'running' || state.status === 'starting');
-  });
+  return listActiveRemoteAgentStates().map((state) => state.id);
 }
 
 async function branchExistsOnOrigin(projectRoot: string, branch: string): Promise<boolean> {

@@ -15,7 +15,7 @@ import { createFlyProvider } from './fly-provider.js';
 import type { FlyProvider } from './fly-provider.js';
 import type { RemoteWorkspaceMetadata, ExecResult } from './interface.js';
 import { join } from 'path';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -73,6 +73,18 @@ export function loadRemoteAgentState(agentId: string): RemoteAgentState | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * List remote agent states currently running/starting.
+ * Local file scan only — no fly API calls.
+ */
+export function listActiveRemoteAgentStates(): RemoteAgentState[] {
+  if (!existsSync(AGENTS_DIR)) return [];
+  return readdirSync(AGENTS_DIR)
+    .map((agentId) => loadRemoteAgentState(agentId))
+    .filter((state): state is RemoteAgentState =>
+      state?.location === 'remote' && (state.status === 'running' || state.status === 'starting'));
 }
 
 /** Run a FlyProvider Effect at the async/Promise boundary. */
