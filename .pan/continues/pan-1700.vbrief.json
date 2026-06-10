@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1700",
   "created": "2026-06-10T04:00:00.054Z",
-  "updated": "2026-06-10T05:34:29.900Z",
+  "updated": "2026-06-10T06:45:30.298Z",
   "gitState": {
     "branch": "feature/pan-1700",
     "sha": "08b793c8a",
@@ -126,6 +126,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T05:25:00.418Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T05:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T05:45:52.618Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T05:58Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T05:58:07.584Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T06:10Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T06:10:10.428Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T06:16Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T06:16:57.173Z"
     }
   ],
   "feedback": []
