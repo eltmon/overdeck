@@ -22,6 +22,7 @@ export type ActivitySource =
   | Role
   | 'cloister'
   | 'dashboard'
+  | 'supervisor'
   | 'planning-agent'
   | 'work-agent'
   | 'review-specialist'

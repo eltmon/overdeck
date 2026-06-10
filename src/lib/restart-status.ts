@@ -13,6 +13,8 @@ export interface RestartStatus {
   durationMs: number;
   attempts: number;
   gaveUp?: boolean;
+  /** Why the restart was triggered (e.g. the watchdog's probe-failure classification). */
+  reason?: string;
 }
 
 function restartStatusPath(): string {
@@ -39,7 +41,8 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
       typeof parsed.attempts !== 'number' ||
       !Number.isFinite(parsed.attempts) ||
       (parsed.error !== undefined && typeof parsed.error !== 'string') ||
-      (parsed.gaveUp !== undefined && typeof parsed.gaveUp !== 'boolean')
+      (parsed.gaveUp !== undefined && typeof parsed.gaveUp !== 'boolean') ||
+      (parsed.reason !== undefined && typeof parsed.reason !== 'string')
     ) {
       return null;
     }
@@ -51,6 +54,7 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
       durationMs: parsed.durationMs,
       attempts: parsed.attempts,
       gaveUp: parsed.gaveUp,
+      reason: parsed.reason,
     };
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') return null;
