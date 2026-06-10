@@ -85,7 +85,7 @@ Your workspace is at /workspace (a full clone of the repo, checked out on your f
 - `/workspace/.pan/continue.json` — structured planning context (decisions, hazards, resumePoint), synced from the host if planning ran there
 - `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.vbrief.json` — the canonical vBRIEF plan, committed on main. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
-- `/workspace/.beads/issues.jsonl` — beads tasks for this issue (`bd ready`, `bd show <id>`)
+- `/workspace/.beads/issues.jsonl` — beads tasks for this issue (`bd ready -l {{ISSUE_ID_LOWER}}`, `bd show <id>`)
 
 Start by reading `.pan/continue.json` (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
