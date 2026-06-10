@@ -9,6 +9,7 @@
  * and assembles/invalidates as needed. Assemblies run minutes — the reconciler
  * is single-flight per project, so ticks never pile up.
  */
+import { stat } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import {
@@ -42,6 +43,17 @@ import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
+const ACCEPTANCE_CRITERIA_READ_CONCURRENCY = 4;
+
+type AcceptanceCriteriaSummary = Array<{ title: string; status: string }>;
+
+interface AcceptanceCriteriaCacheEntry {
+  path: string;
+  mtimeMs: number;
+  criteria: AcceptanceCriteriaSummary;
+}
+
+const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
 
 function projectRoot(): string {
   return process.cwd();
@@ -166,25 +178,53 @@ export interface UatGenerationPayload {
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
-async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, Array<{ title: string; status: string }>>> {
-  const cache = new Map<string, Array<{ title: string; status: string }>>();
+async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next++]!;
+      await worker(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
+async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, AcceptanceCriteriaSummary>> {
+  const cache = new Map<string, AcceptanceCriteriaSummary>();
   if (issueIds.size === 0) return cache;
 
-  await Promise.all([...issueIds].map(async (issueId) => {
+  const root = projectRoot();
+  await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
+    const upperIssueId = issueId.toUpperCase();
     try {
-      const found = await Effect.runPromise(findVBriefByIssue(projectRoot(), issueId));
-      if (!found) return;
+      const found = await Effect.runPromise(findVBriefByIssue(root, upperIssueId));
+      if (!found) {
+        acceptanceCriteriaByIssue.delete(upperIssueId);
+        cache.set(upperIssueId, []);
+        return;
+      }
+      const { mtimeMs } = await stat(found.path);
+      const existing = acceptanceCriteriaByIssue.get(upperIssueId);
+      if (existing && existing.path === found.path && existing.mtimeMs === mtimeMs) {
+        cache.set(upperIssueId, existing.criteria);
+        return;
+      }
       const document = await Effect.runPromise(readVBriefDocument(found.path));
-      cache.set(issueId.toUpperCase(), extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status })));
+      const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
+      acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
+      cache.set(upperIssueId, criteria);
     } catch {
-      cache.set(issueId.toUpperCase(), []);
+      cache.set(upperIssueId, []);
     }
-  }));
+  });
   return cache;
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
+  const status = await readCurrentFlywheelStatusForDashboard();
+  if (!status) return [];
+
   const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
