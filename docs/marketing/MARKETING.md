@@ -199,6 +199,89 @@ losing the thread.
 (`@panctl/desktop`) built on Electron — or run the same surface headless via the CLI and
 REST API.
 
+### Fix-All Flywheel
+**Point it at a backlog and let go.** An autonomous orchestrator that drains your issue
+tracker: it scores and prioritizes open issues, plans them, dispatches work agents, and
+runs the review→test→merge pipeline continuously — with budgets, brakes, and a pause
+switch always one click away.
+
+### Merge train
+**Merges that never pile up.** A conflict-aware merge queue with rolling rebases,
+agent-driven conflict reconciliation, and automatic UAT candidate assembly — so ten
+parallel agents don't end in ten conflicting PRs.
+
+### Deacon (self-healing agents)
+**Agents that don't get stuck.** A continuous health patrol watches every agent for
+stuck patterns — context overflow, dead-end loops, orphaned processes, silent crashes —
+and recovers them automatically: nudge, compact, resume, or escalate. You find out it
+happened; you don't have to fix it.
+
+### GitHub-native audit trail
+**No "trust me, the agent did it."** A GitHub App bot identity opens real PRs, posts
+real reviews, reports CI status checks, and squash-merges through branch protection.
+Every agent change leaves the same audit trail a human team leaves — in GitHub, where
+engineering leadership already looks.
+
+### Automated browser UAT
+**The agent opens the app and checks.** A dedicated UAT agent drives a real browser
+(Playwright) against your running app to verify the issue's acceptance criteria are
+actually observable end-to-end — before merge, not after deploy.
+
+### Remote workspaces
+**Your laptop is not the ceiling.** Offload agent workspaces to cloud machines (Fly.io)
+with one command — agents keep working with full isolation while your machine stays
+cool. Migrate work out, reap machines when done.
+
+### Multi-harness
+**Bring your agent.** Claude Code and Pi today, harness-agnostic by architecture: roles,
+model routing, and pipeline gates apply to whichever CLI agent runs underneath.
+
+### Needs-you inbox
+**Never miss an agent's question.** When any agent asks a question or proposes a plan,
+it surfaces as a dashboard popup and a persistent "Needs you" queue — answer from the
+cockpit instead of hunting through terminals.
+
+### Agent memory
+**Agents that remember the project.** A persistent memory layer of observations and
+summaries carries decisions, hazards, and history across sessions and compactions — so
+the tenth agent on a project knows what the first nine learned.
+
+### RTK output compression
+**Stop paying for log spam.** Command outputs are compressed before they hit the agent's
+context — 15–50KB of build noise becomes a 2KB preview — cutting token spend 10–40% on
+command-heavy work.
+
+### Event stream API
+**Build on the pipeline.** A language-agnostic SSE event stream with resumable sequence
+numbers exposes every pipeline event — wire up dashboards, notifications, or your own
+automation without touching internals.
+
+### Safety controls
+**Brakes, not just throttle.** Per-agent pause gates, troubled-agent quarantine,
+boot-time no-resume flags, and a global emergency stop. Autonomy you can halt at any
+altitude — per agent, per issue, or everything at once.
+
+### Inspection gates
+**Verify each step, not just the end.** Optional per-task inspection agents check every
+bead of a plan against its spec before work proceeds — fine-grained verification for
+high-stakes changes.
+
+### Spec-readiness scoring
+**Know it's buildable before you build.** Issues get a 0–100 readiness score across five
+dimensions with concrete blockers — so agents start from requirements, not guesses.
+
+### Conversation handoff
+**Sessions end; work doesn't.** Any conversation can hand off to a fresh one with full
+context — decisions, state, and next steps — written by the outgoing agent itself.
+
+### Command palette
+**Cmd+K to anywhere.** Jump to any agent, issue, conversation, or view from a single
+keystroke.
+
+### Voice narration
+**Hear the pipeline.** Optional TTS narrates pipeline activity — merges, failures,
+questions — so you can stay across ten agents while looking at none of them.
+
 ---
 
 ## 6. How it works (the flow)
@@ -241,6 +324,33 @@ or a hosted autonomous-agent service.
 - **One skill format across every tool.** Skills aren't Claude-only — the same `SKILL.md`
   drives Codex, Cursor, Gemini CLI, and Antigravity.
 
+### Against the named competition (mid-2026)
+
+The "run agents in parallel in worktrees and review the diffs" feature set is now
+**table stakes** — Conductor, Sculptor, Vibe Kanban, Claude Squad, Cursor 2.0, and
+OpenAI Codex all ship it, and several companies that shipped *only* that have already
+shut down. Panopticon's defensible layer is everything *after* the diff: the automated
+pipeline, the gates, the routing, and the autonomy loop. Use these head-to-heads:
+
+| They ship | Panopticon ships |
+|:---|:---|
+| **Conductor** ($22M Series A, Mar 2026): parallel Claude Code/Codex agents on a Mac; a human reviews and merges every diff | The same cockpit **plus the assembly line**: automated review convoy → tests → per-step inspection → browser UAT → merge train. The human's only job is the final Merge click |
+| **Devin / Cognition** ($1B raise at ~$26B, May 2026): autonomous cloud engineer, usage tiers up to $500/mo | Autonomy that's **yours**: open source, local-first, BYO models and subscriptions, full per-issue cost visibility |
+| **GitHub Agent HQ / Copilot mission control**: agent orchestration bundled into the Copilot seat | Tracker-agnostic (GitHub, Linear, GitLab, Rally), model-agnostic (six providers), and policy-deep — capability routing, quality gates, budgets, and brakes, not just spawning |
+| **Subspace**: a multi-agent workspace with shared cross-agent memory | A **pipeline**, not just a desk: immutable plans, quality gates, a merge train, and a flywheel that drains the backlog on its own |
+| **Factory / Blitzy** ($1.5B / $1.4B valuations, 2026): enterprise sales-led autonomous delivery | The same end-to-end ambition, installable today with `npx @panctl/cli` — no sales call, no cloud commitment |
+
+Three claims in this category that, as of mid-2026, **nobody else can make together**:
+1. **Automated browser UAT as a pipeline gate** — agents verify acceptance criteria in a
+   real browser before merge. Competitors' "browser preview" is for humans to look at.
+2. **An autonomous backlog-draining loop with quality gates, running locally on open
+   source.** Charlie Labs sells this closed and cloud-only; Ralph-loop hacks have no gates.
+3. **A merge train for agent fleets** — conflict-aware queueing and rolling rebases built
+   for the failure mode every parallel-agent tool creates and none of them solve.
+
+Full competitor profiles, funding history, and category analysis:
+[`docs/marketing/COMPETITIVE-LANDSCAPE.md`](COMPETITIVE-LANDSCAPE.md).
+
 ---
 
 ## 8. Audiences / personas
@@ -260,12 +370,17 @@ or a hosted autonomous-agent service.
 Use these as the credibility strip. Update the numbers as they grow.
 
 - **70+ skills** shipped and synced across tools
+- **80+ CLI commands** — every pipeline action scriptable and self-documenting
 - **4 tracker integrations** — GitHub, Linear, GitLab, Rally
 - **6 AI providers** — Anthropic, OpenAI, Google, Kimi, MiniMax, OpenRouter — with
   capability-based model routing
 - **5 specialist agents** in the automated quality pipeline
 - **Hundreds of issues** completed through the full pipeline
-- **Self-hosting proof:** Panopticon is built using Panopticon, in production, every day.
+- **7,000+ commits, ~275K lines of TypeScript, 280+ test files** — built by one person
+  directing agents through Panopticon itself
+- **Self-hosting proof:** Panopticon is built using Panopticon, in production, every day —
+  765+ commits in the last 10 weeks alone were written by agents working through the
+  pipeline, across four production projects.
 
 ---
 
@@ -378,4 +493,5 @@ browser.
 
 *This is a living document. The expanded marketing kit (long-form pages, SEO keyword map,
 video scripts, channel plan) is tracked in a dedicated GitHub issue — see the marketing
-plan referenced there.*
+plan referenced there. Competitor profiles and funding history live in
+[`COMPETITIVE-LANDSCAPE.md`](COMPETITIVE-LANDSCAPE.md).*

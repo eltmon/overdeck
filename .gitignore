@@ -171,3 +171,6 @@ __pycache__/
 /deeplink-*.jpeg
 /panopticon-feature-graph.png
 /SYSTEM-RESOURCE-REPORT-*.md
+
+# Pre-launch sensitive marketing strategy (rebrand candidates, fundraising) — keep local
+/docs/marketing/private/
