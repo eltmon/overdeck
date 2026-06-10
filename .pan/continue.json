@@ -1,0 +1,98 @@
+{
+  "version": "1",
+  "issueId": "PAN-1704",
+  "created": "2026-06-10T00:01:47.676Z",
+  "updated": "2026-06-10T00:12:00.000Z",
+  "gitState": { "branch": "feature/pan-1704", "sha": "789207297", "dirty": true },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Tier discriminant is window-fit + provider routing, computed by a NEW pure module src/lib/conversations/switch-strategy.ts exporting getEffectiveTargetWindow(...) and decideSwitchStrategy(...). The route computes the async inputs (context tokens, observed ceiling, provider-routing-changed, cliproxy-routed) and feeds the pure function so the decision is unit-testable in isolation.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Resolve the issue's 'Fable 5 has a 1M window' premise vs the registry (claude-fable-5 contextWindow = 200000, deliberately conservative) by REUSING the extended-context inference already in computeContextUsage (conversation-service.ts:1148-1152): when the live source session's observedCeiling exceeds the target's registry window AND provider routing is unchanged, effective target window = max(1_000_000, registryWindow). The 206k incident is exactly a session whose observed ceiling already proves extended-context mode is active. Do NOT globally bump Fable's registry contextWindow — that would change proactive-compaction high-water math everywhere (gpt-5.5-style wedging risk).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "CLIProxy-routed targets (provider openai + authMode subscription) always use CLIPROXY_CODEX_CONTEXT_WINDOW (150000) as the effective window, never the marketing 1.05M — per PAN-1672. getEffectiveTargetWindow short-circuits to this before the extended-context inference.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Window-fit gate moves into the route's tier decision. maybeCompactBeforeRespawn is updated in place: its modelChanged force-flag and internal 100k threshold are replaced by a caller-supplied shouldCompact boolean (= tier===3). The summaryFork background-feature gate stays inside maybeCompactBeforeRespawn so 'flag off ⇒ no compaction' semantics are preserved. Compaction runs ONLY in Tier 3.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Provider-routing-changed discriminant = string inequality of getProviderExportsForModel(currentModel) vs getProviderExportsForModel(targetModel). Identical exports ⇒ same routing ⇒ Tier 1 eligible (e.g. Opus 4.8 → Fable 5, both Anthropic). Different ⇒ Tier 2.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "safetyFactor = 0.8 as a single module constant in switch-strategy.ts (matches the issue example). No config knob, no per-conversation tolerance setting (Karpathy: no speculative config).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Tier 1 (in-session /model) delivers `/model <targetModel>` via deliverAgentMessage(conv.tmuxSession, ..., resolveConversationDeliveryMethod(conv)) WITHOUT killing the tmux session, persists the new model in the DB, then verifies acceptance by polling capturePane for the target model's displayName in the statusline within a bounded timeout. On miss/timeout/delivery failure it falls back to Tier 2 (kill + respawn --resume). Tier 1 must not call markRespawnPending (there is no respawn).",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Tier 4 (harness change) is untouched — the existing convertConversationTranscript flow stays as-is. decideSwitchStrategy returns Tier 4 first (before any window/provider checks) when harnessChanged is true.",
+      "recordedAt": "2026-06-10T00:12:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "claude-fable-5 registry contextWindow is 200000, not 1M. Relying on the registry value alone would make the 206k incident STILL compact (Tier 3). The fix depends on the extended-context inference keyed on the live session's observed ceiling.",
+      "mitigation": "getEffectiveTargetWindow lifts to max(1M, registryWindow) only when !providerRoutingChanged AND currentObservedCeiling > registryWindow. Source observedCeiling comes from computeContextUsage / readLatestAssistantUsage on the current session JSONL. Never globally edit Fable's contextWindow."
+    },
+    {
+      "id": "H2",
+      "summary": "Cross-provider switches into CLIProxy-routed gpt models must use the 150k effective ceiling, not 1.05M, or they will skip needed compaction and hard-wedge (PAN-1672 / PAN-1615).",
+      "mitigation": "getEffectiveTargetWindow returns CLIPROXY_CODEX_CONTEXT_WINDOW first when the target is openai+subscription. Unit-test this branch."
+    },
+    {
+      "id": "H3",
+      "summary": "Tier 1 /model acceptance verification is fragile: statusline echo timing and format are not guaranteed, and the correct `/model` argument form (full model id vs alias) must match what Claude Code's slash command accepts.",
+      "mitigation": "Bounded capturePane poll for the target displayName; on any miss/timeout/delivery error fall back to Tier 2. Never assume success. Confirm the /model arg format against a live Claude Code session during implementation; encode the chosen form and timeout in the Tier 1 bead."
+    },
+    {
+      "id": "H4",
+      "summary": "The current route kills the session unconditionally at conversations.ts:2458 BEFORE any decision and sets markRespawnPending. Tier 1 must not kill and must not mark respawn-pending.",
+      "mitigation": "Compute the tier BEFORE the kill. markRespawnPending only on Tier 2/3/4 (respawn tiers). Keep the existing markRespawnPending/finally semantics intact for those tiers."
+    },
+    {
+      "id": "H5",
+      "summary": "The summaryFork feature flag currently gates whether ANY compaction runs. Losing that gate would force compaction when the operator has the feature off.",
+      "mitigation": "Keep isBackgroundFeatureEnabled('summaryFork') inside maybeCompactBeforeRespawn; Tier 3 with the flag off respawns --resume with no compaction (accepting potential overflow), matching today's behavior."
+    },
+    {
+      "id": "H6",
+      "summary": "The extended-context 'carry over' inference is only valid for same-family (same provider routing) switches. Applying it to a cross-provider non-CLIProxy target (e.g. claude → google) could wrongly lift the target window based on the source session's ceiling.",
+      "mitigation": "Gate the max(1M, registryWindow) lift on !providerRoutingChanged. Cross-provider targets fall through to CLIProxy clamp (if applicable) or the plain registry window. Unit-test the claude→google-style case."
+    },
+    {
+      "id": "H7",
+      "summary": "harnessChanged (Tier 4) must remain the converter path; native Claude-format compaction must never run for a harness change (it would corrupt a Pi/Codex JSONL).",
+      "mitigation": "decideSwitchStrategy returns Tier 4 first when harnessChanged. The route keeps the existing harnessChanged branch verbatim; the tier logic only governs the same-harness claude-code path."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-10T00:01:47.676Z",
+      "reason": "planning",
+      "note": "Initial planning session (--auto) for PAN-1704: window-aware tiered conversation model switch.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
