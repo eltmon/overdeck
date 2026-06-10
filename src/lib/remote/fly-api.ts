@@ -107,13 +107,18 @@ export class FlyApiClient {
     name: string,
     config: FlyMachineConfig
   ): Promise<FlyMachine> {
+    // Derive vCPU count from the size string ("shared-cpu-4x" → 4) — it was
+    // hardcoded to 2, silently ignoring the configured vm_size.
+    const cpus = config.size
+      ? parseInt(config.size.match(/-(\d+)x$/)?.[1] ?? '2', 10)
+      : 2;
     return this.request<FlyMachine>('POST', `/apps/${appName}/machines`, {
       name,
       config: {
         image: config.image,
         env: config.env,
         guest: config.size
-          ? { cpu_kind: 'shared', cpus: 2, memory_mb: config.memory ?? 1024 }
+          ? { cpu_kind: 'shared', cpus, memory_mb: config.memory ?? 1024 }
           : undefined,
         restart: config.restart ?? { policy: 'no' },
         auto_destroy: config.auto_destroy,
