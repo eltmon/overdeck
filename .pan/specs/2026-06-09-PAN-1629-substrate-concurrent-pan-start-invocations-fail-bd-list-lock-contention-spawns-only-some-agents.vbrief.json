@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T02:01:02.730Z"
+    "updated": "2026-06-10T02:09:10.784Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 78,
+    "sequence": 79,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T02:01:02.730Z",
+    "updated": "2026-06-10T02:09:10.784Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -444,55 +444,55 @@
         "phase": "review",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T02:01:02.643Z",
+        "updatedAt": "2026-06-10T02:09:10.779Z",
         "work": {
-          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T02:01:02.643Z"
+              "at": "2026-06-10T02:09:10.779Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-10T02:01:02.643Z",
-          "notes": "Agent re-review request (1/25): Fixed review issues and completed acceptance criteria",
+          "status": "blocked",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "notes": "Missing parallel pan start --host --yes spawn/return verification",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-10T02:01:02.643Z",
-              "notes": "Agent re-review request (1/25): Fixed review issues and completed acceptance criteria"
+              "status": "blocked",
+              "at": "2026-06-10T02:09:10.779Z",
+              "notes": "Missing parallel pan start --host --yes spawn/return verification"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T02:01:02.643Z"
+              "at": "2026-06-10T02:09:10.779Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T02:01:02.643Z",
+          "updatedAt": "2026-06-10T02:09:10.779Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T02:01:02.643Z"
+              "at": "2026-06-10T02:09:10.779Z"
             }
           ],
           "readyForMerge": false,
