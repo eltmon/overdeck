@@ -25,6 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();
 });
@@ -108,6 +109,26 @@ describe('hasBeadsTasks', () => {
       transientFailure: expect.anything(),
     });
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
+  });
+
+  it('retries the live start gate query before falling back to jsonl', async () => {
+    vi.useFakeTimers();
+    childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      callback(new Error('database is locked'), '', 'database is locked');
+    });
+    childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      callback(null, { stdout: JSON.stringify([{ id: 'panopticon-4' }]) }, '');
+    });
+    const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
+
+    await expect(countBeadsTasksDetailedWithRetry(tmpDir, 'PAN-1094', {
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    })).resolves.toMatchObject({ count: 1, source: 'bd' });
+    expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
   it('detects when beads do not cover every vBRIEF item', async () => {

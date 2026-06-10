@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T00:28:16.472Z"
+    "updated": "2026-06-10T00:34:09.410Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T00:28:16.472Z",
+    "updated": "2026-06-10T00:34:09.410Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -215,7 +215,7 @@
       {
         "id": "wire-start-gate-query",
         "title": "Route the `pan start` beads-gate query and `beads-query.ts` through lock + retry (get the LIVE count, not stale JSONL)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -231,7 +231,7 @@
           {
             "id": "wire-start-gate-query.ac1",
             "title": "Under simulated lock contention, the start gate retries `bd list` and returns the true live count (>0 when beads exist) instead of falling back to a stale/empty JSONL",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -239,7 +239,7 @@
           {
             "id": "wire-start-gate-query.ac2",
             "title": "queryBeadsForIssuePromise in beads-query.ts retries on transient lock errors before the JSONL fallback",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -247,7 +247,7 @@
           {
             "id": "wire-start-gate-query.ac3",
             "title": "No signature change leaks beyond start.ts callers; existing start.ts tests stay green",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

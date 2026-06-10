@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
+import { runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,15 +52,20 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
   } catch {
     return [];
   }
-}async function queryBeadsForIssuePromise(
+}export async function queryBeadsForIssuePromise(
   workspacePath: string,
-  issueId: string
+  issueId: string,
+  retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
 ): Promise<BeadEntry[]> {
   try {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--json', '-l', issueId.toLowerCase(), '--status', 'all', '--limit', '0'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 }
+    const { stdout } = await runBdWithRetry(
+      `query beads for ${issueId}`,
+      () => execFileAsync(
+        'bd',
+        ['list', '--json', '-l', issueId.toLowerCase(), '--status', 'all', '--limit', '0'],
+        { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 },
+      ),
+      { ...retryOptions, workspacePath },
     );
     const parsed = JSON.parse(stdout || '[]');
     return Array.isArray(parsed) ? parsed : [];
