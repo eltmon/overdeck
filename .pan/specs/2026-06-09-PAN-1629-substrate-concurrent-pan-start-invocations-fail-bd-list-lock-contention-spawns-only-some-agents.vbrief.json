@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T02:09:10.784Z"
+    "updated": "2026-06-10T02:14:42.911Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 79,
+    "sequence": 81,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T02:09:10.784Z",
+    "updated": "2026-06-10T02:14:42.911Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -441,58 +441,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T02:09:10.779Z",
+        "updatedAt": "2026-06-10T02:14:42.804Z",
         "work": {
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "status": "failed",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
+          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/__tests__/config-yaml-conversation-search.test.ts",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-10T02:09:10.779Z"
+              "status": "failed",
+              "at": "2026-06-10T02:14:42.804Z",
+              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/__tests__/config-yaml-conversation-search.test.ts"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "status": "pending",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
           "notes": "Missing parallel pan start --host --yes spawn/return verification",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-10T02:09:10.779Z",
+              "status": "pending",
+              "at": "2026-06-10T02:14:42.804Z",
               "notes": "Missing parallel pan start --host --yes spawn/return verification"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T02:09:10.779Z"
+              "at": "2026-06-10T02:14:42.804Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T02:09:10.779Z",
+          "updatedAt": "2026-06-10T02:14:42.804Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T02:09:10.779Z"
+              "at": "2026-06-10T02:14:42.804Z"
             }
           ],
           "readyForMerge": false,
