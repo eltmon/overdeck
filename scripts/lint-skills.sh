@@ -154,13 +154,15 @@ def validate_command(
             break
 
     if first_arg and subcommands and first_arg in subcommands and first_arg != "help":
+        flag_tokens = tokens[3:]
+        has_flag_tokens = any(token.startswith("-") for token in flag_tokens)
         try:
             sub_help = run_pan(verb, first_arg, "--help")
         except subprocess.CalledProcessError:
-            errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
+            if has_flag_tokens:
+                errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
             return errors
         flags = option_names(sub_help) | global_flags
-        flag_tokens = tokens[3:]
     else:
         flags = set(verb_flags) | set(global_flags)
         flag_tokens = tokens[2:]
