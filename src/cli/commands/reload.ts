@@ -68,6 +68,7 @@ async function recordReloadStatus(startedAt: number, success: boolean, error?: s
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
+    pid: process.pid,
   }));
 }
 
