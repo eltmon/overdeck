@@ -5062,6 +5062,25 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
+  // Cheap no-op when no remote-state.json is active (local file scan only —
+  // no fly API calls); otherwise checks each VM for the REMOTE_DONE sentinel,
+  // materializes the local worktree, creates review artifacts + the completed
+  // marker, and destroys the machine.
+  try {
+    const { reapCompletedRemoteAgents } = await import('../remote/remote-completion.js');
+    const remoteReap = await reapCompletedRemoteAgents();
+    for (const r of remoteReap) {
+      if (r.status === 'handed-off' || r.status === 'error') {
+        const msg = `Remote reap ${r.issueId}: ${r.status} (${r.details.join('; ')})`;
+        actions.push(msg);
+        addLog(r.status === 'error' ? 'warn' : 'action', msg, state.patrolCycle);
+      }
+    }
+  } catch (err: any) {
+    addLog('warn', `Remote reap patrol failed: ${err.message}`, state.patrolCycle);
+  }
+
   // PAN-1730: Reap the work session of an issue idle awaiting its test verdict
   // (review passed, test pending, pane idle ≥10m). When the work pool alone
   // meets the PAN-1665 total ceiling, these idle agents livelock test dispatch —

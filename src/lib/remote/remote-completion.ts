@@ -127,6 +127,12 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
       if (!pushed) {
         details.push(`Session ${sessionAlive ? 'signaled done' : 'ended'} but ${branch} is not on origin — not reaping`);
+        if (!sessionAlive) {
+          // Terminal: dead session, no pushed work. Persist error so the
+          // deacon patrol doesn't re-report every cycle; recover manually
+          // via `pan admin remote reap --issue <id>` after inspecting the VM.
+          saveRemoteAgentState({ ...remoteState, status: 'error', lastActivity: new Date().toISOString() });
+        }
         results.push({ agentId, issueId, status: 'error', details });
         continue;
       }
