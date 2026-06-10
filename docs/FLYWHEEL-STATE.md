@@ -1403,3 +1403,54 @@ completion bookkeeping, not just parking signals. Note: strike-1717 ALSO
 handled the shared-worktree case correctly — it pushed its fast-forward
 directly to origin/main rather than checking out main in the primary worktree
 (live .pan/continues writes), an explicitly good pattern to repeat.
+
+## RUN-18 ticks 6-7 (2026-06-10) — first merge of the run, and the "deployed ≠ merged" discovery
+
+### PAN-1455 merged (attempt 2) — the full operator-merge loop worked
+
+Operator re-clicked MERGE after PAN-1717 made main green: rebase → verify →
+squash-merge → post-merge deploy, all monitored live (DB-poll monitor on
+merge_step gives step-level events: rebasing → verifying → squash-merging →
+post-merge-cleanup). First PR merge of RUN-18.
+
+### THE BIG ONE — post-merge-deploy builds the primary worktree WITHOUT syncing origin (PAN-1723)
+
+The deploy fired 1 second after the squash landed on origin and built the
+primary worktree as-is — which was BEHIND origin by exactly that squash (a
+conv agent's unpushed commits had diverged local main). Result: the deploy
+reported success, server restarted healthy, lifecycle completed — and the
+running server does NOT contain the merged fix (`refresh_token_reused`
+marker: 0 hits in dist). Silent. Post-merge verification-on-main then
+exercises the OLD build.
+
+**Detection recipe:** `git -C <root> status -sb` (behind>0 at deploy time) +
+grep dist for a marker string from the merged diff. **Fix direction (in
+PAN-1723):** deploy from a pristine `git worktree add --detach` of
+origin/main; log the built sha. Under multi-channel operation (conv agents
+committing on local main), divergence at merge time is ROUTINE — every merge
+deploy is suspect until PAN-1723 lands.
+
+### PAN-1716 reaper went live with the merge restart and immediately worked
+
+`[deacon] Reaped terminal advancing session agent-pan-1455-ship (PAN-1716)`
+then PAN-1641's review convoy re-dispatched (02:10) after 60+ min stuck —
+confirming the stall hypothesis (advancing slots exhausted by zombie
+sessions). 1242/1491 queue behind 1641's convoy on the 3 advancing slots —
+expected self-resolving; the advancing-slot ceiling serializes convoy
+dispatch one issue at a time.
+
+### PAN-1658 cascade experiment result (posted on the issue)
+
+The merge cascade did NOT touch the stuck test=pending siblings, consistent
+with getReadySiblings' ready=1 filter (confounder: the deploy restart may
+have preempted the cascade — but the filter argument is structural). What
+unstuck dispatch was the reaper (capacity), not status reconciliation. The
+green-CI→testStatus gap is unowned after #1707's closure; operator to choose
+among the issue's three options.
+
+### Workspace devcontainers look like dueling dashboards in ps — they aren't
+
+Multiple `node dist/dashboard/server.js` processes with containerd-shim
+parents are workspace-container UI peers (deacon-disabled), not host
+dashboards. Check ppid before declaring a restart storm. Also: `ps -o etime`
+is MM:SS under an hour — 02:28 is 2.5 MINUTES, not hours (misread once).
