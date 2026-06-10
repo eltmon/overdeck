@@ -378,13 +378,23 @@ export class FlyProvider implements RemoteProvider {
   // Credential Sync & Configuration (ported from ExeProvider)
   // ============================================================================
 
-  /** Sync Claude Code credentials from local macOS Keychain to remote VM */
+  /**
+   * Sync Claude Code credentials to the remote VM.
+   * Linux stores them at ~/.claude/.credentials.json; macOS in the Keychain.
+   */
   async syncClaudeCredentials(vmName: string): Promise<boolean> {
     try {
-      const { stdout: credentials } = await execAsync(
-        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
-        { encoding: 'utf-8', timeout: 10000 }
-      );
+      let credentials = '';
+      const credFile = join(homedir(), '.claude', '.credentials.json');
+      if (existsSync(credFile)) {
+        credentials = readFileSync(credFile, 'utf-8');
+      } else {
+        const { stdout } = await execAsync(
+          'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        credentials = stdout;
+      }
       if (!credentials?.trim()) return false;
 
       const b64 = Buffer.from(credentials.trim()).toString('base64');
@@ -476,7 +486,8 @@ export class FlyProvider implements RemoteProvider {
   async configureClaudeCode(vmName: string): Promise<void> {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
 
-    // Set onboarding complete
+    // Set onboarding complete + pre-trust /workspace so the agent doesn't
+    // hang at the "do you trust this folder?" dialog on first launch.
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -486,6 +497,9 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
+projects = data.setdefault("projects", {})
+ws = projects.setdefault("/workspace", {})
+ws["hasTrustDialogAccepted"] = True
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
 `;

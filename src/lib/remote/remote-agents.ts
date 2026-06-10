@@ -131,6 +131,44 @@ async function ensureRemoteTmuxContext(provider: FlyProvider, vmName: string): P
 }
 
 /**
+ * Write a file on the VM via base64 chunks. The Machines exec API rejects
+ * payloads somewhere above 4KB (PayloadTooLarge), so large content — agent
+ * prompts are 25KB+ — must be appended in slices and decoded at the end.
+ * Throws on any failed write: a missing prompt file produces an agent that
+ * silently starts with no instructions.
+ */
+async function writeRemoteFile(
+  provider: FlyProvider,
+  vmName: string,
+  remotePath: string,
+  content: string,
+): Promise<void> {
+  const b64 = Buffer.from(content).toString('base64');
+  const tmp = `${remotePath}.b64`;
+  const init = await runSsh(provider, vmName, `mkdir -p $(dirname ${remotePath}) && : > ${tmp}`);
+  if (init.exitCode !== 0) {
+    throw new Error(`Failed to create ${tmp} on ${vmName}: ${init.stderr}`);
+  }
+  const CHUNK = 4096;
+  for (let i = 0; i < b64.length; i += CHUNK) {
+    const chunk = b64.slice(i, i + CHUNK);
+    const res = await runSsh(provider, vmName, `printf %s '${chunk}' >> ${tmp}`);
+    if (res.exitCode !== 0) {
+      throw new Error(`Failed writing chunk ${i / CHUNK} of ${remotePath} on ${vmName}: ${res.stderr}`);
+    }
+  }
+  const fin = await runSsh(provider, vmName, `base64 -d < ${tmp} > ${remotePath} && rm ${tmp} && wc -c < ${remotePath}`);
+  if (fin.exitCode !== 0) {
+    throw new Error(`Failed to decode ${remotePath} on ${vmName}: ${fin.stderr}`);
+  }
+  const written = parseInt(fin.stdout.trim(), 10);
+  const expected = Buffer.byteLength(content);
+  if (written !== expected) {
+    throw new Error(`Size mismatch writing ${remotePath} on ${vmName}: wrote ${written}, expected ${expected}`);
+  }
+}
+
+/**
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
@@ -169,13 +207,11 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   let claudeCmd: string;
 
   if (prompt) {
-    // Write prompt to file on VM using base64 to avoid escaping issues
+    // Write prompt to file on VM (chunked: the exec API rejects large payloads)
     const promptFile = `/workspace/.pan/prompts/${agentId}.md`;
-    await runSsh(fly, vmName, `mkdir -p /workspace/.pan/prompts`);
-    const promptBase64 = Buffer.from(prompt).toString('base64');
-    await runSsh(fly, vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
+    await writeRemoteFile(fly, vmName, promptFile, prompt);
 
-    // Create launcher script using base64 to avoid shell interpretation
+    // Create launcher script
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
     const launcherContent = generateLauncherScriptSync({
       role: 'work',
@@ -188,8 +224,11 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       permissionFlags: getClaudePermissionFlagsSync(),
       model,
     });
-    const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-    await runSsh(fly, vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
+    await writeRemoteFile(fly, vmName, launcherScript, launcherContent);
+    const chmodRes = await runSsh(fly, vmName, `chmod +x ${launcherScript}`);
+    if (chmodRes.exitCode !== 0) {
+      throw new Error(`Failed to chmod launcher on ${vmName}: ${chmodRes.stderr}`);
+    }
 
     claudeCmd = `bash ${launcherScript}`;
   } else {

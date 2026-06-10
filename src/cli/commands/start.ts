@@ -374,6 +374,11 @@ async function handleRemoteWorkspace(
     spinner.warn('Could not sync GitHub CLI auth - gh commands may fail');
   }
 
+  // Re-apply Claude Code config (onboarding marker, /workspace trust,
+  // settings.json permission mode) — idempotent, heals VMs created before
+  // a config change.
+  await fly.configureClaudeCode(remoteMetadata.vmName);
+
   // Spawn remote agent
   spinner.text = 'Spawning remote agent...';
 
