@@ -373,13 +373,17 @@ export async function migrateLocalToRemote(
       throw new Error(`${localPath} is not a git worktree`);
     }
 
-    // 5. Quiesce the local agent so nothing writes mid-migration
+    // 5. Quiesce the local agent so nothing writes mid-migration, and pause
+    // it so deacon auto-resume can't respawn a local duplicate while the
+    // issue runs remotely. `pan start <id> --remote --force` clears the gate.
     const agentId = `agent-${issueId.toLowerCase()}`;
     if (sessionExistsSync(agentId)) {
       spinner.text = 'Stopping local agent...';
       stopAgentSync(agentId);
       result.steps.push(`Stopped local agent ${agentId}`);
     }
+    setAgentPausedSync(agentId, 'migrated to remote (fly.io)');
+    result.steps.push('Paused local agent (deacon resume gate)');
 
     // 6. Make sure ALL local work reaches origin before anything else:
     // commit a checkpoint if the tree is dirty, then push the branch.
