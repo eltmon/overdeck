@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:38:00.028Z"
+    "updated": "2026-06-10T12:40:46.999Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 89,
+    "sequence": 97,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:38:00.028Z",
+    "updated": "2026-06-10T12:40:46.999Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -163,58 +163,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "test",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:37:59.814Z",
+        "updatedAt": "2026-06-10T12:40:46.998Z",
         "work": {
-          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T00:37:59.814Z"
+              "at": "2026-06-10T12:40:46.998Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-10T00:37:59.814Z",
-          "notes": "Agent re-review request (1/25): Fixed review issues",
+          "status": "passed",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "notes": "Approved: all four convoy reviewers reported zero blockers.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-10T00:37:59.814Z",
-              "notes": "Agent re-review request (1/25): Fixed review issues"
+              "status": "passed",
+              "at": "2026-06-10T12:40:46.998Z",
+              "notes": "Approved: all four convoy reviewers reported zero blockers."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T00:37:59.814Z"
+              "status": "passed",
+              "at": "2026-06-10T12:40:46.998Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:37:59.814Z"
+              "at": "2026-06-10T12:40:46.998Z"
             }
           ],
           "readyForMerge": false,
