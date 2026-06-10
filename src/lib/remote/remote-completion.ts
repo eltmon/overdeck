@@ -3,11 +3,11 @@
  *
  * Remote (fly.io) work agents cannot run `pan done` — the host pipeline has
  * no workspace registry entry for them. Instead they finish by pushing their
- * feature branch and printing a `PAN_REMOTE_DONE <ISSUE-ID>` marker into
- * their tmux session (see the REMOTE gate in cloister/prompts/work.md).
+ * feature branch and creating the `/workspace/.pan/REMOTE_DONE` sentinel
+ * file (see the REMOTE gate in cloister/prompts/work.md).
  *
  * `reapCompletedRemoteAgents()` is the host-side half of that contract:
- * for every remote agent that has printed the marker (or exited after
+ * for every remote agent that has created the sentinel (or exited after
  * pushing its branch), it
  *
  *   1. verifies the feature branch exists on origin,
@@ -34,7 +34,6 @@ import { createFlyProviderFromConfig } from './index.js';
 import {
   loadRemoteAgentState,
   saveRemoteAgentState,
-  getRemoteAgentOutput,
   isRemoteAgentRunning,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
@@ -50,8 +49,6 @@ export interface RemoteReapResult {
   status: 'handed-off' | 'still-running' | 'stale' | 'error';
   details: string[];
 }
-
-const DONE_MARKER = 'PAN_REMOTE_DONE';
 
 /** List agent IDs that have a remote-state.json in running/starting state. */
 function listActiveRemoteAgents(): string[] {
@@ -93,15 +90,22 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
     const vmName = remoteState.vmName;
 
     try {
-      // 1. Completion detection: marker in session output, or session exited.
+      // 1. Completion detection: the /workspace/.pan/REMOTE_DONE sentinel
+      // file (created by the agent per the REMOTE prompt contract), or the
+      // session having exited. Do NOT grep session output for the marker —
+      // the prompt's own instruction text contains the literal string, so a
+      // mid-work agent's pane matches it (false positive observed live on
+      // the first migrated issue).
       let sessionAlive = false;
-      let markerSeen = false;
+      let sentinelSeen = false;
       try {
         sessionAlive = await isRemoteAgentRunning(agentId, vmName);
-        if (sessionAlive) {
-          const output = await getRemoteAgentOutput(agentId, vmName, 300);
-          markerSeen = output.includes(`${DONE_MARKER} ${issueId}`) || output.includes(DONE_MARKER);
-        }
+        const config = loadConfigSync();
+        const fly = createFlyProviderFromConfig(config.remote);
+        const check = await Effect.runPromise(
+          fly.ssh(vmName, '[ -f /workspace/.pan/REMOTE_DONE ] && echo present')
+        );
+        sentinelSeen = check.stdout.trim() === 'present';
       } catch (err: any) {
         details.push(`VM unreachable (${err.message}) — falling back to branch check`);
       }
@@ -117,16 +121,16 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       const branch = `feature/${issueId.toLowerCase()}`;
       const pushed = await branchExistsOnOrigin(projectRoot, branch);
 
-      if (sessionAlive && !markerSeen) {
+      if (sessionAlive && !sentinelSeen) {
         results.push({ agentId, issueId, status: 'still-running', details });
         continue;
       }
       if (!pushed) {
-        details.push(`Session ${sessionAlive ? 'printed marker' : 'ended'} but ${branch} is not on origin — not reaping`);
+        details.push(`Session ${sessionAlive ? 'signaled done' : 'ended'} but ${branch} is not on origin — not reaping`);
         results.push({ agentId, issueId, status: 'error', details });
         continue;
       }
-      details.push(markerSeen ? `Done marker seen for ${issueId}` : `Session ended; ${branch} is pushed`);
+      details.push(sentinelSeen ? `REMOTE_DONE sentinel present for ${issueId}` : `Session ended; ${branch} is pushed`);
 
       if (opts.dryRun) {
         details.push('Dry run — would hand off to review');

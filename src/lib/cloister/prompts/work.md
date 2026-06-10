@@ -449,7 +449,11 @@ git status   # must show a clean tree and the branch pushed
 ```
 NEVER edit `.pan/specs/*.vbrief.json` — specs are immutable after planning. Bead closure + the pushed branch are your completion record.
 
-After the push succeeds, print a line containing exactly `PAN_REMOTE_DONE {{ISSUE_ID}}` and stop. The orchestrator polls your session output for that marker to hand the branch to review. Only stop when ALL tasks are complete or you have exhausted all possible work.
+After the push succeeds, signal completion by running:
+```bash
+touch /workspace/.pan/REMOTE_DONE && echo "PAN_REMOTE_DONE {{ISSUE_ID}}"
+```
+The orchestrator polls for the `/workspace/.pan/REMOTE_DONE` file to hand the branch to review — the echo is just for humans watching. Create the file ONLY when all work is complete and pushed. Only stop when ALL tasks are complete or you have exhausted all possible work.
 {{/REMOTE}}
 
 **Uncommitted changes = NOT COMPLETE. Do not say you are done if `git status` shows changes.**
