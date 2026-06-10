@@ -53,7 +53,7 @@ function getRemoteAgentStateFile(agentId: string): string {
 /**
  * Save remote agent state
  */
-function saveRemoteAgentState(state: RemoteAgentState): void {
+export function saveRemoteAgentState(state: RemoteAgentState): void {
   const dir = join(AGENTS_DIR, state.id);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
