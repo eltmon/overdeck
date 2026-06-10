@@ -134,8 +134,19 @@ describe('assembleUatContextGitFields', () => {
     expect(result.changedFiles[11]?.path).toBe('src/file-11.ts');
     expect(result.changedFilesTotal).toBe(13);
     expect(result.changedFilesOmitted).toBe(1);
-    expect(result.diffStat).toBe(diffStat);
+    expect(result.diffStat).toEqual(diffStat);
     expect(result.source).toEqual({ files: 'git' });
+  });
+
+  it('caps the diff stat string before returning git fields', () => {
+    const longDiffStat = 'x'.repeat(4_001);
+
+    const result = assembleUatContextGitFields([
+      changedFile('src/routes.ts', 0),
+    ], { stat: longDiffStat, truncated: false });
+
+    expect(result.diffStat?.stat).toHaveLength(4_000);
+    expect(result.diffStat?.truncated).toBe(true);
   });
 
   it('returns the empty fallback for unavailable git diff stats', () => {

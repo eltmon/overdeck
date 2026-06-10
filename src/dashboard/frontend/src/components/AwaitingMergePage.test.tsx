@@ -37,27 +37,35 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof AwaitingMergeR
 
 describe('AwaitingMergeRow UAT context', () => {
   it('lazy-loads UAT context only after the section expands', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      acceptanceCriteria: [
-        {
-          id: 'uat.ac1',
-          title: 'Fetched checklist item',
-          status: 'pending',
-          itemId: 'frontend-what-to-test',
-          itemTitle: 'Frontend checklist',
-        },
-      ],
-    }), { status: 200 }));
+    const uatContextUrl = '/api/workspaces/PAN-1686/uat-context';
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url !== uatContextUrl) {
+        return new Response(JSON.stringify({ enabled: false }), { status: 200 });
+      }
+
+      return new Response(JSON.stringify({
+        acceptanceCriteria: [
+          {
+            id: 'uat.ac1',
+            title: 'Fetched checklist item',
+            status: 'pending',
+            itemId: 'frontend-what-to-test',
+            itemTitle: 'Frontend checklist',
+          },
+        ],
+      }), { status: 200 });
+    });
+    const uatContextCalls = () => fetchMock.mock.calls.filter(([url]) => url === uatContextUrl);
     vi.stubGlobal('fetch', fetchMock);
 
     renderRow();
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(uatContextCalls()).toHaveLength(0);
 
     fireEvent.click(screen.getByTestId('merge-uat-toggle-PAN-1686'));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1686/uat-context');
+    await waitFor(() => expect(uatContextCalls()).toHaveLength(1));
+    expect(fetchMock).toHaveBeenCalledWith(uatContextUrl);
     expect(await screen.findByText('Fetched checklist item')).toBeTruthy();
   });
 

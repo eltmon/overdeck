@@ -1894,6 +1894,7 @@ interface UatContextGitFields {
 }
 
 const MAX_UAT_CONTEXT_CHANGED_FILES = 12;
+const MAX_UAT_CONTEXT_DIFF_STAT_LENGTH = 4_000;
 
 export function assembleUatContextPlanFields(doc: VBriefDocument | null): UatContextPlanFields {
   if (!doc) {
@@ -1966,11 +1967,17 @@ export function assembleUatContextGitFields(
       deletions: file.deletions,
     }));
 
+  const isDiffStatTruncated = diffStat.truncated || diffStat.stat.length > MAX_UAT_CONTEXT_DIFF_STAT_LENGTH;
+  const limitedDiffStat = {
+    stat: diffStat.stat.slice(0, MAX_UAT_CONTEXT_DIFF_STAT_LENGTH),
+    truncated: isDiffStatTruncated,
+  };
+
   return {
     changedFiles: limitedChangedFiles,
     changedFilesTotal: changedFiles.length,
     changedFilesOmitted: Math.max(0, changedFiles.length - limitedChangedFiles.length),
-    diffStat,
+    diffStat: limitedDiffStat,
     source: { files: 'git' },
   };
 }
