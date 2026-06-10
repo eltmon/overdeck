@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:14:19.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
-    "updated": "2026-06-10T00:01:06.568Z"
+    "updated": "2026-06-10T00:09:52.453Z"
   },
   "plan": {
     "id": "pan-1658",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "41568a01-5a58-4e5a-a085-023e6be11ea3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 18,
+    "sequence": 32,
     "created": "2026-06-09T23:14:19.000Z",
-    "updated": "2026-06-10T00:01:06.568Z",
+    "updated": "2026-06-10T00:09:52.453Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1658",
@@ -71,7 +71,7 @@
       {
         "id": "ci-greenness-helper",
         "title": "Add a check-runs-driven CI greenness signal for a commit SHA in github-app.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:14:19.000Z",
         "metadata": {
@@ -90,7 +90,7 @@
           {
             "id": "ci-greenness-helper.ac1",
             "title": "An exported function in github-app.ts returns a green verdict for a SHA only when there is ≥1 successful CI check-run AND zero pending/incomplete check-runs AND zero failed check-runs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -98,7 +98,7 @@
           {
             "id": "ci-greenness-helper.ac2",
             "title": "The greenness verdict is derived from the /commits/{sha}/check-runs endpoint only; it does NOT block on, or require, the panopticon/review or panopticon/test self-reported commit-statuses (a commit missing those statuses can still be judged green if its CI check-runs are green).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -106,7 +106,7 @@
           {
             "id": "ci-greenness-helper.ac3",
             "title": "Any pending/incomplete check-run yields a 'not yet green' verdict (distinct from 'failed'); any failed/timed-out/cancelled check-run yields a 'red' verdict; a commit with zero CI check-runs is NOT green.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -114,7 +114,7 @@
           {
             "id": "ci-greenness-helper.ac4",
             "title": "Existing callers of getCommitCheckState / getPullRequestState (checksPending/checksFailed behaviour and reconcileClosedPrReadyForMerge) are unchanged — typecheck, lint, and the existing github-app/PR-state tests stay green.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -264,31 +264,31 @@
         "phase": "review",
         "issueId": "PAN-1658",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:01:04.989Z",
+        "updatedAt": "2026-06-10T00:09:52.371Z",
         "work": {
-          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-06-10T00:01:04.989Z",
-          "notes": "Verification FAILED at test (34663ms):\n\nticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js:684:49\n    at ~effect/Utils/internal (file:///home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js:79:12)\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: pty-supervisor build artifact missing — run `npm run build`.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m prepareSupervisorForFreshLaunch src/lib/agents.ts:\u001b[2m1624:11\u001b[22m\u001b[39m\n    \u001b[90m1622|\u001b[39m   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    \u001b[90m1623|\u001b[39m   if (!existsSync(supervisorScriptPath)) {\n    \u001b[90m1624|\u001b[39m     throw new Error('pty-supervisor build artifact missing — run `npm …\n    \u001b[90m   |\u001b[39m           \u001b[31m^\u001b[39m\n    \u001b[90m1625|\u001b[39m   }\n    \u001b[90m1626|\u001b[39m   await writePtyToken(agentId);\n\u001b[90m \u001b[2m❯\u001b[22m Module.spawnAgent src/lib/agents.ts:\u001b[2m3237:34\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m738:21\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
+          "notes": "Verification FAILED at test (55287ms):\n\n  line: 619,\n      column: 25\n    },\n    {\n      line: 993,\n      column: 46,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'catcher'\n    },\n    {\n      line: 244,\n      column: 11,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts',\n      method: 'body'\n    },\n    {\n      line: 993,\n      column: 27,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'internalCall'\n    }\n  ]\n}\n\u001b[36m \u001b[2m❯\u001b[22m catch src/lib/cloister/config.ts:\u001b[2m619:25\u001b[22m\u001b[39m\n    \u001b[90m617|\u001b[39m     \u001b[35myield\u001b[39m\u001b[33m*\u001b[39m \u001b[33mEffect\u001b[39m\u001b[33m.\u001b[39m\u001b[34mtryPromise\u001b[39m({\n    \u001b[90m618|\u001b[39m       \u001b[35mtry\u001b[39m\u001b[33m:\u001b[39m () \u001b[33m=>\u001b[39m \u001b[34mmkdir\u001b[39m(\u001b[33mPANOPTICON_HOME\u001b[39m\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m,\u001b[39m\n    \u001b[90m619|\u001b[39m       catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation…\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m620|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m621|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m catcher node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:46\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts:\u001b[2m244:11\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m internalCall node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:27\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: ENOENT: no such file or directory, mkdir '/tmp/panopticon-wf-test-home'\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\u001b[22m\u001b[39m\n\u001b[31m\u001b[1mSerialized Error:\u001b[22m\u001b[39m \u001b[90m{ errno: -2, code: 'ENOENT', syscall: 'mkdir', path: '/tmp/panopticon-wf-test-home' }\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\u001b[22m\u001b[39m\n\n",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-10T00:01:04.989Z",
-              "notes": "Verification FAILED at test (34663ms):\n\nticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js:684:49\n    at ~effect/Utils/internal (file:///home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js:79:12)\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/merge-reconciliation.test.ts\u001b[2m > \u001b[22m\u001b[2mreconcileGitHubMergeStatus\u001b[2m > \u001b[22m\u001b[2mreturns false when GitHub state lookup throws\n\u001b[22m\u001b[39m[merge] Failed to reconcile PR state for PAN-349: boom\n\n\u001b[90mstderr\u001b[2m | tests/integration/beads-real-corruption.test.ts\n\u001b[22m\u001b[39m[PAN-1111] Skipping real Dolt-corruption recovery test: installed `bd` does not support `bd doctor --fix` in embedded mode. Real auto-recovery coverage is blocked on bd gaining embedded doctor --fix support; this test runs automatically once it does.\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/integration/agent-spawning.test.ts\u001b[2m > \u001b[22mPAN-1048 role primitive — agent spawning\u001b[2m > \u001b[22mharness policy gate at the spawn entry points\u001b[2m > \u001b[22mdowngrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\n\u001b[31m\u001b[1mError\u001b[22m: pty-supervisor build artifact missing — run `npm run build`.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m prepareSupervisorForFreshLaunch src/lib/agents.ts:\u001b[2m1624:11\u001b[22m\u001b[39m\n    \u001b[90m1622|\u001b[39m   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    \u001b[90m1623|\u001b[39m   if (!existsSync(supervisorScriptPath)) {\n    \u001b[90m1624|\u001b[39m     throw new Error('pty-supervisor build artifact missing — run `npm …\n    \u001b[90m   |\u001b[39m           \u001b[31m^\u001b[39m\n    \u001b[90m1625|\u001b[39m   }\n    \u001b[90m1626|\u001b[39m   await writePtyToken(agentId);\n\u001b[90m \u001b[2m❯\u001b[22m Module.spawnAgent src/lib/agents.ts:\u001b[2m3237:34\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/integration/agent-spawning.test.ts:\u001b[2m738:21\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n"
+              "at": "2026-06-10T00:09:52.371Z",
+              "notes": "Verification FAILED at test (55287ms):\n\n  line: 619,\n      column: 25\n    },\n    {\n      line: 993,\n      column: 46,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'catcher'\n    },\n    {\n      line: 244,\n      column: 11,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts',\n      method: 'body'\n    },\n    {\n      line: 993,\n      column: 27,\n      file: '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts',\n      method: 'internalCall'\n    }\n  ]\n}\n\u001b[36m \u001b[2m❯\u001b[22m catch src/lib/cloister/config.ts:\u001b[2m619:25\u001b[22m\u001b[39m\n    \u001b[90m617|\u001b[39m     \u001b[35myield\u001b[39m\u001b[33m*\u001b[39m \u001b[33mEffect\u001b[39m\u001b[33m.\u001b[39m\u001b[34mtryPromise\u001b[39m({\n    \u001b[90m618|\u001b[39m       \u001b[35mtry\u001b[39m\u001b[33m:\u001b[39m () \u001b[33m=>\u001b[39m \u001b[34mmkdir\u001b[39m(\u001b[33mPANOPTICON_HOME\u001b[39m\u001b[33m,\u001b[39m { recursive\u001b[33m:\u001b[39m \u001b[35mtrue\u001b[39m })\u001b[33m,\u001b[39m\n    \u001b[90m619|\u001b[39m       catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation…\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m620|\u001b[39m     })\u001b[33m;\u001b[39m\n    \u001b[90m621|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m catcher node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:46\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Utils.ts:\u001b[2m244:11\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m internalCall node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m993:27\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[1mCaused by: Error\u001b[22m: ENOENT: no such file or directory, mkdir '/tmp/panopticon-wf-test-home'\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\u001b[22m\u001b[39m\n\u001b[31m\u001b[1mSerialized Error:\u001b[22m\u001b[39m \u001b[90m{ errno: -2, code: 'ENOENT', syscall: 'mkdir', path: '/tmp/panopticon-wf-test-home' }\u001b[39m\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯\u001b[22m\u001b[39m\n\n"
             }
           ]
         },
         "review": {
           "status": "failed",
-          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
           "notes": "Verification failed at test",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-10T00:01:04.989Z",
+              "at": "2026-06-10T00:09:52.371Z",
               "notes": "Verification failed at test"
             }
           ],
@@ -296,25 +296,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:01:04.989Z"
+              "at": "2026-06-10T00:09:52.371Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:01:04.989Z",
+          "updatedAt": "2026-06-10T00:09:52.371Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:01:04.989Z"
+              "at": "2026-06-10T00:09:52.371Z"
             }
           ],
           "readyForMerge": false,
