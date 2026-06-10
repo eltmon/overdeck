@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:03:11.907Z"
+    "updated": "2026-06-10T00:06:57.992Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 37,
+    "sequence": 45,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:03:11.907Z",
+    "updated": "2026-06-10T00:06:57.992Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -166,31 +166,29 @@
         "phase": "work",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:03:11.861Z",
+        "updatedAt": "2026-06-10T00:06:56.848Z",
         "work": {
-          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "history": []
         },
         "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T00:03:11.861Z",
-          "notes": "Verification FAILED at test (57352ms):\n\nompleted marker + stoppedByUser) when the review came back blocked (PAN-1614)\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m295:21\u001b[22m\u001b[39m\n    \u001b[90m293|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m294|\u001b[39m\n    \u001b[90m295|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m296|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m297|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts\u001b[2m > \u001b[22mautoResumeStoppedWorkAgents (PAN-871)\u001b[2m > \u001b[22mstill auto-resumes an open issue with pending review feedback when not deliberately stopped\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m302:21\u001b[22m\u001b[39m\n    \u001b[90m300|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m304|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n",
+          "status": "pending",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "history": [
             {
-              "status": "failed",
-              "at": "2026-06-10T00:03:11.861Z",
-              "notes": "Verification FAILED at test (57352ms):\n\nompleted marker + stoppedByUser) when the review came back blocked (PAN-1614)\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m295:21\u001b[22m\u001b[39m\n    \u001b[90m293|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m294|\u001b[39m\n    \u001b[90m295|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m296|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m297|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts\u001b[2m > \u001b[22mautoResumeStoppedWorkAgents (PAN-871)\u001b[2m > \u001b[22mstill auto-resumes an open issue with pending review feedback when not deliberately stopped\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [] to deeply equal [ 'agent-pan-871' ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- [\u001b[39m\n\u001b[32m-   \"agent-pan-871\",\u001b[39m\n\u001b[32m- ]\u001b[39m\n\u001b[31m+ []\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/cloister/__tests__/pan-871-auto-resume.test.ts:\u001b[2m302:21\u001b[22m\u001b[39m\n    \u001b[90m300|\u001b[39m     \u001b[35mconst\u001b[39m resumed \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mautoResumeStoppedWorkAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m301|\u001b[39m\n    \u001b[90m302|\u001b[39m     \u001b[34mexpect\u001b[39m(resumed)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([\u001b[32m'agent-pan-871'\u001b[39m])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m303|\u001b[39m     \u001b[34mexpect\u001b[39m(mockResumeAgent)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[32m'agent-pan-871'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m304|\u001b[39m   })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\u001b[22m\u001b[39m\n\n"
+              "status": "pending",
+              "at": "2026-06-10T00:06:56.848Z"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "notes": "Verification failed at vbrief-ac",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:03:11.861Z",
+              "at": "2026-06-10T00:06:56.848Z",
               "notes": "Verification failed at vbrief-ac"
             }
           ],
@@ -198,25 +196,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:03:11.861Z"
+              "at": "2026-06-10T00:06:56.848Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:03:11.861Z",
+          "updatedAt": "2026-06-10T00:06:56.848Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:03:11.861Z"
+              "at": "2026-06-10T00:06:56.848Z"
             }
           ],
           "readyForMerge": false,
