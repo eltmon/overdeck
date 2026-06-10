@@ -63,6 +63,7 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
   const qi = (issueId: string, batchGroup: 'batch' | 'serialize') => ({
     issueId,
     title: issueId,
+    branchName: `feature/${issueId.toLowerCase()}`,
     mergeOrder: 1,
     conflictsWith: [] as string[],
     batchGroup,
@@ -84,5 +85,20 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
 
   it('returns an empty bundle when nothing is batchable', () => {
     expect(planUatCandidate([qi('PAN-1', 'serialize')], { dateIso: '2026-06-09T00:00:00Z' }).bundled).toEqual([]);
+  });
+});
+
+describe('MERGE_GATE_VERBS (PAN-1736 verb contract)', () => {
+  it("treats both 'shipping' and 'merging' as at-the-merge-gate", async () => {
+    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
+    expect(MERGE_GATE_VERBS.has('shipping')).toBe(true);
+    expect(MERGE_GATE_VERBS.has('merging')).toBe(true);
+  });
+
+  it('excludes verbs that do not mean merge-ready', async () => {
+    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
+    for (const verb of ['planning', 'working', 'reviewing', 'testing', 'blocked', 'parked'] as const) {
+      expect(MERGE_GATE_VERBS.has(verb)).toBe(false);
+    }
   });
 });

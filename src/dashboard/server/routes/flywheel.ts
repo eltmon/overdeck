@@ -17,7 +17,7 @@ import {
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
-import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { sessionExists } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
@@ -43,7 +43,6 @@ import {
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
-import { makeUatCandidateName } from '../../../lib/cloister/uat-candidate-name.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -894,9 +893,9 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       const status = await readCurrentFlywheelStatusForDashboard();
       if (!status) return jsonResponse([]);
-      const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
+      const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
       const queue = await Effect.runPromise(
-        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
+        computeMergeQueue(status.activePipeline, process.cwd(), { getPrUrl: resolveMergeQueuePrUrl }).pipe(
           Effect.provide(nodeServicesLayer),
         ),
       );
@@ -905,102 +904,77 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
   })),
 );
 
-const getFlywheelUatCandidateRoute = HttpRouter.add(
+/**
+ * PAN-1737 UAT batch trains. Generation names contain a slash
+ * (`uat/pan-otter-0610`); URL params carry the name WITHOUT the `uat/`
+ * prefix and handlers reconstitute it.
+ */
+function uatGenerationNameFromParam(param: string): string {
+  const decoded = decodeURIComponent(param);
+  return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
+}
+
+const getUatGenerationsRoute = HttpRouter.add(
   'GET',
-  '/api/flywheel/uat-candidate',
+  '/api/flywheel/uat-generations',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => {
-      const status = await readCurrentFlywheelStatusForDashboard();
-      if (!status) return jsonResponse({ branchName: null, bundled: [] });
-      const { computeMergeQueue, planUatCandidate } = await import('../../../lib/flywheel-merge-order.js');
-      const queue = await Effect.runPromise(
-        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
-          Effect.provide(nodeServicesLayer),
-        ),
-      );
-      const plan = planUatCandidate(queue, { dateIso: new Date().toISOString() });
-      if (plan.bundled.length === 0) return jsonResponse({ branchName: null, bundled: [] });
-      // Use the deterministic per-day name so the displayed branch matches the
-      // one assemble-uat actually creates (planUatCandidate's name omits the codename).
-      const label = (plan.bundled[0]!.split('-')[0] ?? 'candidate').toLowerCase();
-      return jsonResponse({ branchName: uatCandidateBranchName(label, new Date().toISOString()), bundled: plan.bundled });
-    });
+    const { getUatGenerationsPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const payload = yield* Effect.promise(() => getUatGenerationsPayload());
+    return jsonResponse(payload);
+  })),
+);
+
+const postUatGenerationStackRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/uat-generations/:name/stack',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationStackPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const result = yield* Effect.promise(() => postUatGenerationStackPayload(name));
+    if (!result.ok) return jsonResponse({ error: result.error }, { status: result.status });
+    return jsonResponse({ frontendUrl: result.frontendUrl, evicted: result.evicted });
+  })),
+);
+
+const postUatGenerationPromoteRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/uat-generations/:name/promote',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const { firePostMergeLifecycle } = yield* Effect.promise(() => import('./specialists.js'));
+    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(name, firePostMergeLifecycle));
+    if (!result.success) {
+      const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;
+      return jsonResponse(result, { status });
+    }
+    return jsonResponse(result);
   })),
 );
 
 /**
- * Stable per-(label, day) UAT candidate branch name. Deterministic — the
- * codename is seeded by the calendar day — so (a) the name the rail shows and
- * the branch assembly creates always agree, and (b) auto-assembly each flywheel
- * tick rebuilds ONE branch per day (force-reset onto current main) instead of
- * pushing a fresh `uat/<random>-<MMDD>` branch every cycle.
+ * PAN-1737: repurposed from the PAN-1691 one-shot candidate assembly. Now a
+ * FORCED reconcile — rebuild the current generation even when the chain
+ * already answers the ready set (operator suspects staleness).
  */
-function uatCandidateBranchName(label: string, dateIso: string): string {
-  const day = dateIso.slice(0, 10);
-  let h = 0;
-  for (let i = 0; i < day.length; i++) h = (h * 31 + day.charCodeAt(i)) >>> 0;
-  return makeUatCandidateName({ label, dateIso, pick: () => h, isTaken: () => false });
-}
-
-interface AssembleUatDeps {
-  getCandidate?: () => Promise<{ label: string; bundled: string[] } | null>;
-  branchName?: (label: string) => string;
-  assemble?: (
-    branchName: string,
-    featureBranches: string[],
-  ) => Promise<{ branch: string; merged: string[]; conflicts: Array<{ branch: string; reason: string }> }>;
-}
-
-async function defaultGetUatCandidate(): Promise<{ label: string; bundled: string[] } | null> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return null;
-  const { computeMergeQueue, planUatCandidate } = await import('../../../lib/flywheel-merge-order.js');
-  const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, process.cwd()).pipe(Effect.provide(nodeServicesLayer)),
-  );
-  const plan = planUatCandidate(queue, { dateIso: new Date().toISOString() });
-  if (plan.bundled.length === 0) return null;
-  const label = (plan.bundled[0]!.split('-')[0] ?? 'candidate').toLowerCase();
-  return { label, bundled: plan.bundled };
-}
-
-async function defaultAssembleUat(branchName: string, featureBranches: string[]) {
-  const { assembleUatCandidate } = await import('../../../lib/cloister/uat-assemble.js');
-  const { buildUatAssembleSession } = await import('../../../lib/cloister/uat-assemble-deps.js');
-  const session = buildUatAssembleSession(process.cwd());
-  try {
-    const result = await assembleUatCandidate(branchName, featureBranches, session.deps);
-    await session.push();
-    return result;
-  } finally {
-    await session.cleanup();
-  }
-}
-
-/**
- * PAN-1691 assemble the on-demand UAT candidate: create uat/<codename>-<date>
- * off main and merge the batch-safe bundle onto it for one UAT session.
- */
-export async function postFlywheelAssembleUatPayload(deps: AssembleUatDeps = {}) {
-  const candidate = await (deps.getCandidate ?? defaultGetUatCandidate)();
-  if (!candidate || candidate.bundled.length === 0) {
-    return { status: 200, body: { branch: null, merged: [], conflicts: [] } };
-  }
-  const branchName = (deps.branchName ?? ((label: string) => uatCandidateBranchName(label, new Date().toISOString())))(candidate.label);
-  const featureBranches = candidate.bundled.map((id) => `feature/${id.toLowerCase()}`);
-  const result = await (deps.assemble ?? defaultAssembleUat)(branchName, featureBranches);
-  return { status: 200, body: result };
-}
-
 const postFlywheelAssembleUatRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/assemble-uat',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-    const result = yield* Effect.promise(() => postFlywheelAssembleUatPayload());
-    return jsonResponse(result.body, { status: result.status });
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const { runUatTrainReconcile } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const result = yield* Effect.promise(() => runUatTrainReconcile({ force: true }));
+    return jsonResponse(result);
   })),
 );
 
@@ -1027,7 +1001,9 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
-  getFlywheelUatCandidateRoute,
+  getUatGenerationsRoute,
+  postUatGenerationStackRoute,
+  postUatGenerationPromoteRoute,
   postFlywheelAssembleUatRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,

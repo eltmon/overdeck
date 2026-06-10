@@ -4508,6 +4508,31 @@ function initSchema(db) {
       updated_at  TEXT NOT NULL
     );
 
+    -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
+    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
+    -- chain: lifecycle transitions are status flips, rows are never deleted
+    -- (auditable history of what was bundled, resolved, and promoted).
+    CREATE TABLE IF NOT EXISTS uat_generations (
+      name             TEXT PRIMARY KEY,
+      worktree_path    TEXT NOT NULL,
+      project_root     TEXT NOT NULL,
+      base_sha         TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'assembling',
+      members          TEXT NOT NULL DEFAULT '[]',
+      held_out         TEXT NOT NULL DEFAULT '[]',
+      resolutions      TEXT NOT NULL DEFAULT '[]',
+      stack_started_at TEXT,
+      cleaned_at       TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+      ON uat_generations(status);
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+      ON uat_generations(project_root, created_at DESC);
+
     -- ===== Rate Limits =====
     CREATE TABLE IF NOT EXISTS rate_limits (
       service     TEXT PRIMARY KEY,
@@ -4802,7 +4827,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 50`);
+	db.pragma(`user_version = 52`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4810,7 +4835,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 50) return;
+	if (currentVersion === 52) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5411,7 +5436,31 @@ function runMigrations(db) {
 	if (currentVersion < 50) try {
 		db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`);
 	} catch {}
-	db.pragma(`user_version = 50`);
+	if (currentVersion < 51) db.exec(`
+      CREATE TABLE IF NOT EXISTS uat_generations (
+        name             TEXT PRIMARY KEY,
+        worktree_path    TEXT NOT NULL,
+        project_root     TEXT NOT NULL,
+        base_sha         TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'assembling',
+        members          TEXT NOT NULL DEFAULT '[]',
+        held_out         TEXT NOT NULL DEFAULT '[]',
+        resolutions      TEXT NOT NULL DEFAULT '[]',
+        stack_started_at TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+        ON uat_generations(status);
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+        ON uat_generations(project_root, created_at DESC);
+    `);
+	if (currentVersion < 52) try {
+		db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
+	} catch {}
+	db.pragma(`user_version = 52`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

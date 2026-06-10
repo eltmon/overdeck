@@ -98,6 +98,25 @@ describe('renderDevcontainer', () => {
     expect(compose).not.toContain('{{FEATURE_FOLDER}}');
   });
 
+  it('lets UAT batch rendering align host folders with the UAT workspace leaf', () => {
+    renderDevcontainerSync({
+      workspacePath,
+      projectConfig: buildProjectConfig(projectPath),
+      featureName: 'pan-otter-0610',
+      placeholderOverrides: {
+        FEATURE_FOLDER: 'uat-pan-otter-0610',
+        BRANCH_NAME: 'uat/pan-otter-0610',
+        COMPOSE_PROJECT: 'project-uat-pan-otter-0610',
+      },
+    });
+    const compose = readFileSync(
+      join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
+      'utf-8',
+    );
+    expect(compose).toContain('uat-pan-otter-0610');
+    expect(compose).not.toContain('feature-uat-pan-otter-0610');
+  });
+
   it('is idempotent — second render produces identical files', () => {
     renderDevcontainerSync({
       workspacePath,

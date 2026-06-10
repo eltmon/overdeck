@@ -17,6 +17,7 @@ import { startAgentOutputService, stopAgentOutputService } from './services/agen
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
+import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
@@ -382,6 +383,12 @@ console.log('[panopticon] ConversationLifecycleService started');
 
 startSubstrateBugPoller();
 
+// PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
+// times (gated per-tick on flywheel.merge_train_enabled; no-op without an
+// active flywheel run).
+startUatTrainReconciler();
+console.log('[panopticon] UAT batch-train reconciler started');
+
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {
   void cleanupOrphanedConversationAttachments();
@@ -457,6 +464,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopSubstrateBugPoller();
+  stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();

@@ -1,11 +1,15 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@panctl/contracts';
+import { getReviewStatusSync } from './review-status.js';
+import { resolveGitHubIssueSync } from './tracker-utils.js';
 
 export interface MergeQueueItem {
   issueId: string;
   title: string;
+  branchName: string;
   pr?: number;
+  prUrl?: string;
   mergeOrder: number;
   conflictsWith: string[];
   /** PAN-1691: 'batch' = disjoint, mergeable together in one pass; 'serialize' = conflicts, must go one at a time. */
@@ -108,19 +112,55 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
     );
   });
 
+/**
+ * Verbs that mean "at the merge gate" (PAN-1736). Orchestrators have
+ * legitimately emitted both 'shipping' and 'merging' for merge-ready issues;
+ * filtering on one alone silently rendered an empty queue with five ready
+ * items in RUN-18. Contract documented next to FlywheelPipelineVerb in
+ * packages/contracts/src/flywheel.ts — extend BOTH places together.
+ */
+export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
+
+export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
+
+export interface ComputeMergeQueueOptions {
+  getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+  gitConcurrency?: number;
+}
+
+/**
+ * Server-side PR URL resolution for merge-queue items: prefer the review
+ * status record, fall back to the GitHub repo + PR number — the browser never
+ * guesses repo slugs.
+ */
+export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
+  const issueId = item.issueId.toUpperCase();
+  const reviewStatus = getReviewStatusSync(issueId);
+  if (reviewStatus?.prUrl) return reviewStatus.prUrl;
+
+  const prNumber = reviewStatus?.prNumber ?? item.pr;
+  if (prNumber === undefined) return undefined;
+
+  const githubIssue = resolveGitHubIssueSync(issueId);
+  if (!githubIssue.isGitHub) return undefined;
+  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
+}
+
 export const computeMergeQueue = (
   items: ReadonlyArray<FlywheelPipelineItem>,
   projectRoot: string,
+  options: ComputeMergeQueueOptions = {},
 ) =>
   Effect.gen(function*() {
-    const candidates = items.filter((item) => item.verb === 'shipping');
+    const candidates = items.filter((item) => MERGE_GATE_VERBS.has(item.verb));
     if (candidates.length === 0) return [] as MergeQueueItem[];
+    const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 
     const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
 
     const existsFlags = yield* Effect.all(
       branches.map((branch) => branchExists(branch, projectRoot)),
-      { concurrency: 'unbounded' },
+      { concurrency: gitConcurrency },
     );
 
     const existing = candidates
@@ -131,7 +171,7 @@ export const computeMergeQueue = (
 
     const fileSets = yield* Effect.all(
       existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
-      { concurrency: 'unbounded' },
+      { concurrency: gitConcurrency },
     );
 
     const conflictsMap = new Map<string, Set<string>>();
@@ -165,7 +205,9 @@ export const computeMergeQueue = (
     return sorted.map(({ item, conflictCount }, idx) => ({
       issueId: item.issueId,
       title: item.title,
+      branchName: `feature/${item.issueId.toLowerCase()}`,
       pr: item.pr,
+      prUrl: options.getPrUrl?.(item),
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',

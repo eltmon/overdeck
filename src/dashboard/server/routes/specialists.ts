@@ -186,7 +186,13 @@ const postMergeGuard = createInFlightGuard();
 // Exported so the workspaces route can register/unregister server-managed merges.
 export const _serverManagedMerges = new Set<string>();
 
-function firePostMergeLifecycle(issueId: string): void {
+/**
+ * Exported for the UAT batch-promote route (PAN-1737): batch promotion fans
+ * out the per-member post-merge through THIS guard instance so an issue's
+ * lifecycle still runs at most once regardless of which path merged it.
+ * Returns false when a run for the issue is already in flight.
+ */
+export function firePostMergeLifecycle(issueId: string): boolean {
   const started = postMergeGuard.run(
     issueId,
     async () => {
@@ -214,6 +220,7 @@ function firePostMergeLifecycle(issueId: string): void {
   if (!started) {
     console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
   }
+  return started;
 }
 
 function getProjectPathForIssue(issuePrefix: string): string {
