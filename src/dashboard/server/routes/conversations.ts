@@ -227,29 +227,27 @@ async function hasProviderRoutingChanged(currentModel: string | null | undefined
 }
 
 const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
-const STATUSLINE_CONTEXT_MARKER_PATTERN = /(^|\s)(ctx|cost|out)(\s|$)/;
 
 function normalizePaneLine(line: string): string {
-  return line.replace(ANSI_ESCAPE_PATTERN, '').toLowerCase();
+  return line.replace(ANSI_ESCAPE_PATTERN, '').trim().toLowerCase();
+}
+
+function modelStatuslinePrefix(line: string): string {
+  return line.startsWith('statusline:') ? line.slice('statusline:'.length).trimStart() : line;
 }
 
 function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
   const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
   const targetModelId = targetModel.toLowerCase();
-  const lines = pane.split(/\r?\n/).map(normalizePaneLine);
+  const expectedWithId = `${targetDisplayName} (${targetModelId})`;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const rawLine of pane.split(/\r?\n/)) {
+    const line = normalizePaneLine(rawLine);
     if (!line || line.includes('/model')) continue;
 
-    const hasTargetDisplayName = targetDisplayName.length > 0 && line.includes(targetDisplayName);
-    const hasTargetModelId = line.includes(`(${targetModelId})`) || (targetDisplayName === targetModelId && line.includes(targetModelId));
-    if (!hasTargetDisplayName && !hasTargetModelId) continue;
-
-    if (line.includes('statusline:')) return true;
-
-    const nearbyStatuslineText = lines.slice(i, i + 3).join(' ');
-    if (STATUSLINE_CONTEXT_MARKER_PATTERN.test(nearbyStatuslineText)) return true;
+    const modelLine = modelStatuslinePrefix(line);
+    if (modelLine === targetModelId || modelLine.startsWith(`${targetModelId} `)) return true;
+    if (modelLine === expectedWithId || modelLine.startsWith(`${expectedWithId} `)) return true;
   }
 
   return false;

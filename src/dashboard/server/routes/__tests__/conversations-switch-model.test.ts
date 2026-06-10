@@ -122,7 +122,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     process.env.PANOPTICON_HOME = join(testHome, '.panopticon');
     mkdirSync(process.env.PANOPTICON_HOME, { recursive: true });
 
-    capturePaneMock.mockImplementation(() => Effect.succeed('statusline: Claude Fable 5'));
+    capturePaneMock.mockImplementation(() => Effect.succeed('Claude Fable 5 (claude-fable-5)\nctx 21%  cost $0.0000'));
     deliverAgentMessageMock.mockResolvedValue({ ok: true, path: 'supervisor' });
     getProviderExportsForModelMock.mockResolvedValue('');
     getProviderAuthModeMock.mockResolvedValue('anthropic');
@@ -244,7 +244,8 @@ describe('POST /api/conversations/:name/switch-model', () => {
     try {
       capturePaneMock.mockImplementation(() => Effect.succeed([
         '/model claude-fable-5',
-        'statusline: Claude Opus 4.8',
+        'error: failed to switch to Claude Fable 5',
+        'Claude Opus 4.8 (claude-opus-4-8)',
         'ctx 10% cost $0.0000',
       ].join('\n')));
       const cwd = join(testHome, 'echo-workspace');

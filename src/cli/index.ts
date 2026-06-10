@@ -125,10 +125,12 @@ import { registerArtifactCommands } from './commands/artifacts.js';
     const arg = argv[i];
     let value: string | undefined;
     if (arg === '--yolo') {
-      // Bare flag — peek at next arg if it doesn't look like another option
+      // Bare flag means true. Only consume an explicit boolean-ish value;
+      // otherwise `pan --yolo up` would swallow `up` as the flag value.
       const next = argv[i + 1];
-      value = next && !next.startsWith('-') ? next : 'true';
-      argv.splice(i, value === 'true' ? 1 : 2);
+      const hasExplicitValue = next !== undefined && /^(true|false|1|0|yes|no)$/i.test(next);
+      value = hasExplicitValue ? next : 'true';
+      argv.splice(i, hasExplicitValue ? 2 : 1);
       i--;
     } else if (arg.startsWith('--yolo=')) {
       value = arg.slice('--yolo='.length);
