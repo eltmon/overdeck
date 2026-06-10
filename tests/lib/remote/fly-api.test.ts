@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { FlyApiClient, FlyApiError, createFlyApiClientSync } from '../../../src/lib/remote/fly-api.js';
 
 // Mock global fetch
@@ -202,6 +205,14 @@ describe('createFlyApiClient', () => {
 
   it('throws if no token available', () => {
     delete process.env.FLY_API_TOKEN;
-    expect(() => createFlyApiClientSync()).toThrow('Fly API token not found');
+    // Point HOME at an empty dir so the ~/.fly/config.yml fallback (real
+    // flyctl auth on dev machines) can't satisfy the lookup.
+    const originalHome = process.env.HOME;
+    process.env.HOME = mkdtempSync(join(tmpdir(), 'fly-api-test-'));
+    try {
+      expect(() => createFlyApiClientSync()).toThrow('Fly API token not found');
+    } finally {
+      process.env.HOME = originalHome;
+    }
   });
 });
