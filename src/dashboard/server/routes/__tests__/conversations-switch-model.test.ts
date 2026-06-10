@@ -47,6 +47,17 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
   })),
 }));
 
+vi.mock('../../../../lib/background-ai/features.js', () => ({
+  isBackgroundFeatureEnabled: vi.fn((feature: string) => feature === 'summaryFork'),
+}));
+
+vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
+  generateSmartSummary: vi.fn(() => Effect.succeed({
+    summary: 'Mocked compact summary for switch-model coverage.',
+    summaryModel: 'claude-haiku-4-5',
+  })),
+}));
+
 vi.mock('../../../../lib/providers.js', () => ({
   getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
 }));
@@ -226,5 +237,111 @@ describe('POST /api/conversations/:name/switch-model', () => {
     expect(killSessionMock).toHaveBeenCalledWith('conv-switch-fallback');
     expect(createSessionMock).toHaveBeenCalled();
     expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+  });
+
+  it('does not treat an echoed /model command as Tier 1 statusline confirmation', async () => {
+    vi.useFakeTimers();
+    try {
+      capturePaneMock.mockImplementation(() => Effect.succeed([
+        '/model claude-fable-5',
+        'statusline: Claude Opus 4.8',
+        'ctx 10% cost $0.0000',
+      ].join('\n')));
+      const cwd = join(testHome, 'echo-workspace');
+      mkdirSync(cwd, { recursive: true });
+
+      const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+      const { sessionFilePath } = await import('../../../../lib/paths.js');
+      const sessionId = 'echo-session';
+      const sessionFile = sessionFilePath(cwd, sessionId);
+      mkdirSync(join(sessionFile, '..'), { recursive: true });
+      writeFileSync(sessionFile, [
+        JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Keep context' }] } }),
+        JSON.stringify({
+          type: 'assistant',
+          timestamp: '2026-06-10T00:00:00.000Z',
+          message: {
+            role: 'assistant',
+            model: 'claude-opus-4-8',
+            content: [{ type: 'text', text: 'Still in context' }],
+            usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+          },
+        }),
+      ].join('\n') + '\n');
+
+      createConversation({
+        name: 'switch-echo',
+        tmuxSession: 'conv-switch-echo',
+        cwd,
+        model: 'claude-opus-4-8',
+        harness: 'claude-code',
+        claudeSessionId: sessionId,
+      });
+
+      const responsePromise = postSwitchModel('switch-echo', { model: 'claude-fable-5' });
+      for (let i = 0; i < 50 && capturePaneMock.mock.calls.length === 0; i++) {
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
+      }
+      expect(capturePaneMock).toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(5_500);
+      const response = await responsePromise;
+
+      expect(response.status).toBe(200);
+      expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+        'conv-switch-echo',
+        '/model claude-fable-5',
+        'conversation-switch-model',
+        'auto',
+      );
+      expect(killSessionMock).toHaveBeenCalledWith('conv-switch-echo');
+      expect(createSessionMock).toHaveBeenCalled();
+      expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('appends a compact boundary when the same-harness switch exceeds the target window threshold', async () => {
+    const cwd = join(testHome, 'over-window-workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { sessionFilePath } = await import('../../../../lib/paths.js');
+    const sessionId = 'over-window-session';
+    const sessionFile = sessionFilePath(cwd, sessionId);
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Too much context' }] } }),
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-06-10T00:00:00.000Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Large context still in transcript' }],
+          usage: { input_tokens: 900_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      }),
+    ].join('\n') + '\n');
+
+    createConversation({
+      name: 'switch-over-window',
+      tmuxSession: 'conv-switch-over-window',
+      cwd,
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      claudeSessionId: sessionId,
+    });
+
+    const response = await postSwitchModel('switch-over-window', { model: 'claude-fable-5' });
+    const finalContent = readFileSync(sessionFile, 'utf8');
+
+    expect(response.status).toBe(200);
+    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
+    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-over-window');
+    expect(createSessionMock).toHaveBeenCalled();
+    expect(finalContent).toContain('"subtype":"compact_boundary"');
+    expect(finalContent).toContain('"preTokens":900000');
   });
 });

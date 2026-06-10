@@ -226,16 +226,42 @@ async function hasProviderRoutingChanged(currentModel: string | null | undefined
   return currentExports.trim() !== targetExports.trim();
 }
 
-async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
+const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+const STATUSLINE_CONTEXT_MARKER_PATTERN = /(^|\s)(ctx|cost|out)(\s|$)/;
+
+function normalizePaneLine(line: string): string {
+  return line.replace(ANSI_ESCAPE_PATTERN, '').toLowerCase();
+}
+
+function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
   const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
   const targetModelId = targetModel.toLowerCase();
+  const lines = pane.split(/\r?\n/).map(normalizePaneLine);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.includes('/model')) continue;
+
+    const hasTargetDisplayName = targetDisplayName.length > 0 && line.includes(targetDisplayName);
+    const hasTargetModelId = line.includes(`(${targetModelId})`) || (targetDisplayName === targetModelId && line.includes(targetModelId));
+    if (!hasTargetDisplayName && !hasTargetModelId) continue;
+
+    if (line.includes('statusline:')) return true;
+
+    const nearbyStatuslineText = lines.slice(i, i + 3).join(' ');
+    if (STATUSLINE_CONTEXT_MARKER_PATTERN.test(nearbyStatuslineText)) return true;
+  }
+
+  return false;
+}
+
+async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
     const pane = await Effect.runPromise(
       capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
     );
-    const normalizedPane = pane.toLowerCase();
-    if (normalizedPane.includes(targetDisplayName) || normalizedPane.includes(targetModelId)) {
+    if (hasStatuslineModelConfirmation(pane, targetModel)) {
       return true;
     }
     await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
