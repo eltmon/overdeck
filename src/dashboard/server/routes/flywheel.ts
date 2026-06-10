@@ -47,6 +47,7 @@ import { makeUatCandidateName } from '../../../lib/cloister/uat-candidate-name.j
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
+import { resolveGitHubIssueSync } from '../../../lib/tracker-utils.js';
 import {
   cancelPending,
   getActionableAutoMerge,
@@ -273,6 +274,19 @@ interface AutoMergeCancelDeps {
 function parsePrNumber(prUrl: string | undefined): number | undefined {
   const match = prUrl?.match(/\/pull\/(\d+)(?:$|[/?#])/);
   return match ? Number.parseInt(match[1], 10) : undefined;
+}
+
+function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
+  const issueId = item.issueId.toUpperCase();
+  const reviewStatus = getReviewStatusSync(issueId);
+  if (reviewStatus?.prUrl) return reviewStatus.prUrl;
+
+  const prNumber = reviewStatus?.prNumber ?? item.pr;
+  if (prNumber === undefined) return undefined;
+
+  const githubIssue = resolveGitHubIssueSync(issueId);
+  if (!githubIssue.isGitHub) return undefined;
+  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
 }
 
 function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
@@ -896,7 +910,7 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
       if (!status) return jsonResponse([]);
       const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
       const queue = await Effect.runPromise(
-        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
+        computeMergeQueue(status.activePipeline, process.cwd(), { getPrUrl: resolveMergeQueuePrUrl }).pipe(
           Effect.provide(nodeServicesLayer),
         ),
       );

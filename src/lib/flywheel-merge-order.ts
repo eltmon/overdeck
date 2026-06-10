@@ -5,7 +5,9 @@ import type { FlywheelPipelineItem } from '@panctl/contracts';
 export interface MergeQueueItem {
   issueId: string;
   title: string;
+  branchName: string;
   pr?: number;
+  prUrl?: string;
   mergeOrder: number;
   conflictsWith: string[];
   /** PAN-1691: 'batch' = disjoint, mergeable together in one pass; 'serialize' = conflicts, must go one at a time. */
@@ -108,9 +110,14 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
     );
   });
 
+export interface ComputeMergeQueueOptions {
+  getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+}
+
 export const computeMergeQueue = (
   items: ReadonlyArray<FlywheelPipelineItem>,
   projectRoot: string,
+  options: ComputeMergeQueueOptions = {},
 ) =>
   Effect.gen(function*() {
     const candidates = items.filter((item) => item.verb === 'shipping');
@@ -165,7 +172,9 @@ export const computeMergeQueue = (
     return sorted.map(({ item, conflictCount }, idx) => ({
       issueId: item.issueId,
       title: item.title,
+      branchName: `feature/${item.issueId.toLowerCase()}`,
       pr: item.pr,
+      prUrl: options.getPrUrl?.(item),
       mergeOrder: idx + 1,
       conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
