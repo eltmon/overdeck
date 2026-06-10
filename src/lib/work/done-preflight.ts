@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
 import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
+import { runBdWithRetry } from '../bd-process-lock.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -58,15 +59,19 @@ async function listBeadsByStatus(
   }
 
   try {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
-      {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-        timeout: BD_LIST_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
-      },
+    const { stdout } = await runBdWithRetry(
+      `done preflight ${status} beads for ${issueId}`,
+      () => execFileAsync(
+        'bd',
+        ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
+        {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+          timeout: BD_LIST_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+        },
+      ),
+      { workspacePath },
     );
     return stdout;
   } catch (error) {
