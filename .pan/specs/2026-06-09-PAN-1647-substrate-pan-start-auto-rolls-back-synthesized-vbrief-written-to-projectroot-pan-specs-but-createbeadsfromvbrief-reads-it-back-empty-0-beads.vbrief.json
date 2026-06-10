@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:34:02.940Z"
+    "updated": "2026-06-10T00:38:00.028Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 84,
+    "sequence": 89,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:34:02.940Z",
+    "updated": "2026-06-10T00:38:00.028Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -166,55 +166,55 @@
         "phase": "review",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:34:00.823Z",
+        "updatedAt": "2026-06-10T00:37:59.814Z",
         "work": {
-          "updatedAt": "2026-06-10T00:34:00.823Z",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T00:34:00.823Z",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T00:34:00.823Z"
+              "at": "2026-06-10T00:37:59.814Z"
             }
           ]
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-06-10T00:34:00.823Z",
-          "notes": "Review stale: branch advanced after reviewed head with unreviewed scripts/lint-skills.sh change",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
+          "notes": "Agent re-review request (1/25): Fixed review issues",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-06-10T00:34:00.823Z",
-              "notes": "Review stale: branch advanced after reviewed head with unreviewed scripts/lint-skills.sh change"
+              "at": "2026-06-10T00:37:59.814Z",
+              "notes": "Agent re-review request (1/25): Fixed review issues"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:34:00.823Z",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:34:00.823Z"
+              "at": "2026-06-10T00:37:59.814Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:34:00.823Z",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:34:00.823Z",
+          "updatedAt": "2026-06-10T00:37:59.814Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:34:00.823Z"
+              "at": "2026-06-10T00:37:59.814Z"
             }
           ],
           "readyForMerge": false,
