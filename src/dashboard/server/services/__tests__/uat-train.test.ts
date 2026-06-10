@@ -140,6 +140,7 @@ describe('getUatGenerationsPayload', () => {
     expect(first[0]!.members).toHaveLength(8);
     expect(second[0]!.members[0]!.acceptanceCriteria).toEqual(first[0]!.members[0]!.acceptanceCriteria);
     expect(maxActiveReads).toBeLessThanOrEqual(4);
+    expect(mocks.findVBriefByIssue).toHaveBeenCalledTimes(8);
     expect(mocks.readVBriefDocument).toHaveBeenCalledTimes(8);
   });
 });

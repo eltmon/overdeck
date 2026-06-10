@@ -196,6 +196,19 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
   const root = projectRoot();
   await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
     const upperIssueId = issueId.toUpperCase();
+    const existing = acceptanceCriteriaByIssue.get(upperIssueId);
+    if (existing) {
+      try {
+        const { mtimeMs } = await stat(existing.path);
+        if (existing.mtimeMs === mtimeMs) {
+          cache.set(upperIssueId, existing.criteria);
+          return;
+        }
+      } catch {
+        acceptanceCriteriaByIssue.delete(upperIssueId);
+      }
+    }
+
     try {
       const found = await Effect.runPromise(findVBriefByIssue(root, upperIssueId));
       if (!found) {
@@ -204,11 +217,6 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
         return;
       }
       const { mtimeMs } = await stat(found.path);
-      const existing = acceptanceCriteriaByIssue.get(upperIssueId);
-      if (existing && existing.path === found.path && existing.mtimeMs === mtimeMs) {
-        cache.set(upperIssueId, existing.criteria);
-        return;
-      }
       const document = await Effect.runPromise(readVBriefDocument(found.path));
       const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
       acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });

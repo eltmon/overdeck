@@ -4,7 +4,7 @@
     "created": "2026-06-10T14:29:53.682Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
-    "updated": "2026-06-10T17:42:57.601Z"
+    "updated": "2026-06-10T18:05:17.236Z"
   },
   "plan": {
     "id": "pan-1737",
@@ -12,64 +12,64 @@
     "status": "proposed",
     "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
     "author": "agent:claude-fable-5",
-    "sequence": 33,
+    "sequence": 39,
     "created": "2026-06-10T14:29:53.682Z",
-    "updated": "2026-06-10T17:42:57.601Z",
+    "updated": "2026-06-10T18:05:17.236Z",
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json",
       "pipeline": {
         "phase": "review",
         "issueId": "PAN-1737",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T17:42:57.596Z",
+        "updatedAt": "2026-06-10T18:05:17.228Z",
         "work": {
-          "updatedAt": "2026-06-10T17:42:57.596Z",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T17:42:57.596Z",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T17:42:57.596Z"
+              "at": "2026-06-10T18:05:17.228Z"
             }
           ]
         },
         "review": {
           "status": "blocked",
-          "updatedAt": "2026-06-10T17:42:57.596Z",
-          "notes": "UAT generations endpoint still has cycle-3 blockers: unbounded vBRIEF reads and no active-run empty-state guard",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
+          "notes": "Performance: UAT generations poll still rebuilds the vBRIEF index every 15s",
           "history": [
             {
               "status": "blocked",
-              "at": "2026-06-10T17:42:57.596Z",
-              "notes": "UAT generations endpoint still has cycle-3 blockers: unbounded vBRIEF reads and no active-run empty-state guard"
+              "at": "2026-06-10T18:05:17.228Z",
+              "notes": "Performance: UAT generations poll still rebuilds the vBRIEF index every 15s"
             }
           ],
           "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T17:42:57.596Z",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T17:42:57.596Z"
+              "at": "2026-06-10T18:05:17.228Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T17:42:57.596Z",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T17:42:57.596Z",
+          "updatedAt": "2026-06-10T18:05:17.228Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T17:42:57.596Z"
+              "at": "2026-06-10T18:05:17.228Z"
             }
           ],
           "readyForMerge": false,
