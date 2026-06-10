@@ -4,7 +4,7 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T00:10:10.931Z"
+    "updated": "2026-06-10T00:19:14.459Z"
   },
   "plan": {
     "id": "pan-1647",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 52,
+    "sequence": 53,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T00:10:10.931Z",
+    "updated": "2026-06-10T00:19:14.459Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -166,55 +166,57 @@
         "phase": "review",
         "issueId": "PAN-1647",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T00:10:10.796Z",
+        "updatedAt": "2026-06-10T00:19:14.453Z",
         "work": {
-          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T00:10:10.796Z"
+              "at": "2026-06-10T00:19:14.453Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-10T00:10:10.796Z",
-          "notes": "Verification failed at lint",
+          "status": "passed",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
+          "notes": "Approved: all four convoy reviewers were ready and no blocking findings remain.",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-10T00:10:10.796Z",
-              "notes": "Verification failed at lint"
+              "status": "passed",
+              "at": "2026-06-10T00:19:14.453Z",
+              "notes": "Approved: all four convoy reviewers were ready and no blocking findings remain."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:10:10.796Z"
+              "at": "2026-06-10T00:19:14.453Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T00:10:10.796Z",
+          "updatedAt": "2026-06-10T00:19:14.453Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T00:10:10.796Z"
+              "at": "2026-06-10T00:19:14.453Z"
             }
           ],
           "readyForMerge": false,
