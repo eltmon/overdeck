@@ -1228,3 +1228,58 @@ candidates queued at cap: PAN-1705 (conversation Loading… stall), PAN-1706
 bundling with PAN-1699's roles fix). strike-1682: THIRD tick silently parked on
 its moot question — the PAN-1699 gap measured in wall-clock. Swap crept
 2.5→5.4GB during the spawn burst (load 20/24); watching, not acting.
+
+## RUN-18 tick 1 (2026-06-10) — pipeline cascading under its own power; recovery brakes observed live
+
+### Where pipeline truth lives now (re-derive no more)
+
+`~/.panopticon/review-status.json` is **no longer authoritative** — review/test/
+ship/merge state moved to SQLite: `~/.panopticon/panopticon.db`, table
+`review_status` (cols `review_status`, `test_status`, `verification_status`,
+`merge_status`, `ready_for_merge`, `merge_step`, `blocker_reasons`, …). Query
+read-only via `node:sqlite`. The dashboard listens on **:3011** (Traefik at
+`https://pan.localhost`), not 3010. `merge_queue` and `pending_auto_merges`
+tables exist (merge train, PAN-1691) — both empty this tick.
+
+### PAN-1675 compact-recovery CONFIRMED LIVE (first production observation)
+
+agent-pan-1658 (gpt-5.5) hit the predicted ctx-100% wedge AFTER opening PR
+#1707, with verification then failing at lint — the blocking variant (work
+needed, agent unable). Between checks the session reappeared with **733/200k
+fresh context and a re-delivered kickoff** ("Do NOT stop at the prompt — keep
+working"), then resumed addressing the verification feedback ("● Done", cost
++$1.6). That's the PAN-1675 deacon auto-recovery (`resume --compact`) firing in
+production. The footer still renders "ctx 100%"/"100% context used" banner from
+the pre-compact state — cosmetic; trust the token count (733/200k), not the
+percent, right after a recovery.
+
+### RUN-16 pause gates carry resume CONDITIONS — evaluate them, don't just inherit
+
+Two work agents (PAN-1579, PAN-1614) sat `paused` with RUN-16 reasons that
+embed explicit resume conditions. The right move is to evaluate the condition
+each run, not treat the pause as permanent:
+- **PAN-1579 unpaused this tick** — its condition ("resume once docs-index
+  build is decoupled from agent/verification builds") was met by PAN-1678
+  (landed RUN-15, verified under load). Review=blocked with a real finding
+  ("Memory FTS statements block the dashboard event loop") and no live agent —
+  unpausing lets the deacon resume it against that feedback.
+- **PAN-1614 held paused** — its condition (botched deacon.ts rebase
+  integration resolved) is NOT demonstrably met; PR #1630 test=FAILURE.
+  Surfaced as `investigate`, not blind-unpaused. Unpause-without-condition-met
+  is exactly the mistake RUN-16 made and had to revert.
+
+### The deacon/merge-train is re-driving the 5 carry-over PRs itself
+
+Review convoys spawned (~18:06–18:32, before this run started) on PAN-1242/
+1491/1641/1642/1686 — the merge-train cascade validation. Statuses are moving
+(review passed on 1242/1491/1641; 1642 test=failed with work agent fixing;
+1686 review=blocked + merge conflict with work agent on it). **PAN-1455 is the
+only issue fully through (ready_for_merge=1)** — the real operator merge gate.
+The flywheel's job here is watching, not launching: 16 live agents vs cap 4,
+load 26–28/24 cores, swap 74%.
+
+### strike-1682: FOURTH tick parked — the PAN-1699 cost keeps accruing
+
+Still at its moot question ($2.19, code on main since tick 2). Every tick this
+stays parked is wall-clock evidence for PAN-1699 (signal-before-parking).
+PAN-1699 is the top queued launch when a slot frees.
