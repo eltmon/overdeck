@@ -1283,3 +1283,52 @@ load 26–28/24 cores, swap 74%.
 Still at its moot question ($2.19, code on main since tick 2). Every tick this
 stays parked is wall-clock evidence for PAN-1699 (signal-before-parking).
 PAN-1699 is the top queued launch when a slot frees.
+
+## RUN-18 tick 2 (2026-06-10) — "guardrails" warning decoded; the train manufactures PAN-1658 states
+
+### The operator-visible "Couldn't start work agent for PAN-1641: guardrails" — full chain
+
+Deacon's orphan-proposed reconciler → tried to spawn a DUPLICATE work agent on
+an in-review issue → /api/agents health guardrails (memory+capacity 409/429)
+blocked it → warn lands in the activity feed on a retry cooldown. Two filed
+bugs:
+- **PAN-1708 (root):** the proposed→approved spec flip exists only on the
+  dashboard start-agent route (`routes/agents.ts:2900`); the `pan start` CLI
+  path never calls `transitionVBriefOnMain`. Result: ALL 8 in-flight issues'
+  specs on main are stuck `proposed` — which is what feeds the reconciler the
+  false candidates.
+- **PAN-1709 (defense):** the reconciler's filter checks tmux + agent state but
+  never the review pipeline (review_status row / open PR / convoy sessions), so
+  a finished work agent (issue in review) is indistinguishable from
+  never-started. Only system-health guardrails prevented a duplicate spawn —
+  luck, not design.
+
+### PAN-1710: smoke hang is real and branch-specific (3rd consecutive timeout)
+
+The tick-4 (RUN-17) reproducibility test concluded: third consecutive 20-min
+timeout-kill (reported CANCELLED) on #1636 (pan-1491) and #1679 (pan-1641).
+Branch-specific — both touch server-boot surfaces; sibling PRs pass the same
+job. Treat as a real boot regression vs the merge-train main, not infra flake.
+Both merges demoted to blocked; PAN-1710 filed.
+
+### The merge train does NOT heal test=pending — PAN-1658 is MORE relevant, not less
+
+Assessed at operator request (conv 2598 = the merge-train build conversation,
+$190 Opus). The train's reconciler only touches `readyForMerge=true` siblings
+(`merge-train-deps.ts:34`), so an issue stuck review=passed+test=pending is
+invisible to it. Worse: the train's post-merge re-review path lands on the
+transition-only review→test dispatch defect (review-status.ts:404), so the
+cascade itself manufactures stuck states. **Live evidence: PAN-1242/1491/1641
+all review=passed + test=pending for 2h+ after tonight's cascade.** PR #1707
+(PAN-1658's green-CI test-status reconciler) is the feeder that returns stuck
+issues to the train's ready set — ranked top review priority. Conv 2598 has no
+session_file recorded in the conversations table (cannot read transcript;
+judge by what landed on main).
+
+### `pan unpause` ≠ resume; deacon governor backpressure is the usual reason
+
+PAN-1579 unpaused at tick 1 was still unresumed 28 min later — NOT a bug: 7+
+work-role agents were live against the governor's 6-slot work ceiling, so the
+deacon correctly deferred. Check live work-agent count against
+DEFAULT_MAX_WORK_AGENTS before suspecting the resume path. The fallback is an
+explicit `pan start <id>` once slots free.
