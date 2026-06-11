@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'fs';
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { stopAgentSync, getAgentStateSync } from '../../lib/agents.js';
+import { stopAgentSync, getAgentStateSync, isQualifiedAgentId } from '../../lib/agents.js';
 import { sessionExistsSync } from '../../lib/tmux.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent, loadRemoteAgentState } from '../../lib/remote/remote-agents.js';
@@ -26,6 +26,8 @@ interface KillOptions {
  *   agent-<id>-review-<specialist>      — review specialists
  *   agent-<id>-<n>                      — swarm slots (numeric suffix)
  *   planning-<id>                       — plan (legacy prefix kept for compat)
+ *   strike-<id>                         — strike (PAN-1760)
+ *   inspect-<id>-<bead-slug>            — bead inspection (PAN-1760)
  *
  * PAN-1526: `pan kill <ISSUE-ID>` previously only tried `agent-<id>`, so
  * planning agents, pipeline specialists, and swarm slots could not be killed
@@ -43,29 +45,44 @@ function findAgentIdsForIssue(issueLower: string): string[] {
   return entries.filter(name =>
     name === `agent-${issueLower}` ||
     name.startsWith(`agent-${issueLower}-`) ||
-    name === `planning-${issueLower}`,
+    name === `planning-${issueLower}` ||
+    name === `strike-${issueLower}` ||
+    name === `inspect-${issueLower}` ||
+    name.startsWith(`inspect-${issueLower}-`),
   );
 }
 
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
-  const issueId = resolveBareNumericIdSync(id);
-  if (!issueId) {
-    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
-    console.error(chalk.dim(
-      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
-    ));
-    process.exit(1);
-  }
-  const issueLower = issueId.toLowerCase();
+  let issueId: string;
+  let agentIds: string[];
 
-  // Discover every agent tied to this issue (work + plan + pipeline specialists
-  // + swarm slots). Fall back to the canonical work-agent name if disk scan
-  // turns up empty so callers can still kill a tmux-only session.
-  const discovered = findAgentIdsForIssue(issueLower);
-  const workCanonical = `agent-${issueLower}`;
-  const agentIds = discovered.length > 0
-    ? discovered
-    : (sessionExistsSync(workCanonical) ? [workCanonical] : []);
+  if (isQualifiedAgentId(id)) {
+    // PAN-1760: a fully-qualified agent ID (strike-pan-1723, inspect-…,
+    // agent-…-ship) targets exactly that agent — no issue-wide discovery.
+    const agentId = id.toLowerCase();
+    agentIds = [agentId];
+    issueId = getAgentStateSync(agentId)?.issueId ?? agentId;
+  } else {
+    const resolved = resolveBareNumericIdSync(id);
+    if (!resolved) {
+      console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+      console.error(chalk.dim(
+        'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.panopticon/agents/',
+      ));
+      process.exit(1);
+    }
+    issueId = resolved;
+    const issueLower = issueId.toLowerCase();
+
+    // Discover every agent tied to this issue (work + plan + pipeline specialists
+    // + swarm slots + strike/inspect). Fall back to the canonical work-agent name
+    // if disk scan turns up empty so callers can still kill a tmux-only session.
+    const discovered = findAgentIdsForIssue(issueLower);
+    const workCanonical = `agent-${issueLower}`;
+    agentIds = discovered.length > 0
+      ? discovered
+      : (sessionExistsSync(workCanonical) ? [workCanonical] : []);
+  }
 
   if (agentIds.length === 0) {
     console.log(chalk.yellow(`No agents found for ${issueId.toUpperCase()}.`));

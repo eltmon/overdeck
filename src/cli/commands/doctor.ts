@@ -17,6 +17,7 @@ import {
   packageRoot,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { normalizeAgentId } from '../../lib/agents.js';
 import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
@@ -287,7 +288,9 @@ type DoctorDashboardAgent = {
 };
 
 function normalizeDoctorAgentId(agentId: string): string {
-  return /^(agent|planning|conv)-/.test(agentId) ? agentId : `agent-${agentId.toLowerCase()}`;
+  // PAN-1760: route through normalizeAgentId so strike-/inspect- prefixed
+  // agents and singleton IDs aren't blindly re-prefixed with 'agent-'.
+  return normalizeAgentId(agentId);
 }
 
 function stringField(value: unknown): string | undefined {

@@ -4,6 +4,7 @@ import {
   detectCrashedAgents,
   recoverAgent,
   autoRecoverAgents,
+  normalizeAgentId,
 } from '../../lib/agents.js';
 
 interface RecoverOptions {
@@ -78,9 +79,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     }
 
     // Recover specific agent. Preserve known prefixes; bare PAN-NNN gets the work prefix.
-    const agentId = (id.startsWith('agent-') || id.startsWith('planning-'))
-      ? id
-      : `agent-${id.toLowerCase()}`;
+    const agentId = normalizeAgentId(id);
     spinner.text = options.model
       ? `Recovering ${agentId} on ${options.model}...`
       : `Recovering ${agentId}...`;

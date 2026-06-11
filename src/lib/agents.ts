@@ -7,6 +7,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
+import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
@@ -515,6 +516,25 @@ export function normalizeAgentId(agentId: string): string {
     return agentId;
   }
   return `agent-${agentId.toLowerCase()}`;
+}
+
+/** True when the input is already a fully-qualified agent ID (known prefix or singleton), not an issue ID. */
+export function isQualifiedAgentId(input: string): boolean {
+  const lower = input.toLowerCase();
+  return SINGLETON_AGENT_IDS.has(lower) || AGENT_PREFIXES.some(p => lower.startsWith(p));
+}
+
+/**
+ * Resolve a CLI-supplied agent target to an on-disk agent ID (PAN-1760).
+ * Accepts bare numerics ("1148"), issue IDs ("PAN-1148"), and fully-qualified
+ * agent IDs ("agent-pan-1148-ship", "strike-pan-1723", "inspect-pan-1744-x",
+ * "flywheel-orchestrator"). Returns null when a bare numeric can't be resolved
+ * to exactly one agent state dir.
+ */
+export function resolveAgentTargetSync(input: string): string | null {
+  if (isQualifiedAgentId(input)) return input.toLowerCase();
+  const issueId = resolveBareNumericIdSync(input);
+  return issueId ? normalizeAgentId(issueId) : null;
 }
 
 /**
