@@ -173,19 +173,62 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
     expect(fake.writes).toEqual(['hello   world', '\r']);
   });
 
-  it('retries content once and rejects without Enter when the child PTY never echoes input', async () => {
+  it('purges between retries and before rejecting so unconfirmed writes never stack', async () => {
     vi.useFakeTimers();
     const fake = createFakePty();
+    const purge = '\x7f'.repeat('missing echo'.length + 8);
 
     const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content: 'missing echo', echo: false });
     const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
     expect(fake.writes).toEqual(['missing echo']);
-    await vi.advanceTimersByTimeAsync(1_500);
-    expect(fake.writes).toEqual(['missing echo', 'missing echo']);
-    await vi.advanceTimersByTimeAsync(1_500);
+    await vi.advanceTimersByTimeAsync(2_650);
+    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo']);
+    await vi.advanceTimersByTimeAsync(2_650);
 
     await rejected;
-    expect(fake.writes).toEqual(['missing echo', 'missing echo']);
+    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo', purge]);
+    expect(fake.writes).not.toContain('\r');
+  });
+
+  it('confirms a long line whose echo is wrapped mid-word across bordered composer rows', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'Ok please fix it immediately here on main and verify the result';
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-wrap', { content, echo: false });
+    fake.emit('│ Ok please fix it immediat │\r\n│ ely here on main and veri │\r\n│ fy the result             │');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual([content, '\r']);
+  });
+
+  it('accepts the collapsed paste placeholder as echo confirmation', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'a long message the TUI collapses instead of echoing verbatim';
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-placeholder', { content, echo: false });
+    fake.emit('[Pasted text #1 +3 lines]');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual([content, '\r']);
+  });
+
+  it('submits exactly one copy when the echo only appears after the purged retry', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const purge = '\x7f'.repeat('late echo'.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-late', { content: 'late echo', echo: false });
+    await vi.advanceTimersByTimeAsync(2_650);
+    expect(fake.writes).toEqual(['late echo', purge, 'late echo']);
+    fake.emit('late echo');
+    await vi.advanceTimersByTimeAsync(400);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual(['late echo', purge, 'late echo', '\r']);
   });
 
   it('returns non-2xx from the supervisor server when echo confirmation fails', async () => {
@@ -199,11 +242,12 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
     await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
 
     try {
+      const purge = '\x7f'.repeat('never echoed'.length + 8);
       const posted = postToUnixSocket(socketPath, token, { content: 'never echoed', echo: false });
       await vi.waitFor(() => expect(fake.writes).toEqual(['never echoed']));
-      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.advanceTimersByTimeAsync(6_000);
       await expect(posted).resolves.toMatchObject({ status: 502 });
-      expect(fake.writes).toEqual(['never echoed', 'never echoed']);
+      expect(fake.writes).toEqual(['never echoed', purge, 'never echoed', purge]);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
@@ -261,7 +305,8 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
 
   it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
     const content = `swallowed-${'x'.repeat(32)}`;
-    const byteCount = Buffer.byteLength(content, 'utf8') * 2;
+    // Two content writes plus two purge bursts (content length + 8 DELs each).
+    const byteCount = Buffer.byteLength(content, 'utf8') * 4 + 16;
     const { token, socketPath } = await readySupervisor('agent-no-echo', 'bash', [
       '-lc',
       `stty raw -echo; printf READY; dd bs=1 count=${byteCount} of=/dev/null 2>/dev/null; printf READ_TWO; sleep 30`,
@@ -274,12 +319,12 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
 
     expect(result.status).toBe(502);
     expect(result.body).toContain('input echo confirmation failed');
-    expect(Date.now() - started).toBeLessThan(6_000);
-    await waitForProcessOutput(() => stdout.includes('READ_TWO'), 'child did not consume both supervisor write attempts');
+    expect(Date.now() - started).toBeLessThan(9_000);
+    await waitForProcessOutput(() => stdout.includes('READ_TWO'), 'child did not consume both supervisor write attempts and purges');
     expect(stdout).not.toContain(content);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-echo.log');
-    expect(existsSync(logPath)).toBe(false);
-  }, 10_000);
+    expect(readFileSync(logPath, 'utf8')).toContain('"kind":"echo_confirm_failed"');
+  }, 15_000);
 
   it('creates the supervisor socket at mode 0600', async () => {
     const { socketPath } = await readySupervisor('agent-mode');
