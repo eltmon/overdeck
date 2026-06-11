@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
@@ -13,6 +14,9 @@ export default defineConfig({
   clean: false,
   sourcemap: true,
   outExtensions: () => ({ js: '.js' }),
+  alias: {
+    '@panctl/contracts': resolve(import.meta.dirname, '../../../packages/contracts/src/index.ts'),
+  },
   deps: {
     alwaysBundle: [/^@panctl\//],
     neverBundle: [
