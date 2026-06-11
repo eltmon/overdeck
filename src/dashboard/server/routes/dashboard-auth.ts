@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 
 import { Option } from 'effect';
@@ -222,6 +223,41 @@ export function peerIsHostLocalDockerBridge(
 }
 
 /**
+ * True when `addr` shares an RFC1918 subnet with one of THIS process's own
+ * network interfaces. This is the in-container counterpart of
+ * peerIsHostLocalDockerBridge: inside a container the Docker bridge is
+ * invisible — the container sees only its veth endpoints (eth0/eth1), so the
+ * docker0/br-* name filter never matches and the host-local Traefik fronting
+ * the stack 401'd every session mint (first hit live on the PAN-1737 UAT
+ * stack). A peer inside one of the container's attached Docker-network
+ * subnets can only be another container on those networks — the server
+ * publishes no host port (Traefik labels only), so no LAN client can ever
+ * present such an address. Only consulted when running inside a container.
+ */
+export function peerIsLocalContainerNetwork(
+  addr: string,
+  interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>,
+): boolean {
+  const peer = ipv4ToInt(addr);
+  if (peer === null) return false;
+  for (const addrs of Object.values(interfaces)) {
+    for (const info of addrs ?? []) {
+      if (info.family !== 'IPv4' || info.internal) continue;
+      const ifaceIp = ipv4ToInt(info.address);
+      const mask = ipv4ToInt(info.netmask);
+      if (ifaceIp === null || mask === null) continue;
+      const network = (ifaceIp & mask) >>> 0;
+      if (!isRfc1918(network)) continue;
+      if (((peer & mask) >>> 0) === network) return true;
+    }
+  }
+  return false;
+}
+
+/** Docker creates /.dockerenv in every container — stable in-container signal. */
+const runningInContainer = existsSync('/.dockerenv');
+
+/**
  * A request we trust to mint a session because it originated from this machine —
  * the local browser hitting the dashboard directly (127.0.0.1), or the
  * host-local Traefik that fronts pan.localhost. In Docker, that Traefik reaches
@@ -247,7 +283,8 @@ function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
   // Node reports dual-stack IPv4 peers as IPv4-mapped IPv6 (::ffff:a.b.c.d).
   const addr = raw.startsWith('::ffff:') ? raw.slice('::ffff:'.length) : raw;
   if (addr === '127.0.0.1' || addr === '::1') return true;
-  return peerIsHostLocalDockerBridge(addr, networkInterfaces());
+  if (peerIsHostLocalDockerBridge(addr, networkInterfaces())) return true;
+  return runningInContainer && peerIsLocalContainerNetwork(addr, networkInterfaces());
 }
 
 export function rejectUnauthorizedDashboardSessionMintRequest(
