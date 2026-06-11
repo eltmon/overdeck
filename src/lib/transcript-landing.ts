@@ -139,3 +139,97 @@ export function hasNewTranscriptUserRecord(
 
   return after.userRecordCount > before.userRecordCount;
 }
+
+export interface TranscriptWatchProbe {
+  /** A landed user record whose content contains the watched message text. */
+  matchedUserRecord: boolean;
+  /** compact_boundary records observed at/after the probe's start offset. */
+  compactBoundaryCount: number;
+}
+
+const MATCH_PREFIX_CHARS = 120;
+
+function normalizeForContentMatch(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Harness-meta user records the matcher must never treat as the user's own
+ * message landing. Compaction itself writes user-type records (the
+ * continuation summary, `<command-name>`/`<local-command-*>` entries), and a
+ * continuation summary can even quote the watched message — counting any of
+ * these as a landing would mask exactly the eaten-by-compaction case the
+ * probe exists to detect (PAN-1635 / PAN-1769).
+ */
+const META_USER_CONTENT_PREFIXES = [
+  'This session is being continued',
+  '<command-name>',
+  '<local-command-',
+  'Caveat: The messages below',
+];
+
+function userRecordText(entry: unknown): string | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const record = entry as { type?: unknown; message?: { role?: unknown; content?: unknown } };
+  if (record.type !== 'user' || record.message?.role !== 'user') return null;
+  const content = record.message.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  return content
+    .filter((item): item is { type?: unknown; text?: unknown } => !!item && typeof item === 'object')
+    .filter((item) => item.type === 'text' && typeof item.text === 'string')
+    .map((item) => item.text as string)
+    .join('\n');
+}
+
+function isCompactBoundaryRecord(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  const record = entry as { type?: unknown; subtype?: unknown };
+  return record.type === 'system' && record.subtype === 'compact_boundary';
+}
+
+/**
+ * Scan the transcript from `fromByteOffset` for (a) a user record carrying
+ * `messageText` and (b) compact boundaries. Backs the eaten-by-compaction
+ * watcher: a boundary appearing without the message means Claude Code's
+ * submit-time compaction dropped the just-delivered prompt.
+ */
+export async function probeTranscriptSince(
+  workspace: string,
+  sessionId: string,
+  fromByteOffset: number,
+  messageText: string,
+): Promise<TranscriptWatchProbe> {
+  const needle = normalizeForContentMatch(messageText).slice(0, MATCH_PREFIX_CHARS);
+  const sessionFile = sessionFilePath(workspace, sessionId);
+  if (!needle || !existsSync(sessionFile)) {
+    return { matchedUserRecord: false, compactBoundaryCount: 0 };
+  }
+
+  try {
+    const fileStat = await stat(sessionFile);
+    const start = Math.min(Math.max(0, fromByteOffset), fileStat.size);
+    const content = await readFileRange(sessionFile, start, fileStat.size);
+    let matchedUserRecord = false;
+    let compactBoundaryCount = 0;
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line) as unknown;
+        if (isCompactBoundaryRecord(entry)) {
+          compactBoundaryCount += 1;
+          continue;
+        }
+        const text = userRecordText(entry);
+        if (text === null) continue;
+        if (META_USER_CONTENT_PREFIXES.some((prefix) => text.startsWith(prefix))) continue;
+        if (normalizeForContentMatch(text).includes(needle)) matchedUserRecord = true;
+      } catch {
+        // Partial trailing line mid-append; the next probe sees it complete.
+      }
+    }
+    return { matchedUserRecord, compactBoundaryCount };
+  } catch {
+    return { matchedUserRecord: false, compactBoundaryCount: 0 };
+  }
+}
