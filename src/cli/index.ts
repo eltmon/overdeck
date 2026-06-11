@@ -644,7 +644,11 @@ program
       }
     }
 
-    if (options.noResume) {
+    // Commander negation semantics: `--no-resume` sets `options.resume = false`
+    // (there is no `options.noResume` property). PAN-1743: reading the wrong
+    // property meant PANOPTICON_NO_RESUME was never threaded to the server.
+    const noResume = options.resume === false;
+    if (noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
 
@@ -942,7 +946,7 @@ program
         stdio: 'ignore',
         env: {
           ...process.env,
-          ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+          ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
         },
       });
 
@@ -1025,7 +1029,7 @@ program
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -1084,7 +1088,7 @@ program
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 

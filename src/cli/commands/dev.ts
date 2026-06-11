@@ -188,7 +188,7 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; resume?: boolean }) {
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -217,7 +217,11 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }
   }
 
-  if (options.noResume) {
+  // Commander negation semantics: `--no-resume` sets `options.resume = false`
+  // (there is no `options.noResume` property). PAN-1743: reading the wrong
+  // property meant PANOPTICON_NO_RESUME was never threaded to the server.
+  const noResume = options.resume === false;
+  if (noResume) {
     console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
   }
 
@@ -371,7 +375,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
         API_PORT: String(config.dashboardApiPort),
         PANOPTICON_MODE: 'development',
         ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-        ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[server] ${data}`)));
