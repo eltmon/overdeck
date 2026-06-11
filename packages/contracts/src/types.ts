@@ -553,6 +553,12 @@ export const SessionNode = Schema.Struct({
   awaitingInputReason: Schema.optional(Schema.String),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
   deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
+  // Pause gate (PAN-1779 issue-tree redesign): a paused agent is deliberately
+  // suppressed from deacon auto-resume — the tree must show it as paused with
+  // the reason, never as a generic "stopped".
+  paused: Schema.optional(Schema.Boolean),
+  pausedReason: Schema.optional(Schema.String),
+  pausedAt: Schema.optional(Schema.String),
 })
 export type SessionNode = typeof SessionNode.Type
 

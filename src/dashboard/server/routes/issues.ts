@@ -1346,33 +1346,41 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 
       const filesToStage = [`.pan/specs/${proposed.filename}`];
-      const { stdout: branchStdout } = await execFileAsync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      const currentBranch = branchStdout.trim();
-      if (currentBranch === 'main') {
-        await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-        try {
-          await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-        } catch {
-          await execFileAsync(
-            'git',
-            ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
-            { cwd: projectPath, encoding: 'utf-8' },
-          );
-          console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
-          try {
-            const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
-            if (remotes.trim()) {
-              const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
-              pushChild.unref();
-            }
-          } catch { /* push failed — no remote or auth — non-fatal */ }
-        }
+      // Polyrepo project roots (e.g. myn) have no .git at projectPath — the
+      // sub-worktrees are the repos. Spec promotion still lands on disk; only
+      // the convenience commit on main is skipped.
+      const projectIsGitRepo = existsSync(join(projectPath, '.git'));
+      if (!projectIsGitRepo) {
+        console.log(`[complete-planning] Project root ${projectPath} is not a git repository (polyrepo) — pan spec updated on disk but not committed`);
       } else {
-        console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
+        const { stdout: branchStdout } = await execFileAsync(
+          'git',
+          ['rev-parse', '--abbrev-ref', 'HEAD'],
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        const currentBranch = branchStdout.trim();
+        if (currentBranch === 'main') {
+          await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
+          try {
+            await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
+          } catch {
+            await execFileAsync(
+              'git',
+              ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
+            try {
+              const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
+              if (remotes.trim()) {
+                const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+                pushChild.unref();
+              }
+            } catch { /* push failed — no remote or auth — non-fatal */ }
+          }
+        } else {
+          console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
+        }
       }
 
       const isGitRepo = existsSync(join(gitRoot, '.git'));

@@ -167,9 +167,12 @@ export interface CreateRemoteWorkspaceOptions {
   // issues.jsonl, so init-then-sync leaves the dolt DB empty and the agent
   // sees zero beads.
   if (bdInstalled) {
-    await fly.initBeads(vmName, '/workspace');
+    const initOk = await fly.initBeads(vmName, '/workspace');
+    if (!initOk) {
+      console.warn('  ⚠ bd init failed on VM — beads DB unavailable to the agent');
+    }
     const importResult = await Effect.runPromise(
-      fly.ssh(vmName, 'cd /workspace && [ -f .beads/issues.jsonl ] && bd import -i .beads/issues.jsonl 2>&1 || true')
+      fly.ssh(vmName, 'cd /workspace && if [ -f .beads/issues.jsonl ]; then bd import -i .beads/issues.jsonl 2>&1; fi')
     );
     if (importResult.exitCode !== 0) {
       console.warn(`  ⚠ bd import failed on VM: ${importResult.stderr || importResult.stdout}`);

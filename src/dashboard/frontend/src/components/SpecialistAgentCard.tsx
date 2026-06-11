@@ -47,7 +47,7 @@ const STATE_LABEL = {
 
 const STATE_COLOR = {
   sleeping: 'text-primary',
-  active: 'text-success',
+  active: 'text-info', // v1.2: blue = machine working; emerald = outcome only
   uninitialized: 'text-muted-foreground',
   suspended: 'text-warning',
 };
@@ -414,7 +414,7 @@ export function SpecialistAgentCard({
             <div className="text-sm text-muted-foreground">{specialist.description}</div>
             {/* Show current issue being worked on */}
             {specialist.currentIssue && (
-              <div className="text-xs text-signal-cost mt-1 flex items-center gap-1">
+              <div className="text-xs text-foreground mt-1 flex items-center gap-1">
                 <span className="text-muted-foreground">Working on:</span>
                 <span className="font-mono">{specialist.currentIssue}</span>
                 {issueInfo && (

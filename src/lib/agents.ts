@@ -1300,18 +1300,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const clearTimer = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+    };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      req.setTimeout(0); // cancel the idle timer
-      req.removeAllListeners('timeout');
+      clearTimer();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      req.setTimeout(0);
-      req.removeAllListeners('timeout');
+      clearTimer();
       reject(err);
     };
 
@@ -1344,9 +1347,10 @@ async function postUnixSocketJson(
       },
     );
 
-    req.setTimeout(timeoutMs, () => {
+    timeout = setTimeout(() => {
       req.destroy(new Error('socket POST timeout'));
-    });
+    }, timeoutMs);
+    timeout.unref?.();
     req.on('error', (err: Error) => {
       finishErr(err);
     });
@@ -1402,10 +1406,15 @@ export async function deliverAgentMessage(
       supervisorFailure = 'pty-token-missing';
     } else {
       try {
+        // Must exceed the supervisor's worst-case echo-confirmation path
+        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
+        // A shorter client timeout abandons the POST mid-retry and fires the
+        // tmux fallback while the supervisor is still writing — re-creating
+        // the duplicate-submit race PAN-1769 fixed.
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          4_000,
+          8_000,
           ptyToken,
           PTY_TOKEN_HEADER,
         );

@@ -193,7 +193,7 @@ describe('startRestartAnnouncer', () => {
     vi.useRealTimers();
   });
 
-  it('announces a restart status that appears after boot, exactly once', async () => {
+  it('announces a restart status that appears after boot on the fast bootstrap poll, exactly once', async () => {
     const t = makeDeps(null);
     startRestartAnnouncer(t.deps);
 
@@ -201,7 +201,10 @@ describe('startRestartAnnouncer', () => {
     expect(t.emitted).toHaveLength(0);
 
     t.setStatus(watchdogSuccess);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(t.emitted).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
     expect(t.emitted).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(45_000);

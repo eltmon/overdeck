@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-06T08:48:30.045Z",
-  "updated": "2026-06-11T07:18:00.585Z",
+  "updated": "2026-06-11T09:17:20.125Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -139,7 +139,40 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T19:11:48.901Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T07:59:57.693Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T08:47:25.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:53Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T08:53:41.730Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:00Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:00:53.829Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T09:17:20.125Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T09:17:20Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-06-11T09:18:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-1c09ba9e/context.json\n- Branch: feature/pan-1491\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491\n- HEAD reviewed: 1c09ba9ed230dc65840249d7452609513e1a7a28\n- Cycle number: 10\n- Prior cycle SHA: 383e8cf7b2861a1d217d960d8c7eba55a92ac483\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-1c09ba9e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-1c09ba9e/correctness.md | 1 |\n| performance | failed | — | 1 infrastructure failure |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-1c09ba9e/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Reviewer failed before writing a report\nThe performance convoy reviewer terminal signal was `REVIEWER_FAILED performance reviewer session ended before writing a report`. Per the review role rules, any failed reviewer blocks approval even if the other reports are readable.\n\n### [correctness] Substrate bug weights fetch issue details from the current repo, not the bug's repo — `src/dashboard/server/services/flywheel-bug-weights.ts:43`\nThe new weight service strips the `PREFIX-` portion from a substrate bug id and runs `gh issue view <number> --json body,labels` from the dashboard process cwd, without passing `--repo`. Substrate bugs are recorded with per-project prefixes such as `KRUX-3`, so this fetches `eltmon/panopticon-cli#3` when the dashboard is running from this repo instead of `eltmon/krux#3`, or fails when the number does not exist in the current repo. Runtime impact: `/api/flywheel/substrate-bug-weights` and `pan flywheel weights` can compute weights from the wrong issue body/labels or lose the whole payload for cross-repo substrate bugs. The cited file was added since prior cycle SHA `383e8cf7b2861a1d217d960d8c7eba55a92ac483`, so the cycle-10 convergence gate does not demote it.\n\n## Non-blocking Findings\n\n### [security] ~ Unauthenticated GET can drive GitHub CLI lookups — `src/dashboard/server/routes/flywheel.ts:568`\nThe new `/api/flywheel/substrate-bug-weights` route is reachable as a GET route and can invoke GitHub CLI lookups for every open substrate bug, bounded only by service concurrency. The security reviewer classified this as a hardening advisory rather than a blocking vulnerability: it does not expose tokens or issue bodies directly, but it can burn the operator's GitHub API quota and create avoidable local/remote load. Suggested follow-up: require dashboard auth or the internal token on this route before invoking weight computation, and consider short-lived caching or rate limiting keyed by window.\n\n## Clean Sub-roles\n- requirements: all 38 in-PR-scope acceptance criteria were reported implemented, with no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-1c09ba9e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
+    }
+  ]
 }

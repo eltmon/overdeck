@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
-import { forkConversationViaServer, ForkServerError } from './fork-client.js';
+import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
 
 interface ForkOptions {
@@ -71,6 +71,12 @@ export async function forkCommand(
 
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`${modeLabel} failed: ${newConv.forkError ?? 'unknown error'}`));
+    process.exit(1);
+  }
+  if (isForkResultInProgress(newConv)) {
+    console.log(chalk.yellow(`${modeLabel.charAt(0).toUpperCase() + modeLabel.slice(1)} is still in progress — watch https://pan.localhost/conv/${newConv.id}`));
+    console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
+    console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
     process.exit(1);
   }
 

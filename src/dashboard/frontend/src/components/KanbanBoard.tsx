@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore, selectAgents, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 import {
@@ -2783,6 +2784,28 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     'var(--muted-foreground)';
   const reviewSpecialists = specialists.filter((s) => s.role === 'review' && s.status !== 'stopped');
 
+  // PAN-1779: surface the pause gate on the card — paused agents are
+  // deliberately parked (amber = a human must act), never generic "stopped".
+  const pausedAgent = [...issueWorkAgents, ...(planningAgent ? [planningAgent] : [])]
+    .find((a) => (a as { paused?: boolean }).paused === true);
+  const pausedReason = pausedAgent ? (pausedAgent as { pausedReason?: string }).pausedReason : undefined;
+  const handleUnpause = useCallback(async (event: ReactMouseEvent) => {
+    event.stopPropagation();
+    if (!pausedAgent) return;
+    try {
+      const res = await fetch(`/api/agents/${pausedAgent.id}/unpause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
+      toast.success(`${issue.identifier} unpaused — deacon resumes it on the next patrol`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
+    }
+  }, [pausedAgent, issue.identifier]);
+
   const agentSubText = activeAgent
     ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
       ? `${reviewSpecialists.length} reviewers · ${getFriendlyModelName(activeAgent.model)}`
@@ -2805,6 +2828,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       selected={isSelected}
       bulkSelected={isBulkSelected}
       stuckCard={isStackUnhealthy || isPipelineStuck}
+      pausedCard={!!pausedAgent}
       mergeReadyCard={isReadyToMerge}
       runningCard={isRunning}
       unhealthyCard={isStackUnhealthy}
@@ -2861,7 +2885,29 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           ) : (
             <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
           )}
-          <span className="ml-auto">{cardVerbBadge}</span>
+          <span className="ml-auto flex items-center gap-1.5">
+            {pausedAgent && (
+              <>
+                <span
+                  data-testid={`card-paused-${issue.identifier}`}
+                  className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-warning badge-bg-warning text-warning-foreground"
+                  title={pausedReason ? `Paused: ${pausedReason}` : 'Agent is paused'}
+                >
+                  ⏸ Paused
+                </span>
+                <button
+                  type="button"
+                  data-testid={`card-unpause-${issue.identifier}`}
+                  onClick={handleUnpause}
+                  className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-warning badge-bg-warning text-warning-foreground hover:bg-warning/20"
+                  title={pausedReason ? `Unpause — paused: ${pausedReason}` : 'Unpause this agent'}
+                >
+                  ▶ Unpause
+                </button>
+              </>
+            )}
+            {cardVerbBadge}
+          </span>
         </div>
 
         {/* Title */}
