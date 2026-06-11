@@ -151,6 +151,7 @@ export function ConversationPanel({
   const draftTitleRef = useRef('');
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
+  const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const streamMessagesEnabled = useConversationMessagesStream(conversation);
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
@@ -180,12 +181,19 @@ export function ConversationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.deliveryMethod]);
 
+  useEffect(() => {
+    if (streamMessagesEnabled) {
+      void queryClient.cancelQueries({ queryKey: messagesQueryKey });
+    }
+  }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
+
   // Query messages at this level so we can drive the header working-spinner.
   // Live claude-code conversations are pushed through useConversationMessagesStream;
   // keep the existing polling path for non-claude harnesses and historical views.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
-    queryKey: conversationMessagesQueryKey(conversation.name),
+    queryKey: messagesQueryKey,
     queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
+    enabled: !streamMessagesEnabled,
     refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
   });
   const headerMessages = messagesData?.messages ?? [];

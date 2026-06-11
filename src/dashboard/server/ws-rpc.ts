@@ -15,7 +15,7 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
-import { computeContextUsage, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
+import { contextUsageFromParseResult, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
@@ -633,14 +633,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            const readContextUsage = async () => {
-              try {
-                return await computeContextUsage(sessionFile, model);
-              } catch {
-                return null;
-              }
-            };
-
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
               Effect.acquireRelease(
                 Effect.promise(async () => {
@@ -663,13 +655,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   };
                   const initial = await parseConversationMessages(sessionFile, 0, initialState);
                   let currentByteOffset = initial.byteOffset;
-                  let currentContextUsage = await readContextUsage();
+                  let currentContextUsage = contextUsageFromParseResult(initial, model);
                   const priorState: ParseState = {
                     pendingToolUse: initial.pendingToolUse,
                     unresolvedResults: initial.unresolvedResults,
                     lastSequence: initial.lastSequence,
                     planToolUseIds: initial.planToolUseIds,
                     proposedPlan: initial.proposedPlan,
+                    latestAssistantUsage: initial.latestAssistantUsage,
+                    contextBoundaryOffset: initial.contextBoundaryOffset,
                     permissionMode: initial.permissionMode,
                     countedUsageIds: initial.countedUsageIds,
                     fileEditsByAssistantId: initial.fileEditsByAssistantId,
@@ -690,12 +684,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
                   // Watch only bytes written after the initial full parse. Subsequent
                   // events are deltas; the client merges them into its cache.
-                  const handle = watchConversation(sessionFile, async (result) => {
+                  const handle = watchConversation(sessionFile, (result) => {
                     const fileWasReset = result.byteOffset < currentByteOffset;
                     currentByteOffset = result.byteOffset;
-                    if (result.totalTokens > 0 || (result.compactBoundaries?.length ?? 0) > 0 || fileWasReset) {
-                      currentContextUsage = await readContextUsage();
-                    }
+                    currentContextUsage = contextUsageFromParseResult(result, model);
                     offer({
                       kind: 'messages' as const,
                       messages: result.messages,

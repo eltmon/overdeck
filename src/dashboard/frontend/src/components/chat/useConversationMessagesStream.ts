@@ -9,12 +9,31 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, Pro
 export const conversationMessagesQueryKey = (name: string) => ['conversation-messages', name] as const;
 
 
-function mergeById<T extends { id: string }>(previous: T[], next: T[]): T[] {
+function allSequencesAfter<T extends { sequence?: number }>(sequence: number, items: T[]): boolean {
+  let lastSequence = sequence;
+  for (const item of items) {
+    if (typeof item.sequence !== 'number' || item.sequence <= lastSequence) return false;
+    lastSequence = item.sequence;
+  }
+  return true;
+}
+
+function mergeById<T extends { id: string; sequence?: number }>(previous: T[], next: T[]): T[] {
   if (next.length === 0) return previous;
   if (previous.length === 0) return next;
 
-  if (next.length === 1 && previous[previous.length - 1]?.id === next[0]!.id) {
-    return [...previous.slice(0, -1), next[0]!];
+  const previousLast = previous[previous.length - 1]!;
+  const nextFirst = next[0]!;
+
+  if (nextFirst.id === previousLast.id) {
+    const replaced = [...previous.slice(0, -1), nextFirst];
+    const rest = next.slice(1);
+    if (rest.length === 0) return replaced;
+    if (typeof nextFirst.sequence === 'number' && allSequencesAfter(nextFirst.sequence, rest)) {
+      return [...replaced, ...rest];
+    }
+  } else if (typeof previousLast.sequence === 'number' && allSequencesAfter(previousLast.sequence, next)) {
+    return [...previous, ...next];
   }
 
   const existingIds = new Set(previous.map((item) => item.id));
@@ -90,6 +109,7 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
     if (!enabled) return;
 
     const queryKey = conversationMessagesQueryKey(conversation.name);
+    void queryClient.cancelQueries({ queryKey });
     const unsubscribe = getTransport().subscribe(
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,
