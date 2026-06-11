@@ -1122,7 +1122,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     permissionMode: 'auto',
   },
   codex: {
-    permissionMode: 'workspace',
+    permissionMode: 'auto-review',
   },
 };
 

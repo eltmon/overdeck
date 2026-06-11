@@ -648,7 +648,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       permissionMode: config.claude?.permissionMode ?? 'auto',
     },
     codex: {
-      permissionMode: (config.codex?.permissionMode ?? 'workspace') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
+      permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
     },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };

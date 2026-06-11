@@ -2011,7 +2011,7 @@ export function SettingsPage() {
         <div>
           <p className="text-xs font-medium text-foreground mb-1">Codex</p>
           <p className="text-xs text-muted-foreground mb-3">
-            Applies to Codex TUI conversation sessions. Takes effect on the next new conversation.
+            Applies to Codex TUI conversation sessions. Takes effect on the next resume or new conversation.
           </p>
           <div className="space-y-2">
             {([
@@ -2024,14 +2024,14 @@ export function SettingsPage() {
               },
               {
                 value: 'workspace' as const,
-                title: 'Workspace (recommended)',
+                title: 'Workspace',
                 flag: 'approval_policy=on-request + sandbox=workspace-write',
                 description:
                   'Codex works freely inside the working directory, but asks before going outside it or using the network.',
               },
               {
                 value: 'auto-review' as const,
-                title: 'Auto-review',
+                title: 'Auto-review (recommended)',
                 flag: 'approvals_reviewer=auto_review + sandbox=workspace-write',
                 description:
                   'A sub-agent automatically reviews and answers approval requests instead of prompting you. Codex still runs inside the workspace sandbox — the reviewer decides whether to allow escapes.',
@@ -2044,7 +2044,7 @@ export function SettingsPage() {
                   'No approval prompts — Codex has full filesystem and network access. Use with care.',
               },
             ]).map((opt) => {
-              const selected = (formData.codex?.permissionMode ?? 'workspace') === opt.value;
+              const selected = (formData.codex?.permissionMode ?? 'auto-review') === opt.value;
               return (
                 <button
                   key={opt.value}

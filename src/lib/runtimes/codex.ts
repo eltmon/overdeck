@@ -206,7 +206,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       // Pre-seed folder trust so the TUI skips its first-run autonomy wizard.
       // TOML basic-string key: escape backslashes and double-quotes in the path.
       const escaped = opts.trustedDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-      lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"`)
+      lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
