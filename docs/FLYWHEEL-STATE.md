@@ -1630,3 +1630,24 @@ dashboard server (`dashboard.log`: `purpose=role-run source=agents.ts:spawnRun`
 via `onIssueStateChangePromise`). When hunting a mystery dispatch, grep
 `dashboard.log` for `claude-invoke.*<session>` — the deacon log only covers
 patrol-driven actions.
+
+### BOTH tick-1 strikes LANDED within ~40 min — and the bookkeeping pattern held
+
+- **PAN-1699 → 8101a3c76** (signal-before-stalling roles contract). Closed with
+  evidence (prompt-only change; content IS the deliverable). The strike also
+  flagged that **roles/ship.md does not exist** while every ship spawn passes
+  `--agent roles/ship.md` (agents.ts:460 returns it unconditionally; spawn then
+  takes the has-definition branch for permission flags on a lie) → filed
+  **PAN-1747**. Failing-soft is why it went unnoticed — ship sessions run fine.
+- **PAN-1723 → 2d0e4f5c8** (pristine-worktree deploy). Left OPEN: real
+  verification is the next live merge logging the built sha. Check the deploy
+  log on the next merge, then close with evidence.
+- Both strikes parked at the prompt WITHOUT `pan done` citing the strike
+  contract (4-for-4 now). Both pushed `strike/<id>:main` directly — the good
+  shared-worktree pattern from strike-1717.
+- **Landed ≠ live, again:** roles/*.md prompts and the deploy script execute
+  from the PRIMARY worktree, which had diverged behind origin. The orchestrator
+  must fast-forward local main after strikes land or the fixes stay inert.
+  Reconcile recipe when the tree has live .pan writes: path-scoped chore-commit
+  of .pan/continues+specs (repo convention), then `git pull --rebase`, then
+  push. NEVER autostash (it's a stash).
