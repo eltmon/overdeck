@@ -217,7 +217,7 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(result.appendedEvents).toEqual([]);
   });
 
-  it('refuses remote review requests before checking workspace HEAD', async () => {
+  it('rejects remote workspaces without checking remote HEAD', async () => {
     loadWorkspaceMetadataMock.mockReturnValue({
       location: 'remote',
       vmName: 'pan-workspace-123',
@@ -228,8 +228,10 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     const result = await postRequestReview('PAN-1417');
 
     expect(result.status).toBe(409);
-    expect(result.body).toMatchObject({ success: false });
-    expect(result.body.message).toContain('executing remotely on pan-workspace-123');
+    expect(result.body).toMatchObject({
+      success: false,
+      message: expect.stringContaining('PAN-1417 is executing remotely on pan-workspace-123'),
+    });
     expect(execBehaviorMock.mock.calls.some(([command]) => String(command).includes('git rev-parse HEAD'))).toBe(false);
     expect(setReviewStatusMock).not.toHaveBeenCalled();
   });

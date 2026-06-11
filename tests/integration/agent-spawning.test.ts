@@ -35,6 +35,35 @@ const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
 }));
 
+const transcriptLandingMocks = vi.hoisted(() => ({
+  snapshotCount: 0,
+  landed: false,
+  useLandedFlag: false,
+  snapshotCounts: undefined as number[] | undefined,
+}));
+
+vi.mock('../../src/lib/transcript-landing.js', () => ({
+  captureTranscriptUserRecordSnapshot: vi.fn(async () => {
+    if (transcriptLandingMocks.snapshotCounts) {
+      const count = transcriptLandingMocks.snapshotCounts.length > 1
+        ? transcriptLandingMocks.snapshotCounts.shift()!
+        : transcriptLandingMocks.snapshotCounts[0] ?? 0;
+      return { sessionFile: '/tmp/session.jsonl', userRecordCount: count };
+    }
+    if (transcriptLandingMocks.useLandedFlag) {
+      return { sessionFile: '/tmp/session.jsonl', userRecordCount: transcriptLandingMocks.landed ? 1 : 0 };
+    }
+    transcriptLandingMocks.snapshotCount += 1;
+    return {
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: transcriptLandingMocks.snapshotCount,
+    };
+  }),
+  hasNewTranscriptUserRecord: vi.fn((before: { userRecordCount: number }, after: { userRecordCount: number }) =>
+    after.userRecordCount > before.userRecordCount,
+  ),
+}));
+
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
   createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
@@ -191,8 +220,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     testWorkspace = join(testPanopticonHome, 'test-workspace');
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
+    transcriptLandingMocks.snapshotCount = 0;
+    transcriptLandingMocks.landed = false;
+    transcriptLandingMocks.useLandedFlag = false;
+    transcriptLandingMocks.snapshotCounts = undefined;
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
+    vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
     vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
     // PAN-1594: spawnRun/spawnAgent now wait for the session-start hook to write
     // ready.json (waitForReadySignal) instead of scraping the tmux pane. The real
@@ -410,6 +444,35 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result).toEqual({ success: true, messageDelivered: true });
       expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining(`original kickoff for ${agentId}`));
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+      expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
+    });
+
+    it('resumeAgent marks kickoff redelivered only after the redelivery lands', async () => {
+      vi.useFakeTimers();
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-redeliver-second';
+      writeResumableWorkAgent(agentId, false);
+      transcriptLandingMocks.useLandedFlag = true;
+      let deliveryAttempts = 0;
+      vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.sync(() => {
+        deliveryAttempts += 1;
+        if (deliveryAttempts === 2) transcriptLandingMocks.landed = true;
+      }));
+
+      try {
+        const result = resumeAgent(agentId);
+        await vi.waitFor(() => expect(tmux.createSession).toHaveBeenCalled());
+        await vi.advanceTimersByTimeAsync(1_000);
+        await vi.waitFor(() => expect(tmux.sendKeys).toHaveBeenCalledTimes(1));
+        expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(false);
+        await vi.advanceTimersByTimeAsync(3_000);
+        await vi.waitFor(() => expect(tmux.sendKeys).toHaveBeenCalledTimes(2));
+        await expect(result).resolves.toEqual({ success: true, messageDelivered: true });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(deliveryAttempts).toBe(2);
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
