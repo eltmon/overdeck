@@ -580,11 +580,13 @@ export interface YamlConfig {
    *                 Codex can browse files but asks before any write or command.
    * 'workspace'   — approval_policy=on-request + sandbox_mode=workspace-write (default):
    *                 Codex works freely inside the cwd, asks before going outside or using the network.
+   * 'auto-review' — approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write:
+   *                 A sub-agent reviews and auto-answers approval requests instead of prompting the user.
    * 'full-access' — approval_policy=never + sandbox_mode=danger-full-access:
    *                 No approval prompts; full filesystem and network access.
    */
   codex?: {
-    permissionMode?: 'read-only' | 'workspace' | 'full-access';
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }
 
@@ -837,7 +839,7 @@ export interface NormalizedConfig {
 
   /** Permission-mode for Codex TUI conversation sessions. Always defined; defaults to 'workspace'. */
   codex: {
-    permissionMode: 'read-only' | 'workspace' | 'full-access';
+    permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }
 
@@ -2201,7 +2203,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       result.claude.permissionMode = config.claude.permissionMode;
     }
 
-    if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'full-access')) {
+    if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {
       result.codex.permissionMode = config.codex.permissionMode;
     }
 

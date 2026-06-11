@@ -1448,7 +1448,7 @@ export function SettingsPage() {
     });
   };
 
-  const handleCodexPermissionModeChange = (mode: 'read-only' | 'workspace' | 'full-access') => {
+  const handleCodexPermissionModeChange = (mode: 'read-only' | 'workspace' | 'auto-review' | 'full-access') => {
     const next: SettingsConfig = {
       ...formData,
       codex: {
@@ -2028,6 +2028,13 @@ export function SettingsPage() {
                 flag: 'approval_policy=on-request + sandbox=workspace-write',
                 description:
                   'Codex works freely inside the working directory, but asks before going outside it or using the network.',
+              },
+              {
+                value: 'auto-review' as const,
+                title: 'Auto-review',
+                flag: 'approvals_reviewer=auto_review + sandbox=workspace-write',
+                description:
+                  'A sub-agent automatically reviews and answers approval requests instead of prompting you. Codex still runs inside the workspace sandbox — the reviewer decides whether to allow escapes.',
               },
               {
                 value: 'full-access' as const,

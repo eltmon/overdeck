@@ -1562,11 +1562,13 @@ export async function spawnConversationSession(
         codexPermMode === 'full-access' ? 'danger-full-access'
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
+      const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
       const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
+        approvalsReviewer: codexApprovalsReviewer,
       });
       codexFields = {
         harness: 'codex',

@@ -204,9 +204,10 @@ export interface SettingsConfig {
    *
    * 'read-only'   — asks before any write or command (approval_policy=on-request + sandbox=read-only)
    * 'workspace'   — works freely inside cwd, asks before going outside (default)
+   * 'auto-review' — a sub-agent auto-reviews approval requests (approval_policy=on-request + approvals_reviewer=auto_review)
    * 'full-access' — no prompts, full filesystem + network access
    */
   codex?: {
-    permissionMode?: 'read-only' | 'workspace' | 'full-access';
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }

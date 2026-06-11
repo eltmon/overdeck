@@ -162,6 +162,7 @@ export interface InitCodexHomeOpts {
   trustedDir?: string
   approvalPolicy?: string
   sandboxMode?: string
+  approvalsReviewer?: string
 }
 
 /**
@@ -192,6 +193,9 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     ]
     if (opts.sandboxMode) {
       lines.push(`sandbox_mode = "${opts.sandboxMode}"`)
+    }
+    if (opts.approvalsReviewer) {
+      lines.push(`approvals_reviewer = "${opts.approvalsReviewer}"`)
     }
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)

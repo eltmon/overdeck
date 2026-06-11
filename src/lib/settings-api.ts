@@ -236,12 +236,13 @@ export interface ApiSettingsConfig {
    *
    * 'read-only'   → approval_policy=on-request + sandbox_mode=read-only
    * 'workspace'   → approval_policy=on-request + sandbox_mode=workspace-write (default)
+   * 'auto-review' → approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write
    * 'full-access' → approval_policy=never + sandbox_mode=danger-full-access
    *
    * Persisted under `codex.permissionMode` in `~/.panopticon/config.yaml`.
    */
   codex?: {
-    permissionMode?: 'read-only' | 'workspace' | 'full-access';
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
@@ -647,7 +648,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       permissionMode: config.claude?.permissionMode ?? 'auto',
     },
     codex: {
-      permissionMode: config.codex?.permissionMode ?? 'workspace',
+      permissionMode: (config.codex?.permissionMode ?? 'workspace') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
     },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
