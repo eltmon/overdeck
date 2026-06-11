@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1579",
   "created": "2026-06-04T06:06:30.480Z",
-  "updated": "2026-06-08T23:25:05.553Z",
+  "updated": "2026-06-11T09:17:22.556Z",
   "gitState": {
     "branch": "feature/pan-1579",
     "sha": "b8960b6dc",
@@ -126,6 +126,11 @@
       "reason": "feedback",
       "note": "[2026-06-08T15:34Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-06-08T15:34:32.425Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:01:49.590Z"
     }
   ],
   "feedback": []

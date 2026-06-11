@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1242",
   "created": "2026-05-26T02:46:10.046Z",
-  "updated": "2026-06-11T08:54:20.529Z",
+  "updated": "2026-06-11T09:13:39.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,15 +154,17 @@
       "reason": "feedback",
       "note": "[2026-06-11T08:54Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-06-11T08:54:20.529Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:03Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T09:03:45.869Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:08Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-11T09:08:36.538Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-06-11T08:54:20Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1242 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/test/result.json\n  - src/lib/__tests__/config-yaml-conversation-search.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1242 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ]
+  "feedback": []
 }

@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1765",
   "created": "2026-06-11T06:56:12.506Z",
-  "updated": "2026-06-11T07:04:43.000Z",
-  "gitState": { "branch": "feature/pan-1765", "sha": "8e3393c86", "dirty": false },
+  "updated": "2026-06-11T09:14:20.253Z",
+  "gitState": {
+    "branch": "feature/pan-1765",
+    "sha": "8e3393c86",
+    "dirty": false
+  },
   "decisions": [
     {
       "id": "D1",
@@ -102,6 +106,31 @@
       "reason": "planning",
       "note": "Auto-mode discovery complete. Verified root causes: (1) no review dispatch path consults blockerReasons (zero hits in src/lib/cloister/); (2) checkPostReviewCommits resets passed verdicts on any HEAD tree change (the 05:31:56 signature) and force-redispatches convoys; (3) PAN-1620 reconcile service skips already-flagged rows so stale conflict flags never clear; (4) conflict resolution machinery exists only in the post-merge train reconciler. Plan: conflict gate at spawnReviewRoleForIssuePromise + resolver dispatch + stale-flag re-verification. 8 beads, vBRIEF written.",
       "agentModel": "agent:claude-fable-5"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:09:45.545Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:10:19.994Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:11:40.894Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:13:53.840Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:14:20.253Z"
     }
   ],
   "feedback": []
