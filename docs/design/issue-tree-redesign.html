@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Issue Tree Redesign — mockup v2 (style-guide conformant)</title>
+<title>Issue Tree Redesign — mockup v3 (style guide v1.2)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet">
 <style>
@@ -62,6 +62,7 @@
   }
   .issue.h-working::before { background: var(--primary); }      /* machine working = blue */
   .issue.h-paused::before  { background: var(--warning); }      /* human needed = amber  */
+  .issue.h-ready::before   { background: var(--warning); }      /* merge gate = human needed = amber */
   .issue.h-error::before   { background: var(--destructive); }  /* failed/stuck = red    */
   .issue.h-merged::before  { background: var(--success); }      /* merged/done = emerald */
 
@@ -105,6 +106,9 @@
   /* paused = live, immediately actionable → semantic CTA allowed (guide exception) */
   .btn.unpause { color: var(--warning-fg); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
   .btn.unpause:hover { background: color-mix(in srgb, var(--warning) 18%, transparent); }
+  /* the single primary CTA exception (guide: Start Agent / Merge) */
+  .btn.merge { color: #fff; border-color: transparent; background: var(--primary); }
+  .btn.merge:hover { filter: brightness(1.15); }
 
   /* pipeline mini-strip — neutral fills; ONLY the signal segment is colored */
   .pipe { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; flex: none; }
@@ -204,14 +208,14 @@
 </svg>
 
 <div class="page">
-  <h1>Project issue tree — redesign mockup <span style="color:var(--muted-2)">v2 · style-guide conformant</span></h1>
-  <div class="sub">DM Sans / SF Mono per PAN-698 rules · badge formula 8%/32% · warm neutrals · one colored signal per row (amber = human needed · blue = machine working · red = failed · emerald = merged)</div>
+  <h1>Project issue tree — redesign mockup <span style="color:var(--muted-2)">v3 · style guide v1.2</span></h1>
+  <div class="sub">DM Sans / SF Mono per PAN-698 rules · badge formula 8%/32% · warm neutrals · one colored signal per row · signal law v1.2: <span style="color:var(--info)">blue = machine working</span> · <span style="color:var(--warning-fg)">amber = human needed</span> · <span style="color:var(--destructive-fg)">red = action required</span> · <span style="color:var(--success-fg)">emerald = verified outcome</span> · <span style="color:var(--signal-review-fg)">purple = specialist activity</span> · <span style="color:var(--signal-cost-fg)">cyan = money</span></div>
 
   <div class="cols">
 
     <!-- ════════════════ THE TREE ════════════════ -->
     <div class="rail">
-      <div class="rail-head"><span>panopticon-cli</span><span class="count">6 issues · 9 agents</span></div>
+      <div class="rail-head"><span>panopticon-cli</span><span class="count">7 issues · 9 agents</span></div>
 
       <!-- PAUSED issue (the hero case) — signal: amber -->
       <div class="issue h-paused open">
@@ -325,6 +329,26 @@
         </div>
       </div>
 
+      <!-- READY FOR MERGE — the human gate; signal: amber + the one primary CTA -->
+      <div class="issue h-ready">
+        <div class="issue-row">
+          <div class="title-line">
+            <svg class="chev" viewBox="0 0 11 12"><use href="#i-chev"/></svg>
+            <span class="iid mono">PAN-1719</span>
+            <span class="ititle">Container peer trust for in-container Traefik session mint</span>
+          </div>
+          <div class="meta-line">
+            <span class="badge warning">Ready · awaiting your merge 2h</span>
+            <button class="btn merge">Merge</button>
+            <span class="pipe"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i></span>
+          </div>
+          <div class="res-line">
+            <span class="res"><svg viewBox="0 0 16 16"><use href="#i-pr"/></svg>#1742 CI ✓</span>
+            <span class="res"><svg viewBox="0 0 16 16"><use href="#i-branch"/></svg>feature/pan-1719</span>
+          </div>
+        </div>
+      </div>
+
       <!-- MERGED · awaiting close-out — signal: emerald -->
       <div class="issue h-merged">
         <div class="issue-row">
@@ -409,14 +433,15 @@
       </div>
 
       <div class="panel">
-        <h3>Style-guide conformance (v1 → v2)</h3>
+        <h3>Style-guide v1.2 conformance (v3)</h3>
         <ul class="notes">
-          <li><b>Fonts:</b> Inter dropped (deprecated) → DM Sans body; SF Mono for identifiers only (issue IDs, branches, PR #s, model IDs, costs).</li>
-          <li><b>Weights:</b> everything font-medium 500 — no semibold/bold; hierarchy via size + contrast.</li>
-          <li><b>Badges:</b> rounded-sm, 8% bg / 32% border formula, {signal}-foreground text — pills removed.</li>
-          <li><b>Color semantics fixed:</b> amber = human needed (paused, In Review states wanting action) · blue = machine working · emerald = merged/done · red = failed · purple = live review activity only · cyan = cost figures only.</li>
-          <li><b>Restraint:</b> one colored signal per row — the edge bar + at most one signal badge; phase/train/labels neutral; resources neutral unless exceptional (CI ✗); pipeline strip neutral with only the signal segment colored.</li>
-          <li><b>Warm neutrals</b> (neutral-400/500), borders white/6% — slate grays removed.</li>
+          <li><b>Signal law v1.2 throughout:</b> running agents and live convoys are <b>blue</b> (machine working) — matching the StatusDot migration now shipped on main. Emerald appears only as verified outcome (Merged). Amber appears only where a human must act: paused (+ Unpause) and the ready-for-merge gate (+ Merge, the row's one primary CTA).</li>
+          <li><b>Purple</b> only on live specialist activity (the reviewing convoy icon); the In Review <i>phase</i> badge is neutral unless it is the row's signal.</li>
+          <li><b>Cyan</b> only on money (per-agent cost, SF Mono tabular).</li>
+          <li><b>Fonts:</b> DM Sans body; SF Mono for identifiers only (IDs, branches, PR #s, model IDs, costs). font-medium 500 everywhere.</li>
+          <li><b>Badges:</b> rounded-sm, 8% bg / 32% border, {signal}-foreground text.</li>
+          <li><b>Restraint:</b> one colored signal per row — edge bar + at most one signal badge; phase/train/labels/resources neutral unless exceptional (CI ✗); pipeline strip neutral fills with only the signal segment colored.</li>
+          <li><b>Warm neutrals</b> (neutral-400/500), borders white/6%; titles wrap two lines, never clipped.</li>
         </ul>
       </div>
     </div>
