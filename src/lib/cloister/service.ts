@@ -155,7 +155,7 @@ const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
   in_progress: 'work',
   in_review: 'review',
   testing: 'test',
-  shipping: 'ship',
+  shipping: null,
   closed: null,
   canceled: null,
 };
@@ -176,7 +176,7 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
   const base = `agent-${issueId.toLowerCase()}`;
   if (agentId === base) return 'work';
   const role = agentId.slice(base.length + 1);
-  return ['plan', 'review', 'test', 'ship'].includes(role) ? role as Role : null;
+  return ['plan', 'review', 'test'].includes(role) ? role as Role : null;
 }
 
 /**
