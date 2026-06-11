@@ -27,6 +27,7 @@ import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
+import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore, initEventStore } from './event-store.js';
@@ -497,6 +498,16 @@ emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared st
 fixStuckReadyForMerge();
 // PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
 fixStuckCommentedReviews();
+// PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
+// while the server was down otherwise leave stale blockers pinning readyForMerge=false.
+void reconcileStaleGitHubBlockers()
+  .then((n) => {
+    if (n > 0) {
+      console.log(`[panopticon] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Reconciled GitHub-native blockers for ${n} issue(s) on startup` });
+    }
+  })
+  .catch((err: any) => console.warn(`[panopticon] Startup blocker reconciliation failed: ${err.message}`));
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
