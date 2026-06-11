@@ -4,6 +4,7 @@ import type { FlywheelStats } from '@panctl/contracts';
 import { listInWindow, type FlywheelSubstrateBug } from '../../../lib/database/flywheel-substrate-bugs-db.js';
 import { computeSubstrateBugWeight } from '../../../lib/flywheel-bug-weight.js';
 import { parseAffectedCriteria } from '../../../lib/flywheel-affected-criteria.js';
+import { resolveGitHubIssueSync } from '../../../lib/tracker-utils.js';
 import { computeFlywheelStats, parseFlywheelStatsWindow } from './flywheel-telemetry.js';
 import { derivePipelineRunStatsInputs } from './pipeline-run-metrics.js';
 
@@ -45,6 +46,15 @@ function issueNumber(issueId: string): string {
   return match?.[1] ?? issueId;
 }
 
+function issueViewArgs(issueId: string): string[] {
+  const resolution = resolveGitHubIssueSync(issueId);
+  if (resolution.isGitHub) {
+    return ['issue', 'view', String(resolution.number), '--repo', `${resolution.owner}/${resolution.repo}`, '--json', 'body,labels'];
+  }
+
+  return ['issue', 'view', issueNumber(issueId), '--json', 'body,labels'];
+}
+
 function parseLabels(labels: unknown): string[] {
   if (!Array.isArray(labels)) return [];
   return labels.flatMap((label) => {
@@ -57,7 +67,7 @@ function parseLabels(labels: unknown): string[] {
 }
 
 export async function fetchGitHubIssueDetails(issueId: string): Promise<FlywheelIssueDetails> {
-  const { stdout } = await execFileAsync('gh', ['issue', 'view', issueNumber(issueId), '--json', 'body,labels'], {
+  const { stdout } = await execFileAsync('gh', issueViewArgs(issueId), {
     cwd: process.cwd(),
     maxBuffer: 1024 * 1024,
   });

@@ -1,9 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStats, FlywheelStatsCriterion } from '@panctl/contracts';
 import type { FlywheelSubstrateBug } from '../../../../lib/database/flywheel-substrate-bugs-db.js';
-import { computeFlywheelSubstrateBugWeights } from '../flywheel-bug-weights.js';
+
+const serviceMocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
+}));
+
+vi.mock('node:child_process', async (importActual) => ({
+  ...(await importActual<typeof import('node:child_process')>()),
+  execFile: serviceMocks.execFile,
+}));
+
+vi.mock('../../../../lib/tracker-utils.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../lib/tracker-utils.js')>()),
+  resolveGitHubIssueSync: serviceMocks.resolveGitHubIssueSync,
+}));
+
+import { computeFlywheelSubstrateBugWeights, fetchGitHubIssueDetails } from '../flywheel-bug-weights.js';
 
 const generatedAt = new Date('2026-06-06T00:00:00.000Z');
+
+type ExecFileCallback = (error: Error | null, result: { stdout: string; stderr: string }) => void;
 
 function criterion(overrides: Partial<FlywheelStatsCriterion> = {}): FlywheelStatsCriterion {
   return {
@@ -47,6 +65,42 @@ function bug(issueId: string): FlywheelSubstrateBug {
     updatedAt: '2026-06-01T00:00:00.000Z',
   };
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('fetchGitHubIssueDetails', () => {
+  it('fetches issue details from the issue id prefix repo', async () => {
+    serviceMocks.resolveGitHubIssueSync.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'krux',
+      prefix: 'KRUX',
+      number: 3,
+    });
+    serviceMocks.execFile.mockImplementation((...args: unknown[]) => {
+      const callback = args[3] as ExecFileCallback;
+      callback(null, {
+        stdout: JSON.stringify({ body: 'Flywheel-Affects-Criterion: 1', labels: [{ name: 'affects-criterion-7' }] }),
+        stderr: '',
+      });
+    });
+
+    const result = await fetchGitHubIssueDetails('KRUX-3');
+
+    expect(result).toEqual({ body: 'Flywheel-Affects-Criterion: 1', labels: ['affects-criterion-7'] });
+    expect(serviceMocks.execFile).toHaveBeenCalledWith('gh', [
+      'issue',
+      'view',
+      '3',
+      '--repo',
+      'eltmon/krux',
+      '--json',
+      'body,labels',
+    ], expect.objectContaining({ cwd: process.cwd(), maxBuffer: 1024 * 1024 }), expect.any(Function));
+  });
+});
 
 describe('computeFlywheelSubstrateBugWeights', () => {
   it('bounds concurrent issue detail fetches', async () => {
