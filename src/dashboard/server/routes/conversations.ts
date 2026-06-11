@@ -3595,6 +3595,50 @@ function handoffTitleFromFocus(focus: string | undefined, fallback: string): str
   return `Handoff: ${trimmed}`;
 }
 
+type ForkPipelineRuntimeOverrides = Partial<{
+  sessionExists: (sessionName: string) => Promise<boolean>;
+  isHarnessProcessAlive: (sessionName: string) => Promise<boolean>;
+  spawnConversationSession: typeof spawnConversationSession;
+  waitForTmuxSession: typeof waitForTmuxSession;
+  getAgentRuntimeStateSync: typeof getAgentRuntimeStateSync;
+}>;
+
+let forkPipelineRuntimeOverrides: ForkPipelineRuntimeOverrides = {};
+
+export function __setForkPipelineRuntimeOverridesForTest(overrides: ForkPipelineRuntimeOverrides): void {
+  forkPipelineRuntimeOverrides = overrides;
+}
+
+export function __resetForkPipelineRuntimeOverridesForTest(): void {
+  forkPipelineRuntimeOverrides = {};
+}
+
+async function forkSessionExists(sessionName: string): Promise<boolean> {
+  return forkPipelineRuntimeOverrides.sessionExists
+    ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
+    : Effect.runPromise(sessionExists(sessionName));
+}
+
+async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
+  return forkPipelineRuntimeOverrides.isHarnessProcessAlive
+    ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
+    : isHarnessProcessAlive(sessionName);
+}
+
+function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {
+  return forkPipelineRuntimeOverrides.getAgentRuntimeStateSync
+    ? forkPipelineRuntimeOverrides.getAgentRuntimeStateSync(sessionName)
+    : getAgentRuntimeStateSync(sessionName);
+}
+
+async function forkSpawnConversationSession(...args: Parameters<typeof spawnConversationSession>): Promise<void> {
+  return (forkPipelineRuntimeOverrides.spawnConversationSession ?? spawnConversationSession)(...args);
+}
+
+async function forkWaitForTmuxSession(...args: Parameters<typeof waitForTmuxSession>): Promise<void> {
+  return (forkPipelineRuntimeOverrides.waitForTmuxSession ?? waitForTmuxSession)(...args);
+}
+
 /**
  * Watch the hook-driven runtime mirror to confirm a delivered fork brief was
  * actually accepted as a prompt. Once a prompt is submitted the agent leaves
@@ -3614,7 +3658,7 @@ export async function confirmForkPromptAccepted(
   const deadline = Date.now() + timeoutMs;
   let sawIdle = false;
   do {
-    const state = getAgentRuntimeStateSync(tmuxSession)?.state;
+    const state = forkRuntimeState(tmuxSession)?.state;
     if (state === 'active' || state === 'waiting-on-human') return 'accepted';
     if (state === 'idle') sawIdle = true;
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -3648,13 +3692,17 @@ async function ensureForkSessionReady(
   resume: boolean,
   plainFork = false,
 ): Promise<void> {
-  const alive = await Effect.runPromise(sessionExists(conv.tmuxSession));
-  if (alive) {
-    console.info(`[fork-pipeline] Reusing existing tmux session ${conv.tmuxSession} for ${conv.name}`);
-    return;
+  const tmuxAlive = await forkSessionExists(conv.tmuxSession);
+  if (tmuxAlive) {
+    const harnessAlive = await forkHarnessProcessAlive(conv.tmuxSession);
+    if (harnessAlive) {
+      console.info(`[fork-pipeline] Reusing existing live tmux session ${conv.tmuxSession} for ${conv.name}`);
+      return;
+    }
+    console.warn(`[fork-pipeline] Existing tmux session ${conv.tmuxSession} for ${conv.name} is a keep-alive corpse — recreating`);
   }
 
-  await spawnConversationSession(
+  await forkSpawnConversationSession(
     conv.tmuxSession,
     conv.cwd,
     sessionId,
@@ -3665,7 +3713,7 @@ async function ensureForkSessionReady(
     conv.harness ?? 'claude-code',
     plainFork,
   );
-  await waitForTmuxSession(conv.tmuxSession);
+  await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
 async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
@@ -3705,7 +3753,7 @@ async function injectForkSummary(conv: Conversation, summary: string, caller: st
   }
 }
 
-async function runForkPipeline(
+export async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
   sessionId: string,
@@ -3733,11 +3781,13 @@ async function runForkPipeline(
       // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
       throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
-    const alive = await Effect.runPromise(sessionExists(conv.tmuxSession));
-    if (!alive) {
+    const tmuxAlive = await forkSessionExists(conv.tmuxSession);
+    const reusableSession = tmuxAlive && await forkHarnessProcessAlive(conv.tmuxSession);
+    if (!reusableSession) {
       // Plain Claude Code fork: copy JSONL from last compact boundary into the new
       // session file, then spawn with --resume so Claude Code loads the history
-      // directly.
+      // directly. A tmux keep-alive corpse is not reusable; ensureForkSessionReady()
+      // will recreate it, so refresh the session file before respawning.
       const forkSessionFile = await resolveSessionFile(conv);
       if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
       await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
@@ -3909,8 +3959,8 @@ export async function recoverStuckForks(): Promise<number> {
         continue;
       }
 
-      const tmuxAlive = await Effect.runPromise(sessionExists(fork.tmuxSession));
-      const runtimeState = getAgentRuntimeStateSync(fork.tmuxSession)?.state;
+      const tmuxAlive = await forkSessionExists(fork.tmuxSession);
+      const runtimeState = forkRuntimeState(fork.tmuxSession)?.state;
       if (tmuxAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
         markConversationActive(fork.name);
         updateForkStatus(fork.name, null);
@@ -3925,7 +3975,7 @@ export async function recoverStuckForks(): Promise<number> {
         continue;
       }
 
-      await runForkPipeline(
+      await registerInFlightForkPipeline(runForkPipeline(
         fork.name,
         parentConv,
         request.sessionId,
@@ -3938,7 +3988,7 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthor,
         request.handoffAuthorModel,
         request.handoffAuthorHarness,
-      );
+      ));
       recovered += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
