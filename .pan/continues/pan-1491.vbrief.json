@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-06T08:48:30.045Z",
-  "updated": "2026-06-11T07:18:00.585Z",
+  "updated": "2026-06-11T07:59:57.693Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -139,7 +139,20 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T19:11:48.901Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T07:59:57.693Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T07:59:57Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-06-11T07:59:09Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/context.json\n- Branch: feature/pan-1491\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491\n- HEAD reviewed: 383e8cf7b2861a1d217d960d8c7eba55a92ac483\n- Current workspace HEAD observed during synthesis: c9e7c054d126f97ce84476776c4dc26897b0b27e\n- Cycle number: 9\n- Prior cycle SHA: 2f8106b2e5a4603f0a3a001377d9fafd82b95fa6\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/requirements.md | 0 |\n\n## Blocking Findings\n\n### [infrastructure] Review context is stale and the workspace is not in a reviewable git state — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491`\nThe convoy reports and manifest reviewed commit `383e8cf7b2861a1d217d960d8c7eba55a92ac483`, but synthesis observed the workspace at detached HEAD `c9e7c054d126f97ce84476776c4dc26897b0b27e` with unresolved merge conflicts:\n\n- `UU /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/specs/2026-05-25-PAN-1491-feat-flywheel-metric-aware-prioritization-weight-substrate-bug-suggestions-by-which-v1-0-criterion-they-affect.vbrief.json`\n- `UU /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/src/dashboard/server/routes/__tests__/flywheel.test.ts`\n\nApproving this review would certify a commit that is no longer the current workspace state while the current workspace is conflicted. The workspace must be restored to a clean `feature/pan-1491` branch state and review must be rerun against the actual HEAD.\n\n## Non-blocking Findings\n\n### [requirements] ~ Whole-feature acceptance criteria outside this PR's reviewed scope\nThe requirements reviewer found AC10–AC38 are whole-feature-scope items covering the broader metric-aware flywheel feature: weight calculation, substrate-bug-weight API, CLI command, skill lint, role-prompt updates, docs, and frontend rendering. The current manifest's reviewed diff is limited to the contract schema/test and affected-criteria parser/test, so those broader items are non-blocking under the review scope rules.\n\n## Scope Note\nThe four convoy reviewer reports are clean for the manifest-reviewed diff, and the requirements reviewer found all 9 in-PR-scope criteria implemented. This synthesis requests changes because the workspace HEAD and git state no longer match the reviewed manifest, not because the sub-role reports found code-level blockers in the reviewed four-file diff.\n\n## Clean Sub-roles\n- security — no security findings.\n- correctness — no correctness findings.\n- performance — no performance findings.\n- requirements — 9/9 in-PR-scope requirements implemented; no requirements blockers.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-383e8cf7/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
+    }
+  ]
 }
