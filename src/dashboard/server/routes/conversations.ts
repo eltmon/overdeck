@@ -3954,17 +3954,18 @@ export async function recoverStuckForks(): Promise<number> {
         continue;
       }
 
-      if (fork.forkRetryCount >= 2) {
-        updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
-        continue;
-      }
-
       const tmuxAlive = await forkSessionExists(fork.tmuxSession);
-      const runtimeState = forkRuntimeState(fork.tmuxSession)?.state;
-      if (tmuxAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
+      const harnessAlive = tmuxAlive && await forkHarnessProcessAlive(fork.tmuxSession);
+      const runtimeState = harnessAlive ? forkRuntimeState(fork.tmuxSession)?.state : undefined;
+      if (harnessAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
         markConversationActive(fork.name);
         updateForkStatus(fork.name, null);
         recovered += 1;
+        continue;
+      }
+
+      if (fork.forkRetryCount >= 2) {
+        updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
         continue;
       }
 

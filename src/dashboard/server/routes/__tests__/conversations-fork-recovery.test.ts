@@ -198,6 +198,50 @@ describe('fork pipeline recovery and re-entry', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
+  it('salvages a retry-capped fork when its successor harness is already active', async () => {
+    const { getConversationByName, incrementForkRetryCount } = await import('../../../../lib/database/conversations-db.js');
+    const { recoverStuckForks } = await import('../conversations.js');
+    await createForkPair({ forkStatus: 'spawning', forkMode: 'handoff' });
+    incrementForkRetryCount('fork-conv');
+    incrementForkRetryCount('fork-conv');
+    sessionAlive.set('conv-fork-conv', true);
+    harnessAlive.set('conv-fork-conv', true);
+
+    await expect(recoverStuckForks()).resolves.toBe(1);
+
+    const recovered = getConversationByName('fork-conv');
+    expect(recovered?.forkStatus).toBeNull();
+    expect(recovered?.forkRetryCount).toBe(2);
+    expect(spawnCalls).toEqual([]);
+    expect(mocks.authorHandoffExternal).not.toHaveBeenCalled();
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('re-enters a stale runtime-active tmux corpse instead of clearing fork status', async () => {
+    const { getConversationByName } = await import('../../../../lib/database/conversations-db.js');
+    const { recoverStuckForks } = await import('../conversations.js');
+    await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff' });
+    sessionAlive.set('conv-fork-conv', true);
+    harnessAlive.set('conv-fork-conv', false);
+    mocks.getAgentRuntimeStateSync.mockReturnValue({ state: 'active' });
+    const docPath = join(TEST_HOME, 'corpse-recovery-handoff.md');
+    const docText = '## Suggested skills\n\nRe-enter the fork because the tmux session is only a keep-alive corpse. '.repeat(4);
+    mocks.authorHandoffExternal.mockImplementation(async () => {
+      writeFileSync(docPath, docText);
+      return { docText, docPath };
+    });
+
+    await expect(recoverStuckForks()).resolves.toBe(1);
+
+    const recovered = getConversationByName('fork-conv');
+    expect(mocks.authorHandoffExternal).toHaveBeenCalledTimes(1);
+    expect(spawnCalls).toEqual(['conv-fork-conv']);
+    expect(waitCalls).toEqual(['conv-fork-conv']);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith('conv-fork-conv', docText, 'handoff', 'auto');
+    expect(recovered?.forkStatus).toBeNull();
+    expect(recovered?.forkRetryCount).toBe(1);
+  });
+
   it('recovers an existing handoff document through the in-flight registry without re-authoring', async () => {
     const { getConversationByName, recordConversationHandoff } = await import('../../../../lib/database/conversations-db.js');
     const {
