@@ -1687,3 +1687,35 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   boot, out 0 for 80 min, PAN-1709 misfire shape) + ship stalled idle 70 min
   pre-contract. Freed slots; deacon's checkUndispatchedShip should re-dispatch
   ship fresh. Verify next tick.
+
+## RUN-20 tick 4 (2026-06-11) — 4 at the gate; 4th red main of the week (PAN-1746 fixture fallout)
+
+- **FOUR ready_for_merge=1: PAN-1700/1704/1712/1719.** The 1704 pause-gambit
+  worked: pausing the ghost work agent + stalled ship let the pipeline flip it
+  ready within one patrol cycle. PAN-1686 re-passed review+test after its
+  conflict kickback — fully autonomous recovery.
+- **Main went RED at 01:17Z (PAN-1752, filed + struck same tick).** The
+  spawnAgent/spawnRun unit suite fails wholesale — fallout from 72f09e9e0
+  (PAN-1746 gate) changing spawn preconditions the fixtures don't satisfy.
+  Same class as PAN-1698/1717/1732: behavior change lands, fixtures stale,
+  main red. **Production spawns are fine under the live gate** (pan start
+  PAN-1744 and PAN-1747 both succeeded) — it's a test-fixture problem, but a
+  red main still blocks every verify/ship/merge, so it gates the 4 ready
+  merges. Surfaced "hold merges until green."
+- **Strike-fallout lesson (now twice this run):** every strike that changes
+  pipeline behavior should grep the unit suites asserting that behavior
+  (tests/unit/**/agents*, spawn*) BEFORE pushing. Consider adding to
+  roles/strike.md: "run the tests that exercise your changed module, not just
+  the full suite at HEAD~" — the full suite passed for strike-1746 because it
+  ran BEFORE the commit was applied? No — more likely it ran vitest filtered
+  or the suite's spawn tests were green pre-change and the strike never
+  re-ran them post-change. Either way: post-change full-suite verification is
+  the strike contract; flag this in the PAN-1752 fix.
+- **stop-at-proposed contract held for PAN-1747** (4th consecutive):
+  `pan plan --auto` → proposed spec ("finish the PAN-1531 ship-role removal —
+  stop spawning the vestigial ship agent, reconcile docs") → orchestrator
+  `pan start PAN-1747` → work agent up. The planner made the architecture
+  call itself (remove, not define) — correct under decide-don't-delegate;
+  review will scrutinize.
+- work-1744 at ctx 93% (gpt-5.5) with +538/-48 banked and inspection passing —
+  PAN-1675 compact brake is the safety net if it wedges.

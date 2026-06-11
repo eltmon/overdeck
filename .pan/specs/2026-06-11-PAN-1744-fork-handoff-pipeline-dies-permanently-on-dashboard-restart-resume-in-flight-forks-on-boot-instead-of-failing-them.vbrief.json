@@ -4,7 +4,7 @@
     "created": "2026-06-11T01:01:38.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
-    "updated": "2026-06-11T01:03:57.069Z"
+    "updated": "2026-06-11T01:29:26.385Z"
   },
   "plan": {
     "id": "pan-1744",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0a48ed05-3ad4-4cb0-98f5-1477b1199db3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-11T01:01:38.000Z",
-    "updated": "2026-06-11T01:03:57.069Z",
+    "updated": "2026-06-11T01:29:26.385Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1744",
@@ -468,7 +468,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-11-PAN-1744-fork-handoff-pipeline-dies-permanently-on-dashboard-restart-resume-in-flight-forks-on-boot-instead-of-failing-them.vbrief.json"
+      "canonicalFilename": "2026-06-11-PAN-1744-fork-handoff-pipeline-dies-permanently-on-dashboard-restart-resume-in-flight-forks-on-boot-instead-of-failing-them.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1744",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-11T01:29:26.317Z",
+        "work": {
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T01:29:26.317Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T01:29:26.317Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-06-11T01:29:26.317Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"
