@@ -105,14 +105,28 @@ function liveSignatureMatches(
   return true;
 }
 
-/** A live generation goes stale when its base moved or a member changed/left. */
+/**
+ * A live generation is INVALIDATED only when its own CONTENT can no longer be
+ * trusted for promotion: a bundled member left the ready queue (its work must
+ * not merge) or a member's branch gained commits (the tested tree is outdated).
+ *
+ * Deliberately NOT invalidation triggers (the first live run, 2026-06-10,
+ * churned every ready batch to death within minutes):
+ *  - main advancing past baseSha — an active flywheel run lands strike commits
+ *    on main continuously; the batch tree is still perfectly testable. Base
+ *    movement makes liveSignatureMatches() fail, so a FRESH superset assembles
+ *    and supersedes this one when ready; promotion safety against a moved base
+ *    is enforced at promote time (member-file overlap check + clean merge).
+ *  - held-out drift (departed / branch moved / metadata missing) — held-out
+ *    features are not in the tree; their changes also flow through
+ *    liveSignatureMatches() into a fresh assembly, never destruction of a
+ *    testable batch.
+ */
 function isStale(
   gen: UatGeneration,
   desiredIds: ReadonlySet<string>,
   headShas: ReadonlyMap<string, string>,
-  mainSha: string,
 ): string | null {
-  if (gen.baseSha !== mainSha) return `main advanced past base ${gen.baseSha.slice(0, 9)}`;
   for (const member of gen.members) {
     if (!desiredIds.has(member.issueId.toUpperCase())) {
       return `${member.issueId} left the ready queue`;
@@ -120,18 +134,6 @@ function isStale(
     const current = headShas.get(member.branch);
     if (current !== member.headSha) {
       return `${member.issueId} branch gained commits`;
-    }
-  }
-  for (const held of gen.heldOut) {
-    if (!desiredIds.has(held.issueId.toUpperCase())) {
-      return `${held.issueId} left the ready queue`;
-    }
-    if (!held.branch || !held.headSha) {
-      return `${held.issueId} held-out branch metadata missing`;
-    }
-    const current = headShas.get(held.branch);
-    if (current !== held.headSha) {
-      return `${held.issueId} branch gained commits`;
     }
   }
   return null;
@@ -163,7 +165,7 @@ export async function reconcileUatGenerations(
 
     // 1. Invalidate stale live generations (stack teardown included).
     for (const gen of deps.store.listChain(projectRoot, ['ready', 'superseded'])) {
-      const staleReason = isStale(gen, desiredIds, headShas, mainSha);
+      const staleReason = isStale(gen, desiredIds, headShas);
       if (!staleReason) continue;
       log(`[uat-reconciler] invalidating ${gen.name}: ${staleReason}`);
       deps.store.update(gen.name, { status: 'invalidated' });

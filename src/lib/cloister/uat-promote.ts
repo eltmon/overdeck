@@ -40,6 +40,10 @@ export interface UatPromoteGitDeps {
    * merge commit SHA.
    */
   mergeIntoMain(branchName: string, message: string): Promise<string>;
+  /** Files changed on origin/main since the given SHA (base-movement footprint). */
+  changedFilesSince(baseSha: string): Promise<string[]>;
+  /** Files the batch branch changes vs its merge-base with origin/main. */
+  batchChangedFiles(branchName: string): Promise<string[]>;
 }
 
 export interface UatPromoteDeps {
@@ -100,13 +104,31 @@ export async function promoteUatGeneration(
 
   const mainSha = await deps.git.fetchMain();
   if (gen.baseSha !== mainSha) {
-    return {
-      success: false,
-      reason: 'stale-base',
-      message:
-        `${name} was assembled off ${gen.baseSha.slice(0, 9)} but main is now at ${mainSha.slice(0, 9)} — ` +
-        `the tree you tested is stale. A fresh batch reassembles automatically; rebuild and re-test before merging.`,
-    };
+    // Main moved since assembly. An active flywheel run lands commits on main
+    // continuously, so exact base equality would make ready batches almost
+    // never promotable (first live run, 2026-06-10). Safety is preserved by a
+    // narrower check: reject only when main's NEW commits touch files the
+    // batch also touches — then the tested behavior genuinely may not match
+    // what lands. Disjoint movement (docs, unrelated fixes) proceeds; the
+    // no-ff merge itself still hard-fails on any textual conflict.
+    const [mainChanged, batchChanged] = await Promise.all([
+      deps.git.changedFilesSince(gen.baseSha),
+      deps.git.batchChangedFiles(gen.name),
+    ]);
+    const batchSet = new Set(batchChanged);
+    const overlap = mainChanged.filter((f) => batchSet.has(f));
+    if (overlap.length > 0) {
+      return {
+        success: false,
+        reason: 'stale-base',
+        message:
+          `${name} was assembled off ${gen.baseSha.slice(0, 9)} but main is now at ${mainSha.slice(0, 9)}, ` +
+          `and the new commits touch ${overlap.length} file(s) this batch also changes ` +
+          `(${overlap.slice(0, 3).join(', ')}${overlap.length > 3 ? ', …' : ''}) — ` +
+          `the tree you tested may not match what would land. A fresh batch reassembles automatically; re-test before merging.`,
+      };
+    }
+    log(`[uat-promote] ${name}: base moved ${gen.baseSha.slice(0, 9)} → ${mainSha.slice(0, 9)} with no member-file overlap — proceeding`);
   }
 
   let mergeSha: string;
@@ -181,6 +203,20 @@ export function buildUatPromoteGitDeps(projectRoot: string): UatPromoteGitDeps {
         await runGit(['worktree', 'remove', '--force', worktreePath], projectRoot).catch(() => {});
         await runGit(['worktree', 'prune'], projectRoot).catch(() => {});
       }
+    },
+    changedFilesSince: async (baseSha) => {
+      if (!/^[0-9a-f]{7,40}$/i.test(baseSha)) throw new Error(`unsafe base sha: ${baseSha}`);
+      const { stdout } = await runGit(['diff', '--name-only', `${baseSha}..origin/main`], projectRoot);
+      return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+    },
+    batchChangedFiles: async (branchName) => {
+      const safeBranch = safeUatBranchName(branchName);
+      const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], projectRoot)
+        .then(() => `origin/${safeBranch}`)
+        .catch(() => safeBranch);
+      const mergeBase = (await runGit(['merge-base', 'origin/main', ref], projectRoot)).stdout.trim();
+      const { stdout } = await runGit(['diff', '--name-only', `${mergeBase}..${ref}`], projectRoot);
+      return stdout.split('\n').map((l) => l.trim()).filter(Boolean);
     },
   };
 }

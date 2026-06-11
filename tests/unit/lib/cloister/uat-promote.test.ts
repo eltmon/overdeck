@@ -28,7 +28,7 @@ function gen(name: string, status: UatGenerationStatus = 'ready', overrides: Par
   };
 }
 
-function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?: boolean } = {}): UatPromoteDeps & {
+function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?: boolean; mainChangedFiles?: string[]; batchChangedFiles?: string[] } = {}): UatPromoteDeps & {
   map: Map<string, UatGeneration>;
   merges: Array<{ branch: string; message: string }>;
   teardowns: string[];
@@ -47,6 +47,8 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
         merges.push({ branch, message });
         return 'merge-sha-xyz';
       },
+      changedFilesSince: async () => options.mainChangedFiles ?? [],
+      batchChangedFiles: async () => options.batchChangedFiles ?? ['src/feature-a.ts', 'src/feature-b.ts'],
     },
     store: {
       get: (name) => map.get(name) ?? null,
@@ -135,17 +137,40 @@ describe('promoteUatGeneration — success', () => {
 });
 
 describe('promoteUatGeneration — rejections (no git mutation)', () => {
-  it('rejects a stale base with reassemble guidance', async () => {
-    const deps = makeDeps([gen('uat/pan-stale-0610')], { mainSha: 'newer-main-sha' });
+  it('rejects a moved base ONLY when main\'s new commits overlap the batch files', async () => {
+    const deps = makeDeps([gen('uat/pan-stale-0610')], {
+      mainSha: 'newer-main-sha',
+      mainChangedFiles: ['src/feature-a.ts', 'docs/unrelated.md'],
+      batchChangedFiles: ['src/feature-a.ts', 'src/feature-b.ts'],
+    });
 
     const result = await promoteUatGeneration('uat/pan-stale-0610', PROJ, deps);
 
     expect(result).toMatchObject({ success: false, reason: 'stale-base' });
     if (result.success) return;
+    expect(result.message).toContain('src/feature-a.ts');
     expect(result.message).toContain('reassembles automatically');
     expect(deps.merges).toHaveLength(0);
     expect(deps.fired).toEqual([]);
     expect(deps.map.get('uat/pan-stale-0610')!.status).toBe('ready');
+  });
+
+  it('proceeds on a moved base when main\'s new commits are disjoint from the batch', async () => {
+    // First live run (2026-06-10): the flywheel lands strike commits on main
+    // continuously; requiring exact base equality made ready batches almost
+    // never promotable. Disjoint movement is safe — the tested member files
+    // are untouched and the no-ff merge still hard-fails on real conflicts.
+    const deps = makeDeps([gen('uat/pan-moved-0610')], {
+      mainSha: 'newer-main-sha',
+      mainChangedFiles: ['docs/flywheel-tick.md', '.pan/specs/x.vbrief.json'],
+      batchChangedFiles: ['src/feature-a.ts', 'src/feature-b.ts'],
+    });
+
+    const result = await promoteUatGeneration('uat/pan-moved-0610', PROJ, deps);
+
+    expect(result.success).toBe(true);
+    expect(deps.merges).toHaveLength(1);
+    expect(deps.map.get('uat/pan-moved-0610')!.status).toBe('promoted');
   });
 
   it('rejects unknown names and non-promotable statuses', async () => {

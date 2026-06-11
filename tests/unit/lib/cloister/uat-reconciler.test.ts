@@ -174,17 +174,21 @@ describe('growth and invalidation', () => {
     expect(result.invalidated).toEqual([]);
   });
 
-  it('invalidates live generations when main advances past their base, tearing down stacks', async () => {
+  it('keeps a ready generation testable when main merely advances — assembles a fresh one instead', async () => {
+    // First live run (2026-06-10): an active flywheel lands strike commits on
+    // main continuously; invalidating on base movement churned every ready
+    // batch to death. Base movement must trigger REASSEMBLY, not destruction —
+    // promote enforces moved-base safety via the member-file overlap check.
     const proj = freshProject();
-    const stale = gen(proj, 'uat/pan-old-0610', 'ready', { baseSha: 'older-main', stackStartedAt: '2026-06-10T10:00:00.000Z' });
-    const deps = makeDeps(proj, { rows: [stale] });
+    const aged = gen(proj, 'uat/pan-old-0610', 'ready', { baseSha: 'older-main', stackStartedAt: '2026-06-10T10:00:00.000Z' });
+    const deps = makeDeps(proj, { rows: [aged] });
 
     const result = await reconcileUatGenerations(proj, deps);
 
-    expect(result.invalidated).toEqual(['uat/pan-old-0610']);
-    expect(deps.rows.get('uat/pan-old-0610')!.status).toBe('invalidated');
-    expect(deps.teardowns).toEqual(['uat/pan-old-0610']);
-    expect(result.action).toBe('assembled');
+    expect(result.invalidated).toEqual([]);
+    expect(deps.rows.get('uat/pan-old-0610')!.status).toBe('ready');
+    expect(deps.teardowns).toEqual([]);
+    expect(result.action).toBe('assembled'); // fresh superset off current main
   });
 
   it('invalidates when a member leaves the queue or its branch gains commits', async () => {
@@ -204,7 +208,10 @@ describe('growth and invalidation', () => {
     expect(r2.invalidated).toEqual(['uat/pan-moved-0610']);
   });
 
-  it('invalidates when a held-out branch gains commits', async () => {
+  it('held-out drift triggers reassembly, never invalidation of the testable batch', async () => {
+    // Held-out features are not in the tree — their branch moving (a retry
+    // chance) or leaving the queue must spawn a fresh generation while the
+    // current one stays UAT-able.
     const proj = freshProject();
     const heldOut = gen(proj, 'uat/pan-held-0610', 'ready', {
       members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],
@@ -214,7 +221,9 @@ describe('growth and invalidation', () => {
 
     const result = await reconcileUatGenerations(proj, deps);
 
-    expect(result.invalidated).toEqual(['uat/pan-held-0610']);
+    expect(result.invalidated).toEqual([]);
+    expect(deps.rows.get('uat/pan-held-0610')!.status).toBe('ready');
+    expect(result.action).toBe('assembled'); // retry chance for PAN-2 in a fresh generation
   });
 });
 
