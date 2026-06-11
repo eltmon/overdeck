@@ -47,7 +47,22 @@ function getDashboardSessionToken(): string {
 }
 
 export function dashboardCsrfToken(): string {
-  browserCsrfToken ??= process.env['PANOPTICON_DASHBOARD_CSRF_TOKEN'] ?? randomBytes(32).toString('base64url');
+  if (browserCsrfToken) return browserCsrfToken;
+  const override = process.env['PANOPTICON_DASHBOARD_CSRF_TOKEN'];
+  if (override) {
+    browserCsrfToken = override;
+    return browserCsrfToken;
+  }
+  // Same restart-survival derivation as the session token above: the frontend
+  // caches this token once per page load (wsTransport session mint), so a
+  // random-per-process value 403'd every mutation from open tabs after each
+  // dashboard restart — and the flywheel restarts the dashboard on every
+  // post-merge deploy. Distinct context string keeps it independent of the
+  // session token.
+  const internal = getInternalTokenSync();
+  browserCsrfToken = internal
+    ? createHmac('sha256', internal).update('panopticon-dashboard-csrf-v1').digest('base64url')
+    : randomBytes(32).toString('base64url');
   return browserCsrfToken;
 }
 

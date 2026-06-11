@@ -7,6 +7,7 @@ import type { NetworkInterfaceInfo } from 'node:os';
 import {
   DASHBOARD_SESSION_COOKIE,
   _resetDashboardSessionTokenForTests,
+  dashboardCsrfToken,
   dashboardSessionCookieHeader,
   hasDashboardAuthHeaders,
   peerIsHostLocalDockerBridge,
@@ -79,6 +80,48 @@ describe('dashboard session token persistence', () => {
 
   it('issues a durable (Max-Age) session cookie so it survives a browser close', () => {
     expect(dashboardSessionCookieHeader()).toMatch(/Max-Age=\d+/);
+  });
+});
+
+describe('dashboard CSRF token persistence', () => {
+  beforeEach(() => {
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  it('keeps the CSRF token stable across a restart (token regen)', () => {
+    // The frontend caches the CSRF token once per page load; a random
+    // per-process value 403'd every mutation from open tabs after each
+    // dashboard restart (flywheel post-merge deploys restart the dashboard).
+    const before = dashboardCsrfToken();
+    _resetDashboardSessionTokenForTests();
+    expect(dashboardCsrfToken()).toBe(before);
+  });
+
+  it('honors PANOPTICON_DASHBOARD_CSRF_TOKEN override over internal-token derivation', () => {
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'explicit-csrf-override';
+    _resetDashboardSessionTokenForTests();
+    expect(dashboardCsrfToken()).toBe('explicit-csrf-override');
+  });
+
+  it('rotates the CSRF token when the internal token rotates, independently of the session token', () => {
+    const before = dashboardCsrfToken();
+    expect(before).not.toBe(requestCookie(dashboardSessionCookieHeader()).split('=')[1]);
+
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'rotated-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+
+    expect(dashboardCsrfToken()).not.toBe(before);
   });
 });
 
