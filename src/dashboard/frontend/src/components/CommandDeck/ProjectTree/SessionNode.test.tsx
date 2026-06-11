@@ -102,6 +102,11 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionStatus_waiting: 'sessionStatus_waiting',
     sessionStatus_stopping: 'sessionStatus_stopping',
     sessionStatus_paused: 'sessionStatus_paused',
+    sessionIconRunning: 'sessionIconRunning',
+    sessionIconReview: 'sessionIconReview',
+    sessionIconPaused: 'sessionIconPaused',
+    sessionIconError: 'sessionIconError',
+    sessionModel: 'sessionModel',
     sessionPausedReason: 'sessionPausedReason',
     unpauseBtn: 'unpauseBtn',
     sessionDuration: 'sessionDuration',
@@ -139,7 +144,9 @@ describe('SessionNode paused gate (PAN-1779)', () => {
       />,
     );
 
-    expect(screen.getByText('paused')).toBeInTheDocument();
+    // No 'paused' pill — the amber icon tile + reason line + Unpause carry it.
+    expect(screen.queryByText('paused')).toBeNull();
+    expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconPaused')).toBeTruthy();
     expect(screen.getByTestId('session-paused-reason').textContent).toContain('Operator drain 2026-06-10');
     screen.getByTestId('session-unpause').click();
     expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-1642');
@@ -189,10 +196,12 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Security (opus-4-7)')).toHaveAttribute(
+    // Redesign: bare role label; model renders as its own span.
+    expect(screen.getByText('Security')).toHaveAttribute(
       'title',
       'Security specialist reviewer in the review pipeline. Model: opus-4-7. Session: reviewer-1. Last heard: 5m ago.',
     );
+    expect(screen.getByText('opus-4-7')).toBeInTheDocument();
   });
 
   it('adds contextual working tooltip text to the session status pill', () => {
@@ -213,10 +222,9 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('working')).toHaveAttribute(
-      'title',
-      'Actively using tools or just finished a tool run. tmux session is live. Current tool: Bash. Last heard: 5m ago.',
-    );
+    // Redesign: no 'working' pill — the blue icon tile carries live state.
+    expect(screen.queryByText('working')).toBeNull();
+    expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
   it('renders no status pill for quietly-stopped sessions (PAN-1779)', () => {
@@ -247,13 +255,15 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    const workRow = screen.getByText('Work (sonnet-4-6)').closest('button');
-    const reviewRow = screen.getByText('Review (sonnet-4-6)').closest('button');
+    const workRow = screen.getByText('Work').closest('button');
+    const reviewRow = screen.getByText('Review').closest('button');
 
     expect(workRow?.children[1]).toHaveClass('sessionDotSlot');
     expect(reviewRow?.children[1]).toHaveClass('sessionDotSlot');
-    expect(workRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
-    expect(reviewRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
+    // Redesign: no status dots — state lives on the icon tile; the slot
+    // remains for reviewer verdict glyphs and grid alignment.
+    expect(workRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeNull();
+    expect(reviewRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeNull();
   });
 
   it('adds contextual error tooltip text to the session status pill', () => {

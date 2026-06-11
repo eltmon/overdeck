@@ -156,6 +156,9 @@ function ReviewerVerdict({ session, dotStatus, runtime }: { session: SessionNode
   if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
+  // Redesign (PAN-1779): no per-row status dots — the icon tile carries
+  // state. Reviewer verdict glyphs above are the only dot-slot content.
+  if (session.type !== 'reviewer') return null;
   return <PhaseIcon runtime={runtime} dotStatus={dotStatus} />;
 }
 
@@ -207,7 +210,7 @@ function TypeIcon({ type, role }: { type: SessionNodeType['type']; role?: string
 }
 
 function formatDuration(seconds: number | null): string {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   return `${Math.round(seconds / 3600)}h`;
@@ -231,19 +234,17 @@ function deriveSessionModel(session: SessionNodeType, resolvedModel?: string | n
   return sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
 }
 
-function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
-  const model = deriveSessionModel(session, resolvedModel);
+function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | null): string {
+  // Redesign (PAN-1779): bare role names — the model renders as its own
+  // dimmed mono span, never '(model)' inside the label.
   switch (session.type) {
-    case 'ship': return model ? `Ship (${model})` : 'Ship agent';
-    case 'merge': return model ? `Merge (${model})` : 'Merge agent';
-    case 'test': return model ? `Tests (${model})` : 'Tests';
-    case 'review': return model ? `Review (${model})` : 'Review';
-    case 'reviewer': {
-      const role = session.role ? capitalize(session.role) : 'Reviewer';
-      return model ? `${role} (${model})` : role;
-    }
-    case 'work': return model ? `Work (${model})` : 'Work agent';
-    case 'planning': return model ? `Planning (${model})` : 'Planning';
+    case 'ship': return 'Ship';
+    case 'merge': return 'Merge';
+    case 'test': return 'Test';
+    case 'review': return 'Review';
+    case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
+    case 'work': return 'Work';
+    case 'planning': return 'Planning';
     case 'legacy': return 'Planning state';
     default: return session.type;
   }
@@ -552,6 +553,19 @@ export function SessionNode({
         displayStatus,
         lastHeardLabel,
       });
+  const sessionModel = deriveSessionModel(session, defaultModel);
+  const isLiveActivity = !isPaused && (
+    statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
+  );
+  const iconStateClass = isPaused
+    ? styles.sessionIconPaused
+    : statusCssKey === 'error'
+      ? styles.sessionIconError
+      : isLiveActivity
+        ? (session.type === 'review' || session.type === 'reviewer' ? styles.sessionIconReview : styles.sessionIconRunning)
+        : '';
+  const durationLabel = formatDuration(session.duration);
+
   const restartLabel = session.type === 'review'
     ? 'Restart all'
     : session.type === 'reviewer'
@@ -588,17 +602,20 @@ export function SessionNode({
           <span className={styles.sessionDotSlot}>
             <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
           </span>
-          <span className={styles.sessionIconSlot} title={sessionLabelTitle}>
+          <span className={`${styles.sessionIconSlot} ${iconStateClass ?? ''}`} title={sessionLabelTitle}>
             <TypeIcon type={session.type} role={session.role} />
           </span>
           <span className={styles.sessionLabel} title={sessionLabelTitle}>
             {sessionLabel}
           </span>
+          {sessionModel && (
+            <span className={styles.sessionModel} title={sessionLabelTitle}>{sessionModel}</span>
+          )}
           {subtitle && (
             <span className={styles.sessionSubtitle} title={subtitle}>{subtitle}</span>
           )}
           <LiveLastHeard lastActivity={lastActivity} />
-          {!['stopped', 'unknown', 'idle', 'completed'].includes(String(statusCssKey)) && (
+          {!['stopped', 'unknown', 'idle', 'completed', 'running', 'working', 'thinking', 'paused'].includes(String(statusCssKey)) && (
             <span
               className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
               title={sessionStatusTitle}
@@ -619,7 +636,9 @@ export function SessionNode({
               ▶ Unpause
             </span>
           )}
-          <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
+          {durationLabel && (
+            <span className={styles.sessionDuration}>{durationLabel}</span>
+          )}
         </button>
       </ContextMenuTrigger>
       {isPaused && session.pausedReason && (

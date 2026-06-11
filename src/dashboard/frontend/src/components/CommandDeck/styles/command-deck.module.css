@@ -1050,12 +1050,54 @@
 }
 
 .sessionToggleSlot,
-.sessionDotSlot,
-.sessionIconSlot {
+.sessionDotSlot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
+}
+
+/* Redesign (PAN-1779): role icons live in a state-tinted tile — the icon IS
+ * the status indicator (blue machine, purple specialist, amber paused,
+ * red error, neutral idle). */
+.sessionIconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+.sessionIconRunning {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+}
+
+.sessionIconReview {
+  color: var(--signal-review-foreground, var(--signal-review));
+  background: color-mix(in srgb, var(--signal-review) 10%, transparent);
+}
+
+.sessionIconPaused {
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.sessionIconError {
+  color: var(--destructive-foreground, var(--destructive));
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+}
+
+.sessionModel {
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sessionToggleButton {
