@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { cn } from '../../../lib/utils';
 
 export interface SettingsLayoutProps {
   sidebar: ReactNode;
@@ -25,27 +24,16 @@ export function SettingsLayout({ sidebar, children, header }: SettingsLayoutProp
   );
 }
 
+export type SettingsSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 export interface SettingsHeaderProps {
   title: string;
-  hasChanges: boolean;
-  saving: boolean;
-  saveSuccess: boolean;
-  saveError: boolean;
-  onSave: () => void;
-  onReset: () => void;
+  /** Autosave status — every control persists on change; the header only reports. */
+  status: SettingsSaveStatus;
   actions?: ReactNode;
 }
 
-export function SettingsHeader({
-  title,
-  hasChanges,
-  saving,
-  saveSuccess,
-  saveError,
-  onSave,
-  onReset,
-  actions,
-}: SettingsHeaderProps) {
+export function SettingsHeader({ title, status, actions }: SettingsHeaderProps) {
   return (
     <div className="sticky top-0 z-30 bg-card/95 backdrop-blur-sm border-b border-border">
       <div className="flex items-center justify-between px-6 py-3">
@@ -53,39 +41,19 @@ export function SettingsHeader({
           {title}
         </h1>
         <div className="flex items-center gap-3">
-          {saveSuccess && (
+          {actions}
+          {status === 'idle' && (
+            <span className="text-muted-foreground/60 text-xs">Changes save automatically</span>
+          )}
+          {status === 'saving' && (
+            <span className="text-muted-foreground text-xs font-medium">Saving…</span>
+          )}
+          {status === 'saved' && (
             <span className="text-success text-xs font-medium">Saved</span>
           )}
-          {saveError && (
-            <span className="text-destructive text-xs font-medium">Save failed</span>
+          {status === 'error' && (
+            <span className="text-destructive text-xs font-medium">Save failed — your last change was not saved</span>
           )}
-          {actions}
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={!hasChanges}
-            className={cn(
-              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-              hasChanges
-                ? 'text-muted-foreground hover:text-foreground'
-                : 'text-muted-foreground/40 cursor-not-allowed'
-            )}
-          >
-            Reset
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!hasChanges || saving}
-            className={cn(
-              'px-4 py-1.5 text-sm font-medium rounded-md transition-colors',
-              hasChanges && !saving
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            )}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
         </div>
       </div>
     </div>
