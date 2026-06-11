@@ -1909,6 +1909,47 @@ working around. Do not re-investigate or strike these classes:
   continues on --host, unaffected). The flywheel's deliberate slot-release pauses on
   agent-pan-1629 / agent-pan-1704 were left in place.
 
+## RUN-22 tick 1 (2026-06-11, post-reboot) — full fleet self-recovery observed; PAN-1765 churn live again
+
+**RUN-21 was a zero-tick reboot casualty** (same as RUN-19) — host rebooted
+~06:36Z, RUN-22 replaced it at 06:50Z. Re-baseline notes:
+
+- **Post-reboot self-recovery now works END-TO-END.** Startup recovery reset 9
+  orphans (06:37:18), then the next patrol (06:53:18) resumed work-1709 and the
+  deacon re-dispatched the PAN-1704 + PAN-1747 review convoys and PAN-1744 ship
+  within 90 seconds — 13 sessions live, zero hand-holding. Contrast RUN-20
+  tick 1 where the orchestrator had to drive part of it. The resume-decision
+  logic read correctly: 1686 skipped (completed marker + review/test passed),
+  1747 skipped (pipeline mid-flight), paused agents respected.
+- **WATCH: 16-minute patrol gap** between the startup patrol (06:37:18) and the
+  next (06:53:18) — contract is every 60s. Recovered alone; if it recurs, file
+  with both timestamps.
+- **PAN-1746's closed-issue gate confirmed live post-reboot:** repeated
+  `[deacon] PAN-1190: skipping review/test re-dispatch — issue is closed`
+  where the old code would have spawned a $HOME-wedged ship.
+- **awaitingUat = 0 for the first time across all runs** — the RUN-11-era
+  20-deep verifying-on-main backlog is fully drained (label count zero).
+  PAN-1686 is the lone gate item (ready_for_merge=1).
+- **PAN-1765 churn reproduced live:** PAN-1747 carries an unresolved
+  merge_conflict blocker (02:33Z) yet a full 5-session review convoy
+  re-dispatched on it post-reboot — doomed verdict. Launched
+  `pan plan PAN-1765 --auto` (the conflict-gates-review fix). Held
+  main-landing strikes while PAN-1686 sits at the gate (churn-hold rule);
+  plan→work pipeline is churn-safe (feature branches don't move main).
+- **Multi-channel:** operator conv sessions are landing PAN-1768 fixes
+  directly (63c7f0eba, d6077ea34) — do not launch on PAN-1768. PAN-1488's
+  spec flipped to active (0664f1337) with no agent session — likely the conv
+  session exercising the fixed transitionVBriefOnMain; flagged as
+  investigate-if-it-persists.
+- **Drain-cluster question surfaced:** PAN-1642/1641/1242/1491 still paused
+  under "Operator drain 2026-06-10 (PAN-1737 session)" with review=passed
+  test=failed. The drain context (UAT batch) is over; needs operator
+  unpause-or-close. PAN-1658 likewise awaits close-as-superseded.
+- Minor noise: stale completion marker for PAN-714 retries review trigger on a
+  nonexistent workspace (bounded, 3 attempts); host-test fixture agents
+  (agent-pan-resume-*, agent-pan-kickoff-fail) still get orphan-recovered every
+  patrol pre-reboot (PAN-1702/1720 class).
+
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 
 PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
