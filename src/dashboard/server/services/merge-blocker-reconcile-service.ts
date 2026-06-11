@@ -1,35 +1,37 @@
 /**
- * Merge-blocker reconcile service (PAN-1620).
+ * Merge-blocker reconcile service (PAN-1620, PAN-1765).
  *
- * Closes the reactive-webhook gap that let the Awaiting-Merge page show a live
- * MERGE button on a PR that had since gone CONFLICTING / CI-red. `blockerReasons`
- * is otherwise populated ONLY by GitHub webhooks; if a webhook is delayed or
- * dropped after a `readyForMerge` PR goes stale, the row keeps a clickable button
- * until someone clicks it (which then churns the rebase loop or fails).
+ * Closes two reactive-webhook gaps around GitHub mergeability state:
  *
- * Every tick this polls live GitHub state for issues that are `readyForMerge`
- * with no known blockers, and `refreshMergeStateFromGitHub` writes any discovered
- * merge_conflict / failing_checks / draft / not_mergeable blocker back into review
- * status — so the row drops out of "Awaiting Merge" and into "Blocked from Merge"
- * proactively, before any click, and the flywheel can pick it up to rebase/fix CI.
+ * 1. Ready rows with no known blockers can go stale (CONFLICTING / CI-red) when a
+ *    webhook is delayed or dropped. Polling those rows writes newly discovered
+ *    blockers before a human clicks MERGE.
+ * 2. Rows that already carry merge_conflict / not_mergeable blockers can become
+ *    clean again after a resolver rebases the branch. Re-checking those rows on a
+ *    slower cadence lets refreshMergeStateFromGitHub clear stale flags even when
+ *    no webhook arrives.
  *
- * Bounded + cheap: typically 0–3 ready PRs; each is re-checked at most once per
- * RECHECK_INTERVAL_MS via a per-issue throttle. One `gh pr view` per due PR;
- * errors are swallowed inside `refreshMergeStateFromGitHub`.
+ * Bounded + cheap: each issue has a throttle. Ready/no-blocker rows use the PAN-1620
+ * 3-minute cadence; already-blocked mergeability rows use a 10-minute cadence.
  */
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
+import type { BlockerReason } from '../../../lib/review-status.js';
 import { refreshMergeStateFromGitHub } from '../../../lib/webhook-handlers.js';
 
 interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   lastChecked: Map<string, number>;
+  blockerLastChecked: Map<string, number>;
 }
 
 const POLL_INTERVAL_MS = 60_000;
 /** Re-check each ready-to-merge PR at most this often, to bound `gh` calls. */
 const RECHECK_INTERVAL_MS = 180_000;
+/** Re-check already-flagged mergeability blockers less often; they are not mergeable yet. */
+const STALE_BLOCKER_RECHECK_INTERVAL_MS = 10 * 60_000;
+const MERGEABILITY_BLOCKERS = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable']);
 
-const serviceState: ServiceState = { timer: null, lastChecked: new Map() };
+const serviceState: ServiceState = { timer: null, lastChecked: new Map(), blockerLastChecked: new Map() };
 
 /** Parse `https://github.com/<owner>/<repo>/pull/<n>` → `{ repo: 'owner/repo', number }`. */
 function parsePrUrl(url: string | undefined | null): { repo: string; number: number } | null {
@@ -39,14 +41,29 @@ function parsePrUrl(url: string | undefined | null): { repo: string; number: num
   return { repo: `${m[1]}/${m[2]}`, number: Number(m[3]) };
 }
 
+function hasMergeabilityBlocker(blockers: BlockerReason[] | undefined): boolean {
+  return blockers?.some((blocker) => MERGEABILITY_BLOCKERS.has(blocker.type)) ?? false;
+}
+
 async function reconcileOnce(state: ServiceState): Promise<void> {
   const statuses = getAllReviewStatusesFromDb();
   const now = Date.now();
   for (const [issueId, status] of Object.entries(statuses)) {
-    if (!status.readyForMerge) continue;
-    if ((status.blockerReasons?.length ?? 0) > 0) continue; // already flagged — leave it
     const ref = parsePrUrl(status.prUrl);
     if (!ref) continue;
+
+    if (hasMergeabilityBlocker(status.blockerReasons)) {
+      const last = state.blockerLastChecked.get(issueId) ?? 0;
+      if (now - last < STALE_BLOCKER_RECHECK_INTERVAL_MS) continue;
+      state.blockerLastChecked.set(issueId, now);
+      // Fire-and-forget: refreshMergeStateFromGitHub swallows its own errors and
+      // clears stale mergeability blockers when GitHub reports the PR is mergeable.
+      void refreshMergeStateFromGitHub(issueId, ref.repo, ref.number);
+      continue;
+    }
+
+    if (!status.readyForMerge) continue;
+    if ((status.blockerReasons?.length ?? 0) > 0) continue; // non-mergeability blockers stay skipped
     const last = state.lastChecked.get(issueId) ?? 0;
     if (now - last < RECHECK_INTERVAL_MS) continue;
     state.lastChecked.set(issueId, now);
@@ -54,9 +71,13 @@ async function reconcileOnce(state: ServiceState): Promise<void> {
     // writes any discovered blocker back into review status.
     void refreshMergeStateFromGitHub(issueId, ref.repo, ref.number);
   }
-  // Prune throttle entries for issues that are no longer ready-to-merge.
+  // Prune throttle entries for issues that are no longer in the population each map tracks.
   for (const id of [...state.lastChecked.keys()]) {
-    if (!statuses[id]?.readyForMerge) state.lastChecked.delete(id);
+    const status = statuses[id];
+    if (!status?.readyForMerge || (status.blockerReasons?.length ?? 0) > 0) state.lastChecked.delete(id);
+  }
+  for (const id of [...state.blockerLastChecked.keys()]) {
+    if (!hasMergeabilityBlocker(statuses[id]?.blockerReasons)) state.blockerLastChecked.delete(id);
   }
 }
 
@@ -76,4 +97,9 @@ export function stopMergeBlockerReconcileService(): void {
     serviceState.timer = null;
   }
   serviceState.lastChecked.clear();
+  serviceState.blockerLastChecked.clear();
+}
+
+export async function __reconcileOnceForTests(): Promise<void> {
+  await reconcileOnce(serviceState);
 }
