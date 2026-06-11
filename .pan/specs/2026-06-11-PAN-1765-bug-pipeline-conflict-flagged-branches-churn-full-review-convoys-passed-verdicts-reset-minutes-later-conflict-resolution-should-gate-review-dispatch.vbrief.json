@@ -4,7 +4,7 @@
     "created": "2026-06-11T07:04:43.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1765: bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
-    "updated": "2026-06-11T08:14:42.769Z"
+    "updated": "2026-06-11T13:46:32.661Z"
   },
   "plan": {
     "id": "pan-1765",
@@ -14,7 +14,7 @@
     "author": "agent:claude-fable-5",
     "sequence": 3,
     "created": "2026-06-11T07:04:43.000Z",
-    "updated": "2026-06-11T08:14:42.769Z",
+    "updated": "2026-06-11T13:46:32.661Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1765",
@@ -63,7 +63,7 @@
       {
         "id": "mergeability-probe",
         "title": "Add checkBranchMergeability() local merge-conflict probe in new conflict-gate module",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -79,7 +79,7 @@
           {
             "id": "mergeability-probe.ac1",
             "title": "checkBranchMergeability returns 'clean' for a branch that merges into origin/<target> without conflicts, 'conflicts' when merge-tree reports conflicts, and 'unknown' on exec failure — proven by unit tests with an injected exec runner",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -87,7 +87,7 @@
           {
             "id": "mergeability-probe.ac2",
             "title": "The probe never mutates the workspace: no merge commits, no index changes, no HEAD moves (merge-tree only; no 'git merge' fallback)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -95,7 +95,7 @@
           {
             "id": "mergeability-probe.ac3",
             "title": "No execSync anywhere in the new module; all git calls use promisified exec with timeouts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -105,7 +105,7 @@
       {
         "id": "dispatch-timestamp-field",
         "title": "Add conflictResolutionDispatchedAt to ReviewStatus, SQLite schema, and DB round-trip",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -121,7 +121,7 @@
           {
             "id": "dispatch-timestamp-field.ac1",
             "title": "setReviewStatus / getReviewStatus round-trips conflictResolutionDispatchedAt through SQLite (unit test writes then reads the field)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -129,7 +129,7 @@
           {
             "id": "dispatch-timestamp-field.ac2",
             "title": "Migration is idempotent: opening an existing DB without the column adds it; opening twice does not throw",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -137,7 +137,7 @@
           {
             "id": "dispatch-timestamp-field.ac3",
             "title": "npm run typecheck passes with the new field referenced nowhere else yet",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -147,7 +147,7 @@
       {
         "id": "conflict-gate-orchestrator",
         "title": "Implement resolveConflictGate() orchestrator: detect merge blockers, re-verify freshness, clear stale flags, request resolver dispatch",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -169,7 +169,7 @@
           {
             "id": "conflict-gate-orchestrator.ac1",
             "title": "Unit: status without merge blockers → { gated: false } and no probe call (other blocker types like failing_checks do not gate)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "conflict-gate-orchestrator.ac2",
             "title": "Unit: merge_conflict blocker + probe 'clean' → blocker entries removed via setReviewStatus (other blocker types preserved), result { gated: false, clearedStaleBlocker: true }, no resolver dispatched",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "conflict-gate-orchestrator.ac3",
             "title": "Unit: merge_conflict blocker + probe 'conflicts' → { gated: true } and dispatchResolver called exactly once; a second call within the 30-min throttle window (fake timers) does not dispatch again",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -193,7 +193,7 @@
           {
             "id": "conflict-gate-orchestrator.ac4",
             "title": "Unit: probe 'unknown' → gated (conservative) without throwing; dispatch still attempted subject to throttle",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -201,7 +201,7 @@
           {
             "id": "conflict-gate-orchestrator.ac5",
             "title": "Unit: probe result cached per issue ~3 min — two gate calls within the window trigger one probe (fake timers advance past window → re-probe)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -211,7 +211,7 @@
       {
         "id": "conflict-resolver-dispatch",
         "title": "Implement the real conflict-resolver dispatch dep: work-role spawn with rebase-resolution prompt, idempotent",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -227,7 +227,7 @@
           {
             "id": "conflict-resolver-dispatch.ac1",
             "title": "Unit: dispatchResolver spawns role 'work' with a prompt containing rebase-onto-origin/main + preserve-both-intents + re-request-review instructions",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -235,7 +235,7 @@
           {
             "id": "conflict-resolver-dispatch.ac2",
             "title": "Unit: when spawnRun throws 'already running', dispatchResolver swallows it and reports already-dispatched (no throw, no duplicate activity entry)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -243,7 +243,7 @@
           {
             "id": "conflict-resolver-dispatch.ac3",
             "title": "Unit: successful spawn stamps conflictResolutionDispatchedAt and emits exactly one activity entry",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -253,7 +253,7 @@
       {
         "id": "gate-review-dispatch",
         "title": "Wire the conflict gate into spawnReviewRoleForIssuePromise and extend its result with gated: true",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -269,7 +269,7 @@
           {
             "id": "gate-review-dispatch.ac1",
             "title": "Unit (review-agent test): fresh merge_conflict blocker → spawnRun never called, reviewStatus stays 'pending', result { success: false, gated: true }",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -277,7 +277,7 @@
           {
             "id": "gate-review-dispatch.ac2",
             "title": "Unit: stale blocker (probe 'clean') → blocker cleared and the convoy spawn proceeds normally (reviewing status set, spawnRun called)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -285,7 +285,7 @@
           {
             "id": "gate-review-dispatch.ac3",
             "title": "Unit: gated dispatch does not archive .pan/feedback files and does not set reviewSpawnedAt",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -293,7 +293,7 @@
           {
             "id": "gate-review-dispatch.ac4",
             "title": "force: true does NOT bypass the gate (test asserts gated result with force set)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -303,7 +303,7 @@
       {
         "id": "deacon-gated-deferral",
         "title": "Deacon patrols and startup recovery treat gated dispatch as calm deferral — no retry-counter poisoning",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -319,7 +319,7 @@
           {
             "id": "deacon-gated-deferral.ac1",
             "title": "Unit: checkPostReviewCommits with a gated dispatch result records a 'Deferred' action (not 'Failed') and leaves reviewRetryCount unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -327,7 +327,7 @@
           {
             "id": "deacon-gated-deferral.ac2",
             "title": "Unit: repeated patrol ticks against a gated issue never trip the review-infra breaker (reviewRetryCount stays below threshold across N simulated ticks)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -335,7 +335,7 @@
           {
             "id": "deacon-gated-deferral.ac3",
             "title": "A gated issue does not hold an advancing-role concurrency slot after the patrol tick completes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -345,7 +345,7 @@
       {
         "id": "routes-surface-gated",
         "title": "HTTP trigger and review-request routes surface the gated outcome to humans",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -361,7 +361,7 @@
           {
             "id": "routes-surface-gated.ac1",
             "title": "POST review trigger on a conflict-gated issue returns 409 with a message naming the merge conflict and the resolver dispatch (route test or unit test on the handler)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +369,7 @@
           {
             "id": "routes-surface-gated.ac2",
             "title": "workspaces.ts review-request paths log/return the deferral message instead of treating gated as an error",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -379,7 +379,7 @@
       {
         "id": "reconcile-service-stale-flags",
         "title": "Merge-blocker reconcile service re-verifies blocker-flagged rows so stale conflict flags clear",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-11T07:04:43.000Z",
         "metadata": {
@@ -395,7 +395,7 @@
           {
             "id": "reconcile-service-stale-flags.ac1",
             "title": "Unit (fake timers): a row with a merge_conflict blocker triggers refreshMergeStateFromGitHub after the stale-flag interval elapses, at most once per interval per issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -403,7 +403,7 @@
           {
             "id": "reconcile-service-stale-flags.ac2",
             "title": "Unit: rows with only failing_checks/draft_pr/etc. blockers are still skipped (no GitHub call)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -411,7 +411,7 @@
           {
             "id": "reconcile-service-stale-flags.ac3",
             "title": "Unit: ready-with-no-blockers behavior (PAN-1620 path) is unchanged — existing assertions still pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

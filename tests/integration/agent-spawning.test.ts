@@ -237,6 +237,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   const originalPath = process.env.PATH;
   const originalTmuxSocketName = process.env.PANOPTICON_TMUX_SOCKET_NAME;
   const originalTestHarnessCommand = process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  const originalDockerWorkspace = process.env.PANOPTICON_DOCKER_WORKSPACE;
   const testTmuxSocketName = `pan-test-${process.pid}`;
   const supervisorScriptPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
   let createdSupervisorStub = false;
@@ -287,6 +288,10 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = '1';
+    // This suite verifies the role primitive and prompt-delivery paths with a
+    // mocked tmux runtime. Keep PTY-supervisor wiring out of scope so the tests
+    // remain hermetic when run directly without a prior `npm run build`.
+    process.env.PANOPTICON_DOCKER_WORKSPACE = '1';
     // The pi harness is normally guarded by `command -v pi`. Several tests
     // exercise the pi resume/delivery path, so provide a harmless stub binary
     // on PATH for the duration of this test. This keeps harness resolution
@@ -346,6 +351,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       process.env.PATH = originalPath;
     } else {
       delete process.env.PATH;
+    }
+    if (originalDockerWorkspace) {
+      process.env.PANOPTICON_DOCKER_WORKSPACE = originalDockerWorkspace;
+    } else {
+      delete process.env.PANOPTICON_DOCKER_WORKSPACE;
     }
     if (existsSync(testPanopticonHome)) {
       rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
