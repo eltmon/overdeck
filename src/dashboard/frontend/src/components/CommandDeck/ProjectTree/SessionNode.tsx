@@ -168,6 +168,8 @@ interface SessionNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  /** PAN-1779: clear a persistent pause gate (POST /api/agents/:id/unpause). */
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -480,6 +482,7 @@ export function SessionNode({
   onViewTerminal,
   onPauseSession,
   onResumeSession,
+  onUnpauseSession,
   onRestartSession,
   onDeepWipe,
   onOpenStateDir,
@@ -497,11 +500,14 @@ export function SessionNode({
 
   const [isStopping, setIsStopping] = useState(false);
 
-  const dotStatus = session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
+  // PAN-1779: a pause gate beats every other presentation — a paused agent is
+  // deliberately parked (deacon will not auto-resume it), never just "stopped".
+  const isPaused = session.paused === true;
+  const dotStatus = isPaused ? 'waiting' : session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const displayStatus = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
-  const statusCssKey = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const displayStatus = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const statusCssKey = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -533,7 +539,9 @@ export function SessionNode({
   const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;
   const sessionLabel = deriveSessionLabel(session, defaultModel);
   const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
-  const sessionStatusTitle = session.awaitingInput
+  const sessionStatusTitle = isPaused
+    ? `Paused${session.pausedReason ? `: ${session.pausedReason}` : ''}`
+    : session.awaitingInput
     ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
     : getSessionStatusTitle({
         runtime,
@@ -590,9 +598,27 @@ export function SessionNode({
           >
             {displayStatus}
           </span>
+          {isPaused && onUnpauseSession && (
+            <span
+              role="button"
+              tabIndex={-1}
+              data-testid="session-unpause"
+              className={styles.unpauseBtn}
+              title={session.pausedReason ? `Unpause — paused: ${session.pausedReason}` : 'Unpause this agent'}
+              onClick={(e) => { e.stopPropagation(); onUnpauseSession(session.sessionId); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(session.sessionId); } }}
+            >
+              ▶ Unpause
+            </span>
+          )}
           <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
         </button>
       </ContextMenuTrigger>
+      {isPaused && session.pausedReason && (
+        <div className={styles.sessionPausedReason} data-testid="session-paused-reason" title={session.pausedReason}>
+          ⏸ {session.pausedReason}
+        </div>
+      )}
 
       <ContextMenuContent>
         {canPause && (
@@ -603,6 +629,11 @@ export function SessionNode({
         {canResume && (
           <ContextMenuItem onSelect={() => onResumeSession!(session.sessionId)}>
             Resume
+          </ContextMenuItem>
+        )}
+        {isPaused && onUnpauseSession && (
+          <ContextMenuItem onSelect={() => onUnpauseSession(session.sessionId)}>
+            Unpause
           </ContextMenuItem>
         )}
         {canStop && (

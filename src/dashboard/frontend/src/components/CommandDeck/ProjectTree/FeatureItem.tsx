@@ -39,6 +39,7 @@ interface FeatureItemProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -302,6 +303,17 @@ type AggregateBadge =
   | { key: 'work'; label: string; tone: 'running' | 'stopped' }
   | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
   | { key: 'review-error'; label: string; tone: 'error' };
+
+/** Compact age label for the paused badge (PAN-1779): 99h / 3d. */
+function formatPausedAge(pausedAt?: string): string | null {
+  if (!pausedAt) return null;
+  const ms = Date.now() - new Date(pausedAt).getTime();
+  if (Number.isNaN(ms) || ms < 0) return null;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))}m`;
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
 
 function formatRoleList(roles: readonly string[]): string {
   if (roles.length === 0) return '';
@@ -756,6 +768,7 @@ function ReviewGroup({
   onViewTerminal,
   onPauseSession,
   onResumeSession,
+  onUnpauseSession,
   onRestartSession,
   onDeepWipe,
   onOpenStateDir,
@@ -770,6 +783,7 @@ function ReviewGroup({
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -788,6 +802,7 @@ function ReviewGroup({
         onViewTerminal={onViewTerminal}
         onPauseSession={onPauseSession}
         onResumeSession={onResumeSession}
+        onUnpauseSession={onUnpauseSession}
         onRestartSession={onRestartSession}
         onDeepWipe={onDeepWipe}
         onOpenStateDir={onOpenStateDir}
@@ -809,6 +824,7 @@ function ReviewGroup({
               onViewTerminal={onViewTerminal}
               onPauseSession={onPauseSession}
               onResumeSession={onResumeSession}
+              onUnpauseSession={onUnpauseSession}
               onRestartSession={onRestartSession}
               onDeepWipe={onDeepWipe}
               onOpenStateDir={onOpenStateDir}
@@ -821,7 +837,7 @@ function ReviewGroup({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -887,6 +903,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
+  // PAN-1779: surface the pause gate at the issue level — paused agents are
+  // deliberately parked and must never read as generic "stopped".
+  const pausedSession = feature.sessions?.find((s) => s.paused === true);
+  const pausedAge = formatPausedAge(pausedSession?.pausedAt);
+
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
   const activitySummary = buildActivitySummary(aggregateSessions);
@@ -924,7 +945,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   return (
     <ContextMenuRoot>
       <div
-        className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        className={`${styles.featureItemWrapper} ${pausedSession ? styles.featureItemWrapperPaused : ''} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
@@ -974,6 +995,29 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   {badge.label}
                 </span>
               ))}
+            </span>
+          )}
+          {pausedSession && (
+            <span className={styles.featureBadgeGroup} data-testid="feature-paused">
+              <span
+                className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
+                title={pausedSession.pausedReason ? `Paused: ${pausedSession.pausedReason}` : 'Agent is paused'}
+              >
+                ⏸ Paused{pausedAge ? ` ${pausedAge}` : ''}
+              </span>
+              {onUnpauseSession && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  data-testid="feature-unpause"
+                  className={styles.unpauseBtn}
+                  title={pausedSession.pausedReason ? `Unpause — paused: ${pausedSession.pausedReason}` : 'Unpause this agent'}
+                  onClick={(e) => { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); } }}
+                >
+                  ▶ Unpause
+                </span>
+              )}
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
@@ -1041,6 +1085,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                         onViewTerminal={onViewTerminal}
                         onPauseSession={onPauseSession}
                         onResumeSession={onResumeSession}
+                        onUnpauseSession={onUnpauseSession}
                         onRestartSession={onRestartSession}
                         onDeepWipe={onDeepWipe}
                         onOpenStateDir={onOpenStateDir}
@@ -1059,6 +1104,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                       onViewTerminal={onViewTerminal}
                       onPauseSession={onPauseSession}
                       onResumeSession={onResumeSession}
+                      onUnpauseSession={onUnpauseSession}
                       onRestartSession={onRestartSession}
                       onDeepWipe={onDeepWipe}
                       onOpenStateDir={onOpenStateDir}

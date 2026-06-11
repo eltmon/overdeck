@@ -101,6 +101,9 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionStatus_thinking: 'sessionStatus_thinking',
     sessionStatus_waiting: 'sessionStatus_waiting',
     sessionStatus_stopping: 'sessionStatus_stopping',
+    sessionStatus_paused: 'sessionStatus_paused',
+    sessionPausedReason: 'sessionPausedReason',
+    unpauseBtn: 'unpauseBtn',
     sessionDuration: 'sessionDuration',
   },
 }));
@@ -117,6 +120,43 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
     ...overrides,
   };
 }
+
+describe('SessionNode paused gate (PAN-1779)', () => {
+  it('renders paused status, reason line, and unpause control for a paused session', () => {
+    const onUnpauseSession = vi.fn();
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'agent-pan-1642',
+          status: 'stopped',
+          presence: 'ended',
+          paused: true,
+          pausedReason: 'Operator drain 2026-06-10',
+          pausedAt: '2026-05-06T09:00:00.000Z',
+        })}
+        issueId="PAN-1642"
+        onUnpauseSession={onUnpauseSession}
+      />,
+    );
+
+    expect(screen.getByText('paused')).toBeInTheDocument();
+    expect(screen.getByTestId('session-paused-reason').textContent).toContain('Operator drain 2026-06-10');
+    screen.getByTestId('session-unpause').click();
+    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-1642');
+  });
+
+  it('does not render unpause control for unpaused sessions', () => {
+    render(
+      <SessionNode
+        session={makeSession({ sessionId: 'agent-pan-1', status: 'stopped', presence: 'ended' })}
+        issueId="PAN-1"
+        onUnpauseSession={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('session-unpause')).toBeNull();
+    expect(screen.queryByTestId('session-paused-reason')).toBeNull();
+  });
+});
 
 describe('SessionNode', () => {
   beforeEach(() => {

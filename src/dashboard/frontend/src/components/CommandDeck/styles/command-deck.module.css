@@ -318,9 +318,16 @@
 }
 
 .featureBadge_running {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  /* v1.2 signal law: machine activity = blue (emerald is outcome only) */
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+}
+
+.featureBadge_paused {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  color: var(--warning-foreground, var(--warning));
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
 .featureBadge_stopped {
@@ -475,6 +482,49 @@
 .featureItemWrapper {
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* PAN-1779: paused issues carry an unmissable amber edge bar (the row's one
+ * colored signal — amber = a human must act). */
+.featureItemWrapperPaused::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--warning);
+}
+
+.unpauseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.unpauseBtn:hover {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.sessionPausedReason {
+  padding: 0 8px 4px 56px;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--warning) 60%, var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .featureItemWrapperSelected {
@@ -962,8 +1012,14 @@
 }
 
 .sessionStatus_running {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  /* v1.2 signal law: machine activity = blue */
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+}
+
+.sessionStatus_paused {
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
 }
 
 .sessionStatus_error {
@@ -984,13 +1040,13 @@
 }
 
 .sessionStatus_working {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .sessionStatus_thinking {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .sessionStatus_waiting {

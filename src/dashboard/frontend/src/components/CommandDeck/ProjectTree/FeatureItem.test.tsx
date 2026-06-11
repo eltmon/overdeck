@@ -67,6 +67,9 @@ vi.mock('../styles/command-deck.module.css', () => ({
     spinning: 'spinning',
     featureItemWrapper: 'featureItemWrapper',
     featureItemWrapperSelected: 'featureItemWrapperSelected',
+    featureItemWrapperPaused: 'featureItemWrapperPaused',
+    featureBadge_paused: 'featureBadge_paused',
+    unpauseBtn: 'unpauseBtn',
     featureItemRow: 'featureItemRow',
     featureItemCaret: 'featureItemCaret',
     featureItemCaretPlaceholder: 'featureItemCaretPlaceholder',
@@ -221,6 +224,43 @@ describe('FeatureItem', () => {
   afterEach(() => {
     localStorage.clear();
     vi.unstubAllGlobals();
+  });
+
+  it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
+    const onUnpauseSession = vi.fn();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({
+            sessionId: 'agent-pan-821',
+            status: 'stopped',
+            presence: 'ended',
+            paused: true,
+            pausedReason: 'Operator drain 2026-06-10',
+            pausedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+          })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+        onUnpauseSession={onUnpauseSession}
+      />,
+    );
+    const badgeGroup = screen.getByTestId('feature-paused');
+    expect(badgeGroup.textContent).toContain('Paused 2h');
+    screen.getByTestId('feature-unpause').click();
+    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-821');
+  });
+
+  it('does not show paused badge for unpaused sessions', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession()] })}
+        isSelected={false}
+        onSelect={() => {}}
+        onUnpauseSession={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('feature-paused')).toBeNull();
   });
 
   it('renders feature info without caret when no sessions', () => {
