@@ -327,7 +327,10 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
 }
 
 async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
-  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+  const providerDefault = loadYamlConfig().config.providerHarnesses?.[getProviderForModelSync(model).name];
+  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex'
+    ? harness
+    : providerDefault ?? 'claude-code';
   const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
   return decision.allowed ? requested : 'claude-code';
 }
@@ -3005,9 +3008,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // subscription auth, a ToS violation) blocks it, so a config-level
   // `roles.work.harness: pi` cannot silently bypass the gate just because the
   // model+auth combination is illegal.
-  const requestedHarness: RuntimeName = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness
-    ?? 'claude-code';
+  const requestedHarness: RuntimeName | undefined = options.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness;
   const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   if (
@@ -3334,9 +3336,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
   // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
   // runs before we persist the resolved harness or hand it to the launcher.
-  const requestedHarness: RuntimeName = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness
-    ?? 'claude-code';
+  const requestedHarness: RuntimeName | undefined = options.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness;
   const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   // Create state
@@ -5139,4 +5140,3 @@ function writeTaskCache(agentId: string, issueId: string): void {
     }, null, 2)
   );
 }
-

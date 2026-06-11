@@ -37,7 +37,7 @@ vi.mock('../config-yaml.js', () => ({
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
-    flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+    flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
   loadConfig: () => mockLoadConfig(),
@@ -233,7 +233,7 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
-      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+      flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
   });
@@ -257,7 +257,6 @@ describe('loadSettingsApi', () => {
     const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
 
     expect(getRoleConfig('flywheel')).toEqual({
-      harness: 'claude-code',
       model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,

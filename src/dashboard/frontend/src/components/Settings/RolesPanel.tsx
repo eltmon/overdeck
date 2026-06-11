@@ -76,8 +76,7 @@ const WORKHORSE_SLOTS: Array<{ id: WorkhorseSlot; label: string }> = [
   { id: 'cheap', label: 'Cheap' },
 ];
 
-const DEFAULT_FLYWHEEL_CONFIG: Required<Pick<RoleConfig, 'harness' | 'effort' | 'maxAgents' | 'scope'>> = {
-  harness: 'claude-code',
+const DEFAULT_FLYWHEEL_CONFIG: Required<Pick<RoleConfig, 'effort' | 'maxAgents' | 'scope'>> = {
   effort: 'high',
   maxAgents: 8,
   scope: 'pan-only',
@@ -379,7 +378,7 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, clau
   );
 }
 
-function getFlywheelConfig(settings: SettingsResponse | undefined): Required<Pick<RoleConfig, 'harness' | 'effort' | 'maxAgents' | 'scope'>> {
+function getFlywheelConfig(settings: SettingsResponse | undefined): Pick<RoleConfig, 'harness'> & Required<Pick<RoleConfig, 'effort' | 'maxAgents' | 'scope'>> {
   return {
     ...DEFAULT_FLYWHEEL_CONFIG,
     ...(settings?.roles?.flywheel ?? {}),
@@ -512,11 +511,12 @@ export function RolesPanel() {
                         <span className="text-xs font-medium text-foreground">Flywheel harness</span>
                         <select
                           aria-label="Flywheel harness"
-                          value={flywheelConfig.harness}
-                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { harness: event.target.value as Harness } })}
+                          value={flywheelConfig.harness ?? ''}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { harness: event.target.value ? event.target.value as Harness : undefined } })}
                           disabled={saveMutation.isPending}
                           className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                         >
+                          <option value="">Provider default</option>
                           <option value="claude-code">Claude Code</option>
                           <option value="pi">Pi</option>
                           <option value="codex">Codex</option>

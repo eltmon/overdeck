@@ -37,7 +37,6 @@ const settingsPayload = {
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
     flywheel: {
-      harness: 'claude-code',
       model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,
@@ -133,7 +132,7 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Test model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Ship model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Flywheel model')).toHaveValue('claude-opus-4-7');
-    expect(screen.getByLabelText('Flywheel harness')).toHaveValue('claude-code');
+    expect(screen.getByLabelText('Flywheel harness')).toHaveValue('');
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
@@ -203,12 +202,12 @@ describe('RolesPanel', () => {
     ));
     const body = JSON.parse(putCall?.[1]?.body as string);
     expect(body.roles.flywheel).toMatchObject({
-      harness: 'claude-code',
       model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,
       scope: 'all-tracked-projects',
     });
+    expect(body.roles.flywheel).not.toHaveProperty('harness');
   });
 });
 

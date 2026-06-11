@@ -30,6 +30,7 @@ import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
+import { getProviderForModelSync } from '../providers.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -507,8 +508,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
+    const config = loadConfigSync().config;
     const planningModel = modelOverride || settingsModel;
-    const requestedHarness = opts.harness ?? 'claude-code';
+    const providerDefaultHarness = config.providerHarnesses?.[getProviderForModelSync(planningModel).name];
+    const requestedHarness = opts.harness ?? config.roles?.plan?.harness ?? providerDefaultHarness ?? 'claude-code';
     const harnessDecision = canUseHarnessSync(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
     const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
