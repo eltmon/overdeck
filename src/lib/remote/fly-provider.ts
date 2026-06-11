@@ -163,6 +163,27 @@ export class FlyProvider implements RemoteProvider {
       // Ensure app exists
       await api.ensureApp(this.config.app, this.config.org);
 
+      // Get-or-create: machine names are unique per app, so a leftover
+      // machine from a crashed/interrupted run makes a plain create 422.
+      // Adopt it instead — rootfs resets from the image on start, so a
+      // restarted leftover is indistinguishable from a fresh machine for
+      // the provisioning steps that follow.
+      const existing = (await api.listMachines(this.config.app)).find((m) => m.name === name && m.state !== 'destroyed');
+      if (existing) {
+        if (existing.state !== 'started') {
+          await api.startMachine(this.config.app, existing.id);
+        }
+        await api.waitForState(this.config.app, existing.id, 'started', 300);
+        const fresh = await api.getMachine(this.config.app, existing.id);
+        return {
+          name,
+          status: mapFlyStateToVmStatus(fresh.state),
+          machineId: fresh.id,
+          ipAddress: fresh.private_ip,
+          created: fresh.created_at ? new Date(fresh.created_at) : undefined,
+        };
+      }
+
       // Create machine
       const machine = await api.createMachine(this.config.app, name, {
         image: this.config.image,
