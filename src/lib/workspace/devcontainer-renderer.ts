@@ -210,6 +210,15 @@ export function renderDevcontainerSync(
 
   mkdirSync(result.devcontainerDir, { recursive: true });
 
+  // Pre-create the shared host-side caches the compose file bind-mounts
+  // (PAN-1764). Docker auto-creates missing bind sources as root, which the
+  // container's `node` user (uid 1000) cannot write to.
+  for (const cacheDir of ['bun', 'npm']) {
+    mkdirSync(join(homedir(), '.cache', 'panopticon-devcontainer', cacheDir), {
+      recursive: true,
+    });
+  }
+
   const placeholders = createWorkspacePlaceholdersSync(
     opts.projectConfig,
     opts.featureName,

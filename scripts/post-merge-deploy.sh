@@ -137,8 +137,17 @@ for port in 3010 3011 3012; do
   fuser -k "${port}/tcp" >> "$LOG_FILE" 2>&1 || true
 done
 
-# Also kill any orphaned dashboard processes
-pkill -f "node.*dist/dashboard/server" >> "$LOG_FILE" 2>&1 || true
+# Also kill any orphaned dashboard processes — host-side only (PAN-1763).
+# Workspace/UAT stack `server` containers run the same `node dist/dashboard/server.js`
+# cmdline and ARE visible to host pkill (containers share the host kernel); a bare
+# pattern kill SIGTERMed every stack's server container on every deploy, flipping
+# stacks unhealthy and tripping the spawn gate. Skip PIDs in container cgroups.
+for pid in $(pgrep -f "node.*dist/dashboard/server" 2>/dev/null || true); do
+  if grep -qE 'docker|containerd|libpod' "/proc/$pid/cgroup" 2>/dev/null; then
+    continue # in-container workspace/UAT server — not ours to kill
+  fi
+  kill "$pid" >> "$LOG_FILE" 2>&1 || true
+done
 pkill -f "bun.*src/dashboard/server/main" >> "$LOG_FILE" 2>&1 || true
 pkill -f "vite.*301" >> "$LOG_FILE" 2>&1 || true
 
