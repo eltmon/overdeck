@@ -1864,3 +1864,15 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
 - Scoreboard: 10 substrate bugs fixed, 3 PRs merged, deploy live-verified.
   Gate drained; 4 branches cycling review against post-batch main; 1709
   implementing on host.
+
+## RUN-20 tick 14 (2026-06-11) — convoy circular-wait jam-break
+
+**New deadlock shape:** the governor over-committed (total 13/9 — ceiling only
+gates NEW dispatches), leaving 1686's convoy PARTIAL: synthesis + 2/4
+sub-reviewers live, the other 2 forever deferred, synthesis waiting on their
+files while holding 3 slots. Detection: review_status frozen "reviewing"
+across 3 ticks + synthesis pane at out≈17 tokens after 1h45m + convoy session
+count < 5. Fix (RUN-18 playbook): pause idle in-review work agents (freed 2
+slots) → pan review restart → fresh convoy spawned 4/4. If this recurs, the
+substrate fix is making convoy dispatch atomic (all-or-nothing slot
+reservation) — file it with this evidence if seen twice.
