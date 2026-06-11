@@ -2,15 +2,11 @@
   "version": "1",
   "issueId": "PAN-1747",
   "created": "2026-06-11T01:20:23.852Z",
-<<<<<<< HEAD
   "updated": "2026-06-11T07:12:24.086Z",
-=======
-  "updated": "2026-06-11T02:14:50.118Z",
->>>>>>> 3046dc5a0 (chore: complete PAN-1747 vBRIEF acceptance criteria)
   "gitState": {
     "branch": "feature/pan-1747",
-    "sha": "1191bd8ec",
-    "dirty": true
+    "sha": "b7e7879c",
+    "dirty": false
   },
   "decisions": [
     {
@@ -85,10 +81,15 @@
       "timestamp": "2026-06-11T01:20:23.852Z"
     },
     {
-<<<<<<< HEAD
       "reason": "feedback",
       "note": "[2026-06-11T02:13Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-06-11T02:13:35.237Z"
+    },
+    {
+      "timestamp": "2026-06-11T02:14:50.118Z",
+      "reason": "verification-feedback-fixed",
+      "note": "Addressed vbrief-ac verification failure by updating the tracked canonical PAN-1747 vBRIEF spec under .pan/specs so all four items and all eighteen acceptance-criterion subItems are completed. No implementation changes were required; code/tests/docs were already complete.",
+      "agentModel": "gpt-5.5"
     },
     {
       "reason": "feedback",
@@ -139,12 +140,6 @@
       "reason": "feedback",
       "note": "[2026-06-11T07:00Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-06-11T07:00:26.915Z"
-=======
-      "timestamp": "2026-06-11T02:14:50.118Z",
-      "reason": "verification-feedback-fixed",
-      "note": "Addressed vbrief-ac verification failure by updating the tracked canonical PAN-1747 vBRIEF spec under .pan/specs so all four items and all eighteen acceptance-criterion subItems are completed. No implementation changes were required; code/tests/docs were already complete.",
-      "agentModel": "gpt-5.5"
->>>>>>> 3046dc5a0 (chore: complete PAN-1747 vBRIEF acceptance criteria)
     }
   ],
   "feedback": []
