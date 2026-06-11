@@ -1946,6 +1946,7 @@ function scheduleTitleRefinement(conversationName: string): void {
 
 /** Conversations with a retitle currently running — guards against double-clicks. */
 const retitleInFlight = new Set<string>();
+const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
 
 interface ConversationAboutSummary {
   summary: string;
@@ -4763,8 +4764,9 @@ const postConversationRetitleRoute = HttpRouter.add(
 
         retitleInFlight.add(name);
         try {
-          console.log(`[claude-invoke] purpose=conversation-retitle | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript, configuredTitleModel());
+          const model = configuredTitleModel();
+          console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
+          const title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }
@@ -4778,7 +4780,7 @@ const postConversationRetitleRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[conversations] retitle failed for "${name}":`, msg);
-        return jsonResponse({ error: 'Failed to regenerate title' }, { status: 500 });
+        return jsonResponse({ error: `Failed to regenerate title: ${msg}` }, { status: 500 });
       }
     });
   }),
