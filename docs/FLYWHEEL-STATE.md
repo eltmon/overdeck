@@ -1994,6 +1994,36 @@ reconciliation rather than a vestigial ship agent."
   use lowercase); scope enum is [cloister, dashboard, workspace, cli, review,
   beads, db, specialists, terminal, infra, deps].
 
+## RUN-22 tick 2 (2026-06-11 ~07:50Z) — two at the gate; partial convoys do NOT retro-fill
+
+- **PAN-1709 completed a fully-autonomous pipeline pass within one run**: resumed
+  post-reboot by the deacon at 06:53, review+test+verification all passed,
+  ready_for_merge=1 by 07:44. Joins PAN-1704 at the operator gate. PAN-1686
+  merged (uat/pan-flint-0611) and is verifying-on-main.
+- **Partial convoys do NOT retro-fill.** PAN-1747's re-review convoy dispatched
+  3/5 (governor ceiling bit mid-dispatch, total 10/9); after the jam-break
+  freed 2 slots, the patrol used them for other dispatches (agent-pan-1744
+  resume) — the missing performance/security reviewers were never spawned.
+  Confirms RUN-20 tick 14 ("the other 2 forever deferred"). The atomic
+  all-or-nothing convoy-slot reservation is now a twice-observed gap — file it
+  if seen a third time (or fold into PAN-1765's fix, which gates dispatch).
+- **Sequencing rule: never `pan review restart` while the branch carries a real
+  merge_conflict blocker** — that manufactures the doomed-convoy churn PAN-1765
+  exists to fix. Let the work agent resolve+push first; new-commit detection
+  recycles the convoy (restart only if it doesn't).
+- Jam-break round 2 (official surfaces): paused idle work-1709 (issue at gate)
+  + the agent-pan-resume-redeliver-second FIXTURE session (PAN-1720 pollution,
+  counted as work=1 by the governor — second occurrence of a fixture session
+  eating a real slot). Unpaused work-1744 (its pause condition "while convoy
+  runs" expired — review came back BLOCKED, so the work agent is needed).
+- agent-pan-1491-ship spawned despite the vestigial-ship problem and is
+  actively attempting work (rebase?) rather than refusing — ship behavior
+  varies by agent. PAN-1491 is otherwise fully passed with a GENUINE
+  failing_checks blocker (PAN-1710 boot-surface smoke hang class).
+- PAN-1762 (Swarm v2) spec reached proposed via operator-side planning;
+  surfaced start-permission as an openQuestion rather than auto-starting an
+  operator-owned plan for a major feature.
+
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 
 PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
