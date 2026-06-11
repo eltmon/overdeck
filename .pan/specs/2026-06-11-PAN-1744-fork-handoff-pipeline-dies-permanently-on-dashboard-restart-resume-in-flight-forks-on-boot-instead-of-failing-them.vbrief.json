@@ -4,7 +4,7 @@
     "created": "2026-06-11T01:01:38.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
-    "updated": "2026-06-11T03:02:47.354Z"
+    "updated": "2026-06-11T03:09:55.118Z"
   },
   "plan": {
     "id": "pan-1744",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "0a48ed05-3ad4-4cb0-98f5-1477b1199db3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 34,
+    "sequence": 36,
     "created": "2026-06-11T01:01:38.000Z",
-    "updated": "2026-06-11T03:02:47.354Z",
+    "updated": "2026-06-11T03:09:55.118Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1744",
@@ -470,62 +470,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-11-PAN-1744-fork-handoff-pipeline-dies-permanently-on-dashboard-restart-resume-in-flight-forks-on-boot-instead-of-failing-them.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "review",
         "issueId": "PAN-1744",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T03:02:47.327Z",
+        "updatedAt": "2026-06-11T03:09:54.950Z",
         "work": {
-          "updatedAt": "2026-06-11T03:02:47.327Z",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T03:02:47.327Z",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T03:02:47.327Z",
+              "at": "2026-06-11T03:09:54.950Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T03:02:47.327Z",
-          "notes": "Approved: all four convoy reviewers reported zero blocking findings",
+          "status": "reviewing",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-11T03:02:47.327Z",
-              "notes": "Approved: all four convoy reviewers reported zero blocking findings"
+              "status": "reviewing",
+              "at": "2026-06-11T03:09:54.950Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T03:02:47.327Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-11T03:02:47.327Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "status": "pending",
+              "at": "2026-06-11T03:09:54.950Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T03:02:47.327Z",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T03:02:47.327Z",
+          "updatedAt": "2026-06-11T03:09:54.950Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T03:02:47.327Z"
+              "at": "2026-06-11T03:09:54.950Z"
             }
           ],
           "readyForMerge": false,

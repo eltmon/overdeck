@@ -4,7 +4,7 @@
     "created": "2026-06-10T00:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1704: Conversation model switch compacts unconditionally — add window-aware tiered switching (lossless /model or --resume when context fits)",
-    "updated": "2026-06-11T02:55:17.222Z"
+    "updated": "2026-06-11T03:18:13.978Z"
   },
   "plan": {
     "id": "pan-1704",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "cfbef208-8840-448b-b105-acec6ecba538",
     "author": "agent:claude-opus-4-8",
-    "sequence": 28,
+    "sequence": 33,
     "created": "2026-06-10T00:12:00.000Z",
-    "updated": "2026-06-11T02:55:17.222Z",
+    "updated": "2026-06-11T03:18:13.978Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1704",
@@ -368,58 +368,58 @@
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1704-conversation-model-switch-compacts-unconditionally-add-window-aware-tiered-switching.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1704",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T02:55:17.170Z",
+        "updatedAt": "2026-06-11T03:18:13.964Z",
         "work": {
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T02:55:17.170Z",
+              "at": "2026-06-11T03:18:13.964Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-11T02:55:17.170Z"
+              "status": "pending",
+              "at": "2026-06-11T03:18:13.964Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T02:55:17.170Z"
+              "at": "2026-06-11T03:18:13.964Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T02:55:17.170Z",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T02:55:17.170Z"
+              "at": "2026-06-11T03:18:13.964Z"
             }
           ],
           "readyForMerge": false,

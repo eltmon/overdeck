@@ -4,7 +4,7 @@
     "created": "2026-06-11T01:31:21.694Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1747: bug(roles): roles/ship.md does not exist but every ship spawn passes --agent roles/ship.md",
-    "updated": "2026-06-11T03:01:44.510Z"
+    "updated": "2026-06-11T03:18:50.422Z"
   },
   "plan": {
     "id": "pan-1747",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "13976290-eeb7-4916-9130-a70dd166539b",
     "author": "agent:claude-opus-4-8",
-    "sequence": 33,
+    "sequence": 37,
     "created": "2026-06-11T01:31:21.694Z",
-    "updated": "2026-06-11T03:01:44.510Z",
+    "updated": "2026-06-11T03:18:50.422Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1747",
@@ -301,60 +301,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-11-PAN-1747-finish-the-pan-1531-ship-role-removal-stop-spawning-the-vestigial-ship-agent-and-reconcile-docs.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1747",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T03:01:44.504Z",
+        "updatedAt": "2026-06-11T03:18:50.296Z",
         "work": {
-          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T03:01:44.504Z",
-          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "status": "failed",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
+          "notes": "Acceptance criteria check FAILED — 18/18 AC incomplete:\n\n### Stop the reactive scheduler from spawning a ship agent (ROLE_RUN_STATES.shipping -> null) (5/5 incomplete)\n  - [ ] stateToRole('shipping') returns null (ROLE_RUN_STATES.shipping === null).\n  - [ ] A test.passed domain event no longer spawns an agent-<issue>-ship session; onIssueStateChange('shipping') logs 'no role for issue state shipping' and returns.\n  - [ ] roleFromAgentId no longer lists 'ship' among spawnable roles.\n  - [ ] reactive-scheduler.test.ts updated to assert shipping produces no spawn; the suite is green.\n  - [ ] The shipping STATE transition still occurs (issueStateChangeFromDomainEvent unchanged); frontend 'Shipping' phase and flywheel MERGE_GATE_VERBS are unaffected.\n\n### Remove the deacon checkUndispatchedShip safety-net patrol (4/4 incomplete)\n  - [ ] checkUndispatchedShip and its SHIP_DISPATCH_* constants and cooldown/count maps are removed; grep finds no remaining references.\n  - [ ] The deacon patrol loop no longer calls checkUndispatchedShip (lines 5174-5176 removed); typecheck and lint pass with no dead vars/imports.\n  - [ ] deacon-undispatched-ship.test.ts is removed; the full test suite is green.\n  - [ ] checkReadyForMergeStuck and checkFailedMergeRetry remain unchanged.\n\n### Make agent spawn honest: verify a role definition file exists before passing --agent (4/4 incomplete)\n  - [ ] When the resolved role definition file is missing, getRoleRuntimeBaseCommand emits NO --agent flag and includes the global permission flags (no-definition branch).\n  - [ ] When the file exists, behaviour is unchanged: --agent <path> is emitted, permissionFlags is empty, and the bypass prefix is applied.\n  - [ ] A single warning is logged when a role definition file is missing (the failure is no longer silent).\n  - [ ] A unit test covers both the missing-file and present-file branches.\n\n### Reconcile ship-role docs and stale in-code comments to the post-removal reality (5/5 incomplete)\n  - [ ] docs/ROLES.md no longer lists roles/ship.md as an existing instruction source; the ship row reflects server-side shipping + merge-specialist identity.\n  - [ ] CLAUDE.md role-taxonomy table no longer cites roles/ship.md.\n  - [ ] docs/MERGE-WORKFLOW.md notes that the reactive shipping state spawns no agent.\n  - [ ] Stale in-code comments in projects.ts, command-deck.ts, and specialists.ts no longer describe ship as a spawned pipeline stage.\n  - [ ] npm run lint (incl. scripts/lint-skills.sh) still passes -- no doc/skill drift introduced.",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-11T03:01:44.504Z",
-              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+              "status": "failed",
+              "at": "2026-06-11T03:18:50.296Z",
+              "notes": "Acceptance criteria check FAILED — 18/18 AC incomplete:\n\n### Stop the reactive scheduler from spawning a ship agent (ROLE_RUN_STATES.shipping -> null) (5/5 incomplete)\n  - [ ] stateToRole('shipping') returns null (ROLE_RUN_STATES.shipping === null).\n  - [ ] A test.passed domain event no longer spawns an agent-<issue>-ship session; onIssueStateChange('shipping') logs 'no role for issue state shipping' and returns.\n  - [ ] roleFromAgentId no longer lists 'ship' among spawnable roles.\n  - [ ] reactive-scheduler.test.ts updated to assert shipping produces no spawn; the suite is green.\n  - [ ] The shipping STATE transition still occurs (issueStateChangeFromDomainEvent unchanged); frontend 'Shipping' phase and flywheel MERGE_GATE_VERBS are unaffected.\n\n### Remove the deacon checkUndispatchedShip safety-net patrol (4/4 incomplete)\n  - [ ] checkUndispatchedShip and its SHIP_DISPATCH_* constants and cooldown/count maps are removed; grep finds no remaining references.\n  - [ ] The deacon patrol loop no longer calls checkUndispatchedShip (lines 5174-5176 removed); typecheck and lint pass with no dead vars/imports.\n  - [ ] deacon-undispatched-ship.test.ts is removed; the full test suite is green.\n  - [ ] checkReadyForMergeStuck and checkFailedMergeRetry remain unchanged.\n\n### Make agent spawn honest: verify a role definition file exists before passing --agent (4/4 incomplete)\n  - [ ] When the resolved role definition file is missing, getRoleRuntimeBaseCommand emits NO --agent flag and includes the global permission flags (no-definition branch).\n  - [ ] When the file exists, behaviour is unchanged: --agent <path> is emitted, permissionFlags is empty, and the bypass prefix is applied.\n  - [ ] A single warning is logged when a role definition file is missing (the failure is no longer silent).\n  - [ ] A unit test covers both the missing-file and present-file branches.\n\n### Reconcile ship-role docs and stale in-code comments to the post-removal reality (5/5 incomplete)\n  - [ ] docs/ROLES.md no longer lists roles/ship.md as an existing instruction source; the ship row reflects server-side shipping + merge-specialist identity.\n  - [ ] CLAUDE.md role-taxonomy table no longer cites roles/ship.md.\n  - [ ] docs/MERGE-WORKFLOW.md notes that the reactive shipping state spawns no agent.\n  - [ ] Stale in-code comments in projects.ts, command-deck.ts, and specialists.ts no longer describe ship as a spawned pipeline stage.\n  - [ ] npm run lint (incl. scripts/lint-skills.sh) still passes -- no doc/skill drift introduced."
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
           "notes": "AC6 grep still finds checkUndispatchedShip references in docs/FLYWHEEL-STATE.md",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-06-11T03:01:44.504Z",
+              "status": "pending",
+              "at": "2026-06-11T03:18:50.296Z",
               "notes": "AC6 grep still finds checkUndispatchedShip references in docs/FLYWHEEL-STATE.md"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T03:01:44.504Z"
+              "at": "2026-06-11T03:18:50.296Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "updatedAt": "2026-06-11T03:18:50.296Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T03:01:44.504Z"
+              "at": "2026-06-11T03:18:50.296Z"
             }
           ],
           "readyForMerge": false,

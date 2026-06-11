@@ -1814,3 +1814,17 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   keys on close-out and those issues are open. Expectation corrected.
 - Swap appeared: 4.7GB/8GB under convoy churn (was 0 at run start). RAM
   31.8/64. Watch each tick; the RUN-14 pathology starts at swap-full.
+
+## RUN-20 tick 9 (2026-06-11) — pan pause addressing gap (PAN-1760); swap-full ≠ pressure
+
+- **PAN-1760 filed:** pan pause blind-prefixes 'agent-' — NO working form
+  pauses strike-*/inspect-* sessions (tried strike-pan-1723, pan-1723). Same
+  class as PAN-1749's tell fix; audit pause/kill/unpause/untroubled for
+  normalizeAgentId routing. Hit exactly when the orchestrator reached for the
+  pause-for-RAM lever.
+- **Swap-full panic corrected:** swap 95% with RAM at 50% (36GB available) is
+  cold-page eviction from idle sessions, harmless. The RUN-14 pathology was
+  swap-full + RAM near ceiling. Watch AVAILABLE RAM, not the swap gauge.
+- PAN-1709 planned (4th consecutive stop-at-proposed) → work agent started.
+  Churn-hold posture maintained: no new main-landing strikes while
+  1700/1712/1719 sit ready (~3h now).
