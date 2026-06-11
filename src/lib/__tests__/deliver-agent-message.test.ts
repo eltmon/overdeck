@@ -506,7 +506,6 @@ describe('channel bridge delivery', () => {
   });
 
   it('flag-on, socket-timeout: falls back to sendKeysProgram', async () => {
-    vi.useFakeTimers();
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     writeBridgeTokenSync(agentId);
@@ -514,6 +513,7 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string } = {};
     // Bridge that delays its response longer than the deliver timeout.
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500, capture });
+    vi.useFakeTimers();
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
       await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
