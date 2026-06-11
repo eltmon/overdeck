@@ -129,6 +129,8 @@ import {
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
+import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
+import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
@@ -855,6 +857,15 @@ export async function handleConversationMessage(
     );
   }
 
+  // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
+  // eaten-by-compaction watcher below can tell whether this message ever
+  // landed. Claude-only — the probe parses Claude-format JSONL.
+  let watchFromByteOffset: number | null = null;
+  if (harness === 'claude-code' && conv.claudeSessionId) {
+    const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
+    watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
+  }
+
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
@@ -868,6 +879,28 @@ export async function handleConversationMessage(
       return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
     }
     throw deliveryErr;
+  }
+
+  // Watch in the background for Claude Code's submit-time compaction eating
+  // the just-delivered prompt (compact boundary lands, message doesn't) and
+  // redeliver once. The POST already returned ok by the time this matters.
+  if (watchFromByteOffset !== null && conv.claudeSessionId) {
+    void watchForEatenConversationMessage({
+      conversationName: conv.name,
+      tmuxSession: conv.tmuxSession,
+      cwd: conv.cwd,
+      sessionId: conv.claudeSessionId,
+      message: deliveredMessage,
+      deliveryMethod: resolveConversationDeliveryMethod(conv),
+      fromByteOffset: watchFromByteOffset,
+    }).then((outcome) => {
+      if (outcome === 'redelivered') {
+        console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
+      }
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+    });
   }
 
   // Generate AI title for conversations created via instant-start (no message at creation)

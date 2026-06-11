@@ -32,11 +32,13 @@ const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
-const INPUT_ECHO_CONFIRM_TIMEOUT_MS = 1_500;
+const INPUT_ECHO_CONFIRM_TIMEOUT_MS = 2_500;
 const INPUT_ECHO_CONFIRM_INTERVAL_MS = 50;
 const INPUT_ECHO_CONFIRM_ATTEMPTS = 2;
 const INPUT_ECHO_CONFIRM_PREFIX_CHARS = 40;
 const INPUT_SETTLE_MS = 300;
+const INPUT_PURGE_MAX_CHARS = 8_192;
+const INPUT_PURGE_SETTLE_MS = 150;
 
 export interface PtySupervisorPayload {
   content: string;
@@ -143,6 +145,37 @@ async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPaylo
   }
 }
 
+/**
+ * Record what the PTY actually showed when echo confirmation failed — without
+ * this the only artifact of a failed delivery is the opaque 502 in the bridge
+ * log, and the next occurrence is undiagnosable (PAN-1769).
+ */
+async function appendEchoFailureLog(
+  agentId: string,
+  payload: PtySupervisorPayload,
+  observedTail: string,
+): Promise<void> {
+  try {
+    const logPath = getPtySupervisorLogPath(agentId);
+    await mkdir(join(getPanopticonHome(), 'logs'), { recursive: true, mode: 0o700 });
+    const caller = payloadCaller(payload);
+    await appendFile(
+      logPath,
+      `${JSON.stringify({
+        ts: new Date().toISOString(),
+        agentId,
+        kind: 'echo_confirm_failed',
+        contentLength: payload.content.length,
+        observedTail,
+        ...(caller ? { caller } : {}),
+      })}\n`,
+      'utf8',
+    );
+  } catch {
+    // non-critical
+  }
+}
+
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const encoded = JSON.stringify(body);
   res.writeHead(status, {
@@ -167,19 +200,60 @@ function normalizePtyText(value: string): string {
   return stripAnsi(value).replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Echo matching must survive the TUI's composer rendering: long lines wrap at
+ * arbitrary character positions (injecting whitespace mid-word) and wrapped
+ * rows are separated by box-drawing border characters. Collapsing whitespace
+ * to single spaces (normalizePtyText) is not enough — a wrap inside the prefix
+ * breaks a contiguous `.includes()` match even though the paste landed
+ * (PAN-1769). Strip all whitespace and box-drawing chars from both sides.
+ */
+function normalizeForEchoMatch(value: string): string {
+  return stripAnsi(value)
+    .replace(/[─-╿]/g, '')
+    .replace(/\s+/g, '');
+}
+
+/**
+ * Claude Code collapses large pastes into a `[Pasted text #N +M lines]`
+ * placeholder — the raw text never echoes. Treat the placeholder appearing in
+ * output observed since this delivery began as confirmation that the paste
+ * landed.
+ */
+const PASTE_PLACEHOLDER_RE = /\[Pasted text #?\d*/;
+
 function confirmationPrefix(content: string): string {
   const lines = content.split('\n');
   const verifyLine = ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
-  return normalizePtyText(verifyLine).slice(0, INPUT_ECHO_CONFIRM_PREFIX_CHARS);
+  return normalizeForEchoMatch(verifyLine).slice(0, INPUT_ECHO_CONFIRM_PREFIX_CHARS);
 }
 
 async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise<boolean> {
+  const confirmed = (): boolean => {
+    const raw = readOutput();
+    return normalizeForEchoMatch(raw).includes(prefix) || PASTE_PLACEHOLDER_RE.test(stripAnsi(raw));
+  };
   const deadline = Date.now() + INPUT_ECHO_CONFIRM_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (normalizePtyText(readOutput()).includes(prefix)) return true;
+    if (confirmed()) return true;
     await sleep(INPUT_ECHO_CONFIRM_INTERVAL_MS);
   }
-  return normalizePtyText(readOutput()).includes(prefix);
+  return confirmed();
+}
+
+/**
+ * Erase a just-written paste from the harness composer with one Backspace per
+ * written character. The PTY input stream is ordered, so the DELs are applied
+ * after the paste regardless of render timing; extras on an already-empty
+ * composer are no-ops, and a collapsed `[Pasted text]` placeholder is deleted
+ * atomically by the first DEL. Without this, an unconfirmed-but-landed write
+ * stacks with the retry write and the caller's tmux fallback, submitting the
+ * same message two or three times (PAN-1769).
+ */
+async function purgePtyInput(child: pty.IPty, charCount: number): Promise<void> {
+  const count = Math.min(charCount, INPUT_PURGE_MAX_CHARS) + 8;
+  child.write('\x7f'.repeat(count));
+  await sleep(INPUT_PURGE_SETTLE_MS);
 }
 
 export async function injectPtyMessage(
@@ -204,17 +278,28 @@ export async function injectPtyMessage(
   try {
     let confirmed = prefix.length === 0;
     for (let attempt = 1; attempt <= INPUT_ECHO_CONFIRM_ATTEMPTS && !confirmed; attempt++) {
+      if (attempt > 1) {
+        // The unconfirmed write is usually present-but-unrendered (slow TUI
+        // echo), not lost. Erase it before rewriting so retries can never
+        // stack duplicate copies in the composer.
+        await purgePtyInput(child, trimmed.length);
+      }
       child.write(trimmed);
       confirmed = await waitForPtyEcho(() => observedOutput, prefix);
       if (!confirmed && attempt < INPUT_ECHO_CONFIRM_ATTEMPTS) {
         console.warn(
           `[pty-supervisor] Input echo not confirmed for ${agentId} after ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms ` +
-          `(attempt ${attempt}/${INPUT_ECHO_CONFIRM_ATTEMPTS}); rewriting content before Enter.`,
+          `(attempt ${attempt}/${INPUT_ECHO_CONFIRM_ATTEMPTS}); purging and rewriting content before Enter.`,
         );
       }
     }
 
     if (!confirmed) {
+      // Erase the final unconfirmed write before failing: the caller falls
+      // back to tmux paste-buffer delivery, which would otherwise submit its
+      // copy on top of the one already sitting in the composer.
+      await purgePtyInput(child, trimmed.length);
+      await appendEchoFailureLog(agentId, payload, normalizePtyText(observedOutput).slice(-200));
       throw new Error(
         `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms`,
       );
