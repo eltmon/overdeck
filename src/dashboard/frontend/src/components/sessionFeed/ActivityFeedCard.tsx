@@ -13,6 +13,7 @@ export function ActivityFeedCard({ entry, onSelect, now = new Date() }: Activity
       type="button"
       className="w-full rounded-lg border border-border bg-card p-2.5 text-left text-xs transition-colors hover:bg-accent/40 focus:outline-none focus:ring-2 focus:ring-ring"
       onClick={() => onSelect(entry.id)}
+      title={entry.headline}
     >
       <div className="flex items-start gap-2">
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />

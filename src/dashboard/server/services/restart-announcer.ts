@@ -21,30 +21,64 @@ import {
 } from '../../../lib/activity-logger.js';
 import { readRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
 import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
+import { getConversationByTmuxSession } from '../../../lib/database/conversations-db.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
 
+/** Minimal conversation shape the announcer needs from the initiator's tmux session. */
+export type InitiatorConversationResolver = (tmuxSession: string) => { id: number; title?: string | null } | null;
+
+/** Default resolver: the conversations DB, keyed by the initiator's tmux session name. */
+function resolveInitiatorConversation(tmuxSession: string): { id: number; title?: string | null } | null {
+  try {
+    return getConversationByTmuxSession(tmuxSession);
+  } catch {
+    return null;
+  }
+}
+
 /** Dashboard route for the restart's initiator: flywheel orchestrator → the
  *  flywheel page, conversations → their conversation page. Issue agents route
- *  via the entry's issueId instead (same destination as the issue tree). */
-export function initiatorLink(initiator: string | undefined): string | undefined {
+ *  via the entry's issueId instead (same destination as the issue tree).
+ *  The initiator string is a TMUX SESSION NAME (`conv-20260610-4123`), not a
+ *  conversation id — `/conv/:key` only resolves numeric ids, so the link must
+ *  go through the conversations DB (a name-based link landed on an empty
+ *  Command Deck). */
+export function initiatorLink(
+  initiator: string | undefined,
+  resolveConversation: InitiatorConversationResolver = resolveInitiatorConversation,
+): string | undefined {
   if (!initiator) return undefined;
   if (initiator === 'conv-flywheel-orchestrator') return '/flywheel';
-  if (initiator.startsWith('conv-')) return `/conv/${encodeURIComponent(initiator.slice('conv-'.length))}`;
+  if (initiator.startsWith('conv-')) {
+    const conv = resolveConversation(initiator);
+    return conv ? `/conv/${conv.id}` : undefined;
+  }
   return undefined;
 }
 
-function describeInitiator(initiator: string | undefined): string {
+function describeInitiator(
+  initiator: string | undefined,
+  resolveConversation: InitiatorConversationResolver,
+): string {
   if (!initiator) return '';
   if (initiator === 'conv-flywheel-orchestrator') return ' by the flywheel orchestrator';
-  if (initiator.startsWith('conv-')) return ` by conversation ${initiator.slice('conv-'.length)}`;
+  if (initiator.startsWith('conv-')) {
+    const conv = resolveConversation(initiator);
+    if (conv?.title) return ` by conversation ${conv.id} ("${conv.title}")`;
+    if (conv) return ` by conversation ${conv.id}`;
+    return ` by conversation ${initiator.slice('conv-'.length)}`;
+  }
   return ` by ${initiator}`;
 }
 
 /** Map a restart-status entry to an activity-feed entry. Pure; exported for tests. */
-export function describeRestart(status: RestartStatus): EmitActivityOptions {
+export function describeRestart(
+  status: RestartStatus,
+  resolveConversation: InitiatorConversationResolver = resolveInitiatorConversation,
+): EmitActivityOptions {
   const seconds = (status.durationMs / 1000).toFixed(1);
   if (status.trigger === 'watchdog') {
     if (status.gaveUp) {
@@ -69,7 +103,7 @@ export function describeRestart(status: RestartStatus): EmitActivityOptions {
       message: `Supervisor watchdog restarted the dashboard (attempt ${status.attempts}, ${seconds}s)${status.reason ? ` — ${status.reason}` : ''}`,
     };
   }
-  const actor = describeInitiator(status.initiator);
+  const actor = describeInitiator(status.initiator, resolveConversation);
   return {
     source: 'dashboard',
     level: status.success ? 'info' : 'error',
@@ -78,7 +112,7 @@ export function describeRestart(status: RestartStatus): EmitActivityOptions {
       : `Dashboard restart via ${status.trigger}${actor} failed`,
     details: status.error,
     issueId: status.issueId,
-    link: initiatorLink(status.initiator),
+    link: initiatorLink(status.initiator, resolveConversation),
   };
 }
 
