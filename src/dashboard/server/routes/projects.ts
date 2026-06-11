@@ -317,8 +317,8 @@ async function collectSessionTreeNodes(
       });
     }
 
-    // Ship role — final pipeline stage, spawnRun(issueId,'ship') →
-    // `agent-<issue>-ship`. The `merge` history type tracks its status.
+    // Merge/ship history — server-side shipping now prepares the branch, while
+    // historical `merge` entries still surface under the `ship` node identity.
     const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
     const latestMerge = mergeEntries[mergeEntries.length - 1];
     if (latestMerge) {

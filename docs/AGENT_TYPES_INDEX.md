@@ -12,11 +12,7 @@ If you want implementation details, routing settings, or workflow internals, use
 
 ## The big picture
 
-Panopticon no longer models the issue pipeline as a flat collection of named agent types. The runtime primitive is the issue-scoped role:
-
-```ts
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship'
-```
+Panopticon no longer models the issue pipeline as a flat collection of named agent types. The runtime primitive is the issue-scoped role, with server-side shipping handling merge preparation after review and test pass.
 
 There are three layers to keep distinct:
 
@@ -34,7 +30,7 @@ These are the roles a new Panopticon user is most likely to care about first.
 | `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active vBRIEF |
 | `review` | Active | Reviews the completed branch and decides approve vs changes requested | `roles/review.md` plus review convoy subagents |
 | `test` | Active | Runs automated checks and required browser UAT | `roles/test.md` |
-| `ship` | Active | Rebases, verifies, and pushes approved work for human merge | `roles/ship.md` |
+| server-side shipping | Active | Rebases approved work and derives `readyForMerge` for the human Merge button | `rebaseFeatureBranch()` + review-status gates; no spawned role file |
 
 ## Sub-roles
 
@@ -60,9 +56,9 @@ A newcomer-friendly way to think about the normal flow is:
 3. **`work.inspect` / `work.inspect-deep`** verify flagged beads during implementation.
 4. **`review`** performs code review and synthesizes the convoy findings.
 5. **`test`** runs project verification and any required browser UAT.
-6. **`ship`** prepares the branch for human merge.
+6. Server-side shipping prepares the branch for human merge.
 
-Not every project or run will emphasize every sub-role equally, but the five lifecycle roles are the core mental model.
+Not every project or run will emphasize every sub-role equally, but the spawned roles plus server-side shipping are the core mental model.
 
 ## Important distinction: roles vs helper subagents
 
