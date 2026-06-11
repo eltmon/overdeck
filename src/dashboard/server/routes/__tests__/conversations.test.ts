@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { buildForkRequest, parseSummaryForkFocus } from '../conversations.js';
+import { buildForkRequest, parseSummaryForkFocus, readExistingHandoffDoc } from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -128,6 +128,20 @@ describe('buildForkRequest', () => {
       includeThinkingInSummary: false,
       handoffAuthor: 'external',
     }));
+  });
+});
+
+describe('readExistingHandoffDoc', () => {
+  it('reuses a persisted handoff document when it still exists', async () => {
+    const docPath = join(TEST_HOME, 'handoff.md');
+    writeFileSync(docPath, '## Handoff\n\nContinue here.\n');
+
+    await expect(readExistingHandoffDoc({ handoffDocPath: docPath })).resolves.toBe('## Handoff\n\nContinue here.\n');
+  });
+
+  it('returns null when no reusable handoff document exists', async () => {
+    await expect(readExistingHandoffDoc({ handoffDocPath: null })).resolves.toBeNull();
+    await expect(readExistingHandoffDoc({ handoffDocPath: join(TEST_HOME, 'missing.md') })).resolves.toBeNull();
   });
 });
 

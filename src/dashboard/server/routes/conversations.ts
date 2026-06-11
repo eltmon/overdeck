@@ -3635,6 +3635,37 @@ export async function confirmForkPromptAccepted(
  * never double-submitted; when the mirror can't tell us, we fall back to a
  * single delivery (the pre-PAN-1624 behavior).
  */
+export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDocPath'>): Promise<string | null> {
+  if (!conv.handoffDocPath || !existsSync(conv.handoffDocPath)) return null;
+  return readFile(conv.handoffDocPath, 'utf-8');
+}
+
+async function ensureForkSessionReady(
+  conv: Conversation,
+  sessionId: string,
+  resume: boolean,
+  plainFork = false,
+): Promise<void> {
+  const alive = await Effect.runPromise(sessionExists(conv.tmuxSession));
+  if (alive) {
+    console.info(`[fork-pipeline] Reusing existing tmux session ${conv.tmuxSession} for ${conv.name}`);
+    return;
+  }
+
+  await spawnConversationSession(
+    conv.tmuxSession,
+    conv.cwd,
+    sessionId,
+    conv.model ?? undefined,
+    conv.effort ?? undefined,
+    conv.issueId ?? undefined,
+    resume,
+    conv.harness ?? 'claude-code',
+    plainFork,
+  );
+  await waitForTmuxSession(conv.tmuxSession);
+}
+
 async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
@@ -3700,27 +3731,24 @@ async function runForkPipeline(
       // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
       throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
-    // Plain Claude Code fork: copy JSONL from last compact boundary into the new
-    // session file, then spawn with --resume so Claude Code loads the history
-    // directly.
-    const forkSessionFile = await resolveSessionFile(conv);
-    if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-    await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+    const alive = await Effect.runPromise(sessionExists(conv.tmuxSession));
+    if (!alive) {
+      // Plain Claude Code fork: copy JSONL from last compact boundary into the new
+      // session file, then spawn with --resume so Claude Code loads the history
+      // directly.
+      const forkSessionFile = await resolveSessionFile(conv);
+      if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
+      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+    }
 
     updateForkStatus(convName, 'spawning');
-    await spawnConversationSession(
-      conv.tmuxSession,
-      conv.cwd,
+    await ensureForkSessionReady(
+      conv,
       sessionId,
-      conv.model ?? undefined,
-      conv.effort ?? undefined,
-      conv.issueId ?? undefined,
       true, // resume — load the copied JSONL history
-      conv.harness ?? 'claude-code',
       true, // plainFork — skip channels MCP wiring so it doesn't inflate the
             // resumed context past Claude Code's auto-compact threshold
     );
-    await waitForTmuxSession(conv.tmuxSession);
 
     // No summary injection needed for plain Claude Code forks.
     markConversationActive(convName);
@@ -3742,7 +3770,11 @@ async function runForkPipeline(
   };
 
   if (forkMode === 'handoff') {
-    if (handoffAuthor === 'external') {
+    const existingHandoffDoc = await readExistingHandoffDoc(conv);
+    if (existingHandoffDoc !== null) {
+      summary = existingHandoffDoc;
+      handoffDocPath = conv.handoffDocPath;
+    } else if (handoffAuthor === 'external') {
       // External authoring: separate session reads the source JSONL and
       // writes the doc; source conversation is never touched.
       try {
@@ -3799,17 +3831,7 @@ async function runForkPipeline(
   }
 
   updateForkStatus(convName, 'spawning');
-  await spawnConversationSession(
-    conv.tmuxSession,
-    conv.cwd,
-    sessionId,
-    conv.model ?? undefined,
-    conv.effort ?? undefined,
-    conv.issueId ?? undefined,
-    false,
-    conv.harness ?? 'claude-code',
-  );
-  await waitForTmuxSession(conv.tmuxSession);
+  await ensureForkSessionReady(conv, sessionId, false);
 
   await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
