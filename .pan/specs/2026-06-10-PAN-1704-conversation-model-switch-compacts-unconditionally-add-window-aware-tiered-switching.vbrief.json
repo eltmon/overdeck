@@ -4,7 +4,7 @@
     "created": "2026-06-10T00:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1704: Conversation model switch compacts unconditionally — add window-aware tiered switching (lossless /model or --resume when context fits)",
-    "updated": "2026-06-11T01:01:13.320Z"
+    "updated": "2026-06-11T01:18:24.693Z"
   },
   "plan": {
     "id": "pan-1704",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "cfbef208-8840-448b-b105-acec6ecba538",
     "author": "agent:claude-opus-4-8",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-06-10T00:12:00.000Z",
-    "updated": "2026-06-11T01:01:13.320Z",
+    "updated": "2026-06-11T01:18:24.693Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1704",
@@ -371,29 +371,29 @@
         "phase": "test",
         "issueId": "PAN-1704",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T01:01:13.196Z",
+        "updatedAt": "2026-06-11T01:18:24.532Z",
         "work": {
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:01:13.196Z"
+              "at": "2026-06-11T01:18:24.532Z"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "notes": "Approved; correctness finding demoted by cycle-8 convergence gate",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:01:13.196Z",
+              "at": "2026-06-11T01:18:24.532Z",
               "notes": "Approved; correctness finding demoted by cycle-8 convergence gate"
             }
           ],
@@ -401,27 +401,27 @@
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:01:13.196Z",
+              "at": "2026-06-11T01:18:24.532Z",
               "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:01:13.196Z",
+          "updatedAt": "2026-06-11T01:18:24.532Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:01:13.196Z"
+              "at": "2026-06-11T01:18:24.532Z"
             }
           ],
           "readyForMerge": false,

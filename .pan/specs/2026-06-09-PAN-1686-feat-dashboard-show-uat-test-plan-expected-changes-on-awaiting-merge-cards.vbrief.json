@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-06-09T00:40:00.000Z",
-    "updated": "2026-06-11T01:16:16.269Z",
+    "updated": "2026-06-11T01:18:18.022Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1686: show UAT test plan + expected changes on Awaiting Merge cards"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f3a1c9d2-7b64-4e18-9a2f-1c5e6d8b0a44",
     "author": "agent:claude-opus-4-8",
-    "sequence": 17,
+    "sequence": 19,
     "created": "2026-06-09T00:40:00.000Z",
-    "updated": "2026-06-11T01:16:16.269Z",
+    "updated": "2026-06-11T01:18:18.022Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1686",
@@ -416,34 +416,34 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1686-feat-dashboard-show-uat-test-plan-expected-changes-on-awaiting-merge-cards.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "work",
         "issueId": "PAN-1686",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T01:16:16.250Z",
+        "updatedAt": "2026-06-11T01:18:17.744Z",
         "work": {
-          "updatedAt": "2026-06-11T01:16:16.250Z",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
           "history": []
         },
         "verification": {
           "status": "failed",
-          "updatedAt": "2026-06-11T01:16:16.250Z",
-          "notes": "Acceptance criteria check FAILED — 20/20 AC incomplete:\n\n### Export git changed-files helpers from review-context.ts for reuse (2/2 incomplete)\n  - [ ] getDiffBase, getChangedFiles, and getDiffStat are exported from review-context.ts with unchanged signatures/behavior.\n  - [ ] Existing review-context behavior and its consumers (buildReviewContextPromise, formatTier1Summary) are unaffected; typecheck and existing review-context tests still pass.\n\n### Add GET /api/workspaces/:issueId/uat-context endpoint (5/5 incomplete)\n  - [ ] GET /api/workspaces/:issueId/uat-context returns 200 with acceptanceCriteria[], deliverables[], proposal, changedFiles[], diffStat, and a source descriptor.\n  - [ ] acceptanceCriteria are sourced from vBRIEF subItems with metadata.kind==='acceptance_criterion', with the documented fallback to all subItems of an item; deliverables list item title + Action narrative.\n  - [ ] changedFiles come from git diff base...HEAD in the workspace (reusing the exported review-context helpers); on git failure or missing workspace the route returns changedFiles:[] and source.files:'none' without erroring.\n  - [ ] Project/workspace/vBRIEF resolution is tracker-agnostic (works for PAN/MIN/KRUX/AUR/... via parseIssueIdSync/extractPrefixSync), and an invalid issue id returns 400.\n  - [ ] All git calls are async (execAsync); no execSync is introduced; the existing /plan route is unchanged.\n\n### Unit-test the uat-context assembly and fallbacks (2/2 incomplete)\n  - [ ] Tests cover AC extraction (tagged + fallback), deliverables, changed-files mapping, and the no-data/git-failure fallback returning empty fields.\n  - [ ] Tests pass under `npm test` without requiring a live git repository (git is stubbed or logic is unit-tested in isolation).\n\n### Frontend: UatContext type, fetch helper, and parallel per-row query (2/2 incomplete)\n  - [ ] A UatContext type and fetchUatContext helper exist; a parallel useQueries fetches uat-context per ready issue with caching, without disturbing the existing workspace query.\n  - [ ] AwaitingMergeRow receives the uat-context data and rs.uatNotes as optional props; the page typechecks and renders unchanged (no visual change yet).\n\n### Frontend: collapsible 'What to test (UAT)' section (3/3 incomplete)\n  - [ ] Each card has a collapsible 'What to test / Expected changes' header (default collapsed) that expands/collapses on click.\n  - [ ] Expanded view shows a 'What to test (UAT)' checklist sourced from vBRIEF acceptance criteria for that issue.\n  - [ ] When acceptance criteria are missing, the section falls back to the issue description (then title) and never renders blank; uatNotes renders only when present.\n\n### Frontend: 'Expected changes' subsection (deliverables + changed files) (3/3 incomplete)\n  - [ ] Expanded view shows an 'Expected changes' summary listing vBRIEF deliverables and a PR changed-files summary (path + status + +/- counts).\n  - [ ] Changed-files list is truncated to ~12 with a '+N more' affordance; empty changedFiles degrades to a subtle note (and empty deliverables fall back to the proposal) without blanking.\n  - [ ] No regression to the merge button, stack-health display, MergeStepTracker, or row layout for issues from any tracker prefix.\n\n### Frontend tests for the UAT-context section (2/2 incomplete)\n  - [ ] Tests assert the UAT checklist renders from AC, the description fallback engages when AC is empty, and the changed-files summary renders.\n  - [ ] Tests assert the collapse/expand toggle reveals and hides the section; all tests pass under `npm test`.\n\n### Document the UAT-context section on Awaiting Merge cards (1/1 incomplete)\n  - [ ] The flywheel/Awaiting-Merge doc describes the new collapsible UAT-context section and its data source/endpoint.",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
+          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/continues/pan-1686.vbrief.json\n  - .pan/specs/2026-06-09-PAN-1686-feat-dashboard-show-uat-test-plan-expected-changes-on-awaiting-merge-cards.vbrief.json",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-11T01:16:16.250Z",
-              "notes": "Acceptance criteria check FAILED — 20/20 AC incomplete:\n\n### Export git changed-files helpers from review-context.ts for reuse (2/2 incomplete)\n  - [ ] getDiffBase, getChangedFiles, and getDiffStat are exported from review-context.ts with unchanged signatures/behavior.\n  - [ ] Existing review-context behavior and its consumers (buildReviewContextPromise, formatTier1Summary) are unaffected; typecheck and existing review-context tests still pass.\n\n### Add GET /api/workspaces/:issueId/uat-context endpoint (5/5 incomplete)\n  - [ ] GET /api/workspaces/:issueId/uat-context returns 200 with acceptanceCriteria[], deliverables[], proposal, changedFiles[], diffStat, and a source descriptor.\n  - [ ] acceptanceCriteria are sourced from vBRIEF subItems with metadata.kind==='acceptance_criterion', with the documented fallback to all subItems of an item; deliverables list item title + Action narrative.\n  - [ ] changedFiles come from git diff base...HEAD in the workspace (reusing the exported review-context helpers); on git failure or missing workspace the route returns changedFiles:[] and source.files:'none' without erroring.\n  - [ ] Project/workspace/vBRIEF resolution is tracker-agnostic (works for PAN/MIN/KRUX/AUR/... via parseIssueIdSync/extractPrefixSync), and an invalid issue id returns 400.\n  - [ ] All git calls are async (execAsync); no execSync is introduced; the existing /plan route is unchanged.\n\n### Unit-test the uat-context assembly and fallbacks (2/2 incomplete)\n  - [ ] Tests cover AC extraction (tagged + fallback), deliverables, changed-files mapping, and the no-data/git-failure fallback returning empty fields.\n  - [ ] Tests pass under `npm test` without requiring a live git repository (git is stubbed or logic is unit-tested in isolation).\n\n### Frontend: UatContext type, fetch helper, and parallel per-row query (2/2 incomplete)\n  - [ ] A UatContext type and fetchUatContext helper exist; a parallel useQueries fetches uat-context per ready issue with caching, without disturbing the existing workspace query.\n  - [ ] AwaitingMergeRow receives the uat-context data and rs.uatNotes as optional props; the page typechecks and renders unchanged (no visual change yet).\n\n### Frontend: collapsible 'What to test (UAT)' section (3/3 incomplete)\n  - [ ] Each card has a collapsible 'What to test / Expected changes' header (default collapsed) that expands/collapses on click.\n  - [ ] Expanded view shows a 'What to test (UAT)' checklist sourced from vBRIEF acceptance criteria for that issue.\n  - [ ] When acceptance criteria are missing, the section falls back to the issue description (then title) and never renders blank; uatNotes renders only when present.\n\n### Frontend: 'Expected changes' subsection (deliverables + changed files) (3/3 incomplete)\n  - [ ] Expanded view shows an 'Expected changes' summary listing vBRIEF deliverables and a PR changed-files summary (path + status + +/- counts).\n  - [ ] Changed-files list is truncated to ~12 with a '+N more' affordance; empty changedFiles degrades to a subtle note (and empty deliverables fall back to the proposal) without blanking.\n  - [ ] No regression to the merge button, stack-health display, MergeStepTracker, or row layout for issues from any tracker prefix.\n\n### Frontend tests for the UAT-context section (2/2 incomplete)\n  - [ ] Tests assert the UAT checklist renders from AC, the description fallback engages when AC is empty, and the changed-files summary renders.\n  - [ ] Tests assert the collapse/expand toggle reveals and hides the section; all tests pass under `npm test`.\n\n### Document the UAT-context section on Awaiting Merge cards (1/1 incomplete)\n  - [ ] The flywheel/Awaiting-Merge doc describes the new collapsible UAT-context section and its data source/endpoint."
+              "at": "2026-06-11T01:18:17.744Z",
+              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - .pan/continues/pan-1686.vbrief.json\n  - .pan/specs/2026-06-09-PAN-1686-feat-dashboard-show-uat-test-plan-expected-changes-on-awaiting-merge-cards.vbrief.json"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-11T01:16:16.250Z",
+          "status": "pending",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
           "notes": "Review context stale: branch advanced from 72433650 to ca387400 during convoy",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-11T01:16:16.250Z",
+              "status": "pending",
+              "at": "2026-06-11T01:18:17.744Z",
               "notes": "Review context stale: branch advanced from 72433650 to ca387400 during convoy"
             }
           ],
@@ -451,25 +451,25 @@
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:16:16.250Z",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:16:16.250Z"
+              "at": "2026-06-11T01:18:17.744Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T01:16:16.250Z",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:16:16.250Z",
+          "updatedAt": "2026-06-11T01:18:17.744Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:16:16.250Z"
+              "at": "2026-06-11T01:18:17.744Z"
             }
           ],
           "readyForMerge": false,

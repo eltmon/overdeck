@@ -1651,3 +1651,39 @@ patrol-driven actions.
   Reconcile recipe when the tree has live .pan writes: path-scoped chore-commit
   of .pan/continues+specs (repo convention), then `git pull --rebase`, then
   push. NEVER autostash (it's a stash).
+
+## RUN-20 tick 3 (2026-06-11) — PAN-1746 landed+reloaded+closed; strike-1747 surfaced a PAN-1531 architecture contradiction
+
+Run scoreboard after ~75 min: **3 substrate fixes on main** (PAN-1699 closed,
+PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
+(PAN-1747, PAN-1749), 3 issues at the merge gate (1700/1712/1719).
+
+- **strike-1746 landed in ~18 min** (72f09e9e0: terminal-merge dispatch gate +
+  hard-fail on missing workspace). Orchestrator ran the reconcile recipe + `pan
+  reload` → fix live in the running server; closed with evidence.
+- **PAN-1686 fell back from ready** — merge conflict the moment the strike
+  commits hit main (00:59:52Z). Expected rolling-rebase cost; the deacon
+  self-drove a full re-cycle (work + ship + 4-session review convoy). Do NOT
+  treat a ready→blocked flip right after a main landing as a regression.
+- **`pan plan --auto` (PAN-1744) COMPLETED the full planning flow in ~25 min**
+  (proposed spec + planned label + workspace + beads) and its session
+  self-cleaned. Followed the stop-at-proposed contract: `pan start PAN-1744`
+  → the PAN-1618 auto-rebuild gate fired (docker stack rebuilt) → work agent
+  up. The plan→start chain works; just drive the start yourself.
+- **strike-1747 declined with the run's best finding:** roles/ship.md missing
+  is the tip of a PAN-1531 contradiction — docs/MERGE-WORKFLOW.md says the
+  interactive ship role was RETIRED (server-side rebase, no ship actor), but
+  live code still spawns load-bearing ship runs (`service.ts:158`, reactive
+  scheduler, deacon `checkUndispatchedShip()` at deacon.ts:3097) — ship is
+  what flips readyForMerge. Fix needs an architecture decision + ~32-file
+  taxonomy reconciliation. Strike→plan reflex applied: `pan plan PAN-1747
+  --auto` launched same tick.
+- **PAN-1749 filed:** strike-1747 obeyed the brand-new PAN-1699 contract and
+  `pan tell flywheel-orchestrator` returned "not running" DURING AN ACTIVE RUN
+  — the orchestrator has no agent state dir, so the tell no-ops. The contract
+  silently degrades to issue-comment fallback (which the strike correctly
+  used). Until fixed, expect signals as issue comments, not tells.
+- **1704 pair paused** (official surface): ghost work agent (kickoff eaten at
+  boot, out 0 for 80 min, PAN-1709 misfire shape) + ship stalled idle 70 min
+  pre-contract. Freed slots; deacon's checkUndispatchedShip should re-dispatch
+  ship fresh. Verify next tick.
