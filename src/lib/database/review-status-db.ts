@@ -48,6 +48,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         stuck, stuck_reason, stuck_at, stuck_details,
         reviewed_at_commit,
         review_spawned_at,
+        conflict_resolution_dispatched_at,
         test_retry_count,
         review_retry_count,
         recovery_started_at,
@@ -59,7 +60,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         merge_step,
         auto_merge
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -89,6 +90,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         stuck_details         = excluded.stuck_details,
         reviewed_at_commit    = excluded.reviewed_at_commit,
         review_spawned_at     = excluded.review_spawned_at,
+        conflict_resolution_dispatched_at = excluded.conflict_resolution_dispatched_at,
         test_retry_count      = excluded.test_retry_count,
         review_retry_count    = excluded.review_retry_count,
         recovery_started_at   = excluded.recovery_started_at,
@@ -128,6 +130,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.stuckDetails ?? null,
       s.reviewedAtCommit ?? null,
       s.reviewSpawnedAt ?? null,
+      s.conflictResolutionDispatchedAt ?? null,
       s.testRetryCount ?? null,
       s.reviewRetryCount ?? null,
       s.recoveryStartedAt ?? null,
@@ -358,6 +361,8 @@ interface DbReviewStatusRow {
   reviewed_at_commit: string | null;
   // PAN-699: timestamp when review agents were dispatched
   review_spawned_at: string | null;
+  // PAN-1765: timestamp when conflict resolution was dispatched
+  conflict_resolution_dispatched_at: string | null;
   // PAN-699: test-agent dispatch retry counter
   test_retry_count: number | null;
   // PAN-794: parallel-review re-dispatch retry counter
@@ -411,6 +416,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
     reviewSpawnedAt: row.review_spawned_at ?? undefined,
+    conflictResolutionDispatchedAt: row.conflict_resolution_dispatched_at ?? undefined,
     testRetryCount: row.test_retry_count ?? undefined,
     reviewRetryCount: row.review_retry_count ?? undefined,
     recoveryStartedAt: row.recovery_started_at ?? undefined,

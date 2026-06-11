@@ -19,7 +19,7 @@ import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 53;
+export const SCHEMA_VERSION = 54;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -241,6 +241,8 @@ export function initSchema(db: SqliteDatabase): void {
       reviewed_at_commit    TEXT,
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
+      -- PAN-1765: timestamp when conflict resolution was dispatched
+      conflict_resolution_dispatched_at TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
       test_retry_count      INTEGER DEFAULT 0,
       -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
@@ -1471,6 +1473,11 @@ export function runMigrations(db: SqliteDatabase): void {
   if (currentVersion < 53) {
     try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+  }
+
+  // v53 → v54: persist conflict-resolution dispatch throttles (PAN-1765)
+  if (currentVersion < 54) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
