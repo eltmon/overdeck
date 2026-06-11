@@ -141,7 +141,8 @@
   }
   .ric svg { width: 12px; height: 12px; }
   /* live states only — idle stays neutral (one pattern per context: the icon IS the indicator) */
-  .role.running .ric { color: var(--success-fg); background: color-mix(in srgb, var(--success) 8%, transparent); }
+  /* running = BLUE (machine working, per signal table v1.2) — emerald is outcome, not activity */
+  .role.running .ric { color: var(--info); background: color-mix(in srgb, var(--info) 8%, transparent); }
   .role.running .ric svg { animation: pulse 1.8s ease-in-out infinite; }
   .role.paused  .ric { color: var(--warning-fg); background: color-mix(in srgb, var(--warning) 8%, transparent); }
   .role.error   .ric { color: var(--destructive-fg); background: color-mix(in srgb, var(--destructive) 8%, transparent); }
