@@ -728,9 +728,7 @@ export function clearReadySignal(agentId: string): void {
 export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
-  for (let i = 0; i < timeoutSeconds; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-
+  for (let i = 0; i <= timeoutSeconds; i++) {
     if (existsSync(readyPath)) {
       try {
         const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
@@ -742,6 +740,10 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
       } catch {
         // File exists but mid-write / invalid — keep waiting.
       }
+    }
+
+    if (i < timeoutSeconds) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
     }
   }
 
