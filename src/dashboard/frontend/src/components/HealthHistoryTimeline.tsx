@@ -17,7 +17,7 @@ interface HealthHistoryTimelineProps {
 }
 
 const STATE_COLORS = {
-  active: 'bg-success',
+  active: 'bg-info', // v1.2: blue = machine working
   stale: 'bg-warning',
   warning: 'bg-warning',
   stuck: 'bg-destructive',

@@ -27,10 +27,12 @@ const PRIORITY_COLORS: Record<number, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  // v1.2 signal law: queued = neutral, machine working = blue,
+  // In Review = amber human gate, done = emerald outcome.
   backlog: 'bg-card text-card-foreground',
-  todo: 'bg-primary text-primary-foreground',
-  in_progress: 'bg-warning text-warning-foreground',
-  in_review: 'bg-signal-review text-signal-review-foreground',
+  todo: 'bg-muted text-muted-foreground',
+  in_progress: 'bg-info text-primary-foreground',
+  in_review: 'bg-warning text-warning-foreground',
   done: 'bg-success text-success-foreground',
   canceled: 'bg-muted-foreground text-primary-foreground',
 };
