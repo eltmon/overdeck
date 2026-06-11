@@ -254,7 +254,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       delete process.env.PANOPTICON_HOME;
     }
     if (existsSync(testPanopticonHome)) {
-      rmSync(testPanopticonHome, { recursive: true, force: true });
+      rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
     }
   });
 
