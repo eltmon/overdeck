@@ -982,7 +982,12 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumberSync(issueId) ?? issueId}`);
+  // Non-closing reference on purpose: a closing keyword ("Closes #N") hands
+  // close authority to GitHub, which fires the moment the PR's head becomes
+  // reachable from main and races the pipeline's verifying_on_main → close-out
+  // lifecycle (the first UAT batch promote closed 2 of 3 member issues
+  // mid-handoff, 2026-06-11). Panopticon's close-out owns issue closing.
+  lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
