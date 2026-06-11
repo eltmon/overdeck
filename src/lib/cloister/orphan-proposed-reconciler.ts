@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listProjects, type ProjectConfig } from '../projects.js';
-import type { ReviewStatus } from '../review-status.js';
+import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
@@ -59,6 +59,7 @@ export interface FindOrphanProposedOptions {
   projects?: ProjectEntry[];
   tmuxSessionNames?: readonly string[];
   getAgentStateForIssue?: (agentId: string) => Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null>;
+  getReviewStatusForIssue?: (issueId: string) => ReviewPipelinePresenceStatus | null;
   closedIssueIds?: Set<string>;
 }
 
@@ -147,6 +148,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
   const projects = await loadProjectsForScan(options.projects);
   const tmuxSessionNames = await loadTmuxSessionNames(options.tmuxSessionNames);
   const getState = options.getAgentStateForIssue ?? defaultGetAgentState;
+  const getReviewStatus = options.getReviewStatusForIssue ?? getReviewStatusSync;
   const candidates: OrphanProposedCandidate[] = [];
 
   for (const { key, config } of projects) {
@@ -169,6 +171,10 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
       if (tmuxSessionNames.includes(agentId)) continue;
       if (state?.status === 'starting' || state?.status === 'running') continue;
       if (state?.paused === true || state?.troubled === true) continue;
+      if (hasReviewPipelinePresence(getReviewStatus(issueId))) {
+        logReconcilerDiagnostic('candidate-excluded', { issueId, reason: 'review-pipeline-presence' });
+        continue;
+      }
       if (await isIssueClosed(issueId, options.closedIssueIds)) continue;
 
       const planItems = Array.isArray(spec.plan.items) ? spec.plan.items : [];

@@ -7,8 +7,16 @@ const activityLogger = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
 }));
 
+const reviewStatusStore = vi.hoisted(() => ({
+  getReviewStatusSync: vi.fn(() => null),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: activityLogger.emitActivityEntrySync,
+}));
+
+vi.mock('../../review-status.js', () => ({
+  getReviewStatusSync: reviewStatusStore.getReviewStatusSync,
 }));
 
 import {
@@ -68,6 +76,8 @@ describe('orphan proposed spec reconciler', () => {
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), 'orphan-proposed-reconciler-'));
     activityLogger.emitActivityEntrySync.mockReset();
+    reviewStatusStore.getReviewStatusSync.mockReset();
+    reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
     clearOrphanProposedAttemptCooldowns();
   });
 
@@ -95,6 +105,86 @@ describe('orphan proposed spec reconciler', () => {
     ['prUrl set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1707' }],
   ] as const)('returns true for %s', (_label, status) => {
     expect(hasReviewPipelinePresence(status)).toBe(true);
+  });
+
+  it('excludes in-review issues with stopped work agents before spawning', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3401', 'proposed');
+    writeBeads(projectPath, 'PAN-3401');
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3401' }));
+    const getReviewStatusForIssue = vi.fn(() => ({
+      reviewStatus: 'passed' as const,
+      testStatus: 'pending' as const,
+      readyForMerge: false,
+      prNumber: 1707,
+    }));
+    const options = {
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [] as string[],
+      getAgentStateForIssue: async () => ({ status: 'stopped' as const, paused: false, troubled: false }),
+      getReviewStatusForIssue,
+      closedIssueIds: new Set<string>(),
+    };
+
+    await expect(findOrphanProposedSpecsForReconciler(options)).resolves.toEqual([]);
+    await expect(reconcileOrphanProposedSpecs({
+      ...options,
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual([]);
+
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
+  it('keeps all-pending review status rows eligible as candidates', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3402', 'proposed');
+    writeBeads(projectPath, 'PAN-3402');
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      getReviewStatusForIssue: () => ({
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+      }),
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-3402',
+        beadCount: 2,
+        planItemCount: 2,
+      }),
+    ]);
+  });
+
+  it('uses the default review status reader and keeps review-status exclusions out of the activity feed', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3403', 'proposed');
+    writeBeads(projectPath, 'PAN-3403');
+    reviewStatusStore.getReviewStatusSync.mockReturnValue({
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      readyForMerge: false,
+      prNumber: 1707,
+    });
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([]);
+
+    expect(reviewStatusStore.getReviewStatusSync).toHaveBeenCalledWith('PAN-3403');
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
   });
 
   it('detects proposed orphan specs and skips active, paused, and completed issues', async () => {
