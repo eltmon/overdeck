@@ -1,12 +1,8 @@
-import { access, readFile } from 'fs/promises';
-import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlan } from './vbrief/io.js';
 import { notifyPipelineSync } from './pipeline-notifier.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
-import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile } from './vbrief/dag.js';
 import {
   upsertReviewStatusSync as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -339,11 +335,9 @@ export function setReviewStatusSync(
   }
 
   // Single-row upsert — atomic, no TOCTOU risk. SQLite remains authoritative
-  // for Phase 1 live runtime state; the vBRIEF pipeline mirror below is a
-  // corroborating durable task-graph view for pan-oversee/dashboard readers.
+  // for live runtime pipeline state. Do not mirror this into canonical vBRIEF
+  // specs: PAN-1124 makes .pan/specs immutable after planning except plan.status.
   dbUpsert(updated);
-
-  mirrorPipelineStatusToVBrief(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 
@@ -668,34 +662,6 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
   } catch (err) {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
-}
-
-
-function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): void {
-  void (async () => {
-    try {
-      const agentId = `agent-${issueId.toLowerCase()}`;
-      const workStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
-      if (!existsSync(workStateFile)) return;
-      const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
-      if (!workState.workspace) return;
-      const planPath = await Effect.runPromise(findPlan(workState.workspace));
-      if (!planPath) {
-        console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
-        return;
-      }
-      const result = await Effect.runPromise(writePipelineMirrorToPlanFile(
-        planPath,
-        buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
-        `review-status-${process.pid}`,
-      ));
-      if (!result) {
-        console.warn(`[review-status] Failed to write pipeline mirror to ${planPath} for ${issueId}`);
-      }
-    } catch (err: any) {
-      console.warn(`[review-status] Failed to mirror pipeline state to vBRIEF for ${issueId}: ${err.message}`);
-    }
-  })();
 }
 
 

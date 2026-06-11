@@ -13,53 +13,55 @@ Usage:
 import argparse
 import json
 import os
-import re
 import sqlite3
+import subprocess
 import sys
 from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
 DB_PATH = os.path.expanduser("~/.panopticon/panopticon.db")
-PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
 
-def encode_claude_project_dir(cwd: str) -> str:
-    """Mirror encodeClaudeProjectDir() in src/lib/paths.ts."""
-    return re.sub(r"[^a-zA-Z0-9-]", "-", cwd or "")
+def record_resolver_error(info: dict[str, Any], message: str) -> None:
+    info["_resolver_error"] = message
+    print(message, file=sys.stderr)
 
 
 def resolve_session_file(info: dict[str, Any]) -> tuple[str | None, str]:
-    """Resolve the transcript JSONL path for a conversation.
+    """Resolve the transcript JSONL path by delegating to the canonical pan CLI."""
+    conv_id = info.get("id")
+    command = ["pan", "conv", "jsonl", "--json", str(conv_id)]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except FileNotFoundError:
+        record_resolver_error(info, "Error: pan command not found; cannot resolve transcript JSONL path.")
+        return None, "unknown"
 
-    The session_file column is deprecated (PAN-451) and NULL for all
-    conversations created since 2026-05. The canonical source is
-    claude_session_id + cwd:
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        suffix = f": {detail[0]}" if detail else ""
+        record_resolver_error(info, f"Error: {' '.join(command)} failed{suffix}")
+        return None, "unknown"
 
-        ~/.claude/projects/<encoded-cwd>/<claude_session_id>.jsonl
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        record_resolver_error(info, f"Error: {' '.join(command)} returned malformed JSON.")
+        return None, "unknown"
 
-    Returns (path, status) where status is one of:
-        ok       - path exists on disk
-        expired  - session id known, but the JSONL is gone
-                   (Claude Code retention deletes old transcripts)
-        unknown  - no session id or file recorded at all
-    """
-    legacy = info.get("session_file")
-    if legacy and Path(legacy).expanduser().exists():
-        return legacy, "ok"
+    status = payload.get("status")
+    if status not in {"ok", "expired", "unknown"}:
+        record_resolver_error(info, f"Error: {' '.join(command)} returned unknown status {status!r}.")
+        return None, "unknown"
 
-    session_id = info.get("claude_session_id")
-    if session_id:
-        derived = PROJECTS_DIR / encode_claude_project_dir(info.get("cwd") or "") / f"{session_id}.jsonl"
-        if derived.exists():
-            return str(derived), "ok"
-        for match in PROJECTS_DIR.glob(f"*/{session_id}.jsonl"):
-            return str(match), "ok"
-        return str(derived), "expired"
-
-    if legacy:
-        return legacy, "expired"
-    return None, "unknown"
+    path = payload.get("path")
+    return path if isinstance(path, str) else None, status
 
 
 def get_db():
@@ -397,11 +399,11 @@ def main():
                     "Claude Code retention deletes old transcripts.",
                     file=sys.stderr,
                 )
-            else:
+            elif not info.get("_resolver_error"):
                 print("No claude_session_id or session_file recorded for this conversation.", file=sys.stderr)
             sys.exit(1)
         if args.json:
-            payload = dict(info)
+            payload = {key: value for key, value in info.items() if not key.startswith("_")}
             payload["session_summary"] = summary
             print(json.dumps(payload, indent=2))
             return
