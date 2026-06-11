@@ -504,9 +504,17 @@ export class FlyProvider implements RemoteProvider {
 
   /** Initialize beads in a workspace on a remote VM */
   async initBeads(vmName: string, workspacePath: string = '/workspace'): Promise<boolean> {
+    // The cloned .beads/config.yaml carries the repo's sync.remote (an SSH
+    // git URL). VMs are keyless — bd init tries to clone that remote and
+    // fails before creating the local DB. Disable it: the host owns beads
+    // sync; the VM's DB is a local working copy seeded from issues.jsonl.
+    await this.sshImpl(
+      vmName,
+      `cd ${workspacePath} && [ -f .beads/config.yaml ] && sed -i 's|^sync.remote:|# vm-local (keyless): sync.remote:|' .beads/config.yaml || true`
+    );
     const result = await this.sshImpl(
       vmName,
-      `cd ${workspacePath} && bd init --prefix PAN 2>&1 || bd init 2>&1`
+      `cd ${workspacePath} && (bd init --prefix PAN 2>&1 || bd init 2>&1)`
     );
     return result.exitCode === 0;
   }
