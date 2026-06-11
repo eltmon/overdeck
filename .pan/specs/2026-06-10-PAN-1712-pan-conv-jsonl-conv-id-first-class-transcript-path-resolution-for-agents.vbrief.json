@@ -4,17 +4,17 @@
     "created": "2026-06-10T01:00:53.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1712: pan conv jsonl <conv-id> — first-class transcript path resolution for agents",
-    "updated": "2026-06-11T03:49:55.786Z"
+    "updated": "2026-06-11T04:36:10.102Z"
   },
   "plan": {
     "id": "pan-1712",
     "title": "pan conv jsonl <conv-id> — first-class transcript path resolution for agents",
-    "status": "proposed",
+    "status": "completed",
     "uid": "240d64bb-fe05-4f2d-8130-63f9812b23b6",
     "author": "agent:claude-opus-4-8",
-    "sequence": 20,
+    "sequence": 21,
     "created": "2026-06-10T01:00:53.000Z",
-    "updated": "2026-06-11T03:49:55.786Z",
+    "updated": "2026-06-11T04:36:10.102Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1712",
@@ -318,5 +318,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
