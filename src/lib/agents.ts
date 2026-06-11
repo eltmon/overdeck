@@ -48,6 +48,7 @@ import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.j
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
 import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
+import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -756,6 +757,7 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  lastResumeAt?: string;
   /**
    * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
    * undefined = legacy/pre-feature agent or non-applicable role;
@@ -845,6 +847,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     status: raw.status,
     startedAt: raw.startedAt,
     lastActivity: raw.lastActivity,
+    lastResumeAt: raw.lastResumeAt,
     kickoffDelivered: raw.kickoffDelivered,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
@@ -1372,7 +1375,7 @@ export async function deliverAgentMessage(
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          2000,
+          4_000,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
@@ -1440,6 +1443,66 @@ export async function deliverAgentMessage(
   return { ok: true, path: 'tmux' };
 }
 
+const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 3_000;
+const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
+
+async function waitForTranscriptUserRecordLanding(
+  workspace: string,
+  sessionId: string,
+  before: TranscriptUserRecordSnapshot,
+  snapshot: typeof captureTranscriptUserRecordSnapshot,
+  timeoutMs = RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS,
+  intervalMs = RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const fromByteOffset = before.readOffset ?? before.fileSize;
+  do {
+    const after = await snapshot(workspace, sessionId, { fromByteOffset });
+    if (hasNewTranscriptUserRecord(before, after)) return true;
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  } while (Date.now() < deadline);
+
+  const after = await snapshot(workspace, sessionId, { fromByteOffset });
+  return hasNewTranscriptUserRecord(before, after);
+}
+
+export async function deliverResumeMessageWithTranscriptConfirmation(args: {
+  agentId: string;
+  workspace: string;
+  sessionId: string;
+  message: string;
+  caller: string;
+  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
+  timeoutMs?: number;
+  intervalMs?: number;
+  deliver?: typeof deliverAgentMessage;
+  snapshot?: typeof captureTranscriptUserRecordSnapshot;
+}): Promise<{ delivered: boolean; attempts: number; lastDelivery?: DeliveryResult }> {
+  const snapshot = args.snapshot ?? captureTranscriptUserRecordSnapshot;
+  const deliver = args.deliver ?? deliverAgentMessage;
+  const before = await snapshot(args.workspace, args.sessionId);
+  let lastDelivery: DeliveryResult | undefined;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    lastDelivery = await deliver(args.agentId, args.message, args.caller, args.deliveryMethod);
+    if (lastDelivery.ok && await waitForTranscriptUserRecordLanding(
+      args.workspace,
+      args.sessionId,
+      before,
+      snapshot,
+      args.timeoutMs,
+      args.intervalMs,
+    )) {
+      return { delivered: true, attempts: attempt, lastDelivery };
+    }
+    if (attempt < 2) {
+      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
+    }
+  }
+
+  return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
+}
+
 async function deliverInitialPromptWithRetry(
   agentId: string,
   prompt: string,
@@ -1467,6 +1530,10 @@ async function deliverInitialPromptWithRetry(
   }
 
   return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+export function buildDefaultResumeContinueMessage(issueId: string): string {
+  return `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 }
 
 async function buildResumeMessageForAgent(
@@ -4098,10 +4165,34 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
         issueId: agentState.issueId,
       });
     } else if (ready && resumeMessage.message) {
-      const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
-      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
-      await appendTellInterventionForUserSource(normalizedId, caller);
-      console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
+      let delivered = false;
+      if (fallbackHarness === 'claude-code') {
+        const fallbackSessionId = getLatestSessionIdSync(normalizedId);
+        if (fallbackSessionId) {
+          const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+            agentId: normalizedId,
+            workspace: agentState.workspace,
+            sessionId: fallbackSessionId,
+            message: resumeMessage.message,
+            caller: 'resumeAgent:resume-prompt',
+            deliveryMethod: agentState.deliveryMethod,
+          });
+          delivered = delivery.delivered;
+          if (!delivery.delivered) {
+            console.error(`[agents] Fallback resume prompt did not land after ${delivery.attempts} delivery attempts`);
+          }
+        } else {
+          console.error(`[agents] Fallback-restarted ${normalizedId} but no session id was recorded — feedback in mail queue`);
+        }
+      } else {
+        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+        delivered = delivery.ok;
+      }
+      if (delivered) {
+        if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        await appendTellInterventionForUserSource(normalizedId, caller);
+        console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
+      }
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
     }
@@ -4335,6 +4426,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   }
 
   try {
+    const resumeStartedAt = new Date().toISOString();
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
@@ -4351,7 +4443,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
-    const defaultResumeMessage = `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
+    const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
     const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
@@ -4423,9 +4515,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        const delivery = await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
-        messageDelivered = delivery.ok;
-        if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        const delivery = await deliverResumeMessageWithTranscriptConfirmation({
+          agentId: normalizedId,
+          workspace: agentState.workspace,
+          sessionId,
+          message: effectiveMessage,
+          caller: 'resumeAgent:auto-continue',
+          deliveryMethod: agentState.deliveryMethod,
+        });
+        messageDelivered = delivery.delivered;
+        if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+        if (!delivery.delivered) {
+          console.error(`[resumeAgent] Auto-continue prompt did not land after ${delivery.attempts} delivery attempts`);
+        }
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }
@@ -4441,6 +4543,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     // Update agent state
     if (agentState) {
+      agentState.lastResumeAt = resumeStartedAt;
       markAgentRunning(agentState);
       saveAgentStateSync(agentState);
     }

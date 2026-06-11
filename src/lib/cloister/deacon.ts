@@ -149,7 +149,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
@@ -157,6 +157,7 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
@@ -5007,6 +5008,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...closedIssueAgentActions);
   for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
 
+  // Re-send the resume continue prompt when a work agent is alive and idle after
+  // resume but no user record landed in the JSONL transcript.
+  const stalledResumeActions = await nudgeStalledResumeWorkAgents();
+  actions.push(...stalledResumeActions);
+  for (const a of stalledResumeActions) addLog('action', a, state.patrolCycle);
+
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
@@ -6025,6 +6032,87 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  * Returns a list of action descriptions for runPatrol to log.
  */
 const BEAD_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+const STALLED_RESUME_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function hasLandedUserRecordSinceResume(state: AgentState, snapshot: Awaited<ReturnType<typeof captureTranscriptUserRecordSnapshot>>): boolean {
+  const resumeAt = state.lastResumeAt ? Date.parse(state.lastResumeAt) : NaN;
+  if (!Number.isFinite(resumeAt)) return true;
+  const lastUserAt = snapshot.lastUserRecord?.timestamp ? Date.parse(snapshot.lastUserRecord.timestamp) : NaN;
+  if (!Number.isFinite(lastUserAt)) return snapshot.userRecordCount > 0;
+  return lastUserAt >= resumeAt;
+}
+
+function stalledResumeCooldownActive(agentId: string): boolean {
+  const cooldownFile = join(getAgentDir(agentId), '.last-stalled-resume-nudge');
+  if (!existsSync(cooldownFile)) return false;
+  try {
+    const last = parseInt(readFileSync(cooldownFile, 'utf-8').trim(), 10);
+    return !Number.isNaN(last) && Date.now() - last < STALLED_RESUME_NUDGE_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+function recordStalledResumeCooldown(agentId: string): void {
+  writeFileSync(join(getAgentDir(agentId), '.last-stalled-resume-nudge'), String(Date.now()), 'utf-8');
+}
+
+function buildStalledResumePrompt(state: AgentState): string | null {
+  if (state.kickoffDelivered === false) {
+    const promptPath = join(getAgentDir(state.id), 'initial-prompt.md');
+    try {
+      return readFileSync(promptPath, 'utf-8');
+    } catch (err) {
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${state.id} skipped — kickoffDelivered=false but ${promptPath} is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+  return buildDefaultResumeContinueMessage(state.issueId);
+}
+
+export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch { return actions; }
+
+  for (const agentId of dirs) {
+    const state = getAgentStateSync(agentId);
+    if (!state) continue;
+    if (state.status !== 'running') continue;
+    if (state.role !== 'work') continue;
+    if (state.paused || state.troubled) continue;
+    if (!state.lastResumeAt) continue;
+    if (await isIssueClosed(state.issueId)) continue;
+    if (!await Effect.runPromise(sessionExists(agentId))) continue;
+    if (!isAgentIdleForNudge(agentId)) continue;
+    if (stalledResumeCooldownActive(agentId)) continue;
+
+    const sessionId = state.sessionId;
+    if (!sessionId) continue;
+    const snapshot = await captureTranscriptUserRecordSnapshot(state.workspace, sessionId);
+    if (hasLandedUserRecordSinceResume(state, snapshot)) continue;
+
+    const message = buildStalledResumePrompt(state);
+    if (!message) continue;
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(agentId, message);
+      recordStalledResumeCooldown(agentId);
+      const action = `Re-sent stalled resume prompt to ${agentId} (${state.issueId})`;
+      actions.push(action);
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${action}`);
+    } catch (err: any) {
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${agentId} messageAgent failed: ${err?.message ?? err}`);
+    }
+  }
+
+  return actions;
+}
 
 export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
