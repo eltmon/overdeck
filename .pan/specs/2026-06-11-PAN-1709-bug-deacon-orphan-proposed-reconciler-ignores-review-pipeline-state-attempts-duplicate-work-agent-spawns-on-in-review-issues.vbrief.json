@@ -1,0 +1,229 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T03:12:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1709: bug(deacon): orphan-proposed reconciler ignores review pipeline state — attempts duplicate work-agent spawns on in-review issues",
+    "updated": "2026-06-11T03:09:00.322Z"
+  },
+  "plan": {
+    "id": "pan-1709",
+    "title": "bug(deacon): orphan-proposed reconciler ignores review pipeline state — attempts duplicate work-agent spawns on in-review issues",
+    "status": "proposed",
+    "uid": "81362fd3-65af-4f86-8b31-132dde87c8b2",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-11T03:12:00.000Z",
+    "updated": "2026-06-11T03:09:00.322Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1709",
+        "label": "PAN-1709",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1708",
+        "label": "PAN-1708 (sibling: status-flip on CLI start)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "cloister",
+      "reconciler",
+      "bug",
+      "defense-in-depth"
+    ],
+    "narratives": {
+      "Problem": "findOrphanProposedSpecsForReconciler (src/lib/cloister/orphan-proposed-reconciler.ts) treats any issue with a 'proposed' spec, no exact-match `agent-<issue>` tmux session, a non-running agent state, an open tracker issue, and beads==plan-items as an orphan needing a work agent. It never consults the review pipeline: no check of the review_status table (review/test/ship status, prNumber, readyForMerge), no check for live `agent-<issue>-review-*`/test/ship sessions, and no check for an open PR on feature/<issue>. An issue whose work agent legitimately stopped because work is done and in review looks identical to one never started, so the reconciler attempts duplicate work-agent spawns (live incident: spawned agent-pan-1658 onto PAN-1658 whose PR #1707 was closed as superseded, consuming the last agent-capacity slot). Only host-load guardrails blocked earlier duplicates.",
+      "Proposal": "Three-layer pipeline-presence exclusion. (1) Candidate filter consults review_status via a new injectable getReviewStatusForIssue (default getReviewStatusSync) and excludes issues where an exported pure predicate hasReviewPipelinePresence() sees progress: reviewStatus !== 'pending', testStatus !== 'pending', mergeStatus set and !== 'pending', readyForMerge, or prNumber/prUrl recorded. Row existence alone does not exclude. (2) Candidate filter's tmux exclusion widens to any session matching `agent-<issue>` or starting with `agent-<issue>-` (trailing hyphen), covering live review convoy/test/ship sessions. (3) reconcileOrphanProposedSpecs gains an open-PR gate after the cooldown and before the spawn attempt, via injectable hasOpenPrForBranch defaulting to async `gh pr list --head feature/<issue> --state open` (execAsync, fail-open on gh errors). All new skip paths log console diagnostics only, never activity-feed entries (PAN-1626 discipline). This is defense-in-depth alongside sibling PAN-1708 and must work standalone."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Review-pipeline presence is decided by an exported pure predicate over the review_status row: reviewStatus !== 'pending', testStatus !== 'pending' (including 'skipped'), mergeStatus set and !== 'pending', readyForMerge === true, or prNumber/prUrl present. Row existence with all-pending fields does NOT exclude.",
+        "rationale": "Matches the issue's fix sketch (review/test/ship beyond pending, PR recorded, ready_for_merge). All-pending rows are created at spawn time for issues that may genuinely need reconciling; 'skipped' testStatus still proves the pipeline touched the issue."
+      },
+      {
+        "summary": "The review_status read is injected via FindOrphanProposedOptions.getReviewStatusForIssue defaulting to getReviewStatusSync, mirroring the existing getAgentStateForIssue injection.",
+        "rationale": "Keeps unit tests hermetic (no SQLite fixture needed) and follows the module's established dependency-injection pattern."
+      },
+      {
+        "summary": "The open-PR gh check runs in reconcileOrphanProposedSpecs after the per-issue cooldown, not in the per-scan candidate filter.",
+        "rationale": "The spawn is the dangerous action; gating there satisfies the acceptance criterion while the 5-minute cooldown caps gh CLI calls at ≤1 per issue per 5 minutes instead of every 60s patrol."
+      },
+      {
+        "summary": "gh failures fail-open (proceed as if no open PR) with a console diagnostic.",
+        "rationale": "Fail-closed would permanently block legitimate reconciler spawns on non-GitHub projects or hosts without gh auth; the review_status check remains the primary guard."
+      },
+      {
+        "summary": "No config flag for the new checks; they are unconditional. All requiresInspection flags set to false.",
+        "rationale": "Duplicate-spawn correctness guards should not be toggleable. The change is a contained bug fix: a wrong predicate surfaces immediately in the same-bead unit tests and end-of-PR review, not as silent foundation rot across beads."
+      }
+    ],
+    "items": [
+      {
+        "id": "presence-predicate",
+        "title": "Add hasReviewPipelinePresence() predicate with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T03:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1709",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/orphan-proposed-reconciler.ts, add an exported pure function hasReviewPipelinePresence(status) accepting a Pick of ReviewStatus (reviewStatus, testStatus, mergeStatus, readyForMerge, prNumber, prUrl) | null. Return true when reviewStatus !== 'pending', testStatus !== 'pending', mergeStatus is set and !== 'pending', readyForMerge === true, or prNumber/prUrl is present; false for null or an all-pending row. Add unit tests in src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts covering every branch."
+        },
+        "subItems": [
+          {
+            "id": "presence-predicate.ac1",
+            "title": "Predicate returns false for null and for a row with reviewStatus 'pending', testStatus 'pending', no mergeStatus, readyForMerge false, no prNumber/prUrl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "presence-predicate.ac2",
+            "title": "Predicate returns true for each progressed field in isolation: reviewStatus beyond pending, testStatus beyond pending (including 'skipped'), mergeStatus beyond pending, readyForMerge true, prNumber set, prUrl set — each covered by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "filter-review-status",
+        "title": "Exclude candidates with review-pipeline presence in the candidate filter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T03:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1709",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add getReviewStatusForIssue?: (issueId: string) => <ReviewStatus pick> | null to FindOrphanProposedOptions, defaulting to getReviewStatusSync from src/lib/review-status.ts. In findOrphanProposedSpecsForReconciler, skip any spec whose review_status row satisfies hasReviewPipelinePresence(), logging a logReconcilerDiagnostic('candidate-excluded', { issueId, reason: 'review-pipeline-presence' }) console diagnostic (never an activity-feed entry). Add the issue-mandated unit test: spec status 'proposed', beads == plan items, no tmux session, agent state stopped (in-review-with-stopped-work-agent), review_status { reviewStatus: 'passed', prNumber } → no candidate and no spawn through reconcileOrphanProposedSpecs. Also test that an all-pending row still yields a candidate."
+        },
+        "subItems": [
+          {
+            "id": "filter-review-status.ac1",
+            "title": "Unit test: issue with spec 'proposed', stopped work agent, and review_status reviewStatus 'passed' + prNumber produces no candidate and reconcileOrphanProposedSpecs attempts no spawn (the issue's required in-review-with-stopped-work-agent case)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filter-review-status.ac2",
+            "title": "Unit test: an issue with a review_status row whose fields are all pending/absent is still returned as a candidate (row existence alone does not exclude)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filter-review-status.ac3",
+            "title": "Default wiring uses getReviewStatusSync when no getReviewStatusForIssue option is supplied; exclusion emits only a console diagnostic, no emitActivityEntrySync call (PAN-1626 discipline asserted in test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "filter-session-prefix",
+        "title": "Widen tmux exclusion to live pipeline sessions (agent-<issue>-* prefix)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T03:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1709",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In findOrphanProposedSpecsForReconciler, replace the exact tmuxSessionNames.includes(agentId) check with: exclude when any session equals agentId OR starts with `${agentId}-` (trailing hyphen). This covers live review convoy sessions (agent-<issue>-review-<subRole>, per review-monitor.ts), test, and ship sessions. Add unit tests for both the positive and the prefix-collision-negative case."
+        },
+        "subItems": [
+          {
+            "id": "filter-session-prefix.ac1",
+            "title": "Unit test: a live session named agent-<issue>-review-security excludes the issue from candidates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "filter-session-prefix.ac2",
+            "title": "Unit test: a session for a longer issue number (e.g. agent-pan-30011) does NOT exclude PAN-3001 — trailing-hyphen prefix match prevents issue-number collisions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-pr-spawn-gate",
+        "title": "Open-PR gate before spawn attempt in reconcileOrphanProposedSpecs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T03:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1709",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean> to ReconcileOrphanProposedOptions. Default implementation runs `gh pr list --head feature/<issue-lowercase> --state open --json number --limit 1` with cwd=projectPath using promisified exec (execAsync — NEVER execSync; this code is reachable from the dashboard server). In reconcileOrphanProposedSpecs, after the cooldown gate and before the spawn attempt, call it: true → skip with logReconcilerDiagnostic('spawn-skipped', { reason: 'open-pr' }) and push a 'Skipped … open-pr' action, no spawn, no activity-feed entry; gh error → fail-open (log diagnostic, proceed). Set the cooldown timestamp on open-PR skips as on attempts so gh is called at most once per issue per cooldown window. Unit tests mock hasOpenPrForBranch — no real gh calls, no real timers."
+        },
+        "subItems": [
+          {
+            "id": "open-pr-spawn-gate.ac1",
+            "title": "Unit test: candidate with hasOpenPrForBranch resolving true is skipped — spawnWorkAgent is never called and no activity-feed entry is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-pr-spawn-gate.ac2",
+            "title": "Unit test: hasOpenPrForBranch rejecting (gh failure) fails open — the spawn attempt proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-pr-spawn-gate.ac3",
+            "title": "Default implementation uses promisified exec with cwd=projectPath and the feature/<issue-lowercase> head branch; no execSync anywhere in the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "presence-predicate",
+        "to": "filter-review-status",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1709-bug-deacon-orphan-proposed-reconciler-ignores-review-pipeline-state-attempts-duplicate-work-agent-spawns-on-in-review-issues.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
