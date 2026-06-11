@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1747",
   "created": "2026-06-11T01:20:23.852Z",
-  "updated": "2026-06-11T05:18:56.841Z",
+  "updated": "2026-06-11T07:12:24.086Z",
   "gitState": {
     "branch": "feature/pan-1747",
     "sha": "b7e7879c",
@@ -116,6 +116,16 @@
       "reason": "feedback",
       "note": "[2026-06-11T03:18Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-06-11T03:18:50.261Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T06:55:18.139Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:00Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T07:00:26.915Z"
     }
   ],
   "feedback": []
