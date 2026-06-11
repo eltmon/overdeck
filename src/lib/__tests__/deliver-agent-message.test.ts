@@ -417,7 +417,6 @@ describe('channel bridge delivery', () => {
   });
 
   it('supervisor POST timeout: falls through to channels using fake timers', async () => {
-    vi.useFakeTimers();
     const agentId = 'agent-supervisor-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
@@ -426,13 +425,14 @@ describe('channel bridge delivery', () => {
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'late',
-      delayMs: 8_500,
+      delayMs: 9_000,
       capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
       status: 200,
       body: 'ok',
     });
+    vi.useFakeTimers();
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
       await vi.waitFor(() => expect(capture.lastBody).toBeDefined());

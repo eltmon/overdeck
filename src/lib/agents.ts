@@ -1369,21 +1369,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const clearClientTimeout = () => {
       if (timeout) clearTimeout(timeout);
-      timeout = null;
+      timeout = undefined;
     };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       reject(err);
     };
 
