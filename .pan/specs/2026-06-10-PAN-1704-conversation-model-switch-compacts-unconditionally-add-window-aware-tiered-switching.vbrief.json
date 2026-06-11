@@ -4,7 +4,7 @@
     "created": "2026-06-10T00:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1704: Conversation model switch compacts unconditionally — add window-aware tiered switching (lossless /model or --resume when context fits)",
-    "updated": "2026-06-11T01:39:25.132Z"
+    "updated": "2026-06-11T02:01:41.114Z"
   },
   "plan": {
     "id": "pan-1704",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "cfbef208-8840-448b-b105-acec6ecba538",
     "author": "agent:claude-opus-4-8",
-    "sequence": 14,
+    "sequence": 17,
     "created": "2026-06-10T00:12:00.000Z",
-    "updated": "2026-06-11T01:39:25.132Z",
+    "updated": "2026-06-11T02:01:41.114Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1704",
@@ -368,60 +368,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1704-conversation-model-switch-compacts-unconditionally-add-window-aware-tiered-switching.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "review",
         "issueId": "PAN-1704",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T01:39:25.131Z",
+        "updatedAt": "2026-06-11T02:01:41.106Z",
         "work": {
-          "updatedAt": "2026-06-11T01:39:25.131Z",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:39:25.131Z",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:39:25.131Z"
+              "at": "2026-06-11T02:01:41.106Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:39:25.131Z",
-          "notes": "Ship role rebased onto origin/main and preserved reviewed changes.",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
+          "notes": "Approved: all four reviewers ready; no blocking findings after synthesis",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:39:25.131Z",
-              "notes": "Ship role rebased onto origin/main and preserved reviewed changes."
+              "at": "2026-06-11T02:01:41.106Z",
+              "notes": "Approved: all four reviewers ready; no blocking findings after synthesis"
             }
           ],
           "approval": "approved"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T01:39:25.131Z",
-          "notes": "Ship verification passed after rebase: npm run typecheck; npm run lint; npm test.",
+          "status": "pending",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-06-11T01:39:25.131Z",
-              "notes": "Ship verification passed after rebase: npm run typecheck; npm run lint; npm test."
+              "status": "pending",
+              "at": "2026-06-11T02:01:41.106Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T01:39:25.131Z",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:39:25.131Z",
+          "updatedAt": "2026-06-11T02:01:41.106Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:39:25.131Z"
+              "at": "2026-06-11T02:01:41.106Z"
             }
           ],
           "readyForMerge": false,

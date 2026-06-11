@@ -1719,3 +1719,32 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   review will scrutinize.
 - work-1744 at ctx 93% (gpt-5.5) with +538/-48 banked and inspection passing —
   PAN-1675 compact brake is the safety net if it wedges.
+
+## RUN-20 tick 5 (2026-06-11) — main green in ~35 min; rolling-rebase churn quantified
+
+- **PAN-1752 fixed + closed**: 6611efa9d (fixture workspace dir) — diagnosis
+  was exact (fixtures, not the gate; production spawns were never broken).
+  4th red main of the week, all the same class, all fixed by file→strike
+  within ~25-35 min. The class fix is becoming obvious: a CI-side
+  fixture-contract lint, or strike.md requiring module-scoped test runs
+  post-change.
+- **Rolling-rebase churn is the new tax:** each strike landing pulled the
+  ready PRs back into re-review — PAN-1704 lost ready_for_merge TWICE, 1686
+  is on its 3rd review cycle. With merge_train on, the cure is the operator
+  merging the ready set promptly (or auto-merge when the toggle flips).
+  Surfaced explicitly in the snapshot.
+- **Operator active in parallel:** filed PAN-1748/1750/1751/1753/1754/1755
+  tonight (UAT-assembly + settings families) and landed the 1755 interim fix
+  064a97963 directly. PAN-1752 was already closed when I went to close it.
+  Multi-channel awareness rule held: checked git log before launching on
+  anything new.
+- **Launched strikes on PAN-1753** (ROLE_NAMES omits strike — settings save
+  broken) **and PAN-1749** (orchestrator tell delivery). At cap 4: work-1744,
+  work-1747, strike-1753, strike-1749.
+- **work-1744 at ctx 100% with +662/-62 UNSUBMITTED** (blocking wedge).
+  PAN-1675 compact brake expected to fire; verify next tick, file brake gap
+  if it didn't. work-1747 at 89% (net-deletion diff, consistent with
+  ship-role removal).
+- Watch: `agent-pan-resume-redeliver` tmux session appeared at 21:59 — a
+  test-fixture-named session going live on the HOST (PAN-1702/1720 isolation
+  class, likely from a host test run touching real tmux). Cosmetic so far.
