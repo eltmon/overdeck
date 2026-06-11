@@ -81,6 +81,12 @@ export function createWorkspacePlaceholdersSync(
 /**
  * Replace hardcoded user home paths in a compose file with `${HOME}` so the
  * file works across machines and after `cp -r` between users.
+ *
+ * `/home/node/` is excluded: that is the CONTAINER user's home (the mount
+ * TARGET side of bind mounts), not a host path. Rewriting it made compose
+ * interpolate the host's `${HOME}` on the container side, silently moving
+ * mounts like `.codex` (PAN-1619) and the shared caches (PAN-1764) to a path
+ * the in-container `node` user never reads.
  */
 export function sanitizeComposeFileSync(filePath: string): void {
   if (!existsSync(filePath)) return;
@@ -89,7 +95,7 @@ export function sanitizeComposeFileSync(filePath: string): void {
   const original = content;
 
   const homePatterns = [
-    /\/home\/[a-zA-Z0-9_-]+\//g,
+    /\/home\/(?!node\/)[a-zA-Z0-9_-]+\//g,
     /\/Users\/[a-zA-Z0-9_-]+\//g,
   ];
   for (const pattern of homePatterns) {
