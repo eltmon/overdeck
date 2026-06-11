@@ -2024,6 +2024,37 @@ reconciliation rather than a vestigial ship agent."
   surfaced start-permission as an openQuestion rather than auto-starting an
   operator-owned plan for a major feature.
 
+## RUN-22 tick 3 (2026-06-11 ~08:20Z) — planner stalled pre-finalize; finalize is a host-side surface; webhooks are DOWN
+
+- **`pan plan --auto` has a SECOND stall shape: complete-but-unfinalized.** The
+  PAN-1765 planner (Fable 5) wrote the full design + workspace artifacts
+  (+331/-6, autoDecisions, hazards) then sat at the prompt without running
+  `pan plan finalize` — frozen byte-identical for 25+ min. Distinct from
+  stop-at-proposed (which is post-finalize). **Recovery: `pan plan finalize -w
+  <workspace>` runs host-side** and does the whole chain (beads, spec→proposed,
+  promote to main, work-spawn attempt). Then `pan start <id> --host --yes` if
+  the spawn skips on stack-unhealthy (deacon-code tasks don't need the stack).
+  agent-pan-1765 implementing as of 08:18Z.
+- **Webhook ingress is DOWN since the reboot** — zero webhook lines in
+  dashboard.log since the 03:29 restart, no forwarder process (smee/gh-webhook)
+  running. Consequence observed live: PAN-1747 resolved its conflict, PR #1757
+  went MERGEABLE/CLEAN 6/6, but the merge_conflict blocker stayed stale →
+  ready=0 (the PAN-1771 sweep is boot-only by design). PAN-1765's plan
+  independently includes the fix: a ~10-min reconcile cadence re-verifying
+  blocker-flagged rows. Until that lands, expect in-flight blocker staleness
+  after every webhook gap; each server restart's boot sweep is the interim
+  clearer. Surfaced ingress restoration as an operator question (how is
+  delivery even supposed to arrive on this host?).
+- PAN-1747 is therefore EFFECTIVELY at the gate (passed everything, PR clean,
+  stale blocker only) — suggested merging it in the same batch as 1704/1709;
+  the post-merge deploy boot-sweep clears it automatically.
+- 1744 convoy dispatched 4/5 (security missing) — third partial-convoy
+  sighting, but session-absence isn't dispatch-log proof (a fast reviewer may
+  exit early); held off filing until a convoy provably stalls on a missing
+  reviewer file.
+- Paused agent-pan-1491-ship (idle ctx-0 on a review-blocked, genuinely
+  failing-checks issue).
+
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 
 PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
