@@ -562,6 +562,10 @@ export const SessionNode = Schema.Struct({
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
+  remote: Schema.optional(Schema.Struct({
+    provider: Schema.String,
+    vmName: Schema.String,
+  })),
 })
 export type SessionNode = typeof SessionNode.Type
 

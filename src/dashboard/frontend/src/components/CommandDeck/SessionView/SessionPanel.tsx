@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, RefreshCw } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -29,6 +29,13 @@ async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> 
   const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/git-info`);
   if (!res.ok) return null;
   return res.json();
+}
+
+async function fetchAgentOutput(agentId: string): Promise<string> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/output?lines=200`);
+  if (!res.ok) throw new Error('Failed to fetch agent output');
+  const data = await res.json() as { output?: string };
+  return data.output ?? '';
 }
 
 interface SessionPanelProps {
@@ -206,11 +213,43 @@ function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string
   );
 }
 
+function RemoteSessionOutput({ sessionId, vmName }: { sessionId: string; vmName: string }) {
+  const { data: output = '', isFetching, refetch } = useQuery({
+    queryKey: ['session-remote-output', sessionId],
+    queryFn: () => fetchAgentOutput(sessionId),
+    refetchInterval: 5_000,
+  });
+
+  return (
+    <div className={styles.sessionPanelTranscript}>
+      <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
+        <span>Remote output · fly.io · {vmName}</span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:bg-accent"
+          onClick={() => void refetch()}
+          title="Refresh remote output"
+        >
+          <RefreshCw size={12} className={isFetching ? 'animate-spin' : undefined} />
+          Refresh
+        </button>
+      </div>
+      <pre className="m-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed text-foreground">
+        {output.trim() ? output : 'No remote output available yet.'}
+      </pre>
+    </div>
+  );
+}
+
 export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
   const isReviewSession = session.type === 'review';
+  const isRemoteSession = !!session.remote;
   const resolvedModels = useResolvedModels();
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
+    if (isRemoteSession && stored === 'conversation' && !session.hasJsonl) {
+      return 'terminal';
+    }
     // Default review sessions without JSONL to summary tab; with JSONL default
     // to conversation so the user sees what the agent is doing.
     if (isReviewSession && stored === 'conversation' && !session.hasJsonl) {
@@ -272,9 +311,10 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   // Allow terminal for any session with a live tmux session — reviewers and
   // specialists have attachable tmux sessions too. The tmux session name is
   // either the explicit tmuxSession field or the sessionId (which is the
-  // canonical tmux name for reviewer/specialist sessions).
-  const tmuxName = session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined);
-  const hasTerminal = !!tmuxName && session.presence !== 'ended';
+  // canonical tmux name for reviewer/specialist sessions). Remote sessions do
+  // not have a local tmux target, so their Terminal tab shows on-demand output.
+  const tmuxName = session.tmuxSession || (!isRemoteSession && session.presence === 'active' ? session.sessionId : undefined);
+  const hasTerminal = isRemoteSession || (!!tmuxName && session.presence !== 'ended');
   const isEnded = session.presence === 'ended';
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
@@ -384,7 +424,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         )}
 
         {view === 'terminal' && (
-          hasTerminal && tmuxName ? (
+          isRemoteSession && session.remote ? (
+            <RemoteSessionOutput sessionId={session.sessionId} vmName={session.remote.vmName} />
+          ) : hasTerminal && tmuxName ? (
             <XTerminal sessionName={tmuxName} />
           ) : (
             <div className={styles.sessionPanelEmpty}>

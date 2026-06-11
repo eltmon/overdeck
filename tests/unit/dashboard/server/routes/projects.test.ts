@@ -225,4 +225,61 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.issueId).toBe('PAN-123');
     expect(tree.features[0]?.title).toBe('Implement Command Deck Session Tree');
   });
+
+  it('synthesizes an active work session for a remote fly.io agent with no local tmux', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    mockAccess(new Set([
+      '/tmp/panopticon-cli/workspaces',
+      agentDir,
+    ]));
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === '/tmp/panopticon-cli/workspaces') {
+        return Promise.resolve([{ name: 'feature-pan-1762', isDirectory: () => true }]);
+      }
+      if (p === join(homedir(), '.panopticon', 'agents')) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(agentDir, 'remote-state.json')) {
+        return Promise.resolve(JSON.stringify({
+          id: 'agent-pan-1762',
+          issueId: 'PAN-1762',
+          vmName: 'pan-pan-1762-ws',
+          model: 'claude-fable-5',
+          status: 'running',
+          startedAt: '2026-06-11T00:00:00Z',
+          location: 'remote',
+        }));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-1762');
+    expect(tree.features[0]?.sessions).toEqual([
+      expect.objectContaining({
+        type: 'work',
+        sessionId: 'agent-pan-1762',
+        model: 'claude-fable-5',
+        status: 'running',
+        presence: 'active',
+        tmuxSession: undefined,
+        remote: { provider: 'fly.io', vmName: 'pan-pan-1762-ws' },
+      }),
+    ]);
+    expect(getAgentRuntimeState).not.toHaveBeenCalled();
+  });
 });

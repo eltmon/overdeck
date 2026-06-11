@@ -76,6 +76,7 @@ describe('SessionPanel', () => {
 
   afterEach(() => {
     localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it('renders toggle bar with Conversation and Terminal tabs', () => {
@@ -154,6 +155,27 @@ describe('SessionPanel', () => {
     render(<SessionPanel session={makeSession({ tmuxSession: undefined, presence: 'idle' })} />);
     fireEvent.click(screen.getByText('Terminal'));
     expect(screen.getByText('No terminal session available.')).toBeInTheDocument();
+  });
+
+  it('defaults remote sessions without local tmux to remote output', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.includes('/output')) {
+        return {
+          ok: true,
+          json: async () => ({ output: 'remote line 1\nremote line 2' }),
+        };
+      }
+      return { ok: false, json: async () => ({}) };
+    }));
+
+    render(<SessionPanel session={makeSession({
+      tmuxSession: undefined,
+      hasJsonl: false,
+      remote: { provider: 'fly.io', vmName: 'pan-pan-1762-ws' },
+    })} />);
+
+    expect(await screen.findByText((_, node) => node?.textContent === 'remote line 1\nremote line 2')).toBeInTheDocument();
+    expect(screen.queryByTestId('x-terminal')).not.toBeInTheDocument();
   });
 
   it('hides Findings tab when session has no roundMetadata', () => {

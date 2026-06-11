@@ -355,8 +355,8 @@ function formatSessionDuration(seconds: number): string {
 
 function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
-  if (sessions.some((session) => session.awaitingInput === true)) return 'queued';
   if (sessions.some(isRunningSession)) return 'running';
+  if (sessions.some((session) => session.awaitingInput === true)) return 'queued';
   if (sessions.some(isQueuedSession)) return 'queued';
   return 'stopped';
 }
@@ -422,19 +422,19 @@ function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadg
 
   const badges: AggregateBadge[] = [];
 
-  if (sessions.some((session) => session.awaitingInput === true)) {
-    badges.push({
-      key: 'input',
-      label: '! INPUT',
-      tone: 'waiting',
-    });
-  }
-
   if (workSessions.length > 0) {
     badges.push({
       key: 'work',
       label: '▸ work',
       tone: workSessions.some(isRunningSession) ? 'running' : 'stopped',
+    });
+  }
+
+  if (sessions.some((session) => session.awaitingInput === true)) {
+    badges.push({
+      key: 'input',
+      label: '! INPUT',
+      tone: 'waiting',
     });
   }
 

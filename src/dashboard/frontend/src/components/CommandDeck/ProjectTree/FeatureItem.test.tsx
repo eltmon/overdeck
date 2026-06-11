@@ -354,6 +354,25 @@ describe('FeatureItem', () => {
     expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
   });
 
+  it('lets an actively running work session outrank an idle planning input prompt', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({ sessionId: 'planning-pan-821', type: 'planning', status: 'running', presence: 'idle', awaitingInput: true }),
+            makeSession({ sessionId: 'agent-pan-821', type: 'work', duration: 600, status: 'running', presence: 'active', remote: { provider: 'fly.io', vmName: 'pan-pan-821-ws' } }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 10m');
+    const badges = screen.getAllByText(/▸ work|! INPUT/).map((node) => node.textContent);
+    expect(badges).toEqual(['▸ work', '! INPUT']);
+  });
+
   it('shows a review error badge when a review session failed', () => {
     renderFeature(
       <FeatureItem

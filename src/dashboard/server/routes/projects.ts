@@ -55,7 +55,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
-    'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
+    'planning', 'work', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
@@ -103,6 +103,15 @@ function isStaleLegacySession(s: SessionNode): boolean {
 interface SessionTreeContext {
   tmuxSessionNames: Set<string>;
   agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+interface RemoteSessionState {
+  location?: string;
+  vmName?: string;
+  status?: string;
+  model?: string;
+  startedAt?: string;
+  lastActivity?: string;
 }
 
 function escapeRegExp(value: string): string {
@@ -174,12 +183,11 @@ async function collectSessionTreeNodes(
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
-  const strikeAgentId = `strike-${issueLower}`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -199,16 +207,25 @@ async function collectSessionTreeNodes(
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
     const stateText = await readOptional(join(agentDir, 'state.json'));
-    if (!stateText) continue;
+    const remoteStateText = await readOptional(join(agentDir, 'remote-state.json'));
+    if (!stateText && !remoteStateText) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string };
+      const state = stateText
+        ? JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string }
+        : {};
+      const remoteState = remoteStateText
+        ? JSON.parse(remoteStateText) as RemoteSessionState
+        : null;
+      const isRemoteAgent = remoteState?.location === 'remote' && !!remoteState.vmName;
+      const isRemoteActive = isRemoteAgent && (remoteState.status === 'running' || remoteState.status === 'starting');
       const isPlanning = checkId.startsWith('planning-');
-      const isStrike = checkId.startsWith('strike-');
-      const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
+      const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
-      const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
-      const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
+      const rtState = isRemoteActive ? null : await Effect.runPromise(getAgentRuntimeState(checkId));
+      const presence = isRemoteActive
+        ? 'active'
+        : await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
       const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
@@ -217,25 +234,28 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
+      const startedAt = remoteState?.startedAt || state.startedAt || state.createdAt || new Date().toISOString();
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
-        model: state.model || 'unknown',
-        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+        tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning') ? checkId : undefined,
+        model: remoteState?.model || state.model || 'unknown',
+        startedAt,
         endedAt: undefined,
-        duration: state.startedAt
+        duration: startedAt
           ? (() => {
-              const ms = Date.now() - new Date(state.startedAt).getTime();
+              const ms = Date.now() - new Date(startedAt).getTime();
               return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
             })()
           : null,
         status: normalizeAgentStatus(
-          rtState?.state === 'active'
-            ? 'running'
-            : rtState?.state === 'suspended'
-              ? 'completed'
-              : (state.status || 'completed'),
+          isRemoteActive
+            ? (remoteState.status || 'running')
+            : rtState?.state === 'active'
+              ? 'running'
+              : rtState?.state === 'suspended'
+                ? 'completed'
+                : (state.status || remoteState?.status || 'completed'),
         ),
         presence,
         awaitingInput: awaitingInput !== null,
@@ -246,6 +266,7 @@ async function collectSessionTreeNodes(
         paused: state.paused === true ? true : undefined,
         pausedReason: state.paused === true ? state.pausedReason : undefined,
         pausedAt: state.paused === true ? state.pausedAt : undefined,
+        remote: isRemoteAgent ? { provider: 'fly.io', vmName: remoteState.vmName! } : undefined,
       });
     } catch {
       // skip malformed state
