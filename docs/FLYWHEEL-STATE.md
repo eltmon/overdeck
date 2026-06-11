@@ -1828,3 +1828,12 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
 - PAN-1709 planned (4th consecutive stop-at-proposed) → work agent started.
   Churn-hold posture maintained: no new main-landing strikes while
   1700/1712/1719 sit ready (~3h now).
+
+## RUN-20 tick 10 (2026-06-11) — 1709 docker init exit-1; --host fallback
+
+- PAN-1709 start: auto-rebuild ran (PAN-1618 gate) but the stack's `init`
+  service exit-1'd → spawn refused. Restarted `--host --yes` (deacon-code
+  task; the PAN-1579 precedent). WATCH: if fresh-workspace init failures
+  recur, file a workspace-template regression — one data point so far.
+- Gate at ~3.5h (1700/1712/1719). Reviews cycling normally; main CI
+  in_progress; avail RAM 34.6GB.
