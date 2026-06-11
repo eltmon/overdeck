@@ -64,6 +64,7 @@ import {
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
   updateConversationForkFallbackReason,
+  setForkRequest,
   recordConversationHandoff,
   backfillConversationModel,
   archiveConversation,
@@ -78,6 +79,7 @@ import {
   type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
   type Conversation,
+  type ForkRequest,
 } from '../../../lib/database/conversations-db.js';
 import {
   sendRawKeystroke,
@@ -738,6 +740,22 @@ export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string
   if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
   if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
   return { ok: true, focus };
+}
+
+export function buildForkRequest(params: ForkRequest): ForkRequest {
+  return {
+    parentConversationName: params.parentConversationName,
+    sessionId: params.sessionId,
+    forkMode: params.forkMode,
+    ...(params.summaryModel !== undefined ? { summaryModel: params.summaryModel } : {}),
+    localSummaryOnly: params.localSummaryOnly,
+    ...(params.includeThinkingInSummary !== undefined ? { includeThinkingInSummary: params.includeThinkingInSummary } : {}),
+    ...(params.summaryHarness !== undefined ? { summaryHarness: params.summaryHarness } : {}),
+    ...(params.handoffFocus !== undefined ? { handoffFocus: params.handoffFocus } : {}),
+    handoffAuthor: params.handoffAuthor,
+    ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
+    ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
+  };
 }
 
 function safeUploadExtension(filename: string, mimeType: string): string {
@@ -3959,6 +3977,20 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           harness: launchHarness,
           forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
         });
+        const forkRequest = buildForkRequest({
+          parentConversationName: conv.name,
+          sessionId,
+          forkMode,
+          ...(summaryModel !== undefined ? { summaryModel } : {}),
+          localSummaryOnly,
+          includeThinkingInSummary,
+          ...(summaryHarness !== undefined ? { summaryHarness } : {}),
+          ...(handoffFocus !== undefined ? { handoffFocus } : {}),
+          handoffAuthor,
+          ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
+          ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
+        });
+        setForkRequest(newConv.name, JSON.stringify(forkRequest));
         markConversationActive(newConv.name);
 
         runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness).catch((err) => {

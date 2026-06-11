@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseSummaryForkFocus } from '../conversations.js';
+import { buildForkRequest, parseSummaryForkFocus } from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -82,6 +82,54 @@ function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
 }
+
+describe('buildForkRequest', () => {
+  it('captures the complete runForkPipeline argument set for persistence', () => {
+    expect(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      summaryModel: 'summary-model',
+      localSummaryOnly: false,
+      includeThinkingInSummary: true,
+      summaryHarness: 'claude-code',
+      handoffFocus: 'continue the API wiring',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'handoff-model',
+      handoffAuthorHarness: 'pi',
+    })).toEqual({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      summaryModel: 'summary-model',
+      localSummaryOnly: false,
+      includeThinkingInSummary: true,
+      summaryHarness: 'claude-code',
+      handoffFocus: 'continue the API wiring',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'handoff-model',
+      handoffAuthorHarness: 'pi',
+    });
+  });
+
+  it('omits undefined optional fork fields from the persisted JSON shape', () => {
+    expect(JSON.stringify(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    }))).toBe(JSON.stringify({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    }));
+  });
+});
 
 describe('parseSummaryForkFocus', () => {
   it('trims handoff focus text', async () => {
