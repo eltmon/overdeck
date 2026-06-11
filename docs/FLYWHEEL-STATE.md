@@ -2055,6 +2055,28 @@ reconciliation rather than a vestigial ship agent."
 - Paused agent-pan-1491-ship (idle ctx-0 on a review-blocked, genuinely
   failing-checks issue).
 
+## RUN-22 tick 4 (2026-06-11 ~08:40Z) — gate drained: 3 merges in one batch; convoy self-recycled
+
+- **PAN-1704 + PAN-1709 + PAN-1747 all merged 08:26Z** (run total: 4 PRs incl.
+  1686). Notably the batch took PAN-1747 DESPITE its stale merge_conflict
+  blocker — the train/operator path is not gated on blockerReasons, only the
+  flywheel's ready surface is. The ship-role removal (1747) is now live: expect
+  no more vestigial ship spawns after the next reload; if ship sessions still
+  appear, that's a regression to flag.
+- **The 4/5 partial convoy did NOT permanently stall this time** — PAN-1744's
+  convoy was recycled to a full 5/5 by the pipeline itself (~04:34, after its
+  work agent pushed feedback fixes). So partial-convoy is self-healing WHEN new
+  commits arrive (checkPostReviewCommits recycles); it only deadlocks when the
+  branch is quiescent (RUN-20 tick 14 case). Refines the file-on-third-sighting
+  rule: only file if a partial convoy stalls on a QUIESCENT branch.
+- **Host work agents leak fixture sessions**: agent-pan-1765 (--host) running
+  the test suite spawned agent-pan-resume-confirmed on the real tmux socket
+  (PAN-1720 class, 2nd leak tonight). Pattern: every --host work agent that
+  runs `npm test` will do this; pause the fixtures as they appear and keep
+  PAN-1720 alive as the root fix.
+- work-1765 at ctx 89% + gpt-5.5 5h window 100% — double wedge-watch, brake is
+  the net. Inspections passing (bead flow working).
+
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 
 PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
