@@ -15,8 +15,11 @@ async function issueClosedOnce(issueId: string, cache: Map<string, Promise<boole
   return promise;
 }
 
-function issueIdFromInspectSession(sessionName: string): string | null {
-  const match = sessionName.match(/^inspect-([a-z0-9]+-\d+)(?:-|$)/i);
+// Sessions reaped by NAME as a backstop: inspect sessions never have agent
+// state, and strike sessions can outlive their state entry (e.g. state already
+// stopped or removed while the tmux session idles — PAN-1721).
+function issueIdFromStatelessSession(sessionName: string): string | null {
+  const match = sessionName.match(/^(?:inspect|strike)-([a-z0-9]+-\d+)(?:-|$)/i);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -57,7 +60,7 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   for (const sessionName of sessionNames) {
     if (reapedAgentIds.has(sessionName)) continue;
 
-    const issueId = issueIdFromInspectSession(sessionName);
+    const issueId = issueIdFromStatelessSession(sessionName);
     if (!issueId) continue;
     if (!await issueClosedOnce(issueId, closedChecks)) continue;
 

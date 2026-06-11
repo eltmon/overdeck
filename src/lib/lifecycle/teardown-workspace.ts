@@ -45,12 +45,13 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   const step = 'teardown:tmux-sessions';
   let killed = 0;
 
-  // Exact-match sessions (agent, test, merge, planning).
+  // Exact-match sessions (agent, test, merge, planning, strike).
   const exactPatterns = [
     `agent-${issueLower}`,
     `test-${issueLower}`,
     `merge-${issueLower}`,
     `planning-${issueLower}`,
+    `strike-${issueLower}`,
   ];
   for (const session of exactPatterns) {
     if (await Effect.runPromise(sessionExists(session))) {
@@ -443,9 +444,10 @@ async function removeAgentStateImpl(issueLower: string): Promise<StepResult> {
 
   const work = `agent-${issueLower}`;
   const planner = `planning-${issueLower}`;
+  const strike = `strike-${issueLower}`;
   const specialistPrefix = `agent-${issueLower}-`;
   const targets = entries.filter(name =>
-    name === work || name === planner || name.startsWith(specialistPrefix),
+    name === work || name === planner || name === strike || name.startsWith(specialistPrefix),
   );
 
   let removed = 0;
@@ -503,6 +505,155 @@ async function deleteBranchesImpl(
     details.push(`Remote branch ${branchName} not found (already deleted)`);
   }
 
+  return stepOk(step, details);
+}
+
+/**
+ * Whether a local branch exists and is fully merged into main.
+ */
+async function localBranchMergedState(
+  projectPath: string,
+  branchName: string,
+): Promise<{ exists: boolean; merged: boolean }> {
+  try {
+    await execAsync(`git show-ref --verify --quiet "refs/heads/${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
+  } catch {
+    return { exists: false, merged: false };
+  }
+  try {
+    await execAsync(`git merge-base --is-ancestor "${branchName}" main`, { cwd: projectPath, encoding: 'utf-8' });
+    return { exists: true, merged: true };
+  } catch {
+    return { exists: true, merged: false };
+  }
+}
+
+/**
+ * Delete the strike branch (local + remote) once it is merged into main.
+ *
+ * Strike work (`pan strike`) lands on main directly, so a merged
+ * `strike/<issue>` branch is pure residue — it is deleted on every teardown,
+ * not just when `deleteBranches` is requested (PAN-1721). An UNMERGED strike
+ * branch may hold the only copy of an aborted strike's work, so it is
+ * preserved and reported instead.
+ */
+function deleteStrikeBranch(
+  projectPath: string,
+  issueLower: string,
+): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => deleteStrikeBranchImpl(projectPath, issueLower),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('teardown:strike-branch', `Failed: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function deleteStrikeBranchImpl(
+  projectPath: string,
+  issueLower: string,
+): Promise<StepResult> {
+  const step = 'teardown:strike-branch';
+  const branchName = `strike/${issueLower}`;
+  const details: string[] = [];
+
+  // Local branch
+  const local = await localBranchMergedState(projectPath, branchName);
+  if (local.exists) {
+    if (local.merged) {
+      try {
+        await execAsync(`git branch -D "${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
+        details.push(`Deleted local branch ${branchName}`);
+      } catch (err) {
+        details.push(`Failed to delete local branch ${branchName}: ${(err as Error).message}`);
+      }
+    } else {
+      details.push(`Preserved local branch ${branchName} — not merged to main`);
+    }
+  }
+
+  // Remote branch
+  try {
+    const { stdout: remoteRef } = await execAsync(
+      `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
+      { cwd: projectPath, encoding: 'utf-8' },
+    );
+    if (remoteRef.trim()) {
+      let remoteMerged = false;
+      try {
+        await execAsync(`git fetch origin "${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
+        await execAsync('git merge-base --is-ancestor FETCH_HEAD main', { cwd: projectPath, encoding: 'utf-8' });
+        remoteMerged = true;
+      } catch {
+        remoteMerged = false;
+      }
+      if (remoteMerged) {
+        await execAsync(`git push origin --delete "${branchName}"`, { cwd: projectPath, encoding: 'utf-8' });
+        details.push(`Deleted remote branch ${branchName}`);
+      } else {
+        details.push(`Preserved remote branch ${branchName} — not merged to main`);
+      }
+    }
+  } catch {
+    // remote check/delete failed — non-fatal
+  }
+
+  if (details.length === 0) {
+    return stepSkipped(step, [`No strike branch ${branchName} found`]);
+  }
+  return details.some(d => d.startsWith('Failed'))
+    ? stepFailed(step, details.join('; '))
+    : stepOk(step, details);
+}
+
+/**
+ * Remove leftover strike worktrees (`workspaces/feature-<issue>-strike`).
+ *
+ * Runs when the regular worktree removal is gated off (remove_workspace=false
+ * at close-out): a strike worktree has no post-close purpose once the strike
+ * branch is merged or gone, and leaving it keeps the closed issue alive in
+ * resource discovery (PAN-1721). Worktrees whose strike branch has unmerged
+ * commits are preserved alongside the branch.
+ */
+function removeStrikeWorktrees(
+  projectPath: string,
+  issueLower: string,
+): Effect.Effect<StepResult> {
+  return Effect.tryPromise({
+    try: () => removeStrikeWorktreesImpl(projectPath, issueLower),
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('teardown:strike-worktree', `Failed: ${(err as Error).message}`)),
+    ),
+  );
+}
+
+async function removeStrikeWorktreesImpl(
+  projectPath: string,
+  issueLower: string,
+): Promise<StepResult> {
+  const step = 'teardown:strike-worktree';
+  const strikePaths = findAllWorkspacePaths(projectPath, issueLower).filter(p => p.endsWith('-strike'));
+  if (strikePaths.length === 0) {
+    return stepSkipped(step, ['No strike worktree found']);
+  }
+
+  const branch = await localBranchMergedState(projectPath, `strike/${issueLower}`);
+  if (branch.exists && !branch.merged) {
+    return stepSkipped(step, [`Preserved strike worktree — strike/${issueLower} not merged to main`]);
+  }
+
+  const details: string[] = [];
+  for (const p of strikePaths) {
+    const result = await removeWorktreeImpl(projectPath, p);
+    details.push(...(result.details ?? [result.error ?? result.step]));
+    if (!result.success && !result.skipped) {
+      return stepFailed(step, `Failed to remove strike worktree ${p}: ${result.error ?? 'unknown error'}`);
+    }
+  }
   return stepOk(step, details);
 }
 
@@ -694,10 +845,20 @@ export function teardownWorkspace(
       results.push(stepSkipped('teardown:workspace', ['No workspace found to clean up']));
     }
 
+    // 9b. Strike worktrees are residue once the strike branch is merged —
+    // remove them even when deleteWorkspace is gated off (PAN-1721). When
+    // shouldDeleteWorkspace is true the loop above already removed them via
+    // findAllWorkspacePaths.
+    if (!shouldDeleteWorkspace) {
+      results.push(yield* removeStrikeWorktrees(ctx.projectPath, issueLower));
+    }
+
     // 10. Remove agent state
     results.push(yield* removeAgentState(issueLower));
 
-    // 11. Delete branches (only if explicitly requested)
+    // 11. Delete branches. Feature branches only if explicitly requested;
+    // the strike branch is always a candidate once merged to main (PAN-1721).
+    results.push(yield* deleteStrikeBranch(ctx.projectPath, issueLower));
     if (opts.deleteBranches) {
       results.push(yield* deleteBranches(ctx.projectPath, issueLower));
     }
@@ -735,7 +896,7 @@ function pruneCheckpointRefs(projectPath: string, issueLower: string): Effect.Ef
     try: async () => {
       const step = 'teardown:checkpoint-refs';
       const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
-      const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+      const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`];
       const pruned = await Effect.runPromise(pruneCheckpointRefsForAgents(projectPath, agentIds));
       return stepOk(step, [`Pruned ${pruned} checkpoint ref(s) for ${agentIds.join(', ')}`]);
     },
