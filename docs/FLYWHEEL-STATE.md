@@ -1837,3 +1837,19 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   recur, file a workspace-template regression — one data point so far.
 - Gate at ~3.5h (1700/1712/1719). Reviews cycling normally; main CI
   in_progress; avail RAM 34.6GB.
+
+## RUN-20 tick 11 (2026-06-11) — BATCH TRAIN MERGED 3; PAN-1723 live-verified and closed
+
+- **The PAN-1737 UAT batch train delivered**: uat/pan-reef-0611 assembled and
+  merged PAN-1700 + PAN-1712 + PAN-1719 in one batch (36dca7693). First PR
+  merges of RUN-20; the eaten-kickoff keystone is merged AND live (deploy
+  restarted the server at 23:51 with the batch content).
+- **PAN-1723 closed with first-merge live evidence**: deploy log shows
+  pristine worktree at origin/main, built sha == the batch merge commit,
+  health check pass, and correct lock-coalescing of the 3 deploy firings.
+  The deployed-≠-merged class is structurally dead.
+- Deploy-log hygiene note: /tmp/panopticon-deploy.log gets polluted by the
+  restarted server's stdout (fd inheritance) — grep '[post-merge-deploy]' to
+  read deploys. Minor; not filed (cosmetic).
+- Run scoreboard: **9 substrate bugs fixed, 3 PRs merged.** Churn-hold
+  lifted; strike queue resumes with PAN-1760 (pause addressing).
