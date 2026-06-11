@@ -44,6 +44,7 @@ export interface ForkResultConv {
   harness?: string | null;
   forkStatus?: string | null;
   forkError?: string | null;
+  timedOut?: boolean;
   forkFallbackReason?: string | null;
   handoffDocPath?: string | null;
   sessionAlive?: boolean;
@@ -132,5 +133,9 @@ export async function forkConversationViaServer(
     const fs = latest.forkStatus;
     if (fs === null || fs === undefined || fs === 'failed') break;
   }
-  return latest;
+  const fs = latest.forkStatus;
+  return {
+    ...latest,
+    timedOut: fs !== null && fs !== undefined && fs !== 'failed',
+  };
 }
