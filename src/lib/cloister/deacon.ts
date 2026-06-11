@@ -3057,108 +3057,6 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   return actions;
 }
 
-// ============================================================================
-// Undispatched-ship safety-net
-// ============================================================================
-
-// Wait this long after the review/test status last changed before the patrol
-// steps in — long enough that the reactive scheduler's primary
-// onIssueStateChange('shipping') trigger has had every chance to fire first.
-const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
-// Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
-// is already idempotent (activeRoleRunExists skips a live, current ship run),
-// so this is purely to keep the patrol log quiet while a ship run is in flight.
-const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
-const shipDispatchCooldowns = new Map<string, number>();
-const shipDispatchCounts = new Map<string, number>();
-
-/**
- * Safety-net patrol: re-dispatch the ship role for issues where review and
- * test both passed but the issue never reached readyForMerge.
- *
- * The only thing that normally dispatches ship is the reactive scheduler's
- * onIssueStateChange('shipping') event. If that event is swallowed — e.g. a
- * stale/zombie ship session made activeRoleRunExists() return true — the issue
- * jams forever: review and test are green, but ship never runs, readyForMerge
- * stays false, and the dashboard Merge button never lights up. This patrol is
- * the backstop so a single missed event can't strand an issue.
- *
- * onIssueStateChange() owns the actual safety: it resolves the workspace,
- * detects a stale ship session via roleRunHead vs current HEAD, kills the
- * zombie, and only then spawns a fresh ship run. A genuinely in-flight ship
- * run is left alone (activeRoleRunExists returns true), so this patrol is
- * idempotent.
- *
- * Guards:
- *   - review + test both 'passed', not yet readyForMerge
- *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
- *   - staleness: status at least 30 s old (don't race the primary trigger)
- *   - per-issue cooldown: 90 s between re-dispatch attempts
- */
-export async function checkUndispatchedShip(): Promise<string[]> {
-  const actions: string[] = [];
-
-  try {
-    const statuses = loadReviewStatuses();
-    const now = Date.now();
-    const shipEligibleKeys = new Set<string>();
-
-    for (const [key, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'passed') continue;
-      if (status.testStatus !== 'passed') continue;
-      if (status.readyForMerge) continue;
-      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
-      if (!status.updatedAt) continue;
-      shipEligibleKeys.add(key);
-    }
-
-    for (const key of new Set([...shipDispatchCooldowns.keys(), ...shipDispatchCounts.keys()])) {
-      if (!shipEligibleKeys.has(key)) {
-        shipDispatchCooldowns.delete(key);
-        shipDispatchCounts.delete(key);
-      }
-    }
-
-    for (const [key, status] of Object.entries(statuses)) {
-      if (!shipEligibleKeys.has(key)) continue;
-
-      // Give the reactive scheduler's primary trigger time to land first.
-      const updatedAt = status.updatedAt;
-      if (!updatedAt) continue;
-      if (now - new Date(updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
-
-      // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
-      const lastAttempt = shipDispatchCooldowns.get(key);
-      if (lastAttempt && (now - lastAttempt) < SHIP_DISPATCH_COOLDOWN_MS) continue;
-
-      const issueId = status.issueId ?? key;
-      console.log(
-        `[deacon] Ship never dispatched for ${issueId} (review+test passed, `
-        + `readyForMerge=false) — re-triggering shipping lifecycle`,
-      );
-      shipDispatchCooldowns.set(key, now);
-
-      try {
-        const { onIssueStateChange } = await import('./service.js');
-        await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
-        const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
-        shipDispatchCounts.set(key, dispatchCount);
-        console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
-        actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
-      } catch (err) {
-        console.error(
-          `[deacon] failed to re-dispatch ship for ${issueId}:`,
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error in checkUndispatchedShip:', msg);
-  }
-
-  return actions;
-}
 
 /**
  * Detect issues whose feature branch is merged to main but mergeStatus is stale.
@@ -5190,12 +5088,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   // draining AI token credits by sending unnecessary prompts to agents.
   // If an agent is stuck, the human operator can nudge it manually via the
   // dashboard's Tell action.
-
-  // Safety-net: re-dispatch ship for issues where review+test passed but the
-  // reactive shipping trigger was swallowed (e.g. by a stale ship session).
-  const undispatchedShipActions = await checkUndispatchedShip();
-  actions.push(...undispatchedShipActions);
-  for (const a of undispatchedShipActions) addLog('action', a, state.patrolCycle);
 
   // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
   const mergeStuckActions = await checkReadyForMergeStuck();

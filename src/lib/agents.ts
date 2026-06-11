@@ -53,6 +53,7 @@ import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type T
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
+const missingRoleDefinitionWarnings = new Set<string>();
 
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
   new FsError({ operation, path, cause });
@@ -481,14 +482,23 @@ export async function getRoleRuntimeBaseCommand(
   }
 
   const provider = getProviderForModelSync(validatedModel);
-  const definitionPath = roleAgentDefinitionPath(role, subRole);
+  const requestedDefinitionPath = roleAgentDefinitionPath(role, subRole);
+  const definitionPath = requestedDefinitionPath && existsSync(resolve(requestedDefinitionPath))
+    ? requestedDefinitionPath
+    : null;
+  if (requestedDefinitionPath && !definitionPath && !missingRoleDefinitionWarnings.has(requestedDefinitionPath)) {
+    missingRoleDefinitionWarnings.add(requestedDefinitionPath);
+    console.warn(
+      `[agents] Role definition ${resolve(requestedDefinitionPath)} does not exist; launching ${role} without --agent`,
+    );
+  }
   const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
   const nameFlag = ` --name ${agentName}`;
   const effortFlag = effort ? ` --effort ${effort}` : '';
-  // The convoy sub-roles have no `--agent` definition, so claude won't pick up
-  // a frontmatter permissionMode. Fall back to the global Claude permission
-  // flags in that case so the run still launches with the user's bypass/plan
-  // settings honored.
+  // Roles with no usable `--agent` definition (convoy sub-roles, or a stale
+  // roleAgentDefinitionPath pointing at a missing file) won't pick up a
+  // frontmatter permissionMode. Fall back to the global Claude permission flags
+  // so the run still launches with the user's bypass/plan settings honored.
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsStringSync()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlagSync() : '';
 

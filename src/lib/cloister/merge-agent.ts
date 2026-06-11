@@ -1017,8 +1017,9 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
  * Sync the latest main branch into a workspace's feature branch.
  *
  * This performs a `git merge origin/main` in the workspace. If the merge is clean
- * it returns immediately. If conflicts arise, the ship role is started to resolve
- * them. The merge is never pushed — this is a local workspace operation.
+ * it returns immediately. If conflicts arise, the conflict details are surfaced
+ * for manual workspace resolution. The merge is never pushed — this is a local
+ * workspace operation.
  *
  * Auto-commits any uncommitted changes before merging (with safety verification).
  */

@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
+import { isNoResumeCliOptionEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 import { getInternalTokenSync } from '../../lib/internal-token.js';
 
@@ -212,7 +213,9 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; resume?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean; resume?: boolean }) {
+  const noResume = isNoResumeCliOptionEnabled(options);
+
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -241,10 +244,6 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }
   }
 
-  // Commander negation semantics: `--no-resume` sets `options.resume = false`
-  // (there is no `options.noResume` property). PAN-1743: reading the wrong
-  // property meant PANOPTICON_NO_RESUME was never threaded to the server.
-  const noResume = options.resume === false;
   if (noResume) {
     console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
   }

@@ -8,16 +8,21 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 ---
 
-## The six roles
+## The active role files
 
 | Role | File | Purpose |
 |------|------|---------|
 | `plan` | `roles/plan.md` | Read issue, research codebase, write vBRIEF, create beads |
 | `work` | `roles/work.md` | Claim beads, write code, commit per bead, self-inspect (Jidoka) |
-| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses plan/review/test/ship. |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix and merges directly to main, then verifies on main. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
-| `ship` | `roles/ship.md` | Rebase, resolve conflicts, run verification, prep for merge |
+
+There is no spawned `ship` role file. Shipping is server-side: the dashboard runs
+`rebaseFeatureBranch()`, PAN-1650's review-status gate derives `readyForMerge`,
+and the human Merge button performs the final GitHub squash. The `ship` token
+survives only as the merge-specialist identity for model routing, historical
+activity attribution, and old session records.
 
 A **Run** is a process playing a role: `(role, model, harness)`. Runs are ephemeral — they spawn, do one role's worth of work, update the tracker, and exit. There is no long-lived agent holding state.
 
@@ -31,7 +36,7 @@ Role responsibilities during this phase:
 
 | Role | Behavior |
 |------|----------|
-| `ship` | Prepares the branch for the human Merge button. It does not close the issue or tear down the workspace. |
+| server-side shipping | `rebaseFeatureBranch()` prepares the branch and PAN-1650's review-status gate derives `readyForMerge` for the human Merge button. No agent is spawned. |
 | merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/vBRIEF/branches. |
 | `work` / `plan` | Remain paused so the operator can unpause for regression follow-up if verification fails. |
 | `review` / `test` | Their sessions may be killed after merge; the merged code is now evaluated on `main`, not by reusing pre-merge role sessions. |
