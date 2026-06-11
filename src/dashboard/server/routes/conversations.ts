@@ -4831,8 +4831,9 @@ const getConversationAboutRoute = HttpRouter.add(
         }
 
         const transcript = serializeConversationTranscript(messages);
-        console.log(`[claude-invoke] purpose=conversation-about | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-        const summary = await summarizeTranscriptAbout(transcript, configuredTitleModel());
+        const aboutModel = configuredTitleModel();
+        console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
+        const summary = await summarizeTranscriptAbout(transcript, aboutModel);
         if (!summary) {
           return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
         }

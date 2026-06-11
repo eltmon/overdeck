@@ -154,6 +154,10 @@ export function ConversationPanel({
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
+  useEffect(() => {
+    setAboutOpen(false);
+  }, [conversation.name]);
+
   // Sync the picker when the backing conversation's model changes (e.g. after a
   // resume/switch-model that persisted a new model). useState's lazy initializer
   // only fires once, so without this the picker shows the stale model forever.
@@ -607,6 +611,17 @@ export function ConversationPanel({
                 </div>
               )}
 
+              <button
+                className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
+                onClick={() => setAboutOpen(v => !v)}
+                title={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
+                aria-label={aboutOpen ? 'Hide about this conversation' : 'Show about this conversation'}
+                aria-pressed={aboutOpen}
+              >
+                <Info size={14} />
+                <span>About</span>
+              </button>
+
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -662,17 +677,6 @@ export function ConversationPanel({
                         <Wrench size={14} />
                         Hide tool calls
                         {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
-                      </button>
-
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${aboutOpen ? styles.headerMenuItemActive : ''}`}
-                        onClick={() => { setAboutOpen(v => !v); setMenuOpen(false); }}
-                        aria-expanded={aboutOpen}
-                      >
-                        <Info size={14} />
-                        About this conversation
-                        {aboutOpen && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
                       </button>
 
                       {conversation.harness === 'claude-code' && (
