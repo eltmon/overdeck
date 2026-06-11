@@ -13,7 +13,7 @@ import {
   DEFAULT_CHECK_INTERVAL_MS,
   type HealthConfig,
 } from '../../lib/health.js';
-import { listRunningAgentsSync } from '../../lib/agents.js';
+import { listRunningAgentsSync, normalizeAgentId } from '../../lib/agents.js';
 
 interface HealthOptions {
   json?: boolean;
@@ -97,7 +97,7 @@ export async function healthCommand(
         return;
       }
 
-      const agentId = arg.startsWith('agent-') ? arg : `agent-${arg.toLowerCase()}`;
+      const agentId = normalizeAgentId(arg);
       console.log(chalk.dim(`Pinging ${agentId}...`));
 
       const health = await Effect.runPromise(pingAgent(agentId, config));
@@ -120,7 +120,7 @@ export async function healthCommand(
         return;
       }
 
-      const agentId = arg.startsWith('agent-') ? arg : `agent-${arg.toLowerCase()}`;
+      const agentId = normalizeAgentId(arg);
       console.log(chalk.dim(`Attempting recovery of ${agentId}...`));
 
       // Override config to allow immediate recovery

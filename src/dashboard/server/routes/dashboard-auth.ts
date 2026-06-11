@@ -1,4 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -46,7 +48,22 @@ function getDashboardSessionToken(): string {
 }
 
 export function dashboardCsrfToken(): string {
-  browserCsrfToken ??= process.env['PANOPTICON_DASHBOARD_CSRF_TOKEN'] ?? randomBytes(32).toString('base64url');
+  if (browserCsrfToken) return browserCsrfToken;
+  const override = process.env['PANOPTICON_DASHBOARD_CSRF_TOKEN'];
+  if (override) {
+    browserCsrfToken = override;
+    return browserCsrfToken;
+  }
+  // Same restart-survival derivation as the session token above: the frontend
+  // caches this token once per page load (wsTransport session mint), so a
+  // random-per-process value 403'd every mutation from open tabs after each
+  // dashboard restart — and the flywheel restarts the dashboard on every
+  // post-merge deploy. Distinct context string keeps it independent of the
+  // session token.
+  const internal = getInternalTokenSync();
+  browserCsrfToken = internal
+    ? createHmac('sha256', internal).update('panopticon-dashboard-csrf-v1').digest('base64url')
+    : randomBytes(32).toString('base64url');
   return browserCsrfToken;
 }
 
@@ -152,26 +169,122 @@ export function rejectUnsafeDashboardMutationRequest(
   return null;
 }
 
+function ipv4ToInt(value: string): number | null {
+  const parts = value.split('.');
+  if (parts.length !== 4) return null;
+  let result = 0;
+  for (const part of parts) {
+    const octet = Number(part);
+    if (!Number.isInteger(octet) || octet < 0 || octet > 255) return null;
+    result = ((result << 8) | octet) >>> 0;
+  }
+  return result;
+}
+
+/** RFC1918 private ranges — Docker bridges always fall inside one of these. */
+function isRfc1918(ip: number): boolean {
+  return (
+    (ip & 0xff000000) >>> 0 === 0x0a000000 || // 10.0.0.0/8
+    (ip & 0xfff00000) >>> 0 === 0xac100000 || // 172.16.0.0/12
+    (ip & 0xffff0000) >>> 0 === 0xc0a80000    // 192.168.0.0/16
+  );
+}
+
 /**
- * A request whose TCP peer is loopback originated from this machine — either the
- * local browser hitting the dashboard directly, or via the host-local Traefik
- * (127.0.0.1) that fronts pan.localhost. We trust it to mint a session.
+ * True when `addr` is the IP of a container on one of THIS host's Docker bridge
+ * interfaces (docker0 / br-*). Such a peer can only be a process running on this
+ * machine — our own host-local Traefik fronting pan.localhost, or another
+ * Panopticon container — never a LAN client (a direct LAN hit to the 0.0.0.0
+ * API port arrives with a LAN peer that is not inside any Docker bridge subnet).
+ *
+ * Pure for testability: the interface map is injected. We only ever trust
+ * RFC1918 bridge subnets, so a misconfigured public-range br-* cannot widen
+ * trust beyond the local Docker fabric.
+ */
+export function peerIsHostLocalDockerBridge(
+  addr: string,
+  interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>,
+): boolean {
+  const peer = ipv4ToInt(addr);
+  if (peer === null) return false;
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    if (name !== 'docker0' && !name.startsWith('br-')) continue;
+    for (const info of addrs ?? []) {
+      if (info.family !== 'IPv4') continue;
+      const ifaceIp = ipv4ToInt(info.address);
+      const mask = ipv4ToInt(info.netmask);
+      if (ifaceIp === null || mask === null) continue;
+      const network = (ifaceIp & mask) >>> 0;
+      if (!isRfc1918(network)) continue;
+      if (((peer & mask) >>> 0) === network) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * True when `addr` shares an RFC1918 subnet with one of THIS process's own
+ * network interfaces. This is the in-container counterpart of
+ * peerIsHostLocalDockerBridge: inside a container the Docker bridge is
+ * invisible — the container sees only its veth endpoints (eth0/eth1), so the
+ * docker0/br-* name filter never matches and the host-local Traefik fronting
+ * the stack 401'd every session mint (first hit live on the PAN-1737 UAT
+ * stack). A peer inside one of the container's attached Docker-network
+ * subnets can only be another container on those networks — the server
+ * publishes no host port (Traefik labels only), so no LAN client can ever
+ * present such an address. Only consulted when running inside a container.
+ */
+export function peerIsLocalContainerNetwork(
+  addr: string,
+  interfaces: NodeJS.Dict<NetworkInterfaceInfo[]>,
+): boolean {
+  const peer = ipv4ToInt(addr);
+  if (peer === null) return false;
+  for (const addrs of Object.values(interfaces)) {
+    for (const info of addrs ?? []) {
+      if (info.family !== 'IPv4' || info.internal) continue;
+      const ifaceIp = ipv4ToInt(info.address);
+      const mask = ipv4ToInt(info.netmask);
+      if (ifaceIp === null || mask === null) continue;
+      const network = (ifaceIp & mask) >>> 0;
+      if (!isRfc1918(network)) continue;
+      if (((peer & mask) >>> 0) === network) return true;
+    }
+  }
+  return false;
+}
+
+/** Docker creates /.dockerenv in every container — stable in-container signal. */
+const runningInContainer = existsSync('/.dockerenv');
+
+/**
+ * A request we trust to mint a session because it originated from this machine —
+ * the local browser hitting the dashboard directly (127.0.0.1), or the
+ * host-local Traefik that fronts pan.localhost. In Docker, that Traefik reaches
+ * the host server from a Docker-bridge IP (e.g. 172.18.0.2), NOT 127.0.0.1, so
+ * a literal-loopback check alone silently breaks the zero-step bootstrap for
+ * every pan.localhost user — their session mint 401s and no cookie is ever set.
  *
  * This is the auto-bootstrap that removes the manual one-time #panopticon_token
  * step: any browser on pan.localhost gets a session with no user action. It is
  * NOT a security downgrade for the LAN — the raw API ports bind 0.0.0.0, but a
- * direct LAN hit to :3010 has a non-loopback peer and is rejected here. We read
- * ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For, which a
- * caller could spoof.
+ * direct LAN hit has a non-loopback, non-Docker-bridge peer and is rejected. We
+ * read ONLY the real TCP peer (request.remoteAddress), never X-Forwarded-For,
+ * which a caller could spoof.
  */
 function isLoopbackPeer(request: HttpServerRequest.HttpServerRequest): boolean {
   const remoteAddress = (request as { remoteAddress?: unknown }).remoteAddress;
-  const addr = remoteAddress && typeof remoteAddress === 'object' && '_tag' in remoteAddress
+  const raw = remoteAddress && typeof remoteAddress === 'object' && '_tag' in remoteAddress
     ? Option.getOrElse(remoteAddress as Option.Option<string>, () => '')
     : typeof remoteAddress === 'string'
       ? remoteAddress
       : '';
-  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+  if (!raw) return false;
+  // Node reports dual-stack IPv4 peers as IPv4-mapped IPv6 (::ffff:a.b.c.d).
+  const addr = raw.startsWith('::ffff:') ? raw.slice('::ffff:'.length) : raw;
+  if (addr === '127.0.0.1' || addr === '::1') return true;
+  if (peerIsHostLocalDockerBridge(addr, networkInterfaces())) return true;
+  return runningInContainer && peerIsLocalContainerNetwork(addr, networkInterfaces());
 }
 
 export function rejectUnauthorizedDashboardSessionMintRequest(

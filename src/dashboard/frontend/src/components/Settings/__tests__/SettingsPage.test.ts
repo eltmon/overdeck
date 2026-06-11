@@ -103,11 +103,16 @@ describe('SettingsPage role model routing panels', () => {
   it('surfaces conversation search controls', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
     expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
-    expect(SETTINGS_PAGE_SOURCE).toContain('API key env var or config key');
+    // cee57d395: conversation search uses the standard API Keys section now.
+    expect(SETTINGS_PAGE_SOURCE).toContain('Using OpenAI key from API Keys section');
+    expect(SETTINGS_PAGE_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
     expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
     expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
     expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
-    expect(SETTINGS_PAGE_SOURCE).toContain('window.confirm');
+    // window.confirm was replaced by the confirm-modal + confirmationNonce flow
+    // (reindex is a paid operation — server requires the nonce from the estimate).
+    expect(SETTINGS_PAGE_SOURCE).toContain('confirmReindex');
+    expect(SETTINGS_PAGE_SOURCE).toContain('confirmationNonce');
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {

@@ -30,6 +30,7 @@ import {
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import { listSessionNames, isHarnessProcessAlive } from '../../../lib/tmux.js';
+import { isRespawnPending } from './pending-respawn.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
@@ -77,20 +78,34 @@ export async function pollConversations(): Promise<void> {
       // Grace protects a just-spawned conversation: its pane may still be the
       // launcher shell before the harness process takes the foreground.
       if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
-      if (!aliveSessions.has(conv.tmuxSession)) {
-        console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
-        markConversationEnded(conv.name);
-        endedConversations.push(conv);
-      } else if (!(await isHarnessProcessAlive(conv.tmuxSession))) {
-        // Session exists but the harness process has exited — only the launcher
-        // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
-        // reports the session, so the gone-check above misses it. Mark ended so
-        // the dashboard stops showing a dead conversation as active and resume
-        // respawns it. PAN-1638.
-        console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`);
-        markConversationEnded(conv.name);
-        endedConversations.push(conv);
-      }
+      const sessionGone = !aliveSessions.has(conv.tmuxSession);
+      // Session exists but the harness process has exited — only the launcher
+      // keep-alive loop (`while true; do sleep 60; done`) is left. tmux still
+      // reports the session, so the gone-check misses it. Mark ended so the
+      // dashboard stops showing a dead conversation as active and resume
+      // respawns it. PAN-1638.
+      const harnessGone = !sessionGone && !(await isHarnessProcessAlive(conv.tmuxSession));
+      if (!sessionGone && !harnessGone) continue;
+      // Re-validate at mark time, not poll-start time. A resume can land
+      // between the snapshot above and here (kill → spawn → ready), making the
+      // verdict stale: marking then flips a just-revived conversation to
+      // "ended" while its harness is alive, and the next send fails (conv 2596
+      // incident, 2026-06-09). Skip when a respawn is in flight or the row
+      // shows a spawn/attach signal within the grace window.
+      if (isRespawnPending(conv.tmuxSession)) continue;
+      const fresh = getConversationByName(conv.name) ?? conv;
+      const lastAliveSignalMs = Math.max(
+        new Date(fresh.createdAt).getTime() || 0,
+        fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,
+      );
+      if (Date.now() - lastAliveSignalMs < SPAWN_GRACE_PERIOD_MS) continue;
+      console.log(
+        sessionGone
+          ? `[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`
+          : `[conversation-lifecycle] Session ${conv.tmuxSession} alive but harness exited (keep-alive corpse) — marking ended`,
+      );
+      markConversationEnded(conv.name);
+      endedConversations.push(conv);
     }
     // Batch attachment cleanup to avoid an unbounded fan-out when many
     // conversations end simultaneously (e.g., after server restart).

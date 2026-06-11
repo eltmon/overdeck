@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
+import { isNoResumeCliOptionEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 import { getInternalTokenSync } from '../../lib/internal-token.js';
 
@@ -112,12 +113,36 @@ function killPort(port: number, signal: 'TERM' | 'KILL' = 'TERM'): void {
  * owner. An orphan that already lost the port (e.g. after a failed restart) is
  * invisible to killPort(), survives forever, and can run a second Deacon racing
  * the live one. PAN-1622.
+ *
+ * Host-side only (PAN-1763): workspace/UAT stack `server` containers run the same
+ * `node dist/dashboard/server.js` cmdline and are visible to host pkill, so a bare
+ * pattern kill SIGTERMs every stack's server container, flipping stacks unhealthy.
+ * Skip any PID whose cgroup shows it lives inside a container.
  */
 function killAllDashboardServers(signal: 'TERM' | 'KILL' = 'TERM'): void {
+  let pids = '';
   try {
-    execSync(`pkill -${signal} -f 'dist/dashboard/server\\.js' 2>/dev/null || true`, { stdio: 'pipe' });
+    pids = execSync(`pgrep -f 'dist/dashboard/server\\.js' 2>/dev/null || true`, {
+      stdio: 'pipe',
+    }).toString();
   } catch {
-    // ignore
+    return;
+  }
+  for (const line of pids.split('\n')) {
+    const pid = Number(line.trim());
+    if (!pid || pid === process.pid) continue;
+    let cgroup = '';
+    try {
+      cgroup = readFileSync(`/proc/${pid}/cgroup`, 'utf-8');
+    } catch {
+      continue; // process already gone
+    }
+    if (/docker|containerd|libpod/.test(cgroup)) continue; // in-container peer, not ours
+    try {
+      process.kill(pid, signal === 'KILL' ? 'SIGKILL' : 'SIGTERM');
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -188,7 +213,9 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean; resume?: boolean }) {
+  const noResume = isNoResumeCliOptionEnabled(options);
+
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -217,7 +244,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }
   }
 
-  if (options.noResume) {
+  if (noResume) {
     console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
   }
 
@@ -371,7 +398,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
         API_PORT: String(config.dashboardApiPort),
         PANOPTICON_MODE: 'development',
         ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-        ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[server] ${data}`)));

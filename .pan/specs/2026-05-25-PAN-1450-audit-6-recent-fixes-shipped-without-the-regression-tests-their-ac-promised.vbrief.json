@@ -4,17 +4,17 @@
     "created": "2026-05-25T16:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1450: Audit — 6+ recent fixes shipped without the regression tests their AC promised. Add the 7 missing tests, complete PAN-1173's transparently-deferred bonus AC across 9 CLI commands, add a substrate check in the requirements-reviewer role prompt so this pattern fails CI in the future, and audit state.json role population for specialist agents.",
-    "updated": "2026-05-25T16:31:28.584Z"
+    "updated": "2026-06-11T05:54:13.664Z"
   },
   "plan": {
     "id": "pan-1450",
     "title": "Audit: 6+ recent fixes shipped without the regression tests their AC promised",
-    "status": "proposed",
+    "status": "completed",
     "uid": "d7283d2f-4862-4ffe-9a4d-adb6ceb75ec2",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T16:30:00.000Z",
-    "updated": "2026-05-25T16:31:28.584Z",
+    "updated": "2026-06-11T05:54:13.664Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1450",
@@ -730,5 +730,5 @@
       "canonicalFilename": "2026-05-25-PAN-1450-audit-6-recent-fixes-shipped-without-the-regression-tests-their-ac-promised.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

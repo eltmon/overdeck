@@ -132,6 +132,11 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Map full model IDs to pricing model names
     // Order matters - check more specific patterns first
 
+    // Fable models (Mythos-class flagship)
+    if (model.includes('fable-5') || model.includes('fable.5') || model.includes('fable')) {
+      normalizedModel = 'claude-fable-5';
+    }
+
     // Opus models
     if (model.includes('opus-4-8') || model.includes('opus-4.8')) {
       normalizedModel = 'claude-opus-4-8';

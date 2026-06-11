@@ -7,6 +7,7 @@ import { useConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
 import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function loadTab(): ListTab {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 export async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json();
 }

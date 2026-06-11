@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-11T08:51:01.048Z"
+    "updated": "2026-06-11T08:59:40.309Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 137,
+    "sequence": 138,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-11T08:51:01.048Z",
+    "updated": "2026-06-11T08:59:40.309Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -418,7 +418,7 @@
         "phase": "merge",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T08:51:01.048Z",
+        "updatedAt": "2026-06-11T08:59:40.309Z",
         "work": {
           "updatedAt": "2026-06-10T07:41:32.778Z",
           "history": []
@@ -450,8 +450,8 @@
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-06-11T08:51:01.048Z",
-          "notes": "Quality gates pass after fixing config-yaml-conversation-search.test.ts to avoid machine-local conversationSearch defaults: typecheck PASS, build:cli PASS, lint PASS, npm test PASS (root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests).",
+          "updatedAt": "2026-06-11T08:59:40.309Z",
+          "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install PASS, npm run typecheck PASS, npm run lint PASS, npm test PASS (root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests).",
           "history": [
             {
               "status": "failed",
@@ -462,6 +462,11 @@
               "status": "passed",
               "at": "2026-06-11T08:51:01.048Z",
               "notes": "Quality gates pass after fixing config-yaml-conversation-search.test.ts to avoid machine-local conversationSearch defaults: typecheck PASS, build:cli PASS, lint PASS, npm test PASS (root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests)."
+            },
+            {
+              "status": "passed",
+              "at": "2026-06-11T08:59:40.309Z",
+              "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install PASS, npm run typecheck PASS, npm run lint PASS, npm test PASS (root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests)."
             }
           ]
         },
@@ -471,7 +476,7 @@
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T08:51:01.048Z",
+          "updatedAt": "2026-06-11T08:59:40.309Z",
           "history": [
             {
               "status": "pending",
@@ -481,6 +486,11 @@
               "status": "pending",
               "at": "2026-06-11T08:51:01.048Z",
               "notes": "Ready for merge after test specialist passed PAN-1242."
+            },
+            {
+              "status": "pending",
+              "at": "2026-06-11T08:59:40.309Z",
+              "notes": "Ready for merge after resolving sync conflicts and rerunning gates."
             }
           ],
           "readyForMerge": true,

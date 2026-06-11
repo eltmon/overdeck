@@ -11,8 +11,6 @@ import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../..
 import { getEventStore } from '../event-store.js';
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 
-const COMPACT_TOKEN_THRESHOLD = 100_000;
-
 const activeCompactions = new Set<string>();
 export function isCompacting(sessionFile: string): boolean {
   return activeCompactions.has(sessionFile);
@@ -28,7 +26,7 @@ export interface NativeCompactionResult {
 export interface MaybeCompactBeforeRespawnOptions {
   sessionFile: string | null | undefined;
   cwd: string;
-  modelChanged: boolean;
+  shouldCompact: boolean;
 }
 
 export function getConversationCompactionSettings() {
@@ -58,9 +56,10 @@ export async function estimateContextTokens(sessionFile: string | null | undefin
         const entry = JSON.parse(line);
         const usage = entry?.message?.usage ?? entry?.usage;
         if (usage && typeof usage.input_tokens === 'number') {
-          return (usage.input_tokens ?? 0)
+          const total = (usage.input_tokens ?? 0)
             + (usage.cache_creation_input_tokens ?? 0)
             + (usage.cache_read_input_tokens ?? 0);
+          if (total > 0) return total;
         }
       } catch {
         // Skip malformed line
@@ -110,7 +109,12 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
   let summary: string;
   let summaryModel: string | null;
   try {
-    const result = await Effect.runPromise(generateSmartSummary({ jsonlPath: sessionFile, model: settings.model, richMode: settings.richCompaction }));
+    const result = await Effect.runPromise(generateSmartSummary({
+      jsonlPath: sessionFile,
+      model: settings.model,
+      richMode: settings.richCompaction,
+      mode: 'fork',
+    }));
     summary = result.summary;
     summaryModel = result.summaryModel;
   } catch (error) {
@@ -169,18 +173,16 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
 export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnOptions): Promise<void> {
   if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
+  if (!opts.shouldCompact) {
+    console.log('[conversation-compaction] Skipping compact (shouldCompact=false)');
+    return;
+  }
   // Background AI gate: low-cost mode (or the summaryFork toggle) skips
   // automatic LLM compaction before respawn.
   if (!isBackgroundFeatureEnabled('summaryFork')) return;
 
   const tokens = await estimateContextTokens(opts.sessionFile);
-  const overThreshold = tokens > COMPACT_TOKEN_THRESHOLD;
-  if (!opts.modelChanged && !overThreshold) {
-    console.log(`[conversation-compaction] Skipping compact (modelChanged=false, tokens=${tokens})`);
-    return;
-  }
-
-  console.log(`[conversation-compaction] Compacting before respawn (modelChanged=${opts.modelChanged}, tokens=${tokens})`);
+  console.log(`[conversation-compaction] Compacting before respawn (shouldCompact=true, tokens=${tokens})`);
   await compactConversationNative(opts.sessionFile);
 }
 

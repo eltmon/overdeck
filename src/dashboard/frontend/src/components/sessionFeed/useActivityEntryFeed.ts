@@ -13,6 +13,7 @@ interface ActivityEntryShape {
   message?: unknown;
   details?: unknown;
   issueId?: unknown;
+  link?: unknown;
 }
 
 export function createActivityEntryFeedSelector() {
@@ -34,6 +35,7 @@ export function createActivityEntryFeedSelector() {
         const level = typeof entry.level === 'string' ? entry.level : '';
         const details = typeof entry.details === 'string' ? entry.details : undefined;
         const issueId = typeof entry.issueId === 'string' ? (entry.issueId as IssueId) : null;
+        const link = typeof entry.link === 'string' ? entry.link : undefined;
         const tags = level ? [sourceName, level] : [sourceName];
         return {
           kind: 'activity',
@@ -46,6 +48,7 @@ export function createActivityEntryFeedSelector() {
           narrative: details,
           files: [],
           tags,
+          link,
         };
       })
       .filter((entry): entry is ActivitySessionFeedEntry => entry !== null)

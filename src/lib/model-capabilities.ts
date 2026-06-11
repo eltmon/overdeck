@@ -143,6 +143,19 @@ export interface ModelCapability {
    * set. Populate only where there's ground truth (see docs/research/*-work-type-fit.md).
    */
   effortLevels?: readonly EffortLevel[];
+  /**
+   * Whether this model accepts image input (vision) on the endpoint Panopticon
+   * routes it through. Tri-state by design:
+   *   - `false` — proven text-only; image attachments must be blocked.
+   *   - `true`  — proven to accept images.
+   *   - `undefined` — not yet verified; callers treat as "allow" and rely on
+   *     the harness/provider to error if unsupported. Only populate from ground
+   *     truth (a real request against the live endpoint), never from marketing
+   *     copy — e.g. mimo-v2.5-pro's architecture is multimodal but its Token-Plan
+   *     serving endpoints are text-only (PAN-1685). Most models are intentionally
+   *     left undefined pending the per-model vision audit in PAN-1685.
+   */
+  supportsImages?: boolean;
   /** Additional notes about this model's strengths */
   notes?: string;
 }
@@ -161,6 +174,33 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  'claude-fable-5': {
+    model: 'claude-fable-5',
+    provider: 'anthropic',
+    displayName: 'Claude Fable 5',
+    // Real API pricing is $10/M input, $50/M output (≈2× Opus 4.8). The blended
+    // figure mirrors the inflated Opus-4.8 baseline (45) at the same 2× ratio so
+    // cost-awareness badges order Fable above Opus. Exact per-token rates live in
+    // cost.ts DEFAULT_PRICING.
+    costPer1MTokens: 90.0,
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 95,
+      synthesis: 99,
+      speed: 42,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
+  },
 
   'claude-opus-4-8': {
     model: 'claude-opus-4-8',
@@ -737,6 +777,28 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work.',
   },
 
+  'MiniMax-M3': {
+    model: 'MiniMax-M3',
+    provider: 'minimax',
+    displayName: 'MiniMax M3',
+    costPer1MTokens: 1.5, // Same $0.30/M in / $1.20/M out blended as M2.7; confirm at launch
+    contextWindow: 1024000, // 1M context via MSA architecture
+    skills: {
+      'code-generation': 93, // Top-tier coding; MSA architecture for scalable context
+      'code-review': 90,
+      debugging: 90,
+      planning: 88,
+      documentation: 88,
+      testing: 88,
+      security: 82,
+      performance: 85,
+      synthesis: 92,
+      speed: 80,
+      'context-length': 100, // 1M context
+    },
+    notes: 'MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7.',
+  },
+
   // Z.AI models
   'glm-5.1': {
     model: 'glm-5.1',
@@ -814,6 +876,10 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'MiMo V2.5 Pro',
     costPer1MTokens: 2.0,
     contextWindow: 1048576,
+    // Text-only on the Xiaomi Token-Plan serving endpoints: an image request
+    // returns 404 "No endpoints found that support image input". The model's
+    // architecture is multimodal, but the served -pro endpoints are not. PAN-1685.
+    supportsImages: false,
     skills: {
       'code-generation': 88,
       'code-review': 86,
@@ -836,6 +902,9 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'MiMo V2.5',
     costPer1MTokens: 1.0,
     contextWindow: 262144,
+    // Multimodal — verified to accept image input on the same Token-Plan
+    // endpoint where -pro rejects it. PAN-1685.
+    supportsImages: true,
     skills: {
       'code-generation': 82,
       'code-review': 80,
@@ -1003,6 +1072,18 @@ export function getModelEffortLevelsSync(model: ModelId | string): readonly Effo
 export function modelSupportsEffortSync(model: ModelId | string, effort: EffortLevel): boolean {
   const levels = getModelEffortLevelsSync(model);
   return levels === undefined || levels.includes(effort);
+}
+
+/**
+ * Whether image attachments may be sent to a model. Permissive by design:
+ * returns `false` ONLY for models proven text-only (`supportsImages === false`);
+ * `true` and unverified (`undefined`) both allow, so the harness/provider stays
+ * the final authority for unaudited models. Resolves deprecated IDs first.
+ * See {@link ModelCapability.supportsImages} and PAN-1685.
+ */
+export function modelSupportsImagesSync(model: ModelId | string): boolean {
+  const resolved = resolveModelIdSync(String(model));
+  return MODEL_CAPABILITIES[resolved as CapabilityModelId]?.supportsImages !== false;
 }
 
 /**

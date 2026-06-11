@@ -547,19 +547,18 @@ export async function fetchActivityDataWithContext(
         continue;
       }
 
-      // Normal handling for non-review types — test and merge/ship.
-      // Emit exactly one node per role, anchored to the latest section, the
+      // Normal handling for non-review types — test and merge/ship history.
+      // Emit exactly one node per identity, anchored to the latest section, the
       // same way review does. Earlier sections are skipped (their history is
       // still in the DB and surfaced via status history elsewhere).
       if (ss.type === 'test' && i !== lastTestIndex) continue;
       if (ss.type === 'merge' && i !== lastMergeIndex) continue;
 
-      // The pipeline's final stage is the `ship` role, spawned via
-      // spawnRun(issueId, 'ship') as tmux session `agent-<issue>-ship`. The
-      // `merge` history type tracks its status; surface it as a `ship` node
-      // pointed at the real session instead of the legacy `merge-agent` name.
-      // Both the test and ship roles are spawned via spawnRun(issueId, role),
-      // which names the tmux session `agent-<issue>-<role>` — not the legacy
+      // Server-side shipping records `merge` history but no longer spawns a
+      // ship agent. Surface merge history as the `ship` node identity for
+      // continuity with old sessions and activity records.
+      // The test role still uses spawnRun(issueId, 'test'), which names the
+      // tmux session `agent-<issue>-test` — not the legacy
       // `specialist-<project>-<issue>-<role>-agent` form.
       const isShipStage = ss.type === 'merge';
       const nodeType: 'ship' | 'test' = isShipStage ? 'ship' : 'test';

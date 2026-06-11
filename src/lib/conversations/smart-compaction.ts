@@ -167,6 +167,7 @@ function estimateContextTokens(entries: any[]): number {
         if (typeof u.output_tokens === 'number') total += u.output_tokens;
         if (typeof u.cache_creation_input_tokens === 'number') total += u.cache_creation_input_tokens;
         if (typeof u.cache_read_input_tokens === 'number') total += u.cache_read_input_tokens;
+        if (total <= 0) continue;
         // Add trailing entries after this assistant
         for (let j = i + 1; j < entries.length; j++) {
           total += estimateTokens(entries[j]);
@@ -178,6 +179,7 @@ function estimateContextTokens(entries: any[]): number {
         if (typeof u.outputTokens === 'number') total += u.outputTokens;
         if (typeof u.cacheCreationInputTokens === 'number') total += u.cacheCreationInputTokens;
         if (typeof u.cacheReadInputTokens === 'number') total += u.cacheReadInputTokens;
+        if (total <= 0) continue;
         for (let j = i + 1; j < entries.length; j++) {
           total += estimateTokens(entries[j]);
         }
@@ -840,6 +842,7 @@ async function generateTurnPrefixSummary(
 const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   'claude-sonnet-4-6': 1_200_000,         // ~300k tokens content, 1M window
+  'claude-fable-5': 1_200_000,            // ~300k tokens content, large window
   'claude-opus-4-8': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-7': 1_200_000,           // ~300k tokens content, 1M window
   'claude-opus-4-6': 1_200_000,           // ~300k tokens content, 1M window

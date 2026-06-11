@@ -565,8 +565,8 @@ export interface YamlConfig {
    *
    * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
    * blocks destructive ops while still running fully autonomously. `'bypass'` emits
-   * `--dangerously-skip-permissions --permission-mode bypassPermissions` (legacy).
-   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   * `--permission-mode bypassPermissions` (the standalone `--dangerously-skip-permissions`
+   * flag was removed). Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';

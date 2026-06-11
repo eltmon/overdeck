@@ -11,6 +11,7 @@ import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -180,7 +181,7 @@ export function ConversationPanel({
   // Query messages at this level so we can drive the header working-spinner
   const { data: messagesData } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
-    queryFn: () => fetchMessages(conversation.name),
+    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
     refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
   const headerMessages = messagesData?.messages ?? [];
@@ -1021,8 +1022,12 @@ interface MessagesResponse {
   contextUsage?: ContextUsage | null;
 }
 
-async function fetchMessages(name: string): Promise<MessagesResponse> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/messages`);
+async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
+  // PAN-1705: timeout + React Query's abort signal so a request in flight
+  // during a server restart rejects (and retries) instead of pinning the
+  // panel on "Loading…" forever, and switching conversations cancels the
+  // previous conversation's fetch.
+  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }
@@ -1085,7 +1090,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
-    queryFn: () => fetchMessages(conversation.name),
+    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
     // Poll every 2s while session is active for live updates.
     // Since we don't have WebSocket push (unlike T3Code), polling is our streaming mechanism.
     refetchInterval: conversation.sessionAlive ? 2000 : false,

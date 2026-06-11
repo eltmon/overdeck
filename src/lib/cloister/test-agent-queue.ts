@@ -44,7 +44,7 @@ Required steps:
 8. As soon as you decide the verdict, FIRST write the deterministic verdict artifact so the pipeline can recover it even if the POST below is interrupted. Write the workspace file .pan/test/result.json with EXACTLY this shape (status is "passed" or "failed"):
    {"status":"passed","notes":"<commands run, UAT paths exercised, concise evidence>"}
    Create the .pan/test/ directory if it does not exist. This artifact captures BOTH the gate result and the UAT verdict, and MUST be written BEFORE the POST in the next step.
-9. On success, mark tests passed (the ship role handles merge preparation):
+9. On success, mark tests passed (server-side shipping handles merge preparation):
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
      -d '{"testStatus":"passed"}'

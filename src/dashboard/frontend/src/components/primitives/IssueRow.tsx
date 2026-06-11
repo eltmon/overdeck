@@ -37,6 +37,8 @@ export type IssueRowProps = {
   project?: IssueRowProject;
   labels?: ReactNode[];
   verbBadge?: ReactNode;
+  /** PAN-1692: extra badge rendered after the title (e.g. the auto-merge chip). */
+  trailingBadge?: ReactNode;
   agent?: IssueRowAgent;
   ledger?: IssueRowLedger;
   assignee?: IssueRowAssignee;
@@ -99,6 +101,7 @@ export default function IssueRow({
   project,
   labels = [],
   verbBadge,
+  trailingBadge,
   agent,
   ledger,
   assignee,
@@ -172,6 +175,7 @@ export default function IssueRow({
         <span className="flex min-w-0 items-center gap-[8px]">
           <span className="truncate text-[13px] leading-none text-foreground">{title}</span>
           {verbBadge && <span className="shrink-0">{verbBadge}</span>}
+          {trailingBadge && <span className="shrink-0">{trailingBadge}</span>}
         </span>
         <span className="mt-[7px] flex min-w-0 flex-wrap items-center gap-[6px] text-[11px] leading-none text-muted-foreground">
           {project && (

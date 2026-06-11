@@ -5,7 +5,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
@@ -27,6 +27,8 @@ export interface ProjectFeatureResourceDetails {
   branchDrifted?: boolean;
   /** PAN-1523: true when workspace path is configured but missing on disk. */
   workspaceMissing?: boolean;
+  /** PAN-1676: remote (fly.io) work agent for this issue, when one is active. */
+  remoteAgent?: { vmName: string; status: string; model: string; startedAt: string } | null;
 }
 
 export interface ProjectFeatureResourceIdentifiers {

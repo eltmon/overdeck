@@ -6,7 +6,12 @@ import {
   estimateConversationEmbeddingCost,
   estimateTokenCount,
 } from '../embedding-provider.js';
-import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
+import { loadConfigSync, type NormalizedConversationSearchConfig } from '../../config-yaml.js';
+
+vi.mock('../../config-yaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../config-yaml.js')>();
+  return { ...actual, loadConfigSync: vi.fn() };
+});
 
 function config(overrides: Partial<NormalizedConversationSearchConfig> = {}): NormalizedConversationSearchConfig {
   return {
@@ -50,8 +55,39 @@ describe('conversation embedding provider', () => {
 
     const missingKey = createConversationEmbeddingProvider({ config: config({ apiKeyRef: 'MISSING_KEY' }), env: {} });
     expect(missingKey.enabled).toBe(false);
-    expect(missingKey.unavailableReason).toBe('MISSING_KEY is not set');
-    await expect(missingKey.embed(['hello'])).rejects.toThrow(/MISSING_KEY is not set/);
+    expect(missingKey.unavailableReason).toMatch(/OpenAI API key not found/);
+    await expect(missingKey.embed(['hello'])).rejects.toThrow(/OpenAI API key not found/);
+  });
+
+  it('never echoes a mis-saved literal key from apiKeyRef into the unavailable reason', () => {
+    // Regression for the dashboard leak: an older UI let users paste a raw key into
+    // apiKeyRef (a field meant to hold an env-var *name*). The status string must not
+    // surface that secret. env:{} keeps it hermetic (skips the central-config fallback).
+    const secret = 'sk-proj-SHOULD-NOT-LEAK-0123456789abcdef';
+    const provider = createConversationEmbeddingProvider({ config: config({ apiKeyRef: secret }), env: {} });
+    expect(provider.enabled).toBe(false);
+    expect(provider.unavailableReason).not.toContain(secret);
+    expect(provider.unavailableReason).toMatch(/Settings → API Keys/);
+  });
+
+  it('falls back to the central apiKeys.openai when the env var is absent', async () => {
+    vi.mocked(loadConfigSync).mockReturnValue({
+      config: { apiKeys: { openai: 'sk-central' } },
+    } as unknown as ReturnType<typeof loadConfigSync>);
+    const createOpenAI = vi.fn(() => ({ embedding: vi.fn(() => ({ id: 'm' })) }));
+    const embedMany = vi.fn(async () => ({ embeddings: [[0.5]], usage: { tokens: 1 } }));
+
+    // No env injected → production path → resolves apiKeys.openai from (mocked) config,
+    // even though apiKeyRef holds a stale literal value that matches no env var.
+    const provider = createConversationEmbeddingProvider({
+      config: config({ apiKeyRef: 'sk-proj-stale-literal' }),
+      createOpenAI,
+      embedMany,
+    });
+
+    expect(provider.enabled).toBe(true);
+    await provider.embed(['x']);
+    expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-central' });
   });
 
   it('returns an empty embedding batch without calling the provider', async () => {

@@ -11,6 +11,12 @@ export interface SupervisorWatchdogConfig {
   dashboardApiPort: number;
   pollMs: number;
   failThreshold: number;
+  /** Restart threshold for timeout-only failure streaks. A timeout means the
+   *  server accepted the probe but couldn't answer in time — busy/starved, not
+   *  dead. Restarting a busy server kills in-flight pipeline work (verification
+   *  gates, review convoys), so these streaks get a much longer leash than
+   *  hard failures (connection refused / non-OK status). */
+  busyFailThreshold: number;
   maxRestarts: number;
   windowMs: number;
   requestTimeoutMs: number;
@@ -20,6 +26,7 @@ export interface SupervisorWatchdogStatus {
   healthy: boolean;
   lastCheck: string | null;
   consecutiveFailures: number;
+  consecutiveHardFailures: number;
   restartAttempts: string[];
   gaveUp: boolean;
   lastError: string | null;
@@ -45,6 +52,7 @@ interface InternalState {
   healthy: boolean;
   lastCheck: string | null;
   consecutiveFailures: number;
+  consecutiveHardFailures: number;
   restartAttempts: number[];
   gaveUp: boolean;
   lastError: string | null;
@@ -94,10 +102,18 @@ export function readWatchdogConfig(env: NodeJS.ProcessEnv, dashboardApiPort: num
     dashboardApiPort,
     pollMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_POLL_MS, 10_000),
     failThreshold: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_FAIL_THRESHOLD, 3),
+    busyFailThreshold: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_BUSY_FAIL_THRESHOLD, 12),
     maxRestarts: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_MAX_RESTARTS, 3),
     windowMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_WINDOW_MS, 5 * 60_000),
-    requestTimeoutMs: 2_000,
+    requestTimeoutMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_TIMEOUT_MS, 10_000),
   };
+}
+
+/** AbortSignal.timeout() rejects fetch with a TimeoutError (AbortError on older
+ *  runtimes). Anything else — ECONNREFUSED, reset, non-OK status — means the
+ *  server is genuinely down or broken, not merely starved for CPU. */
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
 export class SupervisorWatchdog {
@@ -125,6 +141,7 @@ export class SupervisorWatchdog {
       healthy: true,
       lastCheck: null,
       consecutiveFailures: 0,
+      consecutiveHardFailures: 0,
       restartAttempts: persistedState.restartAttempts,
       gaveUp: persistedState.gaveUp,
       lastError: null,
@@ -149,6 +166,7 @@ export class SupervisorWatchdog {
       healthy: this.state.healthy,
       lastCheck: this.state.lastCheck,
       consecutiveFailures: this.state.consecutiveFailures,
+      consecutiveHardFailures: this.state.consecutiveHardFailures,
       restartAttempts: this.state.restartAttempts.map((ts) => new Date(ts).toISOString()),
       gaveUp: this.state.gaveUp,
       lastError: this.state.lastError,
@@ -178,6 +196,7 @@ export class SupervisorWatchdog {
       this.state.healthy = true;
       this.state.lastCheck = checkedAt;
       this.state.consecutiveFailures = 0;
+      this.state.consecutiveHardFailures = 0;
       this.state.restartAttempts = [];
       this.state.gaveUp = false;
       this.state.lastError = null;
@@ -190,10 +209,24 @@ export class SupervisorWatchdog {
       this.state.healthy = false;
       this.state.lastCheck = checkedAt;
       this.state.consecutiveFailures += 1;
+      this.state.consecutiveHardFailures = isTimeoutError(error) ? 0 : this.state.consecutiveHardFailures + 1;
       this.state.lastError = message;
     }
 
-    if (this.state.consecutiveFailures < this.config.failThreshold) return;
+    // Dead vs busy: hard failures (refused/reset/non-OK) restart at
+    // failThreshold; timeout-only streaks wait for busyFailThreshold so a
+    // server starved by verification gates isn't killed mid-pipeline.
+    const hardDown = this.state.consecutiveHardFailures >= this.config.failThreshold;
+    const busyStarved = this.state.consecutiveFailures >= this.config.busyFailThreshold;
+    if (!hardDown && !busyStarved) {
+      if (this.state.consecutiveFailures === this.config.failThreshold) {
+        await this.log(
+          `watchdog: dashboard slow but alive (${this.state.lastError ?? 'timeout'}) — `
+          + `${this.state.consecutiveFailures} consecutive timeouts; deferring restart until ${this.config.busyFailThreshold}`,
+        );
+      }
+      return;
+    }
     this.pruneRestartAttempts(startedAt);
     await this.persistState();
     if (this.state.gaveUp) return;
@@ -211,6 +244,8 @@ export class SupervisorWatchdog {
         durationMs: this.now() - startedAt,
         attempts: this.state.restartAttempts.length,
         gaveUp: true,
+        reason: hardDown ? 'dashboard unreachable' : 'sustained health-probe timeouts',
+        pid: process.pid,
       }));
       return;
     }
@@ -223,7 +258,10 @@ export class SupervisorWatchdog {
 
     this.state.restartAttempts.push(startedAt);
     await this.persistState();
-    await this.log(`watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures`);
+    await this.log(
+      `watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures `
+      + `(${hardDown ? 'dashboard unreachable' : 'sustained timeouts — dashboard starved'})`,
+    );
 
     let restartError: string | null = null;
     try {
@@ -249,6 +287,10 @@ export class SupervisorWatchdog {
       error: restartError ?? undefined,
       durationMs: this.now() - startedAt,
       attempts: this.state.restartAttempts.length,
+      reason: hardDown
+        ? `dashboard unreachable: ${this.state.lastError ?? 'health check failed'}`
+        : `sustained health-probe timeouts: ${this.state.lastError ?? 'health check timed out'}`,
+      pid: process.pid,
     }));
     if (restartError) {
       await this.log(`watchdog restart failed: ${restartError}`);

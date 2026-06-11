@@ -5,6 +5,14 @@ Panopticon's merge workflow is a four-state pipeline between two actors: the
 (implementation, review, test) but no agent makes the merge decision and no
 agent performs the rebase.
 
+> **Scope.** This describes the **per-issue** merge — one feature, one click. While
+> a Flywheel run with the merge train enabled is active, the primary path is
+> **promoting a UAT batch** (merging several tested features at once); see
+> [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). The per-issue flow below remains
+> the escape hatch (the "Merge one feature to main…" control) and the path for
+> everything outside an active batch-train run. Merging a single feature this way
+> invalidates the live batches and triggers a reassembly.
+
 ## State Machine
 
 ```
@@ -80,7 +88,9 @@ three options surfaced to the agent or operator:
 
 Review specialists (correctness, security, performance, requirements) and
 test specialists have all reported PASS. The dashboard sees the terminal
-review+test signals and proceeds to the rebase step automatically.
+review+test signals and proceeds to the rebase step automatically. The reactive
+`shipping` lifecycle state is retained for phase display and merge-gate logic,
+but it no longer spawns an agent.
 
 ### rebased
 

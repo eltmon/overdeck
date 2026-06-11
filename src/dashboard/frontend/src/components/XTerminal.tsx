@@ -3,18 +3,17 @@ import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
+import { Sun, Moon } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
+// Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
+// their pane background with that value so Claude Code's `theme: auto`
+// detects the dashboard theme via OSC 11 at startup, even headless.
 export const XTERM_BG = { dark: '#1a1a2e', light: '#ffffff' } as const;
 
-// xterm palette. The agent terminal pane is pinned to the dark palette
-// regardless of the dashboard's light/dark theme (see the call site below):
-// Claude Code emits hardcoded dark-theme block fills (user-turn boxes, diff
-// bands) that render as dark boxes on a light xterm background, and its own
-// light theme is broken upstream (anthropics/claude-code#49848, "not planned").
-// The light palette is retained so theme-following is a one-line re-enable if
-// that upstream rendering is ever fixed. The ANSI colors are tuned per-mode for
-// contrast against the background.
+// xterm palette that follows the app's light/dark theme (PAN-1561). The ANSI
+// colors are tuned per-mode for contrast against the background.
 function xtermTheme(isDark: boolean): ITheme {
   if (isDark) {
     return {
@@ -102,6 +101,24 @@ const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
 export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
+  const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
+  // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
+  // pin this one pane. Sessions spawned before a dashboard theme change keep
+  // rendering their old Claude theme (Claude only detects via OSC 11 once, at
+  // startup) — the toggle is the escape hatch for those panes.
+  const themeOverrideKey = `panopticon.terminal.theme.${sessionName}`;
+  const [themeOverride, setThemeOverride] = useState<'auto' | 'dark' | 'light'>(() => {
+    const stored = localStorage.getItem(themeOverrideKey);
+    return stored === 'dark' || stored === 'light' ? stored : 'auto';
+  });
+  const effectiveIsDark = themeOverride === 'auto' ? isDark : themeOverride === 'dark';
+  const effectiveIsDarkRef = useRef(effectiveIsDark);
+  effectiveIsDarkRef.current = effectiveIsDark;
+  const toggleTheme = useCallback(() => {
+    const next = effectiveIsDarkRef.current ? 'light' : 'dark';
+    localStorage.setItem(themeOverrideKey, next);
+    setThemeOverride(next);
+  }, [themeOverrideKey]);
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -365,8 +382,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         allowProposedApi: true,
         macOptionClickForcesSelection: true,
         rightClickSelectsWord: false,
-        // Pinned to dark regardless of dashboard theme — see XTERM_BG comment.
-        theme: xtermTheme(true),
+        theme: xtermTheme(effectiveIsDarkRef.current),
       });
 
       fit = new FitAddon();
@@ -708,27 +724,46 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
   }, [sendResizeIfNeeded]);
 
+  // Recolor a live terminal when the effective theme changes — either the app
+  // theme toggles (PAN-1561) or the per-pane override is flipped (PAN-1520).
+  useEffect(() => {
+    if (terminalInstance.current) {
+      terminalInstance.current.options.theme = xtermTheme(effectiveIsDark);
+    }
+  }, [effectiveIsDark]);
+
   const handleClick = () => {
     terminalInstance.current?.focus();
   };
 
   return (
     <div className="relative w-full h-full">
-      {/* Settings button — hidden when embedded (the host owns the chrome). */}
-      {!embedded && (
+      {/* Top-right controls. The theme toggle is always available (PAN-1520);
+          the settings gear is hidden when embedded (the host owns the chrome). */}
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <button
-          onClick={() => setShowSettings(!showSettings)}
+          onClick={toggleTheme}
           className="p-1.5 rounded bg-card/80 hover:bg-accent/80 text-muted-foreground transition-colors"
-          title="Terminal settings"
+          title={`Terminal theme: ${
+            themeOverride === 'auto' ? `auto (${isDark ? 'dark' : 'light'})` : themeOverride
+          } — click to ${effectiveIsDark ? 'lighten' : 'darken'} this pane`}
+          aria-label="Toggle terminal light/dark theme"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+          {effectiveIsDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
+        {!embedded && (
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-1.5 rounded bg-card/80 hover:bg-accent/80 text-muted-foreground transition-colors"
+            title="Terminal settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        )}
       </div>
-      )}
 
       {/* Settings panel */}
       {!embedded && showSettings && (
@@ -757,7 +792,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         tabIndex={0}
         style={{
           padding: '8px',
-          backgroundColor: XTERM_BG.dark,
+          backgroundColor: effectiveIsDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',
         }}

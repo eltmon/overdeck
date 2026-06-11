@@ -1,12 +1,33 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+const { mockGenerateSmartSummary } = vi.hoisted(() => ({
+  mockGenerateSmartSummary: vi.fn(),
+}));
+
+vi.mock('../../../../lib/conversations/smart-compaction.js', async () => {
+  const { Effect } = await import('effect');
+  return {
+    generateSmartSummary: mockGenerateSmartSummary.mockImplementation((opts: { model?: string }) =>
+      Effect.succeed({
+        summary: `summary from ${opts.model ?? 'default'}`,
+        tokensBefore: 42,
+        firstKeptEntryIndex: 0,
+        summaryModel: opts.model ?? null,
+        readFiles: [],
+        modifiedFiles: [],
+      }),
+    ),
+  };
+});
 
 let TEST_HOME: string;
 let CONFIG_HOME: string;
 
 beforeEach(() => {
+  mockGenerateSmartSummary.mockClear();
   TEST_HOME = join(tmpdir(), `pan-compaction-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   CONFIG_HOME = join(tmpdir(), `pan-compaction-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });

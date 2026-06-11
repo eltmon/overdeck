@@ -12,6 +12,14 @@ export interface ModelDef {
   description?: string;
   /** Blended $/1M tokens for cost-awareness badges/tooltips. */
   costPer1MTokens?: number;
+  /**
+   * Whether this model accepts image input. `false` = proven text-only (block
+   * attachments); `true`/`undefined` = allow. Distinct from the `'vision'`
+   * capability tag above, which is incomplete/unreliable today (e.g. multimodal
+   * models missing the tag) — only `supportsImages` gates the attach guard.
+   * Scoped to the two MiMo models for now; full audit in PAN-1685.
+   */
+  supportsImages?: boolean;
 }
 
 interface ProviderDef {
@@ -31,6 +39,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
+      { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5', icon: Gem, tier: 'premium', costPer1MTokens: 90, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
       { id: 'claude-opus-4-8' as ModelId, name: 'Claude Opus 4.8', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — current flagship, xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous flagship — xhigh/max effort, deepest reasoning' },
       { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
@@ -78,6 +87,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   minimax: {
     name: 'MiniMax',
     models: [
+      { id: 'MiniMax-M3' as ModelId, name: 'M3', icon: Gem, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'MSA architecture, 1M context, top-tier coding, native multimodal' },
       { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
       { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],
@@ -85,8 +95,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   mimo: {
     name: 'Xiaomi MiMo',
     models: [
-      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, enhanced agent efficiency' },
-      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast'], description: 'Multimodal model, 262K context, strong agentic coding' },
+      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], supportsImages: false, description: 'Flagship reasoning model, 1M context, enhanced agent efficiency. Text-only on Token-Plan endpoints.' },
+      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast', 'vision'], supportsImages: true, description: 'Multimodal model, 262K context, strong agentic coding' },
     ],
   },
   nous: {
@@ -105,6 +115,26 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     ],
   },
 };
+
+/** Look up a model definition by id across all providers. */
+export function findModelDef(modelId: string): ModelDef | undefined {
+  for (const provider of Object.values(MODELS_BY_PROVIDER)) {
+    const def = provider.models.find((m) => m.id === modelId);
+    if (def) return def;
+  }
+  return undefined;
+}
+
+/**
+ * Whether image attachments may be sent to a model. Permissive: returns `false`
+ * ONLY for models flagged `supportsImages: false` (proven text-only, e.g.
+ * mimo-v2.5-pro); every other model — including unflagged ones — is allowed, so
+ * the provider stays the final authority. Mirrors `modelSupportsImagesSync` in
+ * src/lib/model-capabilities.ts. PAN-1685.
+ */
+export function modelSupportsImages(modelId: string): boolean {
+  return findModelDef(modelId)?.supportsImages !== false;
+}
 
 export type OpenRouterFavoriteModel = {
   id: string;

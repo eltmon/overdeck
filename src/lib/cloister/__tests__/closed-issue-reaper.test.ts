@@ -127,6 +127,22 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1614');
   });
 
+  it('stops strike-shaped tmux sessions whose parent issue is closed (PAN-1721)', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([
+      'strike-pan-1716',
+      'strike-pan-1717',
+      'agent-pan-1716',
+    ]));
+    mocks.isIssueClosed.mockImplementation(async (issueId: string) => issueId === 'PAN-1716');
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
+      'Reaped strike-pan-1716 — parent issue PAN-1716 is closed',
+    ]);
+
+    expect(mocks.stopAgent).toHaveBeenCalledTimes(1);
+    expect(mocks.stopAgent).toHaveBeenCalledWith('strike-pan-1716');
+  });
+
   it('does not reap closed-issue agents when no-resume mode is active', async () => {
     mocks.getNoResumeMode.mockReturnValue({ active: true, since: '2026-06-08T12:00:00.000Z' });
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([

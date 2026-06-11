@@ -1,4 +1,4 @@
 {
   "status": "passed",
-  "notes": "Quality gates executed after fixing the environment-sensitive conversation-search config test: npm run typecheck (PASS), npm run build:cli (PASS), npm run lint (PASS), npm test (PASS). Test suite summary from npm test: root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests. The previous config-yaml-conversation-search assertion now verifies normalized shape/type instead of assuming machine-local conversationSearch.enabled/model defaults. PAN-1242-specific endpoint, frontend, and UAT coverage remain passing."
+  "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install (PASS), npm run typecheck (PASS), npm run lint (PASS), npm test (PASS). Test summary: root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests."
 }

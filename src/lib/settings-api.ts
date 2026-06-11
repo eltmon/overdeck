@@ -221,7 +221,7 @@ export interface ApiSettingsConfig {
    * Permission mode for spawned Claude Code agents.
    *
    * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
-   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   * 'bypass'         → --permission-mode bypassPermissions (DSP flag removed)
    *
    * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
    * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
@@ -257,7 +257,7 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelIdSync('claude-sonnet-4-6');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],

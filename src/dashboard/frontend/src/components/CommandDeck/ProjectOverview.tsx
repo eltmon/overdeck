@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
@@ -16,6 +16,8 @@ export interface IssueCostBreakdown {
 
 interface ProjectOverviewProps {
   projectName: string;
+  /** projects.yaml key for this project — enables the settings panel (PAN-1693). */
+  projectKey?: string;
   features: ProjectFeature[];
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
@@ -146,8 +148,78 @@ export function projectTotalCost(
   return sum;
 }
 
+/** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
+function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ['project-auto-merge-default', projectKey],
+    queryFn: async (): Promise<{ value: 'auto' | 'hold' | null }> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`);
+      if (!res.ok) return { value: null };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const value = data?.value ?? null;
+  const mutation = useMutation({
+    mutationFn: async (next: 'auto' | 'hold' | null) => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: next }),
+      });
+      if (!res.ok) throw new Error('Failed to save project setting');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-auto-merge-default', projectKey] }),
+  });
+  const options: Array<{ v: 'auto' | 'hold' | null; label: string; color: string }> = [
+    { v: 'auto', label: '⚡ Auto', color: 'var(--success)' },
+    { v: 'hold', label: '🔒 Hold for UAT', color: 'var(--warning)' },
+    { v: null, label: 'Global default', color: 'var(--muted-foreground)' },
+  ];
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 650, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted-foreground)' }}>Project settings</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: 'var(--foreground)' }}>Auto-merge default</span>
+        <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          {options.map((o, i) => {
+            const active = value === o.v;
+            return (
+              <button
+                key={String(o.v)}
+                type="button"
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate(o.v)}
+                style={{
+                  appearance: 'none',
+                  border: 0,
+                  borderLeft: i === 0 ? 0 : '1px solid var(--border)',
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: active ? `color-mix(in srgb, ${o.color} 16%, transparent)` : 'transparent',
+                  color: active ? o.color : 'var(--muted-foreground)',
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+        Applies to this project's issues that have no explicit per-issue auto-merge setting.
+      </div>
+    </div>
+  );
+}
+
 export function ProjectOverview({
   projectName,
+  projectKey,
   features,
   issueCosts,
   issueCostDetails,
@@ -233,6 +305,8 @@ export function ProjectOverview({
       }}
     >
       <HeroBillboard projectName={projectName} metrics={metrics} />
+
+      {projectKey && <ProjectSettingsSection projectKey={projectKey} />}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PIPELINE_PHASES.map(phase => {

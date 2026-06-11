@@ -49,6 +49,16 @@ Before acting, read:
 
 If the brief defines `scope`, operate only inside that scope. If it defines `maxAgents`, never exceed that cap when starting or resuming issue agents.
 
+## Dashboard API — base URL and outage protocol
+
+All `GET/POST /api/flywheel/...` calls in this doc target the dashboard server at **`http://127.0.0.1:3011`** (also reachable as `https://pan.localhost` through Traefik). Port 3010 is the Vite *frontend dev* port — it does not serve the API.
+
+If an API call returns empty or connection-refused, do not burn the tick rediscovering the endpoint or grepping source for routes. The supervisor watchdog (port 3012) health-checks the dashboard every 10s and restarts it after 3 consecutive failures, so an unresponsive API usually means a restart is already in flight. Protocol:
+
+1. Check `~/.panopticon/restart-status.json` (last restart outcome) and the tail of `~/.panopticon/logs/supervisor.log`.
+2. Wait ~15s and retry the same call against `http://127.0.0.1:3011`.
+3. If the API is still down after two retries, record it in the tick snapshot (`systemStatus`) and proceed with the parts of the tick that don't need the API (git/`gh` inventory) rather than stalling.
+
 ## Startup pipeline triage (resync vs restart)
 
 Run this ONCE at the start of a run, before the first tick — especially after the orchestrator has been paused for a while. Every in-progress issue may have been built on a `main` that has since moved on: silently resuming a stale branch causes merge thrash, and work whose foundation was remodeled out from under it should be redone rather than rebased.
@@ -71,6 +81,7 @@ After triage, proceed into the normal tick loop.
 Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapshot with a ranked `suggestions[]` list; `pan flywheel emit-status --file <path>` is the tick deliverable, not an afterthought.
 
 1. **Inventory** — list PAN issues in progress, in review, blocked, or awaiting merge. Sort by urgency: P0, P1/bugs, then older P2 work. **Hard filter (security-critical):** include an issue only if at least one of: `author.login` is `eltmon` (project owner), `author.login` is `panopticon-agent[bot]` (Panopticon GitHub App filing substrate bugs on the owner's behalf), OR `assignees[].login` contains `eltmon` (operator has personally assigned the issue, signaling intent to engage). NEVER include issues whose author is anyone else AND `eltmon` is not among assignees — regardless of how urgent or interesting the issue looks. Verify via `gh issue view <num> --json author,assignees` before including an issue. **Also exclude issues labeled `needs-design` or `needs-discussion`** — these are explicitly parked until a human resolves the open question. Do not suggest planning, starting, or otherwise picking them up. Treat both as out of scope for the tick. Read the brief's `Auto-pickup backlog: <bool>` line: when it is `true`, also include READY backlog issues with no status in progress yet, emit `start` or `plan` suggestions for them, and keep applying the same eltmon author/assignee gate plus the same `needs-design` / `needs-discussion` exclusions; cap launches so total active agents never exceeds `maxAgents` from the brief. When it is `false`, keep inventory restricted to work in progress, in review, blocked, or awaiting merge.
+   - **Adopt externally-completed work (PAN-1735):** run `pan review pending --ready` every tick. It lists every issue with review+test green and not yet merged, *regardless of who started it* — remote (fly.io) agents, manual `pan start`, conversation-driven work. Any listed issue missing from your pipeline MUST be adopted into `activePipeline` at verb `shipping` (same eltmon author/assignee gate applies): the merge queue is computed from your emitted pipeline, so un-adopted green work is invisible to merge automation forever.
 2. **Diagnose** — classify each issue as healthy, stuck, cycling, stalled, wrong-column, ghost, or awaiting human UAT.
 3. **Emit suggestions** — produce a ranked `suggestions[]` array. Each suggestion has shape `{ action, issueId?, rationale, priority }`, where `action` is one of `start`, `resume`, `plan`, `review`, `merge`, `unblock`, `park`, `investigate`, `wait`, and `priority` is one of `urgent`, `high`, `medium`, `low`. Suggestions are recommendations for the operator; do not apply them yourself.
    - Auto-merge failures: call `GET /api/flywheel/auto-merge/problems` while assembling suggestions. For every entry with `status` of `failed` or `blocked`, emit `{ action: 'investigate', issueId, rationale: 'auto-merge <status>: <failureReason>', priority: 'high' }`. The failed/blocked entry stays in the table until cancelled; do not auto-clear it from the orchestrator.
@@ -133,6 +144,15 @@ Allowed:
 Allowed when `require_uat_before_merge=false`:
 
 - `POST /api/flywheel/auto-merge/schedule` schedules eligible auto-merges through the server-managed, operator-cancellable cooldown.
+
+Allowed when `require_uat_before_merge=true` — **auto-assemble the UAT candidate** (this is the under-UAT flow; do it, don't ask the operator to flip UAT off):
+
+- With UAT required you must **not** schedule merges — but you **should** keep a ready-to-UAT bundle assembled so the operator can review and ship a batch in one sitting. Each tick:
+  1. `GET /api/flywheel/uat-candidate` → `{ branchName, bundled }`. `bundled` is the disjoint, batch-safe set of ready features (conflicting ones serialize and are excluded).
+  2. If `bundled` is non-empty, `POST /api/flywheel/assemble-uat` (empty `{}` body). This (re)builds the per-day `uat/<label>-<codename>-<MMDD>` branch off current `origin/main` and merges the bundle onto it.
+  3. Surface the candidate in your status/report: the branch name, the bundled issue IDs, and any merge conflicts it reported. The operator UATs that one branch, then clicks **Ship batch** (or `POST /api/flywheel/merge-next`).
+- **This call is idempotent and safe to run every tick.** The branch name is deterministic per day and the branch is force-reset onto current main, so repeated assembly rebuilds the *same* branch from the current bundle rather than proliferating new ones. Assembling is *not* a merge — it never touches `main` — so the merge-policy gate below does not apply to it.
+- Do **not** ask the operator "want me to flip `require_uat_before_merge=false`?" The UAT candidate *is* the answer under UAT. Only the operator changes that toggle.
 
 Never:
 

@@ -1,0 +1,432 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-10T00:12:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1704: Conversation model switch compacts unconditionally — add window-aware tiered switching (lossless /model or --resume when context fits)",
+    "updated": "2026-06-11T03:18:13.978Z"
+  },
+  "plan": {
+    "id": "pan-1704",
+    "title": "Conversation model switch compacts unconditionally — add window-aware tiered switching",
+    "status": "proposed",
+    "uid": "cfbef208-8840-448b-b105-acec6ecba538",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 33,
+    "created": "2026-06-10T00:12:00.000Z",
+    "updated": "2026-06-11T03:18:13.978Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1704",
+        "label": "PAN-1704",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1672",
+        "label": "PAN-1672 (CLIProxy effective window)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "model-switch",
+      "compaction",
+      "context-window",
+      "pty-supervisor"
+    ],
+    "narratives": {
+      "Problem": "POST /api/conversations/:name/switch-model unconditionally compacts on every model change (maybeCompactBeforeRespawn({modelChanged:true})), destroying in-context history even when switching to a model whose window could hold the whole transcript. Observed: Opus 4.8 → Fable 5 compacted a 206k-token conversation. The kill+respawn flow also leaves the terminal pane blank. The root cause is the unconditional modelChanged force-flag with no context-window awareness — the prior fix (3bf32002a) improved summary quality instead of asking whether to compact at all.",
+      "Proposal": "Make the switch tiered, keyed on window-fit + provider routing. Tier 1: same harness + same provider-routing-env + context fits target window → deliver `/model <new>` in-session via the PTY supervisor (no kill, no compaction, scrollback intact). Tier 2: same harness but provider env differs + context fits → kill+respawn `--resume`, no compaction. Tier 3: context > effectiveTargetWindow × 0.8 → compact (existing fork-mode native compaction) then respawn. Tier 4: harness change → existing converter flow, unchanged. Effective target window reuses the codebase's existing extended-context inference (observed ceiling > registry window ⇒ lift to 1M for same-family targets) and clamps CLIProxy-routed targets to 150k (PAN-1672), so the registry's deliberately-conservative Fable=200000 value is never globally bumped."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve the issue's 'Fable 5 = 1M window' premise vs registry contextWindow=200000 by reusing the existing extended-context inference (computeContextUsage) keyed on the live session's observed ceiling, instead of editing Fable's registry value.",
+        "rationale": "The 206k incident is a session already running in extended-context mode (observed ceiling > 200000), so the inference correctly yields a 1M effective window without changing proactive-compaction high-water math for every Fable session (which a global bump would, risking gpt-5.5-style wedging)."
+      },
+      {
+        "summary": "safetyFactor fixed at 0.8 as a module constant; no per-conversation compaction-tolerance config knob.",
+        "rationale": "The issue marks the per-conversation tolerance knob explicitly optional; Karpathy 'no speculative config'. 0.8 matches the issue's worked example."
+      },
+      {
+        "summary": "Update maybeCompactBeforeRespawn in place (caller-supplied shouldCompact) rather than deleting it.",
+        "rationale": "Keeps the summaryFork feature-flag gate co-located with compaction and is the most surgical change to its single non-test caller (the switch route)."
+      },
+      {
+        "summary": "New pure decision module at src/lib/conversations/switch-strategy.ts.",
+        "rationale": "Mirrors the existing src/lib/conversations/ layout (smart-compaction.ts, summary-fork.ts) and isolates the tier logic for unit testing."
+      },
+      {
+        "summary": "Tier 1 verification = bounded capturePane statusline poll with Tier 2 fallback on miss/timeout/failure.",
+        "rationale": "There is no reliable synchronous ack for an in-session /model change; polling the statusline echo with a hard fallback is the safest available signal and never silently assumes success."
+      }
+    ],
+    "items": [
+      {
+        "id": "switch-strategy-module",
+        "title": "Add pure tier-decision module (getEffectiveTargetWindow + decideSwitchStrategy) with unit tests",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-10T00:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1704",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "switch-route-tiered",
+            "tier1-in-session-model"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/switch-strategy.ts with two PURE, side-effect-free functions plus a SAFETY_FACTOR = 0.8 constant. (1) getEffectiveTargetWindow({ registryWindow, currentObservedCeiling, cliproxyRouted, providerRoutingChanged }): number — returns CLIPROXY_CODEX_CONTEXT_WINDOW (150000) when cliproxyRouted; else max(1_000_000, registryWindow) when !providerRoutingChanged && currentObservedCeiling > registryWindow (mirrors the extended-context inference in conversation-service.ts:1148-1152); else registryWindow. (2) decideSwitchStrategy({ harnessChanged, providerRoutingChanged, contextTokens, effectiveTargetWindow }): { tier: 1|2|3|4, compact: boolean, useModelCommand: boolean } — Tier 4 first when harnessChanged; else Tier 3 (compact:true) when contextTokens > effectiveTargetWindow * SAFETY_FACTOR; else Tier 1 (useModelCommand:true) when !providerRoutingChanged; else Tier 2. The route (next bead) computes the async inputs and feeds these. Ship src/lib/conversations/__tests__/switch-strategy.test.ts covering every branch including the regression cases."
+        },
+        "subItems": [
+          {
+            "id": "switch-strategy-module.ac1",
+            "title": "getEffectiveTargetWindow returns 150000 (CLIPROXY_CODEX_CONTEXT_WINDOW) for cliproxyRouted targets regardless of observed ceiling",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac2",
+            "title": "getEffectiveTargetWindow lifts to 1_000_000 when !providerRoutingChanged and currentObservedCeiling (e.g. 206000) > registryWindow (200000); returns registryWindow when ceiling <= window",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac3",
+            "title": "getEffectiveTargetWindow does NOT lift the window for a cross-provider (providerRoutingChanged) non-cliproxy target even if the source ceiling exceeds the registry window (H6 guard)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac4",
+            "title": "decideSwitchStrategy returns tier 4 when harnessChanged regardless of all other inputs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac5",
+            "title": "decideSwitchStrategy returns tier 1 (useModelCommand:true, compact:false) when !harnessChanged && !providerRoutingChanged && contextTokens <= effectiveTargetWindow*0.8",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac6",
+            "title": "decideSwitchStrategy returns tier 2 (useModelCommand:false, compact:false) when providerRoutingChanged && contextTokens fits the window",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac7",
+            "title": "decideSwitchStrategy returns tier 3 (compact:true) when contextTokens > effectiveTargetWindow*0.8, for both same- and cross-routing",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac8",
+            "title": "Regression: 206000 tokens, same-routing Anthropic switch, effective window inferred to 1_000_000 → decideSwitchStrategy returns tier 1, compact:false (the exact observed incident at the decision layer)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-strategy-module.ac9",
+            "title": "Module is pure: no fs/network/process imports; unit tests run without mocks for the decision functions; npm run typecheck and the new test file pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-route-tiered",
+        "title": "Refactor switch-model route to be tier-aware (defer kill) and replace maybeCompactBeforeRespawn's modelChanged force-flag with a window-fit shouldCompact gate",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-10T00:12:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1704",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "tier1-in-session-model"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts (postConversationSwitchModelRoute, ~2401-2551): compute the tier BEFORE killing the session. Gather inputs — currentModel=conv.model, targetModel=model, harnessChanged, providerRoutingChanged = getProviderExportsForModel(currentModel) !== getProviderExportsForModel(targetModel), contextUsage = computeContextUsage(sessionFile, conv.model) to get contextTokens (estimatedTokens) and currentObservedCeiling (maxObservedInputTokens), cliproxyRouted = getProviderForModelSync(targetModel).name==='openai' && await getProviderAuthMode(targetModel)==='subscription', registryWindow = getModelCapabilitySync(resolveModelIdSync(targetModel)).contextWindow → effectiveTargetWindow via getEffectiveTargetWindow → strategy = decideSwitchStrategy(...). Wire Tier 4 (harnessChanged: existing converter branch, verbatim), Tier 3 (kill+markRespawnPending → compact via the updated maybeCompactBeforeRespawn with shouldCompact:true → respawn --resume), Tier 2 (kill+markRespawnPending → respawn --resume, shouldCompact:false → no compaction). Leave Tier 1 to the next bead: for now a Tier-1-eligible decision should fall through to the Tier 2 path (kill+respawn --resume, no compaction) so this bead is independently correct and mergeable. ALSO update maybeCompactBeforeRespawn (conversation-compaction.ts:176) and MaybeCompactBeforeRespawnOptions: replace `modelChanged: boolean` with `shouldCompact: boolean`; drop the internal COMPACT_TOKEN_THRESHOLD/estimateContextTokens gate; keep the isBackgroundFeatureEnabled('summaryFork') early-return; compact only when shouldCompact && summaryFork enabled. Update the single caller accordingly."
+        },
+        "subItems": [
+          {
+            "id": "switch-route-tiered.ac1",
+            "title": "The session kill (formerly conversations.ts:2458) is moved to run only on Tier 2/3/4; markRespawnPending is set only on respawn tiers",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac2",
+            "title": "Tier 2 (cross-provider same-harness, context fits window): respawn with --resume and NO compaction; the session JSONL gains no compact_boundary (AC#2 of the issue)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac3",
+            "title": "Tier 3 (context > effectiveTargetWindow*0.8): compaction runs and the summary references the correct pre-switch token count; respawn --resume follows (AC#3 of the issue)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac4",
+            "title": "Tier 4 (harness change): behavior is byte-for-byte the existing convertConversationTranscript flow; native compaction never runs for a harness change (AC#4 of the issue)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac5",
+            "title": "maybeCompactBeforeRespawn takes shouldCompact (not modelChanged), preserves the summaryFork early-return, and compacts only when shouldCompact && summaryFork enabled; the lone caller and MaybeCompactBeforeRespawnOptions are updated; no orphaned imports/constants remain",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac6",
+            "title": "providerRoutingChanged is derived from getProviderExportsForModel string equality; two Anthropic models compare equal, claude vs gpt compare unequal",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-route-tiered.ac7",
+            "title": "npm run typecheck, npm run lint, and npm test pass; the existing conversation-compaction route/service tests still pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier1-in-session-model",
+        "title": "Implement Tier 1 — lossless in-session /model switch via the PTY supervisor with statusline verification and Tier 2 fallback",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-10T00:12:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In the switch-model route, when strategy.tier === 1 (useModelCommand): do NOT kill the session and do NOT markRespawnPending. Persist the new model in the DB (setConversationModel), then deliver `/model <targetModel>` via deliverAgentMessage(conv.tmuxSession, '/model <targetModel>', 'switch-model-tier1', resolveConversationDeliveryMethod(conv)). Verify acceptance: poll capturePane(conv.tmuxSession) for the target model's displayName (getModelCapabilitySync(...).displayName) in the statusline within a bounded timeout (~5s). On success return active with the new model (sessionAlive:true, no respawn). On delivery error, timeout, or missed echo, fall back to the Tier 2 path (kill + respawn --resume, no compaction) so the switch always completes. Confirm the exact `/model` argument form Claude Code accepts (full id vs alias) during implementation and encode it."
+        },
+        "subItems": [
+          {
+            "id": "tier1-in-session-model.ac1",
+            "title": "Anthropic→Anthropic switch with context < target window performs Tier 1: the tmux session is NOT killed, no respawn occurs, no compact_boundary is appended, and full history remains in context (AC#1 of the issue)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier1-in-session-model.ac2",
+            "title": "Terminal scrollback is preserved across a Tier 1 switch (the blank-terminal symptom does not occur because the pane/TUI is never respawned)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier1-in-session-model.ac3",
+            "title": "When the /model delivery fails or the statusline echo is not observed within the timeout, the route falls back to Tier 2 (kill + respawn --resume, no compaction) and still returns a live session with the new model — never a wedged or half-switched state",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier1-in-session-model.ac4",
+            "title": "Tier 1 persists the new model to the DB before delivery so a fallback respawn uses the correct model",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier1-in-session-model.ac5",
+            "title": "npm run typecheck, npm run lint, and npm test pass",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-regression-test",
+        "title": "Route-level regression test: 206k-token same-harness switch appends no compact_boundary",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-10T00:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1704",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a route/service-level regression test (extend src/dashboard/server/routes/__tests__/conversation-compaction.test.ts or add a sibling switch-model test) for the exact observed incident: a session JSONL whose latest assistant usage totals ~206000 tokens with an observed ceiling > 200000, switching between two same-routing Anthropic models. Assert the session file gains NO new compact_boundary entry across the switch decision (compaction is skipped). Cover the contrast case (context > effectiveTargetWindow*0.8 → a compact_boundary IS appended) so the gate is proven in both directions. Use fixtures/mocks consistent with the existing conversation-compaction tests; no real wall-clock delays (fake timers if any retry/delay is involved)."
+        },
+        "subItems": [
+          {
+            "id": "switch-regression-test.ac1",
+            "title": "Test: 206k-token, same-routing Anthropic switch with inferred 1M effective window asserts no compact_boundary is appended to the JSONL (AC#5 of the issue)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-regression-test.ac2",
+            "title": "Contrast test: a context that exceeds effectiveTargetWindow*0.8 DOES append a compact_boundary, proving the gate fires when the window forces it",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-regression-test.ac3",
+            "title": "The new test(s) pass under npm test and use no real-wall-clock sleeps",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "switch-strategy-module",
+        "to": "switch-route-tiered",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-strategy-module",
+        "to": "tier1-in-session-model",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-strategy-module",
+        "to": "switch-regression-test",
+        "type": "informs"
+      },
+      {
+        "from": "switch-route-tiered",
+        "to": "tier1-in-session-model",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-route-tiered",
+        "to": "switch-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "tier1-in-session-model",
+        "to": "switch-regression-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-10-PAN-1704-conversation-model-switch-compacts-unconditionally-add-window-aware-tiered-switching.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1704",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-11T03:18:13.964Z",
+        "work": {
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T03:18:13.964Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T03:18:13.964Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T03:18:13.964Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T03:18:13.964Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T03:18:13.964Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1713"
+        }
+      }
+    }
+  },
+  "status": "proposed"
+}

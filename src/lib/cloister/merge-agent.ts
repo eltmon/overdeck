@@ -218,6 +218,24 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   }
 
   const run = (async () => {
+    // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
+    // completed/cancelled, clears review status, and closes the tracker issue.
+    // Re-running the handoff after that resurrects the review row and REOPENS
+    // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
+    // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
+    // close-out and the handoff reopened it into verifying-on-main forever.
+    try {
+      const { findSpecByIssue } = await import('../pan-dir/specs.js');
+      const spec = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
+      if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
+        console.log(`[merge-agent] ${issueId} is closed out (spec ${spec.status}) — skipping post-merge lifecycle`);
+        _completedPostMerge.add(issueId);
+        return;
+      }
+    } catch {
+      // Spec unreadable — proceed; the guard is best-effort.
+    }
+
     const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
     if (!mergeVerification.merged) {
       console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
@@ -342,14 +360,36 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
-      const { setAgentPaused } = await import('../agents.js');
+      const { setAgentPaused, getAgentState } = await import('../agents.js');
       const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-        const paused = await Effect.runPromise(setAgentPaused(agentId, reason, true));
-        if (paused) {
+        // Pause, then VERIFY the gate actually persisted to state.json. A server
+        // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
+        // pending-post-merge.json) or a concurrent deacon read-modify-write on
+        // state.json can silently drop the pause. An unpaused merged work agent
+        // sits idle at its prompt yet still counts against the PAN-1665 work
+        // ceiling, throttling dispatch for every live issue (PAN-1726). Assert
+        // paused=true after the write; retry once, then fail loudly.
+        const initial = await Effect.runPromise(setAgentPaused(agentId, reason, true));
+        if (initial === null) {
+          // No state.json for this agent — nothing to pause (e.g. planning never ran).
+          continue;
+        }
+        let verify = await Effect.runPromise(getAgentState(agentId));
+        if (verify?.paused !== true) {
+          await Effect.runPromise(setAgentPaused(agentId, reason, true));
+          verify = await Effect.runPromise(getAgentState(agentId));
+        }
+        if (verify?.paused === true) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
+        } else {
+          console.error(
+            `[merge-agent] ✗ FAILED to persist pause for ${agentId} after merge — state.json paused=${verify?.paused}. ` +
+            `Idle merged work agent may hold a PAN-1665 work slot and throttle dispatch (PAN-1726).`,
+          );
+          logActivity('agent_pause_failed', `Could not persist pause for ${agentId} after merge — may throttle dispatch (PAN-1726)`);
         }
         if (await Effect.runPromise(sessionExists(agentId))) {
           await Effect.runPromise(killSession(agentId));
@@ -977,8 +1017,9 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
  * Sync the latest main branch into a workspace's feature branch.
  *
  * This performs a `git merge origin/main` in the workspace. If the merge is clean
- * it returns immediately. If conflicts arise, the ship role is started to resolve
- * them. The merge is never pushed — this is a local workspace operation.
+ * it returns immediately. If conflicts arise, the conflict details are surfaced
+ * for manual workspace resolution. The merge is never pushed — this is a local
+ * workspace operation.
  *
  * Auto-commits any uncommitted changes before merging (with safety verification).
  */

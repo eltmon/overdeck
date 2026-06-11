@@ -155,7 +155,7 @@ const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
   in_progress: 'work',
   in_review: 'review',
   testing: 'test',
-  shipping: 'ship',
+  shipping: null,
   closed: null,
   canceled: null,
 };
@@ -176,7 +176,7 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
   const base = `agent-${issueId.toLowerCase()}`;
   if (agentId === base) return 'work';
   const role = agentId.slice(base.length + 1);
-  return ['plan', 'review', 'test', 'ship'].includes(role) ? role as Role : null;
+  return ['plan', 'review', 'test'].includes(role) ? role as Role : null;
 }
 
 /**
@@ -283,6 +283,20 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
 
   if (await isIssueClosed(normalizedIssueId)) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — issue is closed`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
+  // PAN-1746: a merged issue is terminal — never re-dispatch an advancing role
+  // for work that already landed. Boot reconciliation replays issue-state-change
+  // events on restart, and a long-merged issue still carrying its lifecycle
+  // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
+  // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
+  // mergeStatus='merged' is the same terminal signal closed-state is.
+  const { getReviewStatusSync } = await import('../review-status.js');
+  if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
+    const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
     console.log(`[cloister] ${message}`);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
@@ -508,6 +522,38 @@ export type CloisterEvent =
  * Cloister service event listener
  */
 export type CloisterEventListener = (event: CloisterEvent) => void;
+
+/**
+ * One-shot convoy roles (PAN-1742). The review lenses + synthesis and the test
+ * role are spawned fresh via `spawnRun` each cycle; they run once, write their
+ * artifact, and exit. They never save a sessionId, so they cannot be resumed.
+ */
+const ONE_SHOT_ROLES: ReadonlySet<string> = new Set(['review', 'test']);
+
+/**
+ * Decide whether a vanished tmux session should be treated as a crash worth
+ * auto-restarting (PAN-1742). Returns a human-readable reason to SKIP the
+ * crash/restart machinery, or `null` when the agent is a genuine restart
+ * candidate.
+ *
+ * Two cases are not crashes:
+ *  - one-shot convoy roles, whose session-end is a normal completion; and
+ *  - any agent without a saved session, which `restartAgent` cannot resume
+ *    (it throws "No session ID found"), so counting a crash and scheduling a
+ *    restart is pure noise.
+ *
+ * Pure and exported so the rule is unit-tested independent of the service's
+ * private health-check plumbing.
+ */
+export function nonRestartableReason(role: string, sessionId: string | undefined): string | null {
+  if (ONE_SHOT_ROLES.has(role)) {
+    return `(${role}) finished its one-shot run — completion, not a crash`;
+  }
+  if (!sessionId) {
+    return 'ended with no resumable session — not auto-restartable';
+  }
+  return null;
+}
 
 /**
  * Cloister Service
@@ -1209,6 +1255,16 @@ export class CloisterService {
     }
     if (runtimeState?.state === 'stopped') {
       console.log(`🔔 Agent ${agentId} runtime is stopped, skipping restart`);
+      return;
+    }
+
+    // PAN-1742: a vanished session is not always a crash. One-shot convoy roles
+    // complete-and-exit, and any agent with no saved session is structurally
+    // un-restartable. Either way, counting it as a crash pollutes the
+    // crash/troubled counters and schedules a doomed restart.
+    const skipReason = nonRestartableReason(agentState.role, agentState.sessionId);
+    if (skipReason) {
+      console.log(`🔔 Agent ${agentId} ${skipReason}; skipping restart`);
       return;
     }
 

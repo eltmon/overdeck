@@ -4,17 +4,17 @@
     "created": "2026-06-05T18:59:34.680Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1615: Substrate: work agents hard-wedge at the model context ceiling (400) and are misreported 'healthy'; PAN-1415 remediation can't recover them",
-    "updated": "2026-06-07T05:20:25.020Z"
+    "updated": "2026-06-11T05:53:56.964Z"
   },
   "plan": {
     "id": "pan-1615",
     "title": "Substrate: detect, recover, and prevent context-ceiling-wedged work agents",
-    "status": "proposed",
+    "status": "completed",
     "uid": "422e76d2-1995-4f6a-94bf-987d4e45d690",
     "author": "agent:claude-opus-4-8",
-    "sequence": 32,
+    "sequence": 33,
     "created": "2026-06-05T18:59:34.680Z",
-    "updated": "2026-06-07T05:20:25.020Z",
+    "updated": "2026-06-11T05:53:56.964Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1615",
@@ -551,5 +551,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

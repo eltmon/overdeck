@@ -1,0 +1,88 @@
+{
+  "version": "1",
+  "issueId": "PAN-1767",
+  "created": "2026-06-11T06:01:08.803Z",
+  "updated": "2026-06-11T06:09:00.000Z",
+  "gitState": { "branch": "feature/pan-1767", "sha": "0706f6ee1", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Definition of 'awaiting close-out': review-status rows with mergeStatus === 'merged'. pan close deletes the row, so the set is exactly the queue. This is the same predicate issue-data-service.ts uses to derive verifying_on_main (src/dashboard/server/services/issue-data-service.ts:438-457). All surfaces (lib helper, CLI, frontend selector) must use this exact predicate — do not invent label- or tracker-based variants.",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "awaitingCloseOut goes on the server-computed FlywheelStats contract (packages/contracts/src/flywheel-stats.ts) as a REQUIRED top-level number next to window/generatedAt — NOT inside criteria, and NOT on the orchestrator-emitted FlywheelStatus/FlywheelHeadline (packages/contracts/src/flywheel.ts), which must remain unchanged so running orchestrators' emitted payloads keep validating and the gauge works with no active run.",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Data access: server and CLI read via loadReviewStatuses() → getAllReviewStatusesFromDb() (sync SQLite, established pattern). New shared helper src/lib/awaiting-close-out.ts is the single implementation; frontend mirrors the predicate in a store selector over reviewStatusByIssueId.",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "pan status: human-readable headline only, printed BEFORE the no-agents early return (src/cli/commands/status.ts:150). --json output stays a bare agents array (no shape change).",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Dashboard surfaces: (a) chip on FlywheelPage header strip next to the agents chip, visible whenever count > 0 even with no active run, clickable; (b) click target is a new 'Awaiting close-out' section on the existing Awaiting Merge page (AwaitingMergePage.tsx), which currently filters verifying issues out entirely. No new tab, no Sidebar badge.",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Pinned-resources display (issue's optional ask #3): cheap signals only — workspace presence/path, paused agent session count, feature branch, PR link, merge age. NO du-based disk sizing (multi-GB node_modules × ~21 workspaces makes du prohibitively slow). Byte-accurate disk accounting is explicitly out of scope; file a follow-up if wanted.",
+      "recordedAt": "2026-06-11T06:09:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "pan status early-returns when no agents are running (status.ts ~line 150) — the motivating scenario is a 21-deep queue while idle, which would hide the headline.",
+      "mitigation": "Print the awaiting close-out headline before that early return; unit test the no-agents path explicitly."
+    },
+    {
+      "id": "H2",
+      "summary": "Count can briefly over-report: rows where the tracker issue was closed manually without pan close keep mergeStatus='merged' until the deacon's closed-issue reaper clears them.",
+      "mitigation": "Accept for an operator gauge; do NOT add tracker API cross-checks to the helper (must stay sync/offline). The reaper owns stale-row cleanup."
+    },
+    {
+      "id": "H3",
+      "summary": "Adding required fields to the orchestrator-emitted FlywheelStatus/FlywheelHeadline would break payload validation for currently running flywheel orchestrators.",
+      "mitigation": "Only FlywheelStats (server-computed) gains the field. flywheel.ts contract untouched — acceptance criteria pin this."
+    },
+    {
+      "id": "H4",
+      "summary": "Required awaitingCloseOut on FlywheelStats means every existing decode fixture (contracts tests, flywheel-telemetry tests, routes/flywheel tests, CLI flywheel tests) must be updated or decoding fails at runtime.",
+      "mitigation": "Update fixtures in the same bead as each consumer; rebuild packages/contracts before dependent workspaces typecheck."
+    },
+    {
+      "id": "H5",
+      "summary": "Dashboard-server-reachable code must not block the event loop or use execSync.",
+      "mitigation": "Helper uses the existing sync SQLite read (getAllReviewStatusesFromDb) — fast indexed read, same pattern as existing routes. No child processes, no network."
+    },
+    {
+      "id": "H6",
+      "summary": "Browser verification of the chip/section requires controlled review-status state and must not depend on shared browser sessions.",
+      "mitigation": "UAT uses an isolated Playwright browser instance/profile; seed merged review statuses via the established test path rather than relying on whatever the live DB happens to contain."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1767: feat(stats): surface 'awaiting close-out' (verifying-on-main) count in flywheel stats, pan status, and dashboard headline",
+      "timestamp": "2026-06-11T06:01:08.803Z"
+    },
+    {
+      "timestamp": "2026-06-11T06:09:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode discovery complete: defined awaiting-close-out as mergeStatus==='merged' review-status rows; planned 8 beads across lib helper, FlywheelStats contract, server stats, pan flywheel stats, pan status headline, store selector, AwaitingMergePage section, FlywheelPage chip. vBRIEF written; finalizing.",
+      "agentModel": "agent:claude-fable-5"
+    }
+  ],
+  "feedback": []
+}

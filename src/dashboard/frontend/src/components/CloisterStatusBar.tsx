@@ -9,6 +9,7 @@ import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } fr
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
+import { fetchWithTimeout } from '../lib/apiFetch';
 
 interface CloisterStatus {
   running: boolean;
@@ -67,7 +68,7 @@ async function emergencyStop(): Promise<{ killedAgents: string[] }> {
 }
 
 async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) return [];
   return res.json();
 }
