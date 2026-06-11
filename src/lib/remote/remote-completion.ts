@@ -23,7 +23,7 @@
  * Invoked via `pan admin remote reap` (and suitable for a deacon patrol).
  */
 
-import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 import { exec } from 'child_process';
@@ -45,12 +45,87 @@ import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
 
 const execAsync = promisify(exec);
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
+const REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+
+let lastRemoteClaudeCredentialFingerprint: string | null = null;
+let lastRemoteClaudeCredentialRefreshAtMs = 0;
 
 export interface RemoteReapResult {
   agentId: string;
   issueId: string;
   status: 'handed-off' | 'still-running' | 'stale' | 'error';
   details: string[];
+}
+
+interface RemoteClaudeCredentialRefreshDeps {
+  listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+  nowMs?: () => number;
+  credentialFingerprint?: () => string | null;
+  loadConfig?: typeof loadConfigSync;
+  createFlyProvider?: typeof createFlyProviderFromConfig;
+}
+
+function getHostClaudeCredentialFingerprint(): string | null {
+  const credFile = join(homedir(), '.claude', '.credentials.json');
+  if (!existsSync(credFile)) return null;
+  try {
+    const stat = statSync(credFile);
+    return `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return null;
+  }
+}
+
+export function resetRemoteClaudeCredentialRefreshForTests(): void {
+  lastRemoteClaudeCredentialFingerprint = null;
+  lastRemoteClaudeCredentialRefreshAtMs = 0;
+}
+
+/**
+ * Proactively copy fresh host Claude credentials to active remote agents.
+ *
+ * Host OAuth refresh rotates refresh tokens, so a long-running Fly VM can be
+ * left with an orphaned copy. The host credentials file mtime is the precise
+ * trigger on Linux; platforms without that file fall back to a bounded 15 min
+ * refresh cadence. The active-agent scan runs first so the common zero-remote
+ * case never constructs a Fly provider or makes Fly API calls.
+ */
+export async function refreshClaudeCredentialsForActiveRemoteAgents(
+  deps: RemoteClaudeCredentialRefreshDeps = {},
+): Promise<string[]> {
+  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
+  if (activeStates.length === 0) return [];
+
+  const nowMs = (deps.nowMs ?? Date.now)();
+  const fingerprint = (deps.credentialFingerprint ?? getHostClaudeCredentialFingerprint)();
+  const credentialChanged = fingerprint !== null && fingerprint !== lastRemoteClaudeCredentialFingerprint;
+  const refreshDue = lastRemoteClaudeCredentialRefreshAtMs === 0 ||
+    nowMs - lastRemoteClaudeCredentialRefreshAtMs >= REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS;
+  if (!credentialChanged && !refreshDue) return [];
+
+  lastRemoteClaudeCredentialRefreshAtMs = nowMs;
+  if (fingerprint !== null) {
+    lastRemoteClaudeCredentialFingerprint = fingerprint;
+  }
+
+  const config = (deps.loadConfig ?? loadConfigSync)();
+  const fly = (deps.createFlyProvider ?? createFlyProviderFromConfig)(config.remote);
+  const actions: string[] = [];
+
+  for (const state of activeStates) {
+    try {
+      const synced = await fly.syncClaudeCredentials(state.vmName);
+      actions.push(
+        synced
+          ? `Remote credentials refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`
+          : `Remote credentials refresh skipped for ${state.issueId.toUpperCase()} on ${state.vmName} (no host credentials)`,
+      );
+    } catch (err: any) {
+      actions.push(`Remote credentials refresh failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${err.message}`);
+    }
+  }
+
+  return actions;
 }
 
 /** List agent IDs that have a remote-state.json in running/starting state. */
