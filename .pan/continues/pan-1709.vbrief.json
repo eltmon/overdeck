@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1709",
   "created": "2026-06-11T03:03:09.103Z",
-  "updated": "2026-06-11T03:12:00.000Z",
-  "gitState": { "branch": "feature/pan-1709", "sha": "0053e306e", "dirty": false },
+  "updated": "2026-06-11T07:20:50.249Z",
+  "gitState": {
+    "branch": "feature/pan-1709",
+    "sha": "59e3c0a70",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
@@ -68,7 +72,14 @@
       "mitigation": "New skip paths use logReconcilerDiagnostic only; extend the existing PAN-1626 feed-discipline test to cover the new exclusion paths."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Addressed verification feedback: canonical .pan/specs PAN-1709 vBRIEF item and acceptance-criterion statuses are now completed. Next: commit/push and run pan review request PAN-1709 -m \"Completed acceptance criteria\".",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/specs/2026-06-11-PAN-1709-bug-deacon-orphan-proposed-reconciler-ignores-review-pipeline-state-attempts-duplicate-work-agent-spawns-on-in-review-issues.vbrief.json",
+      ".pan/feedback/001-verification-gate-failed.md"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-fable-5",
   "sessionHistory": [
@@ -76,6 +87,12 @@
       "timestamp": "2026-06-11T03:03:09.103Z",
       "reason": "planning",
       "note": "Auto planning session for PAN-1709: orphan-proposed reconciler ignores review pipeline state. Explored orphan-proposed-reconciler.ts candidate filter, review-status.ts/review-status-db.ts read surface, review-monitor session naming, and existing reconciler unit tests. Produced 4-bead vBRIEF.",
+      "agentModel": "agent:claude-fable-5"
+    },
+    {
+      "timestamp": "2026-06-11T07:20:50.249Z",
+      "reason": "verification-feedback",
+      "note": "Verification gate failed because canonical .pan/specs PAN-1709 vBRIEF still had all item/subItem statuses pending. Updated all PAN-1709 vBRIEF items and acceptance criteria to completed.",
       "agentModel": "agent:claude-fable-5"
     }
   ],
