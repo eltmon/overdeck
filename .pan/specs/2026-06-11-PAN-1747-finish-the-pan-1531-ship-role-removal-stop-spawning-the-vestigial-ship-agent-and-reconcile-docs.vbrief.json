@@ -1,0 +1,306 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T01:31:21.694Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1747: bug(roles): roles/ship.md does not exist but every ship spawn passes --agent roles/ship.md",
+    "updated": "2026-06-11T01:34:08.184Z"
+  },
+  "plan": {
+    "id": "pan-1747",
+    "title": "Finish the PAN-1531 ship-role removal: stop spawning the vestigial ship agent and reconcile docs",
+    "status": "proposed",
+    "uid": "13976290-eeb7-4916-9130-a70dd166539b",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-11T01:31:21.694Z",
+    "updated": "2026-06-11T01:34:08.184Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1747",
+        "label": "PAN-1747",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1531",
+        "label": "PAN-1531 (ship-role removal design)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1650",
+        "label": "PAN-1650 (event-driven readyForMerge)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "roles",
+      "cloister",
+      "ship",
+      "pan-1531",
+      "architecture",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "The reactive Cloister scheduler maps test.passed -> shipping -> role 'ship' and spawns an interactive ship agent with `--agent roles/ship.md`, but roles/ship.md does not exist. The agent is instruction-less (buildReactiveRolePrompt points it at the same missing file) and its --agent flag references a missing path, which silently flips the permission-posture branch in getRoleRuntimeBaseCommand. docs/ROLES.md and CLAUDE.md both document roles/ship.md as a real instruction source. This is the surfaced tip of the unfinished PAN-1531 ship-role removal: docs/MERGE-WORKFLOW.md (the authoritative design) says the interactive ship role was retired and the rebase + readyForMerge flip are server-side, yet the live code still spawns a now-vestigial ship agent and runs a dedicated deacon patrol (checkUndispatchedShip) to re-fire it.",
+      "Proposal": "Finish the PAN-1531 removal (direction B'), NOT author roles/ship.md (direction A). PAN-1650 already made readyForMerge event-driven server-side (review-status.ts:258-272 derives it from gate state on every setReviewStatus write), so the reactive ship agent is vestigial -- removing it is safe with no liveness regression and no new server-side flip needed. (1) Stop spawning the ship agent: ROLE_RUN_STATES.shipping -> null while keeping the shipping STATE for display/flywheel. (2) Remove the deacon checkUndispatchedShip safety-net patrol. (3) Make agent spawn honest: verify a role definition file exists before passing --agent. (4) Reconcile docs and stale in-code comments. Keep 'ship' as the merge-specialist identity (router['role:ship']->merge_agent, roleForSpecialist('merge')->'ship', merge activity source:'ship') and a historical-agent-state token -- do NOT mass-excise it; that would break merge model routing and activity attribution."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose direction B' (finish the PAN-1531 ship-role removal) over direction A (author roles/ship.md), and over the issue's two original fix-directions.",
+        "rationale": "docs/MERGE-WORKFLOW.md (the authoritative PAN-1531 design) already retired the interactive ship role for stated reasons (LLM creative rebase resolutions changed semantics; redundant gates; extra orchestration cost). PAN-1650 then made readyForMerge event-driven server-side, so the reactive ship agent is verified vestigial. Reintroducing an LLM ship agent (direction A) reverses a deliberate decision; making roleAgentDefinitionPath('ship') null while still spawning an instruction-less agent (issue direction B) is strictly worse. Aligning the live code to the authoritative doc is the defensible choice."
+      },
+      {
+        "summary": "Scoped the removal to the reactive ship spawn + deacon patrol + honest spawn + docs; KEPT 'ship' as the merge-specialist identity token.",
+        "rationale": "'ship' is entangled with the 'merge' specialist: router['role:ship'] routes to the merge_agent model (router-config.ts:96), roleForSpecialist('merge')/roleForSpecialistModel('merge') return 'ship' (specialist-context.ts:108, specialists.ts:34), merge-agent.ts emits source:'ship' activity, and isSpecialistRole includes 'ship'. Mass-excising 'ship' from the Role union/contracts/frontend would break merge model routing and merge activity attribution. The bug is fully resolved without excision."
+      },
+      {
+        "summary": "Did NOT build a new server-side readyForMerge flip.",
+        "rationale": "PAN-1650 (review-status.ts:258-272) already derives readyForMerge from gate state on every setReviewStatus write, so it flips true the instant review+test+verification pass -- before the ship agent even spawns. The owner's comment premise that 'the ship run flips readyForMerge / is load-bearing' predates PAN-1650 and is no longer true. Removal alone is safe."
+      },
+      {
+        "summary": "Deferred removing 'ship' from ADVANCING_ROLES, reap-terminal-sessions, and the reserved-advancing-slots accounting.",
+        "rationale": "Those touch the concurrency budget and are dead-but-harmless once ship never spawns (no ship sessions exist to budget for or reap). Touching DEFAULT_RESERVED_ADVANCING_SLOTS risks a budget regression disproportionate to this bug. Left intact; flagged as future cleanup."
+      }
+    ],
+    "items": [
+      {
+        "id": "stop-reactive-ship-spawn",
+        "title": "Stop the reactive scheduler from spawning a ship agent (ROLE_RUN_STATES.shipping -> null)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T01:31:21.694Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1747",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/service.ts, change ROLE_RUN_STATES.shipping from 'ship' to null so stateToRole('shipping') returns null and onIssueStateChange('shipping') becomes a no-op (no ship agent spawned). Remove 'ship' from the spawnable-role list in roleFromAgentId (~line 179). Keep the test.passed -> 'shipping' state transition in issueStateChangeFromDomainEvent unchanged -- only the role spawn is removed; the shipping STATE remains for frontend phase display and flywheel MERGE_GATE_VERBS. Update src/lib/cloister/__tests__/reactive-scheduler.test.ts to assert no ship agent is spawned on test.passed."
+        },
+        "subItems": [
+          {
+            "id": "stop-reactive-ship-spawn.ac1",
+            "title": "stateToRole('shipping') returns null (ROLE_RUN_STATES.shipping === null).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-reactive-ship-spawn.ac2",
+            "title": "A test.passed domain event no longer spawns an agent-<issue>-ship session; onIssueStateChange('shipping') logs 'no role for issue state shipping' and returns.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-reactive-ship-spawn.ac3",
+            "title": "roleFromAgentId no longer lists 'ship' among spawnable roles.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-reactive-ship-spawn.ac4",
+            "title": "reactive-scheduler.test.ts updated to assert shipping produces no spawn; the suite is green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-reactive-ship-spawn.ac5",
+            "title": "The shipping STATE transition still occurs (issueStateChangeFromDomainEvent unchanged); frontend 'Shipping' phase and flywheel MERGE_GATE_VERBS are unaffected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-deacon-undispatched-ship-patrol",
+        "title": "Remove the deacon checkUndispatchedShip safety-net patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T01:31:21.694Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1747",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts remove the checkUndispatchedShip() function (~3097-3160), the SHIP_DISPATCH_STALENESS_MS / SHIP_DISPATCH_COOLDOWN_MS constants (~3066, 3070), the shipDispatchCooldowns / shipDispatchCounts maps (~3071-3072), and the patrol-loop call site + action aggregation (5174-5176). Delete the dedicated test src/lib/cloister/__tests__/deacon-undispatched-ship.test.ts -- the behaviour it guards is gone. Leave checkReadyForMergeStuck (PAN-344) and checkFailedMergeRetry intact: those are the real post-readyForMerge merge-trigger safety nets and are unrelated to ship dispatch."
+        },
+        "subItems": [
+          {
+            "id": "remove-deacon-undispatched-ship-patrol.ac1",
+            "title": "checkUndispatchedShip and its SHIP_DISPATCH_* constants and cooldown/count maps are removed; grep finds no remaining references.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-deacon-undispatched-ship-patrol.ac2",
+            "title": "The deacon patrol loop no longer calls checkUndispatchedShip (lines 5174-5176 removed); typecheck and lint pass with no dead vars/imports.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-deacon-undispatched-ship-patrol.ac3",
+            "title": "deacon-undispatched-ship.test.ts is removed; the full test suite is green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-deacon-undispatched-ship-patrol.ac4",
+            "title": "checkReadyForMergeStuck and checkFailedMergeRetry remain unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-agent-definition-exists-before-flag",
+        "title": "Make agent spawn honest: verify a role definition file exists before passing --agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T01:31:21.694Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1747",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts getRoleRuntimeBaseCommand (~464-503), before emitting `--agent <definitionPath>`, verify the resolved role definition file exists on disk (resolve relative to the path claude loads --agent against -- the workspace/project root). When the file is absent, take the no-definition branch: apply the global Claude permission flags (getClaudePermissionFlagsStringSync), skip bypassPrefixForAgentFlagSync, omit --agent, and log a single warning. Keep this generic (an existence check for any role) rather than special-casing ship to null, so no future role can silently point --agent at a missing file. This is the issue's third explicit requirement. Add a unit test."
+        },
+        "subItems": [
+          {
+            "id": "verify-agent-definition-exists-before-flag.ac1",
+            "title": "When the resolved role definition file is missing, getRoleRuntimeBaseCommand emits NO --agent flag and includes the global permission flags (no-definition branch).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-agent-definition-exists-before-flag.ac2",
+            "title": "When the file exists, behaviour is unchanged: --agent <path> is emitted, permissionFlags is empty, and the bypass prefix is applied.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-agent-definition-exists-before-flag.ac3",
+            "title": "A single warning is logged when a role definition file is missing (the failure is no longer silent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-agent-definition-exists-before-flag.ac4",
+            "title": "A unit test covers both the missing-file and present-file branches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-ship-role-docs-and-comments",
+        "title": "Reconcile ship-role docs and stale in-code comments to the post-removal reality",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T01:31:21.694Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1747",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update docs and stale in-code comments to match the post-removal reality. In docs/ROLES.md remove the `ship | roles/ship.md` row (~lines 17-34) and the ship entry in the new-role checklist context (~138); state that shipping is server-side (rebaseFeatureBranch + PAN-1650 event-driven readyForMerge) with no spawned ship role, and that 'ship' survives only as the merge-specialist identity. In CLAUDE.md update the role-taxonomy table (~line 112) to drop roles/ship.md as the ship instruction source. Add a one-line note in docs/MERGE-WORKFLOW.md that the reactive 'shipping' state no longer spawns any agent. Update stale in-code comments that describe ship as a spawned 'final pipeline stage': src/dashboard/server/routes/projects.ts:320, src/dashboard/server/routes/command-deck.ts:558-561, src/dashboard/server/routes/specialists.ts:1083 and :720."
+        },
+        "subItems": [
+          {
+            "id": "reconcile-ship-role-docs-and-comments.ac1",
+            "title": "docs/ROLES.md no longer lists roles/ship.md as an existing instruction source; the ship row reflects server-side shipping + merge-specialist identity.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-ship-role-docs-and-comments.ac2",
+            "title": "CLAUDE.md role-taxonomy table no longer cites roles/ship.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-ship-role-docs-and-comments.ac3",
+            "title": "docs/MERGE-WORKFLOW.md notes that the reactive shipping state spawns no agent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-ship-role-docs-and-comments.ac4",
+            "title": "Stale in-code comments in projects.ts, command-deck.ts, and specialists.ts no longer describe ship as a spawned pipeline stage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-ship-role-docs-and-comments.ac5",
+            "title": "npm run lint (incl. scripts/lint-skills.sh) still passes -- no doc/skill drift introduced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stop-reactive-ship-spawn",
+        "to": "remove-deacon-undispatched-ship-patrol",
+        "type": "informs"
+      },
+      {
+        "from": "stop-reactive-ship-spawn",
+        "to": "reconcile-ship-role-docs-and-comments",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-deacon-undispatched-ship-patrol",
+        "to": "reconcile-ship-role-docs-and-comments",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1747-finish-the-pan-1531-ship-role-removal-stop-spawning-the-vestigial-ship-agent-and-reconcile-docs.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
