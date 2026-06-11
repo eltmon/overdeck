@@ -12,6 +12,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import {
   buildForkRequest,
+  conversationSessionAliveFromState,
   getInFlightForkPipelineCount,
   parseSummaryForkFocus,
   readExistingHandoffDoc,
@@ -68,6 +69,20 @@ describe('generateConversationName', () => {
   it('contains today\'s date in YYYYMMDD format', () => {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     expect(generateConversationName()).toContain(today);
+  });
+});
+
+describe('conversationSessionAliveFromState', () => {
+  it('does not resurrect an ended conversation when its tmux wrapper still exists', () => {
+    expect(conversationSessionAliveFromState({ status: 'ended', forkStatus: null }, true)).toBe(false);
+  });
+
+  it('keeps active non-fork conversations live when tmux is live', () => {
+    expect(conversationSessionAliveFromState({ status: 'active', forkStatus: null }, true)).toBe(true);
+  });
+
+  it('keeps provisioning forks out of the live-session path', () => {
+    expect(conversationSessionAliveFromState({ status: 'active', forkStatus: 'spawning' }, true)).toBe(false);
   });
 });
 

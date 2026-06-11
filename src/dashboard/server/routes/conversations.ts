@@ -1965,6 +1965,13 @@ interface ListEnrichmentEntry {
 }
 const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
 
+export function conversationSessionAliveFromState(
+  conv: Pick<Conversation, 'status' | 'forkStatus'>,
+  tmuxSessionAlive: boolean,
+): boolean {
+  return conv.status === 'active' && !conv.forkStatus && tmuxSessionAlive;
+}
+
 function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();
@@ -2004,7 +2011,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
   const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
   return Effect.runPromise(withConcurrencyLimit(
           conversations.map((conv) => Effect.promise(async () => {
-            const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
+            const sessionAlive = conversationSessionAliveFromState(conv, liveSessionNames.has(conv.tmuxSession));
             let isWorking = false;
             let currentTool: string | null = null;
             const convSf = await resolveSessionFile(conv);
@@ -2253,7 +2260,7 @@ const getConversationRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-        const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+        const sessionAlive = conversationSessionAliveFromState(conv, await tmuxSessionExists(conv.tmuxSession));
         const convSf = await resolveSessionFile(conv);
         let contextUsage = null;
         if (convSf && existsSync(convSf)) {
