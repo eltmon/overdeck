@@ -1589,3 +1589,44 @@ dies on dashboard restart — next start when a slot frees), PAN-1743
 (--no-resume doesn't gate boot orphan recovery), PAN-1745 (conversation-search
 tests failing on main — but main CI is green; verify it's the PAN-1702/1720
 host-only isolation class before launching), PAN-1740, PAN-1739.
+
+## RUN-20 tick 2 (2026-06-11) — THREE at the gate; PAN-1746 filed (ship-on-merged + $HOME spawn)
+
+### The post-reboot ship burst COMPLETED — 3 ready_for_merge in ~30 min
+
+The tick-1 ship agents finished and were reaped: **PAN-1700 + PAN-1686 +
+PAN-1719 all ready_for_merge=1** — from zero-at-the-gate to three in one
+inter-tick window. The pipeline self-drove the whole way (rebase → verify →
+ship complete). Merge order surfaced: 1700 FIRST (eaten-kickoff keystone),
+then 1686, 1719. PAN-1704-ship still finishing; PAN-1712 review passed →
+test queued; 1629 re-reviewing.
+
+### PAN-1746 filed — boot reconciliation dispatches ship on MERGED issues
+
+Caught live: `onIssueStateChangePromise → spawnRun(ship)` fired for PAN-1190
+(merged WEEKS ago, verifying-on-main) at 00:27:34Z — seconds after the deacon
+itself logged "merge_status=merged is terminal". Same path attempted PAN-1487;
+only the docker-stack gate stopped it. Worse: PAN-1190's workspace is deleted,
+and `assertWorkspaceStackHealthyForSpawn` PASSES on a missing workspace (it
+only fails on a broken one), so the launcher started Claude in **$HOME at the
+folder-trust prompt** — a wedged session holding an advancing slot against the
+PAN-1665 governor (live `total=13/9` deferrals). Filed PAN-1746; paused the
+instance via `pan pause agent-pan-1190-ship --reason ...` (official surface,
+RUN-18 misfire precedent). Note `pan pause` accepts full agent-session ids,
+not just issue ids — useful for role-session misfires.
+
+### Live PAN-1700 evidence: agent-pan-1704 is a ghost
+
+Work agent on PAN-1704 (review/test/verify all passed — shouldn't even have a
+work spawn; PAN-1709 shape) resumed at 00:25 with kickoff eaten: out 0, cost
+frozen at $1.3505, garbled "resuming from a summary" banner, byte-identical
+across two checks 18 min apart. Work slots uncontended (1/6) so left it —
+surfaced as the demonstration of why PAN-1700 merges first.
+
+### Tick-2 lesson: the dispatcher of a mystery session may not be the deacon
+
+The deacon log had NO line for the 1190-ship spawn. The dispatcher was the
+dashboard server (`dashboard.log`: `purpose=role-run source=agents.ts:spawnRun`
+via `onIssueStateChangePromise`). When hunting a mystery dispatch, grep
+`dashboard.log` for `claude-invoke.*<session>` — the deacon log only covers
+patrol-driven actions.
