@@ -73,6 +73,7 @@ function launcherFor(session: string): string {
 
 function cleanupSession(session: string): void {
   rmSync(conversationDir(session), { recursive: true, force: true });
+  rmSync(join(homedir(), '.panopticon', 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'sockets', `pty-${session}.sock`), { force: true });
 }
@@ -118,6 +119,31 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(panopticonHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
     expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
+    expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
+  });
+
+  it('wraps Codex TUI conversations with the PTY supervisor and waits for its socket', async () => {
+    createSupervisorSocket = true;
+    const { spawnConversationSession } = await import('../conversations.js');
+
+    await spawnConversationSession(
+      'conv-codex-supervisor-test',
+      tmpdir(),
+      'session-codex-supervisor-test',
+      'gpt-5.5',
+      undefined,
+      'PAN-1405',
+      false,
+      'codex',
+    );
+
+    const launcher = launcherFor('conv-codex-supervisor-test');
+    expect(launcher).toContain("export PANOPTICON_AGENT_ID='conv-codex-supervisor-test'");
+    expect(launcher).toContain(`export CODEX_HOME='${join(homedir(), '.panopticon', 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
+    expect(launcher).toContain("node '");
+    expect(launcher).toContain("/dist/pty-supervisor.js' codex");
+    expect(existsSync(join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
+    expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-codex-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 

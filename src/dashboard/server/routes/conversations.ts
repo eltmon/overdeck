@@ -1171,13 +1171,14 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promi
 }
 
 function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
-  return harness === 'claude-code'
+  return (harness === 'claude-code' || harness === 'codex')
     && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
     && process.env.PAN_DOCKER !== '1';
 }
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
-  return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+  const harness = conv.harness ?? 'claude-code';
+  return conv.deliveryMethod ?? (harness === 'pi' ? 'tmux' : 'auto');
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -1541,7 +1542,8 @@ export async function spawnConversationSession(
 
     } else if (harness === 'codex') {
       // Codex conversations run in TUI mode — bare `codex` interactive terminal.
-      // Users type directly in the pane; dashboard messages arrive via tmux paste-buffer.
+      // Users type directly in the pane; dashboard messages arrive via the PTY
+      // supervisor when available, with tmux as the delivery fallback.
       //
       // Pre-seed the per-agent config so Codex never shows its first-run
       // "Decide how much autonomy" / folder-trust wizard (which otherwise fires

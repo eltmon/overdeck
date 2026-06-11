@@ -280,6 +280,27 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('Codex conversation delivery routes to supervisor when no agent state exists', async () => {
+    const agentId = 'conv-codex-supervisor';
+    const token = await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'codex tui hi', 'codex-conversation-test');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'codex tui hi',
+        meta: { caller: 'codex-conversation-test' },
+      });
+      expect(capture.lastHeaders?.[PTY_TOKEN_HEADER]).toBe(token);
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it('supervisor missing: falls through to channels when channels are enabled', async () => {
     const agentId = 'agent-supervisor-missing';
     writeAgentState(agentId, { channelsEnabled: true });
