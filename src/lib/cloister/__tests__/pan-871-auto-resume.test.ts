@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
@@ -109,11 +109,16 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
 }));
 
-vi.mock('os', () => ({
-  homedir: vi.fn(() => '/tmp/test-home'),
-  loadavg: vi.fn(() => [0, 0, 0]),
-  cpus: vi.fn(() => [{}, {}, {}, {}]),
-}));
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    homedir: vi.fn(() => '/tmp/test-home'),
+    cpus: vi.fn(() => Array.from({ length: 8 }, () => ({}) as ReturnType<typeof actual.cpus>[number])),
+    loadavg: vi.fn(() => [0, 0, 0]),
+  };
+});
 
 vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: vi.fn(() => '/tmp/workspace'),
@@ -186,6 +191,11 @@ vi.mock('../config.js', () => ({
   loadCloisterConfigSync: vi.fn(() => ({ patrolIntervalMs: 60000 })),
 }));
 
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: vi.fn(() => ({ active: false, since: null })),
+  isNoResumeValueEnabled: vi.fn((value: string | undefined) => ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '')),
+}));
+
 vi.mock('../../../lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
@@ -233,7 +243,11 @@ const noCompletedMarkers = (path: string) =>
   !path.endsWith('/completed') && !path.endsWith('/completed.processed');
 
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
+  let originalNoResume: string | undefined;
+
   beforeEach(() => {
+    originalNoResume = process.env.PANOPTICON_NO_RESUME;
+    delete process.env.PANOPTICON_NO_RESUME;
     vi.clearAllMocks();
     mockReadFileSync.mockReturnValue('{}');
     const agentState = {
@@ -264,6 +278,11 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockResumeAgent.mockResolvedValue({ success: true } as any);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
     mockExistsSync.mockImplementation(noCompletedMarkers);
+  });
+
+  afterEach(() => {
+    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
+    else process.env.PANOPTICON_NO_RESUME = originalNoResume;
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {
