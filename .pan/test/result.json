@@ -1,0 +1,4 @@
+{
+  "status": "failed",
+  "notes": "Quality gates executed: npm run typecheck (PASS), npm run lint (PASS), npm run build (PASS), npm test (FAIL). Test suite summary: 5550 passed, 51 skipped, 1 failed. The single failure is in src/lib/__tests__/config-yaml-conversation-search.test.ts (assertion: expected enabled to be false but got true). This test file was modified by PAN-1395, which landed on main after PAN-1242 was created and is unrelated to PAN-1242's feature scope. PAN-1242-specific endpoint tests (src/dashboard/server/routes/__tests__/issues-create.test.ts) with 13 test cases all PASS. Frontend unit tests for NewIssueDialog and KanbanBoard components also PASS. Prior session UAT coverage includes screenshots of board rendering, button visibility, dialog interaction, and issue creation workflow. The feature implementation is complete and correct; test failure is upstream merge conflict from PAN-1395's config-yaml changes."
+}

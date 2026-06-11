@@ -1,0 +1,313 @@
+- generic [ref=e3] [box=0,0,1861,2009]:
+  - complementary [ref=e4] [box=0,0,256,2009]:
+    - generic [ref=e5] [box=0,0,255,48]:
+      - button "Panopticon v0.21.0" [ref=e6] [cursor=pointer] [box=12,12,156,24]:
+        - img [ref=e7] [box=12,14,20,20]
+        - generic [ref=e10] [box=40,12,89,24]: Panopticon
+        - generic [ref=e11] [box=137,16,31,15]: v0.21.0
+      - button "Collapse sidebar ([)" [ref=e12] [cursor=pointer] [box=215,10,28,28]:
+        - img [ref=e13] [box=221,16,16,16]
+    - navigation [ref=e16] [box=0,48,255,1867]:
+      - generic [ref=e17] [box=0,56,255,64]:
+        - button "Home" [ref=e18] [cursor=pointer] [box=0,56,255,32]:
+          - img [ref=e19] [box=14,64,16,16]
+          - generic [ref=e22] [box=42,62,39,20]: Home
+        - button "Flywheel" [ref=e23] [cursor=pointer] [box=0,88,255,32]:
+          - img [ref=e24] [box=14,96,16,16]
+          - generic [ref=e26] [box=42,94,58,20]: Flywheel
+      - generic [ref=e27] [box=0,136,255,403]:
+        - paragraph [ref=e28] [box=0,136,255,15]: Projects
+        - button "auricle" [ref=e29] [cursor=pointer] [box=0,155,255,32]:
+          - generic [ref=e31] [box=34,161,44,20]: auricle
+        - button "eltmon-stream" [ref=e32] [cursor=pointer] [box=0,187,255,32]:
+          - generic [ref=e34] [box=34,193,100,20]: eltmon-stream
+        - button "eltmon-video" [ref=e35] [cursor=pointer] [box=0,219,255,32]:
+          - generic [ref=e37] [box=34,225,91,20]: eltmon-video
+        - button "krux" [ref=e38] [cursor=pointer] [box=0,251,255,32]:
+          - generic [ref=e40] [box=34,257,28,20]: krux
+        - button "lexerra" [ref=e41] [cursor=pointer] [box=0,283,255,32]:
+          - generic [ref=e43] [box=34,289,45,20]: lexerra
+        - button "mind-your-now" [ref=e44] [cursor=pointer] [box=0,315,255,32]:
+          - generic [ref=e46] [box=34,321,105,20]: mind-your-now
+        - button "myn-cli" [ref=e47] [cursor=pointer] [box=0,347,255,32]:
+          - generic [ref=e49] [box=34,353,51,20]: myn-cli
+        - button "pan-tts" [ref=e50] [cursor=pointer] [box=0,379,255,32]:
+          - generic [ref=e52] [box=34,385,51,20]: pan-tts
+        - button "panopticon-cli 15" [ref=e53] [cursor=pointer] [box=0,411,255,32]:
+          - generic [ref=e55] [box=34,417,99,20]: panopticon-cli
+          - generic [ref=e56] [box=232,417,11,20]: "15"
+        - button "papers-please" [ref=e57] [cursor=pointer] [box=0,443,255,32]:
+          - generic [ref=e59] [box=34,449,97,20]: papers-please
+        - button "tindra" [ref=e60] [cursor=pointer] [box=0,475,255,32]:
+          - generic [ref=e62] [box=34,481,39,20]: tindra
+        - button "No project" [ref=e3188] [cursor=pointer] [box=0,507,255,32]:
+          - generic [ref=e3190] [box=34,513,70,20]: No project
+      - generic [ref=e63] [box=0,555,255,683]:
+        - button "More" [expanded] [ref=e64] [cursor=pointer] [box=0,555,255,15]:
+          - img [ref=e65] [box=12,557,12,12]
+          - img [ref=e67] [box=30,557,12,12]
+          - text: More
+        - generic [ref=e71] [box=0,582,255,211]:
+          - paragraph [ref=e72] [box=0,582,255,15]: Operations
+          - button "Command Deck" [ref=e73] [cursor=pointer] [box=0,601,255,32]:
+            - img [ref=e74] [box=14,609,16,16]
+            - generic [ref=e77] [box=42,607,106,20]: Command Deck
+          - button "Board" [ref=e78] [cursor=pointer] [box=0,633,255,32]:
+            - img [ref=e79] [box=14,641,16,16]
+            - generic [ref=e84] [box=42,639,39,20]: Board
+          - button "Pipeline" [ref=e85] [cursor=pointer] [box=0,665,255,32]:
+            - img [ref=e86] [box=14,673,16,16]
+            - generic [ref=e90] [box=42,671,52,20]: Pipeline
+          - button "Awaiting Merge" [ref=e91] [cursor=pointer] [box=0,697,255,32]:
+            - img [ref=e92] [box=14,705,16,16]
+            - generic [ref=e96] [box=42,703,101,20]: Awaiting Merge
+          - button "Agents" [ref=e97] [cursor=pointer] [box=0,729,255,32]:
+            - img [ref=e98] [box=14,737,16,16]
+            - generic [ref=e101] [box=42,735,46,20]: Agents
+          - button "AutoPreso" [ref=e102] [cursor=pointer] [box=0,761,255,32]:
+            - img [ref=e103] [box=14,769,16,16]
+            - generic [ref=e106] [box=42,767,68,20]: AutoPreso
+        - generic [ref=e107] [box=0,805,255,51]:
+          - paragraph [ref=e108] [box=0,805,255,15]: Infrastructure
+          - button "Resources" [ref=e109] [cursor=pointer] [box=0,824,255,32]:
+            - img [ref=e110] [box=14,832,16,16]
+            - generic [ref=e113] [box=42,830,68,20]: Resources
+        - generic [ref=e114] [box=0,868,255,211]:
+          - paragraph [ref=e115] [box=0,868,255,15]: Observability
+          - button "Activity" [ref=e116] [cursor=pointer] [box=0,887,255,32]:
+            - img [ref=e117] [box=14,895,16,16]
+            - generic [ref=e119] [box=42,893,51,20]: Activity
+          - button "Sessions" [ref=e120] [cursor=pointer] [box=0,919,255,32]:
+            - img [ref=e121] [box=14,927,16,16]
+            - generic [ref=e125] [box=42,925,58,20]: Sessions
+          - button "Metrics" [ref=e126] [cursor=pointer] [box=0,951,255,32]:
+            - img [ref=e127] [box=14,959,16,16]
+            - generic [ref=e129] [box=42,957,50,20]: Metrics
+          - button "Costs" [ref=e130] [cursor=pointer] [box=0,983,255,32]:
+            - img [ref=e131] [box=14,991,16,16]
+            - generic [ref=e133] [box=42,989,38,20]: Costs
+          - button "Health" [ref=e134] [cursor=pointer] [box=0,1015,255,32]:
+            - img [ref=e135] [box=14,1023,16,16]
+            - generic [ref=e138] [box=42,1021,43,20]: Health
+          - button "Deacon" [ref=e139] [cursor=pointer] [box=0,1047,255,32]:
+            - img [ref=e140] [box=14,1055,16,16]
+            - generic [ref=e142] [box=42,1053,50,20]: Deacon
+        - generic [ref=e143] [box=0,1091,255,147]:
+          - paragraph [ref=e144] [box=0,1091,255,15]: System
+          - button "Skills" [ref=e145] [cursor=pointer] [box=0,1110,255,32]:
+            - img [ref=e146] [box=14,1118,16,16]
+            - generic [ref=e149] [box=42,1116,33,20]: Skills
+          - button "Context" [ref=e150] [cursor=pointer] [box=0,1142,255,32]:
+            - img [ref=e151] [box=14,1150,16,16]
+            - generic [ref=e154] [box=42,1148,53,20]: Context
+          - button "Settings" [ref=e155] [cursor=pointer] [box=0,1174,255,32]:
+            - img [ref=e156] [box=14,1182,16,16]
+            - generic [ref=e159] [box=42,1180,54,20]: Settings
+          - button "God View" [ref=e160] [cursor=pointer] [box=0,1206,255,32]:
+            - img [ref=e161] [box=14,1214,16,16]
+            - generic [ref=e163] [box=42,1212,63,20]: God View
+    - generic [ref=e165] [box=0,1916,255,94]:
+      - generic [ref=e167] [box=197,1924,46,24]: Just now
+      - generic [ref=e168] [box=12,1952,231,28]:
+        - button "Search /" [ref=e169] [cursor=pointer] [box=12,1956,59,20]:
+          - generic [ref=e170] [box=12,1958,38,16]: Search
+          - generic [ref=e171] [box=56,1956,14,20]: /
+        - generic [ref=e172] [box=151,1952,92,28]:
+          - button "Settings" [ref=e173] [cursor=pointer] [box=151,1952,28,28]:
+            - img [ref=e174] [box=157,1958,16,16]
+          - button "Rebuild Panopticon (npm run build)" [ref=e177] [cursor=pointer] [box=183,1952,28,28]:
+            - img [ref=e178] [box=189,1958,16,16]
+          - button "Switch to light mode" [ref=e182] [cursor=pointer] [box=215,1952,28,28]:
+            - img [ref=e183] [box=221,1958,16,16]
+      - generic [ref=e190] [box=12,1984,31,18]: DEV
+  - generic [ref=e191] [box=256,0,1605,2009]:
+    - generic [ref=e192] [box=256,0,1605,48]:
+      - generic [ref=e194] [box=268,14,77,20]: All projects
+      - button "Search issues, conversations, commands… /" [ref=e195] [cursor=pointer] [box=633,6,448,36]:
+        - img [ref=e196] [box=646,16,16,16]
+        - generic [ref=e199] [box=670,14,273,20]: Search issues, conversations, commands…
+        - generic [ref=e200] [box=1047,13,21,22]: /
+      - generic [ref=e201] [box=1369,9,480,30]:
+        - button "Freeze Deacon — stop all patrol cycles globally" [ref=e202] [cursor=pointer] [box=1369,11,26,26]:
+          - img [ref=e203] [box=1375,17,14,14]
+        - generic [ref=e208] [box=1403,11,81,26]: 7 agents
+        - button "39 stopped" [ref=e211] [cursor=pointer] [box=1492,11,99,26]: 39 stopped
+        - button "normal 23% mem" [ref=e214] [cursor=pointer] [box=1600,9,177,30]:
+          - generic [ref=e215] [box=1609,16,137,16]:
+            - img [ref=e216] [box=1609,17,14,14]
+            - generic [ref=e218] [box=1631,16,53,16]: normal
+            - generic [ref=e219] [box=1691,16,55,16]: 23% mem
+          - img [ref=e220] [box=1754,17,14,14]
+        - button "System controls" [ref=e223] [cursor=pointer] [box=1785,9,28,28]:
+          - img [ref=e224] [box=1791,15,16,16]
+        - button "Toggle activity feed" [pressed] [ref=e225] [cursor=pointer] [box=1821,10,28,28]:
+          - img [ref=e226] [box=1827,16,16,16]
+    - generic [ref=e230] [box=256,48,1605,1961]:
+      - main [ref=e231] [box=256,48,1285,1961]:
+        - generic [ref=e232] [box=256,48,1285,1961]:
+          - generic [ref=e3191] [box=280,72,1231,46]:
+            - generic [ref=e3192] [box=281,73,410,44]
+            - generic [ref=e3200] [box=691,73,410,44]
+            - generic [ref=e3213] [box=1101,73,409,44]
+          - generic [ref=e233] [box=280,134,1231,2034]:
+            - generic [ref=e234] [box=280,134,1231,94]
+            - generic [ref=e263] [box=280,244,1231,1924]
+            - status [ref=e3167] [box=-1,-1,1,1]
+            - generic [box=731,1959,400,58]
+      - complementary "Session activity feed" [ref=e3168] [box=1541,48,320,1961]:
+        - generic [ref=e3169] [box=1542,48,319,41]:
+          - generic [ref=e3170] [box=1554,58,113,20]:
+            - img [ref=e3171] [box=1554,60,16,16]
+            - text: Activity Feed
+          - button "Close activity feed" [ref=e3175] [cursor=pointer] [box=1825,56,24,24]:
+            - img [ref=e3176] [box=1829,60,16,16]
+        - tablist "Session feed tabs" [ref=e3179] [box=1542,89,319,69]:
+          - tab "All" [selected] [ref=e3180] [cursor=pointer] [box=1550,97,98,24]
+          - tab "Chats" [ref=e3181] [cursor=pointer] [box=1652,97,98,24]
+          - tab "Files" [ref=e3182] [cursor=pointer] [box=1755,97,98,24]
+          - tab "Git" [ref=e3183] [cursor=pointer] [box=1550,125,98,24]
+          - tab "Comments" [ref=e3184] [cursor=pointer] [box=1652,125,98,24]
+          - tab "Activity" [ref=e3185] [cursor=pointer] [box=1755,125,98,24]
+        - generic [ref=e3243] [box=1554,170,289,38245]:
+          - generic [ref=e8711] [box=1554,170,289,493]:
+            - heading "Just Now" [level=3] [ref=e8712] [box=1554,170,289,15]
+            - generic [ref=e8713] [box=1554,193,289,470]
+          - generic [ref=e3285] [box=1554,679,289,1709]:
+            - heading "9 PM" [level=3] [ref=e3286] [box=1554,679,289,15]
+            - generic [ref=e3287] [box=1554,702,289,1686]
+          - generic [ref=e3541] [box=1554,2404,289,97]:
+            - heading "7 PM" [level=3] [ref=e3542] [box=1554,2404,289,15]
+            - 'button "P Pi 2h ago Handoff: Finish PAN-1661 issue-cockpit redesign. The IssueMissionControl cockp…" [ref=e3544] [cursor=pointer] [box=1554,2427,289,74]'
+          - generic [ref=e3554] [box=1554,2517,289,97]:
+            - heading "6 PM" [level=3] [ref=e3555] [box=1554,2517,289,15]
+            - 'button "Claude Code 3h ago Handoff: PAN-1650 (event-driven readyForMerge) DONE — committed 7716ad85e, liv…" [ref=e3557] [cursor=pointer] [box=1554,2540,289,74]'
+          - generic [ref=e3568] [box=1554,2630,289,81]:
+            - heading "9 AM" [level=3] [ref=e3569] [box=1554,2630,289,15]
+            - button "Claude Code 13h ago Fix Actions, launch PAN-1580 work" [ref=e3571] [cursor=pointer] [box=1554,2653,289,58]
+          - generic [ref=e3582] [box=1554,2727,289,295]:
+            - heading "Yesterday Jun 6 · 4 PM" [level=3] [ref=e3583] [box=1554,2727,289,15]
+            - generic [ref=e3584] [box=1554,2750,289,272]
+          - generic [ref=e3629] [box=1554,3038,289,81]:
+            - heading "Yesterday Jun 6 · 10 AM" [level=3] [ref=e3630] [box=1554,3038,289,15]
+            - button "Claude Code yesterday New conversation" [ref=e3632] [cursor=pointer] [box=1554,3061,289,58]
+          - generic [ref=e3643] [box=1554,3135,289,1365]:
+            - heading "Friday Jun 5" [level=3] [ref=e3644] [box=1554,3135,289,15]
+            - generic [ref=e3645] [box=1554,3158,289,1342]
+          - generic [ref=e3855] [box=1554,4516,289,97]:
+            - heading "Thursday Jun 4" [level=3] [ref=e3856] [box=1554,4516,289,15]
+            - button "Claude Code 3d ago Add screenshots and handoff documentation" [ref=e3858] [cursor=pointer] [box=1554,4539,289,74]
+          - generic [ref=e3869] [box=1554,4629,289,213]:
+            - heading "Tuesday Jun 2" [level=3] [ref=e3870] [box=1554,4629,289,15]
+            - generic [ref=e3871] [box=1554,4652,289,190]
+          - generic [ref=e3903] [box=1554,4858,289,953]:
+            - heading "Monday Jun 1" [level=3] [ref=e3904] [box=1554,4858,289,15]
+            - generic [ref=e3905] [box=1554,4881,289,930]
+          - generic [ref=e4049] [box=1554,5827,289,81]:
+            - heading "May 31" [level=3] [ref=e4050] [box=1554,5827,289,15]
+            - button "Claude Code May 31 New conversation" [ref=e4052] [cursor=pointer] [box=1554,5850,289,58]
+          - generic [ref=e4063] [box=1554,5924,289,2301]:
+            - heading "May 30" [level=3] [ref=e4064] [box=1554,5924,289,15]
+            - generic [ref=e4065] [box=1554,5947,289,2278]
+          - generic [ref=e4399] [box=1554,8241,289,1431]:
+            - heading "May 29" [level=3] [ref=e4400] [box=1554,8241,289,15]
+            - generic [ref=e4401] [box=1554,8264,289,1408]
+          - generic [ref=e4620] [box=1554,9688,289,1315]:
+            - heading "May 28" [level=3] [ref=e4621] [box=1554,9688,289,15]
+            - generic [ref=e4622] [box=1554,9711,289,1292]
+          - generic [ref=e4821] [box=1554,11019,289,245]:
+            - heading "May 27" [level=3] [ref=e4822] [box=1554,11019,289,15]
+            - generic [ref=e4823] [box=1554,11042,289,222]
+          - generic [ref=e4855] [box=1554,11280,289,245]:
+            - heading "May 26" [level=3] [ref=e4856] [box=1554,11280,289,15]
+            - generic [ref=e4857] [box=1554,11303,289,222]
+          - generic [ref=e4891] [box=1554,11541,289,1249]:
+            - heading "May 25" [level=3] [ref=e4892] [box=1554,11541,289,15]
+            - generic [ref=e4893] [box=1554,11564,289,1226]
+          - generic [ref=e5080] [box=1554,12806,289,525]:
+            - heading "May 24" [level=3] [ref=e5081] [box=1554,12806,289,15]
+            - generic [ref=e5082] [box=1554,12829,289,502]
+          - generic [ref=e5159] [box=1554,13347,289,559]:
+            - heading "May 23" [level=3] [ref=e5160] [box=1554,13347,289,15]
+            - generic [ref=e5161] [box=1554,13370,289,536]
+          - generic [ref=e5250] [box=1554,13922,289,1283]:
+            - heading "May 22" [level=3] [ref=e5251] [box=1554,13922,289,15]
+            - generic [ref=e5252] [box=1554,13945,289,1260]
+          - generic [ref=e5451] [box=1554,15221,289,641]:
+            - heading "May 20" [level=3] [ref=e5452] [box=1554,15221,289,15]
+            - generic [ref=e5453] [box=1554,15244,289,618]
+          - generic [ref=e5553] [box=1554,15878,289,657]:
+            - heading "May 19" [level=3] [ref=e5554] [box=1554,15878,289,15]
+            - generic [ref=e5555] [box=1554,15901,289,634]
+          - generic [ref=e5655] [box=1554,16551,289,1693]:
+            - heading "May 18" [level=3] [ref=e5656] [box=1554,16551,289,15]
+            - generic [ref=e5657] [box=1554,16574,289,1670]
+          - generic [ref=e5911] [box=1554,18260,289,213]:
+            - heading "May 17" [level=3] [ref=e5912] [box=1554,18260,289,15]
+            - generic [ref=e5913] [box=1554,18283,289,190]
+          - generic [ref=e5947] [box=1554,18489,289,1317]:
+            - heading "May 16" [level=3] [ref=e5948] [box=1554,18489,289,15]
+            - generic [ref=e5949] [box=1554,18512,289,1294]
+          - generic [ref=e6159] [box=1554,19822,289,1101]:
+            - heading "May 14" [level=3] [ref=e6160] [box=1554,19822,289,15]
+            - generic [ref=e6161] [box=1554,19845,289,1078]
+          - generic [ref=e6326] [box=1554,20939,289,1315]:
+            - heading "May 13" [level=3] [ref=e6327] [box=1554,20939,289,15]
+            - generic [ref=e6328] [box=1554,20962,289,1292]
+          - generic [ref=e6527] [box=1554,22270,289,1709]:
+            - heading "May 12" [level=3] [ref=e6528] [box=1554,22270,289,15]
+            - generic [ref=e6529] [box=1554,22293,289,1686]
+          - generic [ref=e6778] [box=1554,23995,289,81]:
+            - heading "May 11" [level=3] [ref=e6779] [box=1554,23995,289,15]
+            - button "Claude Code May 11 Monitoring Bootstrap Ready" [ref=e6781] [cursor=pointer] [box=1554,24018,289,58]
+          - generic [ref=e6792] [box=1554,24092,289,657]:
+            - heading "May 10" [level=3] [ref=e6793] [box=1554,24092,289,15]
+            - generic [ref=e6794] [box=1554,24115,289,634]
+          - generic [ref=e6888] [box=1554,24765,289,1627]:
+            - heading "May 9" [level=3] [ref=e6889] [box=1554,24765,289,15]
+            - generic [ref=e6890] [box=1554,24788,289,1604]
+          - generic [ref=e7111] [box=1554,26408,289,163]:
+            - heading "May 8" [level=3] [ref=e7112] [box=1554,26408,289,15]
+            - generic [ref=e7113] [box=1554,26431,289,140]
+          - generic [ref=e7134] [box=1554,26587,289,707]:
+            - heading "May 7" [level=3] [ref=e7135] [box=1554,26587,289,15]
+            - generic [ref=e7136] [box=1554,26610,289,684]
+          - generic [ref=e7237] [box=1554,27310,289,805]:
+            - heading "May 6" [level=3] [ref=e7238] [box=1554,27310,289,15]
+            - generic [ref=e7239] [box=1554,27333,289,782]
+          - generic [ref=e7350] [box=1554,28131,289,361]:
+            - heading "May 5" [level=3] [ref=e7351] [box=1554,28131,289,15]
+            - generic [ref=e7352] [box=1554,28154,289,338]
+          - generic [ref=e7403] [box=1554,28508,289,707]:
+            - heading "May 4" [level=3] [ref=e7404] [box=1554,28508,289,15]
+            - generic [ref=e7405] [box=1554,28531,289,684]
+          - generic [ref=e7506] [box=1554,29231,289,1181]:
+            - heading "May 3" [level=3] [ref=e7507] [box=1554,29231,289,15]
+            - generic [ref=e7508] [box=1554,29254,289,1158]
+          - generic [ref=e7659] [box=1554,30428,289,163]:
+            - heading "May 2" [level=3] [ref=e7660] [box=1554,30428,289,15]
+            - generic [ref=e7661] [box=1554,30451,289,140]
+          - generic [ref=e7682] [box=1554,30607,289,327]:
+            - heading "May 1" [level=3] [ref=e7683] [box=1554,30607,289,15]
+            - generic [ref=e7684] [box=1554,30630,289,304]
+          - generic [ref=e7725] [box=1554,30950,289,1807]:
+            - heading "Apr 30" [level=3] [ref=e7726] [box=1554,30950,289,15]
+            - generic [ref=e7727] [box=1554,30973,289,1784]
+          - generic [ref=e7968] [box=1554,32773,289,557]:
+            - heading "Apr 29" [level=3] [ref=e7969] [box=1554,32773,289,15]
+            - generic [ref=e7970] [box=1554,32796,289,534]
+          - generic [ref=e8041] [box=1554,33346,289,2003]:
+            - heading "Apr 28" [level=3] [ref=e8042] [box=1554,33346,289,15]
+            - generic [ref=e8043] [box=1554,33369,289,1980]
+          - generic [ref=e8304] [box=1554,35365,289,575]:
+            - heading "Apr 27" [level=3] [ref=e8305] [box=1554,35365,289,15]
+            - generic [ref=e8306] [box=1554,35388,289,552]
+          - generic [ref=e8387] [box=1554,35956,289,1133]:
+            - heading "Apr 26" [level=3] [ref=e8388] [box=1554,35956,289,15]
+            - generic [ref=e8389] [box=1554,35979,289,1110]
+          - generic [ref=e8540] [box=1554,37105,289,737]:
+            - heading "Apr 25" [level=3] [ref=e8541] [box=1554,37105,289,15]
+            - generic [ref=e8542] [box=1554,37128,289,714]
+          - generic [ref=e8633] [box=1554,37858,289,557]:
+            - heading "Apr 24" [level=3] [ref=e8634] [box=1554,37858,289,15]
+            - generic [ref=e8635] [box=1554,37881,289,534]
+  - region "Notifications alt+T" [box=1861,0,0,2009]
