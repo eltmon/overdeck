@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-06T08:48:30.045Z",
-  "updated": "2026-06-11T13:24:43.027Z",
+  "updated": "2026-06-11T13:25:42.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -179,6 +179,11 @@
       "reason": "feedback",
       "note": "[2026-06-11T13:19Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-06-11T13:19:50.672Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:25:42.269Z"
     }
   ],
   "feedback": []
