@@ -218,6 +218,24 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   }
 
   const run = (async () => {
+    // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
+    // completed/cancelled, clears review status, and closes the tracker issue.
+    // Re-running the handoff after that resurrects the review row and REOPENS
+    // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
+    // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
+    // close-out and the handoff reopened it into verifying-on-main forever.
+    try {
+      const { findSpecByIssue } = await import('../pan-dir/specs.js');
+      const spec = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
+      if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
+        console.log(`[merge-agent] ${issueId} is closed out (spec ${spec.status}) — skipping post-merge lifecycle`);
+        _completedPostMerge.add(issueId);
+        return;
+      }
+    } catch {
+      // Spec unreadable — proceed; the guard is best-effort.
+    }
+
     const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
     if (!mergeVerification.merged) {
       console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);

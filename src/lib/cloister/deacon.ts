@@ -3180,6 +3180,21 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
 
+      // Closed-out issues are TERMINAL: close-out flips the spec to
+      // completed/cancelled and clears review status. Treating the cleared/
+      // resurrected row as "stale" here re-fires the post-merge handoff,
+      // which REOPENS the closed tracker issue (PAN-1190, 2026-06-11).
+      try {
+        const { findSpecByIssue } = await import('../pan-dir/specs.js');
+        const spec = await Effect.runPromise(findSpecByIssue(project.projectPath, issueId));
+        if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
+          staleMergeReconciled.add(issueId);
+          continue;
+        }
+      } catch {
+        // Spec unreadable — fall through to the normal checks.
+      }
+
       const branch = `feature/${issueId.toLowerCase()}`;
       let isMerged = false;
 
