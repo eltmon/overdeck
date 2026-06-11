@@ -4,17 +4,17 @@
     "created": "2026-05-25T08:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1495: feature-registry worker fails with 'Cannot find module better-sqlite3' (worker cwd resolution bug)",
-    "updated": "2026-05-25T10:26:47.556Z"
+    "updated": "2026-06-11T05:55:27.125Z"
   },
   "plan": {
     "id": "pan-1495",
     "title": "fix: resolve worker native modules from parent process, not process.cwd()",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b2c4f8e1-3a7d-4b62-9f51-8e1d6a4c2b09",
     "author": "agent:claude-opus-4-7",
-    "sequence": 61,
+    "sequence": 62,
     "created": "2026-05-25T08:25:00.000Z",
-    "updated": "2026-05-25T10:26:47.556Z",
+    "updated": "2026-06-11T05:55:27.125Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1495",
@@ -290,5 +290,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
