@@ -141,11 +141,17 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
   if (!status) return false;
   if (getLastAnnounced() === status.ts) return false;
 
-  setLastAnnounced(status.ts);
   const ageMs = now() - Date.parse(status.ts);
-  if (!Number.isFinite(ageMs) || ageMs > ANNOUNCE_MAX_AGE_MS) return false;
+  if (!Number.isFinite(ageMs) || ageMs > ANNOUNCE_MAX_AGE_MS) {
+    // Too old to announce, but mark as seen so we never retry this one.
+    setLastAnnounced(status.ts);
+    return false;
+  }
 
+  // Emit first — only mark as announced if the emit wasn't silently dropped
+  // (e.g. event store not ready yet on boot). Next bootstrap poll will retry.
   emit(describeRestart(status));
+  setLastAnnounced(status.ts);
   return true;
 }
 
