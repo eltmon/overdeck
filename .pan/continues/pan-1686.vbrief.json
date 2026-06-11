@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1686",
   "created": "2026-06-09T00:33:55.138Z",
-  "updated": "2026-06-11T04:55:09.348Z",
+  "updated": "2026-06-11T05:18:54.281Z",
   "gitState": {
     "branch": "feature/pan-1686",
     "sha": "9a2b57507",
@@ -166,7 +166,20 @@
       "reason": "feedback",
       "note": "[2026-06-11T01:26Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-06-11T01:26:24.161Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T05:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T05:18:54.281Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T05:18:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1686\n\n# Review Synthesis — PAN-1686 — 2026-06-11T05:15:22Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-0abaf7f2/context.json`\n- Branch: `feature/pan-1686`\n- Workspace: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686`\n- HEAD reviewed: `0abaf7f23aed159c1e197960203c4592910a5c86`\n- Cycle number: 20\n- Prior cycle SHA: `e47410eb30c59973bbbbb6a6da06bf652823c8ef`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | timeout — reviewer still running past deadline 2026-06-11T05:15:21.267Z | — | 1 infrastructure blocker |\n| correctness | timeout — reviewer still running past deadline 2026-06-11T05:15:21.632Z | — | 1 infrastructure blocker |\n| performance | timeout — reviewer still running past deadline 2026-06-11T05:15:22.407Z | — | 1 infrastructure blocker |\n| requirements | timeout — reviewer still running past deadline 2026-06-11T05:15:21.572Z | — | 1 infrastructure blocker |\n\nNo reviewer output files were read because no sub-role emitted a `REVIEWER_READY` signal. The review role requires a blocked verdict when any reviewer fails or times out.\n\n## Blocking Findings\n\n### [security] Reviewer timed out — infrastructure failure\nThe security reviewer did not produce a usable report before Deacon's timeout deadline: `reviewer still running past deadline 2026-06-11T05:15:21.267Z`. Per `roles/review.md`, timed-out reviewers are blocking infrastructure failures and the synthesis must not approve.\n\n### [correctness] Reviewer timed out — infrastructure failure\nThe correctness reviewer did not produce a usable report before Deacon's timeout deadline: `reviewer still running past deadline 2026-06-11T05:15:21.632Z`. Per `roles/review.md`, timed-out reviewers are blocking infrastructure failures and the synthesis must not approve.\n\n### [performance] Reviewer timed out — infrastructure failure\nThe performance reviewer did not produce a usable report before Deacon's timeout deadline: `reviewer still running past deadline 2026-06-11T05:15:22.407Z`. Per `roles/review.md`, timed-out reviewers are blocking infrastructure failures and the synthesis must not approve.\n\n### [requirements] Reviewer timed out — infrastructure failure\nThe requirements reviewer did not produce a usable report before Deacon's timeout deadline: `reviewer still running past deadline 2026-06-11T05:15:21.572Z`. Per `roles/review.md`, timed-out reviewers are blocking infrastructure failures and the synthesis must not approve.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\nNone — every sub-role timed out before producing a usable report.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-0abaf7f2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1686 -m \"Fixed review issues\"`"
+    }
+  ]
 }
