@@ -1392,10 +1392,15 @@ export async function deliverAgentMessage(
       supervisorFailure = 'pty-token-missing';
     } else {
       try {
+        // Must exceed the supervisor's worst-case echo-confirmation path
+        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
+        // A shorter client timeout abandons the POST mid-retry and fires the
+        // tmux fallback while the supervisor is still writing — re-creating
+        // the duplicate-submit race PAN-1769 fixed.
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          4_000,
+          8_000,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
