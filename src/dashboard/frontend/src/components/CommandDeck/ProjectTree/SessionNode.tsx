@@ -170,6 +170,8 @@ interface SessionNodeProps {
   onResumeSession?: (sessionId: string) => void;
   /** PAN-1779: clear a persistent pause gate (POST /api/agents/:id/unpause). */
   onUnpauseSession?: (sessionId: string) => void;
+  /** Muted summary text after the label (e.g. collapsed convoy verdict). */
+  subtitle?: string;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -483,6 +485,7 @@ export function SessionNode({
   onPauseSession,
   onResumeSession,
   onUnpauseSession,
+  subtitle,
   onRestartSession,
   onDeepWipe,
   onOpenStateDir,
@@ -591,13 +594,18 @@ export function SessionNode({
           <span className={styles.sessionLabel} title={sessionLabelTitle}>
             {sessionLabel}
           </span>
+          {subtitle && (
+            <span className={styles.sessionSubtitle} title={subtitle}>{subtitle}</span>
+          )}
           <LiveLastHeard lastActivity={lastActivity} />
-          <span
-            className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
-            title={sessionStatusTitle}
-          >
-            {displayStatus}
-          </span>
+          {!['stopped', 'unknown', 'idle', 'completed'].includes(String(statusCssKey)) && (
+            <span
+              className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
+              title={sessionStatusTitle}
+            >
+              {displayStatus}
+            </span>
+          )}
           {isPaused && onUnpauseSession && (
             <span
               role="button"

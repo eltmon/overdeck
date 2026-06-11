@@ -219,7 +219,7 @@ describe('SessionNode', () => {
     );
   });
 
-  it('adds contextual stopped tooltip text to the session status pill', () => {
+  it('renders no status pill for quietly-stopped sessions (PAN-1779)', () => {
     render(
       <SessionNode
         session={makeSession({
@@ -230,10 +230,9 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('stopped')).toHaveAttribute(
-      'title',
-      'Session ended cleanly and is no longer live.',
-    );
+    // Redesign: idle/stopped rows stay quiet — only live, paused, or error
+    // states render a status pill.
+    expect(screen.queryByText('stopped')).toBeNull();
   });
 
   it('keeps Work and expandable Review status dots in the same grid slot', () => {

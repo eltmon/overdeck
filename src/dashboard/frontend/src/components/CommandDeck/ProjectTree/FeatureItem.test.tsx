@@ -331,7 +331,9 @@ describe('FeatureItem', () => {
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
+    // Redesign (PAN-1779): the aggregate activity tooltip lives on the issue
+    // id — the row status dot was replaced by the wrapper edge bar.
+    expect(screen.getByTitle('1 work agent running 38m, 1 review error, 1 reviewer stopped')).toBeInTheDocument();
   });
 
   it('shows work and review badges on the parent row', () => {

@@ -254,9 +254,10 @@
 /* Feature Item */
 .featureItem {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 3px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 5px 6px 5px 3px;
   cursor: pointer;
   transition: background 0.1s;
   font-size: 12px;
@@ -266,6 +267,44 @@
   text-align: left;
   color: var(--foreground);
 }
+
+.featureTitleLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.featureMetaLine {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* pipeline mini-strip: neutral fills, only the live segment is colored */
+.featurePipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.featurePipe i {
+  display: block;
+  width: 11px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.featurePipe i.pipeDone { background: color-mix(in srgb, var(--foreground) 22%, transparent); }
+.featurePipe i.pipeWorking { background: var(--info); }
+.featurePipe i.pipePaused { background: var(--warning); }
+.featurePipe i.pipeError { background: var(--destructive); }
+.featurePipe i.pipeMerged { background: var(--success); }
 
 .featureItem:hover {
   background: var(--accent);
@@ -287,10 +326,14 @@
 .featureLabel {
   flex: 1;
   min-width: 0;
+  /* titles wrap to two lines — never clipped mid-word (style guide v1.2) */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .featureLabelUntitled {
@@ -353,6 +396,29 @@
   background: var(--destructive) !important;
   opacity: 1 !important;
   box-shadow: 0 0 8px color-mix(in srgb, var(--destructive) 45%, transparent);
+}
+
+.featureResourceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  border: 1px solid var(--border);
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  white-space: nowrap;
+}
+
+.featureResourceLine {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 6px 5px 27px;
 }
 
 .featureResourceStrip {
@@ -487,6 +553,10 @@
 
 /* PAN-1779: paused issues carry an unmissable amber edge bar (the row's one
  * colored signal — amber = a human must act). */
+.featureItemWrapperWorking::before,
+.featureItemWrapperError::before,
+.featureItemWrapperMerged::before,
+.featureItemWrapperReady::before,
 .featureItemWrapperPaused::before {
   content: "";
   position: absolute;
@@ -497,6 +567,12 @@
   border-radius: 0 3px 3px 0;
   background: var(--warning);
 }
+
+.featureItemWrapperWorking::before { background: var(--info); }
+.featureItemWrapperError::before { background: var(--destructive); }
+.featureItemWrapperMerged::before { background: var(--success); }
+/* ready-for-merge is a human gate — amber, same as paused */
+.featureItemWrapperReady::before { background: var(--warning); }
 
 .unpauseBtn {
   display: inline-flex;
@@ -516,6 +592,16 @@
 
 .unpauseBtn:hover {
   background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.sessionSubtitle {
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .sessionPausedReason {
