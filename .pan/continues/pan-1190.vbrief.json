@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-19T01:05:49.654Z",
-  "updated": "2026-06-11T02:18:19.555Z",
+  "updated": "2026-06-11T02:39:08.035Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -3192,6 +3192,46 @@
       "reason": "resume",
       "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
       "timestamp": "2026-06-11T02:18:19.555Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:21:53.352Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:24:29.664Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:24:57.679Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:29:06.886Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:35:21.846Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:36:12.293Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:38:21.857Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-06-11; reason: retry close-out; review: pending → pending; test: pending → pending; merge: pending → pending",
+      "timestamp": "2026-06-11T02:39:08.035Z"
     }
   ]
 }

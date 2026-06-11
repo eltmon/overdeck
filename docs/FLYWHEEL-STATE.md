@@ -1773,3 +1773,27 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
 - Run scoreboard: **6 substrate bugs fixed** (1699/1746/1752/1749/1753 closed,
   1723 landed-pending-merge-verify), 3 merges READY ~1.5h (1700/1712/1719),
   main green. Strikes launched on PAN-1743 + PAN-1721 (cap 4 reached).
+
+## RUN-20 tick 7 (2026-06-11) — 8 bugs down; the 1747 bootstrap paradox and its resolution
+
+- **Strikes 1743 + 1721 landed within ~25 min** (aa903c5bf: --no-resume flag
+  never actually reached the dashboard server; 8a1eeb4d7: close-out teardown +
+  deacon reaper cover strike-* resources). Both closed. Reloaded the server
+  after a proper sync — **caught myself mid-mistake: the first reload was
+  building a local tree that did NOT yet contain the fixes** (pull had failed
+  on dirty .pan files). Killed it, synced, rebuilt. Always verify local HEAD
+  contains the commit you're reloading FOR, before the build starts.
+- **The PAN-1747 bootstrap paradox** (signaled via the fixed tell path — 2nd
+  live delivery): the ship agent refused to ship the branch that REMOVES the
+  ship role, citing the branch's own docs. Resolution: orchestrator decision
+  recorded IN THE ISSUE BODY (next dispatch reads it) — the removal branch
+  merges under the LEGACY contract; post-merge semantics don't apply to their
+  own delivery vehicle. Used pause→unpause to recycle the dead ship session
+  (pause alone blocks re-dispatch; the unpause clears the gate so
+  checkUndispatchedShip can fire). Escalation if the next ship still aborts:
+  strike a transitional roles/ship.md onto main.
+- **PAN-1744 review BLOCKED** — feedback loop owns it; the compact-recovered
+  work agent is addressing it.
+- Gate: 1700/1712/1719 ready ~2h, operator idle. Churn continues on 1686/1704
+  (re-review convoys) every time main moves — the standing cost of an
+  unmerged ready set.
