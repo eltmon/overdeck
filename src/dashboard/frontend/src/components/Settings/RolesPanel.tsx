@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
@@ -58,7 +58,7 @@ interface SubRoleDefinition {
 interface RoleDefinition {
   id: RoleId;
   name: string;
-  icon: string;
+  icon: LucideIcon;
   description: string;
   defaultModel: ModelRef;
   subRoles?: SubRoleDefinition[];
@@ -86,14 +86,14 @@ const ROLES: RoleDefinition[] = [
   {
     id: 'plan',
     name: 'Plan',
-    icon: 'architecture',
+    icon: DraftingCompass,
     description: 'Researches the issue, writes the vBRIEF, and creates beads.',
     defaultModel: 'workhorse:expensive',
   },
   {
     id: 'work',
     name: 'Work',
-    icon: 'code',
+    icon: Code,
     description: 'Implements beads in the issue workspace.',
     defaultModel: 'workhorse:mid',
     subRoles: [
@@ -104,14 +104,14 @@ const ROLES: RoleDefinition[] = [
   {
     id: 'strike',
     name: 'Strike',
-    icon: 'bolt',
+    icon: Zap,
     description: 'Precision agent — drop in, implement, land directly on main, verify on main. Bypasses plan/review/test/ship.',
     defaultModel: 'workhorse:expensive',
   },
   {
     id: 'review',
     name: 'Review',
-    icon: 'rate_review',
+    icon: ClipboardCheck,
     description: 'Synthesizes security, correctness, performance, and requirements findings.',
     defaultModel: 'workhorse:expensive',
     subRoles: [
@@ -125,21 +125,21 @@ const ROLES: RoleDefinition[] = [
   {
     id: 'test',
     name: 'Test',
-    icon: 'bug_report',
+    icon: Bug,
     description: 'Runs verification suites and browser UAT when required.',
     defaultModel: 'workhorse:mid',
   },
   {
     id: 'ship',
     name: 'Ship',
-    icon: 'rocket_launch',
+    icon: Rocket,
     description: 'Prepares approved branches for human-controlled merge.',
     defaultModel: 'workhorse:mid',
   },
   {
     id: 'flywheel',
     name: 'Flywheel',
-    icon: 'all_inclusive',
+    icon: InfinityIcon,
     description: 'Runs the singleton Fix-All Flywheel orchestrator.',
     defaultModel: 'claude-opus-4-8',
   },
@@ -432,7 +432,7 @@ export function RolesPanel() {
     <div className="bg-card border border-border rounded-lg p-4 mb-6">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <span className="material-symbols-outlined text-primary text-xl">group</span>
+          <Users className="w-5 h-5 text-primary" aria-hidden="true" />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Role Models</h3>
@@ -461,7 +461,7 @@ export function RolesPanel() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start">
                   <div className="flex min-w-0 flex-1 gap-3">
                     <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-primary text-xl">{role.icon}</span>
+                      <role.icon className="w-5 h-5 text-primary" aria-hidden="true" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
@@ -482,9 +482,10 @@ export function RolesPanel() {
                           aria-controls={`${role.id}-subroles`}
                           onClick={() => setExpandedRoles((current) => ({ ...current, [role.id]: !isExpanded }))}
                         >
-                          <span className="material-symbols-outlined text-sm">
-                            {isExpanded ? 'expand_less' : 'expand_more'}
-                          </span>
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            aria-hidden="true"
+                          />
                           {isExpanded ? 'Hide sub-roles' : 'Show sub-roles'}
                         </button>
                       )}
