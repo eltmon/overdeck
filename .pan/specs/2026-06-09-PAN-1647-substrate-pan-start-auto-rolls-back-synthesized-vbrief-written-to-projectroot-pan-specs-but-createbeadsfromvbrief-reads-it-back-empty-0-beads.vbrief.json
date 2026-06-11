@@ -4,17 +4,17 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-10T12:40:46.999Z"
+    "updated": "2026-06-11T05:55:49.540Z"
   },
   "plan": {
     "id": "pan-1647",
     "title": "Substrate: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 97,
+    "sequence": 98,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-10T12:40:46.999Z",
+    "updated": "2026-06-11T05:55:49.540Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -225,5 +225,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
