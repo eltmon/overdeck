@@ -1908,3 +1908,14 @@ working around. Do not re-investigate or strike these classes:
   both stacks healthy again. PAN-1709's stack rebuilt and fully up (its work agent
   continues on --host, unaffected). The flywheel's deliberate slot-release pauses on
   agent-pan-1629 / agent-pan-1704 were left in place.
+
+## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
+
+PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
+reset to pending 05:31:56, with a merge_conflict blocker from 02:33 never
+resolved in between. The pipeline reviews conflict-flagged branches (doomed
+verdicts), instead of gating review on conflict resolution. RUN-18's
+"bulk reset at 01:08, unexplained" = this signature. Filed PAN-1765 with the
+timeline. Tonight's cost: 1686/1704/1747 × ~3 convoy cycles each. The faster
+main moves (good night for fixes!), the worse this burns — it's the next
+keystone after the gate drained.
