@@ -924,7 +924,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/^exec codex exec/m);
   });
 
-  it('codex conversation (tui) mode emits bare `codex` without supervisor', () => {
+  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -932,7 +932,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       codexMode: 'tui',
       spawnMode: 'conversation',
     });
-    expect(script).toMatch(/^codex$/m);
+    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -946,7 +946,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex$/m);
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
