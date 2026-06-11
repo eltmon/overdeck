@@ -4291,10 +4291,8 @@ function rawPrepare(db, sql) {
 	if (db.query) return db.query(sql);
 	throw new Error("SQLite driver does not expose prepare() or query().");
 }
-function readPragmaScalar(db, sql) {
-	const key = sql.trim();
-	const row = db.prepare(`PRAGMA ${key}`).get();
-	if (!row) return null;
+function readFirstColumn(row) {
+	if (!row || typeof row !== "object") return null;
 	const values = Object.values(row);
 	return values.length === 0 ? null : values[0];
 }
@@ -4307,8 +4305,9 @@ function wrapDatabase(raw) {
 		},
 		prepare: (sql) => wrapStatement(sql, rawPrepare(raw, sql)),
 		pragma: (sql, options) => {
-			if (options?.simple) return readPragmaScalar(db, sql);
-			raw.exec(`PRAGMA ${sql}`);
+			const rows = db.prepare(`PRAGMA ${sql}`).all();
+			if (options?.simple) return readFirstColumn(rows[0]);
+			return rows;
 		},
 		transaction: (fn) => {
 			return (...args) => {
