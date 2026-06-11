@@ -2902,25 +2902,27 @@ const postAgentsRoute = HttpRouter.add(
     // commit only happens when projectPath is on main; otherwise the on-disk
     // move still applies and a later sync will pick it up. Failure is non-fatal
     // — agent spawn proceeds even if the lifecycle move fails.
-    yield* Effect.promise(() =>
-      transitionVBriefOnMain(
-        projectPath,
-        issueId,
-        'active',
-        'approved',
-        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
-      )
-        .then((result) => {
+    // transitionVBriefOnMain is Effect-returning — match on it directly (PAN-1768).
+    yield* transitionVBriefOnMain(
+      projectPath,
+      issueId,
+      'active',
+      'approved',
+      `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+    ).pipe(
+      Effect.match({
+        onSuccess: (result) => {
           if (result.moved) {
             console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
           }
           if (result.committed) {
             console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
           }
-        })
-        .catch((err) => {
+        },
+        onFailure: (err) => {
           console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
-        }),
+        },
+      }),
     );
 
     // Running transition (PAN-946): set workspace plan.status to 'running'.
