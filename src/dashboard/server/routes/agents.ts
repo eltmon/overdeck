@@ -47,7 +47,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect, Either, Layer, Option, Schema } from 'effect';
+import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { DomainEvent } from '@panctl/contracts';
 import type { AgentStatus, Role } from '@panctl/contracts';
@@ -2797,9 +2797,14 @@ const postAgentsRoute = HttpRouter.add(
     // validateProviderHealth returns an Effect (typed ProviderHealthError
     // channel) — wrapping it in Effect.promise handed a non-thenable to the
     // runtime and crashed the whole request (PAN-1768).
-    const providerHealthCheck = yield* Effect.either(validateProviderHealth(spawnModel));
-    if (Either.isLeft(providerHealthCheck)) {
-      const err = providerHealthCheck.left;
+    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+      Effect.match({
+        onFailure: (err) => ({ _tag: 'failure' as const, err }),
+        onSuccess: () => ({ _tag: 'success' as const, err: null }),
+      }),
+    );
+    if (providerHealthCheck._tag === 'failure' && providerHealthCheck.err) {
+      const err = providerHealthCheck.err;
       return jsonResponse({
         success: false,
         blocked: true,
