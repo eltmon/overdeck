@@ -1,6 +1,8 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { BlockerReason, ReviewStatus } from '../review-status.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
+import { spawnRun } from '../agents.js';
+import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus } from '../review-status.js';
 
 const execAsync = promisify(exec);
 const GIT_TIMEOUT_MS = 30_000;
@@ -49,6 +51,15 @@ export interface ResolveConflictGateDeps {
   log?: (message: string) => void;
 }
 
+interface RealConflictGateDepsOverrides {
+  spawnRun?: typeof spawnRun;
+  getReviewStatus?: typeof getReviewStatusSync;
+  setReviewStatus?: typeof setReviewStatusSync;
+  emitActivityEntry?: typeof emitActivityEntrySync;
+  now?: () => Date;
+  log?: (message: string) => void;
+}
+
 const probeCache = new Map<string, { checkedAtMs: number; result: BranchMergeability }>();
 
 /**
@@ -84,6 +95,44 @@ export async function checkBranchMergeability(
   } catch (err) {
     return mergeTreeFailureIndicatesConflict(err) ? 'conflicts' : 'unknown';
   }
+}
+
+export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
+  const runSpawn = overrides.spawnRun ?? spawnRun;
+  const readStatus = overrides.getReviewStatus ?? getReviewStatusSync;
+  const writeStatus = overrides.setReviewStatus ?? setReviewStatusSync;
+  const emitActivity = overrides.emitActivityEntry ?? emitActivityEntrySync;
+  const now = overrides.now ?? (() => new Date());
+
+  return {
+    getReviewStatus: readStatus,
+    setReviewStatus: writeStatus,
+    probeMergeability: checkBranchMergeability,
+    now,
+    log: overrides.log,
+    dispatchResolver: async (input) => {
+      try {
+        await runSpawn(input.issueId, 'work', { prompt: buildConflictResolverPrompt(input) });
+      } catch (err) {
+        if (isAlreadyRunningError(err)) {
+          overrides.log?.(`[conflict-gate] ${input.issueId}: conflict resolver already running`);
+          return;
+        }
+        throw err;
+      }
+
+      const dispatchedAt = now().toISOString();
+      const existing = readStatus(input.issueId) ?? undefined;
+      writeStatus(input.issueId, { conflictResolutionDispatchedAt: dispatchedAt }, existing);
+      emitActivity({
+        source: 'review',
+        level: 'info',
+        issueId: input.issueId,
+        message: `Review deferred — conflict resolver dispatched for ${input.issueId}`,
+        details: input.reason,
+      });
+    },
+  };
 }
 
 export async function resolveConflictGate(
@@ -152,6 +201,32 @@ function isResolverDispatchThrottled(status: ReviewStatus, nowMs: number): boole
 
 function isMergeBlocker(blocker: BlockerReason): boolean {
   return MERGE_BLOCKER_TYPES.has(blocker.type);
+}
+
+function buildConflictResolverPrompt(input: DispatchResolverInput): string {
+  const blockerSummary = input.blockerReasons
+    .map((blocker) => `- ${blocker.type}: ${blocker.summary} (detected ${blocker.detectedAt})`)
+    .join('\n');
+
+  return [
+    `Review for ${input.issueId} was deferred because the feature branch has a standing merge conflict with origin/${input.targetBranch}.`,
+    '',
+    'Resolve the conflict WITHOUT degrading either side of the change:',
+    `1. Read what origin/${input.targetBranch} changed and what ${input.issueId} intended before editing.`,
+    `2. Rebase this branch onto origin/${input.targetBranch} and resolve every conflict so BOTH intents are preserved.`,
+    '3. Build, run the relevant tests, commit the resolved state, and push with --force-with-lease.',
+    '4. Re-request review when the branch is clean (use pan done or pan review request as appropriate for this workspace).',
+    '',
+    'Do not blindly accept one side of a conflict — understand both changesets first.',
+    '',
+    'Current blocker details:',
+    blockerSummary || '- mergeability blocker present',
+  ].join('\n');
+}
+
+function isAlreadyRunningError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /already running/i.test(message);
 }
 
 function mergeTreeFailureIndicatesConflict(err: unknown): boolean {

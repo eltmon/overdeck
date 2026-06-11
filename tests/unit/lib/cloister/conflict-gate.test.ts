@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   __resetConflictGateProbeCacheForTests,
+  buildRealConflictGateDeps,
   checkBranchMergeability,
   resolveConflictGate,
   type ExecRunner,
@@ -195,5 +196,71 @@ describe('resolveConflictGate', () => {
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
 
     expect(deps.probeMergeability).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('buildRealConflictGateDeps', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-11T08:45:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('dispatches a work-role resolver with rebase and review-request instructions', async () => {
+    const spawnRun = vi.fn(async () => ({} as never));
+    const setReviewStatus = vi.fn();
+    const emitActivityEntry = vi.fn();
+    const deps = buildRealConflictGateDeps({
+      spawnRun,
+      setReviewStatus,
+      emitActivityEntry,
+      getReviewStatus: () => makeStatus({ blockerReasons: [mergeBlocker] }),
+    });
+
+    await deps.dispatchResolver({
+      issueId: 'PAN-1765',
+      workspacePath: '/workspace',
+      targetBranch: 'main',
+      blockerReasons: [mergeBlocker],
+      reason: 'merge conflict with main must be resolved before review dispatch',
+    });
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-1765', 'work', {
+      prompt: expect.stringContaining('Rebase this branch onto origin/main'),
+    });
+    const prompt = spawnRun.mock.calls[0][2].prompt;
+    expect(prompt).toContain('BOTH intents are preserved');
+    expect(prompt).toContain('Re-request review');
+    expect(prompt).toContain('pan done or pan review request');
+    expect(setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1765',
+      { conflictResolutionDispatchedAt: '2026-06-11T08:45:00.000Z' },
+      expect.objectContaining({ issueId: 'PAN-1765' }),
+    );
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'review',
+      message: 'Review deferred — conflict resolver dispatched for PAN-1765',
+    }));
+  });
+
+  it('swallows already-running spawn errors without stamping status or activity', async () => {
+    const spawnRun = vi.fn(async () => { throw new Error("Role run agent already running. Use 'pan tell' to message it."); });
+    const setReviewStatus = vi.fn();
+    const emitActivityEntry = vi.fn();
+    const deps = buildRealConflictGateDeps({ spawnRun, setReviewStatus, emitActivityEntry });
+
+    await expect(deps.dispatchResolver({
+      issueId: 'PAN-1765',
+      workspacePath: '/workspace',
+      targetBranch: 'main',
+      blockerReasons: [mergeBlocker],
+      reason: 'merge conflict with main must be resolved before review dispatch',
+    })).resolves.toBeUndefined();
+
+    expect(setReviewStatus).not.toHaveBeenCalled();
+    expect(emitActivityEntry).not.toHaveBeenCalled();
   });
 });
