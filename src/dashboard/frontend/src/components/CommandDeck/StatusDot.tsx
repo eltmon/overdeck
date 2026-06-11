@@ -3,7 +3,7 @@
  *
  * Pulse keyframes (defined in src/dashboard/frontend/src/index.css):
  *   active   → 1.6s alive-dot
- *   thinking → 2.0s alive-dot + warning glow
+ *   thinking → 2.0s alive-dot + info glow
  *   waiting  → 1.5s alive-dot + amber glow
  *   idle     → 4.0s alive-dot (very slow breath)
  *   ended    → static dim, no animation
@@ -19,9 +19,12 @@ interface StatusDotProps {
   className?: string;
 }
 
+// Style guide v1.2 signal law: blue = machine actively doing something
+// (active/thinking), amber = a human must act (waiting for input), neutral =
+// no live signal. Emerald is reserved for verified outcomes, never activity.
 const STATUS_COLOR: Record<StatusDotStatus, string> = {
-  active: 'var(--success)',
-  thinking: 'var(--warning)',
+  active: 'var(--info)',
+  thinking: 'var(--info)',
   waiting: 'var(--warning)',
   idle: 'var(--muted-foreground)',
   ended: 'var(--muted-foreground)',
@@ -36,7 +39,7 @@ const STATUS_ANIM_CLASS: Record<StatusDotStatus, string> = {
 };
 
 const STATUS_GLOW: Partial<Record<StatusDotStatus, string>> = {
-  thinking: '0 0 6px color-mix(in srgb, var(--warning) 60%, transparent)',
+  thinking: '0 0 6px color-mix(in srgb, var(--info) 60%, transparent)',
   waiting: '0 0 6px color-mix(in srgb, var(--warning) 70%, transparent)',
 };
 

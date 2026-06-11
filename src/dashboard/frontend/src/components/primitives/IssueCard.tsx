@@ -11,6 +11,8 @@ export type IssueCardProps = {
   bulkSelected?: boolean;
   stuckCard?: boolean;
   mergeReadyCard?: boolean;
+  /** PAN-1779: an agent on this issue is pause-gated — amber, a human must act. */
+  pausedCard?: boolean;
   runningCard?: boolean;
   unhealthyCard?: boolean;
   sessionLostCard?: boolean;
@@ -36,6 +38,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
   bulkSelected = false,
   stuckCard = false,
   mergeReadyCard = false,
+  pausedCard = false,
   runningCard = false,
   unhealthyCard = false,
   sessionLostCard = false,
@@ -47,11 +50,13 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
 }, ref) {
   const accent = unhealthyCard || stuckCard
     ? 'bg-destructive'
-    : mergeReadyCard
-      ? 'bg-success'
-      : runningCard
-        ? 'bg-primary'
-        : (PRIORITY_ACCENT_CLASSES[priority] || 'bg-muted-foreground');
+    : pausedCard
+      ? 'bg-warning'
+      : mergeReadyCard
+        ? 'bg-success'
+        : runningCard
+          ? 'bg-primary'
+          : (PRIORITY_ACCENT_CLASSES[priority] || 'bg-muted-foreground');
 
   return (
     <div
@@ -61,6 +66,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
       data-priority={priority}
       data-stuck-card={stuckCard ? 'true' : 'false'}
       data-merge-ready-card={mergeReadyCard ? 'true' : 'false'}
+      data-paused-card={pausedCard ? 'true' : 'false'}
       data-testid={testId}
       onClick={onClick}
       onContextMenu={onContextMenu}
@@ -71,7 +77,9 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
           ? 'ring-2 ring-warning/70 shadow-lg'
           : unhealthyCard || stuckCard
             ? 'border-destructive/60 bg-destructive/10 shadow-md'
-            : mergeReadyCard
+            : pausedCard
+              ? 'border-warning/50 bg-warning/8 shadow-md'
+              : mergeReadyCard
               ? 'badge-border-success bg-success/10 shadow-md'
               : bulkSelected
                 ? 'border-primary/50 bg-primary/10 shadow-sm'

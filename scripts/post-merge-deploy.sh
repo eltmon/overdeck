@@ -170,11 +170,13 @@ log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
 for i in $(seq 1 "$HEALTH_TIMEOUT"); do
   if curl -s --max-time 2 "$HEALTH_URL" > /dev/null 2>&1; then
     log "Health check passed after ${i}s."
-    # NOTE: The new server reads the pending file on boot, emits lifecycle_started,
-    # processes the lifecycle (including post-merge cleanup), emits lifecycle_completed,
-    # and then deletes the pending file itself. Do NOT delete it here.
-    rm -f "$RESTART_MARKER" || true
-    log "Cleared restart marker. New server will process pending lifecycle and emit lifecycle_complete."
+    # NOTE: The new server reads the restart marker and pending file on boot,
+    # emits lifecycle_started, processes the lifecycle (including post-merge cleanup),
+    # emits lifecycle_completed, and then deletes the files itself. Do NOT delete
+    # the restart marker here: the health endpoint can respond before startup code
+    # reaches processPendingLifecycle(), and deleting it here races away the only
+    # signal that should populate the Activity Feed.
+    log "Restart marker left for new server to process. Pending lifecycle will emit lifecycle_complete."
     log "Post-merge deploy complete for issue=$ISSUE_ID built_sha=$BUILT_SHA."
     exit 0
   fi
@@ -182,5 +184,4 @@ for i in $(seq 1 "$HEALTH_TIMEOUT"); do
 done
 
 log "ERROR: Health check timed out after ${HEALTH_TIMEOUT}s. Check $LOG_FILE."
-rm -f "$RESTART_MARKER" || true
 exit 1

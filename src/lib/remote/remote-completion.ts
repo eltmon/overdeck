@@ -37,6 +37,7 @@ import {
   isRemoteAgentRunning,
   listActiveRemoteAgentStates,
   getRemoteAgentOutput,
+  sendToRemoteAgent,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
@@ -73,41 +74,103 @@ async function branchExistsOnOrigin(projectRoot: string, branch: string): Promis
  * record of the remote conversation — destroying a machine without them
  * loses the transcript irrecoverably (learned on the first migrated issue).
  */
-async function captureRemoteForensics(agentId: string, vmName: string, details: string[]): Promise<void> {
+async function captureRemoteForensics(agentId: string, vmName: string, details: string[]): Promise<{ paneCaptured: boolean }> {
   const agentDir = join(AGENTS_DIR, agentId);
   mkdirSync(agentDir, { recursive: true });
   const config = loadConfigSync();
   const fly = createFlyProviderFromConfig(config.remote);
 
+  let paneCaptured = false;
   try {
     const output = await getRemoteAgentOutput(agentId, vmName, 2000);
     if (output.trim()) {
       writeFileSync(join(agentDir, 'remote-output.log'), output);
       details.push('Captured final remote pane to remote-output.log');
+      paneCaptured = true;
     }
   } catch {
     details.push('Could not capture remote pane');
   }
 
   // The Machines exec API runs with HOME=/, so Claude's session JSONLs live
-  // under /.claude/projects on the VM.
+  // under /.claude/projects — but the launcher may export HOME=/root, so
+  // check both. Surface failures: an empty copy means the only transcript of
+  // the agent's work is about to be lost with the rootfs.
   try {
-    const list = await Effect.runPromise(fly.ssh(vmName, 'ls /.claude/projects/*/*.jsonl 2>/dev/null'));
+    const list = await Effect.runPromise(
+      fly.ssh(vmName, 'ls /.claude/projects/*/*.jsonl /root/.claude/projects/*/*.jsonl 2>/dev/null')
+    );
     const files = list.stdout.trim().split('\n').filter(Boolean);
     if (files.length > 0) {
       const destDir = join(agentDir, 'remote-sessions');
       mkdirSync(destDir, { recursive: true });
+      let copied = 0;
       for (const remotePath of files) {
         try {
           await fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath)));
+          copied++;
         } catch {
-          // per-file best effort
+          details.push(`Failed to copy ${remotePath}`);
         }
       }
-      details.push(`Copied ${files.length} session JSONL(s) to remote-sessions/`);
+      details.push(`Copied ${copied}/${files.length} session JSONL(s) to remote-sessions/`);
+    } else {
+      details.push('No session JSONLs found under /.claude or /root/.claude');
     }
-  } catch {
-    details.push('Could not copy session JSONLs');
+  } catch (err: any) {
+    details.push(`Could not copy session JSONLs: ${err.message}`);
+  }
+  return { paneCaptured };
+}
+
+/**
+ * Commit and push whatever work is sitting in /workspace before the machine
+ * is stopped. Fly machine rootfs is ephemeral — a stop is only "preserved
+ * for inspection" until the next start, which resets the filesystem from the
+ * image. Unpushed work on a stopped machine is one restart away from gone
+ * (lost live on PAN-1762: ~2h of agent work).
+ */
+async function salvageRemoteWork(vmName: string, branch: string, details: string[]): Promise<void> {
+  const config = loadConfigSync();
+  const fly = createFlyProviderFromConfig(config.remote);
+  try {
+    const result = await Effect.runPromise(fly.ssh(
+      vmName,
+      `cd /workspace && git add -A && (git diff --cached --quiet || git commit -m "wip(remote): salvage checkpoint before machine stop") && git push origin ${branch} 2>&1 | tail -2`
+    ));
+    if (result.exitCode === 0) {
+      details.push(`Salvaged workspace state to origin/${branch}`);
+    } else {
+      details.push(`Salvage push failed (exit ${result.exitCode}): ${result.stderr || result.stdout}`);
+    }
+  } catch (err: any) {
+    details.push(`Salvage attempt failed: ${err.message}`);
+  }
+}
+
+/**
+ * Long remote runs outlive the synced OAuth token: when the host's Claude
+ * refreshes its token, the VM's copy is orphaned (refresh tokens rotate),
+ * and the agent stalls on `API Error: 401 · Please run /login` until
+ * credentials are re-synced (observed live on PAN-1762 — ~1h stalled, then
+ * mistaken for a crash). Detect the stall from the pane tail, re-sync
+ * credentials from the host, and nudge the session so it retries.
+ */
+async function healStaleRemoteAuth(agentId: string, vmName: string, details: string[]): Promise<void> {
+  try {
+    const tail = await getRemoteAgentOutput(agentId, vmName, 40);
+    if (!/Invalid authentication credentials|Please run \/login/i.test(tail)) return;
+    const config = loadConfigSync();
+    const fly = createFlyProviderFromConfig(config.remote);
+    const synced = await fly.syncClaudeCredentials(vmName);
+    if (!synced) {
+      details.push('401 stall detected but credential re-sync failed');
+      return;
+    }
+    await sendToRemoteAgent(agentId, vmName, 'Your API credentials were stale and have been re-synced. Please continue from where you left off.');
+    details.push('401 stall detected — re-synced Claude credentials and nudged the session');
+  } catch (err: any) {
+    details.push(`401 heal attempt failed: ${err.message}`);
   }
 }
 
@@ -142,7 +205,14 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       let sessionAlive = false;
       let sentinelSeen = false;
       try {
-        sessionAlive = await isRemoteAgentRunning(agentId, vmName);
+        // A single has-session over the Machines exec API false-negatives on
+        // transient exec failures/429s — one flake here stopped a healthy
+        // mid-work machine live (PAN-1762). Any success across retries means
+        // alive; only consistent failure proceeds to the crash path.
+        for (let attempt = 0; attempt < 3 && !sessionAlive; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 5000));
+          sessionAlive = await isRemoteAgentRunning(agentId, vmName);
+        }
         const config = loadConfigSync();
         const fly = createFlyProviderFromConfig(config.remote);
         const check = await Effect.runPromise(
@@ -165,6 +235,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       const pushed = await branchExistsOnOrigin(projectRoot, branch);
 
       if (sessionAlive && !sentinelSeen) {
+        await healStaleRemoteAuth(agentId, vmName, details);
         results.push({ agentId, issueId, status: 'still-running', details });
         continue;
       }
@@ -180,12 +251,23 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
           ? 'session ended without the REMOTE_DONE sentinel — treating as crash, not completion'
           : `sentinel present but ${branch} is not on origin`;
         details.push(reason);
-        await captureRemoteForensics(agentId, vmName, details);
+        const { paneCaptured } = await captureRemoteForensics(agentId, vmName, details);
+        if (!sessionAlive && paneCaptured) {
+          // Contradiction: has-session said dead, but capture-pane just read
+          // the live pane through the same tmux server. The session is
+          // reachable — the alive check flaked. Do NOT stop the machine.
+          details.push('Pane capture succeeded despite dead has-session — alive-check flake, leaving agent running');
+          results.push({ agentId, issueId, status: 'still-running', details });
+          continue;
+        }
+        // Salvage before stopping: rootfs does not survive a stop→start
+        // cycle, so this is the last chance to preserve unpushed work.
+        await salvageRemoteWork(vmName, branch, details);
         try {
           const config = loadConfigSync();
           const fly = createFlyProviderFromConfig(config.remote);
           await Effect.runPromise(fly.stopVm(vmName));
-          details.push(`Stopped machine ${vmName} (preserved for inspection)`);
+          details.push(`Stopped machine ${vmName} (rootfs resets on next start — salvage above is the durable copy)`);
         } catch (err: any) {
           details.push(`Warning: could not stop machine: ${err.message}`);
         }

@@ -681,6 +681,24 @@ export function CommandDeck({
     }
   }, [queryClient]);
 
+  // PAN-1779: clear a persistent pause gate. Distinct from resume — unpause
+  // removes the gate without spawning; the deacon's next patrol resumes it.
+  const handleUnpauseSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${sessionId}/unpause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
+      toast.success('Agent unpaused — deacon will resume it on the next patrol');
+      await refreshDashboardState(queryClient);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
+    }
+  }, [queryClient]);
+
   const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => {
     try {
       // Find project key for this issue. Primary: resource-allocated issue list.
@@ -1209,6 +1227,7 @@ export function CommandDeck({
                     onViewTerminal={handleViewTerminal}
                     onPauseSession={handlePauseSession}
                     onResumeSession={handleResumeSession}
+                    onUnpauseSession={handleUnpauseSession}
                     onRestartSession={handleRestartSession}
                     onDeepWipe={handleDeepWipe}
                     onOpenStateDir={handleOpenStateDir}

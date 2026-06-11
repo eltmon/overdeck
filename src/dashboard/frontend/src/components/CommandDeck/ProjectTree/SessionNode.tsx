@@ -156,6 +156,9 @@ function ReviewerVerdict({ session, dotStatus, runtime }: { session: SessionNode
   if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
+  // Redesign (PAN-1779): no per-row status dots — the icon tile carries
+  // state. Reviewer verdict glyphs above are the only dot-slot content.
+  if (session.type !== 'reviewer') return null;
   return <PhaseIcon runtime={runtime} dotStatus={dotStatus} />;
 }
 
@@ -168,6 +171,10 @@ interface SessionNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  /** PAN-1779: clear a persistent pause gate (POST /api/agents/:id/unpause). */
+  onUnpauseSession?: (sessionId: string) => void;
+  /** Muted summary text after the label (e.g. collapsed convoy verdict). */
+  subtitle?: string;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -203,7 +210,7 @@ function TypeIcon({ type, role }: { type: SessionNodeType['type']; role?: string
 }
 
 function formatDuration(seconds: number | null): string {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   return `${Math.round(seconds / 3600)}h`;
@@ -227,19 +234,17 @@ function deriveSessionModel(session: SessionNodeType, resolvedModel?: string | n
   return sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
 }
 
-function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
-  const model = deriveSessionModel(session, resolvedModel);
+function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | null): string {
+  // Redesign (PAN-1779): bare role names — the model renders as its own
+  // dimmed mono span, never '(model)' inside the label.
   switch (session.type) {
-    case 'ship': return model ? `Ship (${model})` : 'Ship agent';
-    case 'merge': return model ? `Merge (${model})` : 'Merge agent';
-    case 'test': return model ? `Tests (${model})` : 'Tests';
-    case 'review': return model ? `Review (${model})` : 'Review';
-    case 'reviewer': {
-      const role = session.role ? capitalize(session.role) : 'Reviewer';
-      return model ? `${role} (${model})` : role;
-    }
-    case 'work': return model ? `Work (${model})` : 'Work agent';
-    case 'planning': return model ? `Planning (${model})` : 'Planning';
+    case 'ship': return 'Ship';
+    case 'merge': return 'Merge';
+    case 'test': return 'Test';
+    case 'review': return 'Review';
+    case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
+    case 'work': return 'Work';
+    case 'planning': return 'Planning';
     case 'legacy': return 'Planning state';
     default: return session.type;
   }
@@ -480,6 +485,8 @@ export function SessionNode({
   onViewTerminal,
   onPauseSession,
   onResumeSession,
+  onUnpauseSession,
+  subtitle,
   onRestartSession,
   onDeepWipe,
   onOpenStateDir,
@@ -497,11 +504,14 @@ export function SessionNode({
 
   const [isStopping, setIsStopping] = useState(false);
 
-  const dotStatus = session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
+  // PAN-1779: a pause gate beats every other presentation — a paused agent is
+  // deliberately parked (deacon will not auto-resume it), never just "stopped".
+  const isPaused = session.paused === true;
+  const dotStatus = isPaused ? 'waiting' : session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const displayStatus = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
-  const statusCssKey = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const displayStatus = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const statusCssKey = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -533,7 +543,9 @@ export function SessionNode({
   const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;
   const sessionLabel = deriveSessionLabel(session, defaultModel);
   const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
-  const sessionStatusTitle = session.awaitingInput
+  const sessionStatusTitle = isPaused
+    ? `Paused${session.pausedReason ? `: ${session.pausedReason}` : ''}`
+    : session.awaitingInput
     ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
     : getSessionStatusTitle({
         runtime,
@@ -541,6 +553,19 @@ export function SessionNode({
         displayStatus,
         lastHeardLabel,
       });
+  const sessionModel = deriveSessionModel(session, defaultModel);
+  const isLiveActivity = !isPaused && (
+    statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
+  );
+  const iconStateClass = isPaused
+    ? styles.sessionIconPaused
+    : statusCssKey === 'error'
+      ? styles.sessionIconError
+      : isLiveActivity
+        ? (session.type === 'review' || session.type === 'reviewer' ? styles.sessionIconReview : styles.sessionIconRunning)
+        : '';
+  const durationLabel = formatDuration(session.duration);
+
   const restartLabel = session.type === 'review'
     ? 'Restart all'
     : session.type === 'reviewer'
@@ -577,22 +602,50 @@ export function SessionNode({
           <span className={styles.sessionDotSlot}>
             <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
           </span>
-          <span className={styles.sessionIconSlot} title={sessionLabelTitle}>
+          <span className={`${styles.sessionIconSlot} ${iconStateClass ?? ''}`} title={sessionLabelTitle}>
             <TypeIcon type={session.type} role={session.role} />
           </span>
           <span className={styles.sessionLabel} title={sessionLabelTitle}>
             {sessionLabel}
           </span>
+          {sessionModel && (
+            <span className={styles.sessionModel} title={sessionLabelTitle}>{sessionModel}</span>
+          )}
+          {subtitle && (
+            <span className={styles.sessionSubtitle} title={subtitle}>{subtitle}</span>
+          )}
           <LiveLastHeard lastActivity={lastActivity} />
-          <span
-            className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
-            title={sessionStatusTitle}
-          >
-            {displayStatus}
-          </span>
-          <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
+          {!['stopped', 'unknown', 'idle', 'completed', 'running', 'working', 'thinking', 'paused'].includes(String(statusCssKey)) && (
+            <span
+              className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
+              title={sessionStatusTitle}
+            >
+              {displayStatus}
+            </span>
+          )}
+          {isPaused && onUnpauseSession && (
+            <span
+              role="button"
+              tabIndex={-1}
+              data-testid="session-unpause"
+              className={styles.unpauseBtn}
+              title={session.pausedReason ? `Unpause — paused: ${session.pausedReason}` : 'Unpause this agent'}
+              onClick={(e) => { e.stopPropagation(); onUnpauseSession(session.sessionId); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(session.sessionId); } }}
+            >
+              ▶ Unpause
+            </span>
+          )}
+          {durationLabel && (
+            <span className={styles.sessionDuration}>{durationLabel}</span>
+          )}
         </button>
       </ContextMenuTrigger>
+      {isPaused && session.pausedReason && (
+        <div className={styles.sessionPausedReason} data-testid="session-paused-reason" title={session.pausedReason}>
+          ⏸ {session.pausedReason}
+        </div>
+      )}
 
       <ContextMenuContent>
         {canPause && (
@@ -603,6 +656,11 @@ export function SessionNode({
         {canResume && (
           <ContextMenuItem onSelect={() => onResumeSession!(session.sessionId)}>
             Resume
+          </ContextMenuItem>
+        )}
+        {isPaused && onUnpauseSession && (
+          <ContextMenuItem onSelect={() => onUnpauseSession(session.sessionId)}>
+            Unpause
           </ContextMenuItem>
         )}
         {canStop && (

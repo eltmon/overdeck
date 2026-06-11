@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1641",
   "created": "2026-06-07T02:22:29.140Z",
-  "updated": "2026-06-11T07:05:23.091Z",
+  "updated": "2026-06-11T13:09:05.861Z",
   "gitState": {
     "branch": "feature/pan-1641",
     "sha": "d0926259a",
@@ -106,6 +106,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T19:11:51.094Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T08:47:28.849Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:00:51.455Z"
     }
   ],
   "feedback": []

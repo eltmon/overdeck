@@ -25,6 +25,8 @@ import { getConversationByTmuxSession } from '../../../lib/database/conversation
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
+const BOOTSTRAP_POLL_MS = 1_000;
+const BOOTSTRAP_FAST_POLL_COUNT = 30;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
 
 /** Minimal conversation shape the announcer needs from the initiator's tmux session. */
@@ -147,19 +149,43 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
   return true;
 }
 
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let running = false;
+let runToken = 0;
 
 export function startRestartAnnouncer(deps: RestartAnnouncerDeps = {}): void {
-  if (timer) return;
-  const pass = () => {
-    void announceNewRestart(deps).catch(() => undefined);
+  if (running) return;
+  running = true;
+  const token = ++runToken;
+  let remainingBootstrapPolls = BOOTSTRAP_FAST_POLL_COUNT;
+
+  const schedule = (delayMs: number) => {
+    if (!running || token !== runToken) return;
+    timer = setTimeout(pass, delayMs);
+    timer.unref?.();
   };
+
+  const nextDelay = (emitted: boolean): number => {
+    if (emitted) return POLL_MS;
+    if (remainingBootstrapPolls > 0) {
+      remainingBootstrapPolls -= 1;
+      return BOOTSTRAP_POLL_MS;
+    }
+    return POLL_MS;
+  };
+
+  const pass = () => {
+    void announceNewRestart(deps)
+      .then((emitted) => schedule(nextDelay(emitted)))
+      .catch(() => schedule(nextDelay(false)));
+  };
+
   pass();
-  timer = setInterval(pass, POLL_MS);
-  timer.unref?.();
 }
 
 export function stopRestartAnnouncer(): void {
-  if (timer) clearInterval(timer);
+  running = false;
+  runToken += 1;
+  if (timer) clearTimeout(timer);
   timer = null;
 }

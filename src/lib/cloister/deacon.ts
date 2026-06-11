@@ -27,7 +27,7 @@ import {
   ProcessTimeoutError,
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
-import { buildContextOverflowReseedMessage, isContextOverflowTail } from '../context-overflow.js';
+import { isContextOverflowTail } from '../context-overflow.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -835,44 +835,61 @@ const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
  * Context-window overflow is NOT a transient error. It surfaces as e.g.
  * "API Error: 400 Your input exceeds the context window of this model." and
  * nudging "continue" only re-sends the same oversized context for the same
- * 400. The only recovery is to compact the conversation, then — once the
- * agent is idle again — nudge it to resume from the compacted summary.
+ * 400. Recovery shrinks the context: agent-* sessions are summarized
+ * out-of-band and respawned fresh with the summary as their opening prompt
+ * (PAN-1781); specialist/planning sessions get the harness /compact plus a
+ * continue nudge once it settles.
  *
  * This matters most for non-Anthropic models routed through CLIProxy
  * (e.g. gpt-5.5): Claude Code's native auto-compact is keyed to a context
  * window it can't determine for the proxied model, so it never fires and the
  * backend's own limit produces a hard 400 instead.
  */
-/** Continuation nudge sent after a successful /compact. */
+/** Continuation nudge sent after a successful harness /compact (specialist/planning sessions). */
 const CONTEXT_OVERFLOW_CONTINUE_MSG =
   'Your context was compacted to recover from a context-window overflow. ' +
   'Continue from where you left off using the compacted summary and your ' +
   'beads / continue.json — do NOT start over.';
 
-/** Let `/compact` finish (and the agent return to an idle prompt) before judging the result. */
-const CONTEXT_COMPACT_SETTLE_MS = 60_000;
+/**
+ * Let a recovery attempt finish before judging the result. MUST exceed the
+ * patrol interval (60s): at exactly one interval the guard expires on the very
+ * next patrol regardless of timer drift, which is how a still-settling
+ * respawn used to get re-judged (and escalated) one tick after its compaction.
+ * Compact respawns also spend ~30-60s generating the summary before the fresh
+ * session even launches.
+ */
+const CONTEXT_COMPACT_SETTLE_MS = 150_000;
 
 export const CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT = 85;
 const CONTEXT_PROACTIVE_COMPACT_COOLDOWN_MS = 30 * 60_000;
 const CONTEXT_PROACTIVE_IDLE_STALE_MS = 5 * 60_000;
+/**
+ * PAN-1781: proactive-compact cooldown stamp, persisted in the agent dir so a
+ * dashboard restart doesn't forget an in-flight /compact and double-fire.
+ */
+const PROACTIVE_COMPACT_STAMP_FILE = 'last-proactive-compact';
 
-/** Give /clear one settled chance before escalating to stuck. */
-const MAX_CONTEXT_CLEAR_ATTEMPTS = 1;
-
-type ContextOverflowRecoveryPhase = 'compact' | 'clear';
+/** Bounded compact-respawn attempts per overflow incident before marking stuck. */
+const MAX_CONTEXT_COMPACT_ATTEMPTS = 2;
 
 type ContextOverflowRecovery = {
   lastAttempt: number;
   compactAttempts: number;
-  clearAttempts: number;
-  phase: ContextOverflowRecoveryPhase;
+  /**
+   * How the last attempt recovered: 'respawn' = PAN-1781 fresh-seeded respawn
+   * (agent-* sessions; the seed is the opening prompt, no follow-up nudge
+   * needed); 'harness-compact' = /compact keystroke (specialist/planning
+   * sessions; needs a continue nudge once the compaction settles).
+   */
+  mechanism: 'respawn' | 'harness-compact';
 };
 
 /**
- * Per-session context-overflow recovery state. Present only while a /compact or
- * /clear tier is in flight; deleted once the overflow clears (so a later
- * overflow is a fresh incident) or on escalation. Kept separate from
- * apiErrorRecoveryState so the transient-error path is untouched.
+ * Per-session context-overflow recovery state. Present only while a recovery
+ * tier is in flight; deleted once the overflow clears (so a later overflow is
+ * a fresh incident) or on escalation. Kept separate from apiErrorRecoveryState
+ * so the transient-error path is untouched.
  */
 export const contextOverflowRecoveryState: Map<string, ContextOverflowRecovery> = new Map();
 export const contextProactiveCompactState: Map<string, { lastAttempt: number }> = new Map();
@@ -892,8 +909,18 @@ const STUCK_NATIVE_RECOVERY_COOLDOWN_MS = 10 * 60 * 1000;
 
 async function maybeProactivelyCompactContext(sessionName: string, now: number): Promise<string | null> {
   if (!sessionName.startsWith('agent-')) return null;
-  const cooldown = contextProactiveCompactState.get(sessionName);
-  if (cooldown && (now - cooldown.lastAttempt) < CONTEXT_PROACTIVE_COMPACT_COOLDOWN_MS) return null;
+  // Cooldown: in-memory fast path, with an on-disk stamp fallback so a
+  // dashboard restart doesn't forget a just-fired /compact and double-fire
+  // into the still-compacting session (PAN-1781).
+  let lastAttempt = contextProactiveCompactState.get(sessionName)?.lastAttempt ?? 0;
+  if (!lastAttempt) {
+    try {
+      const stamp = await readFile(join(getAgentDir(sessionName), PROACTIVE_COMPACT_STAMP_FILE), 'utf-8');
+      const parsed = Date.parse(stamp.trim());
+      if (!Number.isNaN(parsed)) lastAttempt = parsed;
+    } catch { /* no stamp yet */ }
+  }
+  if (lastAttempt && (now - lastAttempt) < CONTEXT_PROACTIVE_COMPACT_COOLDOWN_MS) return null;
   if (!isAgentIdleForNudge(sessionName, CONTEXT_PROACTIVE_IDLE_STALE_MS, now)) return null;
 
   const agentState = getAgentStateSync(sessionName);
@@ -912,6 +939,9 @@ async function maybeProactivelyCompactContext(sessionName: string, now: number):
 
   await Effect.runPromise(sendKeys(sessionName, '/compact'));
   contextProactiveCompactState.set(sessionName, { lastAttempt: now });
+  try {
+    await writeFile(join(getAgentDir(sessionName), PROACTIVE_COMPACT_STAMP_FILE), new Date(now).toISOString(), 'utf-8');
+  } catch { /* stamp is best-effort; in-memory cooldown still applies */ }
   emitActivityEntrySync({
     source: 'cloister',
     level: 'warn',
@@ -1069,18 +1099,13 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             actions.push(`Context overflow recovery: native-compacted previously-stuck ${sessionName} (attempt ${rec.attempts})`);
             continue;
           }
-          // Native compaction failed — fall through to the /clear + reseed tier
-          // against the still-live session (mirroring the fresh-overflow path),
-          // so a transient compaction failure doesn't leave the agent wedged
-          // with no nudge until the next cooldown window.
-          console.warn(`[deacon] Native compaction failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY}) — falling through to /clear`);
-          try {
-            await Effect.runPromise(sendKeys(sessionName, '/clear'));
-            await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
-            actions.push(`Context overflow recovery: stuck ${sessionName} native compaction failed — sent /clear + reseed (attempt ${rec.attempts})`);
-          } catch (clearErr) {
-            console.error(`[deacon] Failed to send /clear to stuck ${sessionName}:`, clearErr);
-          }
+          // Respawn failed — a spawn-level error (seed generation never fails:
+          // it degrades to a reseed-only seed inside resumeAgent). PAN-1781
+          // removed the /clear keystroke tier; the bounded retry budget +
+          // cooldown above covers transient spawn failures, and an exhausted
+          // budget correctly leaves the agent stuck for a human.
+          console.warn(`[deacon] Compact respawn failed for stuck ${sessionName} (${recovered.error ?? 'unknown'}; attempt ${rec.attempts}/${MAX_STUCK_NATIVE_RECOVERY})`);
+          actions.push(`Context overflow recovery: compact respawn failed for stuck ${sessionName} (attempt ${rec.attempts})`);
           continue;
         }
       }
@@ -1092,9 +1117,11 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         }
 
         if (ov && !hasOverflow) {
-          // The previous tier cleared the overflow. /compact needs a resume nudge;
-          // /clear already received the reseed nudge immediately after clearing.
-          if (ov.phase === 'compact') {
+          // The previous tier cleared the overflow. A harness /compact leaves
+          // the agent idle at the compacted summary, so nudge it to resume. A
+          // PAN-1781 fresh-seeded respawn needs no nudge — its seed (summary +
+          // reseed instructions) IS the opening prompt.
+          if (ov.mechanism === 'harness-compact') {
             try {
               await Effect.runPromise(sendKeys(sessionName, CONTEXT_OVERFLOW_CONTINUE_MSG));
               console.log(`[deacon] Agent ${sessionName} resumed after context-overflow compaction`);
@@ -1103,124 +1130,86 @@ export async function checkApiErrorAgents(): Promise<string[]> {
               console.error(`[deacon] Failed to resume ${sessionName} after compaction:`, err);
             }
           } else {
-            actions.push(`Context overflow recovery: ${sessionName} cleared after /clear reseed`);
+            actions.push(`Context overflow recovery: ${sessionName} recovered after compact respawn`);
           }
           contextOverflowRecoveryState.delete(sessionName);
           continue;
         }
 
         if (hasOverflow) {
-          if (ov?.phase === 'clear' && ov.clearAttempts >= MAX_CONTEXT_CLEAR_ATTEMPTS) {
+          // Loop guard: a bounded number of compact attempts per incident, then
+          // escalate to stuck for a human. PAN-1781 removed the /clear keystroke
+          // tier — a respawn that still overflows means something is deeply
+          // wrong (e.g. summarization producing oversized seeds), and blowing
+          // away the context with /clear just hides it.
+          if (ov && ov.compactAttempts >= MAX_CONTEXT_COMPACT_ATTEMPTS) {
             if (issueId) {
               markWorkspaceStuck(issueId, 'context_overflow', {
                 compactAttempts: ov.compactAttempts,
-                clearAttempts: ov.clearAttempts,
               });
             }
             emitActivityEntrySync({
               source: 'cloister',
               level: 'error',
-              message: `${sessionName} stuck: context-window overflow persisted after /compact and /clear recovery`,
+              message: `${sessionName} stuck: context-window overflow persisted after ${ov.compactAttempts} compact-recovery attempts`,
               issueId: issueId ?? undefined,
             });
-            console.error(`[deacon] Agent ${sessionName} stuck after /compact + /clear context-overflow recovery — escalating`);
+            console.error(`[deacon] Agent ${sessionName} stuck after ${ov.compactAttempts} compact-recovery attempts — escalating`);
             contextOverflowRecoveryState.delete(sessionName);
             continue;
           }
 
-          if (ov?.phase === 'compact') {
-            const clearAttempts = ov.clearAttempts + 1;
-            try {
-              await Effect.runPromise(sendKeys(sessionName, '/clear'));
-              await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
-              contextOverflowRecoveryState.set(sessionName, {
-                lastAttempt: now,
-                compactAttempts: ov.compactAttempts,
-                clearAttempts,
-                phase: 'clear',
-              });
-              emitActivityEntrySync({
-                source: 'cloister',
-                level: 'warn',
-                message: `${sessionName} context-window overflow persisted after /compact — cleared context and sent reseed nudge (attempt ${clearAttempts})`,
-                issueId: issueId ?? undefined,
-              });
-              console.log(`[deacon] Agent ${sessionName} context-window overflow persisted — sent /clear + reseed (attempt ${clearAttempts})`);
-              actions.push(`Context overflow recovery: cleared ${sessionName} and sent reseed (attempt ${clearAttempts})`);
-            } catch (err) {
-              console.error(`[deacon] Failed to send /clear reseed recovery to ${sessionName}:`, err);
-            }
-            continue;
-          }
-
-          // Fresh overflow → first try compaction, which preserves more
-          // conversation context than /clear.
           const compactAttempts = (ov?.compactAttempts ?? 0) + 1;
 
-          // PAN-1675: for agent-* sessions, recover via Panopticon-side
-          // compaction (out-of-band rewrite of the JSONL the harness resumes
-          // from) instead of the harness `/compact` — `/compact` needs a live,
-          // responsive Claude process and deadlocks on a session already wedged
-          // past the context ceiling. resumeAgent({ compact:true }) compacts the
-          // JSONL then relaunches; the resumed agent is nudged on the next
-          // patrol's 'overflow cleared' branch (phase 'compact'). On failure we
-          // fall through to the /clear + reseed tier in this same pass against
-          // the still-live wedged session. Non-agent (specialist/planning)
-          // sessions keep the harness /compact path.
+          // PAN-1781: agent-* sessions recover via summarize + fresh-seeded
+          // respawn (resumeAgent({compact:true})): the wedged session is
+          // summarized out-of-band and a FRESH session is spawned with that
+          // summary as its opening prompt. Never the harness `/compact` (which
+          // deadlocks past the ceiling) and never an in-place JSONL boundary +
+          // --resume (which the harness's resume leaf selection bypassed ~half
+          // the time, silently rebuilding the full overflowed context — the
+          // root cause behind every "compaction didn't work → /clear" incident
+          // up to PAN-1775). Attempts are counted on failure too, so a
+          // persistently failing respawn exhausts the budget and escalates
+          // instead of retrying forever.
           if (issueId !== null) {
             const { resumeAgent } = await import('../agents.js');
             const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });
+            contextOverflowRecoveryState.set(sessionName, {
+              lastAttempt: now,
+              compactAttempts,
+              mechanism: 'respawn',
+            });
             if (resumeResult.success) {
-              contextOverflowRecoveryState.set(sessionName, {
-                lastAttempt: now,
-                compactAttempts,
-                clearAttempts: ov?.clearAttempts ?? 0,
-                phase: 'compact',
-              });
               emitActivityEntrySync({
                 source: 'cloister',
                 level: 'warn',
-                message: `${sessionName} hit context-window overflow — recovered via Panopticon-side compaction (attempt ${compactAttempts})`,
+                message: `${sessionName} hit context-window overflow — respawned fresh with a compact-summary seed (attempt ${compactAttempts})`,
                 issueId: issueId ?? undefined,
               });
-              console.log(`[deacon] Agent ${sessionName} hit context-window overflow — Panopticon-side compacted + resumed (attempt ${compactAttempts})`);
-              actions.push(`Context overflow recovery: Panopticon-side compacted ${sessionName} (attempt ${compactAttempts})`);
-              continue;
-            }
-            // Compaction/resume failed — fall through to /clear + reseed in this
-            // same patrol pass (no compact attempt recorded; session still live).
-            console.warn(`[deacon] Panopticon-side compaction failed for ${sessionName} (${resumeResult.error ?? 'unknown'}); falling through to /clear`);
-            const clearAttempts = (ov?.clearAttempts ?? 0) + 1;
-            try {
-              await Effect.runPromise(sendKeys(sessionName, '/clear'));
-              await Effect.runPromise(sendKeys(sessionName, buildContextOverflowReseedMessage()));
-              contextOverflowRecoveryState.set(sessionName, {
-                lastAttempt: now,
-                compactAttempts: ov?.compactAttempts ?? 0,
-                clearAttempts,
-                phase: 'clear',
-              });
+              console.log(`[deacon] Agent ${sessionName} hit context-window overflow — compact-respawned (attempt ${compactAttempts})`);
+              actions.push(`Context overflow recovery: compact-respawned ${sessionName} (attempt ${compactAttempts})`);
+            } else {
               emitActivityEntrySync({
                 source: 'cloister',
                 level: 'warn',
-                message: `${sessionName} context-window overflow — Panopticon-side compaction failed, cleared context and sent reseed nudge (attempt ${clearAttempts})`,
+                message: `${sessionName} compact respawn failed (${resumeResult.error ?? 'unknown'}) — will retry after settle (attempt ${compactAttempts}/${MAX_CONTEXT_COMPACT_ATTEMPTS})`,
                 issueId: issueId ?? undefined,
               });
-              console.log(`[deacon] Agent ${sessionName} — compaction failed, sent /clear + reseed (attempt ${clearAttempts})`);
-              actions.push(`Context overflow recovery: compaction failed, cleared ${sessionName} and sent reseed (attempt ${clearAttempts})`);
-            } catch (err) {
-              console.error(`[deacon] Failed to send /clear reseed recovery to ${sessionName}:`, err);
+              console.warn(`[deacon] Compact respawn failed for ${sessionName} (${resumeResult.error ?? 'unknown'}; attempt ${compactAttempts}/${MAX_CONTEXT_COMPACT_ATTEMPTS})`);
+              actions.push(`Context overflow recovery: compact respawn failed for ${sessionName} (attempt ${compactAttempts})`);
             }
             continue;
           }
 
+          // Non-agent (specialist/planning) sessions are not registered agents,
+          // so the respawn path doesn't apply — keep the harness /compact tier.
           try {
             await Effect.runPromise(sendKeys(sessionName, '/compact'));
             contextOverflowRecoveryState.set(sessionName, {
               lastAttempt: now,
               compactAttempts,
-              clearAttempts: ov?.clearAttempts ?? 0,
-              phase: 'compact',
+              mechanism: 'harness-compact',
             });
             emitActivityEntrySync({
               source: 'cloister',

@@ -1,0 +1,76 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T10:04:17.751Z",
+    "updated": "2026-06-11T10:04:17.751Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1775: feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1775",
+    "title": "feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
+    "status": "proposed",
+    "uid": "48500c79-70ae-4dca-9b5d-8ccda6961d53",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-11T10:04:17.751Z",
+    "updated": "2026-06-11T10:04:17.751Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1775",
+        "label": "PAN-1775",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1775-feat-dashboard-remote-fly-io-work-agents-need-a-real-session-row-in-the-issue-tree-chip-only-visibility-reads-as-no-agent.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Problem\n\nDuring the PAN-1762 remote Fable 5 test, the operator asked: *\"why can't I see the work agent in the issue tree?\"* — while the agent was running fine on Fly.\n\nThe remote agent IS surfaced, but only as a **tiny icon chip** in the issue row's resource strip (tooltip: `fly.io: pan-pan-1762-ws (running)`). Compare the two adjacent issues in the tree today:\n\n- **PAN-1765 (local agent):** full session row — `Work (gpt-5.5) · 9s ago · working · 20m` with live last-heard, current tool, and an openable terminal.\n- **PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read `1 session idle · ! INPUT` while a work agent was actively implementing on Fly.\n\n## Why\n\n`feature.sessions` is built from local tmux discovery; remote agents have no local tmux session, so they never enter the sessions list. The PAN-1676 visibility pass added the chip + remoteAgent details (FeatureItem.tsx rows / resource strip) but not session-row parity.\n\n## Fix\n\n1. Synthesize a session entry from `remote-state.json` (`~/.panopticon/agents/agent-<id>/remote-state.json`) wherever feature.sessions is composed, labeled e.g. `Work (claude-fable-5) · fly.io · running`, so the issue header badge counts it as a running work agent (`1 work agent running`, not `1 session idle`).\n2. Clicking it should open the remote terminal (tmux on the VM via `pan workspace ssh` / a ws-terminal remote bridge — or at minimum show remote agent output via `getRemoteAgentOutput`).\n3. The idle planning session should not outrank an actively-working remote agent for the issue's headline status.\n\n## Refs\nPAN-1676 (remaining scope: \"Dashboard visibility / overflow-slot surfacing for remote agents\"), PAN-1762 (the live test that surfaced this).",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T10:04:17.751Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Problem\n\nDuring the PAN-1762 remote Fable 5 test, the operator asked: *\"why can't I see the work agent in the issue tree?\"* — while the agent was running fine on Fly.\n\nThe remote agent IS surfaced, but only as a **tiny icon chip** in the issue row's resource strip (tooltip: `fly.io: pan-pan-1762-ws (running)`). Compare the two adjacent issues in the tree today:\n\n- **PAN-1765 (local agent):** full session row — `Work (gpt-5.5) · 9s ago · working · 20m` with live last-heard, current tool, and an openable terminal.\n- **PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read `1 session idle · ! INPUT` while a work agent was actively implementing on Fly.\n\n## Why\n\n`feature.sessions` is built from local tmux discovery; remote agents have no local tmux session, so they never enter the sessions list. The PAN-1676 visibility pass added the chip + remoteAgent details (FeatureItem.tsx rows / resource strip) but not session-row parity.\n\n## Fix\n\n1. Synthesize a session entry from `remote-state.json` (`~/.panopticon/agents/agent-<id>/remote-state.json`) wherever feature.sessions is composed, labeled e.g. `Work (claude-fable-5) · fly.io · running`, so the issue header badge counts it as a running work agent (`1 work agent running`, not `1 session idle`).\n2. Clicking it should open the remote terminal (tmux on the VM via `pan workspace ssh` / a ws-terminal remote bridge — or at minimum show remote agent output via `getRemoteAgentOutput`).\n3. The idle planning session should not outrank an actively-working remote agent for the issue's headline status.\n\n## Refs\nPAN-1676 (remaining scope: \"Dashboard visibility / overflow-slot surfacing for remote agents\"), PAN-1762 (the live test that surfaced this)."
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "**PAN-1765 (local agent):** full session row — Work (gpt-5.5) · 9s ago · working · 20m with live last-heard, current tool, and an openable terminal.",
+            "status": "pending",
+            "created": "2026-06-11T10:04:17.751Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "**PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read 1 session idle · ! INPUT while a work agent was actively implementing on Fly.",
+            "status": "pending",
+            "created": "2026-06-11T10:04:17.751Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

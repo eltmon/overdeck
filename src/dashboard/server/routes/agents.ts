@@ -1988,9 +1988,10 @@ const postAgentResumeRoute = HttpRouter.add(
     const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
     // PAN-1675: a compact-resume targets a context-wedged agent that is usually
     // still 'running' (a live but stuck session), which the normal gate rejects.
-    // Allow it through for compact === true — resumeAgent compacts the JSONL and
-    // kills the wedged session before relaunch (its own canResume handles the
-    // running case). Non-compact resumes keep the strict gate.
+    // Allow it through for compact === true — resumeAgent summarizes the wedged
+    // session out-of-band, kills it, and respawns a fresh session seeded with
+    // the summary (PAN-1781; its own canResume handles the running case).
+    // Non-compact resumes keep the strict gate.
     if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck && compact !== true) {
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,

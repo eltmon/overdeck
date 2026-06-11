@@ -532,12 +532,14 @@ export function ConversationPanel({
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  // v1.2 signal law: blue = machine activity (forking/starting/alive),
+  // red = failed, neutral = ended. Amber is reserved for human-action states.
   const statusColor = isForkingHeader || isSpawningHeader
-    ? 'var(--warning)'
+    ? 'var(--info)'
     : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
-    ? 'var(--success)'
+    ? 'var(--info)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
   return (
