@@ -1950,6 +1950,50 @@ working around. Do not re-investigate or strike these classes:
   (agent-pan-resume-*, agent-pan-kickoff-fail) still get orphan-recovered every
   patrol pre-reboot (PAN-1702/1720 class).
 
+## RUN-22 operator interlude (2026-06-11 ~07:00-07:30Z) — PAN-1771 stale-blocker sweep: filed→fixed→live in ~30 min
+
+Operator merged UAT batch `uat/pan-flint-0611` (PAN-1686, a8f76b7a4) and asked
+(1) did it merge OK, (2) does merge auto-reload the dashboard, (3) implement if
+not. Then relayed an agent-pan-1704-ship signal (PAN-1699 contract working):
+ship can't run (roles/ship.md absent), PR #1713 green+mergeable, but
+`pan review pending --ready` omits PAN-1704 — "pipeline state needs
+reconciliation rather than a vestigial ship agent."
+
+**Answers established:**
+- Merge-auto-deploy EXISTS and works (PAN-1723, closed): every merge fires
+  `scripts/post-merge-deploy.sh` → pristine origin/main worktree build → dist
+  swap → restart → health check. Verified twice tonight (built sha == merge sha
+  both times). It is postMergeLifecycle, NOT the ship agent, that triggers it.
+- **readyForMerge is EVENT-DRIVEN since PAN-1650** (review-status.ts:268):
+  derived on every status write from review+test+verification+blockers. No ship
+  actor flips it. Ship really is vestigial for the flip (PAN-1747 removes it).
+- **Root cause of 1704's invisibility (PAN-1771, fixed+closed):** GitHub-native
+  blockers (failing_checks/merge_conflict/draft_pr/not_mergeable) were refreshed
+  ONLY by webhooks (refreshMergeStateFromGitHub via PAN-1620). Webhooks missed
+  during server downtime (reboot/deploy) leave stale blockers that pin
+  readyForMerge=false forever under the PAN-1650 derivation. Fix: boot sweep
+  `reconcileStaleGitHubBlockers()` next to fixStuckReadyForMerge(). Live result:
+  8 issues reconciled at boot; PAN-1704 AND PAN-1747 both flipped ready_for_merge=1
+  (1747's 02:33 conflict blocker was also stale); PAN-1491's blocker was
+  re-derived FRESH from live PR state (kept, correctly — it's real).
+
+**Operational learnings:**
+- The deploy lock (/tmp/panopticon-deploy.lock) can read "held" transiently
+  right after a completed deploy — a skipped manual deploy may just need a
+  re-run a few minutes later. No fd leak found (checked /proc/*/fd).
+- Landing a fix when the primary worktree has ANOTHER session's uncommitted
+  source edits: chore-commit .pan state (convention), then
+  `git worktree add --detach /tmp/x origin/main` + cherry-pick + push — never
+  touch the other session's files, never stash. Local main stays diverged until
+  that session commits; **do not `pan reload` while local main is behind origin**
+  (it would build a stale tree) — use the deploy script (pristine origin build)
+  for liveness instead.
+- `pan pause` accepts role-session ids (agent-pan-1704-ship) — used to park the
+  vestigial ship session after its signal (slot release, blocks re-dispatch).
+- commitlint here rejects subjects starting with an uppercase token (RUN-22 →
+  use lowercase); scope enum is [cloister, dashboard, workspace, cli, review,
+  beads, db, specialists, terminal, infra, deps].
+
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 
 PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
