@@ -4,7 +4,7 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-10T07:41:32.778Z"
+    "updated": "2026-06-11T08:51:01.048Z"
   },
   "plan": {
     "id": "pan-1242",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 136,
+    "sequence": 137,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-10T07:41:32.778Z",
+    "updated": "2026-06-11T08:51:01.048Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -415,10 +415,10 @@
     "metadata": {
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "merge",
         "issueId": "PAN-1242",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T07:41:32.778Z",
+        "updatedAt": "2026-06-11T08:51:01.048Z",
         "work": {
           "updatedAt": "2026-06-10T07:41:32.778Z",
           "history": []
@@ -449,14 +449,19 @@
           "approval": "approved"
         },
         "test": {
-          "status": "failed",
-          "updatedAt": "2026-06-10T07:41:32.778Z",
-          "notes": "Quality gates: typecheck PASS, lint PASS, build PASS, test 5550 passed / 1 failed. Failure in config-yaml-conversation-search.test.ts unrelated to PAN-1242 (introduced by PAN-1395). PAN-1242 issues-create endpoint tests all PASS.",
+          "status": "passed",
+          "updatedAt": "2026-06-11T08:51:01.048Z",
+          "notes": "Quality gates pass after fixing config-yaml-conversation-search.test.ts to avoid machine-local conversationSearch defaults: typecheck PASS, build:cli PASS, lint PASS, npm test PASS (root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests).",
           "history": [
             {
               "status": "failed",
               "at": "2026-06-10T07:41:32.778Z",
               "notes": "Quality gates: typecheck PASS, lint PASS, build PASS, test 5550 passed / 1 failed. Failure in config-yaml-conversation-search.test.ts unrelated to PAN-1242 (introduced by PAN-1395). PAN-1242 issues-create endpoint tests all PASS."
+            },
+            {
+              "status": "passed",
+              "at": "2026-06-11T08:51:01.048Z",
+              "notes": "Quality gates pass after fixing config-yaml-conversation-search.test.ts to avoid machine-local conversationSearch defaults: typecheck PASS, build:cli PASS, lint PASS, npm test PASS (root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests)."
             }
           ]
         },
@@ -466,14 +471,19 @@
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T07:41:32.778Z",
+          "updatedAt": "2026-06-11T08:51:01.048Z",
           "history": [
             {
               "status": "pending",
               "at": "2026-06-10T07:41:32.778Z"
+            },
+            {
+              "status": "pending",
+              "at": "2026-06-11T08:51:01.048Z",
+              "notes": "Ready for merge after test specialist passed PAN-1242."
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1516"
         }
       }
