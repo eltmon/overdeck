@@ -16,7 +16,7 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
  */
 
 import { randomUUID } from 'node:crypto';
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -184,11 +184,133 @@ import {
 } from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 const CONVERSATION_LIST_ENRICHMENT_CONCURRENCY = 8;
+const PROCESS_CLEANUP_GRACE_MS = 750;
+
+type ProcessTableRow = {
+  pid: number;
+  ppid: number;
+  args: string;
+};
+
+function parseProcessTable(output: string): ProcessTableRow[] {
+  return output
+    .split('\n')
+    .map((line) => {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (!match) return null;
+      return {
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        args: match[3] ?? '',
+      };
+    })
+    .filter((row): row is ProcessTableRow => row !== null && Number.isFinite(row.pid) && Number.isFinite(row.ppid));
+}
+
+async function readProcessTable(): Promise<ProcessTableRow[]> {
+  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args='], {
+    encoding: 'utf-8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return parseProcessTable(stdout);
+}
+
+function collectProcessTree(rootPids: number[], rows: ProcessTableRow[]): number[] {
+  const childrenByParent = new Map<number, number[]>();
+  for (const row of rows) {
+    const children = childrenByParent.get(row.ppid) ?? [];
+    children.push(row.pid);
+    childrenByParent.set(row.ppid, children);
+  }
+
+  const seen = new Set<number>();
+  const ordered: number[] = [];
+  const visit = (pid: number) => {
+    if (seen.has(pid) || pid === process.pid) return;
+    seen.add(pid);
+    for (const child of childrenByParent.get(pid) ?? []) visit(child);
+    ordered.push(pid);
+  };
+
+  for (const pid of rootPids) visit(pid);
+  return ordered;
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function terminatePids(pids: number[]): Promise<void> {
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Already gone.
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, PROCESS_CLEANUP_GRACE_MS));
+
+  for (const pid of pids) {
+    if (!isProcessAlive(pid)) continue;
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Already gone or permission denied; callers log the cleanup attempt.
+    }
+  }
+}
+
+function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+  const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
+  const sessionId = conv.claudeSessionId?.trim();
+  const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+
+  return rows
+    .filter((row) => {
+      if (row.pid === process.pid) return false;
+      if (row.args.includes(launcherScript)) return true;
+      return sessionNeedles.some((needle) => row.args.includes(needle));
+    })
+    .map((row) => row.pid);
+}
+
+async function killConversationRuntimeProcesses(conv: Conversation): Promise<void> {
+  const rows = await readProcessTable();
+  const rootPids = conversationRuntimeRootPids(conv, rows);
+  const pids = collectProcessTree(rootPids, rows);
+  await terminatePids(pids);
+}
+
+async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
+  // PAN-1458: post-/clear sibling rows share one tmux pane. If another active
+  // conversation still owns that pane, only end this DB row.
+  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+    return;
+  }
+
+  await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+
+  try {
+    await killConversationRuntimeProcesses(conv);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
+  }
+}
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -2526,12 +2648,7 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        // Post-/clear sibling rows share the tmux pane with their parent — killing
-        // from one would tear down the live thread.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -3358,10 +3475,7 @@ const deleteConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
@@ -3401,10 +3515,7 @@ const postConversationArchiveRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
