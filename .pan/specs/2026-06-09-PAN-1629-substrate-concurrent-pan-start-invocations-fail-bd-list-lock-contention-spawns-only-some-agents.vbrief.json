@@ -4,7 +4,7 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-10T02:20:40.773Z"
+    "updated": "2026-06-10T13:23:24.726Z"
   },
   "plan": {
     "id": "pan-1629",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 86,
+    "sequence": 93,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-10T02:20:40.773Z",
+    "updated": "2026-06-10T13:23:24.726Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -441,58 +441,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "test",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-10T02:20:40.554Z",
+        "updatedAt": "2026-06-10T13:23:24.576Z",
         "work": {
-          "updatedAt": "2026-06-10T02:20:40.554Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-10T02:20:40.554Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-10T02:20:40.554Z"
+              "at": "2026-06-10T13:23:24.576Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-06-10T02:20:40.554Z",
-          "notes": "Agent re-review request (2/25): Fixed sync-target-branch",
+          "status": "passed",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
+          "notes": "Approved; only correctness finding was demoted by cycle-3 convergence gate because src/lib/bd-process-lock.ts was unchanged since prior synthesis",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-06-10T02:20:40.554Z",
-              "notes": "Agent re-review request (2/25): Fixed sync-target-branch"
+              "status": "passed",
+              "at": "2026-06-10T13:23:24.576Z",
+              "notes": "Approved; only correctness finding was demoted by cycle-3 convergence gate because src/lib/bd-process-lock.ts was unchanged since prior synthesis"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-10T02:20:40.554Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-10T02:20:40.554Z"
+              "status": "passed",
+              "at": "2026-06-10T13:23:24.576Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-10T02:20:40.554Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-10T02:20:40.554Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-10T02:20:40.554Z"
+              "at": "2026-06-10T13:23:24.576Z"
             }
           ],
           "readyForMerge": false,
