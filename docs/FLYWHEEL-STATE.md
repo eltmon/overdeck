@@ -70,7 +70,14 @@ workspaces (which is all of them). Candidate substrate fix: resolve the real git
 
 ## Parked items
 
-(none recorded yet — `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
+- **PAN-1762 (Swarm v2) — OPERATOR-HELD at proposed (directive 2026-06-11, RUN-22).**
+  The operator wants to review the plan before any work starts. Do NOT
+  `pan start PAN-1762` when its spec reaches proposed — the stop-at-proposed
+  contract is explicitly overridden for this issue. It starts only on the
+  operator's explicit instruction. Do not re-surface it as a start suggestion;
+  list it as held.
+
+(otherwise: `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
 
 ## RUN-9 observations (tick 1, 2026-05-24)
 
