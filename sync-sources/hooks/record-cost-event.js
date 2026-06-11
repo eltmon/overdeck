@@ -3900,6 +3900,16 @@ TaggedError("ProcessTimeoutError");
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
+		model: "claude-fable-5",
+		inputPer1k: .01,
+		outputPer1k: .05,
+		cacheReadPer1k: .001,
+		cacheWrite5mPer1k: .0125,
+		cacheWrite1hPer1k: .02,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
 		model: "claude-opus-4-8",
 		inputPer1k: .005,
 		outputPer1k: .025,
@@ -4144,6 +4154,13 @@ const DEFAULT_PRICING = [
 	{
 		provider: "custom",
 		model: "MiniMax-M2.7-highspeed",
+		inputPer1k: 3e-4,
+		outputPer1k: .0012,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "MiniMax-M3",
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
@@ -4399,7 +4416,9 @@ function initSchema(db) {
       -- PAN-938: pre-review verification gate commit SHA
       last_verified_commit    TEXT,
       -- PAN-938: current merge pipeline step
-      merge_step              TEXT
+      merge_step              TEXT,
+      -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
+      auto_merge              INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -4488,6 +4507,31 @@ function initSchema(db) {
       value       TEXT NOT NULL,
       updated_at  TEXT NOT NULL
     );
+
+    -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
+    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
+    -- chain: lifecycle transitions are status flips, rows are never deleted
+    -- (auditable history of what was bundled, resolved, and promoted).
+    CREATE TABLE IF NOT EXISTS uat_generations (
+      name             TEXT PRIMARY KEY,
+      worktree_path    TEXT NOT NULL,
+      project_root     TEXT NOT NULL,
+      base_sha         TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'assembling',
+      members          TEXT NOT NULL DEFAULT '[]',
+      held_out         TEXT NOT NULL DEFAULT '[]',
+      resolutions      TEXT NOT NULL DEFAULT '[]',
+      stack_started_at TEXT,
+      cleaned_at       TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+      ON uat_generations(status);
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+      ON uat_generations(project_root, created_at DESC);
 
     -- ===== Rate Limits =====
     CREATE TABLE IF NOT EXISTS rate_limits (
@@ -4783,7 +4827,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 49`);
+	db.pragma(`user_version = 52`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4791,7 +4835,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 49) return;
+	if (currentVersion === 52) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5389,7 +5433,34 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 49`);
+	if (currentVersion < 50) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`);
+	} catch {}
+	if (currentVersion < 51) db.exec(`
+      CREATE TABLE IF NOT EXISTS uat_generations (
+        name             TEXT PRIMARY KEY,
+        worktree_path    TEXT NOT NULL,
+        project_root     TEXT NOT NULL,
+        base_sha         TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'assembling',
+        members          TEXT NOT NULL DEFAULT '[]',
+        held_out         TEXT NOT NULL DEFAULT '[]',
+        resolutions      TEXT NOT NULL DEFAULT '[]',
+        stack_started_at TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+        ON uat_generations(status);
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+        ON uat_generations(project_root, created_at DESC);
+    `);
+	if (currentVersion < 52) try {
+		db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
+	} catch {}
+	db.pragma(`user_version = 52`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

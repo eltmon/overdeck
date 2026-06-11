@@ -56,9 +56,10 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         deacon_ignored_reason,
         blocker_reasons,
         last_verified_commit,
-        merge_step
+        merge_step,
+        auto_merge
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -96,7 +97,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         deacon_ignored_reason = excluded.deacon_ignored_reason,
         blocker_reasons       = excluded.blocker_reasons,
         last_verified_commit  = excluded.last_verified_commit,
-        merge_step            = excluded.merge_step
+        merge_step            = excluded.merge_step,
+        auto_merge            = excluded.auto_merge
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -135,6 +137,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.blockerReasons ? JSON.stringify(s.blockerReasons) : null,
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
+      s.autoMerge === undefined ? null : (s.autoMerge ? 1 : 0),
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -374,6 +377,8 @@ interface DbReviewStatusRow {
   last_verified_commit: string | null;
   // Current merge pipeline step
   merge_step: string | null;
+  // PAN-1691: per-issue auto-merge routing key (null=project default, 1=auto, 0=hold-for-UAT)
+  auto_merge: number | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -415,6 +420,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
     lastVerifiedCommit: row.last_verified_commit ?? undefined,
     mergeStep: row.merge_step ?? undefined,
+    autoMerge: row.auto_merge === null || row.auto_merge === undefined ? undefined : row.auto_merge === 1,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -491,6 +497,31 @@ export function setDeaconIgnored(
     now,
     issueId,
   );
+}
+
+/**
+ * PAN-1691: set (or clear) the per-issue auto-merge routing key.
+ * `autoMerge === null` clears it back to the project default (NULL column);
+ * `true` = auto-merge (fast lane); `false` = hold for UAT (manual lane).
+ * Mirrors setDeaconIgnored so the flag can be set on an issue that has no
+ * prior review_status row.
+ */
+export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const value = autoMerge === null ? null : autoMerge ? 1 : 0;
+
+  db.prepare(`
+    INSERT OR IGNORE INTO review_status (
+      issue_id, review_status, test_status, updated_at, ready_for_merge, auto_merge
+    ) VALUES (?, 'pending', 'pending', ?, 0, ?)
+  `).run(issueId, now, value);
+
+  db.prepare(`
+    UPDATE review_status
+    SET auto_merge = ?, updated_at = ?
+    WHERE issue_id = ?
+  `).run(value, now, issueId);
 }
 
 /**

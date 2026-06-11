@@ -35,6 +35,35 @@ const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
 }));
 
+const transcriptLandingMocks = vi.hoisted(() => ({
+  snapshotCount: 0,
+  landed: false,
+  useLandedFlag: false,
+  snapshotCounts: undefined as number[] | undefined,
+}));
+
+vi.mock('../../src/lib/transcript-landing.js', () => ({
+  captureTranscriptUserRecordSnapshot: vi.fn(async () => {
+    if (transcriptLandingMocks.snapshotCounts) {
+      const count = transcriptLandingMocks.snapshotCounts.length > 1
+        ? transcriptLandingMocks.snapshotCounts.shift()!
+        : transcriptLandingMocks.snapshotCounts[0] ?? 0;
+      return { sessionFile: '/tmp/session.jsonl', userRecordCount: count };
+    }
+    if (transcriptLandingMocks.useLandedFlag) {
+      return { sessionFile: '/tmp/session.jsonl', userRecordCount: transcriptLandingMocks.landed ? 1 : 0 };
+    }
+    transcriptLandingMocks.snapshotCount += 1;
+    return {
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: transcriptLandingMocks.snapshotCount,
+    };
+  }),
+  hasNewTranscriptUserRecord: vi.fn((before: { userRecordCount: number }, after: { userRecordCount: number }) =>
+    after.userRecordCount > before.userRecordCount,
+  ),
+}));
+
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
   createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
@@ -177,15 +206,27 @@ vi.mock('../../src/lib/beads-query.js', async (importOriginal) => {
 describe('PAN-1048 role primitive — agent spawning', () => {
   let testPanopticonHome: string;
   let testAgentsDir: string;
+  let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
   beforeEach(async () => {
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     testAgentsDir = join(testPanopticonHome, 'agents');
+    // PAN-1752: spawn paths hard-fail on a missing workspace dir (PAN-1746
+    // gate in assertWorkspaceStackHealthyForSpawn), so the fixture workspace
+    // must actually exist — a bare '/tmp/test-workspace' literal only passed
+    // when leftover state happened to be on the machine.
+    testWorkspace = join(testPanopticonHome, 'test-workspace');
     mkdirSync(testAgentsDir, { recursive: true });
+    mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
+    transcriptLandingMocks.snapshotCount = 0;
+    transcriptLandingMocks.landed = false;
+    transcriptLandingMocks.useLandedFlag = false;
+    transcriptLandingMocks.snapshotCounts = undefined;
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
+    vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
     vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
     // PAN-1594: spawnRun/spawnAgent now wait for the session-start hook to write
     // ready.json (waitForReadySignal) instead of scraping the tmux pane. The real
@@ -244,7 +285,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('writes role: "work" to AgentState and resolves the work model from roles config', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-1',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
       };
 
@@ -262,7 +303,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('persists AgentState (role, harness, model) to disk under PANOPTICON_HOME', async () => {
       await spawnAgent({
         issueId: 'PAN-TEST-2',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
       });
 
@@ -285,7 +326,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       const state = await spawnAgent({
         issueId: 'PAN-KICKOFF-1',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
         prompt: 'do the work',
       });
@@ -305,7 +346,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       try {
         const spawned = spawnAgent({
           issueId: 'PAN-KICKOFF-FAIL',
-          workspace: '/tmp/test-workspace',
+          workspace: testWorkspace,
           role: 'work',
           prompt: 'do the work',
         });
@@ -406,6 +447,35 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
+    it('resumeAgent marks kickoff redelivered only after the redelivery lands', async () => {
+      vi.useFakeTimers();
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-redeliver-second';
+      writeResumableWorkAgent(agentId, false);
+      transcriptLandingMocks.useLandedFlag = true;
+      let deliveryAttempts = 0;
+      vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.sync(() => {
+        deliveryAttempts += 1;
+        if (deliveryAttempts === 2) transcriptLandingMocks.landed = true;
+      }));
+
+      try {
+        const result = resumeAgent(agentId);
+        await vi.waitFor(() => expect(tmux.createSession).toHaveBeenCalled());
+        await vi.advanceTimersByTimeAsync(1_000);
+        await vi.waitFor(() => expect(tmux.sendKeys).toHaveBeenCalledTimes(1));
+        expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(false);
+        await vi.advanceTimersByTimeAsync(3_000);
+        await vi.waitFor(() => expect(tmux.sendKeys).toHaveBeenCalledTimes(2));
+        await expect(result).resolves.toEqual({ success: true, messageDelivered: true });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(deliveryAttempts).toBe(2);
+      expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
+    });
+
     it('resumeAgent keeps generic continue behavior when kickoffDelivered is true', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-confirmed';
@@ -435,7 +505,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('honours an explicit options.model over the role config default', async () => {
       const state = await spawnAgent({
         issueId: 'PAN-TEST-3',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
         model: 'claude-haiku-4-5',
       });
@@ -452,7 +522,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       await expect(spawnAgent({
         issueId: 'PAN-NOBEADS-1',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
       })).rejects.toThrow(/No beads tasks found/);
 
@@ -591,7 +661,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     ])('spawnRun(issueId, $role) writes role and resolves model from workhorses defaults', async ({ role, expectedSuffix, expectedModel }) => {
       const issueId = `PAN-${role.toUpperCase()}-1`;
       const state = await spawnRun(issueId, role, {
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
       });
 
       expect(state.id).toBe(`agent-${issueId.toLowerCase()}${expectedSuffix}`);
@@ -617,7 +687,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
       }));
       await spawnRun('PAN-SUBREVIEW-1', 'review', {
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         subRole: 'security',
         prompt: 'review this diff',
       });
@@ -644,7 +714,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
       }));
       await spawnRun('PAN-SUBSIGNAL-1', 'review', {
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         subRole: 'correctness',
         prompt: 'review this diff',
         reviewSynthesisAgentId: 'agent-pan-subsignal-1-review',
@@ -681,7 +751,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       vi.mocked(tmux.capturePane).mockReturnValueOnce(Effect.succeed('pi rpc mode'));
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         harness: 'pi',
         prompt: 'run the tests',
       });
@@ -700,7 +770,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       vi.mocked(sessionExists).mockReturnValue(Effect.succeed(true));
 
       await expect(
-        spawnRun('PAN-DUP-1', 'review', { workspace: '/tmp/test-workspace' }),
+        spawnRun('PAN-DUP-1', 'review', { workspace: testWorkspace }),
       ).rejects.toThrow(/already running/);
     });
   });
@@ -720,7 +790,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       });
 
       const state = await spawnRun('PAN-PI-1', 'review', {
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         harness: 'pi',
       });
 
@@ -737,7 +807,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       const state = await spawnAgent({
         issueId: 'PAN-PI-2',
-        workspace: '/tmp/test-workspace',
+        workspace: testWorkspace,
         role: 'work',
         harness: 'pi',
       });

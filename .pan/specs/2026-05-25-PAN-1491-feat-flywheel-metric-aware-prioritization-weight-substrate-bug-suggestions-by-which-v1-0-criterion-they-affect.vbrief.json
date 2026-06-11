@@ -4,7 +4,7 @@
     "created": "2026-05-25T17:47:34.381Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1491: feat(flywheel): metric-aware prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect",
-    "updated": "2026-05-25T17:50:19.401Z"
+    "updated": "2026-06-11T00:18:55.118Z"
   },
   "plan": {
     "id": "pan-1491",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "ed1c6a6d-dbc7-4caa-b955-20402f1a0358",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 6,
     "created": "2026-05-25T17:47:34.381Z",
-    "updated": "2026-05-25T17:50:19.401Z",
+    "updated": "2026-06-11T00:18:55.118Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1491",
@@ -624,7 +624,70 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1491-feat-flywheel-metric-aware-prioritization-weight-substrate-bug-suggestions-by-which-v1-0-criterion-they-affect.vbrief.json"
+      "canonicalFilename": "2026-05-25-PAN-1491-feat-flywheel-metric-aware-prioritization-weight-substrate-bug-suggestions-by-which-v1-0-criterion-they-affect.vbrief.json",
+      "pipeline": {
+        "phase": "test",
+        "issueId": "PAN-1491",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-11T00:18:55.117Z",
+        "work": {
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T00:18:55.117Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "notes": "Approved; no blocking findings after convergence demoted repeated weights endpoint performance advisory.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T00:18:55.117Z",
+              "notes": "Approved; no blocking findings after convergence demoted repeated weights endpoint performance advisory."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "failed",
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "notes": "Pre-existing test failure in src/lib/cloister/__tests__/beads-scoping.test.ts (work.md template scoping). Gates: typecheck PASSED, lint PASSED. Test suite: 5692 passed, 1 failed (pre-existing on main), 51 skipped. The failing test checks work.md line 88 contains -l {{ISSUE_ID_LOWER}} but that line is only a documentation example, not an instruction. Test failure predates PAN-1491 and exists on main as well.",
+          "history": [
+            {
+              "status": "failed",
+              "at": "2026-06-11T00:18:55.117Z",
+              "notes": "Pre-existing test failure in src/lib/cloister/__tests__/beads-scoping.test.ts (work.md template scoping). Gates: typecheck PASSED, lint PASSED. Test suite: 5692 passed, 1 failed (pre-existing on main), 51 skipped. The failing test checks work.md line 88 contains -l {{ISSUE_ID_LOWER}} but that line is only a documentation example, not an instruction. Test failure predates PAN-1491 and exists on main as well."
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-11T00:18:55.117Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-11T00:18:55.117Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1636"
+        }
+      }
     }
   },
   "status": "proposed"

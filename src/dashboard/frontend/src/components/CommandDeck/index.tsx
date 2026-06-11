@@ -29,9 +29,10 @@ import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { WS_METHODS } from '@panctl/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 
 async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json();
 }
@@ -1267,6 +1268,7 @@ export function CommandDeck({
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
+                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   features={selectedProjectData?.features}

@@ -48,6 +48,7 @@ import { VoiceDesignTab } from './VoiceDesignTab';
 import { VoicePresetsTab } from './VoicePresetsTab';
 import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
+import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
@@ -106,7 +107,7 @@ interface ConversationSearchStatusResponse {
 }
 
 async function fetchConversationSearchStatus(): Promise<ConversationSearchStatusResponse> {
-  const res = await fetch('/api/settings/conversation-search/status');
+  const res = await fetch('/api/settings/conversation-search/status', { credentials: 'include' });
   if (!res.ok) throw new Error('Failed to fetch conversation search status');
   return res.json();
 }
@@ -124,15 +125,21 @@ interface ConversationSearchCostEstimate {
   confirmationNonce?: string;
 }
 
-async function estimateConversationSearchReindex(): Promise<ConversationSearchCostEstimate> {
-  const res = await fetch('/api/settings/conversation-search/reindex-estimate');
-  if (!res.ok) throw new Error('Failed to estimate reindex cost');
+async function estimateConversationSearchReindex(model?: string): Promise<ConversationSearchCostEstimate> {
+  // Pass ?model= to price a prospective model switch before it's saved.
+  const qs = model ? `?model=${encodeURIComponent(model)}` : '';
+  const res = await fetch(`/api/settings/conversation-search/reindex-estimate${qs}`, { credentials: 'include' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
+  }
   return res.json();
 }
 
 async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
   const res = await fetch('/api/settings/conversation-search/reindex', {
     method: 'POST',
+    credentials: 'include',
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ confirmationNonce }),
   });
@@ -466,10 +473,26 @@ const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
 };
 
 /** Known embedding models per provider for the embeddings picker (PAN-1589). */
-const EMBEDDING_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'],
-  voyage: ['voyage-code-3', 'voyage-3'],
-  ollama: ['nomic-embed-text', 'mxbai-embed-large'],
+interface EmbeddingModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const EMBEDDING_MODELS_BY_PROVIDER: Record<string, EmbeddingModelOption[]> = {
+  openai: [
+    { id: 'text-embedding-3-small', label: 'text-embedding-3-small', description: 'Recommended · 1536-dim · $0.02 / 1M tokens — cheap & fast' },
+    { id: 'text-embedding-3-large', label: 'text-embedding-3-large', description: 'Higher quality · 3072-dim · $0.13 / 1M tokens' },
+    { id: 'text-embedding-ada-002', label: 'text-embedding-ada-002', description: 'Legacy · 1536-dim — prefer 3-small' },
+  ],
+  voyage: [
+    { id: 'voyage-code-3', label: 'voyage-code-3', description: 'Code-optimized · $0.18 / 1M tokens' },
+    { id: 'voyage-3', label: 'voyage-3', description: 'General-purpose semantic embeddings' },
+  ],
+  ollama: [
+    { id: 'nomic-embed-text', label: 'nomic-embed-text', description: 'Local via Ollama · free · nothing leaves your machine' },
+    { id: 'mxbai-embed-large', label: 'mxbai-embed-large', description: 'Local via Ollama · free · larger, higher quality' },
+  ],
 };
 
 const SETTINGS_NAV_ITEMS: NavItem[] = [
@@ -613,10 +636,25 @@ export function SettingsPage() {
   } | null>(null);
   const [convConfigDirty, setConvConfigDirty] = useState(false);
   const [convConfigSaving, setConvConfigSaving] = useState(false);
+  const [convConfigLoading, setConvConfigLoading] = useState(true);
+  const [convConfigError, setConvConfigError] = useState<string | null>(null);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
   const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
+  const [reindexConfirm, setReindexConfirm] = useState<{
+    kind: 'manual' | 'model';
+    newModel?: string;
+    estimate: ConversationSearchCostEstimate | null;
+  } | null>(null);
+  const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
+  const [reindexProgress, setReindexProgress] = useState<{
+    active: boolean;
+    filesScanned: number;
+    filesIndexed: number;
+    chunksIndexed: number;
+    currentFile?: string;
+  } | null>(null);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -627,13 +665,21 @@ export function SettingsPage() {
 
   useEffect(() => { void fetchClaudeAuth(); }, []);
 
-  useEffect(() => {
+  const loadConvConfig = useCallback(() => {
+    setConvConfigLoading(true);
+    setConvConfigError(null);
     ensureDashboardSession()
       .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setConvConfig(d); })
-      .catch(() => undefined);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Failed to load embedding settings (HTTP ${r.status})`);
+        return r.json();
+      })
+      .then((d) => setConvConfig(d))
+      .catch((e) => setConvConfigError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setConvConfigLoading(false));
   }, []);
+
+  useEffect(() => { loadConvConfig(); }, [loadConvConfig]);
 
   const handleConvConfigChange = (patch: Partial<typeof convConfig>) => {
     setConvConfig((prev) => prev ? { ...prev, ...patch } : null);
@@ -794,29 +840,78 @@ export function SettingsPage() {
     },
   });
 
-  const handleConversationSearchReindex = async () => {
+  // Poll live reindex progress while a reindex is running so the UI can show a real bar.
+  const conversationSearchReindexPending = conversationSearchReindexMutation.isPending;
+  useEffect(() => {
+    if (!conversationSearchReindexPending) {
+      setReindexProgress(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/settings/conversation-search/reindex-progress', { credentials: 'include' });
+        if (res.ok && !cancelled) setReindexProgress(await res.json());
+      } catch { /* ignore transient poll errors */ }
+    };
+    void poll();
+    const id = setInterval(poll, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [conversationSearchReindexPending]);
+
+  // Open the confirm modal immediately, then fill in the cost estimate (scanning every
+  // transcript can take a few seconds). `model` prices a prospective switch.
+  const openReindexConfirm = async (kind: 'manual' | 'model', newModel?: string) => {
+    setReindexConfirm({ kind, newModel, estimate: null });
     setEstimatingConversationSearch(true);
     try {
-      const estimate = await estimateConversationSearchReindex();
+      const estimate = await estimateConversationSearchReindex(newModel);
       setConversationSearchEstimate(estimate);
-      if (estimate.disabled) {
-        toast.warning(estimate.unavailableReason ?? 'Conversation search is disabled');
-        return;
-      }
-      if (estimate.estimatedUsd > 1) {
-        const confirmed = window.confirm(
-          `Reindexing is estimated to cost $${estimate.estimatedUsd.toFixed(2)} (${estimate.tokenCount.toLocaleString()} tokens). Continue?`,
-        );
-        if (!confirmed) return;
-        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
-        return;
-      }
-      conversationSearchReindexMutation.mutate(undefined);
+      setReindexConfirm((prev) => (prev && prev.kind === kind && prev.newModel === newModel ? { ...prev, estimate } : prev));
     } catch (error) {
       toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
+      setReindexConfirm(null);
     } finally {
       setEstimatingConversationSearch(false);
     }
+  };
+
+  const handleConversationSearchReindex = () => { void openReindexConfirm('manual'); };
+
+  // Switching the embedding model invalidates every cached vector (they're model-specific)
+  // and forces a paid full reindex, so confirm before applying.
+  const handleEmbeddingModelChange = (newModel: string) => {
+    if (newModel === conversationSearchModel) return;
+    void openReindexConfirm('model', newModel);
+  };
+
+  const cancelReindexConfirm = () => { if (!reindexConfirmBusy) setReindexConfirm(null); };
+
+  const confirmReindex = async () => {
+    if (!reindexConfirm || !reindexConfirm.estimate || reindexConfirm.estimate.disabled) return;
+    const { kind, newModel, estimate } = reindexConfirm;
+    if (kind === 'model' && newModel) {
+      if (!formData || !voiceFormData) return;
+      setReindexConfirmBusy(true);
+      try {
+        const next: SettingsConfig = {
+          ...formData,
+          conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
+        };
+        setFormData(next);
+        await saveMutation.mutateAsync({ settings: next, voiceSettings: voiceFormData });
+        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+      } catch {
+        // saveMutation surfaces its own error toast; leave the modal open to retry.
+        setReindexConfirmBusy(false);
+        return;
+      }
+      setReindexConfirmBusy(false);
+      setReindexConfirm(null);
+      return;
+    }
+    conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+    setReindexConfirm(null);
   };
 
   const ttsStartMutation = useMutation({
@@ -917,7 +1012,6 @@ export function SettingsPage() {
   const conversationSearch = formData.conversationSearch ?? {};
   const conversationSearchEnabled = conversationSearch.enabled ?? false;
   const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
-  const conversationSearchApiKeyRef = conversationSearch.apiKeyRef ?? 'OPENAI_API_KEY';
 
   const handleProviderToggle = (provider: Provider) => {
     setFormData({
@@ -1246,18 +1340,18 @@ export function SettingsPage() {
       case 'sessionEmbeddings': {
         const provider = formData?.conversations?.embedding_provider || 'openai';
         const models = EMBEDDING_MODELS_BY_PROVIDER[provider] ?? [];
-        const model = formData?.conversations?.embedding_model || models[0] || '';
+        const model = formData?.conversations?.embedding_model || models[0]?.id || '';
         return (
           <div className="flex items-center gap-1">
             <select value={provider}
-              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0] }); }}
+              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0]?.id }); }}
               className={`${bgSelectClass} max-w-[100px]`}>
               <option value="openai">OpenAI</option>
               <option value="voyage">Voyage</option>
               <option value="ollama">Ollama</option>
             </select>
             <select value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              {models.map((m) => <option key={m.id} value={m.id} title={m.description}>{m.label}</option>)}
             </select>
           </div>
         );
@@ -1805,7 +1899,7 @@ export function SettingsPage() {
           Permissions
         </h2>
         <p className="text-xs text-muted-foreground mb-4">
-          How spawned Claude Code agents are gated. Applies to work agents, specialists,
+          How spawned Claude Code and Codex agents are gated. Applies to work agents, specialists,
           conversations, and remote agents. Override per-invocation with{' '}
           <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
           <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
@@ -1818,15 +1912,17 @@ export function SettingsPage() {
               value: 'auto',
               title: 'Auto (recommended)',
               flag: '--permission-mode auto',
+              codex: 'Codex: Auto (on-request + workspace-write)',
               description:
-                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
+                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Codex runs in its Auto preset: it works freely inside the workspace but asks before escaping it (e.g. network access). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
             },
             {
               value: 'bypass',
               title: 'Bypass (yolo)',
-              flag: '--dangerously-skip-permissions --permission-mode bypassPermissions',
+              flag: '--permission-mode bypassPermissions',
+              codex: 'Codex: Full Access (danger-full-access)',
               description:
-                'Legacy Panopticon behavior. Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
+                'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Codex runs in Full Access: no approval prompts, full system + network. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
             },
           ] as const).map((opt) => {
             const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
@@ -1853,10 +1949,13 @@ export function SettingsPage() {
                   {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-foreground">{opt.title}</span>
                     <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       {opt.flag}
+                    </code>
+                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {opt.codex}
                     </code>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
@@ -2200,24 +2299,28 @@ export function SettingsPage() {
               </label>
               <label className="text-xs text-muted-foreground">
                 Model
-                <input
-                  type="text"
+                <select
                   value={conversationSearchModel}
-                  onChange={(e) => handleConversationSearchChange({ model: e.target.value })}
+                  onChange={(e) => handleEmbeddingModelChange(e.target.value)}
                   className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  placeholder="text-embedding-3-small"
-                />
+                >
+                  {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
+                  ))}
+                </select>
+                {(() => {
+                  const desc = (EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? [])
+                    .find((m) => m.id === conversationSearchModel)?.description;
+                  return desc ? <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/80">{desc}</span> : null;
+                })()}
               </label>
-              <label className="text-xs text-muted-foreground">
-                API key env var or config key
-                <input
-                  type="text"
-                  value={conversationSearchApiKeyRef}
-                  onChange={(e) => handleConversationSearchChange({ apiKeyRef: e.target.value || undefined })}
-                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  placeholder="OPENAI_API_KEY"
-                />
-              </label>
+              <div className="flex items-end text-xs">
+                {formData?.api_keys?.openai ? (
+                  <span className="text-success">✓ Using OpenAI key from API Keys section</span>
+                ) : (
+                  <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
+                )}
+              </div>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -2253,16 +2356,51 @@ export function SettingsPage() {
                 Estimate & reindex all conversations
               </button>
             </div>
+
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
+              <span className="text-foreground">Estimate &amp; reindex</span> rebuilds the entire semantic-search index from your conversation transcripts: it shows the one-time embedding-API cost, asks you to confirm, then re-embeds every conversation. Run it after switching the model, or to pick up transcripts created before search was enabled.
+            </p>
+
+            {conversationSearchReindexMutation.isPending && reindexProgress && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-1">
+                  <span className="truncate">
+                    {reindexProgress.currentFile ? `Indexing ${reindexProgress.currentFile}…` : 'Finishing up…'}
+                  </span>
+                  <span className="text-foreground tabular-nums shrink-0">
+                    {reindexProgress.filesIndexed}/{reindexProgress.filesScanned || '—'} files · {reindexProgress.chunksIndexed.toLocaleString()} chunks
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${reindexProgress.filesScanned > 0 ? Math.min(100, Math.round((reindexProgress.filesIndexed / reindexProgress.filesScanned) * 100)) : 5}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border my-2" />
 
-          {!convConfig ? (
+          {convConfigLoading ? (
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Loading embedding settings…
             </div>
-          ) : (
+          ) : convConfigError ? (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-muted-foreground">{convConfigError}</span>
+              <button
+                type="button"
+                onClick={loadConvConfig}
+                className="ml-1 inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                <RefreshCw className="w-3 h-3" /> Retry
+              </button>
+            </div>
+          ) : convConfig ? (
             <>
               <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
                 <div className="min-w-0">
@@ -2397,7 +2535,7 @@ export function SettingsPage() {
                 </>
               )}
             </>
-          )}
+          ) : null}
         </div>
       </section>
 
@@ -3596,6 +3734,26 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <ReindexConfirmDialog
+        open={reindexConfirm !== null}
+        title={reindexConfirm?.kind === 'model' ? 'Switch embedding model?' : 'Reindex all conversations?'}
+        intro={reindexConfirm?.kind === 'model' ? (
+          <>
+            Switching to <span className="text-foreground font-medium">{reindexConfirm?.newModel}</span> invalidates
+            every cached embedding — vectors can&apos;t be reused across models — and runs a full reindex with the new
+            model. This is a one-time embedding-API cost:
+          </>
+        ) : (
+          <>This re-embeds every conversation transcript from scratch and replaces the existing index, calling the OpenAI embeddings API once for your whole history:</>
+        )}
+        estimate={reindexConfirm?.estimate ?? null}
+        estimating={estimatingConversationSearch && !reindexConfirm?.estimate}
+        confirmLabel={reindexConfirm?.kind === 'model' ? 'Switch & reindex' : 'Reindex now'}
+        busy={reindexConfirmBusy}
+        onConfirm={() => void confirmReindex()}
+        onCancel={cancelReindexConfirm}
+      />
 
     </SettingsLayout>
   );

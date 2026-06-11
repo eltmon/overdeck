@@ -61,6 +61,22 @@ export interface RunningCounts {
   total: number;
 }
 
+/**
+ * Human-readable breakdown of what currently counts against the ceiling, for
+ * deferral diagnostics (PAN-1716). Lists the offending session ids so a
+ * starvation is diagnosable from the patrol log alone — the original livelock
+ * (completed review/test sessions that never get reaped) is invisible from a
+ * bare "ceiling reached" line.
+ */
+export function describeRunningAgents(): string {
+  const alive = listRunningAgentsSync().filter(a => a.tmuxActive);
+  const work = alive.filter(a => a.role === 'work').map(a => a.id);
+  const advancing = alive.filter(a => a.role && ADVANCING_ROLES.has(a.role)).map(a => a.id);
+  const { totalCeiling } = getConcurrencyLimits();
+  return `counts: work=${work.length} advancing=${advancing.length} total=${work.length + advancing.length}/${totalCeiling}`
+    + ` | advancing=[${advancing.join(', ')}] work=[${work.join(', ')}]`;
+}
+
 /** Count currently-running (tmux-alive) agents by role class. */
 export function countRunningAgents(): RunningCounts {
   let work = 0;

@@ -55,7 +55,7 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
       MINIMAX_API_KEY: 'sk-minimax-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'minimax-m2.7',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'MiniMax-M3',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'minimax-m2.7',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'minimax-m2.7-highspeed',
       ANTHROPIC_SMALL_FAST_MODEL: 'minimax-m2.7-highspeed',

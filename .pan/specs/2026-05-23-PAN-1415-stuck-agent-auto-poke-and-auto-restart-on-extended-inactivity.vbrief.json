@@ -4,17 +4,17 @@
     "created": "2026-05-23T11:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1415: Stuck-agent auto-poke and auto-restart on extended inactivity",
-    "updated": "2026-05-23T11:26:39.481Z"
+    "updated": "2026-06-11T05:55:39.083Z"
   },
   "plan": {
     "id": "pan-1415",
     "title": "Stuck-agent auto-poke and auto-restart on extended inactivity",
-    "status": "proposed",
+    "status": "completed",
     "uid": "40d3e57b-3b54-4237-9f8d-d9d3abf5b375",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-23T11:35:00.000Z",
-    "updated": "2026-05-23T11:26:39.481Z",
+    "updated": "2026-06-11T05:55:39.083Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1415",
@@ -539,5 +539,5 @@
       "canonicalFilename": "2026-05-23-PAN-1415-stuck-agent-auto-poke-and-auto-restart-on-extended-inactivity.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

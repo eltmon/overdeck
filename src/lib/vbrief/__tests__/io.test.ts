@@ -51,6 +51,11 @@ function writeWorkspaceSpec(doc: VBriefDocument): string {
   return specPath;
 }
 
+function createWorktreeShape(): void {
+  writeFileSync(join(WORKSPACE_PATH, '.git'), 'gitdir: ../../.git/worktrees/feature-pan-100');
+  mkdirSync(join(WORKSPACE_PATH, '.pan', 'specs'), { recursive: true });
+}
+
 function writeWorkspaceDraft(doc: VBriefDocument): string {
   const panDir = join(WORKSPACE_PATH, '.pan');
   mkdirSync(panDir, { recursive: true });
@@ -97,13 +102,13 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
-  it('resolves the workspace-local spec when the workspace is itself a git worktree', () => {
-    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
-    writeFileSync(join(WORKSPACE_PATH, '.git'), 'gitdir: ../../.git/worktrees/feature-pan-100');
+  it('resolves the parent project spec when the workspace is itself a git worktree', () => {
+    createWorktreeShape();
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -112,6 +117,29 @@ describe('findPlan', () => {
     const draftPath = writeWorkspaceDraft(doc);
 
     expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
+  });
+
+  it('keeps the workspace draft fallback for a git worktree before promotion', () => {
+    createWorktreeShape();
+    const doc = makePlanDoc([{ id: 'draft-worktree-item' }]);
+    doc.plan.id = ISSUE_ID.toLowerCase();
+    const draftPath = writeWorkspaceDraft(doc);
+
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('draft-worktree-item');
+  });
+
+  it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
+    createWorktreeShape();
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'canonical-item' }]));
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+
+    const result = findPlanSync(WORKSPACE_PATH);
+
+    expect(result).toBe(projectSpec);
+    expect(result?.startsWith(join(PROJECT_ROOT, '.pan', 'specs'))).toBe(true);
+    expect(result?.startsWith(join(WORKSPACE_PATH, '.pan', 'specs'))).toBe(false);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-item');
   });
 
   it('ignores workspace drafts for a different issue', () => {

@@ -39,17 +39,18 @@ describe('buildRichPRBody', () => {
     return writeFile(join(specsDir, filename), JSON.stringify(specDoc));
   }
 
-  it('includes closes reference from issue number even with no plan', async () => {
+  it('includes a NON-closing issue reference (GitHub auto-close races the post-merge lifecycle)', async () => {
     const body = await buildRichPRBody('PAN-42', workspacePath);
-    expect(body).toContain('Closes #42');
+    expect(body).toContain('**Issue:** #42');
+    expect(body).not.toMatch(/closes #/i);
   });
 
-  it('includes closes reference for a different issue number', async () => {
+  it('includes the issue reference for a different issue number', async () => {
     // Different issue ID → different workspace path
     const ws123 = join(projectRoot, 'workspaces', 'feature-pan-123');
     mkdirSync(ws123, { recursive: true });
     const body = await buildRichPRBody('PAN-123', ws123);
-    expect(body).toContain('Closes #123');
+    expect(body).toContain('**Issue:** #123');
   });
 
   it('omits AC section when no plan exists', async () => {
@@ -122,7 +123,7 @@ describe('buildRichPRBody', () => {
     await writeFile(join(specsDir, '2026-01-01-PAN-42-test.vbrief.json'), '{invalid json}');
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
-    expect(body).toContain('Closes #42');
+    expect(body).toContain('**Issue:** #42');
     expect(body).not.toContain('## Acceptance Criteria');
   });
 });

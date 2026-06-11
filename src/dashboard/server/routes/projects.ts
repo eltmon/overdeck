@@ -14,7 +14,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -317,8 +317,8 @@ async function collectSessionTreeNodes(
       });
     }
 
-    // Ship role — final pipeline stage, spawnRun(issueId,'ship') →
-    // `agent-<issue>-ship`. The `merge` history type tracks its status.
+    // Merge/ship history — server-side shipping now prepares the branch, while
+    // historical `merge` entries still surface under the `ship` node identity.
     const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
     const latestMerge = mergeEntries[mergeEntries.length - 1];
     if (latestMerge) {
@@ -543,9 +543,48 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
+const readProjectJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
+});
+
+// ─── Route: GET /api/projects/:projectKey/auto-merge-default ─────────────────
+const getProjectAutoMergeDefaultRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/auto-merge-default',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const config = getProjectSync(params['projectKey'] ?? '');
+    if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    return jsonResponse({ value: config.auto_merge_default ?? null });
+  })),
+);
+
+// ─── Route: POST /api/projects/:projectKey/auto-merge-default ────────────────
+// PAN-1695: set the per-project auto-merge default ('auto' | 'hold' | null=clear).
+const postProjectAutoMergeDefaultRoute = HttpRouter.add(
+  'POST',
+  '/api/projects/:projectKey/auto-merge-default',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const key = params['projectKey'] ?? '';
+    if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    const body = (yield* readProjectJsonBody) as { value?: unknown };
+    const v = body.value;
+    if (v !== 'auto' && v !== 'hold' && v !== null) {
+      return jsonResponse({ error: "value must be 'auto', 'hold', or null" }, { status: 400 });
+    }
+    setProjectAutoMergeDefaultSync(key, v);
+    return jsonResponse({ value: v });
+  })),
+);
+
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
+  getProjectAutoMergeDefaultRoute,
+  postProjectAutoMergeDefaultRoute,
 );
 
 export default projectsRouteLayer;

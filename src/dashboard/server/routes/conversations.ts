@@ -29,6 +29,11 @@ import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
+import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
+import {
+  decideSwitchStrategy,
+  getEffectiveTargetWindow,
+} from '../../../lib/conversations/switch-strategy.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -110,8 +115,10 @@ import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
+import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
+import { detectAwaitingInputForAgent, parseCodexApprovalPrompt } from '../../../lib/agent-input-detection.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
@@ -126,7 +133,10 @@ import {
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
+import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
+import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
   compactConversationNative,
@@ -182,7 +192,92 @@ function shellQuote(str: string): string {
 }
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
+const SWITCH_MODEL_STATUSLINE_TIMEOUT_MS = 5_000;
+const SWITCH_MODEL_STATUSLINE_POLL_MS = 250;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+
+function modelCapabilityForModel(model: string | null | undefined) {
+  if (!model) return undefined;
+  const resolvedModel = resolveModelIdSync(model);
+  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
+    : undefined;
+}
+
+function registryContextWindowForModel(model: string | null | undefined): number {
+  return modelCapabilityForModel(model)?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+}
+
+function displayNameForModel(model: string): string {
+  return modelCapabilityForModel(model)?.displayName ?? model;
+}
+
+async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
+  if (!model) return false;
+  return getProviderForModelSync(model).name === 'openai'
+    && (await getProviderAuthMode(model)) === 'subscription';
+}
+
+function providerRoutingSignature(exports: string): string {
+  return exports
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('unset '))
+    .join('\n');
+}
+
+async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
+  if (!targetModel || currentModel === targetModel) return false;
+
+  const targetSignature = providerRoutingSignature(await getProviderExportsForModel(targetModel));
+  if (!currentModel) return targetSignature !== '';
+
+  const currentSignature = providerRoutingSignature(await getProviderExportsForModel(currentModel));
+  return currentSignature !== targetSignature;
+}
+
+const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+
+function normalizePaneLine(line: string): string {
+  return line.replace(ANSI_ESCAPE_PATTERN, '').trim().toLowerCase();
+}
+
+function modelStatuslinePrefix(line: string): string {
+  return line.startsWith('statusline:') ? line.slice('statusline:'.length).trimStart() : line;
+}
+
+function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
+  const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
+  const targetModelId = targetModel.toLowerCase();
+  const expectedWithId = `${targetDisplayName} (${targetModelId})`;
+
+  for (const rawLine of pane.split(/\r?\n/)) {
+    const line = normalizePaneLine(rawLine);
+    if (!line || line.includes('/model')) continue;
+
+    const modelLine = modelStatuslinePrefix(line);
+    if (modelLine === targetModelId || modelLine.startsWith(`${targetModelId} `)) return true;
+    if (modelLine === expectedWithId || modelLine.startsWith(`${expectedWithId} `)) return true;
+  }
+
+  return false;
+}
+
+async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
+    const pane = await Effect.runPromise(
+      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+    );
+    if (hasStatuslineModelConfirmation(pane, targetModel)) {
+      return true;
+    }
+    await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
+  }
+  return false;
+}
+
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
@@ -301,7 +396,12 @@ async function getCachedMessages(
   // rest of the pipeline (cost rollup, streaming flag, etc.) is unchanged.
   // Pi files don't support the incremental-parse path — we always do a full
   // read; chat sessions are small enough that this is fine.
-  if (isPiSessionFile(sessionFile)) {
+  if (isCodexSessionFile(sessionFile)) {
+    // Codex rollout JSONL (OpenAI schema). Checked before isPiSessionFile
+    // because a Codex path (.../agents/<id>/codex-home/sessions/...) also
+    // matches the Pi detector's substrings.
+    result = await parseCodexConversationMessages(sessionFile);
+  } else if (isPiSessionFile(sessionFile)) {
     result = await parsePiConversationMessages(sessionFile);
   } else if (isSpecialist) {
     result = await parseFromLastCompactBoundary(sessionFile);
@@ -570,19 +670,39 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
   }
 }
 
+/**
+ * Detect whether a session file path is a Codex rollout JSONL. Codex writes
+ * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Panopticon the per-agent
+ * CODEX_HOME lives at .../agents/<id>/codex-home, so the path also satisfies
+ * {@link isPiSessionFile} — codex must therefore be tested first.
+ */
+function isCodexSessionFile(sessionFile: string): boolean {
+  return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
+}
+
 async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
   const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
   const threadIdPath = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
-  if (!existsSync(threadIdPath)) return null;
-  try {
-    const threadId = readFileSync(threadIdPath, 'utf-8').trim();
-    if (!threadId) return null;
-    // Walk codex-home/sessions/** to find the rollout file for this thread-id.
-    const { findRolloutPath } = await import('../../../lib/runtimes/codex.js');
-    return findRolloutPath(codexHome, threadId);
-  } catch {
-    return null;
+  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
+
+  // Fast path: a persisted thread-id resolves directly to its rollout.
+  if (existsSync(threadIdPath)) {
+    try {
+      const threadId = readFileSync(threadIdPath, 'utf-8').trim();
+      if (threadId) {
+        const path = findRolloutPath(codexHome, threadId);
+        if (path) return path;
+      }
+    } catch { /* fall through to the lazy fallback */ }
   }
+
+  // PAN-1690 — lazy fallback. The spawn-time thread-id capture is a one-shot
+  // 120s wait, but Codex only writes its rollout on the first turn, so a
+  // conversation whose first message lands later never gets a persisted
+  // thread-id and the transcript stays empty. The per-conversation CODEX_HOME
+  // holds only this conversation's rollouts, so the newest one is its current
+  // thread — resolve it directly so the view works regardless of spawn timing.
+  return findLatestRollout(codexHome);
 }
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
@@ -785,7 +905,31 @@ export async function handleConversationMessage(
     .filter((c): c is { managed: true; attachmentPath: string; hasAttachment: boolean } => c.managed)
     .map((c) => c.attachmentPath);
   const harness: RuntimeName = conv.harness ?? 'claude-code';
-  let deliveredMessage = transformMessageForHarness(message, harness, managedAttachmentPaths);
+
+  // Guard: text-only models (e.g. mimo-v2.5-pro) return 404 on image input,
+  // which the harness mistranslates as "model may not exist". Drop the image
+  // attachments and continue with the text rather than failing the whole turn.
+  // The composer also blocks attach up front; this is the server-side safety
+  // net for direct API callers. PAN-1685.
+  let outboundMessage = message;
+  let effectiveAttachmentPaths = managedAttachmentPaths;
+  let droppedImageCount = 0;
+  if (managedAttachmentPaths.length > 0 && !modelSupportsImagesSync(conv.model ?? '')) {
+    for (const p of managedAttachmentPaths) {
+      outboundMessage = outboundMessage.split(`@${p}`).join('');
+    }
+    outboundMessage = outboundMessage.trim();
+    droppedImageCount = managedAttachmentPaths.length;
+    effectiveAttachmentPaths = [];
+    if (!outboundMessage) {
+      return jsonResponse(
+        { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+        { status: 422 },
+      );
+    }
+  }
+
+  let deliveredMessage = transformMessageForHarness(outboundMessage, harness, effectiveAttachmentPaths);
 
   // PAN-1546: Claude conversations get prompt-time memory via the in-Claude
   // UserPromptSubmit hook; Pi has no such hook, so inject server-side here for
@@ -795,6 +939,15 @@ export async function handleConversationMessage(
       { cwd: conv.cwd, issueId: conv.issueId, conversationName: conv.name },
       deliveredMessage,
     );
+  }
+
+  // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
+  // eaten-by-compaction watcher below can tell whether this message ever
+  // landed. Claude-only — the probe parses Claude-format JSONL.
+  let watchFromByteOffset: number | null = null;
+  if (harness === 'claude-code' && conv.claudeSessionId) {
+    const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
+    watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
   }
 
   try {
@@ -812,6 +965,28 @@ export async function handleConversationMessage(
     throw deliveryErr;
   }
 
+  // Watch in the background for Claude Code's submit-time compaction eating
+  // the just-delivered prompt (compact boundary lands, message doesn't) and
+  // redeliver once. The POST already returned ok by the time this matters.
+  if (watchFromByteOffset !== null && conv.claudeSessionId) {
+    void watchForEatenConversationMessage({
+      conversationName: conv.name,
+      tmuxSession: conv.tmuxSession,
+      cwd: conv.cwd,
+      sessionId: conv.claudeSessionId,
+      message: deliveredMessage,
+      deliveryMethod: resolveConversationDeliveryMethod(conv),
+      fromByteOffset: watchFromByteOffset,
+    }).then((outcome) => {
+      if (outcome === 'redelivered') {
+        console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
+      }
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+    });
+  }
+
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
     void generateAiTitle(name, message).catch((err: unknown) => {
@@ -820,7 +995,7 @@ export async function handleConversationMessage(
     });
   }
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true, ...(droppedImageCount > 0 ? { imagesDropped: droppedImageCount } : {}) });
 }
 
 /** Generate a default conversation name, e.g. 20260404-1234 */
@@ -856,6 +1031,71 @@ function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
   return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+}
+
+/** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
+const CODEX_APPROVAL_TOOL_PREFIX = 'codex-approval:';
+
+/**
+ * PAN-1690 — pending-input detection for Codex conversations.
+ *
+ * Codex is a TUI: its approval prompts ("Would you like to run the following
+ * command?") are not AskUserQuestion tool-use events in the JSONL, so the
+ * JSONL scan that powers Claude conversations misses them entirely. Detect them
+ * off the live tmux pane instead and fold the result into the same unified
+ * pending-input signal (`pendingInputKinds`) the dashboard already renders.
+ * When the prompt parses into a numbered menu we also synthesize a
+ * `pendingAskUserQuestion` so the existing AskUserQuestion modal can render the
+ * options and answer them via the codex-approval endpoint. The pane detector is
+ * cached + concurrency-limited, so this is cheap per row.
+ */
+async function codexConversationPendingInput(
+  conv: Conversation,
+  sessionAlive: boolean,
+  askedAt: string,
+): Promise<{ kinds: PendingInputKind[]; approval?: PendingAskUserQuestionSnapshot }> {
+  if (!sessionAlive || conv.harness !== 'codex') return { kinds: [] };
+  try {
+    const detection = await Effect.runPromise(
+      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }),
+    );
+    if (!detection) return { kinds: [] };
+    if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
+
+    const parsed = parseCodexApprovalPrompt(detection.prompt);
+    if (parsed) {
+      const approval: PendingAskUserQuestionSnapshot = {
+        toolUseId: `${CODEX_APPROVAL_TOOL_PREFIX}${conv.tmuxSession}`,
+        askedAt,
+        questions: [{
+          question: parsed.detail ? `${parsed.header}\n\n${parsed.detail}` : parsed.header,
+          header: 'Codex approval',
+          multiSelect: false,
+          options: parsed.options.map((o) => ({ label: `${o.number}. ${o.label}` })),
+        }],
+      };
+      return { kinds: ['permissionRequest'], approval };
+    }
+    // Detected an approval but couldn't parse a menu — still flag it.
+    return { kinds: ['permissionRequest'] };
+  } catch {
+    // pane capture failure — non-fatal, treat as no pending input
+    return { kinds: [] };
+  }
+}
+
+/**
+ * PAN-1690 — answer a Codex approval menu from the dashboard. Codex select
+ * popups default-highlight the first option and confirm on Enter, so option N
+ * is reached with Down×(N-1) then Enter (verified against the codex 0.137 TUI).
+ * Small delays let the TUI process each keystroke.
+ */
+async function deliverCodexApprovalChoice(tmuxSession: string, optionNumber: number): Promise<void> {
+  for (let i = 1; i < optionNumber; i += 1) {
+    await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Down', 'codex-approval'));
+    await new Promise((r) => setTimeout(r, 60));
+  }
+  await Effect.runPromise(sendRawKeystroke(tmuxSession, 'Enter', 'codex-approval'));
 }
 
 /** Rewrite an outgoing conversation message so harnesses without Claude Code's
@@ -1111,6 +1351,22 @@ export async function spawnConversationSession(
     providerEnv = await getProviderEnvForModel(model);
 
     if (harness === 'pi') {
+      // Preflight: Pi GPT-5.x conversations authenticate with the user's
+      // ChatGPT/Codex OAuth (openai-codex). If that credential is dead, Pi
+      // fails mid-session with the opaque "No API key for provider:
+      // openai-codex". Proactively refresh it, and if it can't be revived,
+      // fail here with an actionable message. Stays silent (fail-open) when
+      // the auth state can't be determined (e.g. Pi's OAuth module is absent).
+      if (getProviderForModelSync(model).name === 'openai') {
+        const auth = await getPiCodexAuthStatus({ refreshIfExpired: true });
+        if (auth.status === 'missing' || auth.status === 'expired') {
+          throw new Error(
+            'Pi ChatGPT/Codex login (openai-codex) has expired and could not be refreshed. ' +
+            'Re-authenticate with `pan pi-auth login`, then retry.',
+          );
+        }
+      }
+
       // Conversations run Pi in TUI mode (the default Pi terminal UI). This
       // gives users an actual terminal in the tmux pane — they can type
       // directly into Pi, and dashboard-composer messages are delivered via
@@ -1651,31 +1907,77 @@ export async function handleArchivedConversationsList(options: ArchivedConversat
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
-const getConversationsRoute = HttpRouter.add(
-  'GET',
-  '/api/conversations',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ error: originCheck.error }, { status: 403 });
-    }
-    return yield* Effect.promise(async () => {
-    try {
-        const url = new URL(request.url, 'http://localhost');
-        const limitParam = url.searchParams.get('limit');
-        const offsetParam = url.searchParams.get('offset');
-        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
-        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
-        const conversations = listConversations({ limit, offset });
-        const favoritedNames = getCachedFavoritedIds();
+/** PAN-1520/PAN-1705 — build the AskUserQuestion snapshot from a pending-input
+ *  scan. Shared by the enriched list and the lightweight pending-input feed. */
+function askUserQuestionSnapshotFromScan(
+  scan: Awaited<ReturnType<typeof scanPendingInputsPromise>>,
+): PendingAskUserQuestionSnapshot | undefined {
+  if (scan.askUserQuestions.length === 0) return undefined;
+  const first = scan.askUserQuestions[0];
+  return {
+    toolUseId: first.toolId,
+    askedAt: first.timestamp,
+    questions: first.questions.map(q => ({
+      question: q.question,
+      header: q.header,
+      multiSelect: q.multiSelect,
+      options: q.options.map(o => ({ label: o.label, description: o.description })),
+    })),
+  };
+}
 
-        // Enrich with live tmux status
-        // Grace period removed (PAN-826): POST /api/conversations now waits for
-        // Claude to be ready before returning 201, so newly-created conversations
-        // are always live by the time they appear in the list.
-        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
-        const enriched = await Effect.runPromise(withConcurrencyLimit(
+// PAN-1705 — coalesce concurrent list enrichments. Several dashboard clients
+// poll this endpoint on overlapping intervals; each request used to run its
+// own full per-row enrichment (session-file resolution, stats, JSONL scans
+// for alive sessions). Under machine load (verification gates) the
+// overlapping enrichments queue-collapsed the event loop and pushed even
+// trivial endpoints to 10s+. One enrichment per short window serves all
+// concurrent pollers; ≤2s staleness is invisible at the 4-10s poll cadence.
+const LIST_ENRICHMENT_TTL_MS = 2_000;
+interface ListEnrichmentEntry {
+  settledAt: number | null; // null while the enrichment is still running
+  promise: Promise<unknown[]>;
+}
+const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
+
+function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
+  const key = `${limit}:${offset}`;
+  const now = Date.now();
+  const hit = listEnrichmentInFlight.get(key);
+  // Reuse while still running (never two concurrent enrichments per key —
+  // that's the whole point) or within the TTL after it settled.
+  if (hit && (hit.settledAt === null || now - hit.settledAt < LIST_ENRICHMENT_TTL_MS)) {
+    return hit.promise;
+  }
+  const entry: ListEnrichmentEntry = {
+    settledAt: null,
+    promise: enrichConversationList(limit, offset),
+  };
+  listEnrichmentInFlight.set(key, entry);
+  entry.promise
+    .then(() => { entry.settledAt = Date.now(); })
+    // Drop failed enrichments immediately so the next poll retries fresh.
+    .catch(() => {
+      if (listEnrichmentInFlight.get(key) === entry) listEnrichmentInFlight.delete(key);
+    });
+  for (const [k, v] of listEnrichmentInFlight) {
+    if (k !== key && v.settledAt !== null && now - v.settledAt >= LIST_ENRICHMENT_TTL_MS) {
+      listEnrichmentInFlight.delete(k);
+    }
+  }
+  return entry.promise;
+}
+
+async function enrichConversationList(limit: number, offset: number): Promise<unknown[]> {
+  const conversations = listConversations({ limit, offset });
+  const favoritedNames = getCachedFavoritedIds();
+
+  // Enrich with live tmux status
+  // Grace period removed (PAN-826): POST /api/conversations now waits for
+  // Claude to be ready before returning 201, so newly-created conversations
+  // are always live by the time they appear in the list.
+  const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+  return Effect.runPromise(withConcurrencyLimit(
           conversations.map((conv) => Effect.promise(async () => {
             const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
             let isWorking = false;
@@ -1720,19 +2022,10 @@ const getConversationsRoute = HttpRouter.add(
               try {
                 const scan = await scanPendingInputsPromise(convSf);
                 const kinds: PendingInputKind[] = [];
-                if (scan.askUserQuestions.length > 0) {
+                const auqSnapshot = askUserQuestionSnapshotFromScan(scan);
+                if (auqSnapshot) {
                   kinds.push('askUserQuestion');
-                  const first = scan.askUserQuestions[0];
-                  pendingAskUserQuestion = {
-                    toolUseId: first.toolId,
-                    askedAt: first.timestamp,
-                    questions: first.questions.map(q => ({
-                      question: q.question,
-                      header: q.header,
-                      multiSelect: q.multiSelect,
-                      options: q.options.map(o => ({ label: o.label, description: o.description })),
-                    })),
-                  };
+                  pendingAskUserQuestion = auqSnapshot;
                 }
                 if (scan.exitPlanModePending) kinds.push('exitPlanMode');
                 if (scan.enterPlanModeOpen && !scan.exitPlanModePending) kinds.push('enterPlanMode');
@@ -1742,7 +2035,6 @@ const getConversationsRoute = HttpRouter.add(
                 // JSONL scan failure — leave as zero/empty; non-fatal
               }
             }
-
             const compacting = convSf ? isCompacting(convSf) : false;
             const gitInfo = await resolveConversationGitInfo(conv.cwd);
 
@@ -1759,6 +2051,22 @@ const getConversationsRoute = HttpRouter.add(
                 lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
               } catch {
                 // non-fatal — fall back to lastAttachedAt/createdAt downstream
+              }
+            }
+
+            // PAN-1690 — Codex pane-detected approval fallback (TUI prompts
+            // aren't in the JSONL). Use the transcript mtime as a stable
+            // askedAt so the 4s poll doesn't churn the timestamp.
+            if (pendingInputCount === 0) {
+              const codex = await codexConversationPendingInput(
+                conv,
+                sessionAlive,
+                lastActivityAt ?? new Date().toISOString(),
+              );
+              if (codex.kinds.length > 0) {
+                pendingInputKinds = codex.kinds;
+                pendingInputCount = codex.kinds.length;
+                if (codex.approval) pendingAskUserQuestion = codex.approval;
               }
             }
 
@@ -1779,14 +2087,103 @@ const getConversationsRoute = HttpRouter.add(
             };
           })),
           CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
-        ));
+  ));
+}
 
+const getConversationsRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const url = new URL(request.url, 'http://localhost');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        const limit = limitParam ? Math.min(parseInt(limitParam, 10), 1000) : 500;
+        const offset = offsetParam ? Math.max(parseInt(offsetParam, 10), 0) : 0;
+        const enriched = await getEnrichedConversationList(limit, offset);
         return jsonResponse(enriched);
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] list conversations failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-        }})
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/pending-input ─────────────────────────────
+
+// PAN-1705 — lightweight feed for the needs-you modal (PAN-1520). The previous
+// implementation polled the full enriched list (≈0.5 MB, full per-row
+// enrichment server-side) every 4s per client just to filter for
+// pendingAskUserQuestion. Only tmux-alive conversations can have a pending
+// blocking surface, so this endpoint scans just those few JSONLs and returns
+// only the rows that actually need attention.
+const getConversationsPendingInputRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/pending-input',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return yield* Effect.promise(async () => {
+      try {
+        const conversations = listConversations({ limit: 1000 });
+        const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+        const alive = conversations.filter(
+          (conv) => !conv.forkStatus && liveSessionNames.has(conv.tmuxSession),
+        );
+        const rows = await Effect.runPromise(withConcurrencyLimit(
+          alive.map((conv) => Effect.promise(async () => {
+            const convSf = await resolveSessionFile(conv);
+            let pending: PendingAskUserQuestionSnapshot | undefined;
+            let lastActivityAt: string | null = null;
+            if (convSf && existsSync(convSf)) {
+              try {
+                lastActivityAt = new Date((await stat(convSf)).mtimeMs).toISOString();
+              } catch {
+                // non-fatal — askedAt falls back to now for the codex path
+              }
+              try {
+                pending = askUserQuestionSnapshotFromScan(await scanPendingInputsPromise(convSf));
+              } catch {
+                // JSONL scan failure — non-fatal
+              }
+            }
+            if (!pending) {
+              // PAN-1690 — Codex pane-detected approval fallback.
+              const codex = await codexConversationPendingInput(
+                conv,
+                true,
+                lastActivityAt ?? new Date().toISOString(),
+              );
+              if (codex.approval) pending = codex.approval;
+            }
+            if (!pending) return null;
+            return {
+              name: conv.name,
+              title: conv.title ?? null,
+              issueId: conv.issueId ?? null,
+              pendingAskUserQuestion: pending,
+            };
+          })),
+          CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,
+        ));
+        return jsonResponse(rows.filter((row) => row !== null));
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] pending-input feed failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
   }),
 );
 
@@ -1869,6 +2266,14 @@ const getConversationRoute = HttpRouter.add(
             pendingInputKinds = kinds;
             pendingInputCount = kinds.length;
           } catch { /* non-fatal */ }
+        }
+        if (pendingInputCount === 0) {
+          const codex = await codexConversationPendingInput(conv, sessionAlive, new Date().toISOString());
+          if (codex.kinds.length > 0) {
+            pendingInputKinds = codex.kinds;
+            pendingInputCount = codex.kinds.length;
+            if (codex.approval) pendingAskUserQuestion = codex.approval;
+          }
         }
         return jsonResponse({
           ...conv,
@@ -2286,37 +2691,79 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         }
         const harnessChanged = harness !== currentHarness;
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.claudeSessionId;
+
+        // Resolve the transcript before the kill→spawn gap so the route can decide
+        // whether compaction is actually needed for the target window.
+        const sessionFile = await resolveSessionFile(conv);
+        const cwd = conv.cwd;
+        const tmuxSession = conv.tmuxSession;
+        const effort = conv.effort ?? undefined;
+        const issueId = conv.issueId ?? undefined;
+        const targetModel = model ?? conv.model ?? undefined;
+        const providerRoutingChanged = await hasProviderRoutingChanged(conv.model, targetModel);
+        const contextUsage = sessionFile && existsSync(sessionFile)
+          ? await computeContextUsage(sessionFile, conv.model ?? targetModel ?? null)
+          : null;
+        const contextTokens = contextUsage?.estimatedTokens ?? 0;
+        const currentObservedCeiling = Math.max(contextUsage?.maxObservedInputTokens ?? 0, contextTokens);
+        const effectiveTargetWindow = getEffectiveTargetWindow({
+          registryWindow: registryContextWindowForModel(targetModel),
+          currentObservedCeiling,
+          cliproxyRouted: await isCliproxyRoutedModel(targetModel),
+          providerRoutingChanged,
+        });
+        const switchStrategy = decideSwitchStrategy({
+          harnessChanged,
+          providerRoutingChanged,
+          contextTokens,
+          effectiveTargetWindow,
+        });
+
+        if (harness === 'claude-code' && switchStrategy.useModelCommand && targetModel) {
+          if (model) setConversationModel(name, model);
+          try {
+            await deliverAgentMessage(
+              tmuxSession,
+              `/model ${targetModel}`,
+              'conversation-switch-model',
+              resolveConversationDeliveryMethod(conv),
+            );
+            if (await waitForModelStatusline(tmuxSession, targetModel)) {
+              markConversationActive(name);
+              return jsonResponse({ ...conv, status: 'active', model: targetModel, harness, reattached: false, sessionAlive: true });
+            }
+            console.warn(`[conversations] switch-model Tier 1 statusline verification timed out for ${name}; falling back to respawn`);
+          } catch (deliveryErr: unknown) {
+            const msg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+            console.warn(`[conversations] switch-model Tier 1 delivery failed for ${name}; falling back to respawn: ${msg}`);
+          }
+        }
+
         // Mark the session as mid-respawn BEFORE killing it so terminal
         // WS reconnects landing in the kill→spawn gap don't get a fatal
         // 4404. The marker is cleared in the `finally` below regardless
         // of which branch returns or throws.
-        const respawn = markRespawnPending(conv.tmuxSession);
+        const respawn = markRespawnPending(tmuxSession);
         try {
-          // Always kill the existing session first (if alive) so the model change takes effect
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-          if (!(await validateCwdContainment(conv.cwd))) {
-            return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-          }
-
-          // Validate model before persisting so invalid values never reach the DB.
-          if (model && !SAFE_MODEL_PATTERN.test(model)) {
-            return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-          }
+          // Tier 1 (/model in-session) is wired by the follow-up bead. Until then,
+          // every switch still respawns; the tier decision already owns whether
+          // this respawn compacts.
+          await Effect.runPromise(killSession(tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
           // Persist the new model and harness
           if (model) setConversationModel(name, model);
           if (harnessChanged) setConversationHarness(name, harness);
-
-          // Extract the session UUID from the existing session file path
-          const oldSessionId = conv.claudeSessionId;
-
-          // Compact (if needed) then respawn with the new model before reporting success.
-          const sessionFile = await resolveSessionFile(conv);
-          const cwd = conv.cwd;
-          const tmuxSession = conv.tmuxSession;
-          const effort = conv.effort ?? undefined;
-          const issueId = conv.issueId ?? undefined;
 
           // Only resume if the session JSONL actually exists — Claude Code's --resume
           // fails with "No conversation found" if the file is missing (e.g., first
@@ -2360,8 +2807,9 @@ const postConversationSwitchModelRoute = HttpRouter.add(
               canResume = false;
             }
           } else if (harness === 'claude-code') {
-            // Same harness, Claude Code: native (Claude-format) compaction is correct.
-            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+            // Same harness, Claude Code: native (Claude-format) compaction is correct
+            // only when the tier decision says the active context will not fit.
+            await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
           }
           // Pi staying on Pi: skip native compaction — it is Claude-format only and
           // would corrupt the Pi JSONL. Pi manages its own context.
@@ -2709,6 +3157,66 @@ const postConversationMessageRoute = HttpRouter.add(
             details: msg,
           }, { status: 504 });
         }
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/conversations/:id/codex-approval ────────────────────────
+//
+// PAN-1690 — answer a Codex TUI approval menu from the dashboard. The body
+// carries the 1-based option number the operator chose in the AskUserQuestion
+// modal; we re-detect the live menu (to confirm it's still up and bound the
+// choice), then drive the selection with Down×(n-1) + Enter.
+const postConversationCodexApprovalRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/codex-approval',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const optionNumber = Number((body as { optionNumber?: unknown }).optionNumber);
+        if (!Number.isInteger(optionNumber) || optionNumber < 1 || optionNumber > 9) {
+          return jsonResponse({ error: 'optionNumber must be an integer 1-9' }, { status: 400 });
+        }
+        const numericId = Number(rawId);
+        const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
+          ? getConversationById(numericId)
+          : getConversationByName(rawId);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        if (conv.harness !== 'codex') {
+          return jsonResponse({ error: 'Not a Codex conversation' }, { status: 400 });
+        }
+        if (!(await tmuxSessionExists(conv.tmuxSession))) {
+          return jsonResponse({ error: 'Conversation session is not running' }, { status: 409 });
+        }
+        // Re-detect uncached so we only send keystrokes when the menu is still
+        // up, and so we can bound optionNumber to the options actually shown.
+        const detection = await Effect.runPromise(
+          detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false }),
+        );
+        const parsed = detection ? parseCodexApprovalPrompt(detection.prompt) : null;
+        if (!parsed) {
+          return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
+        }
+        if (optionNumber > parsed.options.length) {
+          return jsonResponse({ error: `optionNumber out of range (1-${parsed.options.length})` }, { status: 400 });
+        }
+        await deliverCodexApprovalChoice(conv.tmuxSession, optionNumber);
+        return jsonResponse({ ok: true, optionNumber });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] codex approval failed:', msg);
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
@@ -3998,6 +4506,7 @@ const getConversationAboutRoute = HttpRouter.add(
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
+  getConversationsPendingInputRoute,
   getArchivedConversationsRoute,
   getConversationRoute,
   getConversationHandoffDocRoute,
@@ -4015,6 +4524,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
+  postConversationCodexApprovalRoute,
   postConversationDeliveryMethodRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,

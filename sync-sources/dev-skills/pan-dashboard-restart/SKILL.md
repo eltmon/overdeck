@@ -78,7 +78,16 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
 ## Verify success
 
 - `pan.localhost/api/health` returns `{"status":"ok"}` and `curl http://localhost:<port>/api/health` returns 200.
-- Exactly one `node dist/dashboard/server.js` process; its `/proc/<pid>/cwd` is the primary repo.
+- Exactly one **host-level** `node dist/dashboard/server.js` process; its `/proc/<pid>/cwd` is the primary repo.
+  **Do not count workspace-container servers.** Each running workspace devcontainer has its own `server` service whose `dist/dashboard/server.js` process is visible in host `ps` — those are legitimate read/UI peers (cwd `/workspaces/panopticon`, parent `containerd-shim`, `PANOPTICON_DISABLE_DEACON=1`), NOT duplicate dashboards and NOT a single-deacon hazard. Seeing N+1 server processes with N containers up is the healthy state. Container-aware census:
+  ```bash
+  for pid in $(pgrep -f 'node .*dist/dashboard/server.js'); do
+    grep -qE 'docker|containerd|kubepods|libpod' /proc/$pid/cgroup 2>/dev/null \
+      && echo "$pid container (legit workspace server)" \
+      || echo "$pid HOST ($(readlink /proc/$pid/cwd))"
+  done
+  ```
+  Exactly one `HOST` line, with cwd = the primary repo, is success. Multiple `HOST` lines = a real orphan (the deacon's orphan-server reaper, PAN-1625, will also catch it).
 - Agent tmux sessions (`tmux -L panopticon list-sessions`) are intact.
 - The deacon log (`/tmp/pan-dash.log` or the dashboard log) shows a single `Deacon started` and patrols advancing — no `received SIGTERM` loop.
 

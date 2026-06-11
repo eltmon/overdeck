@@ -36,6 +36,7 @@
 /* ─── Light mode (default) ─── */
 :root {
   color-scheme: light;
+  --pan-color-scheme: light;
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
 
@@ -82,6 +83,7 @@
 /* ─── Dark mode ─── */
 .dark {
   color-scheme: dark;
+  --pan-color-scheme: dark;
 
   /* Surfaces */
   --background: #080b10;

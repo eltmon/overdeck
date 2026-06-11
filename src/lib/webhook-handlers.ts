@@ -6,7 +6,7 @@
  */
 
 import { Effect } from 'effect';
-import { setReviewStatus, getReviewStatus, type BlockerReason, type ReviewStatus } from './review-status.js';
+import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 
@@ -621,3 +621,59 @@ export const isTrackedRepository = (
   fullName: string | undefined,
 ): Effect.Effect<boolean> =>
   Effect.sync(() => isTrackedRepositorySync(fullName));
+
+// ─── Boot-time blocker reconciliation (PAN-1771) ─────────────────────────────
+
+const GH_NATIVE_BLOCKER_TYPES = new Set<BlockerReason['type']>([
+  'merge_conflict',
+  'not_mergeable',
+  'failing_checks',
+  'draft_pr',
+]);
+
+function prNumberFromUrl(prUrl: string): number | null {
+  const m = prUrl.match(/\/pull\/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Pure boot-sweep filter: returns the PR identity to refresh when a status
+ * carries GitHub-native blockers that may have gone stale, null otherwise.
+ * Exported for tests.
+ */
+export function needsBlockerReconciliation(
+  status: Pick<ReviewStatus, 'mergeStatus' | 'blockerReasons' | 'prUrl' | 'prNumber'>,
+): { repo: string; prNumber: number } | null {
+  if (status.mergeStatus === 'merged') return null;
+  const ghBlockers = (status.blockerReasons ?? []).filter((b) => GH_NATIVE_BLOCKER_TYPES.has(b.type));
+  if (ghBlockers.length === 0) return null;
+  const repo = status.prUrl ? getRepoFromPrUrl(status.prUrl) : null;
+  const prNumber = status.prNumber ?? (status.prUrl ? prNumberFromUrl(status.prUrl) : null);
+  if (!repo || !prNumber) return null;
+  return { repo, prNumber };
+}
+
+/**
+ * PAN-1771: GitHub-native blockers (failing_checks, merge_conflict, draft_pr,
+ * not_mergeable) are refreshed only by webhook-driven
+ * refreshMergeStateFromGitHub calls. Webhooks that arrive while the server is
+ * down (reboot, deploy restart, crash) are lost, so a blocker recorded before
+ * the outage can outlive the condition it describes — and a stale blocker pins
+ * readyForMerge=false forever under the PAN-1650 event-driven derivation.
+ *
+ * Re-derives the blocker set from live PR state for every non-merged status
+ * still carrying GitHub-native blockers. Sequential on purpose: the candidate
+ * set is small and this avoids a gh subprocess burst at boot. Returns the
+ * number of statuses refreshed.
+ */
+export async function reconcileStaleGitHubBlockers(): Promise<number> {
+  const statuses = loadReviewStatuses();
+  let refreshed = 0;
+  for (const status of Object.values(statuses)) {
+    const target = needsBlockerReconciliation(status);
+    if (!target) continue;
+    await refreshMergeStateFromGitHub(status.issueId, target.repo, target.prNumber);
+    refreshed++;
+  }
+  return refreshed;
+}

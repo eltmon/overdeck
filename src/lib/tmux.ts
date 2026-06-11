@@ -10,6 +10,7 @@ import { getPanopticonHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
+import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -449,26 +450,77 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
 }
 
 /**
- * Foreground commands that mean a launcher session is a keep-alive *corpse*, not
- * a live harness. Launchers end with `while true; do sleep 60; done`
+ * Process names that mean a launcher session is a keep-alive *corpse*, not a
+ * live harness. Launchers end with `while true; do sleep 60; done`
  * (src/lib/launcher-generator.ts), so after the harness process (Claude/Pi/…)
- * exits the tmux session stays alive running that loop. Its foreground command
- * is then `sleep` (during the wait) or the hosting shell (between iterations) —
- * never the harness, which surfaces as `node`/`claude`/the runtime binary.
+ * exits the tmux session stays alive running that loop — its process tree is
+ * then only the hosting shell and `sleep`, never the harness, which surfaces
+ * as `node`/`claude`/the runtime binary.
  */
 const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
+
+/**
+ * Pure tree walk behind isHarnessProcessAlive, exported for tests: true when
+ * any process in the pane's tree (the pane pids themselves or any descendant)
+ * is something other than a shell or `sleep`. `psTable` is `ps -eo
+ * pid=,ppid=,comm=` output.
+ */
+export function paneTreeHasHarnessProcess(panePids: number[], psTable: string): boolean {
+  const childrenByPpid = new Map<number, number[]>();
+  const commByPid = new Map<number, string>();
+  for (const line of psTable.split('\n')) {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
+    if (!match) continue;
+    const pid = Number(match[1]);
+    const ppid = Number(match[2]);
+    commByPid.set(pid, match[3].trim());
+    const siblings = childrenByPpid.get(ppid);
+    if (siblings) siblings.push(pid);
+    else childrenByPpid.set(ppid, [pid]);
+  }
+  const queue = [...panePids];
+  const seen = new Set<number>();
+  while (queue.length > 0) {
+    const pid = queue.pop()!;
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    const comm = commByPid.get(pid);
+    if (comm && !KEEPALIVE_FOREGROUND_COMMANDS.has(comm)) return true;
+    const children = childrenByPpid.get(pid);
+    if (children) queue.push(...children);
+  }
+  return false;
+}
 
 /**
  * Honest liveness signal for a launcher-managed session: true only when the
  * session exists AND a real harness process is running in it — not the post-exit
  * keep-alive loop. `sessionExists` alone cannot tell a live session from a
- * corpse because the keep-alive loop outlives the harness. A pane whose only
- * foreground command is a shell or `sleep` is treated as dead. PAN-1637/PAN-1638.
+ * corpse because the keep-alive loop outlives the harness. PAN-1637/PAN-1638.
+ *
+ * The check must walk the pane's process TREE, not read
+ * `#{pane_current_command}`: launcher scripts run the harness without job
+ * control, so the pane's foreground process group stays the launcher shell and
+ * tmux reports `bash` for a pane whose live tree is
+ * bash → node (pty-supervisor) → claude. Trusting pane_current_command marked
+ * every live supervisor-wrapped conversation as a corpse ~37s after spawn
+ * (PAN-1769, conv 2701/2707 false-"ended").
  */
 export async function isHarnessProcessAlive(sessionName: string): Promise<boolean> {
-  const cmds = await listPaneValuesText(sessionName, '#{pane_current_command}');
-  if (cmds.length === 0) return false;
-  return cmds.some((cmd) => !KEEPALIVE_FOREGROUND_COMMANDS.has(cmd));
+  const panePids = (await listPaneValuesText(sessionName, '#{pane_pid}'))
+    .map((value) => Number.parseInt(value, 10))
+    .filter((pid) => Number.isInteger(pid) && pid > 0);
+  if (panePids.length === 0) return false;
+  let psTable: string;
+  try {
+    const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,comm='], { encoding: 'utf-8' });
+    psTable = String(stdout);
+  } catch {
+    // Can't inspect the process table — report alive so a probe hiccup never
+    // corpse-marks (and auto-ends) a live session.
+    return true;
+  }
+  return paneTreeHasHarnessProcess(panePids, psTable);
 }
 
 
@@ -705,7 +757,25 @@ export const createSession = (
   options?: { env?: Record<string, string>; width?: number; height?: number },
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' }).then(() => undefined),
+    try: async () => {
+      await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
+      // Stamp the initial window's background with the dashboard theme so tmux
+      // answers OSC 11 background queries even with no client attached. Claude
+      // Code's `theme: auto` queries once at startup; without this, headless
+      // agents get no answer and fall back to dark regardless of the
+      // dashboard theme (conv 2547).
+      try {
+        const theme = await getUiTheme();
+        // window-style is a window option: the trailing ':' targets the
+        // session's (only) window — a bare '=name' fails with "no such window".
+        await tmuxExecAsync(
+          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          { encoding: 'utf-8' },
+        );
+      } catch {
+        // Best-effort: a failed theme stamp must not fail session creation.
+      }
+    },
     catch: (cause) => toTmuxError('create-session', cause),
   });
 

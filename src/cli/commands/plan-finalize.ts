@@ -13,7 +13,8 @@ import type { VBriefDocument } from '../../lib/vbrief/types.js';
 interface PlanFinalizeOptions {
   workspace?: string;
   json?: boolean;
-  noPromote?: boolean;
+  /** Commander negation: `--no-promote` arrives as `promote: false` (default true). */
+  promote?: boolean;
 }
 
 interface PromotePlanningResult {
@@ -90,7 +91,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
   emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
-  const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
+  // Pass the exact plan being finalized: on a re-plan, the main-side canonical
+  // spec still has the OLD content until promotion, so resolving main-first
+  // here would materialize beads from the superseded plan.
+  const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath, { planPath }));
 
   if (!result.success || result.created.length === 0) {
     const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
@@ -134,7 +138,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentError: string | null = null;
   let workAgentSkipReason: string | null = null;
 
-  if (!options.noPromote) {
+  const noPromote = options.promote === false;
+  if (!noPromote) {
     emitAutoPromotePhase(issueId, 'completePlanning', 'start', 'posting complete-planning autoSpawn request');
     const promotion = await promotePlanning(issueId);
     promoted = promotion.success;
@@ -153,7 +158,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     emitAutoPromotePhase(issueId, 'completePlanning', 'skipped', 'promotion skipped by --no-promote');
   }
 
-  emitAutoPromotePhase(issueId, 'terminal', promoted || options.noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : options.noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
+  emitAutoPromotePhase(issueId, 'terminal', promoted || noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
     workAgentSpawned,
     workAgentSkipReason,
   });
@@ -178,7 +183,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     for (const id of result.created) console.log(chalk.dim('  • ' + id));
     console.log(chalk.green(`✓ Set plan.status=proposed (canonical: ${canonicalFilename})`));
     console.log('');
-    if (options.noPromote) {
+    if (noPromote) {
       console.log(chalk.cyan('Planning is finalized. Promotion skipped (--no-promote).'));
       console.log(chalk.dim('Run `pan plan done ' + issueId + '` or click Done in the dashboard to promote.'));
     } else if (promoted) {

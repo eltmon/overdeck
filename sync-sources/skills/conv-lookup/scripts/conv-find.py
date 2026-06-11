@@ -14,12 +14,54 @@ import argparse
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
 DB_PATH = os.path.expanduser("~/.panopticon/panopticon.db")
+
+
+def record_resolver_error(info: dict[str, Any], message: str) -> None:
+    info["_resolver_error"] = message
+    print(message, file=sys.stderr)
+
+
+def resolve_session_file(info: dict[str, Any]) -> tuple[str | None, str]:
+    """Resolve the transcript JSONL path by delegating to the canonical pan CLI."""
+    conv_id = info.get("id")
+    command = ["pan", "conv", "jsonl", "--json", str(conv_id)]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+    except FileNotFoundError:
+        record_resolver_error(info, "Error: pan command not found; cannot resolve transcript JSONL path.")
+        return None, "unknown"
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        suffix = f": {detail[0]}" if detail else ""
+        record_resolver_error(info, f"Error: {' '.join(command)} failed{suffix}")
+        return None, "unknown"
+
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        record_resolver_error(info, f"Error: {' '.join(command)} returned malformed JSON.")
+        return None, "unknown"
+
+    status = payload.get("status")
+    if status not in {"ok", "expired", "unknown"}:
+        record_resolver_error(info, f"Error: {' '.join(command)} returned unknown status {status!r}.")
+        return None, "unknown"
+
+    path = payload.get("path")
+    return path if isinstance(path, str) else None, status
 
 
 def get_db():
@@ -40,6 +82,7 @@ def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "cwd": row["cwd"],
         "issue_id": row["issue_id"] if "issue_id" in row.keys() else None,
         "session_file": row["session_file"],
+        "claude_session_id": row["claude_session_id"] if "claude_session_id" in row.keys() else None,
         "title": row["title"] if "title" in row.keys() else None,
         "title_source": row["title_source"] if "title_source" in row.keys() else None,
         "title_seed": row["title_seed"] if "title_seed" in row.keys() else None,
@@ -62,7 +105,7 @@ def format_cost(value: Any) -> str:
 def list_recent(n=20, *, as_json=False):
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
         "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations ORDER BY id DESC LIMIT ?",
         (n,),
@@ -87,7 +130,7 @@ def list_recent(n=20, *, as_json=False):
 def find_by_id(conv_id):
     conn = get_db()
     row = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
         "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations WHERE id = ?",
         (conv_id,),
@@ -105,8 +148,8 @@ def search(query, *, as_json=False):
     conn = get_db()
     q = f"%{query}%"
     rows = conn.execute(
-        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, title, title_source, title_seed, "
-        "total_cost, model, effort, created_at, ended_at "
+        "SELECT id, name, tmux_session, status, cwd, issue_id, session_file, claude_session_id, "
+        "title, title_source, title_seed, total_cost, model, effort, created_at, ended_at "
         "FROM conversations "
         "WHERE title LIKE ? OR cwd LIKE ? OR model LIKE ? OR name LIKE ? "
         "ORDER BY id DESC LIMIT 50",
@@ -342,12 +385,25 @@ def main():
         search(args.search, as_json=args.json)
     elif args.conv_id:
         info = find_by_id(args.conv_id)
-        summary = get_session_summary(info["session_file"]) if info.get("session_file") else None
+        resolved, resolve_status = resolve_session_file(info)
+        info["resolved_session_file"] = resolved
+        info["session_file_status"] = resolve_status
+        summary = get_session_summary(resolved) if resolve_status == "ok" else None
         if args.jsonl:
-            print(info["session_file"] or "")
-            sys.exit(0 if info["session_file"] else 1)
+            if resolve_status == "ok":
+                print(resolved)
+                sys.exit(0)
+            if resolve_status == "expired":
+                print(
+                    f"Transcript JSONL not on disk (expected at {resolved}). "
+                    "Claude Code retention deletes old transcripts.",
+                    file=sys.stderr,
+                )
+            elif not info.get("_resolver_error"):
+                print("No claude_session_id or session_file recorded for this conversation.", file=sys.stderr)
+            sys.exit(1)
         if args.json:
-            payload = dict(info)
+            payload = {key: value for key, value in info.items() if not key.startswith("_")}
             payload["session_summary"] = summary
             print(json.dumps(payload, indent=2))
             return
@@ -364,7 +420,12 @@ def main():
         print(f"  Created:       {info['created_at']}")
         if info['ended_at']:
             print(f"  Ended:         {info['ended_at']}")
-        print(f"  Session file:  {info['session_file'] or 'N/A'}")
+        if resolve_status == "ok":
+            print(f"  Session file:  {resolved}")
+        elif resolve_status == "expired":
+            print(f"  Session file:  {resolved}  (not on disk — transcript expired)")
+        else:
+            print("  Session file:  N/A (no claude_session_id recorded)")
         if summary:
             print()
             print_session_summary(summary)

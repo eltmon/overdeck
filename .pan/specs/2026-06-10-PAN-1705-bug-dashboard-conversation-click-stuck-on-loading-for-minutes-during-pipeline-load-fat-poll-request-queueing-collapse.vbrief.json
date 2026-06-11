@@ -1,0 +1,267 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-10T01:20:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1705: bug(dashboard): conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse",
+    "updated": "2026-06-10T01:01:39.393Z"
+  },
+  "plan": {
+    "id": "pan-1705",
+    "title": "bug(dashboard): conversation click stuck on Loading… for minutes during pipeline load — fat-poll request queueing collapse",
+    "status": "proposed",
+    "uid": "36b94431-7ffa-41ff-95c4-93f80084963f",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-10T01:20:00.000Z",
+    "updated": "2026-06-10T01:01:39.393Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1705",
+        "label": "PAN-1705",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1706",
+        "label": "PAN-1706 (companion: orphan browser reaping, already merged)",
+        "type": "related"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1665",
+        "label": "PAN-1665 (gate concurrency throttle, complementary)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "bugfix",
+      "cloister",
+      "verification-gate",
+      "react-query"
+    ],
+    "narratives": {
+      "Problem": "Clicking a conversation in Command Deck hangs on 'Loading…' for minutes while the verification-gate / merge-train pipeline runs; a page reload fixes it instantly. Root cause is a server-side request-queueing collapse during pipeline-load windows, amplified historically by fat list-polling and orphaned headless browsers, plus in-flight fetches that hung forever across server restarts. THREE of the four diagnosed mechanisms are already fixed on main: the heavy AskUserQuestion poll was replaced by a lightweight /api/conversations/pending-input feed, the enriched list got single-flight+TTL coalescing, and all dashboard fetches got a 20s fetchWithTimeout (commit c3a0452b6); the ×4 orphaned-playwright-browser amplifier was reaped in PAN-1706. What remains is the gate-window CPU/IO starvation (the loadavg-11 window where even trivial endpoints averaged 15s) and a finishing touch on the restart path.",
+      "Proposal": "Close the residual mechanisms with three surgical changes. (1) Complete gate backpressure: a shared low-priority wrapper (nice -n 19 + ionice best-effort) applied both to the existing local-gate command in validation.ts AND to the pre-gate `bun install` / contracts `build_command` in verification-runner.ts that currently run at normal priority and bypass the wrapper — so the verification gates can no longer starve the dashboard event loop's CPU or disk. (2) Make the panopticon:reconnected handler cancelQueries() before invalidateQueries() so a fetch stalled across a server restart aborts immediately instead of blocking the refetch for the full 20s timeout. (3) Set MALLOC_ARENA_MAX=2 on the dashboard server child (the issue-requested experiment) to curb glibc malloc-arena RSS fragmentation from constant child spawning. ETag/304 and full WS push-first for the conversation list are deferred to #790/#898 — the per-tab pollers already coalesce to one fetch and the list churns during load, so a conditional response would mostly miss when it matters."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope to residual work only; do not re-implement the pending-input feed, list coalescing, or fetchWithTimeout (already on main in c3a0452b6) nor browser reaping (PAN-1706).",
+        "rationale": "Re-doing landed work risks regressions and wastes the work agent's budget; the workspace branched from a main that already contains these fixes."
+      },
+      {
+        "summary": "Combine nice AND ionice in a single shared helper rather than nice-only.",
+        "rationale": "The 2026-06-09 collapse occurred with nice -n 19 already present (added 2026-05-07). nice de-prioritises CPU only; bun install/build are disk-I/O heavy, so ionice best-effort priority is required to actually relieve the contention the incident showed."
+      },
+      {
+        "summary": "Defer ETag/304 and WS push-first for the conversation list to #790/#898; not in this bug fix.",
+        "rationale": "All four list pollers share queryKey ['conversations'] (React Query coalesces to one fetch/tab); server coalescing already de-dups concurrent work; and the enriched list changes every few seconds during pipeline load, so a 304 conditional response would mostly miss exactly when the bug bites. The cost/complexity is not justified by the marginal benefit for THIS bug."
+      },
+      {
+        "summary": "Keep refetchIntervalInBackground:true on the remaining background polls.",
+        "rationale": "After the pending-input migration those polls (backend-health, cliproxy-status, pending-input feed, cost stream) are lightweight and exist to catch outages even when the tab is hidden; the heavy 0.5 MB background poll is gone and the orphaned-browser amplifier that made background polling costly is already fixed in PAN-1706."
+      },
+      {
+        "summary": "Include MALLOC_ARENA_MAX=2 even though it is cosmetic.",
+        "rationale": "The issue explicitly names it as 'worth a MALLOC_ARENA_MAX=2 experiment'; it is a one-line, reversible, zero-risk env tweak, so shipping it is the defensible auto-mode default. Marked lowest priority."
+      }
+    ],
+    "items": [
+      {
+        "id": "gate-lowprio-helper",
+        "title": "Shared low-priority command wrapper (nice + ionice) applied to the local quality-gate runner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T01:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a shared helper (e.g. exported `wrapLowPriority(command: string): string` in src/lib/cloister/validation.ts or a small src/lib/process-priority.ts) that prefixes a command with `nice -n 19 ionice -c2 -n7 sh -c '<escaped>'` on Linux, `nice -n 19 sh -c '<escaped>'` on other POSIX platforms (no ionice on darwin), and returns the bare command on win32. Replace the existing inline nice-only wrapper at src/lib/cloister/validation.ts:423-432 with a call to this helper. Preserve the existing single-quote escaping (command.replace(/'/g, \"'\\\\''\")) byte-for-byte — only the fixed-literal priority prefix changes. Do NOT touch the SSH or docker-exec branches."
+        },
+        "subItems": [
+          {
+            "id": "gate-lowprio-helper.ac1",
+            "title": "On Linux, the local (non-remote, non-container) gate command is wrapped as `nice -n 19 ionice -c2 -n7 sh -c '<escaped>'`; the escaped inner command is byte-identical to the pre-change output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-lowprio-helper.ac2",
+            "title": "On darwin the wrapper is `nice -n 19 sh -c '<escaped>'` (no ionice); on win32 it is the bare command — verified by a unit test that stubs process.platform for all three branches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-lowprio-helper.ac3",
+            "title": "The SSH (fly) and docker-exec gate branches in validation.ts are unchanged; existing tests/cloister/verification-gate.test.ts still passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-lowprio-helper.ac4",
+            "title": "npm run typecheck and npm run lint pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pregate-backpressure",
+        "title": "Wrap pre-gate bun install and contracts build_command in the low-priority helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-10T01:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/verification-runner.ts, the pre-gate dependency install (`installCmd`, ~line 322) and the contracts package `build_command` (~line 334) run via execAsync at NORMAL priority before runQualityGates is reached, so they bypass the validation.ts nice wrapper. Wrap each of these commands with the same wrapLowPriority helper from the previous bead so the CPU- and I/O-heavy install/build cannot starve the dashboard event loop during a verification-gate run. Keep the existing cwd, env, encoding, and per-command timeouts (install 60s, build 30s) intact; do not change git fetch/merge calls."
+        },
+        "subItems": [
+          {
+            "id": "pregate-backpressure.ac1",
+            "title": "On Linux, the pre-gate install command and the contracts build command are each executed through the wrapLowPriority helper (nice + ionice prefix present in the spawned command string).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pregate-backpressure.ac2",
+            "title": "Non-zero exit codes from install/build still reject (failure still aborts the verification run) and the existing per-command timeouts are preserved — verified by tests/cloister/verification-runner.test.ts (extended if needed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pregate-backpressure.ac3",
+            "title": "git fetch/merge and any non-install/non-build execAsync calls in verification-runner.ts are left untouched.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pregate-backpressure.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test (cloister suite) pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconnect-cancel-queries",
+        "title": "cancelQueries before invalidateQueries on panopticon:reconnected so restart-stalled fetches recover instantly",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-10T01:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, the panopticon:reconnected handler (~lines 1030-1037) currently calls only queryClient.invalidateQueries(). Because React Query dedupes against an in-flight promise, a messages fetch that hung across a server restart blocks the refetch until the 20s fetchWithTimeout fires. Update the handler to call queryClient.cancelQueries() (abort all in-flight queries) BEFORE queryClient.invalidateQueries() (refetch active ones), so a conversation click that was loading when the server restarted resolves on reconnect in ~0s instead of ~20s. Keep the existing console.log; the handler may become async or fire-and-forget the cancel (void queryClient.cancelQueries())."
+        },
+        "subItems": [
+          {
+            "id": "reconnect-cancel-queries.ac1",
+            "title": "The panopticon:reconnected handler calls queryClient.cancelQueries() before queryClient.invalidateQueries().",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-cancel-queries.ac2",
+            "title": "Manual/observed: with a conversation panel stuck on Loading… because a server restart killed an in-flight messages fetch, dispatching panopticon:reconnected (transport reconnect) clears the spinner and shows messages without waiting the full 20s timeout and without a page reload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-cancel-queries.ac3",
+            "title": "Frontend typecheck/lint pass; no other reconnect listeners (EventRouter, NoResumeBanner) are altered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "malloc-arena-max",
+        "title": "Set MALLOC_ARENA_MAX=2 on the dashboard server child (RSS-fragmentation experiment)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-10T01:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add MALLOC_ARENA_MAX:'2' to the environment of every spawn site that launches dist/dashboard/server.js (the supervised API child in src/cli/commands/dev.ts:366-369 env block, plus any production `pan up` server spawn site — grep for spawn(node22,[bundledServer]) / server.js spawn). This caps glibc malloc arenas to curb the RSS fragmentation observed in the incident (1.3 GB RSS vs 236 MB V8 heap) caused by constant child spawning. This is the experiment the issue explicitly requests; it does not affect the V8 heap or correctness, only resident memory."
+        },
+        "subItems": [
+          {
+            "id": "malloc-arena-max.ac1",
+            "title": "Every spawn of dist/dashboard/server.js includes MALLOC_ARENA_MAX='2' in its env block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "malloc-arena-max.ac2",
+            "title": "The dashboard still starts cleanly under `pan up` / `pan dev` (server boots, /ws/terminal works) — no behavioural regression from the env var.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "malloc-arena-max.ac3",
+            "title": "npm run typecheck and npm run lint pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-lowprio-helper",
+        "to": "pregate-backpressure",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-10-PAN-1705-bug-dashboard-conversation-click-stuck-on-loading-for-minutes-during-pipeline-load-fat-poll-request-queueing-collapse.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

@@ -23,27 +23,26 @@ import type { SessionUsage } from './jsonl-parser.js';
 import { getPricingSync } from '../cost.js';
 
 interface CodexTokenUsageFields {
+  // Flat (legacy) rollout field names.
   input?: number;
   cached_input?: number;
   output?: number;
   reasoning_output?: number;
   total?: number;
+  // Nested (cli >= 0.137.0) rollout field names.
+  input_tokens?: number;
+  cached_input_tokens?: number;
+  output_tokens?: number;
+  reasoning_output_tokens?: number;
+  total_tokens?: number;
 }
 
-interface CodexTokenCountRecord {
-  type: 'token_count';
-  timestamp?: string;
-  info?: {
-    total_token_usage?: CodexTokenUsageFields;
-    last_token_usage?: CodexTokenUsageFields;
-  };
-}
-
-interface CodexTaskStartedRecord {
-  type: 'task_started';
-  model?: string;
-  thread_id?: string;
-  timestamp?: string;
+/** First defined numeric value across the flat/nested field-name variants. */
+function pickUsage(...candidates: (number | undefined)[]): number | undefined {
+  for (const c of candidates) {
+    if (typeof c === 'number') return c;
+  }
+  return undefined;
 }
 
 /**
@@ -59,7 +58,7 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
     return null;
   }
 
-  let model = 'codex-4o';
+  let model = '';
   let threadId = '';
   let startTime = '';
   let endTime = '';
@@ -79,35 +78,54 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
       continue;
     }
 
-    const type = entry['type'];
+    // Normalize the two rollout schemas. cli >= 0.137.0 nests the record kind
+    // under `payload.type` inside event_msg/turn_context/session_meta wrappers;
+    // older rollouts put the kind and its fields at the top level. `data` is
+    // wherever the kind-specific fields live for this record.
+    const payload = entry['payload'] && typeof entry['payload'] === 'object'
+      ? (entry['payload'] as Record<string, unknown>)
+      : null;
+    const type = (payload?.['type'] ?? entry['type']) as string | undefined;
+    const data = payload ?? entry;
+    const ts = typeof entry['timestamp'] === 'string' ? (entry['timestamp'] as string) : '';
 
-    if (type === 'task_started') {
-      const r = entry as unknown as CodexTaskStartedRecord;
-      if (r.model) model = r.model;
-      if (r.thread_id) threadId = r.thread_id;
-      if (r.timestamp) startTime = r.timestamp;
+    if (type === 'session_meta') {
+      // Nested schema: the thread/session id lives here, not in task_started.
+      if (!threadId && typeof data['id'] === 'string') threadId = data['id'];
+      if (!startTime && ts) startTime = ts;
+    } else if (type === 'turn_context') {
+      // The nested schema carries the resolved model here, not in task_started.
+      if (typeof data['model'] === 'string' && data['model']) model = data['model'];
+    } else if (type === 'task_started') {
+      if (typeof data['model'] === 'string' && data['model']) model = data['model'];
+      if (typeof data['thread_id'] === 'string') threadId = data['thread_id'];
+      if (!startTime && ts) startTime = ts;
     } else if (type === 'agent_message') {
       messageCount++;
-      const ts = typeof entry['timestamp'] === 'string' ? (entry['timestamp'] as string) : '';
       if (ts) endTime = ts;
     } else if (type === 'token_count') {
-      const r = entry as unknown as CodexTokenCountRecord;
-      const usage = r.info?.total_token_usage;
+      const info = data['info'] as { total_token_usage?: CodexTokenUsageFields } | undefined;
+      const usage = info?.total_token_usage;
       if (usage) {
-        totalInput = usage.input ?? totalInput;
-        totalCachedInput = usage.cached_input ?? totalCachedInput;
-        totalOutput = usage.output ?? totalOutput;
+        totalInput = pickUsage(usage.input, usage.input_tokens) ?? totalInput;
+        totalCachedInput = pickUsage(usage.cached_input, usage.cached_input_tokens) ?? totalCachedInput;
+        totalOutput = pickUsage(usage.output, usage.output_tokens) ?? totalOutput;
         hasUsage = true;
-        const ts = typeof entry['timestamp'] === 'string' ? (entry['timestamp'] as string) : '';
         if (ts) endTime = ts;
       }
     }
   }
 
   if (!hasUsage && messageCount === 0) return null;
+  // Subscription Codex conversations are GPT-5.x; fall back to gpt-5.5 pricing
+  // when the rollout carried no model so cost stays non-zero.
+  if (!model) model = 'gpt-5.5';
 
   const pricing = getPricingSync('openai', model);
-  const inputCost = (totalInput / 1000) * (pricing?.inputPer1k ?? 0);
+  // total_token_usage.input_tokens includes the cached portion, so charge only
+  // the non-cached remainder at the full input rate.
+  const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
+  const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
   const cachedCost = (totalCachedInput / 1000) * (pricing?.cacheReadPer1k ?? 0);
   const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
   const totalCost = inputCost + cachedCost + outputCost;

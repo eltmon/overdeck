@@ -4,17 +4,17 @@
     "created": "2026-05-25T23:35:53.950Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1488: chore(repo): add required_pull_request_reviews to main branch protection",
-    "updated": "2026-05-25T23:38:35.440Z"
+    "updated": "2026-06-11T06:53:47.930Z"
   },
   "plan": {
     "id": "pan-1488",
     "title": "chore(repo): add required_pull_request_reviews to main branch protection",
-    "status": "proposed",
+    "status": "running",
     "uid": "9ae9365e-d1eb-4574-bb43-48f2368105ea",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-05-25T23:35:53.950Z",
-    "updated": "2026-05-25T23:38:35.440Z",
+    "updated": "2026-06-11T06:53:47.930Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1488",
@@ -265,5 +265,5 @@
       "canonicalFilename": "2026-05-25-PAN-1488-chore-repo-add-required-pull-request-reviews-to-main-branch-protection.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

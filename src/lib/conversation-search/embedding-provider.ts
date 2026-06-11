@@ -97,28 +97,27 @@ function resolveOpenAiApiKey(
   env: NodeJS.ProcessEnv,
   envWasExplicit: boolean,
 ): { value?: string; reason: string } {
+  // `apiKeyRef` names an environment variable holding the key (default OPENAI_API_KEY).
+  // It is a *reference* and is never echoed below: a legacy/mis-saved config can store a
+  // literal API key here, and `reason` is surfaced verbatim in the dashboard UI.
   const ref = config.apiKeyRef?.trim() || OPENAI_DEFAULT_API_KEY_ENV;
   const envValue = env[ref];
   if (envValue) return { value: envValue, reason: '' };
 
-  const configValue = envWasExplicit ? undefined : resolveConfiguredOpenAiApiKey(ref);
+  // Fall back to the OpenAI key from the central API Keys config section (the source the
+  // dashboard populates). Skipped when env is injected explicitly (tests) to stay hermetic.
+  const configValue = envWasExplicit ? undefined : resolveConfiguredOpenAiApiKey();
   if (configValue) return { value: configValue, reason: '' };
 
-  return { reason: `${ref} is not set` };
+  return { reason: 'OpenAI API key not found. Add it under Settings → API Keys, or set the OPENAI_API_KEY environment variable.' };
 }
 
-function resolveConfiguredOpenAiApiKey(ref: string): string | undefined {
-  let loaded: ReturnType<typeof loadConfigSync>['config'];
+function resolveConfiguredOpenAiApiKey(): string | undefined {
   try {
-    loaded = loadConfigSync().config;
+    return loadConfigSync().config.apiKeys.openai || undefined;
   } catch {
     return undefined;
   }
-
-  if (ref === OPENAI_DEFAULT_API_KEY_ENV || ref === 'openai' || ref === 'api_keys.openai') {
-    return loaded.apiKeys.openai;
-  }
-  return undefined;
 }
 
 export function estimateConversationEmbeddingCost(

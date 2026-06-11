@@ -7,6 +7,13 @@ import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '.
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
+export interface ConversationIndexProgress {
+  filesScanned: number;
+  filesIndexed: number;
+  chunksIndexed: number;
+  currentFile?: string;
+}
+
 export interface ConversationIndexerOptions {
   config?: NormalizedConversationSearchConfig;
   db?: EmbeddingsDbHandle;
@@ -14,6 +21,8 @@ export interface ConversationIndexerOptions {
   roots?: string[];
   now?: () => string;
   signal?: AbortSignal;
+  /** Invoked once per file (before it is embedded) and once at completion, for live progress UIs. */
+  onProgress?: (progress: ConversationIndexProgress) => void;
 }
 
 export interface IndexConversationFileOptions extends ConversationIndexerOptions {
@@ -64,14 +73,18 @@ export async function indexConversationSearch(
   }
 
   try {
+    let processed = 0;
     for (const filePath of files) {
       throwIfAborted(options.signal);
+      options.onProgress?.({ filesScanned: files.length, filesIndexed: processed, chunksIndexed: result.chunksIndexed, currentFile: basename(filePath) });
       const fileResult = await indexConversationFile({ ...options, config, db: owned.db, provider: owned.provider, filePath });
       result.filesIndexed += fileResult.filesIndexed;
       result.chunksIndexed += fileResult.chunksIndexed;
       result.chunksSkipped += fileResult.chunksSkipped;
       result.errors.push(...fileResult.errors);
+      processed += 1;
     }
+    options.onProgress?.({ filesScanned: files.length, filesIndexed: processed, chunksIndexed: result.chunksIndexed });
   } finally {
     owned.close();
   }
@@ -134,21 +147,27 @@ export async function estimateFullReindexConversationSearchCost(
   let tokenCount = 0;
   let estimatedUsd = 0;
   let chunksEstimated = 0;
+  let filesScanned = 0;
   for (const filePath of files) {
-    for await (const chunk of chunkConversationJsonl({
-      filePath,
-      sessionId: sessionIdFromPath(filePath),
-      projectId: projectIdFromPath(filePath),
-      fromOffset: 0,
-      signal: options.signal,
-    })) {
-      const estimate = provider.estimateCost([chunk.text]);
-      tokenCount += estimate.tokenCount;
-      estimatedUsd += estimate.estimatedUsd;
-      chunksEstimated += 1;
+    try {
+      for await (const chunk of chunkConversationJsonl({
+        filePath,
+        sessionId: sessionIdFromPath(filePath),
+        projectId: projectIdFromPath(filePath),
+        fromOffset: 0,
+        signal: options.signal,
+      })) {
+        const estimate = provider.estimateCost([chunk.text]);
+        tokenCount += estimate.tokenCount;
+        estimatedUsd += estimate.estimatedUsd;
+        chunksEstimated += 1;
+      }
+      filesScanned += 1;
+    } catch {
+      // Skip files that fail to parse (malformed JSONL, permission errors, etc.)
     }
   }
-  return { ...empty, tokenCount, estimatedUsd, filesScanned: files.length, chunksEstimated, disabled: false };
+  return { ...empty, tokenCount, estimatedUsd, filesScanned, chunksEstimated, disabled: false };
 }
 
 export async function indexConversationFile(

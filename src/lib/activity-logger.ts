@@ -22,6 +22,7 @@ export type ActivitySource =
   | Role
   | 'cloister'
   | 'dashboard'
+  | 'supervisor'
   | 'planning-agent'
   | 'work-agent'
   | 'review-specialist'
@@ -39,6 +40,8 @@ export interface EmitActivityOptions {
   message: string;
   details?: string;
   issueId?: string;
+  /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
+  link?: string;
 }
 
 export interface EmitDetailedOptions {
@@ -112,6 +115,7 @@ export function emitActivityEntrySync(options: EmitActivityOptions): void {
       message: options.message,
       details: options.details,
       issueId: options.issueId,
+      link: options.link,
     },
   });
 }

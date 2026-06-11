@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { IssueId } from '@panctl/contracts';
 import type { ConversationSessionFeedEntry } from './types';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 
 export interface ConversationFeedRow {
   id: number;
@@ -25,7 +26,7 @@ export interface UseConversationFeedResult {
 }
 
 async function fetchConversations(): Promise<ConversationFeedRow[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json() as Promise<ConversationFeedRow[]>;
 }

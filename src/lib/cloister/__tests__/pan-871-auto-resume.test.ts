@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
@@ -35,6 +35,7 @@ vi.mock('../../../lib/agents.js', async () => {
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
+  buildDefaultResumeContinueMessage: vi.fn((issueId: string) => `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`),
   recordAgentFailure: effectMock(null),
   recordAgentFailureProgram: effectMock(null),
   };
@@ -79,8 +80,22 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
   isDeaconGloballyPaused: vi.fn(() => false),
 }));
 
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    loadavg: () => [1, 1, 1],
+    cpus: () => Array.from({ length: 24 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+  };
+});
+
 vi.mock('../agent-idle.js', () => ({
   isAgentIdleForNudge: vi.fn(() => false),
+}));
+
+vi.mock('../../../lib/transcript-landing.js', () => ({
+  captureTranscriptUserRecordSnapshot: vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 })),
 }));
 
 vi.mock('child_process', () => ({
@@ -93,6 +108,17 @@ vi.mock('child_process', () => ({
   }),
   execFile: vi.fn(),
 }));
+
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    homedir: vi.fn(() => '/tmp/test-home'),
+    cpus: vi.fn(() => Array.from({ length: 8 }, () => ({}) as ReturnType<typeof actual.cpus>[number])),
+    loadavg: vi.fn(() => [0, 0, 0]),
+  };
+});
 
 vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
   findWorkspacePath: vi.fn(() => '/tmp/workspace'),
@@ -165,6 +191,11 @@ vi.mock('../config.js', () => ({
   loadCloisterConfigSync: vi.fn(() => ({ patrolIntervalMs: 60000 })),
 }));
 
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: vi.fn(() => ({ active: false, since: null })),
+  isNoResumeValueEnabled: vi.fn((value: string | undefined) => ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '')),
+}));
+
 vi.mock('../../../lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
@@ -183,14 +214,15 @@ vi.mock('fs', () => ({
   rmSync: vi.fn(),
 }));
 
-import { autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads } from '../deacon.js';
+import { autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, nudgeStalledResumeWorkAgents } from '../deacon.js';
 import { getAgentStateSync, getAgentState, messageAgent, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
 import { sessionExists } from '../../../lib/tmux.js';
 import { isAgentIdleForNudge } from '../agent-idle.js';
 import { isIssueClosed } from '../issue-closed.js';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
@@ -202,14 +234,22 @@ const mockSessionExists = sessionExists as any;
 const mockIsAgentIdleForNudge = isAgentIdleForNudge as any;
 const mockIsIssueClosed = isIssueClosed as any;
 const mockExistsSync = existsSync as any;
+const mockReadFileSync = readFileSync as any;
+const mockWriteFileSync = writeFileSync as any;
+const mockCaptureTranscriptUserRecordSnapshot = captureTranscriptUserRecordSnapshot as any;
 
 // Default existsSync behaviour mirrors the module mock: no completed markers present.
 const noCompletedMarkers = (path: string) =>
   !path.endsWith('/completed') && !path.endsWith('/completed.processed');
 
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
+  let originalNoResume: string | undefined;
+
   beforeEach(() => {
+    originalNoResume = process.env.PANOPTICON_NO_RESUME;
+    delete process.env.PANOPTICON_NO_RESUME;
     vi.clearAllMocks();
+    mockReadFileSync.mockReturnValue('{}');
     const agentState = {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
@@ -236,7 +276,13 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     mockIsIssueClosed.mockResolvedValue(false);
     mockMessageAgent.mockResolvedValue(undefined);
     mockResumeAgent.mockResolvedValue({ success: true } as any);
+    mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
     mockExistsSync.mockImplementation(noCompletedMarkers);
+  });
+
+  afterEach(() => {
+    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
+    else process.env.PANOPTICON_NO_RESUME = originalNoResume;
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {
@@ -344,5 +390,121 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
 
     expect(actions).toEqual(['Nudged idle agent-pan-871 (PAN-871) — 1 open bead(s)']);
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('Next ready bead: workspace-nudge'));
+  });
+
+  it('re-sends the resume prompt to an idle resumed work agent with zero user records since resume', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    });
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+    mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
+
+    const actions = await nudgeStalledResumeWorkAgents();
+
+    expect(actions).toEqual(['Re-sent stalled resume prompt to agent-pan-871 (PAN-871)']);
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-871', expect.stringContaining('You are resuming work on PAN-871'));
+    expect(mockWriteFileSync).toHaveBeenCalledWith('/tmp/test-agents/agent-pan-871/.last-stalled-resume-nudge', expect.any(String), 'utf-8');
+  });
+
+  it('does not re-send a stalled resume prompt when the issue is closed', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    });
+    mockIsIssueClosed.mockResolvedValue(true);
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+
+    const actions = await nudgeStalledResumeWorkAgents();
+
+    expect(actions).toEqual([]);
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-871');
+    expect(mockSessionExists).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('does not re-send when a user record landed after the last resume', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    });
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+    mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: 1,
+      lastUserRecord: { lineNumber: 1, timestamp: '2026-06-10T00:01:10.000Z' },
+    });
+
+    const actions = await nudgeStalledResumeWorkAgents();
+
+    expect(actions).toEqual([]);
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('skips orphaned, paused, and cooldown-gated stalled resume candidates', async () => {
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+      paused: true,
+    });
+    mockSessionExists.mockResolvedValue(true);
+    mockIsAgentIdleForNudge.mockReturnValue(true);
+
+    expect(await nudgeStalledResumeWorkAgents()).toEqual([]);
+
+    mockGetAgentState.mockReturnValue({
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    });
+    mockSessionExists.mockResolvedValue(false);
+    expect(await nudgeStalledResumeWorkAgents()).toEqual([]);
+
+    mockSessionExists.mockResolvedValue(true);
+    mockReadFileSync.mockReturnValue(String(Date.now()));
+    expect(await nudgeStalledResumeWorkAgents()).toEqual([]);
+    expect(mockMessageAgent).not.toHaveBeenCalled();
   });
 });

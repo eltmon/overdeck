@@ -173,11 +173,18 @@ export class FlyProvider implements RemoteProvider {
         auto_destroy: false,
       });
 
-      // Wait for machine to start
+      // Wait for machine to start. This must be fatal: callers exec commands
+      // immediately after createVm, and a not-yet-started machine 412s every
+      // exec. First boot pulls the full image from the registry, which can
+      // exceed two minutes — hence the generous timeout.
       try {
-        await api.waitForState(this.config.app, machine.id, 'started', 120);
-      } catch {
-        // Non-fatal: machine may still be starting
+        await api.waitForState(this.config.app, machine.id, 'started', 300);
+      } catch (cause) {
+        throw new Error(
+          `Machine ${machine.id} (${name}) did not reach 'started' within 300s — ` +
+            `likely still pulling the image. Check: fly machines list -a ${this.config.app}`,
+          { cause }
+        );
       }
 
       return {
@@ -263,23 +270,32 @@ export class FlyProvider implements RemoteProvider {
 
   private async sshImpl(vm: string, command: string): Promise<ExecResult> {
     const { appName, machineId } = await this.resolveVm(vm);
-    try {
-      const result = await this.getApi().execCommand(
-        appName,
-        machineId,
-        ['/bin/sh', '-c', command],
-        60
-      );
-      return {
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
-        exitCode: result.exit_code ?? 0,
-      };
-    } catch (err) {
-      if (err instanceof FlyApiError) {
-        return { stdout: '', stderr: err.message, exitCode: 1 };
+    // The Machines exec API rate-limits per-machine actions; bursts of execs
+    // (e.g. chunked file writes) hit 429 resource_exhausted. Back off and
+    // retry before surfacing the error.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const result = await this.getApi().execCommand(
+          appName,
+          machineId,
+          ['/bin/sh', '-c', command],
+          60
+        );
+        return {
+          stdout: result.stdout ?? '',
+          stderr: result.stderr ?? '',
+          exitCode: result.exit_code ?? 0,
+        };
+      } catch (err) {
+        if (err instanceof FlyApiError) {
+          if (err.statusCode === 429 && attempt < 4) {
+            await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+            continue;
+          }
+          return { stdout: '', stderr: err.message, exitCode: 1 };
+        }
+        throw err;
       }
-      throw err;
     }
   }
 
@@ -371,13 +387,23 @@ export class FlyProvider implements RemoteProvider {
   // Credential Sync & Configuration (ported from ExeProvider)
   // ============================================================================
 
-  /** Sync Claude Code credentials from local macOS Keychain to remote VM */
+  /**
+   * Sync Claude Code credentials to the remote VM.
+   * Linux stores them at ~/.claude/.credentials.json; macOS in the Keychain.
+   */
   async syncClaudeCredentials(vmName: string): Promise<boolean> {
     try {
-      const { stdout: credentials } = await execAsync(
-        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
-        { encoding: 'utf-8', timeout: 10000 }
-      );
+      let credentials = '';
+      const credFile = join(homedir(), '.claude', '.credentials.json');
+      if (existsSync(credFile)) {
+        credentials = readFileSync(credFile, 'utf-8');
+      } else {
+        const { stdout } = await execAsync(
+          'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        credentials = stdout;
+      }
       if (!credentials?.trim()) return false;
 
       const b64 = Buffer.from(credentials.trim()).toString('base64');
@@ -388,16 +414,26 @@ export class FlyProvider implements RemoteProvider {
     }
   }
 
-  /** Sync GitHub CLI authentication to the remote VM */
+  /**
+   * Sync GitHub CLI authentication to the remote VM.
+   *
+   * Copying hosts.yml is not enough: gh commonly stores the token in the OS
+   * keyring, leaving hosts.yml token-less. Export the live token via
+   * `gh auth token` and log in on the VM, then wire gh as the git https
+   * credential helper so clone/push authenticate.
+   */
   async syncGitHubAuth(vmName: string): Promise<boolean> {
-    const ghConfigPath = join(homedir(), '.config', 'gh', 'hosts.yml');
-    if (!existsSync(ghConfigPath)) return false;
-
     try {
-      const content = readFileSync(ghConfigPath, 'utf-8');
-      const b64 = Buffer.from(content).toString('base64');
-      await this.sshImpl(vmName, `mkdir -p ~/.config/gh && echo '${b64}' | base64 -d > ~/.config/gh/hosts.yml`);
-      return true;
+      const { stdout } = await execAsync('gh auth token', { timeout: 10000 });
+      const token = stdout.trim();
+      if (!token) return false;
+
+      const b64 = Buffer.from(token).toString('base64');
+      const result = await this.sshImpl(
+        vmName,
+        `echo '${b64}' | base64 -d | gh auth login --with-token && gh auth setup-git`
+      );
+      return result.exitCode === 0;
     } catch {
       return false;
     }
@@ -433,17 +469,16 @@ export class FlyProvider implements RemoteProvider {
     const check = await this.sshImpl(vmName, 'which bd 2>/dev/null');
     if (check.exitCode === 0 && check.stdout.trim()) return true;
 
-    // Install via npm
-    const result = await this.sshImpl(vmName, 'npm install -g @beads-dev/beads 2>&1');
-    if (result.exitCode !== 0) {
-      // Try alternative install
-      const alt = await this.sshImpl(
-        vmName,
-        'curl -fsSL https://raw.githubusercontent.com/beads-dev/beads/main/install.sh | bash 2>&1'
-      );
-      return alt.exitCode === 0;
-    }
-    return true;
+    // Canonical install script (same source as the host prereqs registry).
+    // Running as root it lands in /usr/local/bin, which stays on PATH even
+    // under the Machines exec HOME=/ quirk.
+    const result = await this.sshImpl(
+      vmName,
+      'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash 2>&1'
+    );
+    if (result.exitCode !== 0) return false;
+    const verify = await this.sshImpl(vmName, 'which bd 2>/dev/null');
+    return verify.exitCode === 0 && verify.stdout.trim().length > 0;
   }
 
   /** Initialize beads in a workspace on a remote VM */
@@ -459,7 +494,8 @@ export class FlyProvider implements RemoteProvider {
   async configureClaudeCode(vmName: string): Promise<void> {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
 
-    // Set onboarding complete
+    // Set onboarding complete + pre-trust /workspace so the agent doesn't
+    // hang at the "do you trust this folder?" dialog on first launch.
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -469,6 +505,9 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
+projects = data.setdefault("projects", {})
+ws = projects.setdefault("/workspace", {})
+ws["hasTrustDialogAccepted"] = True
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
 `;

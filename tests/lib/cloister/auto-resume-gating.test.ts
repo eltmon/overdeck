@@ -79,21 +79,19 @@ describe('auto-resume gates', () => {
   }
 
   async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
-    // PAN-1665: throttle tests need deterministic load/core counts. Only install
-    // the os mock when overrides are supplied so existing tests keep real values.
-    if (osOverrides) {
-      vi.doMock('os', async (importOriginal) => {
-        const actual = await importOriginal<typeof import('os')>();
-        return {
-          ...actual,
-          default: actual,
-          loadavg: osOverrides.loadavg ? () => osOverrides.loadavg! : actual.loadavg,
-          cpus: osOverrides.cpusCount
-            ? () => Array.from({ length: osOverrides.cpusCount! }, () => ({}) as ReturnType<typeof actual.cpus>[number])
-            : actual.cpus,
-        };
-      });
-    }
+    // PAN-1665: throttle tests need deterministic load/core counts. Default to
+    // low load so unrelated auto-resume tests do not depend on the host machine.
+    vi.doMock('os', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('os')>();
+      const loadavg = osOverrides?.loadavg ?? [0, 0, 0];
+      const cpusCount = osOverrides?.cpusCount ?? 4;
+      return {
+        ...actual,
+        default: actual,
+        loadavg: () => loadavg,
+        cpus: () => Array.from({ length: cpusCount }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+      };
+    });
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();
       return {
@@ -109,6 +107,8 @@ describe('auto-resume gates', () => {
       getConcurrencyLimits: () => ({ maxWorkAgents: resumeSlotsMock, reservedAdvancingSlots: 3, totalCeiling: resumeSlotsMock + 3 }),
       countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
       workResumeSlotsAvailable: () => resumeSlotsMock,
+      resetPatrolDispatchBudget: vi.fn(),
+      tryReserveAdvancingSlot: () => true,
       canDispatchAdvancing: () => true,
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({

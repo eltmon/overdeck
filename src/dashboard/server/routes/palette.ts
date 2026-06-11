@@ -194,6 +194,9 @@ export interface PaletteConversationHit {
   sessionId: string;
   conversationId: string;
   projectId: string;
+  /** Dashboard project key (name ?? key) this conversation's cwd lives under, so
+   *  the palette can route to the right deck. Null when under no registered project. */
+  projectKey: string | null;
   role: string;
   ts: string | null;
   byteOffset: number;
@@ -216,11 +219,56 @@ function routeableConversationName(sessionId: string, cache: Map<string, string>
   return routeable;
 }
 
-function toPaletteConversationHit(hit: ConversationSearchHit, routeableNames: Map<string, string>): PaletteConversationHit {
+interface ProjectDirMatch {
+  enc: string;
+  key: string;
+}
+
+/**
+ * Encode a cwd the way Claude Code names its `~/.claude/projects/<dir>` folders —
+ * path separators and dots become hyphens. A conversation chunk's `projectId` IS
+ * that dir name, so encoding each registered project's real path the same way lets
+ * us match a hit back to its dashboard project.
+ */
+function registeredProjectDirs(): ProjectDirMatch[] {
+  try {
+    return listProjectsSync().map((p) => ({
+      enc: p.config.path.replace(/[/.]/g, '-'),
+      key: p.config.name ?? p.key,
+    }));
+  } catch (error) {
+    console.error('[palette] failed to list projects for conversation routing:', error);
+    return [];
+  }
+}
+
+/**
+ * The dashboard project key (`name ?? key`) whose cwd contains this conversation,
+ * or null when it is under no registered project. Longest-prefix wins so a
+ * workspace path (`…-panopticon-cli-workspaces-feature-x`) resolves to its parent
+ * project's deck rather than a phantom one.
+ */
+function resolveConversationProjectKey(projectId: string, dirs: ProjectDirMatch[]): string | null {
+  let best: ProjectDirMatch | null = null;
+  for (const dir of dirs) {
+    if (!dir.enc) continue;
+    if (projectId === dir.enc || projectId.startsWith(`${dir.enc}-`)) {
+      if (!best || dir.enc.length > best.enc.length) best = dir;
+    }
+  }
+  return best?.key ?? null;
+}
+
+function toPaletteConversationHit(
+  hit: ConversationSearchHit,
+  routeableNames: Map<string, string>,
+  projectDirs: ProjectDirMatch[],
+): PaletteConversationHit {
   return {
     sessionId: hit.sessionId,
     conversationId: routeableConversationName(hit.sessionId, routeableNames),
     projectId: hit.projectId,
+    projectKey: resolveConversationProjectKey(hit.projectId, projectDirs),
     role: hit.role,
     ts: hit.ts,
     byteOffset: hit.byteOffset,
@@ -234,7 +282,8 @@ function toPaletteConversationHit(hit: ConversationSearchHit, routeableNames: Ma
 async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
   const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
   const routeableNames = new Map<string, string>();
-  return hits.map((hit) => toPaletteConversationHit(hit, routeableNames));
+  const projectDirs = registeredProjectDirs();
+  return hits.map((hit) => toPaletteConversationHit(hit, routeableNames, projectDirs));
 }
 
 async function searchProjectMemory(

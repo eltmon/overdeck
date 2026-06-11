@@ -144,6 +144,9 @@ async function recordRestartStatus(startedAt: number, success: boolean, error?: 
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
+    pid: process.pid,
+    initiator: process.env.PANOPTICON_AGENT_ID,
+    issueId: process.env.PANOPTICON_ISSUE_ID,
   }));
 }
 

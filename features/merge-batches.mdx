@@ -1,0 +1,71 @@
+---
+title: UAT Batch Trains
+description: Always one tested batch of every ready feature, ready to merge in one click
+---
+
+# UAT Batch Trains
+
+When agents land merge-ready features faster than you can review and merge them
+one at a time, the bottleneck becomes the last-mile UAT. **UAT batch trains** fix
+that: Panopticon keeps **one assembled, testable batch of every ready feature**
+available at all times, so you can exercise the combined result and then land
+exactly what you tested — in a single click.
+
+<Note>
+Batch trains run only while a **Flywheel** run is active and the merge-train flag
+(`flywheel.merge_train_enabled`) is on. They are inert otherwise.
+</Note>
+
+## What you see
+
+On the Flywheel page, the **UAT batches** card shows, newest first:
+
+- A **ready batch** — a `uat/<codename>` branch bundling every ready feature,
+  with the conflicts between them already resolved. It offers **Open UAT
+  frontend** (a live dashboard serving that exact branch), a per-feature **What
+  to UAT** checklist, and **Merge batch (N) to main**.
+- A batch **assembling** in the background when a new feature becomes ready — the
+  current batch stays fully testable until the new one is ready and supersedes it.
+- **Held-out** features, with the reason, when a conflict couldn't be resolved
+  automatically. Nothing blocks the batch; the held-out feature is retried in a
+  later generation.
+
+## How it works
+
+1. **Assemble.** A 60-second reconciler builds a generation — a throwaway
+   `uat/<label>-<codename>-<MMDD>` branch off `main` — merging each ready feature
+   in order. When two features conflict, a timeboxed assembly agent resolves the
+   conflict *inside the batch*; if it can't, that feature is held out (never the
+   whole batch).
+2. **Accumulate.** New ready features trigger a new, larger generation in the
+   background. Generations accumulate — you can test and promote an earlier,
+   smaller batch if the newest isn't what you want.
+3. **Test.** Click **Open UAT frontend** to exercise the combined branch on a
+   real running stack. The checklist pulls each feature's acceptance criteria,
+   plus an explicit "verify the touchpoint" item wherever a conflict was resolved.
+4. **Promote.** **Merge batch (N) to main** lands exactly the tree you tested —
+   conflict resolutions included — in one merge. Each feature then closes out
+   through the normal post-merge flow.
+
+Merging a single feature on its own is still available as an escape hatch; doing
+so simply restales the live batches and a fresh one reassembles automatically.
+
+## Live UAT stacks
+
+Each generation can serve a live dashboard at
+`uat-<codename>.pan.localhost`, spun on demand from the batch's worktree.
+Panopticon runs **at most two UAT stacks at once** (Docker's network pool is
+limited) and tears down the oldest when you start a third; promoting or
+invalidating a batch always tears its stack down.
+
+## Honest controls
+
+Every action names its exact effect and confirms before anything happens —
+"Merge batch (3) to main" lists the three issues and states that it lands the
+tree you tested. There is no opaque "Ship batch" button: a batch builds itself,
+and nothing reaches `main` until you say so.
+
+<Card title="Engineering reference" icon="book" href="https://github.com/eltmon/panopticon-cli/blob/main/docs/UAT-BATCH-TRAINS.md">
+The full model, modules, reconciler, API, and promotion semantics live in
+`docs/UAT-BATCH-TRAINS.md`.
+</Card>

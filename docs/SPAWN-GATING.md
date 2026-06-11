@@ -31,12 +31,12 @@ There is no `pan work` spawn command today; the CLI audit found `pan start <id>`
 
 ## Spawn entrypoint audit
 
-- `src/lib/agents.ts:1851` `spawnRun()` is the role-run choke point for review, test, and ship roles; it gates non-work roles directly and delegates work to `spawnAgent()`.
+- `src/lib/agents.ts:1851` `spawnRun()` is the role-run choke point for spawned review and test roles; it gates non-work roles directly and delegates work to `spawnAgent()`.
 - `src/lib/agents.ts:2106` `spawnAgent()` is the work-agent choke point; dashboard direct services, swarm slots, merge-prep recovery, and handoff all flow through it.
 - `src/lib/cloister/review-agent.ts:335` and `src/lib/cloister/review-agent.ts:525` start review roles through `spawnRun()`.
 - `src/lib/cloister/test-agent-queue.ts:85`, `src/lib/cloister/deacon.ts:1568`, `src/lib/cloister/deacon.ts:1745`, and `src/dashboard/server/routes/workspaces.ts:3602` start test roles through `spawnRun()`.
-- `src/lib/cloister/merge-agent.ts:1149` starts ship roles through `spawnRun()`.
-- `src/lib/cloister/service.ts:350` starts reactive lifecycle roles through `spawnRun()`.
+- Server-side shipping no longer starts a ship role through `spawnRun()`.
+- `src/lib/cloister/service.ts:350` starts reactive lifecycle roles through `spawnRun()` when a lifecycle state maps to a spawned role.
 - `src/dashboard/server/services/agent-spawner.ts:166`, `src/dashboard/server/routes/workspaces.ts:267`, `src/dashboard/server/routes/swarm.ts:1009`, and `src/lib/cloister/handoff.ts:136` start work agents through `spawnAgent()`.
 - `src/dashboard/server/routes/agents.ts:2649` and `src/dashboard/server/routes/agents.ts:2709` shell out to `pan start`, which reaches `spawnAgent()`.
 - `src/cli/commands/swarm.ts:121` calls `POST /api/swarm`, which reaches `spawnAgent()` for each slot.

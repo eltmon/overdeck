@@ -40,6 +40,9 @@ import { PipelineSkeleton } from './components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
+import { DiffPanel } from './components/DiffPanel';
+import { DiffWorkerPoolProvider } from './components/DiffWorkerPoolProvider';
+import type { TurnDiffSummary } from './components/chat/chat-types';
 import { DeaconPauseToggle } from './components/DeaconPauseToggle';
 import { NoResumeBanner } from './components/NoResumeBanner';
 import { LowCostModePill } from './components/LowCostModePill';
@@ -56,6 +59,7 @@ import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion
 import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
 import { usePanesStore } from './lib/panesStore';
 import { refreshDashboardState } from './lib/refresh-dashboard-state';
+import { fetchWithTimeout } from './lib/apiFetch';
 import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 
@@ -319,6 +323,60 @@ function StandaloneFlywheelPopoutRoute() {
   );
 }
 
+/**
+ * Standalone diff popout (/popout/diff). Renders ONLY the diff — not the host
+ * conversation/agent page. The pop-out button in DiffPanel passes `prefix` (the
+ * diff fetch base, e.g. /api/conversations/<name>/diffs) plus the selected
+ * turn/file via query params; this route refetches the turn summaries from that
+ * base and mounts a bare full-width DiffPanel. Theme is applied at module load
+ * from localStorage, and diffs are REST-driven, so no EventRouter is needed.
+ */
+function StandaloneDiffPopoutRoute() {
+  useCodexAutoRetry();
+  const search = new URLSearchParams(window.location.search);
+  const prefix = search.get('prefix') ?? '';
+  const agentId = search.get('agentId') ?? prefix;
+  const { data, isError } = useQuery({
+    queryKey: ['popout-diff-summaries', prefix],
+    queryFn: async () => {
+      const res = await fetch(prefix);
+      if (!res.ok) throw new Error(`Failed to load diff summaries: ${res.status}`);
+      return (await res.json()) as { summaries: TurnDiffSummary[] };
+    },
+    enabled: prefix.length > 0,
+    // Same cadence as the inline panel (ConversationPanel) — keeps summaries
+    // fresh as turns complete AND self-heals after a transient backend outage
+    // (e.g. a watchdog dashboard restart) instead of dead-ending on the error
+    // state after the default 3 retries.
+    refetchInterval: 5000,
+  });
+  return (
+    <div className="h-screen overflow-hidden bg-background">
+      {prefix.length === 0 || (isError && data === undefined) ? (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          {prefix.length === 0 ? 'Missing diff source.' : 'Failed to load this diff — retrying…'}
+        </div>
+      ) : data === undefined ? (
+        // The summaries endpoint shells out to git per turn and can take seconds
+        // on a long conversation — without this gate, DiffPanel mounts with an
+        // empty summary list and shows a misleading "No completed turns yet."
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Loading diff…
+        </div>
+      ) : (
+        <DiffWorkerPoolProvider>
+          <DiffPanel
+            mode="sheet"
+            agentId={agentId}
+            turnDiffSummaries={data.summaries}
+            diffUrlPrefix={prefix}
+          />
+        </DiffWorkerPoolProvider>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
@@ -335,6 +393,10 @@ export default function App() {
 
   if (terminalPath === '/popout/flywheel-conversation') {
     return <StandaloneFlywheelPopoutRoute />;
+  }
+
+  if (terminalPath === '/popout/diff') {
+    return <StandaloneDiffPopoutRoute />;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
@@ -556,7 +618,11 @@ export default function App() {
 
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
-    const projectKey = hit.projectId || NO_PROJECT_KEY;
+    // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
+    // hit.projectId is the encoded ~/.claude/projects dir name and is NOT a deck
+    // key, so routing on it lands on a phantom project. Fall back to the No-project
+    // bucket when the conversation is under no registered project.
+    const projectKey = hit.projectKey || NO_PROJECT_KEY;
     try {
       const locator = await fetchConversationMessageLocator(conversationName, hit.byteOffset);
       const nonce = Date.now();
@@ -694,8 +760,10 @@ export default function App() {
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
 
-  // PAN-1520 — poll conversations for pending AskUserQuestion. Cheaper than a
-  // dedicated WS event for now; the list endpoint already returns the field.
+  // PAN-1520 — poll conversations for pending AskUserQuestion. PAN-1705:
+  // uses the dedicated pending-input feed (scans only tmux-alive sessions,
+  // returns only rows that need attention) instead of pulling the full
+  // 0.5 MB enriched list every 4s.
   type ConvAskUserQuestionRow = {
     name: string;
     title?: string | null;
@@ -704,11 +772,10 @@ export default function App() {
   };
   const { data: convAskUserQuestionRows = [] } = useQuery({
     queryKey: ['conv-ask-user-question'],
-    queryFn: async (): Promise<ConvAskUserQuestionRow[]> => {
-      const res = await fetch('/api/conversations?limit=1000');
+    queryFn: async ({ signal }): Promise<ConvAskUserQuestionRow[]> => {
+      const res = await fetchWithTimeout('/api/conversations/pending-input', { signal });
       if (!res.ok) return [];
-      const rows: ConvAskUserQuestionRow[] = await res.json();
-      return rows.filter((r) => r.pendingAskUserQuestion != null);
+      return res.json();
     },
     refetchInterval: 4000,
     refetchIntervalInBackground: true,
@@ -931,9 +998,62 @@ export default function App() {
     },
   });
 
+  // PAN-1690 — answer a Codex TUI approval menu. The selected option's label
+  // is prefixed with its number ("1. Yes, proceed"); we send that number to the
+  // codex-approval endpoint, which drives the menu via Down×(n-1) + Enter.
+  const codexApprovalMutation = useMutation({
+    mutationFn: async ({ id, optionNumber }: {
+      id: string;
+      optionNumber: number;
+      label?: string;
+      toolUseId?: string;
+    }) => {
+      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optionNumber }),
+      });
+      if (!res.ok) {
+        let message = `Failed to send approval (${res.status})`;
+        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onMutate: ({ toolUseId }) => {
+      if (toolUseId) markAskUserQuestionAnswered(toolUseId);
+      return { toolUseId };
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(`Approval sent to ${variables.label?.trim() || variables.id}`);
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.toolUseId) unmarkAskUserQuestionAnswered(context.toolUseId);
+      toast.error(`Failed to send approval: ${error.message}`);
+    },
+  });
+
   const handleSubmitAskUserQuestion = useCallback((answers: string[]) => {
     if (!currentAskUserQuestionSubject) return;
     const subject = currentAskUserQuestionSubject;
+    const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
+    // PAN-1690 — Codex approval: route the numbered choice to the keystroke
+    // endpoint instead of delivering prose into the pane.
+    if (toolUseId?.startsWith('codex-approval:')) {
+      const match = /^\s*(\d+)/.exec(answers[0] ?? '');
+      const optionNumber = match ? Number(match[1]) : NaN;
+      if (!Number.isInteger(optionNumber)) {
+        toast.error('Could not determine which option was selected');
+        return;
+      }
+      codexApprovalMutation.mutate({
+        id: subject.id,
+        optionNumber,
+        label: subject.title?.trim() || subject.id,
+        toolUseId,
+      });
+      return;
+    }
     askUserQuestionAnswerMutation.mutate({
       kind: (subject as AskUserQuestionSubject & { kind?: 'agent' | 'conv' }).kind ?? 'agent',
       id: subject.id,
@@ -941,7 +1061,7 @@ export default function App() {
       answers,
       questions: subject.pendingAskUserQuestion?.questions as never,
     });
-  }, [askUserQuestionAnswerMutation, currentAskUserQuestionSubject]);
+  }, [askUserQuestionAnswerMutation, codexApprovalMutation, currentAskUserQuestionSubject]);
 
   const handleDismissAskUserQuestion = useCallback(() => {
     if (!currentAskUserQuestionSubject) return;
@@ -1471,7 +1591,7 @@ export default function App() {
       <AskUserQuestionDialog
         subject={currentAskUserQuestionSubject}
         isOpen={!!currentAskUserQuestionSubject && !currentChannelPermissionRequest}
-        isSubmitting={askUserQuestionAnswerMutation.isPending}
+        isSubmitting={askUserQuestionAnswerMutation.isPending || codexApprovalMutation.isPending}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}
       />

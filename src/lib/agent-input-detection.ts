@@ -152,6 +152,18 @@ function looksLikeSessionResumeDialog(text: string): boolean {
     || /press enter to (?:continue|resume)/i.test(text)
 }
 
+/**
+ * PAN-1690 — Codex TUI approval prompt header. Codex asks for approval with a
+ * distinctive "Would you like to …?" prompt box (command run, edits, network/
+ * host grants) followed by a numbered Yes/…/No menu. Unlike Claude's menu,
+ * Codex renders option descriptions and a footer hint *below* "3. No", so the
+ * trailing-line heuristics the Claude path relies on never fire — we key on the
+ * header instead. Verb list pulled from the codex binary; see PAN-1690.
+ */
+function looksLikeCodexApprovalHeader(line: string): boolean {
+  return /Would you like to (?:run the following command|grant these permissions?|make the following edits|allow|apply)\b/i.test(line)
+}
+
 export function detectAwaitingInputFromPaneSync(
   pane: string,
   options: { isPlanning?: boolean } = {},
@@ -172,6 +184,23 @@ export function detectAwaitingInputFromPaneSync(
       return {
         reason: 'tool_permission',
         prompt: snippetAround(lines, menuIndex, 10, 3),
+      }
+    }
+  }
+
+  // PAN-1690 — Codex TUI approval prompt. Key on the distinctive header plus a
+  // still-visible numbered option list near the bottom (so an answered prompt
+  // that scrolled into history doesn't re-fire). Tolerates the option
+  // descriptions / footer hint Codex renders below "3. No".
+  const codexHeaderIndex = lastIndexMatching(lines, looksLikeCodexApprovalHeader)
+  if (codexHeaderIndex >= 0 && isRecentPromptIndex(lines, codexHeaderIndex)) {
+    // Tolerate whatever selection-cursor glyph Codex renders (❯ › > ▶ •) — or
+    // none — by consuming any leading non-word characters before "1. Yes".
+    const optionIndex = lastIndexMatching(lines, (line) => /^[^\w]*1\.\s*Yes\b/i.test(line))
+    if (optionIndex > codexHeaderIndex && lines.length - optionIndex <= 12) {
+      return {
+        reason: 'tool_permission',
+        prompt: snippetAround(lines, codexHeaderIndex, 1, 14),
       }
     }
   }
@@ -276,3 +305,52 @@ export const detectAwaitingInputFromPane = (
   options: { isPlanning?: boolean } = {},
 ): Effect.Effect<AwaitingInputDetection | null> =>
   Effect.sync(() => detectAwaitingInputFromPaneSync(pane, options))
+
+export interface CodexApprovalPrompt {
+  /** The "Would you like to …?" header line. */
+  header: string
+  /** Lines between the header and the first option (command, reason, etc.). */
+  detail: string
+  /** The numbered menu options, in order. */
+  options: Array<{ number: number; label: string }>
+}
+
+/**
+ * PAN-1690 — parse a Codex approval prompt (as captured by the codex-aware
+ * branch of detectAwaitingInputFromPaneSync) into its header, detail, and
+ * numbered options, so the dashboard can render the menu and answer it without
+ * the terminal. Returns null when the text doesn't contain a usable menu
+ * (fewer than two numbered options). Option lines tolerate a leading selection
+ * cursor (❯ › > etc.); the footer hint and other non-numbered lines are
+ * naturally excluded.
+ */
+export function parseCodexApprovalPrompt(text: string): CodexApprovalPrompt | null {
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  if (lines.length === 0) return null
+
+  const headerIndex = lines.findIndex((l) => looksLikeCodexApprovalHeader(l))
+  if (headerIndex < 0) return null
+
+  const optionRe = /^[^\w]*(\d+)\.\s*(.+?)\s*$/
+  const options: Array<{ number: number; label: string }> = []
+  const detailLines: string[] = []
+  let firstOptionSeen = false
+  for (let i = headerIndex + 1; i < lines.length; i += 1) {
+    const m = optionRe.exec(lines[i]!)
+    if (m) {
+      firstOptionSeen = true
+      options.push({ number: Number(m[1]), label: m[2]!.trim() })
+    } else if (!firstOptionSeen) {
+      detailLines.push(lines[i]!)
+    }
+    // Lines after the first option that aren't options (footer hints, blanks)
+    // are ignored.
+  }
+
+  if (options.length < 2) return null
+  return {
+    header: lines[headerIndex]!,
+    detail: detailLines.join('\n'),
+    options,
+  }
+}

@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
+import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -244,6 +245,11 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     lines.push('export COLORTERM=truecolor');
     lines.push('export LANG=C.UTF-8');
     lines.push('export LC_ALL=C.UTF-8');
+    // Claude Code `theme: auto` fallback when its OSC 11 background query
+    // goes unanswered: COLORFGBG bg index 15 = light terminal, 0 = dark.
+    // Captured at spawn time from the dashboard theme, mirroring the tmux
+    // pane-bg stamp in createSession() (the OSC 11 primary path).
+    lines.push(`export COLORFGBG='${colorFgBgForTheme(getUiThemeSync())}'`);
   }
 
   // Remote PATH

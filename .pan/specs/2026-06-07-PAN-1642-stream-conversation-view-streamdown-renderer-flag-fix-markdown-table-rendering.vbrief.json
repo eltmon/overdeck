@@ -4,7 +4,7 @@
     "created": "2026-06-07T02:16:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
-    "updated": "2026-06-09T22:21:00.346Z"
+    "updated": "2026-06-11T00:31:12.440Z"
   },
   "plan": {
     "id": "pan-1642",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "00a069dd-f2c5-4081-98cd-2aaf86fa6e74",
     "author": "agent:claude-opus-4-8",
-    "sequence": 90,
+    "sequence": 8,
     "created": "2026-06-07T02:16:46.000Z",
-    "updated": "2026-06-09T22:21:00.346Z",
+    "updated": "2026-06-11T00:31:12.440Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1642",
@@ -446,59 +446,59 @@
         "phase": "test",
         "issueId": "PAN-1642",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-09T22:21:00.345Z",
+        "updatedAt": "2026-06-11T00:31:12.395Z",
         "work": {
-          "updatedAt": "2026-06-09T22:21:00.345Z",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-09T22:21:00.345Z",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T22:21:00.345Z",
+              "at": "2026-06-11T00:31:12.395Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-06-09T22:21:00.345Z",
-          "notes": "Approved: no blocking findings remain after convergence-gate demotion",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
+          "notes": "Approved; current-cycle blockers were demoted by convergence gate",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-09T22:21:00.345Z",
-              "notes": "Approved: no blocking findings remain after convergence-gate demotion"
+              "at": "2026-06-11T00:31:12.395Z",
+              "notes": "Approved; current-cycle blockers were demoted by convergence gate"
             }
           ],
           "approval": "approved"
         },
         "test": {
           "status": "failed",
-          "updatedAt": "2026-06-09T22:21:00.345Z",
-          "notes": "Frontend test regression: MessagesTimeline.test.tsx (11 failed tests). ChatMarkdownSettingsProvider export missing from vi.mock('../ChatMarkdown'). Backend: npm run typecheck PASSED, npm run lint PASSED, npm test config-yaml-conversation-search failure is pre-existing (system conversationSearch.enabled=true). Auto-resume test failures unrelated to PAN-1642. Fix: update MessagesTimeline.test.tsx mock to export ChatMarkdownSettingsProvider.",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
+          "notes": "Test failures detected: (1) Backend tests: config-yaml-conversation-search.test.ts failure is pre-existing (system config has conversationSearch.enabled: true). Auto-resume tests (pan-871-auto-resume.test.ts, failure-tracking.test.ts, auto-resume-gating.test.ts) are unrelated to PAN-1642. (2) Frontend tests: MessagesTimeline.test.tsx has 11 failed tests - ChatMarkdownSettingsProvider export missing from vi.mock('../ChatMarkdown') mock. This is a regression from PAN-1642 which added ChatMarkdownSettingsProvider to ChatMarkdown.tsx but did not update the mock in MessagesTimeline.test.tsx. The mock only exports ChatMarkdown, not ChatMarkdownSettingsProvider, causing render failures. Commands run: npm run typecheck (PASSED), npm run lint (PASSED), npm test (FAILED with test mock issue). Gate status: Typecheck ✓, Lint ✓, Tests ✗ (regression in frontend mocks due to incomplete implementation).",
           "history": [
             {
               "status": "failed",
-              "at": "2026-06-09T22:21:00.345Z",
-              "notes": "Frontend test regression: MessagesTimeline.test.tsx (11 failed tests). ChatMarkdownSettingsProvider export missing from vi.mock('../ChatMarkdown'). Backend: npm run typecheck PASSED, npm run lint PASSED, npm test config-yaml-conversation-search failure is pre-existing (system conversationSearch.enabled=true). Auto-resume test failures unrelated to PAN-1642. Fix: update MessagesTimeline.test.tsx mock to export ChatMarkdownSettingsProvider."
+              "at": "2026-06-11T00:31:12.395Z",
+              "notes": "Test failures detected: (1) Backend tests: config-yaml-conversation-search.test.ts failure is pre-existing (system config has conversationSearch.enabled: true). Auto-resume tests (pan-871-auto-resume.test.ts, failure-tracking.test.ts, auto-resume-gating.test.ts) are unrelated to PAN-1642. (2) Frontend tests: MessagesTimeline.test.tsx has 11 failed tests - ChatMarkdownSettingsProvider export missing from vi.mock('../ChatMarkdown') mock. This is a regression from PAN-1642 which added ChatMarkdownSettingsProvider to ChatMarkdown.tsx but did not update the mock in MessagesTimeline.test.tsx. The mock only exports ChatMarkdown, not ChatMarkdownSettingsProvider, causing render failures. Commands run: npm run typecheck (PASSED), npm run lint (PASSED), npm test (FAILED with test mock issue). Gate status: Typecheck ✓, Lint ✓, Tests ✗ (regression in frontend mocks due to incomplete implementation)."
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-09T22:21:00.345Z",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-09T22:21:00.345Z",
+          "updatedAt": "2026-06-11T00:31:12.395Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-09T22:21:00.345Z"
+              "at": "2026-06-11T00:31:12.395Z"
             }
           ],
           "readyForMerge": false,
