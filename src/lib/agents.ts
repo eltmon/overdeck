@@ -34,6 +34,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
+import { buildCompactRecoverySeedMessage } from './context-overflow.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
@@ -4304,39 +4305,58 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Work agents: When message is sent via /work-tell
  */
 /**
- * PAN-1675: Out-of-band Panopticon-side compaction of a work agent's JSONL
- * session — recovers a context-wedged agent without the harness `/compact`
- * deadlock (which needs a live, responsive Claude process to run). Resolves the
- * SAME session file the harness resumes from and rewrites it in place via
- * native compaction.
+ * PAN-1781: Build the opening prompt for a compact-recovery respawn — an
+ * out-of-band summary of the wedged session plus durable-artifact reseed
+ * instructions. Replaces PAN-1675's in-place JSONL compaction
+ * (compactAgentSession), which appended a compact_boundary the harness's
+ * resume leaf selection bypassed ~half the time, silently rebuilding the full
+ * pre-compact context. The old JSONL is read-only here — never mutated.
  *
- * Never throws: every failure path returns `{ compacted:false, error }` so
- * callers (resumeAgent's `--compact` path, the deacon's fresh-overflow tier)
- * can fail safely and fall through to the `/clear` fallback. A missing
- * sessionId or workspace short-circuits to `{ compacted:false }` with no
- * compaction call.
+ * Never throws and never returns an unusable seed: smart summary → fallback
+ * heuristic summary → reseed-instructions-only, in that order. A missing
+ * sessionId or workspace skips straight to the reseed-only seed.
  */
-export async function compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }> {
+export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed: string; summarized: boolean }> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
   const sessionId = getLatestSessionIdSync(normalizedId);
-  if (!agentState?.workspace || !sessionId) {
-    return { compacted: false };
-  }
-  try {
+  const issueId = agentState?.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+
+  let summary: string | null = null;
+  if (agentState?.workspace && sessionId) {
     const sessionFile = sessionFilePath(agentState.workspace, sessionId);
-    // Dynamic import: keep conversation-compaction out of agents.ts's top-level
-    // import graph (it pulls in dashboard server services).
-    const { compactConversationNative } = await import(
-      '../dashboard/server/services/conversation-compaction.js'
-    );
-    await compactConversationNative(sessionFile);
-    return { compacted: true };
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    logAgentLifecycleSync(normalizedId, `compactAgentSession failed: ${error}`);
-    return { compacted: false, error };
+    try {
+      // Dynamic imports: keep conversation-compaction out of agents.ts's
+      // top-level import graph (it pulls in dashboard server services).
+      const [{ getConversationCompactionSettings }, { generateSmartSummary }] = await Promise.all([
+        import('../dashboard/server/services/conversation-compaction.js'),
+        import('./conversations/smart-compaction.js'),
+      ]);
+      const settings = getConversationCompactionSettings();
+      const result = await Effect.runPromise(generateSmartSummary({
+        jsonlPath: sessionFile,
+        model: settings.model,
+        richMode: settings.richCompaction,
+        mode: 'fork',
+      }));
+      summary = result.summary;
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      logAgentLifecycleSync(normalizedId, `compact-recovery smart summary failed (${error}); trying heuristic fallback`);
+      try {
+        const { generateFallbackSummary } = await import('./conversations/summary-fork.js');
+        summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
+      } catch (fallbackErr) {
+        const fallbackError = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        logAgentLifecycleSync(normalizedId, `compact-recovery fallback summary failed (${fallbackError}); seeding with reseed instructions only`);
+      }
+    }
   }
+
+  return {
+    seed: buildCompactRecoverySeedMessage(issueId, summary),
+    summarized: summary !== null,
+  };
 }
 
 export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
@@ -4421,18 +4441,21 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     return { success: false, error: reason };
   }
 
-  // PAN-1675: Optionally compact the wedged session's JSONL out-of-band BEFORE
-  // killing the live tmux session, so the fresh resume reads a compacted history
-  // instead of immediately re-overflowing. Fail-safe: if compaction fails, do
-  // NOT kill the session or build a launcher — leave the wedged session live so
-  // the caller (e.g. the deacon) can fall through to the /clear tier against it.
+  // PAN-1781: compact recovery = summarize the wedged session out-of-band and
+  // respawn a FRESH session seeded with that summary. The previous approach
+  // (PAN-1675: append a compact_boundary to the JSONL and relaunch with
+  // --resume) was silently bypassed by the harness's resume leaf selection
+  // ~half the time in the field — the relaunched session rebuilt the full
+  // pre-compact context, re-overflowed, and escalated to /clear. A fresh
+  // seeded session has nothing stale to rewind to, so its starting context is
+  // bounded by construction. The old JSONL stays untouched on disk.
+  // buildCompactRecoverySeed never throws: it degrades smart summary →
+  // heuristic summary → reseed-instructions-only.
+  let compactSeed: string | null = null;
   if (opts?.compact) {
-    const compactResult = await compactAgentSession(normalizedId);
-    if (!compactResult.compacted) {
-      const reason = `Pre-resume compaction failed: ${compactResult.error ?? 'unknown error'}`;
-      logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
-      return { success: false, error: reason };
-    }
+    const seedResult = await buildCompactRecoverySeed(normalizedId);
+    compactSeed = seedResult.seed;
+    logAgentLifecycleSync(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
   }
 
   // Kill any zombie tmux session (crashed agent left behind)
@@ -4481,9 +4504,14 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
+    // PAN-1781: a compact recovery skips the kickoff-redelivery machinery — its
+    // seed (summary + reseed instructions) IS the opening prompt of the fresh
+    // session; a caller-supplied message rides along after it.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
     const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
-    const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
+    const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
+      ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
+      : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
       emitActivityEntrySync({
@@ -4502,13 +4530,17 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       workspace: agentState.workspace,
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
-      spawnMode: 'resume',
-      resumeSessionId: sessionId,
+      // PAN-1781: compact recovery launches a FRESH session (no --resume) so the
+      // harness cannot rewind to the overflowed history. Normal resumes keep
+      // re-attaching to the saved session.
+      ...(compactSeed ? {} : { spawnMode: 'resume' as const, resumeSessionId: sessionId }),
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       // PAN-1574: codex resume embeds the message inline so `codex exec resume
       // <threadId> <message>` delivers it in one shot without a separate send.
+      // For a compact-recovery fresh spawn the same field carries the seed into
+      // the plain `codex exec` form.
       ...(effectiveHarness === 'codex' ? { promptInline: effectiveMessage } : {}),
     });
 
@@ -4550,6 +4582,17 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // <threadId> <message>` via buildCodexCommand. No SessionStart hook fires.
       messageDelivered = true;
       if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+    } else if (compactSeed) {
+      // PAN-1781: fresh seeded session — deliver like a kickoff. Transcript
+      // confirmation is impossible here: the new session's id is unknown until
+      // its SessionStart hook fires, and the saved sessionId points at the
+      // archived (overflowed) session. deliverInitialPromptWithRetry waits for
+      // the ready signal internally.
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', agentState.deliveryMethod);
+      messageDelivered = delivery.ok;
+      if (!delivery.ok) {
+        console.error(`[resumeAgent] Compact-recovery seed did not land: ${delivery.failure ?? 'unknown failure'}`);
+      }
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
@@ -4573,8 +4616,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
 
     const resumedAt = new Date().toISOString();
-    console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
-    logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
+    if (compactSeed) {
+      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+    } else {
+      console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
+    }
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',
       lastActivity: resumedAt,

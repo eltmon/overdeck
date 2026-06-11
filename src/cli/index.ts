@@ -447,7 +447,7 @@ program
   .description('Resume from saved Claude session')
   .option('--host', 'Bypass workspace docker stack-health gate and resume on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
-  .option('--compact', 'Panopticon-side compact the saved session JSONL before relaunch (recovers a context-wedged agent without the harness /compact deadlock)')
+  .option('--compact', 'Summarize the saved session out-of-band and respawn a fresh session seeded with the summary (recovers a context-wedged agent without the harness /compact deadlock)')
   .action(resumeCommand);
 
 program

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1765",
   "created": "2026-06-11T06:56:12.506Z",
-  "updated": "2026-06-11T09:14:20.253Z",
+  "updated": "2026-06-11T13:01:08.022Z",
   "gitState": {
     "branch": "feature/pan-1765",
     "sha": "8e3393c86",
@@ -131,6 +131,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-11T09:14:20.253Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:01:08.022Z"
     }
   ],
   "feedback": []
