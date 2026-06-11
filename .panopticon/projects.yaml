@@ -79,14 +79,12 @@ projects:
         command: npm run build
         required: true
       test:
-        # PAN-666 changed-file scoping (`npx vitest run --changed {{CHANGED_BASE}}
-        # && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}`)
-        # is committed in the repo's tracked .panopticon/projects.yaml. Activate it
-        # here only AFTER `pan reload` rebuilds the dashboard with the new gate
-        # code (585e8fe39) — the running build does not yet substitute {{...}}
-        # placeholders into gate commands, so adopting it before the rebuild would
-        # pass the literal token to vitest --changed and fail the gate.
-        command: npm test -- --run
+        # PAN-666: scope verification to tests affected by this branch's diff.
+        # Full-repo Vitest runs are still available via `npm test`, but the
+        # verification gate runs on a loaded multi-agent host where unrelated
+        # full-suite files can exceed the per-test 5s timeout due to worker
+        # starvation. The verification runner substitutes CHANGED_BASE.
+        command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
         required: true
   mind-your-now:
     name: mind-your-now

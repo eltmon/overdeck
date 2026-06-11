@@ -368,7 +368,7 @@ describe('FeatureItem', () => {
       />,
     );
 
-    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 10m');
+    expect(screen.getAllByText('PAN-821')[0]).toHaveAttribute('title', '1 work agent running 10m');
     const badges = screen.getAllByText(/▸ work|! INPUT/).map((node) => node.textContent);
     expect(badges).toEqual(['▸ work', '! INPUT']);
   });
