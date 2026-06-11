@@ -171,6 +171,7 @@ const getActivityRoute = HttpRouter.add(
       message: (e.payload as Record<string, unknown>)['message'] as string,
       details: (e.payload as Record<string, unknown>)['details'] as string | null,
       issueId: (e.payload as Record<string, unknown>)['issueId'] as string | null,
+      link: (e.payload as Record<string, unknown>)['link'] as string | undefined,
     })));
   })),
 );
