@@ -1546,3 +1546,46 @@ ticks (code long since on main).
   into the pipeline via pan-tell from its wrangler.
 - 1641 test=failed (suspect its PAN-1710 boot-surface regression vs new main,
   or broken workspace docker stack) — feedback cycle owns it.
+
+## RUN-20 tick 1 (2026-06-11) — post-reboot re-baseline; strikes on PAN-1723 + PAN-1699
+
+**RUN-19 was a zero-tick casualty** — started 00:10Z, killed by a host reboot
+(~00:16Z), no snapshot content. RUN-20 replaced it at 00:24Z. When a run's
+report shows a zero-second window, look for a reboot/restart before reading
+anything into it.
+
+### Post-reboot state (the deacon re-drove everything itself)
+
+Host up 10 min at tick 1; the deacon re-dispatched the whole advancing fleet
+at 00:18–00:24Z: ship on 1629/1686/1704/1712/1719 (clearing the 13:11Z
+merge-conflict blockers), review convoys on 1642/1712. Main GREEN at
+1a508f015. RAM 21/64GB, swap 0. merge_queue + pending_auto_merges both EMPTY.
+Pipeline truth confirmed in SQLite `review_status` (no `settings` table —
+autonomy toggles are not in the DB; defaults apply, require_uat=true).
+
+- **PAN-1700 ready_for_merge=1** — the ONLY issue at the gate, and it's the
+  keystone eaten-kickoff fix. Surfaced as the urgent operator action: a
+  reboot-respawn burst is exactly the situation PAN-1700's bug bites.
+- Watch items: agent-pan-1712-ship + agent-pan-1629-ship panes captured BLANK
+  twice ~10 min post-spawn (1686-ship/1642-review idle-at-prompt with low
+  tokens). Byte-compare next tick before calling them frozen; if frozen, the
+  official surface is `pan review restart` (convoys) — ship has no equivalent,
+  file the gap.
+- PAN-1739 has a stale strike branch + workspace, no session — PAN-1681-class
+  residue; surfaced `investigate`, did not relaunch on top.
+
+### Tick-1 launches (active work was 0 vs minAgents=2)
+
+Zero work/plan/strike agents at run start → launched `pan strike PAN-1723
+PAN-1699 --effort high` (both Opus 4.8, spawned clean, kickoffs visible):
+
+- **PAN-1723** (deploy builds stale primary worktree): every merge deploy is
+  suspect until it lands — highest-leverage deploy-correctness fix.
+- **PAN-1699** (signal-before-parking): its absence cost 20+ silently-parked
+  strike ticks across RUN-17/18; prompt-only edits, low strike risk.
+
+New unstarted candidates queued (post-RUN-18 filings): PAN-1744 (fork/handoff
+dies on dashboard restart — next start when a slot frees), PAN-1743
+(--no-resume doesn't gate boot orphan recovery), PAN-1745 (conversation-search
+tests failing on main — but main CI is green; verify it's the PAN-1702/1720
+host-only isolation class before launching), PAN-1740, PAN-1739.
