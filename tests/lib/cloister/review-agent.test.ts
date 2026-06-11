@@ -27,13 +27,30 @@ import {
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
 
-const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessageAgent, mockNotifyPipeline, mockGetAgentState } = vi.hoisted(() => ({
+const {
+  mockKillSessionAsync,
+  mockSaveAgentStateAsync,
+  mockSpawnRun,
+  mockMessageAgent,
+  mockNotifyPipeline,
+  mockGetAgentState,
+  mockResolveConflictGate,
+  mockBuildRealConflictGateDeps,
+  mockSetReviewStatus,
+  mockGetReviewStatus,
+  mockArchiveFeedbackFiles,
+} = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
   mockNotifyPipeline: vi.fn(),
   mockGetAgentState: vi.fn(() => null),
+  mockResolveConflictGate: vi.fn().mockResolvedValue({ gated: false }),
+  mockBuildRealConflictGateDeps: vi.fn(() => ({ real: true })),
+  mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn(() => null),
+  mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -71,6 +88,33 @@ vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
   notifyPipelineSync: mockNotifyPipeline,
 }));
+
+vi.mock('../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: mockGetReviewStatus,
+  setReviewStatusSync: mockSetReviewStatus,
+}));
+
+vi.mock('../../../src/lib/cloister/conflict-gate.js', () => ({
+  buildRealConflictGateDeps: mockBuildRealConflictGateDeps,
+  resolveConflictGate: mockResolveConflictGate,
+}));
+
+vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
+  archiveFeedbackFiles: mockArchiveFeedbackFiles,
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
+  mockKillSessionAsync.mockResolvedValue(undefined);
+  mockSaveAgentStateAsync.mockResolvedValue(undefined);
+  mockMessageAgent.mockResolvedValue(undefined);
+  mockGetAgentState.mockReturnValue(null);
+  mockGetReviewStatus.mockReturnValue(null);
+  mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
+  mockResolveConflictGate.mockResolvedValue({ gated: false });
+  mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+});
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
 // PAN-931: pan down must kill review sessions so they don't survive dashboard
@@ -232,6 +276,60 @@ describe('killAllReviewerSessions', () => {
     expect(isReviewSessionForIssue('agent-pan-1080-review-security', 'panopticon-cli', 'PAN-1080')).toBe(true);
     expect(isReviewSessionForIssue('agent-pan-1080', 'panopticon-cli', 'PAN-1080')).toBe(false);
     expect(isReviewSessionForIssue('agent-pan-1081-review', 'panopticon-cli', 'PAN-1080')).toBe(false);
+  });
+});
+
+// ── conflict gate dispatch deferral (PAN-1765) ────────────────────────────────
+
+describe('spawnReviewRoleForIssue conflict gate', () => {
+  it('defers review without spawning or archiving feedback when conflict-gated', async () => {
+    mockResolveConflictGate.mockResolvedValue({
+      gated: true,
+      reason: 'merge conflict with main must be resolved before review dispatch',
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1765',
+      workspace: '/tmp/pan-review-gated',
+      branch: 'feature/pan-1765',
+      force: true,
+    }));
+
+    expect(result).toEqual({
+      success: false,
+      gated: true,
+      message: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch',
+    });
+    expect(mockResolveConflictGate).toHaveBeenCalledWith(
+      'PAN-1765',
+      '/tmp/pan-review-gated',
+      'main',
+      { real: true },
+    );
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1765', {
+      reviewStatus: 'pending',
+      reviewNotes: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch',
+    });
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockArchiveFeedbackFiles).not.toHaveBeenCalled();
+  });
+
+  it('places the gate before feedback archiving and review-spawn status writes', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const dispatchBlock = agentSrc.match(
+      /const gate = await resolveConflictGate[\s\S]*?setReviewStatusSync\(opts\.issueId, \{\s*reviewStatus: 'reviewing'/,
+    );
+    expect(dispatchBlock).not.toBeNull();
+    const block = dispatchBlock![0];
+    expect(block.indexOf('resolveConflictGate')).toBeLessThan(block.indexOf('archiveFeedbackFiles'));
+    expect(block).toContain('if (gate.gated)');
+    expect(block).toContain('return { success: false, gated: true, message }');
   });
 });
 
