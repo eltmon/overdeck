@@ -4,17 +4,17 @@
     "created": "2026-06-10T14:29:53.682Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1737: UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
-    "updated": "2026-06-10T18:10:51.413Z"
+    "updated": "2026-06-11T04:36:23.021Z"
   },
   "plan": {
     "id": "pan-1737",
     "title": "UAT batch trains — auto-assembled, conflict-resolved, always-ready UAT batches with live frontends and batch promotion",
-    "status": "proposed",
+    "status": "completed",
     "uid": "30851df6-29c6-48a1-9d0a-61bb02bb2a1e",
     "author": "agent:claude-fable-5",
-    "sequence": 44,
+    "sequence": 45,
     "created": "2026-06-10T14:29:53.682Z",
-    "updated": "2026-06-10T18:10:51.413Z",
+    "updated": "2026-06-11T04:36:23.021Z",
     "metadata": {
       "canonicalFilename": "2026-06-10-PAN-1737-merge-queue-ux-overhaul-branch-names-honest-control-labels-uat-instructions-live-uat-frontend-link.vbrief.json",
       "pipeline": {
@@ -597,5 +597,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
