@@ -1,4 +1,4 @@
 {
   "status": "passed",
-  "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install (PASS), npm run typecheck (PASS), npm run lint (PASS), npm test (PASS). Test summary: root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests."
+  "notes": "Sync conflicts with origin/main resolved for PAN-1242, and all 25 vBRIEF acceptance criteria are marked completed. Quality gates after the merge: bun install (PASS), npm run typecheck (PASS), npm run lint (PASS), npm test (PASS). Test summary: root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests."
 }
