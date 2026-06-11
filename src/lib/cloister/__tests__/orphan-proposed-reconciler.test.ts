@@ -11,6 +11,18 @@ const reviewStatusStore = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(() => null),
 }));
 
+const childProcessMocks = vi.hoisted(() => ({
+  exec: vi.fn((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
+    callback(null, '[]', '');
+    return {} as never;
+  }),
+}));
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return { ...actual, exec: childProcessMocks.exec };
+});
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: activityLogger.emitActivityEntrySync,
 }));
@@ -78,6 +90,11 @@ describe('orphan proposed spec reconciler', () => {
     activityLogger.emitActivityEntrySync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
+    childProcessMocks.exec.mockReset();
+    childProcessMocks.exec.mockImplementation((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
+      callback(null, '[]', '');
+      return {} as never;
+    });
     clearOrphanProposedAttemptCooldowns();
   });
 
@@ -296,6 +313,83 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual([]);
 
     expect(spawnWorkAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips spawning when the feature branch already has an open PR', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3601', 'proposed');
+    writeBeads(projectPath, 'PAN-3601');
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3601' }));
+    const hasOpenPrForBranch = vi.fn(async () => true);
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      hasOpenPrForBranch,
+      spawnWorkAgent,
+    })).resolves.toEqual(['Skipped orphan proposed spec PAN-3601: open-pr']);
+
+    expect(hasOpenPrForBranch).toHaveBeenCalledWith(projectPath, 'PAN-3601');
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
+  it('fails open and attempts the spawn when the open-PR check rejects', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3602', 'proposed');
+    writeBeads(projectPath, 'PAN-3602');
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3602' }));
+    const hasOpenPrForBranch = vi.fn(async () => {
+      throw new Error('gh unavailable');
+    });
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      hasOpenPrForBranch,
+      spawnWorkAgent,
+    })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3602']);
+
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3602');
+  });
+
+  it('checks open PRs with gh from the project directory for the feature branch', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3603', 'proposed');
+    writeBeads(projectPath, 'PAN-3603');
+    childProcessMocks.exec.mockImplementation((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
+      callback(null, '[{"number":1707}]', '');
+      return {} as never;
+    });
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3603' }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      now: new Date('2026-05-25T20:00:00.000Z'),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual(['Skipped orphan proposed spec PAN-3603: open-pr']);
+
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(childProcessMocks.exec).toHaveBeenCalledTimes(1);
+    const [command, options] = childProcessMocks.exec.mock.calls[0];
+    expect(command).toBe('gh pr list --head feature/pan-3603 --state open --json number --limit 1');
+    expect(options).toMatchObject({ cwd: projectPath });
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
   });
 
   it('surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)', async () => {
