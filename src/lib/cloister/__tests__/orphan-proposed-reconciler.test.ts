@@ -14,6 +14,7 @@ vi.mock('../../activity-logger.js', () => ({
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
+  hasReviewPipelinePresence,
   reconcileOrphanProposedSpecs,
   spawnWorkAgentThroughAgentsEndpoint,
 } from '../orphan-proposed-reconciler.js';
@@ -74,6 +75,26 @@ describe('orphan proposed spec reconciler', () => {
     vi.unstubAllGlobals();
     clearOrphanProposedAttemptCooldowns();
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('returns false when review pipeline status is absent or all pending', () => {
+    expect(hasReviewPipelinePresence(null)).toBe(false);
+    expect(hasReviewPipelinePresence({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+    })).toBe(false);
+  });
+
+  it.each([
+    ['reviewStatus beyond pending', { reviewStatus: 'reviewing', testStatus: 'pending', readyForMerge: false }],
+    ['testStatus skipped', { reviewStatus: 'pending', testStatus: 'skipped', readyForMerge: false }],
+    ['mergeStatus beyond pending', { reviewStatus: 'pending', testStatus: 'pending', mergeStatus: 'queued', readyForMerge: false }],
+    ['readyForMerge true', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: true }],
+    ['prNumber set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prNumber: 1707 }],
+    ['prUrl set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1707' }],
+  ] as const)('returns true for %s', (_label, status) => {
+    expect(hasReviewPipelinePresence(status)).toBe(true);
   });
 
   it('detects proposed orphan specs and skips active, paused, and completed issues', async () => {

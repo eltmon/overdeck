@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listProjects, type ProjectConfig } from '../projects.js';
+import type { ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
@@ -28,6 +29,21 @@ type ProposedSpecState = {
     items?: unknown;
   };
 };
+
+export type ReviewPipelinePresenceStatus = Pick<ReviewStatus,
+  'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'prNumber' | 'prUrl'
+>;
+
+export function hasReviewPipelinePresence(status: ReviewPipelinePresenceStatus | null): boolean {
+  if (!status) return false;
+  if (status.reviewStatus !== 'pending') return true;
+  if (status.testStatus !== 'pending') return true;
+  if (status.mergeStatus && status.mergeStatus !== 'pending') return true;
+  if (status.readyForMerge === true) return true;
+  if (status.prNumber != null) return true;
+  if (typeof status.prUrl === 'string' && status.prUrl.trim().length > 0) return true;
+  return false;
+}
 
 export interface OrphanProposedCandidate {
   projectKey: string;
