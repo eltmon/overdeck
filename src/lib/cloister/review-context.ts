@@ -98,7 +98,7 @@ async function getCurrentBranch(cwd: string): Promise<string> {
   }
 }
 
-async function getDiffBase(cwd: string): Promise<string> {
+export async function getDiffBase(cwd: string): Promise<string> {
   try {
     const { stdout } = await execAsync('git merge-base origin/main HEAD', { cwd, encoding: 'utf-8' });
     return stdout.trim();
@@ -112,7 +112,7 @@ async function getDiffBase(cwd: string): Promise<string> {
   }
 }
 
-async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]> {
+export async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]> {
   // --name-status gives us the status letter + path
   let nameStatus = '';
   try {
@@ -168,7 +168,7 @@ async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]
   return files.sort((a, b) => b.riskScore - a.riskScore);
 }
 
-async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; truncated: boolean }> {
+export async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; truncated: boolean }> {
   let stat = '';
 
   try {
