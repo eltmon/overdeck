@@ -1876,3 +1876,35 @@ count < 5. Fix (RUN-18 playbook): pause idle in-review work agents (freed 2
 slots) → pan review restart → fresh convoy spawned 4/4. If this recurs, the
 substrate fix is making convoy dispatch atomic (all-or-nothing slot
 reservation) — file it with this evidence if seen twice.
+
+## Spawn-guardrail substrate fixes (2026-06-11, handoff session — PAN-1763/PAN-1764 closed)
+
+A parallel handoff session root-fixed the two spawn-guardrail failures RUN-20 was
+working around. Do not re-investigate or strike these classes:
+
+- **"services exited 130/255" stack-health failures (PAN-1763, f6a5bbb51):** every
+  post-merge deploy (`scripts/post-merge-deploy.sh` step 5) and `pan dev` restart ran a
+  bare `pkill -f 'dist/dashboard/server'`, which matched every workspace/UAT stack's
+  in-container server (same cmdline, host-visible PIDs). The 23:50:22Z deploy sweep
+  killed PAN-1629's and PAN-1704's servers 16 ms apart. Both kill sites now skip PIDs in
+  container cgroups. Live-verified: a full `pan reload` with 6 container servers running
+  left all 6 untouched. The tick-10 "1709 docker init exit-1" and the recurring
+  exited-130 stacks were NOT a workspace-template regression in the old sense — see next.
+- **Fresh-workspace init exit-1 (PAN-1764, f6a5bbb51 + 51f488ae8):** init needed
+  github.com for better-sqlite3's prebuilt binary on every run (the bun-store volume was
+  mounted at /root/.bun while services run as user node — dead — and `down -v` wiped it
+  anyway); a transient DNS EAI_AGAIN hard-failed init with no fallback (alpine image has
+  no python3). Now: shared host bind caches `~/.cache/panopticon-devcontainer/{bun,npm}`
+  (survive rebuilds, shared across stacks, _prebuilds cached), one bun-install retry,
+  renderer pre-creates the dirs. **Bonus:** `sanitizeComposeFileSync` was rewriting
+  container-side `/home/node/` mount targets to `${HOME}` — this had silently broken the
+  PAN-1619 `.codex` bridge in every rendered workspace; fixed + locked by a renderer test.
+  Live-verified on PAN-1709's stack: init exit 0, caches warm (1.6G bun;
+  better-sqlite3-v12.10.0-linuxmusl in _prebuilds).
+- **Beads-422 "no beads tasks":** confirmed all six active workspaces have
+  `.beads/issues.jsonl`; the 422s are the PAN-1629 bd-list lock race (misleading error),
+  whose fix is PAN-1629's own in-review PR. No separate action.
+- **Repairs applied:** pan-1629 + pan-1704 server containers restarted (`docker start`);
+  both stacks healthy again. PAN-1709's stack rebuilt and fully up (its work agent
+  continues on --host, unaffected). The flywheel's deliberate slot-release pauses on
+  agent-pan-1629 / agent-pan-1704 were left in place.
