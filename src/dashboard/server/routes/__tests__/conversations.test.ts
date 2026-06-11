@@ -10,7 +10,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { buildForkRequest, parseSummaryForkFocus, readExistingHandoffDoc, recoverStuckForks } from '../conversations.js';
+import {
+  buildForkRequest,
+  getInFlightForkPipelineCount,
+  parseSummaryForkFocus,
+  readExistingHandoffDoc,
+  recoverStuckForks,
+  registerInFlightForkPipeline,
+  waitForInFlightForkPipelines,
+} from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -128,6 +136,44 @@ describe('buildForkRequest', () => {
       includeThinkingInSummary: false,
       handoffAuthor: 'external',
     }));
+  });
+});
+
+describe('in-flight fork pipeline shutdown grace', () => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await waitForInFlightForkPipelines(0);
+  });
+
+  it('is a no-op when no fork pipelines are in flight', async () => {
+    await expect(waitForInFlightForkPipelines(10_000)).resolves.toEqual({ completed: true, count: 0 });
+  });
+
+  it('deregisters fork pipelines when they settle', async () => {
+    const pipeline = registerInFlightForkPipeline(Promise.resolve());
+    expect(getInFlightForkPipelineCount()).toBe(1);
+
+    await pipeline;
+
+    expect(getInFlightForkPipelineCount()).toBe(0);
+  });
+
+  it('bounds shutdown waiting when a fork pipeline does not settle', async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const pipeline = registerInFlightForkPipeline(new Promise<void>((resolve) => {
+      finish = resolve;
+    }));
+
+    const wait = waitForInFlightForkPipelines(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(wait).resolves.toEqual({ completed: false, count: 1 });
+    expect(getInFlightForkPipelineCount()).toBe(1);
+
+    finish();
+    await pipeline;
+    expect(getInFlightForkPipelineCount()).toBe(0);
   });
 });
 

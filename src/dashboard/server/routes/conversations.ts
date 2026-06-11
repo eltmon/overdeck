@@ -3855,6 +3855,38 @@ function parsePersistedForkRequest(raw: string): ForkRequest | null {
   }
 }
 
+const inFlightForkPipelines = new Set<Promise<void>>();
+
+export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<void> {
+  const tracked = pipeline.finally(() => {
+    inFlightForkPipelines.delete(tracked);
+  });
+  inFlightForkPipelines.add(tracked);
+  return tracked;
+}
+
+export function getInFlightForkPipelineCount(): number {
+  return inFlightForkPipelines.size;
+}
+
+export async function waitForInFlightForkPipelines(timeoutMs = 10_000): Promise<{ completed: boolean; count: number }> {
+  const pipelines = [...inFlightForkPipelines];
+  const count = pipelines.length;
+  if (count === 0) return { completed: true, count: 0 };
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.allSettled(pipelines).then(() => ({ completed: true, count })),
+      new Promise<{ completed: boolean; count: number }>((resolve) => {
+        timeout = setTimeout(() => resolve({ completed: false, count }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function recoverStuckForks(): Promise<number> {
   const forks = getStuckForks();
   let recovered = 0;
@@ -4094,7 +4126,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         setForkRequest(newConv.name, JSON.stringify(forkRequest));
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness).catch((err) => {
+        registerInFlightForkPipeline(
+          runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
+        ).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });

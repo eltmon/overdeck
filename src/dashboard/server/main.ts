@@ -29,7 +29,7 @@ import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
-import { recoverStuckForks } from './routes/conversations.js';
+import { recoverStuckForks, waitForInFlightForkPipelines } from './routes/conversations.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
@@ -460,6 +460,14 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   shuttingDown = true;
   console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
+  const forkGrace = await waitForInFlightForkPipelines(10_000);
+  if (forkGrace.count > 0) {
+    if (forkGrace.completed) {
+      console.log(`[panopticon] Waited for ${forkGrace.count} in-flight fork pipeline(s) before shutdown`);
+    } else {
+      console.warn(`[panopticon] ${forkGrace.count} in-flight fork pipeline(s) still running after shutdown grace window`);
+    }
+  }
   clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopAgentOutputService();
