@@ -28,12 +28,43 @@ afterEach(() => {
 // ============== Imports (after mock is set up) ==============
 
 import {
+  createConversation,
+  getConversationByName,
+  getStuckForks,
+  incrementForkRetryCount,
   listFavoritedIds,
-  setFavorite,
   removeFavorite,
+  setFavorite,
+  setForkRequest,
 } from '../../../../src/lib/database/conversations-db.js';
 
 // ============== Tests ==============
+
+describe('fork recovery metadata', () => {
+  it('round-trips fork requests, retry counts, and stuck fork filtering', () => {
+    createConversation({ name: 'conv-summary', tmuxSession: 'tmux-summary', cwd: '/tmp', forkStatus: 'summarizing' });
+    createConversation({ name: 'conv-failed', tmuxSession: 'tmux-failed', cwd: '/tmp', forkStatus: 'failed' });
+    createConversation({ name: 'conv-regular', tmuxSession: 'tmux-regular', cwd: '/tmp' });
+
+    const request = JSON.stringify({
+      parentConversationName: 'conv-parent',
+      sessionId: 'session-summary',
+      forkMode: 'summary',
+      localSummaryOnly: false,
+      handoffAuthor: 'external',
+    });
+    setForkRequest('conv-summary', request);
+
+    expect(incrementForkRetryCount('conv-summary')).toBe(1);
+    expect(incrementForkRetryCount('conv-summary')).toBe(2);
+
+    const conversation = getConversationByName('conv-summary');
+    expect(conversation?.forkRequest).toBe(request);
+    expect(conversation?.forkRetryCount).toBe(2);
+
+    expect(getStuckForks().map((fork) => fork.name)).toEqual(['conv-summary']);
+  });
+});
 
 describe('favorites — listFavoritedIds', () => {
   it('returns an empty array when no favorites exist', () => {
