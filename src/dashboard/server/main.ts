@@ -29,7 +29,7 @@ import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
-import { clearStuckForks } from '../../lib/database/conversations-db.js';
+import { recoverStuckForks } from './routes/conversations.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
@@ -489,11 +489,20 @@ console.log('[panopticon] Restart announcer started');
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
 emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
-// Mark any in-progress forks as failed — they were interrupted by the restart.
-{ const n = clearStuckForks(); if (n) {
-  console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`);
-  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
-} }
+// Resume recoverable in-progress forks after boot services settle (PAN-1744).
+setTimeout(() => {
+  void recoverStuckForks()
+    .then((n) => {
+      if (n > 0) {
+        console.log(`[panopticon] Recovered ${n} stuck fork(s)`);
+        emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
+      }
+    })
+    .catch((err) => {
+      console.warn('[panopticon] Failed to recover stuck forks:', err);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
+    });
+}, 1000);
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
 // PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'

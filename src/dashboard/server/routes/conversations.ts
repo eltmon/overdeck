@@ -50,6 +50,8 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 import {
   listConversations,
   listArchivedConversationsWithEnrichment,
+  getStuckForks,
+  incrementForkRetryCount,
   getConversationByName,
   getConversationByClaudeSessionId,
   getConversationById,
@@ -3837,6 +3839,83 @@ async function runForkPipeline(
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
+}
+
+function parsePersistedForkRequest(raw: string): ForkRequest | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<ForkRequest>;
+    if (typeof parsed.parentConversationName !== 'string') return null;
+    if (typeof parsed.sessionId !== 'string') return null;
+    if (parsed.forkMode !== 'summary' && parsed.forkMode !== 'plain' && parsed.forkMode !== 'handoff') return null;
+    if (typeof parsed.localSummaryOnly !== 'boolean') return null;
+    if (parsed.handoffAuthor !== 'source' && parsed.handoffAuthor !== 'external') return null;
+    return parsed as ForkRequest;
+  } catch {
+    return null;
+  }
+}
+
+export async function recoverStuckForks(): Promise<number> {
+  const forks = getStuckForks();
+  let recovered = 0;
+
+  for (const fork of forks) {
+    try {
+      if (!fork.forkRequest) {
+        updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
+        continue;
+      }
+
+      const request = parsePersistedForkRequest(fork.forkRequest);
+      if (!request) {
+        updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
+        continue;
+      }
+
+      if (fork.forkRetryCount >= 2) {
+        updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
+        continue;
+      }
+
+      const tmuxAlive = await Effect.runPromise(sessionExists(fork.tmuxSession));
+      const runtimeState = getAgentRuntimeStateSync(fork.tmuxSession)?.state;
+      if (tmuxAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
+        markConversationActive(fork.name);
+        updateForkStatus(fork.name, null);
+        recovered += 1;
+        continue;
+      }
+
+      incrementForkRetryCount(fork.name);
+      const parentConv = getConversationByName(request.parentConversationName);
+      if (!parentConv) {
+        updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
+        continue;
+      }
+
+      await runForkPipeline(
+        fork.name,
+        parentConv,
+        request.sessionId,
+        request.summaryModel,
+        request.forkMode,
+        request.localSummaryOnly,
+        request.includeThinkingInSummary,
+        request.summaryHarness,
+        request.handoffFocus,
+        request.handoffAuthor,
+        request.handoffAuthorModel,
+        request.handoffAuthorHarness,
+      );
+      recovered += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[fork-recovery] Failed to recover ${fork.name}:`, error);
+      updateForkStatus(fork.name, 'failed', message);
+    }
+  }
+
+  return recovered;
 }
 
 const postConversationSummaryForkRoute = HttpRouter.add(

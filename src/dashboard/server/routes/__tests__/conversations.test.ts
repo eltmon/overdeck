@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { buildForkRequest, parseSummaryForkFocus, readExistingHandoffDoc } from '../conversations.js';
+import { buildForkRequest, parseSummaryForkFocus, readExistingHandoffDoc, recoverStuckForks } from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -677,6 +677,59 @@ describe('conversations route — DB integration', () => {
     const conv = getConversationByName('resume-me');
     expect(conv!.lastAttachedAt).toBeTruthy();
     expect(conv!.status).toBe('active');
+  });
+
+  it('marks legacy in-flight forks without persisted requests as failed on recovery', async () => {
+    const { createConversation, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'legacy-fork', tmuxSession: 'conv-legacy-fork', cwd: '/cwd', forkStatus: 'summarizing' });
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('legacy-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('recovery metadata');
+  });
+
+  it('honors the fork recovery retry limit without re-attempting', async () => {
+    const { createConversation, getConversationByName, incrementForkRetryCount, setForkRequest } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'retry-capped-fork', tmuxSession: 'conv-retry-capped-fork', cwd: '/cwd', forkStatus: 'spawning' });
+    setForkRequest('retry-capped-fork', JSON.stringify(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    })));
+    incrementForkRetryCount('retry-capped-fork');
+    incrementForkRetryCount('retry-capped-fork');
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('retry-capped-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('retry limit');
+    expect(conv?.forkRetryCount).toBe(2);
+  });
+
+  it('increments the fork retry count before a recovery attempt failure', async () => {
+    const { createConversation, getConversationByName, setForkRequest } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'missing-parent-fork', tmuxSession: 'conv-missing-parent-fork', cwd: '/cwd', forkStatus: 'handoff' });
+    setForkRequest('missing-parent-fork', JSON.stringify(buildForkRequest({
+      parentConversationName: 'missing-source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      localSummaryOnly: false,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    })));
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('missing-parent-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('missing-source-conv');
+    expect(conv?.forkRetryCount).toBe(1);
   });
 
   it('creates a summary fork conversation without ending the source conversation', async () => {
