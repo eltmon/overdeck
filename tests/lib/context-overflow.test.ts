@@ -5,18 +5,19 @@ import { buildCompactRecoverySeedMessage, isContextOverflowTail } from '../../sr
 const OVERFLOW_LINE = 'API Error: 400 Your input exceeds the context window of this model.';
 
 describe('buildCompactRecoverySeedMessage', () => {
-  it('points only at durable recovery artifacts and warns not to restart', () => {
-    const message = buildCompactRecoverySeedMessage('PAN-TEST', null);
+  it('points at the archived summary and durable recovery artifacts', () => {
+    const message = buildCompactRecoverySeedMessage('PAN-1781', 'Archived summary text.');
 
-    expect(message).toContain('PAN-TEST');
+    expect(message).toContain('PAN-1781');
+    expect(message).toContain('Archived summary text.');
     expect(message).toContain('.pan/continue.json');
     expect(message).toContain('bd ready');
     expect(message).toContain('bd show <id>');
     expect(message).toContain('git status');
     expect(message).toContain('git diff');
     expect(message).toMatch(/Do NOT start over/);
-    expect(message).toMatch(/fresh session/i);
-    expect(message).toMatch(/context-window/i);
+    expect(message).toMatch(/starting a fresh session/i);
+    expect(message).toMatch(/context-window limit/i);
   });
 });
 
