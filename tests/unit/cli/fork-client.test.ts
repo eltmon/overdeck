@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { forkConversationViaServer } from '../../../src/cli/commands/fork-client.js';
+import { forkConversationViaServer, isForkResultInProgress } from '../../../src/cli/commands/fork-client.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -7,6 +7,15 @@ function jsonResponse(body: unknown, status = 200): Response {
     headers: { 'content-type': 'application/json' },
   });
 }
+
+describe('isForkResultInProgress', () => {
+  it('is true only for timeout or non-failed in-flight fork statuses', () => {
+    expect(isForkResultInProgress({ id: 1, name: 'a', tmuxSession: 'conv-a', timedOut: true, forkStatus: 'spawning' })).toBe(true);
+    expect(isForkResultInProgress({ id: 2, name: 'b', tmuxSession: 'conv-b', forkStatus: 'handoff' })).toBe(true);
+    expect(isForkResultInProgress({ id: 3, name: 'c', tmuxSession: 'conv-c', forkStatus: null })).toBe(false);
+    expect(isForkResultInProgress({ id: 4, name: 'd', tmuxSession: 'conv-d', forkStatus: 'failed' })).toBe(false);
+  });
+});
 
 describe('forkConversationViaServer', () => {
   const originalFetch = globalThis.fetch;

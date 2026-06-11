@@ -53,6 +53,10 @@ export interface ForkResultConv {
 
 export class ForkServerError extends Error {}
 
+export function isForkResultInProgress(conv: ForkResultConv): boolean {
+  return conv.timedOut === true || (conv.forkStatus !== null && conv.forkStatus !== undefined && conv.forkStatus !== 'failed');
+}
+
 /**
  * Loopback base URL for the dashboard API. Mirrors the resolution used by other
  * CLI→server callers (`src/lib/agent-runtime.ts`): prefer an explicit override,
