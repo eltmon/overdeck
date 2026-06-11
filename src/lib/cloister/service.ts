@@ -288,6 +288,20 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
     return;
   }
 
+  // PAN-1746: a merged issue is terminal — never re-dispatch an advancing role
+  // for work that already landed. Boot reconciliation replays issue-state-change
+  // events on restart, and a long-merged issue still carrying its lifecycle
+  // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
+  // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
+  // mergeStatus='merged' is the same terminal signal closed-state is.
+  const { getReviewStatusSync } = await import('../review-status.js');
+  if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
+    const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
   // Resolve the workspace up front so activeRoleRunExists can probe the
   // workspace HEAD for stale-session (zombie) detection.
   const workspace = await resolveWorkspaceForIssue(normalizedIssueId);

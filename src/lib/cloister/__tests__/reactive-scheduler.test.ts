@@ -129,6 +129,7 @@ import { sessionExists, killSession } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
+import { getReviewStatusSync } from '../../review-status.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -146,6 +147,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
+    vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
     mockHeadSha = 'newhead1';
   });
 
@@ -187,6 +189,24 @@ describe('reactive Cloister scheduler', () => {
     expect(listRunningAgents).not.toHaveBeenCalled();
     expect(getAgentState).not.toHaveBeenCalled();
     expect(sessionExists).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'in_review',
+    'testing',
+    'shipping',
+  ] as const)('skips %s dispatch when the merge already landed (PAN-1746)', async (state) => {
+    // Boot reconciliation replays state-change events on restart; a long-merged
+    // issue still carrying its lifecycle state must NOT re-dispatch an advancing
+    // role. mergeStatus='merged' is the same terminal signal a closed issue is.
+    vi.mocked(getReviewStatusSync).mockReturnValue({ mergeStatus: 'merged' } as any);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+
+    expect(getReviewStatusSync).toHaveBeenCalledWith('PAN-503');
+    expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
   });
 
   it('skips spawning when an active run already exists for the issue and role', async () => {

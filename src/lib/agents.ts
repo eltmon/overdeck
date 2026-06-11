@@ -2717,6 +2717,22 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
   const normalizedIssue = issueId.toUpperCase();
 
+  // PAN-1746: absence of a workspace must be a HARDER failure than an unhealthy
+  // one. The host-fallback path below lets advancing roles (review/test/ship)
+  // proceed when the docker stack is merely unhealthy — but a workspace
+  // directory that does not exist at all means the launcher would fall back to
+  // its cwd ($HOME) and wedge Claude at the folder-trust prompt while it holds
+  // an advancing slot against the PAN-1665 governor. Refuse the spawn outright
+  // instead of degrading to host. (`work`'s resume path already guards this in
+  // restartAgent; this closes the same gap on the role-run spawn path.)
+  if (workspacePath && !existsSync(workspacePath)) {
+    throw new Error(
+      `Workspace for ${normalizedIssue} does not exist at ${workspacePath} — refusing to spawn ${role}. `
+      + `A missing workspace would land the agent in $HOME at the folder-trust prompt. `
+      + `Recreate the workspace ('pan workspace rebuild ${normalizedIssue}') before retrying.`,
+    );
+  }
+
   const health = await Effect.runPromise(getWorkspaceStackHealth(issueId, { workspacePath }));
   if (health.healthy) {
     spawnStackRebuildState.delete(normalizedIssue);
