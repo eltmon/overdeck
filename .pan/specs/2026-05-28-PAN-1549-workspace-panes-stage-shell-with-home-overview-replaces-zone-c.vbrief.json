@@ -4,17 +4,17 @@
     "created": "2026-05-28T14:38:04.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1549: feat: Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "updated": "2026-05-29T00:03:40.649Z"
+    "updated": "2026-06-11T05:54:20.920Z"
   },
   "plan": {
     "id": "pan-1549",
     "title": "Workspace Panes — Stage shell with HOME overview (replaces Zone C)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7cf83284-9615-423b-bf34-5ce061df6e37",
     "author": "agent:claude-opus-4-7",
-    "sequence": 95,
+    "sequence": 96,
     "created": "2026-05-28T14:38:04.000Z",
-    "updated": "2026-05-29T00:03:40.649Z",
+    "updated": "2026-06-11T05:54:20.920Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1549",
@@ -1318,5 +1318,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
