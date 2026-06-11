@@ -22,8 +22,17 @@
 import type { ReadyFeature, GenerationStorePort } from './uat-generation-engine.js';
 import type { UatGeneration } from '../database/uat-generations-db.js';
 
-/** A crashed 'assembling' row older than this is marked failed (train un-wedge). */
-export const STUCK_ASSEMBLING_MS = 30 * 60 * 1000;
+/**
+ * An 'assembling' row with NO PROGRESS for this long is marked failed (train
+ * un-wedge). Keyed on updated_at — the engine patches the row after every
+ * member step — so a big batch grinding through many timeboxed conflict
+ * resolutions is never killed for total age (the first live run killed a
+ * slow-but-alive 5-member assembly at a flat 30min of created_at age; with
+ * many developers driving hundreds of agents, assemblies will only get
+ * bigger). A crashed engine stops updating the row and trips this within the
+ * hour. Cooperative cancellation of the in-flight engine is PAN-1755.
+ */
+export const STUCK_ASSEMBLING_MS = 60 * 60 * 1000;
 /** Minimum age before re-attempting an assembly that failed for the same input. */
 export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
 
@@ -175,14 +184,17 @@ export async function reconcileUatGenerations(
       });
     }
 
-    // 2. Un-wedge crashed assemblies; respect a live one.
+    // 2. Un-wedge crashed assemblies; respect a live one. "Stuck" means NO
+    // PROGRESS (updated_at stale) — the engine patches the row after every
+    // member step, so total age is the wrong signal: a big batch grinding
+    // through many timeboxed conflict resolutions is alive, just slow.
     const assembling = deps.store.listChain(projectRoot, ['assembling']);
     for (const gen of assembling) {
-      const created = Date.parse(gen.createdAt || '');
-      // Unparseable createdAt: freshness can't be proven — treat as stuck.
-      const age = Number.isFinite(created) ? now() - created : Number.POSITIVE_INFINITY;
-      if (age > STUCK_ASSEMBLING_MS) {
-        log(`[uat-reconciler] marking stuck assembling generation ${gen.name} failed (age ${Math.round(age / 60000)}m)`);
+      const lastProgress = Date.parse(gen.updatedAt || gen.createdAt || '');
+      // Unparseable timestamps: freshness can't be proven — treat as stuck.
+      const sinceProgress = Number.isFinite(lastProgress) ? now() - lastProgress : Number.POSITIVE_INFINITY;
+      if (sinceProgress > STUCK_ASSEMBLING_MS) {
+        log(`[uat-reconciler] marking stuck assembling generation ${gen.name} failed (no progress for ${Math.round(sinceProgress / 60000)}m)`);
         deps.store.update(gen.name, { status: 'failed' });
       }
     }

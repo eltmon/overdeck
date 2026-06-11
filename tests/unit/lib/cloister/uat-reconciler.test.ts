@@ -239,15 +239,30 @@ describe('single-flight, stuck assemblies, backoff', () => {
     expect(deps.assembled).toHaveLength(0);
   });
 
-  it('marks a stuck assembling generation failed and proceeds', async () => {
+  it('marks an assembling generation failed when it makes NO PROGRESS past the cap', async () => {
+    // Stuck = updated_at staleness, not total age — the engine bumps the row
+    // every member step, so a slow multi-conflict batch is alive, not stuck.
     const proj = freshProject();
     const stuck = gen(proj, 'uat/pan-stuck-0610', 'assembling', {
-      createdAt: new Date(T0 - STUCK_ASSEMBLING_MS - 1000).toISOString(),
+      createdAt: new Date(T0 - STUCK_ASSEMBLING_MS - 7200_000).toISOString(),
+      updatedAt: new Date(T0 - STUCK_ASSEMBLING_MS - 1000).toISOString(),
     });
     const deps = makeDeps(proj, { rows: [stuck] });
     const result = await reconcileUatGenerations(proj, deps);
     expect(deps.rows.get('uat/pan-stuck-0610')!.status).toBe('failed');
     expect(result.action).toBe('assembled');
+  });
+
+  it('does NOT kill a slow-but-alive assembly (old created_at, fresh updated_at)', async () => {
+    const proj = freshProject();
+    const slow = gen(proj, 'uat/pan-slow-0610', 'assembling', {
+      createdAt: new Date(T0 - STUCK_ASSEMBLING_MS - 7200_000).toISOString(),
+      updatedAt: new Date(T0 - 60_000).toISOString(), // progressed a minute ago
+    });
+    const deps = makeDeps(proj, { rows: [slow] });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(deps.rows.get('uat/pan-slow-0610')!.status).toBe('assembling');
+    expect(result.action).toBe('in-flight'); // respected as live
   });
 
   it('backs off after a recent failure for the same desired input', async () => {
