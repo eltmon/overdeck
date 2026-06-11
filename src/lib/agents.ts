@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -3200,7 +3200,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     },
   }));
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(agentId, 'remain-on-exit', 'on'));
+  await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
   // PAN-1574: codex specialists are headless one-shot processes. After the session
   // starts, poll for the rollout JSONL to capture the real thread-id, then write it

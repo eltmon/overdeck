@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -1037,6 +1037,19 @@ export function SettingsPage() {
     });
   };
 
+  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+    setFormData({
+      ...formData,
+      models: {
+        ...formData.models,
+        provider_harnesses: {
+          ...formData.models.provider_harnesses,
+          [provider]: harness,
+        },
+      },
+    });
+  };
+
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
     setFormData({
       ...formData,
@@ -1435,6 +1448,21 @@ export function SettingsPage() {
     });
   };
 
+  const handleCodexPermissionModeChange = (mode: 'read-only' | 'workspace' | 'full-access') => {
+    const next: SettingsConfig = {
+      ...formData,
+      codex: {
+        ...formData.codex,
+        permissionMode: mode,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
+  };
+
 
   const handleSave = () => saveMutation.mutate({
     settings: formData,
@@ -1577,6 +1605,7 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1788,6 +1817,18 @@ export function SettingsPage() {
                         )}
                       </div>
                     )}
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-foreground">Default harness</span>
+                      <select
+                        value={providerHarness}
+                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
+                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="claude-code">Claude Code</option>
+                        <option value="pi">Pi</option>
+                        <option value="codex">Codex</option>
+                      </select>
+                    </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
                       <div className="flex items-center gap-2">
@@ -1858,7 +1899,19 @@ export function SettingsPage() {
               </div>
             </div>
             {expandedProviders.openrouter && (
-              <div className="px-3 pb-3 pt-0 ml-7">
+              <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Default harness</span>
+                  <select
+                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
+                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="claude-code">Claude Code</option>
+                    <option value="pi">Pi</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
                   enabled={!!formData.models.providers.openrouter}
@@ -1877,79 +1930,151 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Permissions — controls what flags get passed to spawned `claude` processes */}
+      {/* Permissions — controls what flags get passed to spawned agents */}
       <section id="permissions" className="py-6 scroll-mt-4">
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-muted-foreground" />
           Permissions
         </h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          How spawned Claude Code and Codex agents are gated. Applies to work agents, specialists,
-          conversations, and remote agents. Override per-invocation with{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+        <p className="text-xs text-muted-foreground mb-6">
+          How spawned agents are gated, configured per harness. Applies to work agents, specialists,
+          conversations, and remote agents.
         </p>
 
-        <div className="space-y-2">
-          {([
-            {
-              value: 'auto',
-              title: 'Auto (recommended)',
-              flag: '--permission-mode auto',
-              codex: 'Codex: Auto (on-request + workspace-write)',
-              description:
-                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Codex runs in its Auto preset: it works freely inside the workspace but asks before escaping it (e.g. network access). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
-            },
-            {
-              value: 'bypass',
-              title: 'Bypass (yolo)',
-              flag: '--permission-mode bypassPermissions',
-              codex: 'Codex: Full Access (danger-full-access)',
-              description:
-                'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Codex runs in Full Access: no approval prompts, full system + network. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
-            },
-          ] as const).map((opt) => {
-            const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                data-testid={`permission-mode-${opt.value}`}
-                onClick={() => handlePermissionModeChange(opt.value)}
-                disabled={saveMutation.isPending}
-                className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
-                  selected
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-transparent hover:bg-muted/30'
-                }`}
-              >
-                <span
-                  className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    selected ? 'border-primary' : 'border-muted-foreground/40'
+        {/* Claude Code */}
+        <div className="mb-6">
+          <p className="text-xs font-medium text-foreground mb-1">Claude Code</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Override per-invocation with{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'auto' as const,
+                title: 'Auto (recommended)',
+                flag: '--permission-mode auto',
+                description:
+                  "Claude Code's built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.",
+              },
+              {
+                value: 'bypass' as const,
+                title: 'Bypass (yolo)',
+                flag: '--permission-mode bypassPermissions',
+                description:
+                  'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when the classifier interferes with intentionally destructive automation.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`permission-mode-${opt.value}`}
+                  onClick={() => handlePermissionModeChange(opt.value)}
+                  disabled={saveMutation.isPending}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
                   }`}
                 >
-                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-foreground">{opt.title}</span>
-                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      {opt.flag}
-                    </code>
-                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      {opt.codex}
-                    </code>
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                    {opt.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Codex */}
+        <div>
+          <p className="text-xs font-medium text-foreground mb-1">Codex</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Applies to Codex TUI conversation sessions. Takes effect on the next new conversation.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'read-only' as const,
+                title: 'Read-only',
+                flag: 'approval_policy=on-request + sandbox=read-only',
+                description:
+                  'Codex can browse files but asks before making any changes or running commands.',
+              },
+              {
+                value: 'workspace' as const,
+                title: 'Workspace (recommended)',
+                flag: 'approval_policy=on-request + sandbox=workspace-write',
+                description:
+                  'Codex works freely inside the working directory, but asks before going outside it or using the network.',
+              },
+              {
+                value: 'full-access' as const,
+                title: 'Full access (yolo)',
+                flag: 'approval_policy=never + sandbox=danger-full-access',
+                description:
+                  'No approval prompts — Codex has full filesystem and network access. Use with care.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.codex?.permissionMode ?? 'workspace') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`codex-permission-mode-${opt.value}`}
+                  onClick={() => handleCodexPermissionModeChange(opt.value)}
+                  disabled={saveMutation.isPending}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
+                  }`}
+                >
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 

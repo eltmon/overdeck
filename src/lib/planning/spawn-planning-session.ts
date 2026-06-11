@@ -23,6 +23,7 @@ import {
   createSession,
   killSession,
   setOption,
+  exactPaneTarget,
   buildTmuxCommandString,
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
@@ -619,7 +620,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
     await Effect.runPromise(setOption(sessionName, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOption(sessionName, 'remain-on-exit', 'on'));
+    await Effect.runPromise(setOption(exactPaneTarget(sessionName), 'remain-on-exit', 'on'));
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the

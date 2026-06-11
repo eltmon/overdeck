@@ -899,12 +899,19 @@ export const sendKeys = (
         if (verifyLine.length >= 3) {
           const SUBMIT_TIMEOUT_MS = 2_000;
           const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+          let stillPendingSubmit = true;
           while (Date.now() < submitDeadline) {
             const pane = await capturePaneText(sessionName, 5);
             if (!pane.includes(verifyLine.slice(0, 40))) {
+              stillPendingSubmit = false;
               break;
             }
             await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+          }
+          if (stillPendingSubmit) {
+            console.warn(`[tmux] Submitted text still visible on ${sessionName} after ${SUBMIT_TIMEOUT_MS}ms; sending Enter once more.`);
+            await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+            logSendKeys(sessionName, '[Enter resent after submit verification timeout]', caller);
           }
         }
       } finally {

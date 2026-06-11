@@ -105,6 +105,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
   listPaneValues: vi.fn(() => Effect.succeed([])),
   setOption: vi.fn(() => Effect.void),
+  exactPaneTarget: (name: string) => name.startsWith('=') ? (name.endsWith(':') ? name : `${name}:`) : `=${name}:`,
   capturePane: vi.fn().mockResolvedValue('Claude Code'),
   capturePane: vi.fn(() => Effect.succeed('Claude Code')),
 }));
@@ -675,7 +676,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
       const { setOption } = await import('../../src/lib/tmux.js');
       expect(setOption).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
-      expect(setOption).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
+      expect(setOption).toHaveBeenCalledWith(`=${state.id}:`, 'remain-on-exit', 'on');
     });
 
     it('launches review sub-roles as interactive sessions, not headless print mode (PAN-1557)', async () => {
