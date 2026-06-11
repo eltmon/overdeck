@@ -77,11 +77,10 @@ export async function reconcileTestStatusFromGreenCiWithDeps(
         if (prState.state !== 'OPEN' || prState.merged || !prState.headSha) continue;
 
         const ciState = await Effect.runPromise(deps.getCiCheckRunsState(owner, repo, prState.headSha));
-        if (ciState.verdict === 'pending') {
+        if (ciState.verdict !== 'green') {
           deps.cooldowns.set(issueId, now + deps.cooldownMs);
           continue;
         }
-        if (ciState.verdict !== 'green') continue;
 
         const firstRun = ciState.successfulRuns[0];
         const runLabel = firstRun?.htmlUrl

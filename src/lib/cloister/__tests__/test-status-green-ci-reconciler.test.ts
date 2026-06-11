@@ -78,7 +78,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
 
     await expect(reconcileTestStatusFromGreenCiWithDeps(redDeps)).resolves.toEqual([]);
     expect(redDeps.setReviewStatusSync).not.toHaveBeenCalled();
-    expect(redDeps.cooldowns.has('PAN-1658')).toBe(false);
+    expect(redDeps.cooldowns.get('PAN-1658')).toBe(1_300_000);
   });
 
   it('skips non-candidate review, test, merge, PR, and GitHub App states without mutation', async () => {

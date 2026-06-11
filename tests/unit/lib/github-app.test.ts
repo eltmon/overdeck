@@ -87,4 +87,39 @@ describe('getCiCheckRunsState', () => {
       { name: 'build (22)', status: 'completed', conclusion: 'cancelled' },
     ])).resolves.toMatchObject({ verdict: 'red', green: false, pending: false, failed: true, failedCount: 1 });
   });
+
+  it('fetches paginated check-runs before deciding the commit is green', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ check_runs: [{ name: 'build (22)', status: 'completed', conclusion: 'success' }] }),
+        {
+          status: 200,
+          headers: {
+            link: '<https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100&page=2>; rel="next"',
+          },
+        },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ check_runs: [{ name: 'test', status: 'in_progress', conclusion: null }] }),
+        { status: 200 },
+      ));
+
+    const state = await Effect.runPromise(getCiCheckRunsState('eltmon', 'panopticon-cli', 'abc123'));
+
+    expect(state).toMatchObject({
+      verdict: 'pending',
+      green: false,
+      pending: true,
+      failed: false,
+      total: 2,
+      successCount: 1,
+      pendingCount: 1,
+    });
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      'https://api.github.com/app/installations/67890/access_tokens',
+      'https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100',
+      'https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100&page=2',
+    ]);
+  });
 });

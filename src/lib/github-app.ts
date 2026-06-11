@@ -174,12 +174,12 @@ async function getInstallationAccessToken(): Promise<string> {
   return token;
 }
 
-async function githubApi<T>(
+async function githubApiWithToken<T>(
+  token: string,
   path: string,
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
-): Promise<T> {
-  const token = await getInstallationAccessToken();
+): Promise<{ data: T; headers: Headers; status: number }> {
   const response = await fetch(`https://api.github.com${path}`, {
     ...init,
     headers: {
@@ -196,11 +196,48 @@ async function githubApi<T>(
     throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
+  const data = response.status === 204 ? undefined as T : await response.json() as T;
+  return { data, headers: response.headers, status: response.status };
+}
+
+async function githubApi<T>(
+  path: string,
+  init: RequestInit = {},
+  extraHeaders: Record<string, string> = {}
+): Promise<T> {
+  const token = await getInstallationAccessToken();
+  const { data } = await githubApiWithToken<T>(token, path, init, extraHeaders);
+  return data;
+}
+
+function withPerPage(path: string, perPage: number): string {
+  const [pathname, query = ''] = path.split('?');
+  const params = new URLSearchParams(query);
+  if (!params.has('per_page')) params.set('per_page', String(perPage));
+  return `${pathname}?${params.toString()}`;
+}
+
+function nextPathFromLinkHeader(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  const match = linkHeader.split(',').map(part => part.trim()).find(part => part.endsWith('rel="next"'))?.match(/^<([^>]+)>/);
+  if (!match) return null;
+  const url = new URL(match[1]);
+  if (url.hostname !== 'api.github.com') return null;
+  return `${url.pathname}${url.search}`;
+}
+
+async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitHubCheckRunApiResponse['check_runs']>> {
+  const token = await getInstallationAccessToken();
+  const allRuns: NonNullable<GitHubCheckRunApiResponse['check_runs']> = [];
+  let nextPath: string | null = withPerPage(path, 100);
+
+  while (nextPath) {
+    const { data, headers } = await githubApiWithToken<GitHubCheckRunApiResponse>(token, nextPath);
+    allRuns.push(...(data.check_runs || []));
+    nextPath = nextPathFromLinkHeader(headers.get('link'));
   }
 
-  return await response.json() as T;
+  return allRuns;
 }
 
 export function parsePullRequestRef(input: {
@@ -277,10 +314,10 @@ async function getCiCheckRunsStatePromise(
   repo: string,
   sha: string,
 ): Promise<GitHubCiCheckRunsState> {
-  const checkRuns = await githubApi<GitHubCheckRunApiResponse>(
+  const checkRuns = await githubApiAllCheckRunPages(
     `/repos/${owner}/${repo}/commits/${sha}/check-runs`
   );
-  return summarizeCiCheckRuns(checkRuns.check_runs || []);
+  return summarizeCiCheckRuns(checkRuns);
 }
 
 async function getCommitCheckState(
