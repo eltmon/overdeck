@@ -4,17 +4,17 @@
     "created": "2026-05-31T21:30:18.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1395: Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "updated": "2026-06-08T15:53:23.672Z"
+    "updated": "2026-06-11T05:53:33.193Z"
   },
   "plan": {
     "id": "pan-1395",
     "title": "Ctrl+K palette: semantic conversation search with excerpts (Phase 2)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "0195f7d2-3c8e-4d7a-9f1b-2a6c4e8b1d33",
     "author": "agent:claude-opus-4-8",
-    "sequence": 63,
+    "sequence": 64,
     "created": "2026-05-31T21:30:18.000Z",
-    "updated": "2026-06-08T15:53:23.672Z",
+    "updated": "2026-06-11T05:53:33.193Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1395",
@@ -783,5 +783,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
