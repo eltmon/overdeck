@@ -98,7 +98,7 @@ If you are about to **stop short of your deliverable** — self-abort, refuse to
 pan tell flywheel-orchestrator "plan <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
 ```
 
-Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session.
+Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
 
 The four push-back shapes that require this signal: **self-abort** (planning can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing). This sits alongside `AskUserQuestion` — surface the question to the operator *and* tell the orchestrator, then keep moving; don't silently wait at the prompt.
 
