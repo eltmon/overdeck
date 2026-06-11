@@ -88,7 +88,9 @@ three options surfaced to the agent or operator:
 
 Review specialists (correctness, security, performance, requirements) and
 test specialists have all reported PASS. The dashboard sees the terminal
-review+test signals and proceeds to the rebase step automatically.
+review+test signals and proceeds to the rebase step automatically. The reactive
+`shipping` lifecycle state is retained for phase display and merge-gate logic,
+but it no longer spawns an agent.
 
 ### rebased
 

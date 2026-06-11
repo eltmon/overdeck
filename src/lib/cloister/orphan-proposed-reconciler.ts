@@ -1,16 +1,20 @@
+import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { isAbsolute, join, resolve } from 'path';
+import { promisify } from 'util';
 import { Effect } from 'effect';
 
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listProjects, type ProjectConfig } from '../projects.js';
+import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
+const execAsync = promisify(exec);
 const attemptCooldowns = new Map<string, number>();
 let scanInFlight = false;
 
@@ -29,6 +33,21 @@ type ProposedSpecState = {
   };
 };
 
+export type ReviewPipelinePresenceStatus = Pick<ReviewStatus,
+  'reviewStatus' | 'testStatus' | 'mergeStatus' | 'readyForMerge' | 'prNumber' | 'prUrl'
+>;
+
+export function hasReviewPipelinePresence(status: ReviewPipelinePresenceStatus | null): boolean {
+  if (!status) return false;
+  if (status.reviewStatus !== 'pending') return true;
+  if (status.testStatus !== 'pending') return true;
+  if (status.mergeStatus && status.mergeStatus !== 'pending') return true;
+  if (status.readyForMerge === true) return true;
+  if (status.prNumber != null) return true;
+  if (typeof status.prUrl === 'string' && status.prUrl.trim().length > 0) return true;
+  return false;
+}
+
 export interface OrphanProposedCandidate {
   projectKey: string;
   projectName: string;
@@ -43,6 +62,7 @@ export interface FindOrphanProposedOptions {
   projects?: ProjectEntry[];
   tmuxSessionNames?: readonly string[];
   getAgentStateForIssue?: (agentId: string) => Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null>;
+  getReviewStatusForIssue?: (issueId: string) => ReviewPipelinePresenceStatus | null;
   closedIssueIds?: Set<string>;
 }
 
@@ -57,6 +77,7 @@ export interface ReconcileOrphanProposedOptions extends FindOrphanProposedOption
   now?: Date;
   config?: OrphanProposedReconcilerConfig;
   spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
   dashboardOrigin?: string;
 }
 
@@ -127,10 +148,30 @@ async function loadTmuxSessionNames(tmuxSessionNames?: readonly string[]): Promi
   return Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
 }
 
+function hasIssueScopedSession(tmuxSessionNames: readonly string[], agentId: string): boolean {
+  return tmuxSessionNames.some((sessionName) => sessionName === agentId || sessionName.startsWith(`${agentId}-`));
+}
+
+async function defaultHasOpenPrForBranch(projectPath: string, issueId: string): Promise<boolean> {
+  const branch = `feature/${issueId.toLowerCase()}`;
+
+  try {
+    const result = await execAsync(`gh pr list --head ${branch} --state open --json number --limit 1`, { cwd: projectPath }) as { stdout?: string } | string;
+    const stdout = typeof result === 'string' ? result : result.stdout;
+    const prs = JSON.parse(stdout ?? '[]') as unknown;
+    return Array.isArray(prs) && prs.length > 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logReconcilerDiagnostic('open-pr-check-failed', { projectPath, issueId, branch, error: message });
+    return false;
+  }
+}
+
 export async function findOrphanProposedSpecsForReconciler(options: FindOrphanProposedOptions = {}): Promise<OrphanProposedCandidate[]> {
   const projects = await loadProjectsForScan(options.projects);
   const tmuxSessionNames = await loadTmuxSessionNames(options.tmuxSessionNames);
   const getState = options.getAgentStateForIssue ?? defaultGetAgentState;
+  const getReviewStatus = options.getReviewStatusForIssue ?? getReviewStatusSync;
   const candidates: OrphanProposedCandidate[] = [];
 
   for (const { key, config } of projects) {
@@ -150,9 +191,13 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
 
       const agentId = `agent-${issueId.toLowerCase()}`;
       const state = await getState(agentId);
-      if (tmuxSessionNames.includes(agentId)) continue;
+      if (hasIssueScopedSession(tmuxSessionNames, agentId)) continue;
       if (state?.status === 'starting' || state?.status === 'running') continue;
       if (state?.paused === true || state?.troubled === true) continue;
+      if (hasReviewPipelinePresence(getReviewStatus(issueId))) {
+        logReconcilerDiagnostic('candidate-excluded', { issueId, reason: 'review-pipeline-presence' });
+        continue;
+      }
       if (await isIssueClosed(issueId, options.closedIssueIds)) continue;
 
       const planItems = Array.isArray(spec.plan.items) ? spec.plan.items : [];
@@ -274,53 +319,66 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
 
     logReconcilerDiagnostic('scan-start', { scanAt: now.toISOString() });
     const candidates = await findOrphanProposedSpecsForReconciler(options);
+    const hasOpenPrForBranch = options.hasOpenPrForBranch ?? defaultHasOpenPrForBranch;
 
     for (const candidate of candidates) {
-    // Per-cycle detection is diagnostic, not feed-worthy — the actionable
-    // outcome (spawn / failure) below is what the operator needs to see.
-    logReconcilerDiagnostic('orphan-detected', { ...candidate });
+      // Per-cycle detection is diagnostic, not feed-worthy — the actionable
+      // outcome (spawn / failure) below is what the operator needs to see.
+      logReconcilerDiagnostic('orphan-detected', { ...candidate });
 
-    const lastAttempt = attemptCooldowns.get(candidate.issueId);
-    if (lastAttempt !== undefined && now.getTime() - lastAttempt < minAttemptIntervalMs) {
-      const remainingMs = minAttemptIntervalMs - (now.getTime() - lastAttempt);
-      logReconcilerDiagnostic('spawn-skipped', { ...candidate, reason: 'cooldown', remainingMs });
-      continue;
-    }
-
-    attemptCooldowns.set(candidate.issueId, now.getTime());
-    logReconcilerDiagnostic('spawn-attempt', { ...candidate });
-
-    try {
-      const spawn = await (options.spawnWorkAgent ?? ((issueId) => spawnWorkAgentThroughAgentsEndpoint(issueId, options.dashboardOrigin)))(candidate.issueId);
-      if (spawn.spawned) {
-        emitReconcilerActivity(
-          'success',
-          `Started work agent for ${candidate.issueId} — proposed spec had tasks but no running agent`,
-          { ...candidate, agentId: spawn.agentId },
-          candidate.issueId,
-        );
-        actions.push(`Spawned work agent for orphan proposed spec ${candidate.issueId}`);
-      } else {
-        const reason = spawn.skippedReason ?? 'spawn-failed';
-        emitReconcilerActivity(
-          'warn',
-          `Couldn't start work agent for ${candidate.issueId}: ${reason}`,
-          { ...candidate, error: spawn.error },
-          candidate.issueId,
-        );
-        actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${reason}`);
+      const lastAttempt = attemptCooldowns.get(candidate.issueId);
+      if (lastAttempt !== undefined && now.getTime() - lastAttempt < minAttemptIntervalMs) {
+        const remainingMs = minAttemptIntervalMs - (now.getTime() - lastAttempt);
+        logReconcilerDiagnostic('spawn-skipped', { ...candidate, reason: 'cooldown', remainingMs });
+        continue;
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      emitReconcilerActivity(
-        'error',
-        `Couldn't start work agent for ${candidate.issueId}: ${message}`,
-        { ...candidate, error: message },
-        candidate.issueId,
-      );
-      actions.push(`Skipped orphan proposed spec ${candidate.issueId}: spawn-failed`);
+
+      attemptCooldowns.set(candidate.issueId, now.getTime());
+
+      try {
+        if (await hasOpenPrForBranch(candidate.projectPath, candidate.issueId)) {
+          logReconcilerDiagnostic('spawn-skipped', { ...candidate, reason: 'open-pr' });
+          actions.push(`Skipped orphan proposed spec ${candidate.issueId}: open-pr`);
+          continue;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logReconcilerDiagnostic('open-pr-check-failed', { ...candidate, error: message });
+      }
+
+      logReconcilerDiagnostic('spawn-attempt', { ...candidate });
+
+      try {
+        const spawn = await (options.spawnWorkAgent ?? ((issueId) => spawnWorkAgentThroughAgentsEndpoint(issueId, options.dashboardOrigin)))(candidate.issueId);
+        if (spawn.spawned) {
+          emitReconcilerActivity(
+            'success',
+            `Started work agent for ${candidate.issueId} — proposed spec had tasks but no running agent`,
+            { ...candidate, agentId: spawn.agentId },
+            candidate.issueId,
+          );
+          actions.push(`Spawned work agent for orphan proposed spec ${candidate.issueId}`);
+        } else {
+          const reason = spawn.skippedReason ?? 'spawn-failed';
+          emitReconcilerActivity(
+            'warn',
+            `Couldn't start work agent for ${candidate.issueId}: ${reason}`,
+            { ...candidate, error: spawn.error },
+            candidate.issueId,
+          );
+          actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${reason}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitReconcilerActivity(
+          'error',
+          `Couldn't start work agent for ${candidate.issueId}: ${message}`,
+          { ...candidate, error: message },
+          candidate.issueId,
+        );
+        actions.push(`Skipped orphan proposed spec ${candidate.issueId}: spawn-failed`);
+      }
     }
-  }
 
     return actions;
   } finally {

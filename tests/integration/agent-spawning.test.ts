@@ -212,12 +212,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   beforeEach(async () => {
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     testAgentsDir = join(testPanopticonHome, 'agents');
-    mkdirSync(testAgentsDir, { recursive: true });
     // PAN-1752: spawn paths hard-fail on a missing workspace dir (PAN-1746
     // gate in assertWorkspaceStackHealthyForSpawn), so the fixture workspace
     // must actually exist — a bare '/tmp/test-workspace' literal only passed
     // when leftover state happened to be on the machine.
     testWorkspace = join(testPanopticonHome, 'test-workspace');
+    mkdirSync(testAgentsDir, { recursive: true });
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     transcriptLandingMocks.snapshotCount = 0;

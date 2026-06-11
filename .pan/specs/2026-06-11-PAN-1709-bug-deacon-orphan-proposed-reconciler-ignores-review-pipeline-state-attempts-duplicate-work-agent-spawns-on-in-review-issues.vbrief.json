@@ -4,7 +4,7 @@
     "created": "2026-06-11T03:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1709: bug(deacon): orphan-proposed reconciler ignores review pipeline state — attempts duplicate work-agent spawns on in-review issues",
-    "updated": "2026-06-11T03:09:00.322Z"
+    "updated": "2026-06-11T07:20:50.249Z"
   },
   "plan": {
     "id": "pan-1709",
@@ -14,7 +14,7 @@
     "author": "agent:claude-fable-5",
     "sequence": 2,
     "created": "2026-06-11T03:12:00.000Z",
-    "updated": "2026-06-11T03:09:00.322Z",
+    "updated": "2026-06-11T07:20:50.249Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1709",
@@ -64,7 +64,7 @@
       {
         "id": "presence-predicate",
         "title": "Add hasReviewPipelinePresence() predicate with unit tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T03:12:00.000Z",
         "metadata": {
@@ -80,7 +80,7 @@
           {
             "id": "presence-predicate.ac1",
             "title": "Predicate returns false for null and for a row with reviewStatus 'pending', testStatus 'pending', no mergeStatus, readyForMerge false, no prNumber/prUrl",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -88,7 +88,7 @@
           {
             "id": "presence-predicate.ac2",
             "title": "Predicate returns true for each progressed field in isolation: reviewStatus beyond pending, testStatus beyond pending (including 'skipped'), mergeStatus beyond pending, readyForMerge true, prNumber set, prUrl set — each covered by a unit test",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -98,7 +98,7 @@
       {
         "id": "filter-review-status",
         "title": "Exclude candidates with review-pipeline presence in the candidate filter",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-11T03:12:00.000Z",
         "metadata": {
@@ -114,7 +114,7 @@
           {
             "id": "filter-review-status.ac1",
             "title": "Unit test: issue with spec 'proposed', stopped work agent, and review_status reviewStatus 'passed' + prNumber produces no candidate and reconcileOrphanProposedSpecs attempts no spawn (the issue's required in-review-with-stopped-work-agent case)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -122,7 +122,7 @@
           {
             "id": "filter-review-status.ac2",
             "title": "Unit test: an issue with a review_status row whose fields are all pending/absent is still returned as a candidate (row existence alone does not exclude)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -130,7 +130,7 @@
           {
             "id": "filter-review-status.ac3",
             "title": "Default wiring uses getReviewStatusSync when no getReviewStatusForIssue option is supplied; exclusion emits only a console diagnostic, no emitActivityEntrySync call (PAN-1626 discipline asserted in test)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -140,7 +140,7 @@
       {
         "id": "filter-session-prefix",
         "title": "Widen tmux exclusion to live pipeline sessions (agent-<issue>-* prefix)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-11T03:12:00.000Z",
         "metadata": {
@@ -156,7 +156,7 @@
           {
             "id": "filter-session-prefix.ac1",
             "title": "Unit test: a live session named agent-<issue>-review-security excludes the issue from candidates",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +164,7 @@
           {
             "id": "filter-session-prefix.ac2",
             "title": "Unit test: a session for a longer issue number (e.g. agent-pan-30011) does NOT exclude PAN-3001 — trailing-hyphen prefix match prevents issue-number collisions",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -174,7 +174,7 @@
       {
         "id": "open-pr-spawn-gate",
         "title": "Open-PR gate before spawn attempt in reconcileOrphanProposedSpecs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-11T03:12:00.000Z",
         "metadata": {
@@ -190,7 +190,7 @@
           {
             "id": "open-pr-spawn-gate.ac1",
             "title": "Unit test: candidate with hasOpenPrForBranch resolving true is skipped — spawnWorkAgent is never called and no activity-feed entry is emitted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -198,7 +198,7 @@
           {
             "id": "open-pr-spawn-gate.ac2",
             "title": "Unit test: hasOpenPrForBranch rejecting (gh failure) fails open — the spawn attempt proceeds",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -206,7 +206,7 @@
           {
             "id": "open-pr-spawn-gate.ac3",
             "title": "Default implementation uses promisified exec with cwd=projectPath and the feature/<issue-lowercase> head branch; no execSync anywhere in the change",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
