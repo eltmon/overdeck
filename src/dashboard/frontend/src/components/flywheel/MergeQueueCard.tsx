@@ -122,7 +122,14 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
       toast.success(`Merged ${data.members.length} feature${data.members.length === 1 ? '' : 's'} to main (${data.members.join(', ')})`);
       invalidate();
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : 'Batch merge failed'),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Batch merge failed');
+      // The most common rejection is a stale card (batch already promoted or
+      // invalidated under us — e.g. the post-merge deploy restarted the server
+      // before the refetch landed). Refetch so the stale button disappears
+      // instead of inviting another doomed click.
+      invalidate();
+    },
   });
 
   const rebuildMutation = useMutation({
