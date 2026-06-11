@@ -47,7 +47,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect, Layer, Option, Schema } from 'effect';
+import { Effect, Either, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { DomainEvent } from '@panctl/contracts';
 import type { AgentStatus, Role } from '@panctl/contracts';
@@ -2618,12 +2618,13 @@ const postAgentsRoute = HttpRouter.add(
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
-      yield* Effect.promise(() => writeAutoStartVBrief(projectPath, workspacePath, {
+      // writeAutoStartVBrief is Effect-returning — yield it directly (PAN-1768).
+      yield* writeAutoStartVBrief(projectPath, workspacePath, {
         issueId,
         title: issueTitle,
         body: issueBody,
         url: cachedIssue?.url,
-      }));
+      });
       planPath = yield* findPlan(workspacePath);
     }
     if (!planPath) {
@@ -2793,29 +2794,29 @@ const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    try {
-      yield* Effect.promise(() => validateProviderHealth(spawnModel));
-    } catch (err) {
-      if (err instanceof ProviderHealthError) {
-        return jsonResponse({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: err.message,
-          hint: err.probeResult.kind === 'quota'
-            ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
-            : err.probeResult.kind === 'auth'
-              ? 'Check your API key in Settings → Providers.'
-              : 'The provider may be temporarily unavailable. Try again later or switch models.',
-          providerHealth: {
-            provider: err.provider.name,
-            model: err.model,
-            kind: err.probeResult.kind,
-            status: err.probeResult.status,
-          },
-        }, { status: 429 });
-      }
-      throw err;
+    // validateProviderHealth returns an Effect (typed ProviderHealthError
+    // channel) — wrapping it in Effect.promise handed a non-thenable to the
+    // runtime and crashed the whole request (PAN-1768).
+    const providerHealthCheck = yield* Effect.either(validateProviderHealth(spawnModel));
+    if (Either.isLeft(providerHealthCheck)) {
+      const err = providerHealthCheck.left;
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: err.message,
+        hint: err.probeResult.kind === 'quota'
+          ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
+          : err.probeResult.kind === 'auth'
+            ? 'Check your API key in Settings → Providers.'
+            : 'The provider may be temporarily unavailable. Try again later or switch models.',
+        providerHealth: {
+          provider: err.provider.name,
+          model: err.model,
+          kind: err.probeResult.kind,
+          status: err.probeResult.status,
+        },
+      }, { status: 429 });
     }
 
     if (!isRemote) {
