@@ -217,6 +217,36 @@ describe('orphan proposed spec reconciler', () => {
     ]);
   });
 
+  it('excludes issues with live issue-scoped pipeline tmux sessions', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3501', 'proposed');
+    writeBeads(projectPath, 'PAN-3501');
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: ['agent-pan-3501-review-security'],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([]);
+  });
+
+  it('does not treat longer issue-number sessions as issue-scoped matches', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3501', 'proposed');
+    writeBeads(projectPath, 'PAN-3501');
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: ['agent-pan-35011-review-security'],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([
+      expect.objectContaining({ issueId: 'PAN-3501' }),
+    ]);
+  });
+
   it('detects proposed orphan specs with redirect-backed beads stores', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });

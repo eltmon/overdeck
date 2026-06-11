@@ -144,6 +144,10 @@ async function loadTmuxSessionNames(tmuxSessionNames?: readonly string[]): Promi
   return Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
 }
 
+function hasIssueScopedSession(tmuxSessionNames: readonly string[], agentId: string): boolean {
+  return tmuxSessionNames.some((sessionName) => sessionName === agentId || sessionName.startsWith(`${agentId}-`));
+}
+
 export async function findOrphanProposedSpecsForReconciler(options: FindOrphanProposedOptions = {}): Promise<OrphanProposedCandidate[]> {
   const projects = await loadProjectsForScan(options.projects);
   const tmuxSessionNames = await loadTmuxSessionNames(options.tmuxSessionNames);
@@ -168,7 +172,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
 
       const agentId = `agent-${issueId.toLowerCase()}`;
       const state = await getState(agentId);
-      if (tmuxSessionNames.includes(agentId)) continue;
+      if (hasIssueScopedSession(tmuxSessionNames, agentId)) continue;
       if (state?.status === 'starting' || state?.status === 'running') continue;
       if (state?.paused === true || state?.troubled === true) continue;
       if (hasReviewPipelinePresence(getReviewStatus(issueId))) {
