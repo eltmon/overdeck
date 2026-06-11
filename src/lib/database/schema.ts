@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 52;
+export const SCHEMA_VERSION = 53;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -462,7 +462,9 @@ export function initSchema(db: Database.Database): void {
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
       fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
-      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
+      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -1463,6 +1465,12 @@ export function runMigrations(db: Database.Database): void {
   // v51 → v52: mark UAT generation artifacts as cleaned after branch/worktree cleanup (PAN-1737)
   if (currentVersion < 52) {
     try { db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`); } catch { /* already exists */ }
+  }
+
+  // v52 → v53: persist fork pipeline restart recovery parameters (PAN-1744)
+  if (currentVersion < 53) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

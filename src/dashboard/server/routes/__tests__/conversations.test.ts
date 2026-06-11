@@ -10,7 +10,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { parseSummaryForkFocus } from '../conversations.js';
+import {
+  buildForkRequest,
+  getInFlightForkPipelineCount,
+  parseSummaryForkFocus,
+  readExistingHandoffDoc,
+  recoverStuckForks,
+  registerInFlightForkPipeline,
+  waitForInFlightForkPipelines,
+} from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
   const actual = await vi.importActual('../../../../lib/agents.js');
@@ -82,6 +90,106 @@ function decodeTextResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
   return payload?.body ? new TextDecoder().decode(payload.body) : '';
 }
+
+describe('buildForkRequest', () => {
+  it('captures the complete runForkPipeline argument set for persistence', () => {
+    expect(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      summaryModel: 'summary-model',
+      localSummaryOnly: false,
+      includeThinkingInSummary: true,
+      summaryHarness: 'claude-code',
+      handoffFocus: 'continue the API wiring',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'handoff-model',
+      handoffAuthorHarness: 'pi',
+    })).toEqual({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      summaryModel: 'summary-model',
+      localSummaryOnly: false,
+      includeThinkingInSummary: true,
+      summaryHarness: 'claude-code',
+      handoffFocus: 'continue the API wiring',
+      handoffAuthor: 'external',
+      handoffAuthorModel: 'handoff-model',
+      handoffAuthorHarness: 'pi',
+    });
+  });
+
+  it('omits undefined optional fork fields from the persisted JSON shape', () => {
+    expect(JSON.stringify(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    }))).toBe(JSON.stringify({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    }));
+  });
+});
+
+describe('in-flight fork pipeline shutdown grace', () => {
+  afterEach(async () => {
+    vi.useRealTimers();
+    await waitForInFlightForkPipelines(0);
+  });
+
+  it('is a no-op when no fork pipelines are in flight', async () => {
+    await expect(waitForInFlightForkPipelines(10_000)).resolves.toEqual({ completed: true, count: 0 });
+  });
+
+  it('deregisters fork pipelines when they settle', async () => {
+    const pipeline = registerInFlightForkPipeline(Promise.resolve());
+    expect(getInFlightForkPipelineCount()).toBe(1);
+
+    await pipeline;
+
+    expect(getInFlightForkPipelineCount()).toBe(0);
+  });
+
+  it('bounds shutdown waiting when a fork pipeline does not settle', async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const pipeline = registerInFlightForkPipeline(new Promise<void>((resolve) => {
+      finish = resolve;
+    }));
+
+    const wait = waitForInFlightForkPipelines(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(wait).resolves.toEqual({ completed: false, count: 1 });
+    expect(getInFlightForkPipelineCount()).toBe(1);
+
+    finish();
+    await pipeline;
+    expect(getInFlightForkPipelineCount()).toBe(0);
+  });
+});
+
+describe('readExistingHandoffDoc', () => {
+  it('reuses a persisted handoff document when it still exists', async () => {
+    const docPath = join(TEST_HOME, 'handoff.md');
+    writeFileSync(docPath, '## Handoff\n\nContinue here.\n');
+
+    await expect(readExistingHandoffDoc({ handoffDocPath: docPath })).resolves.toBe('## Handoff\n\nContinue here.\n');
+  });
+
+  it('returns null when no reusable handoff document exists', async () => {
+    await expect(readExistingHandoffDoc({ handoffDocPath: null })).resolves.toBeNull();
+    await expect(readExistingHandoffDoc({ handoffDocPath: join(TEST_HOME, 'missing.md') })).resolves.toBeNull();
+  });
+});
 
 describe('parseSummaryForkFocus', () => {
   it('trims handoff focus text', async () => {
@@ -615,6 +723,59 @@ describe('conversations route — DB integration', () => {
     const conv = getConversationByName('resume-me');
     expect(conv!.lastAttachedAt).toBeTruthy();
     expect(conv!.status).toBe('active');
+  });
+
+  it('marks legacy in-flight forks without persisted requests as failed on recovery', async () => {
+    const { createConversation, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'legacy-fork', tmuxSession: 'conv-legacy-fork', cwd: '/cwd', forkStatus: 'summarizing' });
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('legacy-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('recovery metadata');
+  });
+
+  it('honors the fork recovery retry limit without re-attempting', async () => {
+    const { createConversation, getConversationByName, incrementForkRetryCount, setForkRequest } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'retry-capped-fork', tmuxSession: 'conv-retry-capped-fork', cwd: '/cwd', forkStatus: 'spawning' });
+    setForkRequest('retry-capped-fork', JSON.stringify(buildForkRequest({
+      parentConversationName: 'source-conv',
+      sessionId: 'session-123',
+      forkMode: 'summary',
+      localSummaryOnly: true,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    })));
+    incrementForkRetryCount('retry-capped-fork');
+    incrementForkRetryCount('retry-capped-fork');
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('retry-capped-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('retry limit');
+    expect(conv?.forkRetryCount).toBe(2);
+  });
+
+  it('increments the fork retry count before a recovery attempt failure', async () => {
+    const { createConversation, getConversationByName, setForkRequest } = await import('../../../../lib/database/conversations-db.js');
+    createConversation({ name: 'missing-parent-fork', tmuxSession: 'conv-missing-parent-fork', cwd: '/cwd', forkStatus: 'handoff' });
+    setForkRequest('missing-parent-fork', JSON.stringify(buildForkRequest({
+      parentConversationName: 'missing-source-conv',
+      sessionId: 'session-123',
+      forkMode: 'handoff',
+      localSummaryOnly: false,
+      includeThinkingInSummary: false,
+      handoffAuthor: 'external',
+    })));
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const conv = getConversationByName('missing-parent-fork');
+    expect(conv?.forkStatus).toBe('failed');
+    expect(conv?.forkError).toContain('missing-source-conv');
+    expect(conv?.forkRetryCount).toBe(1);
   });
 
   it('creates a summary fork conversation without ending the source conversation', async () => {
