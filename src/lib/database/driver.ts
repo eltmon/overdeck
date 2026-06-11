@@ -178,10 +178,8 @@ function rawPrepare(db: RawDatabase, sql: string): RawStatement {
   throw new Error('SQLite driver does not expose prepare() or query().');
 }
 
-function readPragmaScalar(db: SqliteDatabase, sql: string): unknown {
-  const key = sql.trim();
-  const row = db.prepare(`PRAGMA ${key}`).get();
-  if (!row) {
+function readFirstColumn(row: unknown): unknown {
+  if (!row || typeof row !== 'object') {
     return null;
   }
   const values = Object.values(row);
@@ -198,11 +196,11 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
     },
     prepare: (sql: string) => wrapStatement(sql, rawPrepare(raw, sql)),
     pragma: (sql: string, options?: { simple?: boolean }) => {
+      const rows = db.prepare(`PRAGMA ${sql}`).all();
       if (options?.simple) {
-        return readPragmaScalar(db, sql);
+        return readFirstColumn(rows[0]);
       }
-      raw.exec(`PRAGMA ${sql}`);
-      return undefined;
+      return rows;
     },
     transaction: <TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult) => {
       return (...args: TArgs): TResult => {
