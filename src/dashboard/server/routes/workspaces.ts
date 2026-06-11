@@ -3794,6 +3794,16 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             }));
 
             if (!reviewResult.success) {
+              if (reviewResult.gated) {
+                console.log(`[review] review dispatch deferred for ${issueId}: ${reviewResult.message}`);
+                completePendingOperation(issueId, reviewResult.message);
+                setReviewStatus(issueId, {
+                  reviewStatus: 'pending',
+                  reviewNotes: reviewResult.message,
+                });
+                return;
+              }
+
               console.warn(
                 `[review] review dispatch failed: ${reviewResult.message}`
               );
@@ -4001,6 +4011,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
               // managed by the review role itself via /api/review/:id/status.
               console.log(`[request-review] Review role spawned for ${issueId}`);
+            } else if (result.gated) {
+              console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: result.message });
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';
               console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
@@ -4246,6 +4259,21 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           autoRequeueCount: newCount,
           remainingRequeues: MAX_AUTO_REQUEUE - newCount,
         });
+      } else if (result.gated) {
+        console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          reviewNotes: result.message,
+        });
+        return jsonResponse(
+          {
+            success: false,
+            gated: true,
+            message: result.message,
+            autoRequeueCount: newCount,
+          },
+          { status: 409 }
+        );
       } else {
         console.warn(
           `[request-review] Dispatch failed for ${issueId}: ${result.error}`

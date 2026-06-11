@@ -744,6 +744,46 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
+  it('specialists review restart route returns 409 for gated dispatches', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists.ts'),
+      'utf-8',
+    );
+
+    const restartMatch = routeSrc.match(
+      /postProjectReviewRestartRoute[\s\S]*?postProjectReviewerRoleRestartRoute/,
+    );
+    expect(restartMatch).not.toBeNull();
+    const restartBlock = restartMatch![0];
+
+    expect(restartBlock).toContain('if (result.gated)');
+    expect(restartBlock).toContain('gated: true');
+    expect(restartBlock).toContain('{ status: 409 }');
+  });
+
+  it('workspaces.ts review request routes treat gated dispatches as deferrals', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    expect(routeSrc).toContain('reviewResult.gated');
+    expect(requestReviewBlock).toContain('Review deferred for');
+    expect(requestReviewBlock).toContain('gated: true');
+    expect(requestReviewBlock).toContain('{ status: 409 }');
+    expect(requestReviewBlock).toContain('reviewNotes: result.message');
+  });
+
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
