@@ -27,6 +27,7 @@ import {
   getAgentDir,
 } from '../../src/lib/agents.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
+import { closeFeatureRegistryStorage } from '../../src/lib/registry/feature-registry-storage.js';
 import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
@@ -247,14 +248,15 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     piFifoMocks.writePiCommand.mockClear();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await closeFeatureRegistryStorage();
     if (originalPanopticonHome) {
       process.env.PANOPTICON_HOME = originalPanopticonHome;
     } else {
       delete process.env.PANOPTICON_HOME;
     }
     if (existsSync(testPanopticonHome)) {
-      rmSync(testPanopticonHome, { recursive: true, force: true });
+      rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
     }
   });
 
