@@ -1853,3 +1853,14 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   read deploys. Minor; not filed (cosmetic).
 - Run scoreboard: **9 substrate bugs fixed, 3 PRs merged.** Churn-hold
   lifted; strike queue resumes with PAN-1760 (pause addressing).
+
+## RUN-20 tick 12 (2026-06-11) — PAN-1760 landed + live-verified; 10 bugs fixed
+
+- strike-1760 landed 5dcfccee9 (normalizeAgentId routing for agent-targeting
+  commands) ~15 min after launch; live-verified by re-running the exact
+  failed invocation (pan pause strike-pan-1723 → success). Zombie strikes
+  reclaimed. inspect-* sessions remain unaddressable (no agent state dir —
+  registration scope, owned by close-out/reaper, not filed).
+- Scoreboard: 10 substrate bugs fixed, 3 PRs merged, deploy live-verified.
+  Gate drained; 4 branches cycling review against post-batch main; 1709
+  implementing on host.
