@@ -469,17 +469,16 @@ export class FlyProvider implements RemoteProvider {
     const check = await this.sshImpl(vmName, 'which bd 2>/dev/null');
     if (check.exitCode === 0 && check.stdout.trim()) return true;
 
-    // Install via npm
-    const result = await this.sshImpl(vmName, 'npm install -g @beads-dev/beads 2>&1');
-    if (result.exitCode !== 0) {
-      // Try alternative install
-      const alt = await this.sshImpl(
-        vmName,
-        'curl -fsSL https://raw.githubusercontent.com/beads-dev/beads/main/install.sh | bash 2>&1'
-      );
-      return alt.exitCode === 0;
-    }
-    return true;
+    // Canonical install script (same source as the host prereqs registry).
+    // Running as root it lands in /usr/local/bin, which stays on PATH even
+    // under the Machines exec HOME=/ quirk.
+    const result = await this.sshImpl(
+      vmName,
+      'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash 2>&1'
+    );
+    if (result.exitCode !== 0) return false;
+    const verify = await this.sshImpl(vmName, 'which bd 2>/dev/null');
+    return verify.exitCode === 0 && verify.stdout.trim().length > 0;
   }
 
   /** Initialize beads in a workspace on a remote VM */

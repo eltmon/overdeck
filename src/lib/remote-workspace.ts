@@ -138,8 +138,8 @@ export interface CreateRemoteWorkspaceOptions {
     options.spinner.text = 'Installing beads CLI...';
   }
   const bdInstalled = await fly.installBeads(vmName);
-  if (bdInstalled) {
-    await fly.initBeads(vmName, '/workspace');
+  if (!bdInstalled) {
+    console.warn('  ⚠ beads CLI (bd) install failed on VM — agent will have no bead tracking');
   }
 
   // Step 6.5: Sync planning artifacts from the local workspace, if one exists.
@@ -159,6 +159,20 @@ export interface CreateRemoteWorkspaceOptions {
       // Chunked + size-verified: a single base64 exec silently truncates past
       // the ~16KB payload cap, and these files are the agent's resume state.
       await writeRemoteFile(fly, vmName, remotePath, readFileSync(localPath, 'utf-8'));
+    }
+  }
+
+  // Step 6.6: Initialize the beads DB and import the synced JSONL. Must run
+  // AFTER the artifact sync — `bd init` does not auto-import a pre-existing
+  // issues.jsonl, so init-then-sync leaves the dolt DB empty and the agent
+  // sees zero beads.
+  if (bdInstalled) {
+    await fly.initBeads(vmName, '/workspace');
+    const importResult = await Effect.runPromise(
+      fly.ssh(vmName, 'cd /workspace && [ -f .beads/issues.jsonl ] && bd import -i .beads/issues.jsonl 2>&1 || true')
+    );
+    if (importResult.exitCode !== 0) {
+      console.warn(`  ⚠ bd import failed on VM: ${importResult.stderr || importResult.stdout}`);
     }
   }
 
