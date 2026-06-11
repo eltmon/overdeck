@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@panctl/contracts';
-import { getReviewStatusSync } from './review-status.js';
+import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 
 export interface MergeQueueItem {
@@ -126,6 +126,20 @@ export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
   gitConcurrency?: number;
+  /**
+   * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
+   * review-status DB predicate; injectable for tests. The verb filter alone is
+   * the orchestrator's INTENT — an LLM emission that has tagged mid-review
+   * issues as merge-bound. Only verb ∩ eligibility enters the queue.
+   */
+  eligibility?: (issueId: string) => MergeGateEligibility;
+  /** Called for each verb-tagged item the eligibility gate rejects. */
+  onIneligible?: (issueId: string, reason: string) => void;
+}
+
+/** Default eligibility: the issue's review-status record, read synchronously. */
+export function reviewRecordEligibility(issueId: string): MergeGateEligibility {
+  return mergeGateEligibility(getReviewStatusSync(issueId.toUpperCase()));
 }
 
 /**
@@ -152,7 +166,16 @@ export const computeMergeQueue = (
   options: ComputeMergeQueueOptions = {},
 ) =>
   Effect.gen(function*() {
-    const candidates = items.filter((item) => MERGE_GATE_VERBS.has(item.verb));
+    const eligibility = options.eligibility ?? reviewRecordEligibility;
+    const candidates = items.filter((item) => {
+      if (!MERGE_GATE_VERBS.has(item.verb)) return false;
+      const gate = eligibility(item.issueId);
+      if (!gate.eligible) {
+        options.onIneligible?.(item.issueId, gate.reason ?? 'not eligible');
+        return false;
+      }
+      return true;
+    });
     if (candidates.length === 0) return [] as MergeQueueItem[];
     const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 

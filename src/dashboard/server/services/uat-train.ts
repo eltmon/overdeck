@@ -65,7 +65,11 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
   if (!status) return null;
   const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
   const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, projectRoot(), { getPrUrl: resolveMergeQueuePrUrl }).pipe(
+    computeMergeQueue(status.activePipeline, projectRoot(), {
+      getPrUrl: resolveMergeQueuePrUrl,
+      onIneligible: (issueId, reason) =>
+        console.log(`[uat-train] ${issueId} has a merge verb but is not merge-eligible (${reason}) — excluded from the ready set`),
+    }).pipe(
       Effect.provide(nodeServicesLayer),
     ),
   );
@@ -285,11 +289,13 @@ export async function postUatGenerationPromotePayload(
   firePostMerge: (issueId: string) => boolean,
 ): Promise<PromoteResult> {
   const root = projectRoot();
+  const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
   return promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
     firePostMerge,
+    memberEligibility: reviewRecordEligibility,
     log: (msg) => console.log(msg),
   });
 }

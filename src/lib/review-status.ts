@@ -127,6 +127,33 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
   return status.verificationStatus !== 'failed';
 }
 
+export interface MergeGateEligibility {
+  eligible: boolean;
+  reason?: string;
+}
+
+/**
+ * Authoritative "allowed to merge" predicate (PAN-1759). The flywheel
+ * orchestrator's pipeline verb says it INTENDS to merge an issue; this record
+ * says the pipeline ALLOWS it. Both must hold before an issue enters the merge
+ * queue or a UAT batch — RUN-20 tagged a mid-review issue with a merge verb
+ * and it rode into a promotable batch. Same criteria as the
+ * fixStuckReadyForMerge repair sweep: review passed, test passed/skipped,
+ * verification not failed, not already merged.
+ */
+export function mergeGateEligibility(
+  status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
+): MergeGateEligibility {
+  if (!status) return { eligible: false, reason: 'no review record' };
+  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
+    return { eligible: false, reason: `test is ${status.testStatus}` };
+  }
+  if (!verificationSatisfied(status)) return { eligible: false, reason: 'verification failed' };
+  if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
+  return { eligible: true };
+}
+
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {

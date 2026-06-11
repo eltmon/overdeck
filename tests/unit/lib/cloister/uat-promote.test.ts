@@ -28,7 +28,7 @@ function gen(name: string, status: UatGenerationStatus = 'ready', overrides: Par
   };
 }
 
-function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?: boolean; mainChangedFiles?: string[]; batchChangedFiles?: string[] } = {}): UatPromoteDeps & {
+function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?: boolean; mainChangedFiles?: string[]; batchChangedFiles?: string[]; ineligible?: Record<string, string> } = {}): UatPromoteDeps & {
   map: Map<string, UatGeneration>;
   merges: Array<{ branch: string; message: string }>;
   teardowns: string[];
@@ -67,6 +67,10 @@ function makeDeps(rows: UatGeneration[], options: { mainSha?: string; failMerge?
     },
     teardownStack: async (g) => { teardowns.push(g.name); },
     firePostMerge: (issueId) => { fired.push(issueId); return true; },
+    memberEligibility: (issueId) => {
+      const reason = options.ineligible?.[issueId];
+      return reason ? { eligible: false, reason } : { eligible: true };
+    },
     log: () => {},
   };
 }
@@ -171,6 +175,24 @@ describe('promoteUatGeneration — rejections (no git mutation)', () => {
     expect(result.success).toBe(true);
     expect(deps.merges).toHaveLength(1);
     expect(deps.map.get('uat/pan-moved-0610')!.status).toBe('promoted');
+  });
+
+  it('refuses a batch containing a member the pipeline has not cleared to merge (PAN-1759)', async () => {
+    // RUN-20: the orchestrator tagged a mid-review issue with a merge verb and
+    // it rode into a ready batch. Promote must refuse regardless of how the
+    // member got in.
+    const deps = makeDeps([gen('uat/pan-otter-0611')], {
+      ineligible: { 'PAN-2': 'review is reviewing' },
+    });
+
+    const result = await promoteUatGeneration('uat/pan-otter-0611', PROJ, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'member-not-ready' });
+    if (result.success) return;
+    expect(result.message).toContain('PAN-2 (review is reviewing)');
+    expect(deps.merges).toHaveLength(0);
+    expect(deps.fired).toEqual([]);
+    expect(deps.map.get('uat/pan-otter-0611')!.status).toBe('ready');
   });
 
   it('rejects unknown names and non-promotable statuses', async () => {

@@ -55,10 +55,19 @@ export interface UatPromoteDeps {
    * Returns false when a run for that issue is already in flight.
    */
   firePostMerge(issueId: string): boolean;
+  /**
+   * Authoritative per-member merge eligibility (PAN-1759), checked at promote
+   * time as defense-in-depth: batch membership is computed from orchestrator
+   * verbs at assembly time, and a member's pipeline state can change (or have
+   * been wrong) between assembly and the operator clicking Merge. RUN-20
+   * assembled a batch containing a mid-review issue; this gate refuses to land
+   * it on main.
+   */
+  memberEligibility(issueId: string): { eligible: boolean; reason?: string };
   log?: (msg: string) => void;
 }
 
-export type PromoteFailureReason = 'not-found' | 'wrong-status' | 'stale-base' | 'merge-failed';
+export type PromoteFailureReason = 'not-found' | 'wrong-status' | 'member-not-ready' | 'stale-base' | 'merge-failed';
 
 export type PromoteResult =
   | {
@@ -99,6 +108,20 @@ export async function promoteUatGeneration(
       success: false,
       reason: 'wrong-status',
       message: `${name} is ${gen.status} — only a ready or superseded batch can be merged to main`,
+    };
+  }
+
+  const notReady = gen.members
+    .map((m) => ({ issueId: m.issueId, gate: deps.memberEligibility(m.issueId) }))
+    .filter(({ gate }) => !gate.eligible);
+  if (notReady.length > 0) {
+    const detail = notReady.map(({ issueId, gate }) => `${issueId} (${gate.reason ?? 'not eligible'})`).join(', ');
+    return {
+      success: false,
+      reason: 'member-not-ready',
+      message:
+        `${name} contains member(s) the pipeline has not cleared to merge: ${detail} — ` +
+        `wait for them to pass review+test, or for the reconciler to rebuild the batch without them.`,
     };
   }
 
