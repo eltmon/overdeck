@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1747",
   "created": "2026-06-11T01:20:23.852Z",
-  "updated": "2026-06-11T02:22:06.390Z",
+  "updated": "2026-06-11T03:01:45.162Z",
   "gitState": {
     "branch": "feature/pan-1747",
     "sha": "b7e7879c",
@@ -86,7 +86,20 @@
       "reason": "feedback",
       "note": "[2026-06-11T02:17Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-06-11T02:17:49.272Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T03:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T03:01:45.162Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T03:01:45Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1747\n\n# Review Synthesis — PAN-1747 — 2026-06-11T03:01:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/context.json`\n- Branch: `feature/pan-1747`\n- Workspace: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747`\n- HEAD reviewed: `b085c8359aa69a387affdc8af38f9e9fb5f68c55`\n- Manifest HEAD: `082aba8ebd95108175e182e3105db55363e8da1d`\n- PR merge-base: `0053e306ed9d139087bd6a9406e7eb6b7ff2f732`\n- PR commit count: `8`\n- Cycle number: `2`\n- Prior cycle SHA: `b4a2e3d8f64344bc9cfa38e2c3a5fe5bd870fc62`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Stale `checkUndispatchedShip` references remain in tracked docs — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/docs/FLYWHEEL-STATE.md:1677`, `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/docs/FLYWHEEL-STATE.md:1688`\nThe requirements reviewer classified this as `Scope: in_pr_scope` for AC6: `checkUndispatchedShip` and its `SHIP_DISPATCH_*` constants/state must be removed and grep must find no remaining references. The reviewer observed that tracked documentation still says live code uses deacon `checkUndispatchedShip()` and that deacon's `checkUndispatchedShip` should re-dispatch ship. That contradicts the ship-role removal and fails the explicit grep-based acceptance criterion.\n\nFix: update or remove the stale `checkUndispatchedShip` references in `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/docs/FLYWHEEL-STATE.md` so the required grep returns no matches.\n\n## Non-blocking Findings\n\n### [requirements] Full `npm test` is currently red outside the changed-file set\n~ Scope: `whole_feature_scope`. The requirements reviewer reported `npm test` exits 1 in `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/tests/lib/shadow-state.test.ts` with three failures. That file is outside the manifest's changed-file set, so this review does not treat it as a PR-scoped blocker; the downstream test gate should still handle the full-suite failure unless it is separately waived.\n\n### [requirements] `npm run lint` is currently red outside the changed-file set\n~ Scope: `whole_feature_scope`. The requirements reviewer reported `npm run lint` exits 1 in `scripts/lint-skills.sh` because `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/sync-sources/skills/pan-review/SKILL.md:66`, `:68`, and `:69` reference `pan review reset/restart` help that cannot be read. That skill file is outside the manifest's changed-file set, so this review does not treat it as a PR-scoped blocker; the lint gate should still handle it before merge.\n\n## Scope Note\nThe requirements reviewer raised two whole-feature quality-gate failures (`npm test` and `npm run lint`) that are outside the changed-file set; they are documented as non-blocking review notes, not ignored. The blocking requirements finding is AC6-specific: the issue's grep-based removal criterion still fails because tracked docs retain `checkUndispatchedShip` references.\n\n## Clean Sub-roles\n- security — no findings.\n- correctness — no findings.\n- performance — no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1747/.pan/review/agent-pan-1747-review-082aba8e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1747 -m \"Fixed review issues\"`"
+    }
+  ]
 }

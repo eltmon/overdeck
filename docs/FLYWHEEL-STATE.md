@@ -1797,3 +1797,20 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
 - Gate: 1700/1712/1719 ready ~2h, operator idle. Churn continues on 1686/1704
   (re-review convoys) every time main moves — the standing cost of an
   unmerged ready set.
+
+## RUN-20 tick 8 (2026-06-11) — churn-aware posture: hold strikes, drain the gate
+
+- 1747 got pulled into re-review before its ship could re-dispatch (main moved
+  again) — the bootstrap-paradox resolution rides the next pass. 1744
+  re-reviewing after addressing its blocked verdict. The re-review churn now
+  visibly costs: 1686/1704/1747 at 2-3 cycles each tonight.
+- **Posture decision: hold NEW main-landing strikes while 3 PRs sit ready at
+  the gate** — each landing re-triggers convoys on every in-flight branch.
+  Launched planning on PAN-1709 instead (root cause of the ghost-misfire
+  class; planning's main footprint is one spec commit). When the gate drains,
+  resume strike velocity. The churn-vs-velocity tradeoff is real and should
+  be priced into every strike decision while ready PRs wait.
+- Zombie strike sessions 1723/1747 correctly NOT reaped — the PAN-1721 reaper
+  keys on close-out and those issues are open. Expectation corrected.
+- Swap appeared: 4.7GB/8GB under convoy churn (was 0 at run start). RAM
+  31.8/64. Watch each tick; the RUN-14 pathology starts at swap-full.

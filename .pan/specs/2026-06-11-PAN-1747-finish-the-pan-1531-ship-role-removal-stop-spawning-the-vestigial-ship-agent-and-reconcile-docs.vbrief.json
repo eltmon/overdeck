@@ -4,7 +4,7 @@
     "created": "2026-06-11T01:31:21.694Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1747: bug(roles): roles/ship.md does not exist but every ship spawn passes --agent roles/ship.md",
-    "updated": "2026-06-11T02:43:52.111Z"
+    "updated": "2026-06-11T03:01:44.510Z"
   },
   "plan": {
     "id": "pan-1747",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "13976290-eeb7-4916-9130-a70dd166539b",
     "author": "agent:claude-opus-4-8",
-    "sequence": 29,
+    "sequence": 33,
     "created": "2026-06-11T01:31:21.694Z",
-    "updated": "2026-06-11T02:43:52.111Z",
+    "updated": "2026-06-11T03:01:44.510Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1747",
@@ -301,58 +301,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-11-PAN-1747-finish-the-pan-1531-ship-role-removal-stop-spawning-the-vestigial-ship-agent-and-reconcile-docs.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "review",
         "issueId": "PAN-1747",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T02:43:51.939Z",
+        "updatedAt": "2026-06-11T03:01:44.504Z",
         "work": {
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T02:43:51.939Z",
+              "at": "2026-06-11T03:01:44.504Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "status": "blocked",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
+          "notes": "AC6 grep still finds checkUndispatchedShip references in docs/FLYWHEEL-STATE.md",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-11T02:43:51.939Z"
+              "status": "blocked",
+              "at": "2026-06-11T03:01:44.504Z",
+              "notes": "AC6 grep still finds checkUndispatchedShip references in docs/FLYWHEEL-STATE.md"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T02:43:51.939Z"
+              "at": "2026-06-11T03:01:44.504Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T02:43:51.939Z",
+          "updatedAt": "2026-06-11T03:01:44.504Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T02:43:51.939Z"
+              "at": "2026-06-11T03:01:44.504Z"
             }
           ],
           "readyForMerge": false,
