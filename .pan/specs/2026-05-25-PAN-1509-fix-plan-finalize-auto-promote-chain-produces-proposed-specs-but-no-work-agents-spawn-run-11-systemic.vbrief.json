@@ -2,19 +2,19 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:42:28.231Z",
+    "updated": "2026-06-11T05:54:53.654Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1509: fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)"
   },
   "plan": {
     "id": "pan-1509",
     "title": "fix(plan-finalize): auto-promote chain produces 'proposed' specs but no work agents spawn (RUN-11 systemic)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "8d4f1509-1509-4a2b-8c3d-f9e0f1a2b3c4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 43,
+    "sequence": 44,
     "created": "2026-05-25T17:30:00.000Z",
-    "updated": "2026-05-25T21:42:28.231Z",
+    "updated": "2026-06-11T05:54:53.654Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1509",
@@ -757,5 +757,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
