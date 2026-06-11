@@ -4581,6 +4581,8 @@ function initSchema(db) {
       reviewed_at_commit    TEXT,
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
+      -- PAN-1765: timestamp when conflict resolution was dispatched
+      conflict_resolution_dispatched_at TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
       test_retry_count      INTEGER DEFAULT 0,
       -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
@@ -5009,7 +5011,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 53`);
+	db.pragma(`user_version = 54`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -5017,7 +5019,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 53) return;
+	if (currentVersion === 54) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5650,7 +5652,10 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
 		} catch {}
 	}
-	db.pragma(`user_version = 53`);
+	if (currentVersion < 54) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
+	} catch {}
+	db.pragma(`user_version = 54`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
