@@ -62,7 +62,15 @@
       "mitigation": "Use the generic file-existence guard in getRoleRuntimeBaseCommand rather than special-casing roleAgentDefinitionPath('ship') to null -- the generic guard covers all roles and survives future role additions."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Verification feedback 001 addressed: canonical .pan/specs PAN-1747 vBRIEF item/subItem acceptance criteria statuses are completed. Next: commit, push, and run pan review request PAN-1747.",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/specs/2026-06-11-PAN-1747-finish-the-pan-1531-ship-role-removal-stop-spawning-the-vestigial-ship-agent-and-reconcile-docs.vbrief.json",
+      ".pan/continues/pan-1747.vbrief.json",
+      ".pan/feedback/001-verification-gate-failed.md"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
@@ -76,6 +84,12 @@
       "reason": "feedback",
       "note": "[2026-06-11T02:13Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-06-11T02:13:35.237Z"
+    },
+    {
+      "timestamp": "2026-06-11T02:14:50.118Z",
+      "reason": "verification-feedback-fixed",
+      "note": "Addressed vbrief-ac verification failure by updating the tracked canonical PAN-1747 vBRIEF spec under .pan/specs so all four items and all eighteen acceptance-criterion subItems are completed. No implementation changes were required; code/tests/docs were already complete.",
+      "agentModel": "gpt-5.5"
     },
     {
       "reason": "feedback",

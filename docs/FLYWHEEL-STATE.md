@@ -1671,13 +1671,12 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   → the PAN-1618 auto-rebuild gate fired (docker stack rebuilt) → work agent
   up. The plan→start chain works; just drive the start yourself.
 - **strike-1747 declined with the run's best finding:** roles/ship.md missing
-  is the tip of a PAN-1531 contradiction — docs/MERGE-WORKFLOW.md says the
+  was the tip of a PAN-1531 contradiction — docs/MERGE-WORKFLOW.md said the
   interactive ship role was RETIRED (server-side rebase, no ship actor), but
-  live code still spawns load-bearing ship runs (`service.ts:158`, reactive
-  scheduler, deacon `checkUndispatchedShip()` at deacon.ts:3097) — ship is
-  what flips readyForMerge. Fix needs an architecture decision + ~32-file
-  taxonomy reconciliation. Strike→plan reflex applied: `pan plan PAN-1747
-  --auto` launched same tick.
+  live code still spawned load-bearing ship runs from the reactive scheduler
+  and the old deacon undispatched-ship patrol — ship was treated as what flipped
+  readyForMerge. Fix needed an architecture decision + taxonomy reconciliation.
+  Strike→plan reflex applied: `pan plan PAN-1747 --auto` launched same tick.
 - **PAN-1749 filed:** strike-1747 obeyed the brand-new PAN-1699 contract and
   `pan tell flywheel-orchestrator` returned "not running" DURING AN ACTIVE RUN
   — the orchestrator has no agent state dir, so the tell no-ops. The contract
@@ -1685,8 +1684,8 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   used). Until fixed, expect signals as issue comments, not tells.
 - **1704 pair paused** (official surface): ghost work agent (kickoff eaten at
   boot, out 0 for 80 min, PAN-1709 misfire shape) + ship stalled idle 70 min
-  pre-contract. Freed slots; deacon's checkUndispatchedShip should re-dispatch
-  ship fresh. Verify next tick.
+  pre-contract. Freed slots; the then-existing deacon ship-dispatch patrol was
+  expected to re-dispatch ship fresh. Verify next tick.
 
 ## RUN-20 tick 4 (2026-06-11) — 4 at the gate; 4th red main of the week (PAN-1746 fixture fallout)
 
@@ -1789,8 +1788,8 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
   recorded IN THE ISSUE BODY (next dispatch reads it) — the removal branch
   merges under the LEGACY contract; post-merge semantics don't apply to their
   own delivery vehicle. Used pause→unpause to recycle the dead ship session
-  (pause alone blocks re-dispatch; the unpause clears the gate so
-  checkUndispatchedShip can fire). Escalation if the next ship still aborts:
+  (pause alone blocks re-dispatch; the unpause clears the gate so the legacy
+  ship-dispatch patrol can fire). Escalation if the next ship still aborts:
   strike a transitional roles/ship.md onto main.
 - **PAN-1744 review BLOCKED** — feedback loop owns it; the compact-recovered
   work agent is addressing it.
