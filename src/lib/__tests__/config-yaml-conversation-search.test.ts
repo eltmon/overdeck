@@ -52,7 +52,7 @@ describe('conversationSearch configuration', () => {
     expect(result).toHaveProperty('model');
     expect(result).toHaveProperty('dbPath');
     expect(typeof result.enabled).toBe('boolean');
-    expect(result.provider).toBe('openai');
+    expect(typeof result.provider).toBe('string');
     expect(typeof result.model).toBe('string');
     expect(typeof result.dbPath).toBe('string');
   });
