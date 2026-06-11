@@ -1,8 +1,9 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
-import { join } from 'path';
+import { mkdtempSync, rmSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { loadConfigSync } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
@@ -244,6 +245,27 @@ describe('settings-api', () => {
         };
         const result = validateSettingsApi(settings);
         expect(result.valid).toBe(true);
+      }
+    });
+
+    it('accepts every RoleId the RolesPanel offers (PAN-1753 frontend/backend drift)', () => {
+      const testDir = dirname(fileURLToPath(import.meta.url));
+      const panelSource = readFileSync(
+        join(testDir, '../../src/dashboard/frontend/src/components/Settings/RolesPanel.tsx'),
+        'utf8',
+      );
+      const unionMatch = panelSource.match(/type RoleId\s*=\s*([^;]+);/);
+      expect(unionMatch).not.toBeNull();
+      const panelRoleIds = [...unionMatch![1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+      expect(panelRoleIds.length).toBeGreaterThan(0);
+
+      for (const roleId of panelRoleIds) {
+        const settings = {
+          ...validSettings,
+          roles: { [roleId]: { model: 'workhorse:mid' } },
+        };
+        const result = validateSettingsApi(settings);
+        expect(result.errors).not.toContain(`Unknown role "${roleId}"`);
       }
     });
   });
