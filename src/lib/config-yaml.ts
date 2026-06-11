@@ -166,6 +166,29 @@ export interface ConversationsConfig {
   };
 }
 
+export type ConversationSearchProvider = 'openai';
+
+export interface ConversationSearchConfig {
+  /** Whether conversation semantic search is enabled. Default: false. */
+  enabled?: boolean;
+  /** Embedding provider. Default: 'openai'. */
+  provider?: ConversationSearchProvider;
+  /** Embedding model. Default: 'text-embedding-3-small'. */
+  model?: string;
+  /** Name of an env var or config key holding the API key. Default: provider's standard env var. */
+  apiKeyRef?: string;
+  /** Path to the sidecar embeddings DB. Default: ~/.panopticon/conversations/embeddings.db. */
+  dbPath?: string;
+}
+
+export interface NormalizedConversationSearchConfig {
+  enabled: boolean;
+  provider: ConversationSearchProvider;
+  model: string;
+  apiKeyRef: string | undefined;
+  dbPath: string;
+}
+
 export type DocsEmbeddingProvider = 'local' | 'openai';
 export type DocsClassifierProvider = 'anthropic' | 'cliproxy';
 export type DocsPrdStatus = 'active' | 'planned' | 'completed';
@@ -489,6 +512,9 @@ export interface YamlConfig {
   /** Panopticon docs RAG configuration */
   docs?: DocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch?: ConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
 
@@ -517,6 +543,8 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
     /** RTK Bash output compression configuration */
     rtk?: RtkConfig;
+    /** TLDR token-efficient code-analysis configuration */
+    tldr?: TldrConfig;
   };
 
   /** TTS configuration */
@@ -541,8 +569,8 @@ export interface YamlConfig {
    *
    * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
    * blocks destructive ops while still running fully autonomously. `'bypass'` emits
-   * `--dangerously-skip-permissions --permission-mode bypassPermissions` (legacy).
-   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   * `--permission-mode bypassPermissions` (the standalone `--dangerously-skip-permissions`
+   * flag was removed). Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';
@@ -608,6 +636,21 @@ export interface CavemanConfig {
 }
 
 export interface RtkConfig {
+  enabled?: boolean;
+}
+
+/**
+ * TLDR (token-efficient code analysis) configuration.
+ *
+ * When enabled, work/planning agents whose workspace has a TLDR `.venv` get the
+ * TLDR MCP tools wired in and their prompt advertises TLDR as available; the
+ * per-workspace TLDR daemon is started at spawn. When disabled, agents fall back
+ * to direct file reads regardless of whether a `.venv` is present. Default ON to
+ * preserve historical behaviour (TLDR was implicitly on whenever a `.venv`
+ * existed). Changing this only affects sessions launched/resumed AFTER the
+ * change — running agents must be resumed to pick it up.
+ */
+export interface TldrConfig {
   enabled?: boolean;
 }
 
@@ -713,6 +756,9 @@ export interface NormalizedConfig {
   /** Panopticon docs RAG behavior */
   docs: NormalizedDocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch: NormalizedConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory: {
     extraction: {
@@ -750,6 +796,9 @@ export interface NormalizedConfig {
 
   /** RTK Bash output compression configuration (normalised, never undefined) */
   rtk: NormalizedRtkConfig;
+
+  /** TLDR token-efficient code-analysis configuration (normalised, never undefined) */
+  tldr: NormalizedTldrConfig;
 
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
@@ -809,6 +858,11 @@ export interface NormalizedRtkConfig {
   enabled: boolean;
 }
 
+/** Normalized TLDR configuration (never undefined). */
+export interface NormalizedTldrConfig {
+  enabled: boolean;
+}
+
 /**
  * Model ID migration result
  *
@@ -839,6 +893,11 @@ export function getConversationsConfigSync(): RuntimeConversationsConfig {
 }
 
 
+
+export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
+  const { config } = loadConfigSync();
+  return config.conversationSearch;
+}
 
 export interface MigrationResult {
   /** List of migrated model IDs */
@@ -953,6 +1012,13 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       timeoutMs: 1500,
     },
   },
+  conversationSearch: {
+    enabled: false,
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+    apiKeyRef: undefined,
+    dbPath: join(homedir(), '.panopticon', 'conversations', 'embeddings.db'),
+  },
   memory: {
     extraction: {
       fallbackChain: [],
@@ -1000,6 +1066,12 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   rtk: {
     enabled: false,
+  },
+  tldr: {
+    // Default ON: TLDR was historically active whenever a workspace `.venv`
+    // existed. The toggle lets operators turn it off (e.g. to reclaim the disk
+    // the per-workspace .venv consumes — PAN-1674).
+    enabled: true,
   },
   tts: {
     enabled: false,
@@ -1279,6 +1351,15 @@ function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig | null):
 
   if (rtk.enabled !== undefined) {
     result.enabled = rtk.enabled;
+  }
+}
+
+function mergeTldrConfig(result: NormalizedTldrConfig, config: YamlConfig | null): void {
+  const tldr = config?.agents?.tldr;
+  if (!tldr) return;
+
+  if (tldr.enabled !== undefined) {
+    result.enabled = tldr.enabled;
   }
 }
 
@@ -1631,6 +1712,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.rtk.enabled,
     },
     docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+    conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
       lifecycle: DEFAULT_CONFIG.tts.lifecycle,
@@ -2027,6 +2109,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge RTK configuration
     mergeRtkConfig(result.rtk, config);
 
+    // Merge TLDR configuration
+    mergeTldrConfig(result.tldr, config);
+
     // Merge docs RAG configuration
     mergeDocsConfig(result.docs, config);
 
@@ -2088,6 +2173,26 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
       result.claude.permissionMode = config.claude.permissionMode;
+    }
+
+    // Merge conversationSearch configuration
+    if (config.conversationSearch) {
+      const cs = config.conversationSearch;
+      if (typeof cs.enabled === 'boolean') {
+        result.conversationSearch.enabled = cs.enabled;
+      }
+      if (cs.provider !== undefined) {
+        result.conversationSearch.provider = cs.provider;
+      }
+      if (cs.model !== undefined) {
+        result.conversationSearch.model = cs.model;
+      }
+      if (cs.apiKeyRef !== undefined) {
+        result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+      }
+      if (cs.dbPath !== undefined) {
+        result.conversationSearch.dbPath = cs.dbPath;
+      }
     }
   }
 
@@ -2433,6 +2538,20 @@ export function isClaudeCodeChannelsEnabled(): boolean {
 
 export function isClaudeCodeChannelsMcpEnabled(): boolean {
   return loadConfigSync().config.experimental.claudeCodeChannelsMcp;
+}
+
+/**
+ * Whether TLDR (token-efficient code analysis) is enabled. Gates whether agents
+ * advertise/use the TLDR MCP tools and whether the per-workspace TLDR daemon is
+ * started at spawn. Read at session launch — a change only affects sessions
+ * launched/resumed after it. Defaults to true when unset.
+ */
+export function isTldrEnabledSync(): boolean {
+  try {
+    return loadConfigSync().config.tldr.enabled;
+  } catch {
+    return DEFAULT_CONFIG.tldr.enabled;
+  }
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

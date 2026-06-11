@@ -126,7 +126,7 @@ export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
-import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot } from './concurrency.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -149,7 +149,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
@@ -157,8 +157,13 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
+import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
+import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
+import { isIssueClosed } from './issue-closed.js';
+import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 
 // ============================================================================
 // Configuration
@@ -1786,17 +1791,13 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       // Operator-set ignore flag: skip all patrol re-dispatch for this issue
       // until the human toggles it back off via the kanban button.
       if (status.deaconIgnored) continue;
-      // PAN-1496: never re-dispatch review/test for an issue closed on the
-      // tracker (e.g. closed on GitHub mid-pipeline, bypassing close-out which
-      // clears the review_status row). isTrackerIssueClosed is TTL-cached, so
+      // PAN-1496/PAN-1613: never re-dispatch review/test for an issue closed
+      // on the tracker or shadow-state. The shared helper is TTL-cached, so
       // checking each surviving row at most once per cache window is bounded and
       // cannot reproduce the PAN-328 API storm.
-      {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
-        if (await isIssueClosed(issueId)) {
-          actions.push(`Skipped orphaned-review re-dispatch for ${issueId}: issue is closed on the tracker`);
-          continue;
-        }
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review/test re-dispatch — issue is closed`);
+        continue;
       }
       // Skip issues that already completed their pipeline — don't reset
       // statuses that the specialist already reported results for.
@@ -1961,7 +1962,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             // PAN-1665: at the concurrency ceiling — defer (leave status untouched
             // so a later patrol retries once a slot frees). Never fail the review.
             actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
           } else if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
             // PAN-1048 R4: deacon recovery routes through the role primitive.
@@ -2035,7 +2036,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             // PAN-1665: at the concurrency ceiling — defer without touching status
             // so a later patrol retries once a slot frees.
             actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665)`);
+            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
           } else {
             try {
               const run = await spawnRun(issueId, 'test', {
@@ -2132,7 +2133,6 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // a small, bounded set — so the per-issue tracker fallback in
       // isIssueClosed can't storm the API the way a per-open-issue check would.
       try {
-        const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
         if (await isIssueClosed(issueId)) {
           try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
           try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
@@ -2165,7 +2165,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // row exists yet, so leaving it untouched lets a later patrol retry cleanly.
       if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred missing-status review for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
 
@@ -2217,8 +2217,37 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
       if (status.reviewStatus !== 'passed') continue;
       if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
 
+      // PAN-1681: a live test session (idle or working) is the failsafe's job,
+      // not a re-dispatch target. Re-dispatching a fresh agent here is what burnt
+      // the 3-retry budget on idle agents that simply never signaled. Skip
+      // entirely — checkCompletedButUnsignaledTests (run just before this) nudges
+      // /auto-completes the existing agent. Only re-dispatch when NO live session.
+      const testSession = `agent-${issueId.toLowerCase()}-test`;
+      if (sessionExistsSync(testSession)) {
+        const testPaneDead = await Effect.runPromise(isPaneDead(testSession)).catch(() => true);
+        if (!testPaneDead) continue;
+      }
+
       const retryCount = status.testRetryCount ?? 0;
-      if (retryCount >= 3) continue;
+      if (retryCount >= 3) {
+        // PAN-1681: stop silently capping. With no live session to recover from
+        // (we'd have continued above) and the verdict failsafe unable to recover,
+        // the issue is genuinely stranded. Surface a one-time visible stuck marker
+        // so the operator can see it instead of it sitting at test=pending forever.
+        // Set only once — don't re-stamp every patrol.
+        if (status.stuckReason !== 'test_signal_strand') {
+          setReviewStatusSync(issueId, {
+            stuck: true,
+            stuckReason: 'test_signal_strand',
+            stuckAt: new Date().toISOString(),
+            testNotes: `Test stranded at ${status.testStatus} after ${retryCount} re-dispatches — the test agent never signaled and no verdict artifact was recovered. Inspect agent-${issueId.toLowerCase()}-test, or run: pan admin specialists done test ${issueId} --status passed|failed.`,
+          });
+          const msg = `Surfaced test strand for ${issueId}: stuck after ${retryCount} re-dispatches (test_signal_strand)`;
+          actions.push(msg);
+          console.warn(`[deacon] ${msg}`);
+        }
+        continue;
+      }
 
       // For pending, only retry if it's been >5 minutes since review passed
       if (status.testStatus === 'pending') {
@@ -2230,14 +2259,12 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         }
       }
 
-      // PAN-1496: never re-dispatch test for an issue closed on the tracker
-      // (e.g. closed on GitHub mid-pipeline, bypassing close-out which would
-      // have cleared the review_status row). The check is reached only by the
-      // small set of issues that pass all status filters above, and
-      // isTrackerIssueClosed is TTL-cached — so this cannot storm the API.
-      const { isIssueClosed } = await import('./orphan-proposed-reconciler.js');
+      // PAN-1496/PAN-1613: never re-dispatch test for an issue closed on the
+      // tracker or shadow-state. The check is reached only by the small set of
+      // issues that pass all status filters above, and the shared helper is
+      // TTL-cached — so this cannot storm the API.
       if (await isIssueClosed(issueId)) {
-        actions.push(`Skipped test retry for ${issueId}: issue is closed on the tracker`);
+        console.log(`[deacon] ${issueId}: skipping test re-dispatch — issue is closed`);
         continue;
       }
 
@@ -2260,7 +2287,7 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
       // pending/dispatch_failed so a later patrol retries once a slot frees.
       if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred test retry for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
 
@@ -2557,6 +2584,132 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
 }
 
 // ============================================================================
+// Completed-but-unsignaled test detection (PAN-1681)
+// ============================================================================
+
+/**
+ * Detect test agents that finished but never persisted their verdict — the test
+ * twin of {@link checkCompletedButUnsignaledReviews}. The test role narrates
+ * "tests pass" but the agent (often Haiku 4.5) sometimes never POSTs testStatus,
+ * stranding the issue at test=pending/testing with a live-but-idle session.
+ *
+ * Recovery is symmetric with the review failsafe: the test role writes a
+ * deterministic verdict artifact (.pan/test/result.json) BEFORE it POSTs, and
+ * this patrol reads it back to recover the verdict. It NEVER guesses pass/fail
+ * (continue.json D6) — auto-complete fires only from a written artifact; with no
+ * artifact it nudges once to prompt write+POST, then defers to the
+ * strand-surfacing path in checkPendingTestDispatch.
+ *
+ * Guards (hazard H4):
+ *   - Only fires when reviewStatus === 'passed' && testStatus ∈ {testing,pending}
+ *   - Skips closed issues (isIssueClosed) and stuck/ignored issues
+ *   - Gates a live session on isAgentIdleForNudge + a 5-min settle window
+ *   - Nudges at most once per test cycle (deduped by session) before completing
+ *   - Only honors an artifact newer than the current test dispatch (H3)
+ */
+const unsignaledTestNudges = new Map<string, number>();
+
+export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
+  const actions: string[] = [];
+  const TEST_SETTLE_MS = 5 * 60 * 1000; // 5 minutes — mirror SYNTHESIS_SETTLE_MS
+  const NUDGE_DEDUP_MS = 30 * 60 * 1000;
+
+  try {
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'passed') continue;
+      if (status.testStatus !== 'testing' && status.testStatus !== 'pending') continue;
+      if (status.stuck || status.deaconIgnored) continue;
+      if (await isIssueClosed(issueId)) continue;
+
+      const resolved = resolveProjectFromIssueSync(issueId);
+      if (!resolved) continue;
+      const issueLower = issueId.toLowerCase();
+      const wsPath = findWorkspacePath(resolved.projectPath, issueLower);
+      if (!wsPath) continue;
+
+      const testSession = `agent-${issueLower}-test`;
+      const sessionAlive = sessionExistsSync(testSession);
+      const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(testSession)).catch(() => true) : true;
+      const sessionLive = sessionAlive && !paneDead;
+      const idle = sessionLive ? isAgentIdleForNudge(testSession, TEST_SETTLE_MS, now) : false;
+
+      const lastNudged = unsignaledTestNudges.get(testSession);
+      const alreadyNudged = !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
+
+      // Only honor an artifact newer than the current test dispatch so a previous
+      // cycle's verdict is never read after a re-dispatch (H3). The latest
+      // test→'testing' history entry is the dispatch time.
+      const lastDispatchAt = status.history
+        ?.filter(h => h.type === 'test' && h.status === 'testing')
+        .pop()?.timestamp;
+      const minMtimeMs = lastDispatchAt ? new Date(lastDispatchAt).getTime() : undefined;
+      const artifact = readTestVerdictArtifact(wsPath, minMtimeMs);
+
+      const decision = decideUnsignaledTestAction({ sessionLive, idle, alreadyNudged, artifact });
+
+      switch (decision.action) {
+        case 'auto-complete': {
+          const fallbackNote = `Test auto-completed by deacon: ${decision.status} (verdict artifact present, agent ${sessionLive ? 'alive but unresponsive after nudge' : 'dead'})`;
+          setReviewStatusSync(issueId, {
+            testStatus: decision.status,
+            testNotes: decision.notes || fallbackNote,
+          });
+          const msg = `Auto-completed test for ${issueId}: ${decision.status} (${sessionLive ? 'alive but unresponsive after nudge' : 'dead agent'}, verdict artifact)`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+          break;
+        }
+        case 'nudge-verdict': {
+          const noteArg =
+            decision.status === 'failed'
+              ? ` --notes "${(decision.notes || 'See .pan/test/result.json').replace(/"/g, "'").slice(0, 120)}"`
+              : '';
+          const cmd = `pan admin specialists done test ${issueId} --status ${decision.status}${noteArg}`;
+          const nudge = `Your test verdict (${decision.status}) is already written to .pan/test/result.json. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(testSession, nudge);
+            unsignaledTestNudges.set(testSession, now);
+            const msg = `Nudged ${testSession} to signal ${decision.status} (verdict artifact present)`;
+            actions.push(msg);
+            console.log(`[deacon] ${msg}`);
+          } catch (err: any) {
+            console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
+          }
+          break;
+        }
+        case 'nudge-write': {
+          const nudge = `Your test run for ${issueId} looks finished but no verdict was recorded. Decide the verdict from the gates/UAT you ran, then do BOTH of these now: (1) write the workspace file .pan/test/result.json as {"status":"passed"|"failed","notes":"<evidence>"}, and (2) run: pan admin specialists done test ${issueId} --status passed|failed. Do this immediately — do not summarize or ask questions, just write the file and run the command.`;
+          try {
+            const { messageAgent } = await import('../agents.js');
+            await messageAgent(testSession, nudge);
+            unsignaledTestNudges.set(testSession, now);
+            const msg = `Nudged ${testSession} to write+signal a test verdict (no artifact yet)`;
+            actions.push(msg);
+            console.log(`[deacon] ${msg}`);
+          } catch (err: any) {
+            console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
+          }
+          break;
+        }
+        case 'wait':
+        case 'none':
+        default:
+          break;
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking completed-but-unsignaled tests:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // Verification/review contradiction (PAN-796)
 // ============================================================================
 
@@ -2654,6 +2807,10 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       if (status.mergeStatus === 'merged') continue;
       if (!status.reviewedAtCommit) continue;
       if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+      if (await isIssueClosed(issueId)) {
+        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
+        continue;
+      }
 
       // Resolve workspace path
       const project = resolveProjectFromIssueSync(issueId);
@@ -2740,7 +2897,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         // PAN-1665: at the ceiling — status is already reset to pending above, so
         // the orphan-review path will re-dispatch on a later patrol once a slot frees.
         actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665)`);
+        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
       } else if (freshStatus?.reviewStatus === 'pending') {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const branch = `feature/${issueId.toLowerCase()}`;
@@ -2900,108 +3057,6 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   return actions;
 }
 
-// ============================================================================
-// Undispatched-ship safety-net
-// ============================================================================
-
-// Wait this long after the review/test status last changed before the patrol
-// steps in — long enough that the reactive scheduler's primary
-// onIssueStateChange('shipping') trigger has had every chance to fire first.
-const SHIP_DISPATCH_STALENESS_MS = 30 * 1000; // 30 s
-// Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
-// is already idempotent (activeRoleRunExists skips a live, current ship run),
-// so this is purely to keep the patrol log quiet while a ship run is in flight.
-const SHIP_DISPATCH_COOLDOWN_MS = 90 * 1000; // 90 s
-const shipDispatchCooldowns = new Map<string, number>();
-const shipDispatchCounts = new Map<string, number>();
-
-/**
- * Safety-net patrol: re-dispatch the ship role for issues where review and
- * test both passed but the issue never reached readyForMerge.
- *
- * The only thing that normally dispatches ship is the reactive scheduler's
- * onIssueStateChange('shipping') event. If that event is swallowed — e.g. a
- * stale/zombie ship session made activeRoleRunExists() return true — the issue
- * jams forever: review and test are green, but ship never runs, readyForMerge
- * stays false, and the dashboard Merge button never lights up. This patrol is
- * the backstop so a single missed event can't strand an issue.
- *
- * onIssueStateChange() owns the actual safety: it resolves the workspace,
- * detects a stale ship session via roleRunHead vs current HEAD, kills the
- * zombie, and only then spawns a fresh ship run. A genuinely in-flight ship
- * run is left alone (activeRoleRunExists returns true), so this patrol is
- * idempotent.
- *
- * Guards:
- *   - review + test both 'passed', not yet readyForMerge
- *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
- *   - staleness: status at least 30 s old (don't race the primary trigger)
- *   - per-issue cooldown: 90 s between re-dispatch attempts
- */
-export async function checkUndispatchedShip(): Promise<string[]> {
-  const actions: string[] = [];
-
-  try {
-    const statuses = loadReviewStatuses();
-    const now = Date.now();
-    const shipEligibleKeys = new Set<string>();
-
-    for (const [key, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'passed') continue;
-      if (status.testStatus !== 'passed') continue;
-      if (status.readyForMerge) continue;
-      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
-      if (!status.updatedAt) continue;
-      shipEligibleKeys.add(key);
-    }
-
-    for (const key of new Set([...shipDispatchCooldowns.keys(), ...shipDispatchCounts.keys()])) {
-      if (!shipEligibleKeys.has(key)) {
-        shipDispatchCooldowns.delete(key);
-        shipDispatchCounts.delete(key);
-      }
-    }
-
-    for (const [key, status] of Object.entries(statuses)) {
-      if (!shipEligibleKeys.has(key)) continue;
-
-      // Give the reactive scheduler's primary trigger time to land first.
-      const updatedAt = status.updatedAt;
-      if (!updatedAt) continue;
-      if (now - new Date(updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
-
-      // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
-      const lastAttempt = shipDispatchCooldowns.get(key);
-      if (lastAttempt && (now - lastAttempt) < SHIP_DISPATCH_COOLDOWN_MS) continue;
-
-      const issueId = status.issueId ?? key;
-      console.log(
-        `[deacon] Ship never dispatched for ${issueId} (review+test passed, `
-        + `readyForMerge=false) — re-triggering shipping lifecycle`,
-      );
-      shipDispatchCooldowns.set(key, now);
-
-      try {
-        const { onIssueStateChange } = await import('./service.js');
-        await Effect.runPromise(onIssueStateChange(issueId, 'shipping'));
-        const dispatchCount = (shipDispatchCounts.get(key) ?? 0) + 1;
-        shipDispatchCounts.set(key, dispatchCount);
-        console.log(`[deacon] Ship re-dispatched (${dispatchCount} total for issue ${issueId})`);
-        actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
-      } catch (err) {
-        console.error(
-          `[deacon] failed to re-dispatch ship for ${issueId}:`,
-          err instanceof Error ? err.message : String(err),
-        );
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error in checkUndispatchedShip:', msg);
-  }
-
-  return actions;
-}
 
 /**
  * Detect issues whose feature branch is merged to main but mergeStatus is stale.
@@ -3022,6 +3077,21 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
+
+      // Closed-out issues are TERMINAL: close-out flips the spec to
+      // completed/cancelled and clears review status. Treating the cleared/
+      // resurrected row as "stale" here re-fires the post-merge handoff,
+      // which REOPENS the closed tracker issue (PAN-1190, 2026-06-11).
+      try {
+        const { findSpecByIssue } = await import('../pan-dir/specs.js');
+        const spec = await Effect.runPromise(findSpecByIssue(project.projectPath, issueId));
+        if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
+          staleMergeReconciled.add(issueId);
+          continue;
+        }
+      } catch {
+        // Spec unreadable — fall through to the normal checks.
+      }
 
       const branch = `feature/${issueId.toLowerCase()}`;
       let isMerged = false;
@@ -4620,6 +4690,138 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 }
 
 /**
+ * PAN-1716: Defense-in-depth reaper for completed advancing-role sessions.
+ *
+ * Every review/test/ship session whose phase verdict is already terminal but is
+ * still tmux-alive is a zombie: Claude sits idle at its prompt forever, yet
+ * `countRunningAgents()` keeps counting it against the PAN-1665 advancing
+ * ceiling. Enough of them starve every new dispatch and livelock the pipeline.
+ *
+ * The completion paths (`pan specialists done`, the HTTP route) kill the session
+ * directly; this janitor catches any they miss so a single dropped kill can't
+ * accumulate into a livelock. Runs early in the patrol so freed ceiling slots
+ * benefit this same cycle's dispatchers.
+ */
+export async function checkTerminalAdvancingSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectTerminalAdvancingSessions(statuses, [...aliveSessions]);
+    for (const session of toKill) {
+      try {
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped terminal advancing session ${session} (verdict recorded, session idle)`);
+        console.log(`[deacon] Reaped terminal advancing session ${session} (PAN-1716)`);
+        logDeaconEventSync(`checkTerminalAdvancingSessions: reaped ${session} — phase verdict terminal but session alive (PAN-1716)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap terminal session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping terminal advancing sessions:', msg);
+  }
+  return actions;
+}
+
+/**
+ * PAN-1726: Defense-in-depth reaper for the WORK session of a merged issue.
+ *
+ * `postMergeLifecycle` pauses + kills `agent-<id>` at merge time, but a server
+ * restart mid-lifecycle (the PAN-1723 deploy re-runs the lifecycle from
+ * pending-post-merge.json) or a deacon read-modify-write race on state.json can
+ * leave the work session alive with `paused: null`. An idle merged work agent
+ * sits at its prompt yet still counts against the PAN-1665 work ceiling,
+ * throttling test/work dispatch for every live issue — the work-role sibling of
+ * the PAN-1716 advancing reaper. We re-pause (so auto-resume can't resurrect it)
+ * THEN kill the session; state.json is preserved so reopen still works.
+ */
+export async function checkMergedWorkSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectMergedWorkSessions } = await import('./reap-terminal-sessions.js');
+    const { setAgentPaused } = await import('../agents.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const toKill = selectMergedWorkSessions(statuses, [...aliveSessions]);
+    for (const session of toKill) {
+      try {
+        // The work session name is the agent id (`agent-<id>`). Re-assert the
+        // pause gate before killing so the next patrol's auto-resume won't bring
+        // it back; killing alone would just churn it stopped→running forever.
+        await Effect.runPromise(setAgentPaused(session, 'merged — awaiting close-out (verify on main)', true));
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped merged work session ${session} (issue merged, session idle)`);
+        console.log(`[deacon] Reaped merged work session ${session} (PAN-1726)`);
+        logDeaconEventSync(`checkMergedWorkSessions: paused + reaped ${session} — issue merged but work session alive (PAN-1726)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap merged work session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping merged work sessions:', msg);
+  }
+  return actions;
+}
+
+/** Pane must be idle at least this long before the awaiting-test reaper kills it. */
+const AWAITING_TEST_IDLE_REAP_MS = 10 * 60 * 1000;
+
+/**
+ * PAN-1730: Reap the WORK session of an issue that's idle awaiting its test
+ * verdict (review passed, test pending).
+ *
+ * Such a work agent has handed off via `pan done` and sits idle at its prompt,
+ * yet `countRunningAgents()` keeps counting it against the PAN-1665 work
+ * ceiling. When the work pool alone meets the total ceiling (work=7/9 observed)
+ * `tryReserveAdvancingSlot()` can never admit the test that would release these
+ * agents — a livelock that zeroed pipeline throughput for hours. Killing the
+ * idle work session frees the work slot (and RAM).
+ *
+ * Unlike the PAN-1726 merged reaper this does NOT pause the agent: if the test
+ * later FAILS, the deacon's auto-resume `needsFix` gate must be free to bring it
+ * back to fix the feedback. While test stays `pending` the auto-resume
+ * "pipeline mid-flight" gate already prevents churn, so killing-without-pausing
+ * neither resurrects a still-pending agent nor strands a failed one. Runs before
+ * the dispatchers so the freed slot benefits this same cycle's test dispatch.
+ */
+export async function checkAwaitingTestWorkSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { selectAwaitingTestWorkSessions } = await import('./reap-terminal-sessions.js');
+    const statuses = loadReviewStatuses();
+    const aliveSessions = await Effect.runPromise(listSessionNames());
+    const candidates = selectAwaitingTestWorkSessions(statuses, [...aliveSessions]);
+    const now = Date.now();
+    for (const session of candidates) {
+      // Only reap a genuinely idle pane — a work agent still finalizing right
+      // after handoff must be left alone. The work session name IS the agent id.
+      const runtime = getAgentRuntimeStateSync(session);
+      if (runtime?.state !== 'idle') continue;
+      const idleSince = Date.parse(runtime.lastActivity ?? '');
+      if (!Number.isFinite(idleSince) || now - idleSince < AWAITING_TEST_IDLE_REAP_MS) continue;
+      try {
+        // No pause: auto-resume's mid-flight gate keeps it down while test is
+        // pending, and its needsFix gate must stay free to resume it on failure.
+        await Effect.runPromise(killSession(session));
+        actions.push(`Reaped idle awaiting-test work session ${session} (review passed, test pending, idle ≥10m)`);
+        console.log(`[deacon] Reaped idle awaiting-test work session ${session} (PAN-1730)`);
+        logDeaconEventSync(`checkAwaitingTestWorkSessions: reaped ${session} — review passed, test pending, idle ≥10m (PAN-1730)`);
+      } catch (err) {
+        console.warn(`[deacon] Failed to reap awaiting-test work session ${session}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error reaping awaiting-test work sessions:', msg);
+  }
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -4715,6 +4917,16 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...orphanProposedActions);
   for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
 
+  const closedIssueAgentActions = await reconcileClosedIssueAgents();
+  actions.push(...closedIssueAgentActions);
+  for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
+
+  // Re-send the resume continue prompt when a work agent is alive and idle after
+  // resume but no user record landed in the JSONL transcript.
+  const stalledResumeActions = await nudgeStalledResumeWorkAgents();
+  actions.push(...stalledResumeActions);
+  for (const a of stalledResumeActions) addLog('action', a, state.patrolCycle);
+
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
   // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
@@ -4756,6 +4968,48 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.warn(`[deacon] Failed to check workspace existence: ${err.message}`);
   }
 
+  // PAN-1716: Reap completed advancing-role (review/test/ship) sessions that are
+  // still tmux-alive before the dispatchers run, so freed ceiling slots are
+  // available to this same cycle's review/test/ship re-dispatch below.
+  const reapedTerminalActions = await checkTerminalAdvancingSessions();
+  actions.push(...reapedTerminalActions);
+  for (const a of reapedTerminalActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1726: Reap the work session of an already-merged issue (work-role
+  // sibling of the PAN-1716 advancing reaper). An idle merged work agent holds a
+  // PAN-1665 work slot; re-pause + kill it so the slot frees for live work.
+  const reapedWorkActions = await checkMergedWorkSessions();
+  actions.push(...reapedWorkActions);
+  for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
+  // Cheap no-op when no remote-state.json is active (local file scan only —
+  // no fly API calls); otherwise checks each VM for the REMOTE_DONE sentinel,
+  // materializes the local worktree, creates review artifacts + the completed
+  // marker, and destroys the machine.
+  try {
+    const { reapCompletedRemoteAgents } = await import('../remote/remote-completion.js');
+    const remoteReap = await reapCompletedRemoteAgents();
+    for (const r of remoteReap) {
+      if (r.status === 'handed-off' || r.status === 'error') {
+        const msg = `Remote reap ${r.issueId}: ${r.status} (${r.details.join('; ')})`;
+        actions.push(msg);
+        addLog(r.status === 'error' ? 'warn' : 'action', msg, state.patrolCycle);
+      }
+    }
+  } catch (err: any) {
+    addLog('warn', `Remote reap patrol failed: ${err.message}`, state.patrolCycle);
+  }
+
+  // PAN-1730: Reap the work session of an issue idle awaiting its test verdict
+  // (review passed, test pending, pane idle ≥10m). When the work pool alone
+  // meets the PAN-1665 total ceiling, these idle agents livelock test dispatch —
+  // freeing the slot here lets this same cycle's checkPendingTestDispatch admit
+  // the test that releases them. Kill-without-pause; see the function comment.
+  const reapedAwaitingTestActions = await checkAwaitingTestWorkSessions();
+  actions.push(...reapedAwaitingTestActions);
+  for (const a of reapedAwaitingTestActions) addLog('action', a, state.patrolCycle);
+
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
@@ -4770,6 +5024,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1681: Recover test agents that wrote .pan/test/result.json but never
+  // POSTed testStatus (nudge once → auto-complete). Runs BEFORE the dispatcher
+  // below so a recoverable verdict is honored before any re-dispatch or stuck
+  // marker — the dispatcher's stuck path skips issues this already resolved.
+  const unsignaledTestActions = await checkCompletedButUnsignaledTests();
+  actions.push(...unsignaledTestActions);
+  for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
 
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
   const pendingTestActions = await checkPendingTestDispatch();
@@ -4826,12 +5088,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   // draining AI token credits by sending unnecessary prompts to agents.
   // If an agent is stuck, the human operator can nudge it manually via the
   // dashboard's Tell action.
-
-  // Safety-net: re-dispatch ship for issues where review+test passed but the
-  // reactive shipping trigger was swallowed (e.g. by a stale ship session).
-  const undispatchedShipActions = await checkUndispatchedShip();
-  actions.push(...undispatchedShipActions);
-  for (const a of undispatchedShipActions) addLog('action', a, state.patrolCycle);
 
   // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
   const mergeStuckActions = await checkReadyForMergeStuck();
@@ -4928,6 +5184,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const reaperActions = await reapOrphanedDashboardServers();
     actions.push(...reaperActions);
     for (const a of reaperActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // PAN-1706: reap leftover playwright-mcp trees / stale headless browsers.
+  // Each ghost browser keeps a full dashboard page polling at full rate,
+  // multiplying server load. Same ~10 min cadence as the server reaper.
+  if (state.patrolCycle % serverReaperEveryCycles === 0) {
+    const playwrightActions = await reapLeftoverPlaywrightBrowsers();
+    actions.push(...playwrightActions);
+    for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
   }
 
   // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
@@ -5674,6 +5939,87 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  * Returns a list of action descriptions for runPatrol to log.
  */
 const BEAD_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+const STALLED_RESUME_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function hasLandedUserRecordSinceResume(state: AgentState, snapshot: Awaited<ReturnType<typeof captureTranscriptUserRecordSnapshot>>): boolean {
+  const resumeAt = state.lastResumeAt ? Date.parse(state.lastResumeAt) : NaN;
+  if (!Number.isFinite(resumeAt)) return true;
+  const lastUserAt = snapshot.lastUserRecord?.timestamp ? Date.parse(snapshot.lastUserRecord.timestamp) : NaN;
+  if (!Number.isFinite(lastUserAt)) return snapshot.userRecordCount > 0;
+  return lastUserAt >= resumeAt;
+}
+
+function stalledResumeCooldownActive(agentId: string): boolean {
+  const cooldownFile = join(getAgentDir(agentId), '.last-stalled-resume-nudge');
+  if (!existsSync(cooldownFile)) return false;
+  try {
+    const last = parseInt(readFileSync(cooldownFile, 'utf-8').trim(), 10);
+    return !Number.isNaN(last) && Date.now() - last < STALLED_RESUME_NUDGE_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+function recordStalledResumeCooldown(agentId: string): void {
+  writeFileSync(join(getAgentDir(agentId), '.last-stalled-resume-nudge'), String(Date.now()), 'utf-8');
+}
+
+function buildStalledResumePrompt(state: AgentState): string | null {
+  if (state.kickoffDelivered === false) {
+    const promptPath = join(getAgentDir(state.id), 'initial-prompt.md');
+    try {
+      return readFileSync(promptPath, 'utf-8');
+    } catch (err) {
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${state.id} skipped — kickoffDelivered=false but ${promptPath} is unreadable: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }
+  return buildDefaultResumeContinueMessage(state.issueId);
+}
+
+export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch { return actions; }
+
+  for (const agentId of dirs) {
+    const state = getAgentStateSync(agentId);
+    if (!state) continue;
+    if (state.status !== 'running') continue;
+    if (state.role !== 'work') continue;
+    if (state.paused || state.troubled) continue;
+    if (!state.lastResumeAt) continue;
+    if (await isIssueClosed(state.issueId)) continue;
+    if (!await Effect.runPromise(sessionExists(agentId))) continue;
+    if (!isAgentIdleForNudge(agentId)) continue;
+    if (stalledResumeCooldownActive(agentId)) continue;
+
+    const sessionId = state.sessionId;
+    if (!sessionId) continue;
+    const snapshot = await captureTranscriptUserRecordSnapshot(state.workspace, sessionId);
+    if (hasLandedUserRecordSinceResume(state, snapshot)) continue;
+
+    const message = buildStalledResumePrompt(state);
+    if (!message) continue;
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(agentId, message);
+      recordStalledResumeCooldown(agentId);
+      const action = `Re-sent stalled resume prompt to ${agentId} (${state.issueId})`;
+      actions.push(action);
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${action}`);
+    } catch (err: any) {
+      logDeaconEventSync(`nudgeStalledResumeWorkAgents: ${agentId} messageAgent failed: ${err?.message ?? err}`);
+    }
+  }
+
+  return actions;
+}
 
 export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
@@ -5689,6 +6035,10 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     if (!state) continue;
     if (state.status !== 'running') continue;
     if (state.role !== 'work') continue;
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} skipped — issue ${state.issueId} is closed`);
+      continue;
+    }
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await Effect.runPromise(sessionExists(agentId))) continue;
@@ -5923,10 +6273,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
-    const shadowState = await Effect.runPromise(getShadowState(state.issueId));
-    const issueClosed = shadowState?.trackerStatus === 'closed';
-    if (issueClosed) {
-      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+    if (await isIssueClosed(state.issueId)) {
+      logDeaconEventSync(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is closed`);
       continue;
     }
 

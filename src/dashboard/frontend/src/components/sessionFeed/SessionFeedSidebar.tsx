@@ -368,6 +368,10 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
       pushRoute(`/conv/${encodeURIComponent(entry.conversationName)}`);
       return;
     case 'activity':
+      if (entry.link) {
+        pushRoute(entry.link);
+        return;
+      }
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
       return;
     case 'git':

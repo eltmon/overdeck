@@ -4,7 +4,7 @@
     "created": "2026-06-05T18:57:46.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1613: Substrate: agents stay live / are re-spawned on CLOSED issues (zombie agent slots)",
-    "updated": "2026-06-05T19:00:46.877Z"
+    "updated": "2026-06-08T13:34:43.468Z"
   },
   "plan": {
     "id": "pan-1613",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "66d110af-7aa0-46e7-945a-499cd4836b53",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 90,
     "created": "2026-06-05T18:57:46.000Z",
-    "updated": "2026-06-05T19:00:46.877Z",
+    "updated": "2026-06-08T13:34:43.468Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1613",
@@ -500,7 +500,64 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-05-PAN-1613-substrate-agents-stay-live-are-re-spawned-on-closed-issues-zombie-agent-slots.vbrief.json"
+      "canonicalFilename": "2026-06-05-PAN-1613-substrate-agents-stay-live-are-re-spawned-on-closed-issues-zombie-agent-slots.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1613",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-08T13:34:43.462Z",
+        "work": {
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": []
+        },
+        "verification": {
+          "status": "running",
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-06-08T13:34:43.462Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T13:34:43.462Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T13:34:43.462Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-08T13:34:43.462Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-08T13:34:43.462Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1631"
+        }
+      }
     }
   },
   "status": "proposed"

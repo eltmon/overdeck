@@ -66,11 +66,11 @@ Panopticon orchestrates issue work through five lifecycle **roles**. **You are r
 | **work** | Implementation from your vBRIEF + beads tasks | workspace worktree | `roles/work.md` |
 | **review** | Review synthesis and approval/blocking decision | project root | `roles/review.md` |
 | **test** | Automated verification and required browser UAT | project root | `roles/test.md` |
-| **ship** | Rebase/verify/push preparation for human merge | project root | `roles/ship.md` |
+| server-side shipping | Rebase/readyForMerge preparation for human merge | project root | no spawned role file |
 
 Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
 
-**Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test/ship must enforce should be encoded in the vBRIEF as acceptance criteria, because those criteria propagate through the role prompts and review/test artifacts.
+**Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test and server-side shipping must enforce should be encoded in the vBRIEF as acceptance criteria, because those criteria propagate through the role prompts and downstream artifacts.
 
 ### Claude Code subagents (NOT Panopticon roles)
 

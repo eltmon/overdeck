@@ -70,6 +70,19 @@ vi.mock('../../src/lib/activity-logger.js', () => ({
   emitActivityTtsSync: vi.fn(),
 }));
 
+// checkPostReviewCommits now gates on isIssueClosed (PAN-1613), whose tracker
+// fallback shells out to `gh issue view` — which in CI resolves the test's
+// PAN-1215-A against the real repo and reads it as closed, making the patrol
+// skip the issue and breaking these rebase-detection assertions. Mock the
+// module so the gate is deterministic (never closed) and this stays a unit-
+// isolated integration test.
+vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
+}));
+
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
   notifyPipelineSync: vi.fn(),

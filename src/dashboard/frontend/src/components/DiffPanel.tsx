@@ -36,6 +36,62 @@ import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './Dif
 type DiffThemeType = 'light' | 'dark'
 
 const DIFF_PANEL_UNSAFE_CSS = `
+:host {
+  /* Pin the diff to our app theme (PAN-1520): @pierre/diffs renders into a shadow
+     DOM and switches light/dark via CSS light-dark(), which follows color-scheme.
+     Without this, the shadow tree can briefly fall back to the OS prefers-color-scheme
+     on first paint before the themeType prop applies (a light flash in dark mode).
+     This style is injected last into the shadow, so it wins. */
+  color-scheme: var(--pan-color-scheme, light dark);
+
+  /* The --diffs-*-override vars MUST be declared here: the library substitutes
+     them in its own :host block (e.g. --diffs-bg-context:
+     var(--diffs-bg-context-override, <default>)). Declaring them on descendants
+     like [data-diff] is invisible to that substitution — the var resolves at
+     :host before inheritance. */
+  --diffs-bg-context-override: color-mix(in srgb, var(--background) 97%, var(--foreground));
+  --diffs-bg-hover-override: color-mix(in srgb, var(--background) 94%, var(--foreground));
+  --diffs-bg-separator-override: color-mix(in srgb, var(--background) 95%, var(--foreground));
+  --diffs-bg-buffer-override: color-mix(in srgb, var(--background) 90%, var(--foreground));
+
+  /* Add/remove colors. The library uses these as MIX TARGETS: each changed line
+     paints color-mix(in lab, <bg> var(--mix-light|--mix-dark), <target>), so
+     these must be PURE accent colors. A pre-diluted blend here gets diluted a
+     second time by the line mix and reads as virtually no tint at all. Fill
+     strength is controlled by the --mix-* knobs below, not by these colors. */
+  --diffs-bg-addition-override: #22c55e;
+  --diffs-bg-addition-number-override: #22c55e;
+  --diffs-bg-deletion-override: #ef4444;
+  --diffs-bg-deletion-number-override: #ef4444;
+
+  /* Word-level emphasis must stay a clear step above the boosted line fill. */
+  --diffs-bg-addition-emphasis-override: light-dark(rgb(34 197 94 / 0.40), rgb(34 197 94 / 0.45));
+  --diffs-bg-deletion-emphasis-override: light-dark(rgb(239 68 68 / 0.40), rgb(239 68 68 / 0.45));
+}
+
+/* Line-fill strength (GitHub-plus). Library defaults: line 88%/80%, gutter
+   91%/85%, hover 80%/75% (numbers are the BG share — higher = fainter tint).
+   unsafeCSS is injected as an unlayered <style>, so these win over the
+   library's @layer base rules; hover must therefore be re-declared to keep
+   its step-stronger highlight. */
+[data-line-type='change-addition'],
+[data-line-type='change-deletion'] {
+  --mix-light: 70%;
+  --mix-dark: 66%;
+}
+[data-line-type='change-addition']:where([data-gutter-buffer], [data-column-number]),
+[data-line-type='change-deletion']:where([data-gutter-buffer], [data-column-number]) {
+  --mix-light: 64%;
+  --mix-dark: 60%;
+}
+@media (pointer: fine) {
+  [data-line-type='change-addition'][data-hovered],
+  [data-line-type='change-deletion'][data-hovered] {
+    --mix-light: 62%;
+    --mix-dark: 58%;
+  }
+}
+
 [data-diffs-header],
 [data-diff],
 [data-file],
@@ -46,21 +102,6 @@ const DIFF_PANEL_UNSAFE_CSS = `
   --diffs-dark-bg: color-mix(in srgb, var(--card) 90%, var(--background)) !important;
   --diffs-token-light-bg: transparent;
   --diffs-token-dark-bg: transparent;
-
-  --diffs-bg-context-override: color-mix(in srgb, var(--background) 97%, var(--foreground));
-  --diffs-bg-hover-override: color-mix(in srgb, var(--background) 94%, var(--foreground));
-  --diffs-bg-separator-override: color-mix(in srgb, var(--background) 95%, var(--foreground));
-  --diffs-bg-buffer-override: color-mix(in srgb, var(--background) 90%, var(--foreground));
-
-  --diffs-bg-addition-override: color-mix(in srgb, var(--background) 92%, #22c55e);
-  --diffs-bg-addition-number-override: color-mix(in srgb, var(--background) 88%, #22c55e);
-  --diffs-bg-addition-hover-override: color-mix(in srgb, var(--background) 85%, #22c55e);
-  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--background) 80%, #22c55e);
-
-  --diffs-bg-deletion-override: color-mix(in srgb, var(--background) 92%, #ef4444);
-  --diffs-bg-deletion-number-override: color-mix(in srgb, var(--background) 88%, #ef4444);
-  --diffs-bg-deletion-hover-override: color-mix(in srgb, var(--background) 85%, #ef4444);
-  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--background) 80%, #ef4444);
 
   background-color: var(--diffs-bg) !important;
 }
@@ -615,20 +656,29 @@ export function DiffPanel({
         >
           <WrapText className="size-3" />
         </ToggleButton>
-        <button
-          type="button"
-          className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:border-border hover:text-foreground/80"
-          onClick={() => {
-            const params = new URLSearchParams(window.location.search)
-            params.set('diff', '1')
-            if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
-            window.open(`${window.location.pathname}?${params.toString()}`, '_blank', 'width=1000,height=800')
-          }}
-          aria-label="Open diff in new window"
-          title="Pop out"
-        >
-          <ExternalLink className="size-3" />
-        </button>
+        {mode === 'inline' && (
+          <button
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:border-border hover:text-foreground/80"
+            onClick={() => {
+              // Pop out ONLY the diff into a standalone window — not the whole
+              // host page. The dedicated /popout/diff route re-renders a bare
+              // DiffPanel from these params (prefix = the fetch base, so the
+              // popout refetches its own summaries + diffs).
+              const params = new URLSearchParams()
+              params.set('diff', '1')
+              params.set('prefix', baseUrl)
+              params.set('agentId', agentId)
+              if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
+              if (selectedFilePath) params.set('diffFilePath', selectedFilePath)
+              window.open(`/popout/diff?${params.toString()}`, '_blank', 'width=1000,height=800')
+            }}
+            aria-label="Open diff in new window"
+            title="Pop out"
+          >
+            <ExternalLink className="size-3" />
+          </button>
+        )}
         {onClose && (
           <button
             type="button"

@@ -10,6 +10,7 @@ import {
   handlePullRequestReview,
   handlePullRequestReviewThread,
   handleStatus,
+  needsBlockerReconciliation,
   type WebhookPayload,
 } from '../../../src/lib/webhook-handlers.js';
 
@@ -27,6 +28,7 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   // Strip the optional third arg (existing status) so test assertions stay clean.
   setReviewStatus: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
   setReviewStatusSync: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
+  loadReviewStatuses: () => ({}),
 }));
 
 // Mock tracker-config so isTrackedRepository passes in tests
@@ -718,5 +720,60 @@ describe('handleStatus', () => {
     })));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('needsBlockerReconciliation (PAN-1771)', () => {
+  const ghBlocker = { type: 'failing_checks' as const, summary: 'Required checks are failing', detectedAt: '2026-06-11T01:39:00Z' };
+
+  it('returns PR identity for a non-merged status with a GitHub-native blocker', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'pending',
+      blockerReasons: [ghBlocker],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1713',
+      prNumber: 1713,
+    })).toEqual({ repo: 'test-owner/test-repo', prNumber: 1713 });
+  });
+
+  it('parses the PR number from prUrl when prNumber is absent', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'pending',
+      blockerReasons: [ghBlocker],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+    })).toEqual({ repo: 'test-owner/test-repo', prNumber: 42 });
+  });
+
+  it('skips merged statuses', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'merged',
+      blockerReasons: [ghBlocker],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1713',
+      prNumber: 1713,
+    })).toBeNull();
+  });
+
+  it('skips statuses without blockers', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'pending',
+      blockerReasons: [],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1713',
+      prNumber: 1713,
+    })).toBeNull();
+  });
+
+  it('skips statuses whose only blockers are not GitHub-native', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'pending',
+      blockerReasons: [{ type: 'unresolved_conversations', summary: 'Open review threads', detectedAt: '2026-06-11T01:39:00Z' }],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1713',
+      prNumber: 1713,
+    })).toBeNull();
+  });
+
+  it('skips statuses without a resolvable PR identity', () => {
+    expect(needsBlockerReconciliation({
+      mergeStatus: 'pending',
+      blockerReasons: [ghBlocker],
+    })).toBeNull();
   });
 });

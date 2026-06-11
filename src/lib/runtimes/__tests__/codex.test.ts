@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout } from '../codex.js'
+import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout } from '../codex.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
@@ -139,6 +139,34 @@ describe('initCodexHome', () => {
     expect(config).toContain('trust_level = "trusted"')
   })
 
+  it('seeds auth.json from the global ~/.codex so the TUI skips sign-in onboarding', () => {
+    // The fake HOME is the test base; withFakeCodexHome() points CODEX_HOME at
+    // <base>/.codex, which is also where homedir()/.codex resolves. Drop a fake
+    // global credential there.
+    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode } = require('node:fs')
+    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth')
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'auth.json')
+    expect(existsNode(seeded)).toBe(true)
+    expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global')
+  })
+
+  it('does not clobber an existing per-agent auth.json (refreshed token survives resume)', () => {
+    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode } = require('node:fs')
+    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global-stale"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-resume')
+    mkdirNode(codexDir, { recursive: true })
+    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-fresh"}}')
+
+    initCodexHome(codexDir) // resume — must not overwrite the home's own token
+
+    expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
+  })
+
   it('is idempotent — does not overwrite existing config', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-03')
     initCodexHome(codexDir)
@@ -151,16 +179,49 @@ describe('initCodexHome', () => {
 })
 
 describe('extractThreadIdFromRollout', () => {
-  it('extracts the last segment as thread-id', () => {
-    expect(extractThreadIdFromRollout('/path/to/rollout-uuid-abc123.jsonl')).toBe('abc123')
+  it('extracts the full trailing session UUID (not just the last segment)', () => {
+    // Real codex format: rollout-<timestamp>-<uuid>.jsonl. The id is the whole
+    // UUID; returning only the last hyphen group breaks resume + lookups.
+    expect(
+      extractThreadIdFromRollout(
+        '/path/sessions/2026/06/09/rollout-2026-06-09T01-47-53-019eaaec-4dfa-7ab1-90ba-9104d16534d1.jsonl',
+      ),
+    ).toBe('019eaaec-4dfa-7ab1-90ba-9104d16534d1')
   })
 
-  it('handles multi-segment UUIDs', () => {
-    expect(extractThreadIdFromRollout('/path/rollout-a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6-mythread.jsonl')).toBe('mythread')
-  })
-
-  it('returns null for invalid filenames', () => {
+  it('returns null when there is no trailing UUID', () => {
     expect(extractThreadIdFromRollout('/path/notarollout.jsonl')).toBeNull()
+    expect(extractThreadIdFromRollout('/path/rollout-uuid-abc123.jsonl')).toBeNull()
+  })
+})
+
+describe('findLatestRollout', () => {
+  let ctx: ReturnType<typeof withFakeCodexHome>
+  beforeEach(() => { ctx = withFakeCodexHome() })
+  afterEach(() => ctx.cleanup())
+
+  it('returns the most-recently-modified rollout across nested day dirs', () => {
+    const home = join(ctx.agentsHome, 'conv-x', 'codex-home')
+    const older = join(home, 'sessions', '2026', '06', '08')
+    const newer = join(home, 'sessions', '2026', '06', '09')
+    mkdirSync(older, { recursive: true })
+    mkdirSync(newer, { recursive: true })
+    const oldPath = join(older, 'rollout-2026-06-08T10-00-00-019eaaaa-1111-2222-3333-444444444444.jsonl')
+    const newPath = join(newer, 'rollout-2026-06-09T10-00-00-019eaabb-5555-6666-7777-888888888888.jsonl')
+    writeFileSync(oldPath, '{}')
+    writeFileSync(newPath, '{}')
+    // Force the newer file to have a later mtime regardless of write order.
+    const { utimesSync } = require('node:fs')
+    utimesSync(oldPath, new Date(1000), new Date(1000))
+    utimesSync(newPath, new Date(2000), new Date(2000))
+
+    expect(findLatestRollout(home)).toBe(newPath)
+  })
+
+  it('returns null when there are no rollouts', () => {
+    const home = join(ctx.agentsHome, 'conv-empty', 'codex-home')
+    mkdirSync(join(home, 'sessions'), { recursive: true })
+    expect(findLatestRollout(home)).toBeNull()
   })
 })
 

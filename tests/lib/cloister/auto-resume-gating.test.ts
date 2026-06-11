@@ -79,21 +79,19 @@ describe('auto-resume gates', () => {
   }
 
   async function loadDeaconWithResumeMock(osOverrides?: { loadavg?: number[]; cpusCount?: number }) {
-    // PAN-1665: throttle tests need deterministic load/core counts. Only install
-    // the os mock when overrides are supplied so existing tests keep real values.
-    if (osOverrides) {
-      vi.doMock('os', async (importOriginal) => {
-        const actual = await importOriginal<typeof import('os')>();
-        return {
-          ...actual,
-          default: actual,
-          loadavg: osOverrides.loadavg ? () => osOverrides.loadavg! : actual.loadavg,
-          cpus: osOverrides.cpusCount
-            ? () => Array.from({ length: osOverrides.cpusCount! }, () => ({}) as ReturnType<typeof actual.cpus>[number])
-            : actual.cpus,
-        };
-      });
-    }
+    // PAN-1665: throttle tests need deterministic load/core counts. Default to
+    // low load so unrelated auto-resume tests do not depend on the host machine.
+    vi.doMock('os', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('os')>();
+      const loadavg = osOverrides?.loadavg ?? [0, 0, 0];
+      const cpusCount = osOverrides?.cpusCount ?? 4;
+      return {
+        ...actual,
+        default: actual,
+        loadavg: () => loadavg,
+        cpus: () => Array.from({ length: cpusCount }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+      };
+    });
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();
       return {
@@ -109,6 +107,8 @@ describe('auto-resume gates', () => {
       getConcurrencyLimits: () => ({ maxWorkAgents: resumeSlotsMock, reservedAdvancingSlots: 3, totalCeiling: resumeSlotsMock + 3 }),
       countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
       workResumeSlotsAvailable: () => resumeSlotsMock,
+      resetPatrolDispatchBudget: vi.fn(),
+      tryReserveAdvancingSlot: () => true,
       canDispatchAdvancing: () => true,
     }));
     vi.doMock('../../../src/lib/review-status.js', () => ({
@@ -130,6 +130,16 @@ describe('auto-resume gates', () => {
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
       getShadowState: vi.fn(() => Effect.succeed(null)),
+    }));
+    // PAN-1613: autoResumeStoppedWorkAgents now gates on isIssueClosed. With
+    // shadow-state mocked to null above, the real isIssueClosed would fall
+    // through to a live `gh issue view` for the test issue ids — mock it so the
+    // gate is deterministic (never closed) and the test stays hermetic.
+    vi.doMock('../../../src/lib/cloister/issue-closed.js', () => ({
+      isIssueClosed: vi.fn(async () => false),
+      isTrackerIssueClosed: vi.fn(async () => false),
+      clearIssueClosedCache: vi.fn(),
+      TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
     }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),

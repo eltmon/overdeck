@@ -1,4 +1,4 @@
 {
-  "status": "failed",
-  "notes": "Quality gates passed (npm run typecheck, npm run lint, npm test all passed). However, requirements review identified two blocking gaps in the e2e-pi-local-gemma acceptance criteria: (1) Verification used non-standard port 127.0.0.1:11435 instead of default localhost:11434; (2) Verification ran Pi directly with CLI flags rather than through a real Panopticon work-agent spawn (pan start/spawnAgent). The committed verification note at docs/PAN-1641-OLLAMA-VERIFY.md does not satisfy AC28 (work agent spawn) and AC29 (zero-cloud evidence on default endpoint). All other 31 ACs are implemented; only the e2e UAT path is incomplete."
+  "status": "passed",
+  "notes": "Quality gates passed after the Ollama verification fix: npm run typecheck, npm run lint, and npm test -- tests/lib/ollama.test.ts tests/integration/agent-spawning.test.ts src/lib/__tests__/launcher-generator.test.ts src/lib/__tests__/harness-policy.test.ts tests/lib/agents-auth-routing.test.ts all completed successfully. The prior e2e-pi-local-gemma gap is fixed by docs/PAN-1641-OLLAMA-VERIFY.md: it records a real Panopticon Pi work-agent spawn using model ollama:gemma4:12b, default port 11434 on loopback, generated launcher env OPENAI_BASE_URL=http://[::1]:11434/v1, and strace evidence with zero non-local network connections."
 }

@@ -23,6 +23,7 @@ vi.mock('../config-yaml.js', () => ({
     test: 'workhorse:mid',
     ship: 'workhorse:mid',
     flywheel: 'claude-opus-4-7',
+    strike: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -35,6 +36,7 @@ vi.mock('../config-yaml.js', () => ({
     review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
+    strike: { model: 'workhorse:expensive' },
     flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -105,6 +107,13 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         manualCompactMode: 'claude-code',
         richCompaction: true,
         titleModel: 'claude-haiku-4-5',
+      },
+      conversationSearch: {
+        enabled: false,
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        apiKeyRef: undefined,
+        dbPath: '/tmp/conversations/embeddings.db',
       },
       memory: {
         extraction: { fallbackChain: [] },
@@ -431,6 +440,31 @@ describe('saveSettingsApi', () => {
     }));
 
     expect(loadSettingsApi().roles?.review?.sub?.security?.model).toBe('parent');
+  });
+
+  it('persists conversation search settings', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.conversationSearch?.enabled).toBe(false);
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      conversationSearch: {
+        enabled: true,
+        provider: 'openai',
+        model: 'text-embedding-3-large',
+        apiKeyRef: 'OPENAI_SEARCH_KEY',
+        dbPath: '/tmp/search.db',
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('conversationSearch:');
+    expect(written).toContain('enabled: true');
+    expect(written).toContain('model: text-embedding-3-large');
+    expect(written).toContain('apiKeyRef: OPENAI_SEARCH_KEY');
+    expect(written).toContain('dbPath: /tmp/search.db');
   });
 
   it('persists DashScope provider enablement and API key', async () => {

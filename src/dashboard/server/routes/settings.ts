@@ -11,6 +11,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   PUT  /api/settings
  */
 
+import { randomBytes } from 'node:crypto';
+
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -26,6 +28,7 @@ import {
   updateProviderApiKey,
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
+import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { getProviderForModelSync, PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
@@ -37,8 +40,52 @@ import {
 } from '../../../lib/claude-settings-overlay.js';
 import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
+import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '../services/conversation-search-watcher.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
+import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
+import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
+import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
+
+const REINDEX_CONFIRM_THRESHOLD_USD = 1;
+const REINDEX_CONFIRM_TTL_MS = 10 * 60 * 1000;
+const reindexConfirmationNonces = new Map<string, { estimatedUsd: number; expiresAt: number }>();
+let activeConversationSearchReindex: Promise<unknown> | null = null;
+
+interface ConversationReindexProgress {
+  active: boolean;
+  filesScanned: number;
+  filesIndexed: number;
+  chunksIndexed: number;
+  currentFile?: string;
+  startedAt?: number;
+}
+let conversationReindexProgress: ConversationReindexProgress = {
+  active: false,
+  filesScanned: 0,
+  filesIndexed: 0,
+  chunksIndexed: 0,
+};
+
+function createReindexConfirmationNonce(estimatedUsd: number): string {
+  const nonce = randomBytes(24).toString('base64url');
+  const now = Date.now();
+  for (const [key, entry] of reindexConfirmationNonces) {
+    if (entry.expiresAt <= now) reindexConfirmationNonces.delete(key);
+  }
+  reindexConfirmationNonces.set(nonce, { estimatedUsd, expiresAt: now + REINDEX_CONFIRM_TTL_MS });
+  return nonce;
+}
+
+function consumeReindexConfirmationNonce(nonce: unknown, estimatedUsd: number): boolean {
+  if (typeof nonce !== 'string') return false;
+  const entry = reindexConfirmationNonces.get(nonce);
+  reindexConfirmationNonces.delete(nonce);
+  return !!entry && entry.expiresAt > Date.now() && Math.abs(entry.estimatedUsd - estimatedUsd) < 0.000001;
+}
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -82,6 +129,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   // MiniMax models
   'minimax-m2.7': { apiModel: 'minimax-m2.7' },
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
+  'MiniMax-M3': { apiModel: 'MiniMax-M3' },
   // Z.AI models
   'glm-5.1': { apiModel: 'glm-5.1' },
   'glm-4.7': { apiModel: 'glm-4.7' },
@@ -675,6 +723,146 @@ const postValidateApiKeyRoute = HttpRouter.add(
   })),
 );
 
+// ─── Routes: Conversation search status / reindex ─────────────────────────────
+
+const getConversationSearchStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/status',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.try({
+      try: () => {
+        const config = getConversationSearchConfigSync();
+        if (!config.enabled) {
+          return jsonResponse({
+            enabled: false,
+            available: false,
+            unavailableReason: 'conversationSearch is disabled',
+            dbPath: config.dbPath,
+            chunkCount: 0,
+            indexedFileCount: 0,
+            lastIndexedAt: null,
+          });
+        }
+
+        const provider = createConversationEmbeddingProvider({ config });
+        if (!provider.enabled) {
+          return jsonResponse({
+            enabled: config.enabled,
+            available: false,
+            unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable',
+            dbPath: config.dbPath,
+            chunkCount: 0,
+            indexedFileCount: 0,
+            lastIndexedAt: null,
+          });
+        }
+
+        const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
+        try {
+          const stats = db.getStats();
+          return jsonResponse({
+            enabled: config.enabled,
+            available: db.available && provider.enabled,
+            unavailableReason: db.unavailableReason,
+            dbPath: config.dbPath,
+            ...stats,
+          });
+        } finally {
+          db.close();
+        }
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+  })),
+);
+
+const getConversationSearchReindexEstimateRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/reindex-estimate',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.try({
+      try: async () => {
+        // Optional ?model= lets the UI price a *prospective* model switch before saving it.
+        const modelOverride = new URL(request.url, 'http://localhost').searchParams.get('model')?.trim();
+        const baseConfig = getConversationSearchConfigSync();
+        const config = modelOverride ? { ...baseConfig, model: modelOverride } : baseConfig;
+        const estimate = await estimateFullReindexConversationSearchCost({ config });
+        const confirmationNonce = estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD
+          ? createReindexConfirmationNonce(estimate.estimatedUsd)
+          : undefined;
+        return jsonResponse({ ...estimate, confirmationNonce });
+      },
+      catch: (err) => {
+        const message = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+        console.error(`[conversation-search] reindex estimate failed: ${message}`);
+        return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+      },
+    });
+  })),
+);
+
+const postConversationSearchReindexRoute = HttpRouter.add(
+  'POST',
+  '/api/settings/conversation-search/reindex',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      if (activeConversationSearchReindex) {
+        return jsonResponse({ error: 'Conversation search reindex already in progress' }, { status: 409 });
+      }
+
+      const job = (async () => {
+        const estimate = await estimateFullReindexConversationSearchCost();
+        if (estimate.disabled) return jsonResponse(estimate);
+        if (estimate.estimatedUsd > REINDEX_CONFIRM_THRESHOLD_USD) {
+          const nonce = (body as { confirmationNonce?: unknown }).confirmationNonce;
+          if (!consumeReindexConfirmationNonce(nonce, estimate.estimatedUsd)) {
+            return jsonResponse({
+              error: 'Reindex confirmation required',
+              requiresConfirmation: true,
+              estimate,
+            }, { status: 409 });
+          }
+        }
+
+        await stopConversationSearchWatcher();
+        conversationReindexProgress = { active: true, filesScanned: 0, filesIndexed: 0, chunksIndexed: 0, startedAt: Date.now() };
+        try {
+          const result = await fullReindexConversationSearch({
+            onProgress: (p) => {
+              conversationReindexProgress = { active: true, startedAt: conversationReindexProgress.startedAt, ...p };
+            },
+          });
+          return jsonResponse(result);
+        } finally {
+          conversationReindexProgress = { ...conversationReindexProgress, active: false };
+          await syncConversationSearchWatcher();
+        }
+      })();
+      activeConversationSearchReindex = job;
+      try {
+        return await job;
+      } finally {
+        if (activeConversationSearchReindex === job) activeConversationSearchReindex = null;
+      }
+    });
+  })),
+);
+
+// Read-only progress for the live reindex bar. Public (same rationale as the status route).
+const getConversationSearchReindexProgressRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/conversation-search/reindex-progress',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(conversationReindexProgress);
+  })),
+);
+
 // ─── Route: PUT /api/settings ─────────────────────────────────────────────────
 
 const putSettingsRoute = HttpRouter.add(
@@ -693,6 +881,7 @@ const putSettingsRoute = HttpRouter.add(
         await Effect.runPromise(saveSettingsApi(newSettings));
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
+        await syncConversationSearchWatcher();
         return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
@@ -701,6 +890,28 @@ const putSettingsRoute = HttpRouter.add(
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : String(err));
       }
+    });
+  })),
+);
+
+// ─── Route: PUT /api/settings/ui-theme ────────────────────────────────────────
+// The frontend syncs its resolved theme here on load and on toggle. New tmux
+// sessions stamp their pane background from this value so Claude Code's
+// `theme: auto` detects the dashboard theme even when started headless.
+
+const putUiThemeRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/ui-theme',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const theme = (body as { theme?: unknown } | null)?.theme;
+      if (theme !== 'light' && theme !== 'dark') {
+        return jsonResponse({ error: "theme must be 'light' or 'dark'" }, { status: 400 });
+      }
+      await setUiTheme(theme);
+      return jsonResponse({ success: true });
     });
   })),
 );
@@ -875,7 +1086,12 @@ export const settingsRouteLayer = Layer.mergeAll(
   getOpenAIAuthRoute,
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
+  getConversationSearchStatusRoute,
+  getConversationSearchReindexEstimateRoute,
+  postConversationSearchReindexRoute,
+  getConversationSearchReindexProgressRoute,
   putSettingsRoute,
+  putUiThemeRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,

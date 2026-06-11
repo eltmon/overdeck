@@ -21,6 +21,7 @@ import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
+import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
@@ -144,9 +145,22 @@ export function ComposerFooter({
   // Images are pasted/dropped into the active composer, so conversation.name is
   // the owning conversation. The store stamps it onto each image for async
   // upload attribution.
+  //
+  // Guard: text-only models (e.g. mimo-v2.5-pro) return 404 on image input,
+  // which the harness mistranslates as "model may not exist". Rather than block
+  // the whole message, drop the image and pin a notice — the text still sends.
+  // PAN-1685.
   const enqueueImages = useCallback((files: File[]) => {
+    if (files.length > 0 && !modelSupportsImages(model)) {
+      const def = findModelDef(model);
+      toast.warning(
+        `${def?.name ?? model} can't read images — image not attached. ` +
+        `Switch to a vision-capable model (e.g. MiMo V2.5) to send images.`,
+      );
+      return;
+    }
     enqueueImagesForConversation(conversation.name, files);
-  }, [enqueueImagesForConversation, conversation.name]);
+  }, [enqueueImagesForConversation, conversation.name, model]);
 
   const removePendingImage = useCallback((id: string) => {
     removeImageForConversation(conversation.name, id);

@@ -13,6 +13,8 @@ import {
   type ReviewStatusData,
 } from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
+import { useDashboardStore } from '../../../lib/store';
+import { AutoMergeToggle } from '../../AutoMergeToggle';
 
 type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
@@ -172,6 +174,12 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
   const reviewStatus = reviewStatusQuery.data;
   const activity = activityQuery.data;
 
+  // PAN-1691: per-issue auto-merge routing key, read from the store snapshot
+  // (already carries autoMerge) so we avoid threading a new query type.
+  const autoMergeSnap = useDashboardStore(
+    (s) => s.reviewStatusByIssueId[issueId.toUpperCase()] ?? s.reviewStatusByIssueId[issueId],
+  );
+
   const planningForStageStatus = planningSummary.data;
 
   const stageStatuses = useMemo(
@@ -312,6 +320,7 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           {resolvedTotalCost !== null && (
             <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
+          <AutoMergeToggle issueId={issueId} autoMerge={autoMergeSnap?.autoMerge} compact />
         </div>
       </div>
 

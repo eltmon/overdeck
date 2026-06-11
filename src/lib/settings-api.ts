@@ -23,6 +23,7 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
+  type ConversationSearchConfig,
   type RoleEffort,
   ROLE_EFFORTS,
 } from './config-yaml.js';
@@ -135,6 +136,7 @@ export interface ApiSettingsConfig {
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
+  conversationSearch?: ConversationSearchConfig;
   conversations?: {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
@@ -187,6 +189,9 @@ export interface ApiSettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
+    tldr?: {
+      enabled?: boolean;
+    };
   };
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
@@ -216,7 +221,7 @@ export interface ApiSettingsConfig {
    * Permission mode for spawned Claude Code agents.
    *
    * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
-   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   * 'bypass'         → --permission-mode bypassPermissions (DSP flag removed)
    *
    * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
    * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
@@ -252,7 +257,7 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelIdSync('claude-sonnet-4-6');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
@@ -577,6 +582,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       rtk: {
         enabled: config.rtk?.enabled ?? false,
       },
+      tldr: {
+        enabled: config.tldr?.enabled ?? true,
+      },
     },
     tts: toApiTtsConfig(config.tts),
     tts_summarizer: {
@@ -589,6 +597,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    conversationSearch: config.conversationSearch,
     conversations: conversationSettings,
     memory: {
       provider: memory.extraction.provider,
@@ -662,6 +671,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['api_keys', config.api_keys],
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
+    ['conversationSearch', config.conversationSearch],
     ['conversations', config.conversations],
     ['memory', config.memory],
     ['background_ai', config.background_ai],
@@ -680,6 +690,10 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
 
   if (config.agents?.rtk !== undefined) {
     doc.setIn(['agents', 'rtk'], config.agents.rtk);
+  }
+
+  if (config.agents?.tldr !== undefined) {
+    doc.setIn(['agents', 'tldr'], config.agents.tldr);
   }
 
   if (config.tts !== undefined) {
@@ -740,8 +754,11 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
     },
-    agents: settings.agents?.rtk !== undefined
-      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
+    agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
+      ? {
+          ...(settings.agents?.rtk !== undefined ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } } : {}),
+          ...(settings.agents?.tldr !== undefined ? { tldr: { enabled: settings.agents.tldr.enabled ?? true } } : {}),
+        }
       : undefined,
     tts: settings.tts_summarizer
       ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
@@ -751,6 +768,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    conversationSearch: settings.conversationSearch,
     conversations: settings.conversations,
     memory: settings.memory
       ? {
@@ -826,6 +844,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
         ...current.agents?.rtk,
         ...updates.agents?.rtk,
       },
+      tldr: {
+        ...current.agents?.tldr,
+        ...updates.agents?.tldr,
+      },
     },
     tts: {
       ...current.tts,
@@ -842,6 +864,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    conversationSearch: {
+      ...current.conversationSearch,
+      ...updates.conversationSearch,
     },
     conversations: {
       ...current.conversations,
@@ -957,11 +983,20 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (settings.agents !== undefined) {
     if (!isRecord(settings.agents)) {
       errors.push('agents must be an object');
-    } else if (settings.agents.rtk !== undefined) {
-      if (!isRecord(settings.agents.rtk)) {
-        errors.push('agents.rtk must be an object');
-      } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
-        errors.push('agents.rtk.enabled must be a boolean');
+    } else {
+      if (settings.agents.rtk !== undefined) {
+        if (!isRecord(settings.agents.rtk)) {
+          errors.push('agents.rtk must be an object');
+        } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
+          errors.push('agents.rtk.enabled must be a boolean');
+        }
+      }
+      if (settings.agents.tldr !== undefined) {
+        if (!isRecord(settings.agents.tldr)) {
+          errors.push('agents.tldr must be an object');
+        } else if (settings.agents.tldr.enabled !== undefined && typeof settings.agents.tldr.enabled !== 'boolean') {
+          errors.push('agents.tldr.enabled must be a boolean');
+        }
       }
     }
   }

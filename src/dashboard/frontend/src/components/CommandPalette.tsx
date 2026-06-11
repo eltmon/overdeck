@@ -8,10 +8,8 @@
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
+ *   - Conversations                         — semantic JSONL transcript search
  *   - Memory / Observations                 — FTS over ~/.panopticon/memory
- *
- * Phase 2 (tracked separately) will add semantic conversation search with
- * excerpts that point to the relevant message inside a JSONL session.
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -33,6 +31,9 @@ import {
   Brain,
   Sparkles,
   Eye,
+  Loader2,
+  MessageCircle,
+  Clock,
 } from 'lucide-react';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
@@ -51,14 +52,27 @@ interface PaletteAction {
   destructive?: boolean;
   // Optional rich excerpt rendering (memory/observation results).
   excerptSegments?: ExcerptSegment[];
+  // Optional structured metadata chips (rendered instead of `description`).
+  meta?: Array<{ icon?: React.ElementType; text: string; pill?: boolean }>;
   // Sort hint within group: lower = earlier.
   rank?: number;
+}
+
+export interface ConversationPaletteOpenRequest {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  /** Resolved dashboard project key (name ?? key), or null when under no registered project. */
+  projectKey: string | null;
+  byteOffset: number;
+  label: string;
 }
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: string, issueId?: string) => void;
+  onOpenConversationHit?: (hit: ConversationPaletteOpenRequest) => void | Promise<void>;
 }
 
 interface PanCommandEntry {
@@ -85,15 +99,108 @@ interface PaletteSearchHit {
   rank: number;
 }
 
+interface PaletteConversationHit {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  projectKey: string | null;
+  role: string;
+  ts: string | null;
+  byteOffset: number;
+  displayContent: string;
+  excerpt: string;
+  excerptSegments: Array<{ text: string; match: boolean }>;
+  rank: number;
+}
+
 interface PaletteSearchResponse {
   memory: PaletteSearchHit[];
   observations: PaletteSearchHit[];
   summaries: PaletteSearchHit[];
+  conversations: PaletteConversationHit[];
 }
 
 const EMPTY_AGENTS: Agent[] = [];
 const EMPTY_ISSUES: Issue[] = [];
-const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [] };
+const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summaries: [], conversations: [] };
+
+// ─── Display helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Turn a Claude project-dir id (the cwd with '/' encoded as '-', e.g.
+ * `-home-eltmon-Projects-panopticon-cli`) into a human label like
+ * `panopticon-cli`, or `panopticon-cli · feature-pan-1053` for a workspace.
+ * The encoding is lossy (a real '-' is indistinguishable from a path separator),
+ * so we anchor on the `Projects` segment and fall back to the trailing segment.
+ */
+function friendlyProjectLabel(projectId: string): string {
+  if (!projectId) return '';
+  const segs = projectId.replace(/^-+/, '').split('-').filter(Boolean);
+  if (segs.length === 0) return projectId;
+  const projectsIdx = segs.lastIndexOf('Projects');
+  const after = projectsIdx >= 0 ? segs.slice(projectsIdx + 1) : segs;
+  const wsIdx = after.indexOf('workspaces');
+  if (wsIdx >= 0) {
+    const base = after.slice(0, wsIdx).join('-') || segs[segs.length - 1] || projectId;
+    const ws = after.slice(wsIdx + 1).join('-');
+    return ws ? `${base} · ${ws}` : base;
+  }
+  if (projectsIdx >= 0) return after.join('-') || projectId;
+  // No `Projects` anchor — best effort: the cwd basename (last segment).
+  return after[after.length - 1] || projectId;
+}
+
+/** Compact, human-friendly timestamp: "Today 18:30", "Yesterday 09:12", "Jun 9", "Jun 9, 2025". */
+function formatHitDate(ts: string | null): string {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if (d.toDateString() === now.toDateString()) return `Today ${hhmm}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${hhmm}`;
+  const opts: Intl.DateTimeFormatOptions =
+    d.getFullYear() === now.getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' };
+  return d.toLocaleDateString(undefined, opts);
+}
+
+// ─── Result-type scoping (filter chips) ─────────────────────────────────────────
+
+type PaletteScope = 'all' | 'actions' | 'commands' | 'issues' | 'conversations' | 'memory';
+
+const SCOPE_LABEL: Record<PaletteScope, string> = {
+  all: 'All',
+  actions: 'Actions',
+  commands: 'Commands',
+  issues: 'Issues',
+  conversations: 'Conversations',
+  memory: 'Memory',
+};
+
+/** Map a result group heading to the scope chip it belongs under. */
+function groupScope(group: string): Exclude<PaletteScope, 'all'> {
+  if (group === 'Conversations') return 'conversations';
+  if (group.startsWith('Commands · ')) return 'commands';
+  if (group === 'Issues' || group === 'Active Workspaces' || group === 'Running Agents') return 'issues';
+  if (group === 'Memory' || group === 'Memory · Summaries' || group === 'Observations') return 'memory';
+  return 'actions';
+}
+
+/** Subtle accent (icon-chip fill + icon color) per result type, so rows read as
+ *  intentional icon chips rather than empty checkboxes. */
+function accentForGroup(group: string): { box: string; icon: string } {
+  switch (groupScope(group)) {
+    case 'conversations': return { box: 'bg-indigo-500/15', icon: 'text-indigo-400' };
+    case 'memory':        return { box: 'bg-amber-500/15',  icon: 'text-amber-400' };
+    case 'issues':        return { box: 'bg-sky-500/15',    icon: 'text-sky-400' };
+    case 'commands':      return { box: 'bg-emerald-500/15', icon: 'text-emerald-400' };
+    default:              return { box: 'bg-muted',          icon: 'text-muted-foreground' };
+  }
+}
 
 // ─── Server API ───────────────────────────────────────────────────────────────
 
@@ -125,6 +232,7 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
       memory: data.memory ?? [],
       observations: data.observations ?? [],
       summaries: data.summaries ?? [],
+      conversations: data.conversations ?? [],
     };
   } catch (err) {
     if ((err as { name?: string }).name === 'AbortError') return EMPTY_SEARCH;
@@ -208,7 +316,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -218,6 +326,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
   const [panCommands, setPanCommands] = useState<PanCommandEntry[]>([]);
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [scope, setScope] = useState<PaletteScope>('all');
 
   // Reset query when opened, and lazy-load the pan command catalog the first
   // time the palette is shown.
@@ -225,6 +334,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     if (!isOpen) return;
     setQuery('');
     setSearchResults(EMPTY_SEARCH);
+    setScope('all');
     if (panCommands.length === 0) {
       void fetchPanCommands().then(setPanCommands);
     }
@@ -432,7 +542,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     },
   })), [panCommands]);
 
-  // ─── Dynamic: memory + observations + summaries ───────────────────────────
+  // ─── Dynamic: conversations + memory + observations + summaries ────────────
 
   const memoryActions = useMemo<PaletteAction[]>(() => {
     const out: PaletteAction[] = [];
@@ -462,10 +572,46 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       }
     };
     push(searchResults.observations, 'Observations', Eye);
+    for (const hit of searchResults.conversations) {
+      const label = hit.displayContent || hit.conversationId || hit.sessionId;
+      const project = friendlyProjectLabel(hit.projectId);
+      const date = formatHitDate(hit.ts);
+      const metaChips: PaletteAction['meta'] = [];
+      if (project) metaChips.push({ icon: FolderOpen, text: project, pill: true });
+      if (date) metaChips.push({ icon: Clock, text: date });
+      if (hit.role) metaChips.push({ text: hit.role });
+      out.push({
+        id: `conv-${hit.sessionId}-${hit.byteOffset}`,
+        label: label.length > 80 ? `${label.slice(0, 77)}…` : label,
+        meta: metaChips,
+        icon: MessageCircle,
+        group: 'Conversations',
+        rank: hit.rank,
+        excerptSegments: hit.excerptSegments.map((seg) => ({
+          kind: seg.match ? 'match' : 'text',
+          value: seg.text,
+        })),
+        keywords: ['conversation', hit.sessionId, hit.conversationId, hit.projectId, hit.role],
+        onSelect: () => {
+          if (onOpenConversationHit) {
+            void onOpenConversationHit({
+              sessionId: hit.sessionId,
+              conversationId: hit.conversationId,
+              projectId: hit.projectId,
+              projectKey: hit.projectKey,
+              byteOffset: hit.byteOffset,
+              label,
+            });
+            return;
+          }
+          toast.message(label, { description: hit.excerpt || [project, date].filter(Boolean).join(' · ') || undefined });
+        },
+      });
+    }
     push(searchResults.memory, 'Memory', Brain);
     push(searchResults.summaries, 'Memory · Summaries', Sparkles);
     return out;
-  }, [searchResults, openIssue]);
+  }, [searchResults, openIssue, onOpenConversationHit]);
 
   // ─── Filter + group ───────────────────────────────────────────────────────
 
@@ -486,9 +632,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     }
     const q = trimmed.toLowerCase();
     return allActions.filter((action) => {
-      // Server-side memory results are pre-matched against the query, so
+      // Server-side search results are pre-matched against the query, so
       // include them unconditionally (sort handles ranking).
-      if (action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
+      if (action.group === 'Conversations' || action.group === 'Memory' || action.group === 'Observations' || action.group === 'Memory · Summaries') {
         return true;
       }
       return (
@@ -511,10 +657,29 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }
-    for (const g of ['Observations', 'Memory', 'Memory · Summaries']) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
+    for (const g of ['Observations', 'Conversations', 'Memory', 'Memory · Summaries']) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     ordered.push(...seen);
     return ordered;
   }, [filtered]);
+
+  // Scope chips reflect the result types actually present (plus All). Only shown
+  // when there's more than one type to choose between.
+  const availableScopes = useMemo<PaletteScope[]>(() => {
+    const present = new Set<PaletteScope>();
+    for (const g of groupOrder) present.add(groupScope(g));
+    const ordered = (['actions', 'commands', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
+    return ordered.length > 1 ? ['all', ...ordered] : [];
+  }, [groupOrder]);
+
+  // If the active scope drops out of the results (e.g. the query changed), reset.
+  useEffect(() => {
+    if (scope !== 'all' && !availableScopes.includes(scope)) setScope('all');
+  }, [scope, availableScopes]);
+
+  const visibleGroups = useMemo(
+    () => (scope === 'all' ? groupOrder : groupOrder.filter((g) => groupScope(g) === scope)),
+    [groupOrder, scope],
+  );
 
   if (!isOpen) return null;
 
@@ -538,24 +703,55 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
             <Command.Input
               value={query}
               onValueChange={setQuery}
-              placeholder="Search commands, issues, memory, observations…"
+              placeholder="Search commands, issues, conversations, memory…"
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
               autoFocus
             />
             {isSearchLoading && (
-              <span className="text-[10px] text-muted-foreground">searching…</span>
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1 shrink-0">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                searching…
+              </span>
             )}
             <kbd className="text-[10px] text-muted-foreground bg-card px-1.5 py-0.5 rounded border border-border">ESC</kbd>
           </div>
 
+          {/* Scope filter chips — only when there's more than one result type */}
+          {availableScopes.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border overflow-x-auto">
+              {availableScopes.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setScope(s)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${
+                    scope === s
+                      ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+                      : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+                  }`}
+                >
+                  {SCOPE_LABEL[s]}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Results */}
           <Command.List className="max-h-[480px] overflow-y-auto py-2">
-            {filtered.length === 0 ? (
-              <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-                {query.trim().length === 0 ? 'Start typing…' : `No results for "${query}"`}
-              </Command.Empty>
+            {isSearchLoading && query.trim().length >= 2 && (
+              <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Searching conversations & memory…
+              </div>
+            )}
+            {visibleGroups.length === 0 ? (
+              isSearchLoading && query.trim().length >= 2 ? null : (
+                <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+                  {query.trim().length === 0 ? 'Start typing…' : `No results for "${query}"`}
+                </Command.Empty>
+              )
             ) : (
-              groupOrder.map((group) => (
+              visibleGroups.map((group) => (
                 <Command.Group
                   key={group}
                   heading={group}
@@ -564,19 +760,19 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                   {filtered
                     .filter((a) => a.group === group)
                     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
-                    .map((action) => (
+                    .map((action) => {
+                      const accent = accentForGroup(action.group);
+                      return (
                       <Command.Item
                         key={action.id}
                         value={action.id}
                         onSelect={() => handleSelect(action.onSelect)}
-                        className="flex items-start gap-3 px-3 py-2 mx-1 rounded-lg cursor-pointer data-[selected=true]:bg-popover transition-colors group"
+                        className="flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg cursor-pointer data-[selected=true]:bg-popover transition-colors group"
                       >
-                        <div className={`size-7 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                          action.destructive
-                            ? 'bg-destructive/10 text-destructive'
-                            : 'bg-card text-muted-foreground group-data-[selected=true]:text-primary'
+                        <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                          action.destructive ? 'bg-destructive/10 text-destructive' : `${accent.box} ${accent.icon}`
                         }`}>
-                          <action.icon className="w-3.5 h-3.5" />
+                          <action.icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium truncate ${
@@ -584,11 +780,27 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                           }`}>
                             <Highlighted text={action.label} terms={highlightTerms} />
                           </p>
-                          {action.description && (
+                          {action.meta && action.meta.length > 0 ? (
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {action.meta.map((m, i) => (
+                                <span
+                                  key={i}
+                                  className={`inline-flex items-center gap-1 text-[11px] ${
+                                    m.pill
+                                      ? 'px-1.5 py-0.5 rounded-md bg-muted text-foreground/75 font-medium'
+                                      : 'text-muted-foreground'
+                                  }`}
+                                >
+                                  {m.icon && <m.icon className="w-3 h-3 opacity-60" />}
+                                  {m.text}
+                                </span>
+                              ))}
+                            </div>
+                          ) : action.description ? (
                             <p className="text-xs text-muted-foreground truncate">
                               <Highlighted text={action.description} terms={highlightTerms} />
                             </p>
-                          )}
+                          ) : null}
                           {action.excerptSegments && action.excerptSegments.length > 0 && (
                             <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-snug">
                               {action.excerptSegments.map((seg, i) =>
@@ -602,7 +814,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                           )}
                         </div>
                       </Command.Item>
-                    ))}
+                      );
+                    })}
                 </Command.Group>
               ))
             )}

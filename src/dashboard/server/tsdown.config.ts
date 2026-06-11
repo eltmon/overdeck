@@ -19,6 +19,16 @@ export default defineConfig({
       '@homebridge/node-pty-prebuilt-multiarch',
       'better-sqlite3',
       'ssh2',
+      // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
+      // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled
+      // coreBundle.js, which has an internal `require("chromium-bidi/...")` for a
+      // package playwright does not ship — emitting UNRESOLVED_IMPORT warnings that
+      // the workspace docker `init` guard turns into exit 1 (forcing --host).
+      // Externalizing it keeps it resolved from node_modules at runtime and drops
+      // a 5.6 MB browser chunk from the server bundle.
+      'playwright',
+      'playwright-core',
+      /^chromium-bidi/,
       /^bun:/,
       /^@effect\/platform-bun/,
     ],

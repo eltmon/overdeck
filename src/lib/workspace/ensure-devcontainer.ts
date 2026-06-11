@@ -25,7 +25,7 @@
  */
 
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { Effect } from 'effect';
 import { stepOk, stepSkipped, stepFailed } from '../lifecycle/types.js';
 import type { StepResult } from '../lifecycle/types.js';
@@ -66,8 +66,10 @@ export function ensureDevcontainerSync(
 ): EnsureDevcontainerResult {
   const stepName = 'ensure:devcontainer';
   const devcontainerDir = join(input.workspacePath, '.devcontainer');
+  const workspaceLeaf = pathLeaf(input.workspacePath);
+  const isUatBatch = workspaceLeaf.startsWith('uat-');
 
-  if (existsSync(devcontainerDir)) {
+  if (existsSync(devcontainerDir) && !isUatBatch) {
     return {
       step: stepSkipped(stepName, [`Already exists: ${devcontainerDir}`]),
       rendered: false,
@@ -105,13 +107,20 @@ export function ensureDevcontainerSync(
 
   // feature-min-846 → min-846. Workspace path leaf is the source of truth
   // for the feature name (same convention used elsewhere in workspace-manager).
-  const featureName = pathLeaf(input.workspacePath).replace(/^feature-/, '');
+  const featureName = isUatBatch ? workspaceLeaf.slice('uat-'.length) : workspaceLeaf.replace(/^feature-/, '');
 
   try {
     const renderDetail = renderDevcontainerSync({
       workspacePath: input.workspacePath,
       projectConfig,
       featureName,
+      ...(isUatBatch ? {
+        placeholderOverrides: {
+          FEATURE_FOLDER: workspaceLeaf,
+          BRANCH_NAME: `uat/${featureName}`,
+          COMPOSE_PROJECT: `${basename(projectConfig.path)}-${workspaceLeaf}`,
+        },
+      } : {}),
     });
     return {
       step: stepOk(stepName, [

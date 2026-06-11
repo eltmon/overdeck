@@ -13,7 +13,7 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -149,6 +149,14 @@ export class CodexSpawnTimeout extends Error {
  *   - approvalPolicy / sandboxMode: autonomy for interactive conversations,
  *     derived from the Panopticon yolo setting. Headless `codex exec` overrides
  *     these via -c/-s flags at launch, so the defaults here only matter for TUI.
+ *
+ * In addition to the config seeding, this copies the user's global Codex
+ * credential (~/.codex/auth.json) into the per-agent CODEX_HOME. A fresh home
+ * with no auth.json makes Codex render its blocking sign-in onboarding
+ * ("Welcome to Codex … Sign in with ChatGPT … Press enter to continue") on
+ * every launch — which never writes a rollout, so nothing surfaces in the
+ * conversation view and the user is forced through the auth flow each time.
+ * Seeding auth is the credential analog of seeding folder trust above.
  */
 export interface InitCodexHomeOpts {
   trustedDir?: string
@@ -196,6 +204,22 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
+  }
+
+  // Seed auth so Codex skips its blocking sign-in onboarding on a fresh home.
+  // Copy the global ~/.codex/auth.json once, only when this home has none —
+  // Codex keeps its own copy refreshed thereafter, so on resume we must not
+  // clobber a newer token with a staler global one. Best-effort: if the user
+  // has never signed in to Codex globally there is nothing to copy, and the
+  // onboarding will (correctly) prompt for a real first-time login.
+  const homeAuthPath = join(codexHomeDir, 'auth.json')
+  if (!existsSync(homeAuthPath)) {
+    const globalAuthPath = join(homedir(), '.codex', 'auth.json')
+    if (existsSync(globalAuthPath)) {
+      copyFileSync(globalAuthPath, homeAuthPath)
+      // auth.json holds OAuth access/refresh tokens — keep it private.
+      try { chmodSync(homeAuthPath, 0o600) } catch { /* best-effort */ }
+    }
   }
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
@@ -252,16 +276,52 @@ function findAnyRollout(dir: string): string | null {
 }
 
 /**
- * Extract the thread-id from a rollout filename: rollout-<uuid>-<threadId>.jsonl
+ * Extract the thread-id from a rollout filename.
+ *
+ * Codex names rollouts `rollout-<timestamp>-<threadId>.jsonl`, where threadId
+ * is the session UUID (8-4-4-4-12) — e.g.
+ * `rollout-2026-06-09T01-47-53-019eaaec-4dfa-7ab1-90ba-9104d16534d1.jsonl`
+ * → `019eaaec-4dfa-7ab1-90ba-9104d16534d1`. Extract the trailing UUID;
+ * splitting on `-` and taking the last segment truncates the id to its final
+ * group, which breaks `codex exec resume <threadId>` and findRolloutPath.
  */
 export function extractThreadIdFromRollout(rolloutPath: string): string | null {
   const name = basename(rolloutPath, '.jsonl')
-  // Format: rollout-<uuid>-<threadId>
-  // UUID is 32 hex chars with optional dashes; threadId is everything after the last `-`
-  const parts = name.split('-')
-  if (parts.length < 3) return null
-  // The last segment is the threadId
-  return parts[parts.length - 1] ?? null
+  const m = name.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i)
+  return m ? m[1]! : null
+}
+
+/**
+ * Return the most-recently-modified rollout JSONL under <codexHomeDir>/sessions,
+ * or null. A per-conversation/-agent CODEX_HOME holds only that session's
+ * rollouts, so the newest one is its current thread. Used to resolve the
+ * transcript when no thread-id was persisted — the spawn-time capture is a
+ * one-shot window, but Codex only writes its rollout on the first turn.
+ */
+export function findLatestRollout(codexHomeDir: string): string | null {
+  const sessionsRoot = join(codexHomeDir, 'sessions')
+  const paths: string[] = []
+  const walk = (dir: string): void => {
+    let entries: string[]
+    try { entries = readdirSync(dir) } catch { return }
+    for (const entry of entries) {
+      const full = join(dir, entry)
+      let isDir = false
+      try { isDir = statSync(full).isDirectory() } catch { continue }
+      if (isDir) walk(full)
+      else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) paths.push(full)
+    }
+  }
+  walk(sessionsRoot)
+  let latest: string | null = null
+  let latestMtime = -1
+  for (const p of paths) {
+    try {
+      const m = statSync(p).mtimeMs
+      if (m > latestMtime) { latestMtime = m; latest = p }
+    } catch { /* skip unreadable */ }
+  }
+  return latest
 }
 
 // ─── Sync runtime ─────────────────────────────────────────────────────────────

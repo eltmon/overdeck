@@ -13,10 +13,20 @@ BYTES_PER_SECOND = SAMPLE_RATE * 2
 COMMIT_SILENCE_SECONDS = 0.45
 MIN_COMMIT_BYTES = BYTES_PER_SECOND // 2
 PARTIAL_INTERVAL_SECONDS = 0.5
-MAX_PARTIAL_WINDOW_BYTES = BYTES_PER_SECOND * 3
+MAX_PARTIAL_WINDOW_BYTES = BYTES_PER_SECOND * 10
 BROWSER_AUDIO_FRAME_SAMPLES = 4096
 MAX_QUEUE_AUDIO_SECONDS = 2
 MAX_AUDIO_QUEUE_ITEMS = max(1, int(MAX_QUEUE_AUDIO_SECONDS * SAMPLE_RATE / BROWSER_AUDIO_FRAME_SAMPLES))
+# A frame counts as speech when its RMS exceeds this level (float scale, 1.0 =
+# full scale). 0.008 ~= -42 dBFS: conversational speech on typical mics sits
+# around -30 to -20 dBFS while room noise stays below -50 dBFS. The browser
+# streams frames continuously even when nobody is talking, so commit-on-silence
+# must gate on speech energy, not on frame arrival.
+VOICE_RMS_THRESHOLD = 0.008
+# While no speech has been detected since the last commit, cap the buffer so an
+# open mic can't grow it without bound; keep a short pre-roll for utterance onset.
+MAX_SILENT_BUFFER_BYTES = BYTES_PER_SECOND * 4
+SILENT_BUFFER_KEEP_BYTES = BYTES_PER_SECOND * 2
 
 
 def emit(message):
@@ -74,47 +84,83 @@ def pcm16_to_float32(pcm_bytes):
     return np.frombuffer(pcm_bytes, dtype="<i2").astype("float32") / 32768.0
 
 
+def frame_rms(pcm_bytes):
+    import numpy as np
+
+    samples = pcm16_to_float32(pcm_bytes)
+    if samples.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(samples * samples)))
+
+
 def main():
     model_name = os.environ.get("MOONSHINE_MODEL", "moonshine/base")
     transcribe = load_model(model_name)
     audio_queue = queue.Queue(maxsize=MAX_AUDIO_QUEUE_ITEMS)
     stopped = threading.Event()
     buffer = bytearray()
-    last_audio_at = 0.0
+    has_voice = False
+    last_voice_at = 0.0
     last_partial = ""
     last_partial_at = 0.0
 
     def commit_buffer():
-        nonlocal last_partial
+        nonlocal has_voice, last_partial
         if not buffer:
             return
         pcm = bytes(buffer)
         buffer.clear()
-        if len(pcm) >= MIN_COMMIT_BYTES:
-            text = transcribe(pcm)
-            if text:
-                emit({"type": "transcript:committed", "text": text})
-                last_partial = ""
+        has_voice = False
+        text = transcribe(pcm) if len(pcm) >= MIN_COMMIT_BYTES else ""
+        if text:
+            emit({"type": "transcript:committed", "text": text})
+        elif last_partial:
+            # The buffer produced no committed text (e.g. a cough); clear the
+            # stale partial so it doesn't linger in the client preview.
+            emit({"type": "transcript:partial", "text": ""})
+        last_partial = ""
 
     def worker():
-        nonlocal last_audio_at, last_partial, last_partial_at
+        nonlocal has_voice, last_voice_at, last_partial, last_partial_at
         while not stopped.is_set():
             try:
-                chunk = audio_queue.get(timeout=0.05)
+                chunks = [audio_queue.get(timeout=0.05)]
             except queue.Empty:
-                if buffer and time.monotonic() - last_audio_at >= COMMIT_SILENCE_SECONDS:
+                if has_voice and time.monotonic() - last_voice_at >= COMMIT_SILENCE_SECONDS:
                     commit_buffer()
                 continue
-            if chunk is None:
+            # Drain everything queued while the previous transcription ran so a
+            # slow partial pass can never back the queue up into dropped audio.
+            while True:
+                try:
+                    chunks.append(audio_queue.get_nowait())
+                except queue.Empty:
+                    break
+            finalize = False
+            for chunk in chunks:
+                if chunk is None:
+                    finalize = True
+                    continue
+                buffer.extend(chunk)
+                if frame_rms(chunk) >= VOICE_RMS_THRESHOLD:
+                    has_voice = True
+                    last_voice_at = time.monotonic()
+            if finalize:
                 commit_buffer()
                 emit({"type": "transcript:finalized"})
                 continue
-            buffer.extend(chunk)
-            last_audio_at = time.monotonic()
-            if len(buffer) >= MIN_COMMIT_BYTES and last_audio_at - last_partial_at >= PARTIAL_INTERVAL_SECONDS:
+            now = time.monotonic()
+            if not has_voice:
+                if len(buffer) > MAX_SILENT_BUFFER_BYTES:
+                    del buffer[:-SILENT_BUFFER_KEEP_BYTES]
+                continue
+            if now - last_voice_at >= COMMIT_SILENCE_SECONDS:
+                commit_buffer()
+                continue
+            if len(buffer) >= MIN_COMMIT_BYTES and now - last_partial_at >= PARTIAL_INTERVAL_SECONDS:
                 partial_pcm = bytes(buffer[-MAX_PARTIAL_WINDOW_BYTES:])
                 text = transcribe(partial_pcm)
-                last_partial_at = last_audio_at
+                last_partial_at = now
                 if text and text != last_partial:
                     emit({"type": "transcript:partial", "text": text})
                     last_partial = text
@@ -129,7 +175,7 @@ def main():
             message_type = message.get("type")
             if message_type == "audio":
                 if message.get("encoding") != "pcm16le" or message.get("sampleRate") != SAMPLE_RATE:
-                    emit({"type": "error", "error": "expected pcm16le audio at 24000 Hz"})
+                    emit({"type": "error", "error": f"expected pcm16le audio at {SAMPLE_RATE} Hz"})
                     continue
                 try:
                     audio_queue.put(base64.b64decode(message.get("audio", "")), timeout=MAX_QUEUE_AUDIO_SECONDS)

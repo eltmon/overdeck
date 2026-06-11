@@ -64,7 +64,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
-    models: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -105,9 +105,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
-    models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
+    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
     haikuModel: 'minimax-m2.7-highspeed',
-    tierModels: { opus: 'minimax-m2.7', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
+    tierModels: { opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
     description: 'Route directly to MiniMax Anthropic-compatible endpoint using MINIMAX_API_KEY.',
   },
@@ -208,7 +208,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Anthropic models
-  if (['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
@@ -224,7 +224,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check MiniMax models
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(modelId)) {
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'].includes(modelId)) {
     return PROVIDERS.minimax;
   }
 

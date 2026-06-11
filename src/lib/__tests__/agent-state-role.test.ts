@@ -23,6 +23,11 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
+    vi.doUnmock('../agents.js');
+    vi.doUnmock('../cloister/agent-idle.js');
+    vi.doUnmock('../cloister/issue-closed.js');
+    vi.doUnmock('../cloister/specialists.js');
+    vi.doUnmock('../transcript-landing.js');
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
@@ -75,10 +80,11 @@ describe('AgentState role persistence', () => {
     expect(command).toContain('--effort low');
   });
 
-  it('preserves the flywheel singleton agent id during normalization', async () => {
+  it('preserves first-class runtime session ids during normalization', async () => {
     const { normalizeAgentId } = await import('../agents.js');
 
     expect(normalizeAgentId('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(normalizeAgentId('inspect-pan-1613-workspace-rn3ha')).toBe('inspect-pan-1613-workspace-rn3ha');
     expect(normalizeAgentId('PAN-1')).toBe('agent-pan-1');
   });
 
@@ -138,6 +144,96 @@ describe('AgentState role persistence', () => {
     expect(rawState.handoffCount).toBeUndefined();
     expect(rawState.agentPhase).toBeUndefined();
     expect(rawState.type).toBeUndefined();
+  });
+
+  it('persists lastResumeAt through normal state save and load', async () => {
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const lastResumeAt = '2026-06-10T00:01:00.000Z';
+
+    saveAgentStateSync({
+      id: 'agent-pan-resume-state',
+      issueId: 'PAN-1700',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt,
+    } as any);
+
+    expect(getAgentStateSync('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
+    const rawState = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-resume-state', 'state.json'), 'utf-8'));
+    expect(rawState.lastResumeAt).toBe(lastResumeAt);
+  });
+
+  it('lets the stalled-resume patrol observe a persisted lastResumeAt from disk', async () => {
+    const messageAgent = vi.fn(async () => undefined);
+    vi.doMock('../tmux.js', async () => ({
+      createSessionSync: vi.fn(),
+      createSession: vi.fn(() => Effect.void),
+      killSessionSync: vi.fn(),
+      killSession: vi.fn(() => Effect.void),
+      sendKeys: vi.fn(() => Effect.void),
+      sendKeysProgram: vi.fn(() => Effect.void),
+      sendRawKeystroke: vi.fn(() => Effect.void),
+      sessionExistsSync: vi.fn(() => true),
+      sessionExists: vi.fn(() => Effect.succeed(true)),
+      listSessions: vi.fn(() => Effect.succeed([])),
+      listSessionsSync: vi.fn(() => []),
+      listSessionNames: vi.fn(() => Effect.succeed([])),
+      capturePaneSync: vi.fn(() => ''),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValuesSync: vi.fn(() => []),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      setOption: vi.fn(() => Effect.void),
+      buildTmuxCommandString: vi.fn(() => 'tmux'),
+      isPaneDead: vi.fn(() => false),
+    }));
+    vi.doMock('../cloister/agent-idle.js', () => ({
+      isAgentIdleForNudge: vi.fn(() => true),
+    }));
+    vi.doMock('../cloister/issue-closed.js', () => ({
+      isIssueClosed: vi.fn(async () => false),
+    }));
+    vi.doMock('../cloister/specialists.js', () => ({
+      getTmuxSessionName: vi.fn(),
+      isRunning: vi.fn(async () => false),
+      getAllProjectSpecialistStatuses: vi.fn(() => []),
+    }));
+    vi.doMock('../transcript-landing.js', () => ({
+      captureTranscriptUserRecordSnapshot: vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 })),
+    }));
+    vi.doMock('../agents.js', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../agents.js')>()),
+      messageAgent,
+    }));
+
+    const { saveAgentStateSync, getAgentStateSync } = await import('../agents.js');
+    const { nudgeStalledResumeWorkAgents } = await import('../cloister/deacon.js');
+    const lastResumeAt = '2026-06-10T00:01:00.000Z';
+
+    saveAgentStateSync({
+      id: 'agent-pan-resume-persist',
+      issueId: 'PAN-1700',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      sessionId: 'session-1',
+      lastResumeAt,
+    } as any);
+
+    expect(getAgentStateSync('agent-pan-resume-persist')?.lastResumeAt).toBe(lastResumeAt);
+    await expect(nudgeStalledResumeWorkAgents()).resolves.toEqual([
+      'Re-sent stalled resume prompt to agent-pan-resume-persist (PAN-1700)',
+    ]);
+    expect(messageAgent).toHaveBeenCalledWith(
+      'agent-pan-resume-persist',
+      expect.stringContaining('You are resuming work on PAN-1700'),
+    );
   });
 
   it('accepts flywheel role in persisted state.json', async () => {

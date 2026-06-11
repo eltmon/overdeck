@@ -121,7 +121,7 @@ export interface ClaudeUserSettings {
  * - mode === 'auto'   → `defaultMode: 'default'` (Claude's classifier runs;
  *                       destructive ops still prompt for permission).
  * - mode === 'bypass' → `defaultMode: 'bypassPermissions'` (matches the
- *                       --dangerously-skip-permissions CLI flag).
+ *                       `--permission-mode bypassPermissions` spawn flag).
  *
  * Pass an explicit `mode` when provisioning a remote host so the resolved
  * mode at provision time is captured deterministically. With no argument,

@@ -4,17 +4,17 @@
     "created": "2026-06-07T03:07:29Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1580: Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "updated": "2026-06-07T05:07:24.059Z"
+    "updated": "2026-06-11T05:53:49.528Z"
   },
   "plan": {
     "id": "pan-1580",
     "title": "Dashboard shows a blank page on server restart instead of waiting for reconnect",
-    "status": "proposed",
+    "status": "completed",
     "uid": "e05658d9-aea0-49e8-8c58-3af56a8a819f",
     "author": "agent:claude-opus-4-8",
-    "sequence": 59,
+    "sequence": 60,
     "created": "2026-06-07T03:07:29Z",
-    "updated": "2026-06-07T05:07:24.059Z",
+    "updated": "2026-06-11T05:53:49.528Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1580",
@@ -509,5 +509,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -360,6 +360,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   deaconIgnored: Schema.optional(Schema.Boolean),
   deaconIgnoredAt: Schema.optional(Schema.String),
   deaconIgnoredReason: Schema.optional(Schema.String),
+  /** PAN-1691: per-issue auto-merge routing key. undefined = project default, true = auto-merge (fast lane), false = hold for UAT. */
+  autoMerge: Schema.optional(Schema.Boolean),
   /** Active review orchestrator tmux session name (e.g. agent-pan-540-review). */
   reviewCoordinatorSessionName: Schema.optional(Schema.String),
   /** Active review sub-role tmux session names (e.g. agent-pan-540-review-correctness). Discovered at emission time. */

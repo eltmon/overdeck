@@ -161,7 +161,7 @@ export function embedVoyage(opts: EmbedOptions): Effect.Effect<EmbeddingResult, 
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
-const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|::1)(:\d+)?\/?$/;
+const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
 
 export function embedOllama(opts: EmbedOptions): Effect.Effect<EmbeddingResult, ConfigError | EmbedHttpError> {
   return Effect.gen(function* () {

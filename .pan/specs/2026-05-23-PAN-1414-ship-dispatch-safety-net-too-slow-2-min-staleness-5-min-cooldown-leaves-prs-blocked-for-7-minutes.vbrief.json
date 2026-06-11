@@ -4,17 +4,17 @@
     "created": "2026-05-23T11:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1414: Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
-    "updated": "2026-05-23T18:05:09.481Z"
+    "updated": "2026-06-11T05:53:08.200Z"
   },
   "plan": {
     "id": "pan-1414",
     "title": "Ship-dispatch safety net too slow: 2-min staleness + 5-min cooldown leaves PRs blocked for 7+ minutes",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7c2f1a3d-9b8e-4f6a-b1c5-2d3e4f5a6b7c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-23T11:25:00.000Z",
-    "updated": "2026-05-23T18:05:09.481Z",
+    "updated": "2026-06-11T05:53:08.200Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1414",
@@ -250,5 +250,5 @@
       "canonicalFilename": "2026-05-23-PAN-1414-ship-dispatch-safety-net-too-slow-2-min-staleness-5-min-cooldown-leaves-prs-blocked-for-7-minutes.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

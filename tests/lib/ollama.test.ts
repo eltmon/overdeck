@@ -49,6 +49,7 @@ describe('ollama lifecycle', () => {
   it('resolves the default localhost base URL and validates configured localhost URLs', () => {
     expect(resolveOllamaBaseUrl()).toBe(OLLAMA_BASE_URL);
     expect(resolveOllamaBaseUrl({ models: { providers: { ollama: { base_url: 'http://127.0.0.1:11434/' } } } })).toBe('http://127.0.0.1:11434');
+    expect(resolveOllamaBaseUrl({ models: { providers: { ollama: { base_url: 'http://[::1]:11434/' } } } })).toBe('http://[::1]:11434');
     expect(resolveOllamaBaseUrl({ models: { providers: { ollama: true } } })).toBe(OLLAMA_BASE_URL);
   });
 

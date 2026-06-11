@@ -184,8 +184,10 @@ export function registerWorkspaceCommands(program: Command): void {
 
   workspace
     .command('migrate <issueId>')
-    .description('Migrate workspace between local and remote')
-    .option('--to <location>', 'Target location: "remote" or "local"')
+    .description('Migrate workspace between local and remote (stops+pauses the local agent, commits and pushes all work first)')
+    .option('--to <location>', 'Target location: "remote" or "local" (default: auto-detect from current location)')
+    .option('--keep', 'Keep the source workspace after migration')
+    .option('--force', 'Overwrite an existing destination workspace / ignore branch-drift guard')
     .action(migrateCommand);
 
   workspace
@@ -1284,54 +1286,22 @@ with open(path, "w") as f:
  */
 interface MigrateOptions {
   to?: 'local' | 'remote';
+  keep?: boolean;
+  force?: boolean;
 }
 
 async function migrateCommand(issueId: string, options: MigrateOptions): Promise<void> {
-  const spinner = ora('Migrating workspace...').start();
-
-  if (!options.to) {
-    spinner.fail('Must specify target location: --to remote or --to local');
+  if (options.to && options.to !== 'remote' && options.to !== 'local') {
+    console.error(chalk.red('Invalid --to value. Use "remote" or "local".'));
     process.exit(1);
   }
-
-  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadata = loadWorkspaceMetadataSync(normalizedId);
-
-  if (options.to === 'remote') {
-    if (metadata?.location === 'remote') {
-      spinner.info('Workspace is already remote');
-      return;
-    }
-
-    // Persist beads before migrating
-    spinner.text = 'Persisting beads...';
-    try {
-      await execAsync('bd dolt commit -m "Sync beads before migration"', { encoding: 'utf-8' });
-      await execAsync('git add .beads/ && git commit -m "Sync beads before migration" && git push', { encoding: 'utf-8' });
-    } catch {
-      // Non-fatal - beads persistence might not be needed
-    }
-
-    // Create remote workspace
-    const branchName = `feature/${normalizedId}`;
-    await createRemoteWorkspace(issueId, normalizedId, branchName, spinner, {});
-
-    spinner.succeed('Migrated to remote!');
-    console.log('');
-    console.log(chalk.dim('Local workspace remains unchanged. Delete it manually if no longer needed.'));
-
-  } else if (options.to === 'local') {
-    if (!metadata || metadata.location !== 'remote') {
-      spinner.info('Workspace is already local (or not found)');
-      return;
-    }
-
-    spinner.text = 'Migration to local not yet implemented';
-    spinner.warn('Migration from remote to local coming soon');
-    console.log('');
-    console.log(chalk.dim('For now, create a local workspace manually:'));
-    console.log(chalk.dim(`  pan workspace create ${issueId} --local`));
-  }
+  const { migrateWorkspace } = await import('./workspace-migrate.js');
+  await migrateWorkspace(issueId, {
+    toRemote: options.to === 'remote',
+    toLocal: options.to === 'local',
+    keep: options.keep,
+    force: options.force,
+  });
 }
 
 /**

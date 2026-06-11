@@ -1,0 +1,131 @@
+{
+  "version": "1",
+  "issueId": "PAN-1658",
+  "created": "2026-06-09T23:10:17.751Z",
+  "updated": "2026-06-10T07:33:35.400Z",
+  "gitState": {
+    "branch": "feature/pan-1658",
+    "sha": "78db92a4d",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Fix via a deacon reconciler (issue Option 1), not a triggerMerge-gate change (Option 2) or test-role re-dispatch (Option 3). Reconciling the root testStatus makes readyForMerge re-derive true consistently across the dashboard, auto-merge, merge-train, and triggerMerge — whereas Option 2 patches only the merge entry gate and leaves the derived readyForMerge=false everywhere else (UI still shows 'stuck'), and Option 3 re-runs the heavy, slow, gpt-5.5-wedge-prone review+test convoy the issue explicitly wants to avoid.",
+      "recordedAt": "2026-06-09T23:14:19.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "\"Green CI on the current HEAD\" MUST be determined from GitHub Actions check-runs (the vitest+playwright suite), NOT from the self-reported panopticon/* commit-statuses. After a rebase the panopticon/test status is exactly the thing that is stuck/absent, so gating on it is circular and the reconciler would never fire. The greenness signal must: require at least one successful CI check-run, treat any pending/incomplete check-run as 'not yet green' (skip, re-check next patrol), and treat any failed check-run as 'do not mark passed'.",
+      "recordedAt": "2026-06-09T23:14:19.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Reconciler is unconditional / default-on, matching the sibling reconcilers (reconcileMergedButReviewing, reconcileClosedPrReadyForMerge). No new config flag. Premature testStatus=passed cannot cause a bad merge because triggerMerge Step 3 (runVerificationForIssue('merge-verify')) re-runs the full typecheck/lint/test suite on the rebased branch and aborts on failure — that remains the authoritative quality gate. Operators can still suppress via the existing global deacon freeze.",
+      "recordedAt": "2026-06-09T23:14:19.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Candidate predicate for reconciliation: reviewStatus === 'passed' AND testStatus === 'pending' (exactly — never 'testing'/'failed'/'passed'/'skipped') AND mergeStatus is non-terminal (pending/undefined/null, never 'merged'/'merging'/'queued'/'verifying') AND a parseable GitHub PR URL exists. The reconciler touches ONLY testStatus (+ testNotes); it never modifies uatStatus, verificationStatus, reviewStatus, or readyForMerge directly — readyForMerge re-derives itself from the gate state. UAT and verification gates therefore remain authoritative.",
+      "recordedAt": "2026-06-09T23:14:19.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Reuse the existing GitHub primitive path (getPullRequestState → headSha) used by reconcileClosedPrReadyForMerge for the current HEAD, and add a check-runs-focused greenness helper rather than relying on getPullRequestState().checksPending/checksFailed (those fold in the combined commit-status /status endpoint, which the absent/stuck panopticon/* statuses contaminate). Guard the whole reconciler on isGitHubAppConfigured(); per-issue throttle map on pending-CI and API-error outcomes to protect the GitHub rate budget; emit an activity action string per reconciled issue, mirroring the sibling reconcilers.",
+      "recordedAt": "2026-06-09T23:14:19.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Circular CI signal: the combined commit-status endpoint (/repos/.../commits/{sha}/status) aggregates the self-reported panopticon/review and panopticon/test contexts. After a rebase those are absent on the new SHA, and GitHub returns combined state='pending' for a commit with zero (or only-pending) statuses. getPullRequestState().checksPending folds that in, so naively reusing it would make checksPending permanently true and the reconciler would never fire — failing to fix the bug.",
+      "mitigation": "Drive greenness from the check-runs endpoint (/check-runs) only, ignoring panopticon/* commit-statuses. Require ≥1 successful CI check-run and zero pending/failed check-runs. The work agent should empirically confirm the combined-status-empty behavior on a real rebased PR before finalizing the predicate."
+    },
+    {
+      "id": "H2",
+      "summary": "Never mask a red build. If the reconciler marked testStatus=passed while CI is actually failing or still running, it would let a broken PR be queued for merge.",
+      "mitigation": "Mark passed ONLY when CI check-runs are complete AND all-successful AND none failed. Any pending check → skip (re-check next patrol). Any failed check → leave testStatus untouched (the failure/merge-verify paths own that case). triggerMerge Step 3 is the backstop, but the reconciler must not rely on it as an excuse to mark passed on red."
+    },
+    {
+      "id": "H3",
+      "summary": "Stale SHA: checking CI against a cached or pre-rebase SHA could mark passed based on the wrong commit's CI.",
+      "mitigation": "Always resolve the CURRENT PR HEAD (getPullRequestState().headSha or gh pr view --json headRefOid) at reconcile time and evaluate check-runs against that exact SHA. Cite the SHA + CI run in testNotes for audit."
+    },
+    {
+      "id": "H4",
+      "summary": "Race with an in-flight rebase or a legitimately running test role. The HEAD SHA is moving during a rebase, and the test role may be mid-flight.",
+      "mitigation": "Candidate filter requires testStatus==='pending' exactly (excludes 'testing', so a running test role is never disturbed) and mergeStatus non-terminal (excludes mid-merge). Re-resolving HEAD each patrol + the per-issue throttle means a transient mid-rebase read self-corrects on the next tick."
+    },
+    {
+      "id": "H5",
+      "summary": "GitHub API rate budget: this reconciler adds a per-candidate PR/check-runs lookup every patrol cycle.",
+      "mitigation": "Guard on isGitHubAppConfigured(); maintain a per-issue cooldown map (set on pending-CI and on API error, e.g. a few minutes) exactly like reconcileClosedPrReadyForMerge's closedPrReadyReconcileCooldowns, so transient failures don't burn the budget re-polling the same issues each tick."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session for PAN-1658 (orchestration context elided in resume — see original entry). Root cause: setReviewStatusSync dispatches review→test only on the reviewStatus pending→passed transition (review-status.ts:415-433); after a rebase the status is already 'passed' so no transition fires, testStatus stays 'pending', readyForMerge derives false (review-status.ts:259-272), and triggerMerge blocks (workspaces.ts:4673-4683). Fix = a default-on deacon reconciler modeled on reconcileClosedPrReadyForMerge (deacon.ts:3333) that, for reviewStatus=passed && testStatus=pending issues with green GitHub Actions CI check-runs on the current PR HEAD, sets testStatus=passed citing the CI run.",
+      "note": "Planning session started for PAN-1658: bug(pipeline): testStatus stuck 'pending' after rebase/force-push despite green CI — blocks merge, no reconciler",
+      "timestamp": "2026-06-09T23:10:17.751Z"
+    },
+    {
+      "timestamp": "2026-06-09T23:14:19.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete: 3 beads (CI-greenness helper → reconciler+wiring → unit tests). Approach = Option 1 (deacon reconciler). Ready for pan plan finalize.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-09T23:58Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-09T23:58:58.631Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T00:00Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T00:00:57.470Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T00:07Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-10T00:07:54.416Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T00:09Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-10T00:09:45.909Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T00:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T00:24:37.466Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T00:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T00:40:14.760Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T07:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T07:33:34.286Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T07:33:35.400Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-10T07:33:34Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1658\n\n# Review Synthesis — PAN-1658 — 2026-06-10T07:32:37Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/context.json\n- Branch: feature/pan-1658\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658\n- HEAD reviewed: ba5342cdbc0efd37d7532433cd81b6de979a903d\n- PR merge-base: 2d42bf49f77791df5d48158fa3564b88eee6a37c\n- PR commit count: 12\n- Cycle number: 2\n- Prior cycle SHA: 72f497cda7e0f89edfd9044f0c0905708ec1c447\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Green-CI reconciliation can emit shipping before stale-review detection runs — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960`\nThe new patrol step runs `reconcileTestStatusFromGreenCi()` at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960-4965`, before the existing stale-review guard `checkPostReviewCommits()` runs at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:5008-5010`. The reconciler can write `testStatus: 'passed'` at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/test-status-green-ci-reconciler.ts:90-93`, which derives `readyForMerge` and emits the `test.passed` lifecycle event. Reactive scheduling can then dispatch shipping for an unreviewed post-review commit before stale-review detection resets the issue later in the same patrol.\n\nScope gate: this finding is inside the PR diff. The targeted PR diff adds `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960-4966`; the cycle diff since prior review SHA `72f497cda7e0f89edfd9044f0c0905708ec1c447` also moves this patrol block into the pre-stale-review position. Cycle number is 2, so the cycle-3 convergence gate does not apply.\n\nRequired fix: run `checkPostReviewCommits()` before `reconcileTestStatusFromGreenCi()` and before pending-test dispatch, or make the green-CI reconciler prove the current PR HEAD is still the reviewed tree (for example by exact `reviewedAtCommit` match or the same tree-equivalence check used by `checkPostReviewCommits()`) before writing `testStatus: 'passed'`.\n\n## Non-blocking Findings\n\n### [correctness] Reconciler does not re-check candidate state after async GitHub lookups — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/test-status-green-ci-reconciler.ts:60`\nThe reconciler reads candidate state once, awaits PR and CI API calls, then writes `testStatus: 'passed'` without re-reading the issue row. A concurrent lifecycle path could move the issue from `testStatus='pending'` to `testStatus='testing'` while those requests are in flight, allowing the stale snapshot to overwrite an active test run. Consider re-reading status or using compare-and-set immediately before writing.\n\n### [performance] Duplicate GitHub status/check-run lookups in the new patrol reconciler — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:3395`\nThe reconciler uses `getPullRequestState()` to learn PR state/head SHA, but that helper also computes full legacy commit state by fetching both `/status` and `/check-runs`; the new reconciler then calls `getCiCheckRunsState()` and fetches check-runs again for the same head SHA. This is avoidable daemon-path API work. A lightweight PR-head helper would preserve existing callers while letting this path fetch the check-runs-only verdict once.\n\n### [requirements] Changed files outside the stated PAN-1658 requirements\nThe requirements reviewer found full in-scope coverage for the CI greenness helper and testStatus reconciler requirements, but noted that `.panopticon/projects.yaml`, `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/dashboard/server/routes/__tests__/conversation-compaction.test.ts`, and `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/__tests__/config-yaml-conversation-search.test.ts` are not mapped to the stated requirements. This is non-blocking for requirements coverage but should remain intentional.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1658 -m \"Fixed review issues\"`"
+    }
+  ]
+}

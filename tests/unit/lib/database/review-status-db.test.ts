@@ -33,6 +33,7 @@ import {
   deleteReviewStatus,
   getReviewStatusFromDbSync,
   getAllReviewStatusesFromDb,
+  setAutoMerge,
 } from '../../../../src/lib/database/review-status-db.js';
 
 // ============== Helpers ==============
@@ -66,6 +67,43 @@ describe('upsertReviewStatus', () => {
     const row = testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get('PAN-U-2') as any;
     expect(row.review_status).toBe('passed');
     expect(row.ready_for_merge).toBe(1);
+  });
+
+  // PAN-1691: per-issue auto-merge routing key is a tri-state (undefined/true/false).
+  it('round-trips autoMerge: undefined → NULL → undefined', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-1' }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-1') as any;
+    expect(row.auto_merge).toBeNull();
+    expect(getReviewStatusFromDbSync('PAN-AM-1')?.autoMerge).toBeUndefined();
+  });
+
+  it('round-trips autoMerge: true → 1 → true', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-2', autoMerge: true }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-2') as any;
+    expect(row.auto_merge).toBe(1);
+    expect(getReviewStatusFromDbSync('PAN-AM-2')?.autoMerge).toBe(true);
+  });
+
+  it('round-trips autoMerge: false → 0 → false', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-3', autoMerge: false }));
+    const row = testDb.prepare('SELECT auto_merge FROM review_status WHERE issue_id = ?').get('PAN-AM-3') as any;
+    expect(row.auto_merge).toBe(0);
+    expect(getReviewStatusFromDbSync('PAN-AM-3')?.autoMerge).toBe(false);
+  });
+
+  it('flips autoMerge on conflict update', () => {
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: false }));
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-4', autoMerge: true }));
+    expect(getReviewStatusFromDbSync('PAN-AM-4')?.autoMerge).toBe(true);
+  });
+
+  it('setAutoMerge sets/clears the tri-state flag and creates a row if absent', () => {
+    setAutoMerge('PAN-SAM-1', true);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBe(true);
+    setAutoMerge('PAN-SAM-1', false);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBe(false);
+    setAutoMerge('PAN-SAM-1', null);
+    expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBeUndefined();
   });
 
   it('stores history entries', () => {

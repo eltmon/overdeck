@@ -62,6 +62,10 @@ vi.mock('../test-agent-queue.js', () => ({
   dispatchTestAgentAndNotify: vi.fn(async () => undefined),
 }));
 
+vi.mock('../issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
@@ -124,6 +128,8 @@ import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState } fro
 import { sessionExists, killSession } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
+import { isIssueClosed } from '../issue-closed.js';
+import { getReviewStatusSync } from '../../review-status.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -140,6 +146,8 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(getAgentState).mockResolvedValue(null);
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
+    vi.mocked(isIssueClosed).mockResolvedValue(false);
+    vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
     mockHeadSha = 'newhead1';
   });
 
@@ -148,7 +156,7 @@ describe('reactive Cloister scheduler', () => {
     expect(stateToRole('in_progress')).toBe('work');
     expect(stateToRole('in_review')).toBe('review');
     expect(stateToRole('testing')).toBe('test');
-    expect(stateToRole('shipping')).toBe('ship');
+    expect(stateToRole('shipping')).toBeNull();
     expect(stateToRole('closed')).toBeNull();
     expect(stateToRole('canceled')).toBeNull();
   });
@@ -163,6 +171,57 @@ describe('reactive Cloister scheduler', () => {
       branch: 'feature/pan-503',
     }));
     expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'in_review',
+    'testing',
+  ] as const)('skips %s dispatch when the issue is closed', async (state) => {
+    vi.mocked(isIssueClosed).mockResolvedValue(true);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+
+    expect(isIssueClosed).toHaveBeenCalledWith('PAN-503');
+    expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(listRunningAgents).not.toHaveBeenCalled();
+    expect(getAgentState).not.toHaveBeenCalled();
+    expect(sessionExists).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'in_review',
+    'testing',
+  ] as const)('skips %s dispatch when the merge already landed (PAN-1746)', async (state) => {
+    // Boot reconciliation replays state-change events on restart; a long-merged
+    // issue still carrying its lifecycle state must NOT re-dispatch an advancing
+    // role. mergeStatus='merged' is the same terminal signal a closed issue is.
+    vi.mocked(getReviewStatusSync).mockReturnValue({ mergeStatus: 'merged' } as any);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', state));
+
+    expect(getReviewStatusSync).toHaveBeenCalledWith('PAN-503');
+    expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch a role for the shipping state', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
+
+    expect(logSpy).toHaveBeenCalledWith("[cloister] PAN-503: no role for issue state 'shipping'");
+    expect(isIssueClosed).not.toHaveBeenCalled();
+    expect(getReviewStatusSync).not.toHaveBeenCalled();
+    expect(listRunningAgents).not.toHaveBeenCalled();
+    expect(sessionExists).not.toHaveBeenCalled();
+    expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+
+    logSpy.mockRestore();
   });
 
   it('skips spawning when an active run already exists for the issue and role', async () => {
@@ -210,13 +269,13 @@ describe('reactive Cloister scheduler', () => {
     })).toEqual({ issueId: 'PAN-503', state: 'shipping' });
   });
 
-  it('reacts to work, review, and test completion events by routing each role through its dispatcher', async () => {
+  it('reacts to work, review, and test completion events by routing only spawned roles through dispatchers', async () => {
     await Effect.runPromise(handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } }));
     await Effect.runPromise(handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } }));
     await Effect.runPromise(handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } }));
 
-    // PAN-1048 review feedback 003: review/test go through dedicated wrappers,
-    // ship still uses bare spawnRun().
+    // PAN-1048 review feedback 003: review/test go through dedicated wrappers.
+    // Shipping remains a lifecycle state, but no longer maps to a spawned role.
     expect(spawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
     expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-503',
@@ -228,8 +287,7 @@ describe('reactive Cloister scheduler', () => {
       expect.any(String),
       'feature/pan-503',
     );
-    expect(spawnRun).toHaveBeenCalledTimes(1);
-    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'ship', expect.any(Object));
+    expect(spawnRun).not.toHaveBeenCalled();
   });
 
   it('ignores agent.completed events for non-work roles so review/test cycles do not loop', () => {
@@ -256,45 +314,5 @@ describe('reactive Cloister scheduler', () => {
       type: 'agent.completed',
       payload: { issueId: 'PAN-503' },
     })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
-  });
-
-  it('treats a ship session as still-active when its roleRunHead matches the workspace HEAD', async () => {
-    // A genuinely in-flight ship run: state.json HEAD marker == current HEAD.
-    // The scheduler must NOT re-dispatch — that would double-spawn ship.
-    vi.mocked(getAgentState).mockImplementation(async (id: string) => {
-      if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
-      if (id === 'agent-pan-503-ship') {
-        return { role: 'ship', status: 'running', roleRunHead: 'samehead', workspace: '/tmp/ws' } as any;
-      }
-      return null;
-    });
-    mockHeadSha = 'samehead';
-
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
-
-    expect(spawnRun).not.toHaveBeenCalled();
-    expect(killSession).not.toHaveBeenCalled();
-  });
-
-  it('re-dispatches ship when the existing ship session is a stale zombie (HEAD moved past roleRunHead)', async () => {
-    // The ship-stall bug: an agent finished work but never exited, leaving
-    // state.json status:'running' forever. Once the workspace HEAD advances
-    // past the run's roleRunHead marker, that session is stale — the scheduler
-    // must kill it and dispatch a fresh ship run for the new HEAD.
-    vi.mocked(getAgentState).mockImplementation(async (id: string) => {
-      if (id === 'agent-pan-503') return { workspace: '/tmp/ws' } as any;
-      if (id === 'agent-pan-503-ship') {
-        return { role: 'ship', status: 'running', roleRunHead: 'oldhead0', workspace: '/tmp/ws' } as any;
-      }
-      return null;
-    });
-    // Zombie tmux session still physically present.
-    vi.mocked(sessionExists).mockResolvedValue(true);
-    mockHeadSha = 'newhead1';
-
-    await Effect.runPromise(onIssueStateChange('PAN-503', 'shipping'));
-
-    expect(killSession).toHaveBeenCalledWith('agent-pan-503-ship');
-    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'ship', expect.any(Object));
   });
 });

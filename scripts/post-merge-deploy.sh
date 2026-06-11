@@ -48,13 +48,60 @@ log "Repo root: $REPO_ROOT"
 
 cd "$REPO_ROOT"
 
-# --- Step 1: Build ---
-log "Building project (npm run build)..."
-if ! npm run build >> "$LOG_FILE" 2>&1; then
-  log "ERROR: Build failed. Server stays on old code."
+# --- Step 1: Build from a pristine origin/main worktree (PAN-1723) ---
+# The primary worktree at REPO_ROOT is shared with conversation agents that may
+# have unpushed commits or a dirty tree, so it is routinely diverged from
+# origin/main at merge time. Building it directly deploys a server that is
+# MISSING the just-merged change while reporting success ("landed != live").
+#
+# Instead, fetch origin/main, build in a throwaway detached worktree checked out
+# at exactly the merged sha, then swap the built dist/ into REPO_ROOT. This both
+# guarantees the merged sha is built and removes all contention with conv agents
+# on the primary worktree (no pull, dirty tree irrelevant).
+BUILD_WT=""
+cleanup_build_wt() {
+  if [[ -n "$BUILD_WT" && -d "$BUILD_WT" ]]; then
+    git -C "$REPO_ROOT" worktree remove --force "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
+    rm -rf "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
+  fi
+  rm -rf "$REPO_ROOT/dist.incoming" >> "$LOG_FILE" 2>&1 || true
+}
+trap cleanup_build_wt EXIT
+
+log "Fetching origin/main..."
+if ! git -C "$REPO_ROOT" fetch origin main >> "$LOG_FILE" 2>&1; then
+  log "ERROR: git fetch origin main failed. Server stays on old code."
   exit 1
 fi
-log "Build complete."
+
+# Sibling of REPO_ROOT to guarantee the same filesystem (fast hardlinked
+# bun install + atomic dist rename below).
+BUILD_WT="$(dirname "$REPO_ROOT")/.pan-deploy-build-$$"
+log "Creating pristine build worktree at origin/main: $BUILD_WT"
+if ! git -C "$REPO_ROOT" worktree add --detach "$BUILD_WT" origin/main >> "$LOG_FILE" 2>&1; then
+  log "ERROR: git worktree add failed. Server stays on old code."
+  exit 1
+fi
+
+BUILT_SHA="$(git -C "$BUILD_WT" rev-parse HEAD)"
+log "Building project (npm run build) from sha=$BUILT_SHA ..."
+
+BUN="$(command -v bun || echo "$HOME/.bun/bin/bun")"
+if ! ( cd "$BUILD_WT" && "$BUN" install && npm run build ) >> "$LOG_FILE" 2>&1; then
+  log "ERROR: Build failed in pristine worktree. Server stays on old code."
+  exit 1
+fi
+
+# Stage the freshly built dist into REPO_ROOT (same filesystem) so the final
+# swap before restart is a near-atomic directory rename.
+rm -rf "$REPO_ROOT/dist.incoming"
+cp -a "$BUILD_WT/dist" "$REPO_ROOT/dist.incoming"
+
+# Worktree no longer needed once dist is staged — remove it now.
+git -C "$REPO_ROOT" worktree remove --force "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
+rm -rf "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
+BUILD_WT=""
+log "Build complete. Built sha=$BUILT_SHA staged at dist.incoming."
 
 # --- Step 2: Link (makes 'panopticon' CLI available globally) ---
 log "Running npm link..."
@@ -74,14 +121,33 @@ cat > "$RESTART_MARKER" << EOF
 EOF
 log "Restart marker written: $RESTART_MARKER"
 
-# --- Step 4: Kill old server ---
+# --- Step 4: Swap in the freshly built dist (PAN-1723) ---
+# Near-atomic directory rename (same filesystem). The old server still has its
+# loaded modules in memory and any open file descriptors stay valid; the new
+# server below boots from the fresh dist.
+log "Swapping in freshly built dist (sha=$BUILT_SHA)..."
+rm -rf "$REPO_ROOT/dist.old.$$"
+mv "$REPO_ROOT/dist" "$REPO_ROOT/dist.old.$$" 2>/dev/null || true
+mv "$REPO_ROOT/dist.incoming" "$REPO_ROOT/dist"
+rm -rf "$REPO_ROOT/dist.old.$$" >> "$LOG_FILE" 2>&1 || true
+
+# --- Step 5: Kill old server ---
 log "Stopping old server processes..."
 for port in 3010 3011 3012; do
   fuser -k "${port}/tcp" >> "$LOG_FILE" 2>&1 || true
 done
 
-# Also kill any orphaned dashboard processes
-pkill -f "node.*dist/dashboard/server" >> "$LOG_FILE" 2>&1 || true
+# Also kill any orphaned dashboard processes — host-side only (PAN-1763).
+# Workspace/UAT stack `server` containers run the same `node dist/dashboard/server.js`
+# cmdline and ARE visible to host pkill (containers share the host kernel); a bare
+# pattern kill SIGTERMed every stack's server container on every deploy, flipping
+# stacks unhealthy and tripping the spawn gate. Skip PIDs in container cgroups.
+for pid in $(pgrep -f "node.*dist/dashboard/server" 2>/dev/null || true); do
+  if grep -qE 'docker|containerd|libpod' "/proc/$pid/cgroup" 2>/dev/null; then
+    continue # in-container workspace/UAT server — not ours to kill
+  fi
+  kill "$pid" >> "$LOG_FILE" 2>&1 || true
+done
 pkill -f "bun.*src/dashboard/server/main" >> "$LOG_FILE" 2>&1 || true
 pkill -f "vite.*301" >> "$LOG_FILE" 2>&1 || true
 
@@ -94,12 +160,12 @@ if lsof -i :3010,:3011,:3012 > /dev/null 2>&1; then
   sleep 1
 fi
 
-# --- Step 5: Start new server ---
+# --- Step 6: Start new server ---
 log "Starting new server..."
 NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
 setsid "$NODE" dist/dashboard/server.js >> "$LOG_FILE" 2>&1 &
 
-# --- Step 6: Health check ---
+# --- Step 7: Health check ---
 log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
 for i in $(seq 1 "$HEALTH_TIMEOUT"); do
   if curl -s --max-time 2 "$HEALTH_URL" > /dev/null 2>&1; then
@@ -109,7 +175,7 @@ for i in $(seq 1 "$HEALTH_TIMEOUT"); do
     # and then deletes the pending file itself. Do NOT delete it here.
     rm -f "$RESTART_MARKER" || true
     log "Cleared restart marker. New server will process pending lifecycle and emit lifecycle_complete."
-    log "Post-merge deploy complete for issue=$ISSUE_ID."
+    log "Post-merge deploy complete for issue=$ISSUE_ID built_sha=$BUILT_SHA."
     exit 0
   fi
   sleep 1

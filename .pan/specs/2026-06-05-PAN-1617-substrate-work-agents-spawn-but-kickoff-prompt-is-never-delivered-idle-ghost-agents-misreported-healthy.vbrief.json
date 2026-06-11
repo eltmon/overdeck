@@ -3,18 +3,18 @@
     "version": "0.5",
     "created": "2026-06-05T18:57:44.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1617: Substrate: work agents spawn but kickoff prompt is never delivered \u2014 idle 'ghost' agents at the launch screen, misreported healthy",
-    "updated": "2026-06-07T04:27:01.020Z"
+    "description": "Plan for PAN-1617: Substrate: work agents spawn but kickoff prompt is never delivered — idle 'ghost' agents at the launch screen, misreported healthy",
+    "updated": "2026-06-11T05:54:05.590Z"
   },
   "plan": {
     "id": "pan-1617",
-    "title": "Substrate: work agents spawn but kickoff prompt is never delivered \u2014 idle 'ghost' agents, misreported healthy",
-    "status": "running",
+    "title": "Substrate: work agents spawn but kickoff prompt is never delivered — idle 'ghost' agents, misreported healthy",
+    "status": "completed",
     "uid": "b1ba5134-1861-4179-9b08-bff65a545378",
     "author": "agent:claude-opus-4-8",
-    "sequence": 71,
+    "sequence": 72,
     "created": "2026-06-05T18:57:44.000Z",
-    "updated": "2026-06-07T04:27:01.020Z",
+    "updated": "2026-06-11T05:54:05.590Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1617",
@@ -30,7 +30,7 @@
       "reliability"
     ],
     "narratives": {
-      "Problem": "A work agent can spawn (tmux up, Claude running, state status=running role=work) but never receive its kickoff/work prompt, sitting at the pristine launch screen forever. Spawn delivery is fire-and-forget: when waitForReadySignal returns false the code only console.errors then markAgentRunning anyway, and deliverAgentMessage returns void and silently falls through to an unverifiable tmux sendKeys. The health classifier (determineHealthStatus) keys off lastActivity, which the heartbeat keeps refreshing, so the idle ghost is reported 'healthy'. When the deacon later orphans\u2192stops\u2192auto-resumes such an agent, resumeAgent does `--resume <sessionId>` into a session that never received a kickoff and sends only a generic continue. Result: silent zero-progress stalls masked as healthy, defeating autonomous operation.",
+      "Problem": "A work agent can spawn (tmux up, Claude running, state status=running role=work) but never receive its kickoff/work prompt, sitting at the pristine launch screen forever. Spawn delivery is fire-and-forget: when waitForReadySignal returns false the code only console.errors then markAgentRunning anyway, and deliverAgentMessage returns void and silently falls through to an unverifiable tmux sendKeys. The health classifier (determineHealthStatus) keys off lastActivity, which the heartbeat keeps refreshing, so the idle ghost is reported 'healthy'. When the deacon later orphans→stops→auto-resumes such an agent, resumeAgent does `--resume <sessionId>` into a session that never received a kickoff and sends only a generic continue. Result: silent zero-progress stalls masked as healthy, defeating autonomous operation.",
       "Proposal": "Introduce a tri-state kickoffDelivered flag on AgentState (undefined=legacy, false=spawned-not-confirmed, true=confirmed). Make deliverAgentMessage report a structured DeliveryResult so spawn can verify which transport carried the kickoff. At work-agent spawn, set kickoffDelivered=false up front, verify delivery (ready signal + transport ack), retry once, and escalate (recordAgentFailure) instead of silently marking running on failure. Add an early stall rule to determineHealthStatus that flags role=work/status=running/kickoffDelivered=false past a 5-min grace as 'stalled' (independent of the heartbeat-masked lastActivity). On deacon resume of a work agent with kickoffDelivered=false, re-deliver the persisted initial-prompt.md kickoff (idempotently) rather than relaunching the TUI with a bare continue. Cover the full ghost lifecycle with unit and integration tests."
     },
     "autoDecisions": [
@@ -56,7 +56,7 @@
       },
       {
         "summary": "deliverAgentMessage returns DeliveryResult (additive)",
-        "rationale": "Backward-compatible \u2014 existing void-ignoring callers are unaffected; gives spawn the supervisor success/failure signal the issue requires."
+        "rationale": "Backward-compatible — existing void-ignoring callers are unaffected; gives spawn the supervisor success/failure signal the issue requires."
       }
     ],
     "items": [
@@ -78,7 +78,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add `kickoffDelivered?: boolean` to the AgentState interface in src/lib/agents.ts with a doc comment defining the tri-state contract (undefined = legacy/pre-feature or non-applicable; false = spawned but kickoff not yet confirmed; true = kickoff confirmed delivered). Add the passthrough in cleanAgentState() so the field is persisted and round-trips through saveAgentState/getAgentState. No behavioral change in this bead \u2014 only the schema and its documented semantics."
+          "Action": "Add `kickoffDelivered?: boolean` to the AgentState interface in src/lib/agents.ts with a doc comment defining the tri-state contract (undefined = legacy/pre-feature or non-applicable; false = spawned but kickoff not yet confirmed; true = kickoff confirmed delivered). Add the passthrough in cleanAgentState() so the field is persisted and round-trips through saveAgentState/getAgentState. No behavioral change in this bead — only the schema and its documented semantics."
         },
         "subItems": [
           {
@@ -124,7 +124,7 @@
           ]
         },
         "narrative": {
-          "Action": "Change deliverAgentMessage's return type from Promise<void> to Promise<DeliveryResult> where DeliveryResult = { ok: boolean; path: 'supervisor'|'channels'|'tmux'|'pi'|'codex'; failure?: string }. Return the appropriate result at every exit (supervisor success => {ok:true,path:'supervisor'}; channels success => channels; auto-mode tmux fallback => {ok:true,path:'tmux'} since sendKeys did run; codex => codex). Strict-mode explicit 'supervisor'/'channels' still THROW on failure (unchanged). Change is additive \u2014 existing callers that ignore the return value are unaffected. Update src/lib/__tests__/deliver-agent-message.test.ts to assert the returned result shape per path."
+          "Action": "Change deliverAgentMessage's return type from Promise<void> to Promise<DeliveryResult> where DeliveryResult = { ok: boolean; path: 'supervisor'|'channels'|'tmux'|'pi'|'codex'; failure?: string }. Return the appropriate result at every exit (supervisor success => {ok:true,path:'supervisor'}; channels success => channels; auto-mode tmux fallback => {ok:true,path:'tmux'} since sendKeys did run; codex => codex). Strict-mode explicit 'supervisor'/'channels' still THROW on failure (unchanged). Change is additive — existing callers that ignore the return value are unaffected. Update src/lib/__tests__/deliver-agent-message.test.ts to assert the returned result shape per path."
         },
         "subItems": [
           {
@@ -166,7 +166,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In both work-agent spawn paths \u2014 spawnAgent (work) and spawnRun when role==='work' in src/lib/agents.ts \u2014 make kickoff delivery verified instead of fire-and-forget. Set state.kickoffDelivered=false before delivery and save. Ensure the kickoff is persisted to <agentDir>/initial-prompt.md for later resume re-delivery. After waitForReadySignal: if ready, deliver and inspect the DeliveryResult; on a confirmed path set state.kickoffDelivered=true and save. On ready=false OR an unverified delivery, retry the ready-wait + delivery ONCE. If it still fails, do NOT silently markAgentRunning as a healthy running agent \u2014 call recordAgentFailure with reason 'kickoff delivery failed' and emit an activity-level error so the failure surfaces. Set kickoffDelivered=true on the Pi (writePiAgentPrompt) and Codex (inline exec) delivery paths too so those harnesses are never falsely flagged (hazard H5). Per hazard H3, treat tmux-only ok as weak: confirm via the ready signal, and only flip kickoffDelivered=true when the agent reached the prompt and a delivery was issued."
+          "Action": "In both work-agent spawn paths — spawnAgent (work) and spawnRun when role==='work' in src/lib/agents.ts — make kickoff delivery verified instead of fire-and-forget. Set state.kickoffDelivered=false before delivery and save. Ensure the kickoff is persisted to <agentDir>/initial-prompt.md for later resume re-delivery. After waitForReadySignal: if ready, deliver and inspect the DeliveryResult; on a confirmed path set state.kickoffDelivered=true and save. On ready=false OR an unverified delivery, retry the ready-wait + delivery ONCE. If it still fails, do NOT silently markAgentRunning as a healthy running agent — call recordAgentFailure with reason 'kickoff delivery failed' and emit an activity-level error so the failure surfaces. Set kickoffDelivered=true on the Pi (writePiAgentPrompt) and Codex (inline exec) delivery paths too so those harnesses are never falsely flagged (hazard H5). Per hazard H3, treat tmux-only ok as weak: confirm via the ready signal, and only flip kickoffDelivered=true when the agent reached the prompt and a delivery was issued."
         },
         "subItems": [
           {
@@ -224,7 +224,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add an early stall rule to determineHealthStatus in src/dashboard/lib/health-filtering.ts, placed BEFORE the lastActivity-based staleness logic and AFTER the liveness (alive) check. When state.role==='work' && agentStatus==='running' && state.kickoffDelivered===false && (Date.now() - Date.parse(state.startedAt)) > 5*60*1000, return { status: 'stalled', reason: 'Work agent running with no kickoff delivered since spawn' }. The rule must NOT consult lastActivity (the heartbeat masks it \u2014 that is the root cause of the misreport). Only fire on explicit ===false, never undefined (hazard H1). Verify the /api/health/agents consumer (src/dashboard/server/routes/misc.ts) and any frontend status switch tolerate the new 'stalled' value; map it to an appropriate severity if a strict union exists (hazard H6)."
+          "Action": "Add an early stall rule to determineHealthStatus in src/dashboard/lib/health-filtering.ts, placed BEFORE the lastActivity-based staleness logic and AFTER the liveness (alive) check. When state.role==='work' && agentStatus==='running' && state.kickoffDelivered===false && (Date.now() - Date.parse(state.startedAt)) > 5*60*1000, return { status: 'stalled', reason: 'Work agent running with no kickoff delivered since spawn' }. The rule must NOT consult lastActivity (the heartbeat masks it — that is the root cause of the misreport). Only fire on explicit ===false, never undefined (hazard H1). Verify the /api/health/agents consumer (src/dashboard/server/routes/misc.ts) and any frontend status switch tolerate the new 'stalled' value; map it to an appropriate severity if a strict union exists (hazard H6)."
         },
         "subItems": [
           {
@@ -282,7 +282,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Make work-agent resume re-establish kickoff context for ghosts. In resumeAgent (and the fallback-restart path) in src/lib/agents.ts: when the agent is role==='work' and state.kickoffDelivered===false, after the session is ready, re-deliver the original kickoff read from <agentDir>/initial-prompt.md (instead of, or prepended to, the generic continue prompt), then set state.kickoffDelivered=true on confirmed re-delivery. Make it idempotent: kickoffDelivered===true/undefined keeps today's generic-continue behavior (hazard H4). This closes the autoResumeStoppedWorkAgents \u2192 resumeAgent path that the deacon uses after recoverOrphanedAgents marks a ghost running\u2192stopped, so a re-launched ghost actually receives its task rather than a bare TUI + 'continue'."
+          "Action": "Make work-agent resume re-establish kickoff context for ghosts. In resumeAgent (and the fallback-restart path) in src/lib/agents.ts: when the agent is role==='work' and state.kickoffDelivered===false, after the session is ready, re-deliver the original kickoff read from <agentDir>/initial-prompt.md (instead of, or prepended to, the generic continue prompt), then set state.kickoffDelivered=true on confirmed re-delivery. Make it idempotent: kickoffDelivered===true/undefined keeps today's generic-continue behavior (hazard H4). This closes the autoResumeStoppedWorkAgents → resumeAgent path that the deacon uses after recoverOrphanedAgents marks a ghost running→stopped, so a re-launched ghost actually receives its task rather than a bare TUI + 'continue'."
         },
         "subItems": [
           {
@@ -303,7 +303,7 @@
           },
           {
             "id": "deacon-redeliver-kickoff.ac3",
-            "title": "Resume of an agent with kickoffDelivered=true or undefined is unchanged (no double-delivery) \u2014 idempotent",
+            "title": "Resume of an agent with kickoffDelivered=true or undefined is unchanged (no double-delivery) — idempotent",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -329,7 +329,7 @@
       },
       {
         "id": "ghost-lifecycle-integration-test",
-        "title": "Integration test: full ghost-agent lifecycle (spawn-fail \u2192 stalled \u2192 resume re-delivers)",
+        "title": "Integration test: full ghost-agent lifecycle (spawn-fail → stalled → resume re-delivers)",
         "status": "completed",
         "priority": "medium",
         "created": "2026-06-05T18:57:44.000Z",
@@ -361,7 +361,7 @@
           },
           {
             "id": "ghost-lifecycle-integration-test.ac3",
-            "title": "Test uses vi.useFakeTimers / advanceTimersByTimeAsync for the grace window \u2014 no real setTimeout waits",
+            "title": "Test uses vi.useFakeTimers / advanceTimersByTimeAsync for the grace window — no real setTimeout waits",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -485,5 +485,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

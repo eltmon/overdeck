@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
+
+// Pin PANOPTICON_HOME to an empty temp dir so the COLORFGBG export (derived
+// from ~/.panopticon/ui-theme.json) deterministically uses the dark default
+// regardless of the developer machine's synced dashboard theme.
+let tempHome: string;
+let prevHome: string | undefined;
+
+beforeEach(() => {
+  tempHome = mkdtempSync(join(tmpdir(), 'pan-launcher-test-'));
+  prevHome = process.env.PANOPTICON_HOME;
+  process.env.PANOPTICON_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
+  else process.env.PANOPTICON_HOME = prevHome;
+  rmSync(tempHome, { recursive: true, force: true });
+});
 
 const DEFAULT_CONFIG: LauncherConfig = {
   role: 'work',
@@ -91,6 +112,7 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       export PANOPTICON_AGENT_ID='plan-abc'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='planning'
@@ -289,6 +311,7 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
       cd -- '/workspace/project'
@@ -322,6 +345,7 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       cd -- '/workspace/project'
       trap '' HUP
       claude --resume 'sess-resume'

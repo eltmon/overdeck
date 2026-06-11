@@ -4,17 +4,17 @@
     "created": "2026-05-25T16:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1326: PAN-1316 follow-up: stopWorkspaceDocker resolves wrong workspace for specialist agents",
-    "updated": "2026-05-25T16:27:25.292Z"
+    "updated": "2026-06-11T05:55:02.620Z"
   },
   "plan": {
     "id": "pan-1326",
     "title": "PAN-1316 follow-up: stopWorkspaceDocker resolves wrong workspace for specialist agents",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b5fc8a72-3e9c-4d1e-a86b-7d3a9c2e51b4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T16:35:00.000Z",
-    "updated": "2026-05-25T16:27:25.292Z",
+    "updated": "2026-06-11T05:55:02.620Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1326",
@@ -234,5 +234,5 @@
       "canonicalFilename": "2026-05-25-PAN-1326-pan-1316-follow-up-stopworkspacedocker-resolves-wrong-workspace-for-specialist-agents.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

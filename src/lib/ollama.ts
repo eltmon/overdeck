@@ -12,7 +12,7 @@ export const OLLAMA_BASE_URL = 'http://localhost:11434';
 export const OLLAMA_OPENAI_BASE_URL = `${OLLAMA_BASE_URL}/v1`;
 export const DEFAULT_OLLAMA_MODEL = 'gemma4:12b';
 export const OLLAMA_MODEL_PREFIX = 'ollama:';
-export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|::1)(:\d+)?\/?$/;
+export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
 
 export class OllamaError extends Data.TaggedError('OllamaError')<{
   readonly operation: string;
