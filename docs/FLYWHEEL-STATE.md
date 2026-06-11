@@ -1748,3 +1748,28 @@ PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
 - Watch: `agent-pan-resume-redeliver` tmux session appeared at 21:59 — a
   test-fixture-named session going live on the HOST (PAN-1702/1720 isolation
   class, likely from a host test run touching real tmux). Cosmetic so far.
+
+## RUN-20 tick 6 (2026-06-11) — compact brake saved 1744; tell-fix LIVE-verified; 6 bugs down
+
+- **PAN-1675 compact brake: 2nd production save, new variant.** work-1744
+  (ctx 100%, +662/-62 UNSUBMITTED — the blocking pre-PR wedge) was auto
+  recovered: fresh 26% ctx, kickoff re-delivered, diff preserved, work
+  continued into a review convoy. The brake covers the pre-PR variant, not
+  just post-PR (RUN-18's case).
+- **PAN-1749 closed with the strongest evidence type yet:** the strike fixed
+  `pan tell` singleton resolution (a7cc9f23c, tellCommand blindly prefixed
+  'agent-'; now routes normalizeAgentId) and then SIGNALED THE RUNNING
+  ORCHESTRATOR through the repaired path — the message arrived mid-run.
+  Signal contract now works end-to-end. roles/*.md gained the tell-fails→
+  issue-comment fallback.
+- **PAN-1753 landed WITH its test mocks in the same push** (8e98ae2f9 +
+  7bab68059) — no fixture-staleness red. The PAN-1752 lesson propagated to
+  the next strike immediately.
+- **Host-test isolation got expensive (PAN-1720 comment):** a host suite run
+  spawned a REAL fixture agent (agent-pan-resume-redeliver, issueId=
+  PAN-RESUME) with a live TUI at the project picker; the governor counted it
+  (total=10/9) and deferred real review re-dispatches. Paused it. Watch for
+  more fixture-named sessions after any host suite run.
+- Run scoreboard: **6 substrate bugs fixed** (1699/1746/1752/1749/1753 closed,
+  1723 landed-pending-merge-verify), 3 merges READY ~1.5h (1700/1712/1719),
+  main green. Strikes launched on PAN-1743 + PAN-1721 (cap 4 reached).

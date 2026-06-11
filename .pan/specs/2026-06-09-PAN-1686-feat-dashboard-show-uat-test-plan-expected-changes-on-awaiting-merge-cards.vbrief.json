@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-06-09T00:40:00.000Z",
-    "updated": "2026-06-11T01:59:39.663Z",
+    "updated": "2026-06-11T02:15:42.929Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1686: show UAT test plan + expected changes on Awaiting Merge cards"
   },
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f3a1c9d2-7b64-4e18-9a2f-1c5e6d8b0a44",
     "author": "agent:claude-opus-4-8",
-    "sequence": 35,
+    "sequence": 41,
     "created": "2026-06-09T00:40:00.000Z",
-    "updated": "2026-06-11T01:59:39.663Z",
+    "updated": "2026-06-11T02:15:42.929Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1686",
@@ -419,55 +419,55 @@
         "phase": "review",
         "issueId": "PAN-1686",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T01:59:39.653Z",
+        "updatedAt": "2026-06-11T02:15:42.830Z",
         "work": {
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T01:59:39.653Z",
+              "at": "2026-06-11T02:15:42.830Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
           "status": "reviewing",
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "history": [
             {
               "status": "reviewing",
-              "at": "2026-06-11T01:59:39.653Z"
+              "at": "2026-06-11T02:15:42.830Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:59:39.653Z"
+              "at": "2026-06-11T02:15:42.830Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T01:59:39.653Z",
+          "updatedAt": "2026-06-11T02:15:42.830Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T01:59:39.653Z"
+              "at": "2026-06-11T02:15:42.830Z"
             }
           ],
           "readyForMerge": false,

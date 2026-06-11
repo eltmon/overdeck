@@ -2,33 +2,139 @@
   "version": "1",
   "issueId": "PAN-1744",
   "created": "2026-06-11T00:57:26.844Z",
-  "updated": "2026-06-11T01:01:38.000Z",
-  "gitState": { "branch": "feature/pan-1744", "sha": "b1ff24876", "dirty": false },
+  "updated": "2026-06-11T02:18:10.376Z",
+  "gitState": {
+    "branch": "feature/pan-1744",
+    "sha": "b1ff24876",
+    "dirty": false
+  },
   "decisions": [
-    { "id": "D1", "summary": "Boot recovery re-enters the SAME runForkPipeline (made resume-safe) rather than a duplicate recovery code path — one pipeline, no drift between live and recovery behavior.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D2", "summary": "Persist the full fork request as a JSON column (fork_request) on the fork conversation row at creation. The runForkPipeline params today live only in the dead process's memory; this is the minimal durable state needed to reconstruct the call after a restart.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D3", "summary": "Retry guard fork_retry_count capped at 2, incremented and persisted BEFORE each recovery attempt so a fork that crashes the dashboard during its own recovery still burns a retry and cannot crash-loop the server on every boot.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D4", "summary": "Recovery runs on a short delay after boot (scheduled setTimeout), not inline at the old clearStuckForks call site, so tmux/runtime-mirror/lifecycle services have settled enough to classify session state and avoid killing a working agent.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D5", "summary": "Legacy in-flight forks with no persisted fork_request fall back to the old behavior (mark failed). Only forks created after this change are recoverable; older ones degrade rather than guess parameters.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D6", "summary": "CLI honesty applies to BOTH consumers — handoff.ts and fork.ts — because they share forkConversationViaServer and contain the identical 'only check forkStatus===failed then print green' false-success bug.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D7", "summary": "Include the bounded graceful-shutdown grace window (the issue's 'cheap complement'): on SIGTERM/INT/HUP, await in-flight forks up to a cap before exit so the common pan-reload case never interrupts a fork.", "recordedAt": "2026-06-11T01:01:38.000Z" },
-    { "id": "D8", "summary": "No new config flags and no dashboard UI work. The change is confined to the server pipeline, the conversations DB schema, and the two CLI commands. This is a correctness/resilience bug, not a feature.", "recordedAt": "2026-06-11T01:01:38.000Z" }
+    {
+      "id": "D1",
+      "summary": "Boot recovery re-enters the SAME runForkPipeline (made resume-safe) rather than a duplicate recovery code path — one pipeline, no drift between live and recovery behavior.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Persist the full fork request as a JSON column (fork_request) on the fork conversation row at creation. The runForkPipeline params today live only in the dead process's memory; this is the minimal durable state needed to reconstruct the call after a restart.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Retry guard fork_retry_count capped at 2, incremented and persisted BEFORE each recovery attempt so a fork that crashes the dashboard during its own recovery still burns a retry and cannot crash-loop the server on every boot.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Recovery runs on a short delay after boot (scheduled setTimeout), not inline at the old clearStuckForks call site, so tmux/runtime-mirror/lifecycle services have settled enough to classify session state and avoid killing a working agent.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Legacy in-flight forks with no persisted fork_request fall back to the old behavior (mark failed). Only forks created after this change are recoverable; older ones degrade rather than guess parameters.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "CLI honesty applies to BOTH consumers — handoff.ts and fork.ts — because they share forkConversationViaServer and contain the identical 'only check forkStatus===failed then print green' false-success bug.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Include the bounded graceful-shutdown grace window (the issue's 'cheap complement'): on SIGTERM/INT/HUP, await in-flight forks up to a cap before exit so the common pan-reload case never interrupts a fork.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "No new config flags and no dashboard UI work. The change is confined to the server pipeline, the conversations DB schema, and the two CLI commands. This is a correctness/resilience bug, not a feature.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "tmux-alive-but-not-injected: a fork whose tmux session spawned but whose brief never landed must NOT be classified as 'completed' and marked active.", "mitigation": "The 'completed' dispatch branch requires BOTH the tmux session alive AND the runtime mirror reporting active/waiting-on-human (getAgentRuntimeStateSync). tmux-alive-but-idle re-enters the resumable pipeline to re-inject, it does not mark active." },
-    { "id": "H2", "summary": "Double-authoring or double-spawn when the pipeline is re-entered during recovery.", "mitigation": "resumable-fork-pipeline bead makes runForkPipeline reuse an existing handoff_doc_path+file (skip authoring) and skip spawnConversationSession when the tmux session already exists (sessionExists)." },
-    { "id": "H3", "summary": "A fork that crashes the dashboard could send recovery into an infinite crash-loop on every boot.", "mitigation": "incrementForkRetryCount is called and persisted BEFORE each attempt; at retry_count >= 2 the fork is marked failed instead of re-attempted." },
-    { "id": "H4", "summary": "clearStuckForks is currently called synchronously at boot and may be covered by an existing test; removing/repurposing it can break that test.", "mitigation": "Locate any clearStuckForks test; update or remove it as part of the boot-fork-recovery bead. Keep clearStuckForks only if still needed as a narrow terminal fail-marker, otherwise remove it and its callers/tests cleanly." },
-    { "id": "H5", "summary": "Migration correctness: a non-additive or non-idempotent migration corrupts existing databases.", "mitigation": "Add columns to BOTH the CREATE TABLE block (fresh DBs) AND a try/catch ALTER TABLE migration step (existing DBs), bump SCHEMA_VERSION to 53, matching the established pattern in schema.ts. Verify running migrations twice does not throw." },
-    { "id": "H6", "summary": "Graceful shutdown could block a restart indefinitely if an in-flight fork hangs.", "mitigation": "The shutdown wait is strictly bounded (~10s cap); a fork that does not settle in the window is logged and the process exits anyway. Boot recovery is the backstop for anything dropped." },
-    { "id": "H7", "summary": "fork_request must contain every parameter runForkPipeline needs — an omitted field would make recovery re-enter with wrong/default behavior (silent wrong-fork).", "mitigation": "Define a single shared ForkRequest type enumerating all runForkPipeline args + parent conv name + sessionId; the persist bead serializes from exactly that type. This is the foundation bead's deep-inspection focus." },
-    { "id": "H8", "summary": "Dashboard server is Node 22 only and must be rebuilt before restart; recovery/shutdown code runs in dist.", "mitigation": "After server changes, run npm run build before any restart; never run the server under Bun. (Project rule: dashboard-node22-only.)" }
+    {
+      "id": "H1",
+      "summary": "tmux-alive-but-not-injected: a fork whose tmux session spawned but whose brief never landed must NOT be classified as 'completed' and marked active.",
+      "mitigation": "The 'completed' dispatch branch requires BOTH the tmux session alive AND the runtime mirror reporting active/waiting-on-human (getAgentRuntimeStateSync). tmux-alive-but-idle re-enters the resumable pipeline to re-inject, it does not mark active."
+    },
+    {
+      "id": "H2",
+      "summary": "Double-authoring or double-spawn when the pipeline is re-entered during recovery.",
+      "mitigation": "resumable-fork-pipeline bead makes runForkPipeline reuse an existing handoff_doc_path+file (skip authoring) and skip spawnConversationSession when the tmux session already exists (sessionExists)."
+    },
+    {
+      "id": "H3",
+      "summary": "A fork that crashes the dashboard could send recovery into an infinite crash-loop on every boot.",
+      "mitigation": "incrementForkRetryCount is called and persisted BEFORE each attempt; at retry_count >= 2 the fork is marked failed instead of re-attempted."
+    },
+    {
+      "id": "H4",
+      "summary": "clearStuckForks is currently called synchronously at boot and may be covered by an existing test; removing/repurposing it can break that test.",
+      "mitigation": "Locate any clearStuckForks test; update or remove it as part of the boot-fork-recovery bead. Keep clearStuckForks only if still needed as a narrow terminal fail-marker, otherwise remove it and its callers/tests cleanly."
+    },
+    {
+      "id": "H5",
+      "summary": "Migration correctness: a non-additive or non-idempotent migration corrupts existing databases.",
+      "mitigation": "Add columns to BOTH the CREATE TABLE block (fresh DBs) AND a try/catch ALTER TABLE migration step (existing DBs), bump SCHEMA_VERSION to 53, matching the established pattern in schema.ts. Verify running migrations twice does not throw."
+    },
+    {
+      "id": "H6",
+      "summary": "Graceful shutdown could block a restart indefinitely if an in-flight fork hangs.",
+      "mitigation": "The shutdown wait is strictly bounded (~10s cap); a fork that does not settle in the window is logged and the process exits anyway. Boot recovery is the backstop for anything dropped."
+    },
+    {
+      "id": "H7",
+      "summary": "fork_request must contain every parameter runForkPipeline needs — an omitted field would make recovery re-enter with wrong/default behavior (silent wrong-fork).",
+      "mitigation": "Define a single shared ForkRequest type enumerating all runForkPipeline args + parent conv name + sessionId; the persist bead serializes from exactly that type. This is the foundation bead's deep-inspection focus."
+    },
+    {
+      "id": "H8",
+      "summary": "Dashboard server is Node 22 only and must be rebuilt before restart; recovery/shutdown code runs in dist.",
+      "mitigation": "After server changes, run npm run build before any restart; never run the server under Bun. (Project rule: dashboard-node22-only.)"
+    }
   ],
   "resumePoint": null,
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
-    { "timestamp": "2026-06-11T00:57:26.844Z", "reason": "planning", "note": "Planning session started for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them", "agentModel": "agent:claude-opus-4-8" }
+    {
+      "timestamp": "2026-06-11T00:57:26.844Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:05Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T02:05:11.979Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:11Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T02:11:14.238Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:15Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T02:15:25.344Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T02:18:04.966Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T02:18:10.376Z"
+    }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-11T02:15:25Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1744 (attempt 3/10):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 30/30 AC incomplete:\n\n### Add fork_request and fork_retry_count columns + DB accessors to the conversations table (5/5 incomplete)\n  - [ ] CREATE TABLE conversations includes fork_request TEXT and fork_retry_count INTEGER NOT NULL DEFAULT 0; a fresh DB created from schema has both columns.\n  - [ ] Migration v52->v53 adds both columns via try/catch ALTER TABLE; SCHEMA_VERSION is 53; running migrations twice on an existing DB is idempotent (no throw).\n  - [ ] A shared exported ForkRequest type enumerates every parameter runForkPipeline needs to re-enter (all summary/handoff params + parent conv name + sessionId).\n  - [ ] getStuckForks(), setForkRequest(name, json), and incrementForkRetryCount(name) exist; a unit test round-trips: set a request, increment retry twice (returns 1 then 2), and getStuckForks returns only non-null, non-failed in-flight forks.\n  - [ ] mapRow exposes forkRequest and forkRetryCount on the Conversation type; existing conversation reads/writes are unaffected (typecheck + existing conversations-db tests pass).\n\n### Persist the full fork request at creation in the summary-fork route (3/3 incomplete)\n  - [ ] Creating a fork (any mode) writes a fork_request JSON row whose fields, when parsed, exactly reconstruct the arguments runForkPipeline was launched with, including parent conv name and sessionId.\n  - [ ] fork_retry_count is initialized to 0 for a newly created fork.\n  - [ ] The live happy-path fork still completes exactly as before (no behavior change observable to a fork that does not get interrupted); existing summary-fork route tests pass.\n\n### Make runForkPipeline resume-safe (reuse existing handoff doc, skip spawn when tmux already alive) (4/4 incomplete)\n  - [ ] Re-entering runForkPipeline for a handoff whose handoff_doc_path is set and whose doc file exists reuses the existing doc text and does NOT call the authoring path again.\n  - [ ] Re-entering runForkPipeline when the tmux session already exists skips spawnConversationSession and proceeds to injection + mark-active (no second tmux session is created).\n  - [ ] First-run behavior is unchanged: with no doc and no tmux session, runForkPipeline authors, spawns, injects, and clears fork_status exactly as before (existing fork tests pass).\n  - [ ] A unit/integration test exercises a second invocation of runForkPipeline for the same fork and asserts no re-author and no double-spawn.\n\n### Replace clearStuckForks blanket-fail with a boot recovery pass (dispatch by stage + retry guard) (7/7 incomplete)\n  - [ ] Boot no longer blanket-marks in-flight forks failed; recoverStuckForks() runs on a short post-boot delay and processes each conversation returned by getStuckForks().\n  - [ ] Tmux-alive AND runtime-mirror-active fork is marked active with fork_status cleared and is never killed (test: simulate live session+mirror -> stays active).\n  - [ ] A fork with a handoff doc already on disk is recovered by re-entering runForkPipeline, which reuses the doc and re-spawns/re-injects rather than re-authoring (test asserts no re-author).\n  - [ ] A pre-doc (authoring-stage) fork is recovered by re-running the pipeline from scratch (test: in-flight with no doc and no tmux -> pipeline re-runs).\n  - [ ] fork_retry_count is incremented BEFORE the attempt; a fork at retry_count >= 2 is marked failed and not re-attempted (test: third boot for the same fork yields failed, not a fourth attempt).\n  - [ ] A legacy in-flight fork with no fork_request is marked failed (graceful fallback, no crash).\n  - [ ] One fork's recovery throwing does not prevent the others from being processed (per-fork try/catch).\n\n### fork-client: distinguish deadline-expiry-while-in-flight from completion (3/3 incomplete)\n  - [ ] ForkResultConv carries a timedOut boolean; it is true only when the poll deadline expires with forkStatus still in-flight (non-null, non-'failed').\n  - [ ] A completed fork (forkStatus becomes null) returns timedOut=false; a failed fork (forkStatus 'failed') returns timedOut=false.\n  - [ ] Unit test with a fake/stubbed server response simulates a timeout-while-spawning and asserts timedOut=true with the last in-flight forkStatus preserved.\n\n### handoff.ts and fork.ts: print 'in progress — watch <url>' instead of false success on timeout/in-flight (4/4 incomplete)\n  - [ ] handoff.ts prints an 'in progress — watch <url>' message (not the green success block) when the result is timedOut/in-flight, and includes the conv id + dashboard URL.\n  - [ ] fork.ts applies the same honest output for the same timedOut/in-flight condition.\n  - [ ] The green success block is printed ONLY when forkStatus is null (genuine completion); the 'failed' branch is unchanged.\n  - [ ] Both commands exit with a non-zero code on the in-progress/timeout path so scripts/automation do not treat a not-yet-live fork as success.\n\n### Give in-flight fork pipelines a bounded grace window on shutdown (4/4 incomplete)\n  - [ ] In-flight fork pipelines are registered when launched and de-registered when they settle (success or failure).\n  - [ ] On SIGTERM/SIGINT/SIGHUP the shutdown handler awaits in-flight forks up to a bounded timeout before exiting.\n  - [ ] The wait is bounded: a fork that does not finish within the window is logged and the process exits anyway (test: a never-settling in-flight fork does not hang shutdown past the cap).\n  - [ ] With no in-flight forks, shutdown is not measurably delayed (the grace path is a no-op when the in-flight set is empty).\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Update plan.vbrief.json subItem statuses to 'completed'\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-1744 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    }
+  ]
 }
