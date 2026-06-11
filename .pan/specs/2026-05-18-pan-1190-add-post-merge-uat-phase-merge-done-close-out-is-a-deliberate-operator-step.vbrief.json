@@ -3,12 +3,12 @@
     "version": "0.5",
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1190: Add post-merge UAT phase \u2014 merge \u2260 done, close-out is a deliberate operator step",
+    "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
     "updated": "2026-05-18T17:36:29.051Z"
   },
   "plan": {
     "id": "pan-1190",
-    "title": "Add post-merge UAT phase: merge \u2260 done, close-out is a deliberate operator step",
+    "title": "Add post-merge UAT phase: merge ≠ done, close-out is a deliberate operator step",
     "status": "completed",
     "uid": "f5e8a1c2-9b3d-4e7f-a8b1-c2d3e4f5a6b7",
     "author": "agent:claude-opus-4-7",
@@ -46,8 +46,8 @@
       "deacon"
     ],
     "narratives": {
-      "Problem": "Today's postMergeLifecycle conflates 'PR merged' with 'issue done'. The moment the operator clicks Merge, the work agent is killed, ~/.panopticon/agents/<id>/ is wiped, the review-status entry is dropped, the vBRIEF is moved to completed, and the GitHub issue is auto-closed \u2014 all before the operator has even pulled main to run the merged code. Tonight (PAN-1170, 2026-05-18 12:38Z) the issue vanished from Command Deck within 17 seconds of the merge click, leaving zero window for operator UAT. Merge \u2260 verified-working-on-main, and the pipeline should not pretend they are the same event.",
-      "Proposal": "Split today's monolithic postMergeLifecycle into two operator-gated phases. (1) Merge handoff (postMergeLifecycle, refactored): verifies the PR landed, sets mergeStatus='merged', transitions canonical status to a new 'verifying_on_main' state, applies the 'verifying-on-main' label on GitHub, pauses (does NOT destroy) the work agent + state dir, stops Docker, and kills resource-leaky specialist sessions. Issue stays OPEN and visible on Command Deck with a distinct VERIFYING badge. (2) Close-out ceremony (existing closeOut workflow in src/lib/lifecycle/workflows.ts, extended): triggered when the operator clicks 'Close Out' on the issue (or runs `pan close <id>`). Does today's destructive cleanup \u2014 moves PRD, transitions vBRIEF active\u2192completed, tears down workspace, deletes branches per config, prunes checkpoint refs, closes the issue on the tracker, applies 'closed-out' label, clears review status. Optional auto close-out timer for teams that don't want the manual step (default off). The change is forward-only: already-merged-and-closed issues are not migrated."
+      "Problem": "Today's postMergeLifecycle conflates 'PR merged' with 'issue done'. The moment the operator clicks Merge, the work agent is killed, ~/.panopticon/agents/<id>/ is wiped, the review-status entry is dropped, the vBRIEF is moved to completed, and the GitHub issue is auto-closed — all before the operator has even pulled main to run the merged code. Tonight (PAN-1170, 2026-05-18 12:38Z) the issue vanished from Command Deck within 17 seconds of the merge click, leaving zero window for operator UAT. Merge ≠ verified-working-on-main, and the pipeline should not pretend they are the same event.",
+      "Proposal": "Split today's monolithic postMergeLifecycle into two operator-gated phases. (1) Merge handoff (postMergeLifecycle, refactored): verifies the PR landed, sets mergeStatus='merged', transitions canonical status to a new 'verifying_on_main' state, applies the 'verifying-on-main' label on GitHub, pauses (does NOT destroy) the work agent + state dir, stops Docker, and kills resource-leaky specialist sessions. Issue stays OPEN and visible on Command Deck with a distinct VERIFYING badge. (2) Close-out ceremony (existing closeOut workflow in src/lib/lifecycle/workflows.ts, extended): triggered when the operator clicks 'Close Out' on the issue (or runs `pan close <id>`). Does today's destructive cleanup — moves PRD, transitions vBRIEF active→completed, tears down workspace, deletes branches per config, prunes checkpoint refs, closes the issue on the tracker, applies 'closed-out' label, clears review status. Optional auto close-out timer for teams that don't want the manual step (default off). The change is forward-only: already-merged-and-closed issues are not migrated."
     },
     "autoDecisions": [
       {
@@ -56,7 +56,7 @@
       },
       {
         "summary": "Display the new state as a 'VERIFYING' VerbBadge variant. If PAN-1148's VerbBadge component is not yet merged on main, add the equivalent inline style in WorkspaceStatusOverview.tsx + KanbanBoard.tsx so the badge ships independently.",
-        "rationale": "Issue body says 'use the VerbBadge VERIFYING from PAN-1148 or add a new variant'. We don't want to block PAN-1190 on PAN-1148's merge order \u2014 graceful fallback ensures shippability."
+        "rationale": "Issue body says 'use the VerbBadge VERIFYING from PAN-1148 or add a new variant'. We don't want to block PAN-1190 on PAN-1148's merge order — graceful fallback ensures shippability."
       },
       {
         "summary": "Pause the work agent at merge (set state.paused=true via setAgentPaused() in src/lib/agents.ts, kill tmux session) but preserve ~/.panopticon/agents/<id>/. Operator can `pan unpause <id>` if a regression surfaces.",
@@ -68,11 +68,11 @@
       },
       {
         "summary": "Kill reviewer/synthesis specialist sessions at merge, NOT at close-out.",
-        "rationale": "These sessions hold large MCP processes and Claude context \u2014 keeping them alive across a multi-hour operator UAT window has zero context-recovery value but a non-trivial RSS cost. Today's behavior already kills them at merge; preserve that."
+        "rationale": "These sessions hold large MCP processes and Claude context — keeping them alive across a multi-hour operator UAT window has zero context-recovery value but a non-trivial RSS cost. Today's behavior already kills them at merge; preserve that."
       },
       {
-        "summary": "Keep vBRIEF active\u2192completed transition AT close-out (not at merge). During verify phase, vBRIEF stays at 'running' / 'active'.",
-        "rationale": "The canonical lifecycle (draft \u2192 proposed \u2192 approved \u2192 active/running \u2192 completed) treats 'completed' as the post-close-out terminal state. PAN-1124 single-spec-on-main rules require atomic single-commit status updates \u2014 driving the spec to 'completed' at merge would be premature if the operator reopens the issue from a regression."
+        "summary": "Keep vBRIEF active→completed transition AT close-out (not at merge). During verify phase, vBRIEF stays at 'running' / 'active'.",
+        "rationale": "The canonical lifecycle (draft → proposed → approved → active/running → completed) treats 'completed' as the post-close-out terminal state. PAN-1124 single-spec-on-main rules require atomic single-commit status updates — driving the spec to 'completed' at merge would be premature if the operator reopens the issue from a regression."
       },
       {
         "summary": "Default close_out.remove_workspace=false and close_out.delete_feature_branch=false (operator opt-in to destruction).",
@@ -105,7 +105,7 @@
           "inspectionDepth": "deep"
         },
         "narrative": {
-          "Action": "Extend src/core/state-mapping.ts to recognize a new canonical state between in_review and done. This is the foundation every downstream bead reads from \u2014 the state name, label spelling, and mapping precedence must be settled before postMergeLifecycle is refactored."
+          "Action": "Extend src/core/state-mapping.ts to recognize a new canonical state between in_review and done. This is the foundation every downstream bead reads from — the state name, label spelling, and mapping precedence must be settled before postMergeLifecycle is refactored."
         },
         "subItems": [
           {
@@ -126,7 +126,7 @@
           },
           {
             "id": "add-canonical-state.ac3",
-            "title": "STATE_TYPE_MAP maps verifying_on_main \u2192 'started'.",
+            "title": "STATE_TYPE_MAP maps verifying_on_main → 'started'.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -134,7 +134,7 @@
           },
           {
             "id": "add-canonical-state.ac4",
-            "title": "GitHub trackers stateMap: verifying_on_main \u2192 { status: 'open', label: 'verifying-on-main' }. Linear/GitLab/Jira/Trello fall back to existing in_progress/in_review semantics with auto_create when supported.",
+            "title": "GitHub trackers stateMap: verifying_on_main → { status: 'open', label: 'verifying-on-main' }. Linear/GitLab/Jira/Trello fall back to existing in_progress/in_review semantics with auto_create when supported.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -158,7 +158,7 @@
           },
           {
             "id": "add-canonical-state.ac7",
-            "title": "mapGitHubStateToCanonical: an OPEN issue with the 'verifying-on-main' label OR the legacy 'needs-close-out' label maps to verifying_on_main (NOT done). Precedence: verifying-on-main beats merged-without-close-out semantics \u2014 issue stays in verifying column until close-out applies 'closed-out' and closes the issue.",
+            "title": "mapGitHubStateToCanonical: an OPEN issue with the 'verifying-on-main' label OR the legacy 'needs-close-out' label maps to verifying_on_main (NOT done). Precedence: verifying-on-main beats merged-without-close-out semantics — issue stays in verifying column until close-out applies 'closed-out' and closes the issue.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -195,7 +195,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Update src/dashboard/frontend/src/types.ts and any contracts in packages/contracts to surface the new canonical state to React components. Do NOT add a new mergeStatus value \u2014 the existing 'merged' value plus the canonical state on the Issue is sufficient."
+          "Action": "Update src/dashboard/frontend/src/types.ts and any contracts in packages/contracts to surface the new canonical state to React components. Do NOT add a new mergeStatus value — the existing 'merged' value plus the canonical state on the Issue is sufficient."
         },
         "subItems": [
           {
@@ -242,7 +242,7 @@
         "subItems": [
           {
             "id": "extend-closeout-workflow.ac1",
-            "title": "closeOut() runs a vBRIEF active\u2192completed transition via transitionVBriefOnMain (port from merge-agent.ts step 5c, between archive and teardown).",
+            "title": "closeOut() runs a vBRIEF active→completed transition via transitionVBriefOnMain (port from merge-agent.ts step 5c, between archive and teardown).",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -274,7 +274,7 @@
           },
           {
             "id": "extend-closeout-workflow.ac5",
-            "title": "Existing closeOut step ordering (verify-merged \u2192 archive \u2192 teardown \u2192 close \u2192 label \u2192 clear-status) is preserved; new steps slot in as additive non-mutating phases.",
+            "title": "Existing closeOut step ordering (verify-merged → archive → teardown → close → label → clear-status) is preserved; new steps slot in as additive non-mutating phases.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -324,7 +324,7 @@
           },
           {
             "id": "split-postmerge-nondestructive.ac2",
-            "title": "postMergeLifecycle NO LONGER runs: closeIssueWithCircuitBreaker, vBRIEF active\u2192completed transition, agent state dir removal, workspace teardown, feature-branch deletion, PRD active\u2192completed move, checkpoint-ref prune. closeIssueWithCircuitBreaker and its tracking state may be deleted if no other caller remains.",
+            "title": "postMergeLifecycle NO LONGER runs: closeIssueWithCircuitBreaker, vBRIEF active→completed transition, agent state dir removal, workspace teardown, feature-branch deletion, PRD active→completed move, checkpoint-ref prune. closeIssueWithCircuitBreaker and its tracking state may be deleted if no other caller remains.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -414,7 +414,7 @@
           },
           {
             "id": "closeout-http-route.ac2",
-            "title": "Route resolves the project from the issue ID (resolveProjectFromIssue), builds a LifecycleContext (issueId, projectPath, github=\u2026), and invokes closeOut(ctx) from src/lib/lifecycle/index.ts.",
+            "title": "Route resolves the project from the issue ID (resolveProjectFromIssue), builds a LifecycleContext (issueId, projectPath, github=…), and invokes closeOut(ctx) from src/lib/lifecycle/index.ts.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -430,7 +430,7 @@
           },
           {
             "id": "closeout-http-route.ac4",
-            "title": "Route uses async fs / promisified exec only (no execSync, no readFileSync) \u2014 complies with .claude/rules/no-execsync-server.md.",
+            "title": "Route uses async fs / promisified exec only (no execSync, no readFileSync) — complies with .claude/rules/no-execsync-server.md.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -480,7 +480,7 @@
           },
           {
             "id": "dashboard-verifying-ui.ac2",
-            "title": "The VERIFYING badge is visually distinct from the existing transient mergeStatus='verifying' (merge-in-flight) badge \u2014 different color or shape so operators can tell the post-merge state apart from the pre-merge progress state.",
+            "title": "The VERIFYING badge is visually distinct from the existing transient mergeStatus='verifying' (merge-in-flight) badge — different color or shape so operators can tell the post-merge state apart from the pre-merge progress state.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -520,7 +520,7 @@
           },
           {
             "id": "dashboard-verifying-ui.ac7",
-            "title": "Playwright e2e test (isolated browser instance/profile per test) drives the flow: merge \u2192 badge appears \u2192 click Close Out \u2192 confirmation modal \u2192 success \u2192 issue gone from the column.",
+            "title": "Playwright e2e test (isolated browser instance/profile per test) drives the flow: merge → badge appears → click Close Out → confirmation modal → success → issue gone from the column.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -562,7 +562,7 @@
           },
           {
             "id": "command-deck-visibility.ac3",
-            "title": "KanbanBoard maps verifying_on_main into a sensible column \u2014 either a new 'Verifying' column or fold into 'Done' as a non-default sub-state with badge. Choose: a new 'Verifying' column (rationale recorded in continue.json) between Review and Done.",
+            "title": "KanbanBoard maps verifying_on_main into a sensible column — either a new 'Verifying' column or fold into 'Done' as a non-default sub-state with badge. Choose: a new 'Verifying' column (rationale recorded in continue.json) between Review and Done.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -599,12 +599,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Walk each Deacon call site of postMergeLifecycle in src/lib/cloister/deacon.ts (lines ~2481, ~3135, ~3903 today) and confirm the new non-destructive contract is acceptable. Deacon should NOT trigger auto close-out from these paths \u2014 that's a separate bead. Update orphan-recovery and reconcile sweeps so a paused work agent for a verifying-on-main issue is recognized as 'expected paused', not 'stopped, needs auto-resume'."
+          "Action": "Walk each Deacon call site of postMergeLifecycle in src/lib/cloister/deacon.ts (lines ~2481, ~3135, ~3903 today) and confirm the new non-destructive contract is acceptable. Deacon should NOT trigger auto close-out from these paths — that's a separate bead. Update orphan-recovery and reconcile sweeps so a paused work agent for a verifying-on-main issue is recognized as 'expected paused', not 'stopped, needs auto-resume'."
         },
         "subItems": [
           {
             "id": "deacon-recognize-verifying.ac1",
-            "title": "autoResumeStoppedWorkAgents() (or equivalent) skips agents whose state.json has paused=true AND mergeStatus='merged' (verify phase) \u2014 never auto-resumes them.",
+            "title": "autoResumeStoppedWorkAgents() (or equivalent) skips agents whose state.json has paused=true AND mergeStatus='merged' (verify phase) — never auto-resumes them.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -620,7 +620,7 @@
           },
           {
             "id": "deacon-recognize-verifying.ac3",
-            "title": "recoverOrphanedAgents does NOT treat a paused-for-verify agent as orphaned \u2014 it's an expected steady state, not a recovery target.",
+            "title": "recoverOrphanedAgents does NOT treat a paused-for-verify agent as orphaned — it's an expected steady state, not a recovery target.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -707,7 +707,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a Deacon patrol that, when close_out.auto=true, finds issues in verifying_on_main older than close_out.auto_delay_minutes (measured from review-status mergeStatus=merged timestamp) and runs closeOut() against them. Default config leaves this disabled \u2014 operators opt in."
+          "Action": "Add a Deacon patrol that, when close_out.auto=true, finds issues in verifying_on_main older than close_out.auto_delay_minutes (measured from review-status mergeStatus=merged timestamp) and runs closeOut() against them. Default config leaves this disabled — operators opt in."
         },
         "subItems": [
           {
@@ -744,7 +744,7 @@
           },
           {
             "id": "auto-closeout-poller.ac5",
-            "title": "Sweep is idempotent \u2014 a successful closeOut clears the canonical state from verifying_on_main, so the next sweep skips the issue.",
+            "title": "Sweep is idempotent — a successful closeOut clears the canonical state from verifying_on_main, so the next sweep skips the issue.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -752,7 +752,7 @@
           },
           {
             "id": "auto-closeout-poller.ac6",
-            "title": "If closeOut fails, the sweep does NOT retry in a tight loop \u2014 it backs off (re-eligible no sooner than auto_delay_minutes later) and surfaces the failure via emitActivityEntry so an operator can intervene.",
+            "title": "If closeOut fails, the sweep does NOT retry in a tight loop — it backs off (re-eligible no sooner than auto_delay_minutes later) and surfaces the failure via emitActivityEntry so an operator can intervene.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -794,7 +794,7 @@
           },
           {
             "id": "pan-close-cli-state-check.ac3",
-            "title": "skills/pan-close/SKILL.md describes the merge \u2192 verify-on-main \u2192 close-out flow (replacing any 'merge auto-closes' wording).",
+            "title": "skills/pan-close/SKILL.md describes the merge → verify-on-main → close-out flow (replacing any 'merge auto-closes' wording).",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -823,12 +823,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "If a closed-out issue is reopened on the tracker (gh issue reopen / Linear state Done\u2192In Progress), the pipeline must restore a sensible canonical state. mapGitHubStateToCanonical already handles open issues by label \u2014 extend it so a reopened issue with 'verifying-on-main' label maps back to verifying_on_main, and so reopening clears the 'closed-out' label."
+          "Action": "If a closed-out issue is reopened on the tracker (gh issue reopen / Linear state Done→In Progress), the pipeline must restore a sensible canonical state. mapGitHubStateToCanonical already handles open issues by label — extend it so a reopened issue with 'verifying-on-main' label maps back to verifying_on_main, and so reopening clears the 'closed-out' label."
         },
         "subItems": [
           {
             "id": "reopen-tolerance.ac1",
-            "title": "mapGitHubStateToCanonical: an OPEN issue with the 'closed-out' label maps to in_progress (clean-up state \u2014 labels are stale after reopen), NOT done.",
+            "title": "mapGitHubStateToCanonical: an OPEN issue with the 'closed-out' label maps to in_progress (clean-up state — labels are stale after reopen), NOT done.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -852,7 +852,7 @@
           },
           {
             "id": "reopen-tolerance.ac4",
-            "title": "Unit tests cover: closed\u2192reopened with 'closed-out' label \u2192 in_progress; merged+verifying-on-main label on OPEN issue \u2192 verifying_on_main; closed with 'closed-out' \u2192 done.",
+            "title": "Unit tests cover: closed→reopened with 'closed-out' label → in_progress; merged+verifying-on-main label on OPEN issue → verifying_on_main; closed with 'closed-out' → done.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -862,7 +862,7 @@
       },
       {
         "id": "tests-verify-flow",
-        "title": "End-to-end and unit tests for the verify \u2192 close-out flow",
+        "title": "End-to-end and unit tests for the verify → close-out flow",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-18T13:25:00.000Z",
@@ -902,7 +902,7 @@
           },
           {
             "id": "tests-verify-flow.ac4",
-            "title": "Playwright e2e test runs in an isolated browser instance/profile (no shared state with other tests), drives merge \u2192 VERIFYING badge \u2192 Close Out button \u2192 success \u2192 issue removed from board.",
+            "title": "Playwright e2e test runs in an isolated browser instance/profile (no shared state with other tests), drives merge → VERIFYING badge → Close Out button → success → issue removed from board.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -931,7 +931,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Document the new canonical state, the merge/verify/close-out split, and the configuration knobs. Touch docs/ROLES.md, CLAUDE.md (the postMergeLifecycle Docker cleanup section still applies \u2014 update wording to reflect close-out destination for non-Docker steps), and skills/pan-close/SKILL.md."
+          "Action": "Document the new canonical state, the merge/verify/close-out split, and the configuration knobs. Touch docs/ROLES.md, CLAUDE.md (the postMergeLifecycle Docker cleanup section still applies — update wording to reflect close-out destination for non-Docker steps), and skills/pan-close/SKILL.md."
         },
         "subItems": [
           {
@@ -1124,5 +1124,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
