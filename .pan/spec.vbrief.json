@@ -1,0 +1,473 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-11T07:04:43.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1765: bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
+    "updated": "2026-06-11T08:14:42.769Z"
+  },
+  "plan": {
+    "id": "pan-1765",
+    "title": "bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
+    "status": "proposed",
+    "uid": "c0b51592-9a05-4166-9ece-350bb55d964c",
+    "author": "agent:claude-fable-5",
+    "sequence": 3,
+    "created": "2026-06-11T07:04:43.000Z",
+    "updated": "2026-06-11T08:14:42.769Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1765",
+        "label": "PAN-1765",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "deacon",
+      "review-dispatch",
+      "merge-conflict",
+      "compute-waste"
+    ],
+    "narratives": {
+      "Problem": "Review convoys (5 sessions each) are dispatched for issues whose review status carries a standing merge_conflict blocker. The verdicts are structurally doomed: even after review+test pass, the pre-merge conflict gate (workspaces.ts ~5151) re-flags the blocker and resets readyForMerge, and checkPostReviewCommits (deacon.ts) wipes both verdicts the next time HEAD moves (e.g. merge-train rebases after every main landing). Verified root causes: (1) no review dispatch path consults blockerReasons — grep for blockerReasons in src/lib/cloister/ returns zero hits; (2) nothing dispatches conflict resolution for blocker-flagged issues outside the post-merge train reconciler, so flags stand for hours; (3) the PAN-1620 merge-blocker reconcile service explicitly skips rows that already have blockers, so stale flags are never re-verified. Evidence: PAN-1747 ran 3 full convoys in one night against a conflict flag detected at 02:33 that no agent ever worked on; same on PAN-1686 and PAN-1704.",
+      "Proposal": "Add a conflict gate at the single review-dispatch choke point, spawnReviewRoleForIssuePromise (review-agent.ts:296), which all five dispatch paths route through. The gate: (a) reads blockerReasons and considers only merge_conflict and not_mergeable types; (b) re-verifies freshness with a local git merge-tree probe against origin/<target> — a stale flag (branch rebased clean since detectedAt) is cleared and review proceeds; (c) when the conflict is real, review dispatch is deferred (status stays pending with an explanatory note) and a work-role conflict-resolver agent is dispatched instead, reusing the PAN-1691 prompt pattern from merge-train-deps.dispatchConflictResolver, with session-exists idempotency plus a persisted conflictResolutionDispatchedAt throttle. Callers (deacon patrols, startup recovery, HTTP routes) treat the gated result as a calm deferral — never an infra failure, never a reviewRetryCount increment. Secondary fix per the issue: the merge-blocker reconcile service also re-verifies blocker-flagged rows on a slower cadence so resolved conflicts clear even without a dispatch attempt. Self-healing loop: review stays pending, the deacon pending-redispatch retries each patrol, and once the resolver pushes a clean rebase the probe clears the flag and the convoy finally runs on a mergeable branch."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The conflict gate applies to ALL review dispatch paths, including force:true human re-review overrides.",
+        "rationale": "Review verdicts on an unmergeable branch are structurally void — that is this exact bug. The freshness probe prevents false gating (a resolved conflict clears immediately), so a human who wants review can get it by resolving the conflict, which the gate auto-dispatches an agent to do. checkPostReviewCommits passes force:true, so force cannot be the bypass discriminator anyway."
+      },
+      {
+        "summary": "Gate scope is limited to merge_conflict and not_mergeable blocker types.",
+        "rationale": "Both mean the branch cannot land, voiding any verdict. failing_checks, draft_pr, changes_requested, and unresolved_conversations do not gate review — review feedback remains valuable while CI or conversations are being fixed."
+      },
+      {
+        "summary": "Freshness re-verification uses a local 'git fetch' + 'git merge-tree --write-tree' probe in the workspace, not the GitHub API.",
+        "rationale": "Local probe works without a PR, has no rate limits, and answers in milliseconds. On probe failure ('unknown', e.g. missing workspace or old git) the gate stays conservative: defer review, still attempt resolver dispatch — mis-gating costs latency, not a 5-session convoy."
+      },
+      {
+        "summary": "Conflict resolution is dispatched as a work-role agent (spawnRun(issueId, 'work', …)) with the both-features-intent rebase prompt, modeled on merge-train-deps.dispatchConflictResolver.",
+        "rationale": "PAN-1691 already established this as the agent-mediated conflict resolution pattern. syncMainIntoWorkspace is operator-surfaced since PAN-1531 and the ship role is reserved for approved branches."
+      },
+      {
+        "summary": "Two throttles: in-memory mergeability-probe cache (~3 min per issue) and a persisted conflictResolutionDispatchedAt field (30 min re-dispatch window) plus session-exists idempotency.",
+        "rationale": "Deacon patrols run every 60s; without throttles the gate would git-fetch per issue per tick and could storm resolver spawns when sessions crash quickly. 3 min matches the PAN-1620 RECHECK_INTERVAL precedent."
+      },
+      {
+        "summary": "Gated dispatch returns { success: false, gated: true, message } from spawnReviewRoleForIssue; review status stays 'pending'.",
+        "rationale": "Keeping status pending preserves the deacon pending-redispatch loop as the natural retry mechanism. The explicit gated flag lets callers log a deferral without poisoning reviewRetryCount or the PAN-794 infra breaker."
+      }
+    ],
+    "items": [
+      {
+        "id": "mergeability-probe",
+        "title": "Add checkBranchMergeability() local merge-conflict probe in new conflict-gate module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/conflict-gate.ts with checkBranchMergeability(workspacePath, targetBranch, deps?) returning 'clean' | 'conflicts' | 'unknown'. Implementation: `git fetch origin <targetBranch>` then `git merge-tree --write-tree --name-only HEAD origin/<targetBranch>` (non-destructive, git >= 2.38); exit code / conflict markers classify the result. Any exec failure (missing workspace, old git, network error) returns 'unknown' — never throws. Inject the exec runner for unit tests (follow the DI style of merge-train-reconciler.ts). Async exec only — no execSync (server-reachable code)."
+        },
+        "subItems": [
+          {
+            "id": "mergeability-probe.ac1",
+            "title": "checkBranchMergeability returns 'clean' for a branch that merges into origin/<target> without conflicts, 'conflicts' when merge-tree reports conflicts, and 'unknown' on exec failure — proven by unit tests with an injected exec runner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-probe.ac2",
+            "title": "The probe never mutates the workspace: no merge commits, no index changes, no HEAD moves (merge-tree only; no 'git merge' fallback)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mergeability-probe.ac3",
+            "title": "No execSync anywhere in the new module; all git calls use promisified exec with timeouts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-timestamp-field",
+        "title": "Add conflictResolutionDispatchedAt to ReviewStatus, SQLite schema, and DB round-trip",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add optional `conflictResolutionDispatchedAt?: string` (ISO timestamp) to the ReviewStatus interface in src/lib/review-status.ts. Persist it: add column `conflict_resolution_dispatched_at TEXT` to the review_status CREATE TABLE in src/lib/database/schema.ts plus a try/catch ALTER TABLE migration following the existing pattern (schema.ts ~1036ff), and wire read/write in src/lib/database/review-status-db.ts (JSON.stringify not needed — plain TEXT). normalizeReviewStatusSync is a spread passthrough and needs no change — verify with a round-trip test."
+        },
+        "subItems": [
+          {
+            "id": "dispatch-timestamp-field.ac1",
+            "title": "setReviewStatus / getReviewStatus round-trips conflictResolutionDispatchedAt through SQLite (unit test writes then reads the field)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-timestamp-field.ac2",
+            "title": "Migration is idempotent: opening an existing DB without the column adds it; opening twice does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-timestamp-field.ac3",
+            "title": "npm run typecheck passes with the new field referenced nowhere else yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-gate-orchestrator",
+        "title": "Implement resolveConflictGate() orchestrator: detect merge blockers, re-verify freshness, clear stale flags, request resolver dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1765",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "conflict-resolver-dispatch",
+            "gate-review-dispatch",
+            "deacon-gated-deferral",
+            "routes-surface-gated"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/conflict-gate.ts add resolveConflictGate(issueId, workspace, targetBranch, deps) with dependency-injected deps (getReviewStatus, setReviewStatus, probeMergeability, dispatchResolver, now, log) so it is unit-testable without git/DB/spawns — same pattern as merge-train-reconciler.ts. Behavior: (1) no merge_conflict/not_mergeable blocker in blockerReasons → { gated: false }. (2) Blocker present → probe mergeability. Probe 'clean' → remove merge_conflict/not_mergeable entries from blockerReasons (preserve other blocker types), return { gated: false, clearedStaleBlocker: true }. Probe 'conflicts' or 'unknown' → return { gated: true, reason } and request resolver dispatch UNLESS throttled: skip dispatch when conflictResolutionDispatchedAt is younger than 30 min (deps.now-based — fake timers in tests per CLAUDE.md rule). Probe results are cached in-module per issue for ~3 min keyed by issueId so 60s deacon patrols do not git-fetch every tick; expose a reset hook for tests. This bead defines the GateResult contract ({ gated, reason?, clearedStaleBlocker? }) and the deps interface that beads conflict-resolver-dispatch and gate-review-dispatch implement/consume."
+        },
+        "subItems": [
+          {
+            "id": "conflict-gate-orchestrator.ac1",
+            "title": "Unit: status without merge blockers → { gated: false } and no probe call (other blocker types like failing_checks do not gate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-orchestrator.ac2",
+            "title": "Unit: merge_conflict blocker + probe 'clean' → blocker entries removed via setReviewStatus (other blocker types preserved), result { gated: false, clearedStaleBlocker: true }, no resolver dispatched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-orchestrator.ac3",
+            "title": "Unit: merge_conflict blocker + probe 'conflicts' → { gated: true } and dispatchResolver called exactly once; a second call within the 30-min throttle window (fake timers) does not dispatch again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-orchestrator.ac4",
+            "title": "Unit: probe 'unknown' → gated (conservative) without throwing; dispatch still attempted subject to throttle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-gate-orchestrator.ac5",
+            "title": "Unit: probe result cached per issue ~3 min — two gate calls within the window trigger one probe (fake timers advance past window → re-probe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-resolver-dispatch",
+        "title": "Implement the real conflict-resolver dispatch dep: work-role spawn with rebase-resolution prompt, idempotent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In conflict-gate.ts (or a small sibling builder mirroring merge-train-deps.ts buildRealReconcileDeps), implement buildRealConflictGateDeps(): the dispatchResolver dep calls spawnRun(issueId, 'work', { prompt }) with a prompt modeled on merge-train-deps.dispatchConflictResolver but framed for a standing conflict with origin/main rather than a just-merged sibling: read what main changed AND what this issue intended, rebase onto origin/main preserving both intents, build/test/commit/push --force-with-lease, then re-request review (pan done / pan review request). Idempotency: spawnRun throws 'already running' when the session exists — catch it and treat as already-dispatched (do NOT crash the gate). On successful spawn: stamp conflictResolutionDispatchedAt via setReviewStatus and emitActivityEntrySync (source 'review', message 'Review deferred — conflict resolver dispatched for <issue>') so the dashboard shows why no convoy ran."
+        },
+        "subItems": [
+          {
+            "id": "conflict-resolver-dispatch.ac1",
+            "title": "Unit: dispatchResolver spawns role 'work' with a prompt containing rebase-onto-origin/main + preserve-both-intents + re-request-review instructions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-resolver-dispatch.ac2",
+            "title": "Unit: when spawnRun throws 'already running', dispatchResolver swallows it and reports already-dispatched (no throw, no duplicate activity entry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-resolver-dispatch.ac3",
+            "title": "Unit: successful spawn stamps conflictResolutionDispatchedAt and emits exactly one activity entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-review-dispatch",
+        "title": "Wire the conflict gate into spawnReviewRoleForIssuePromise and extend its result with gated: true",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/review-agent.ts spawnReviewRoleForIssuePromise (line ~296): after the session-idempotency block but BEFORE setReviewStatusSync({ reviewStatus: 'reviewing' }) and before any convoy/manifest work, call resolveConflictGate with real deps. If gated: leave reviewStatus 'pending' (do not flip to reviewing), set reviewNotes to a deferral explanation including the blocker detectedAt, and return { success: false, gated: true, message: 'Review dispatch deferred: merge conflict with <target> must be resolved first' }. Extend the function's return type ({ success, message, error?, gated? }) — the Effect wrapper spawnReviewRoleForIssue inherits it. Resolve targetBranch the same way the review context does (default 'main'). The gate must run for ALL callers including force:true (see autoDecisions). Do not disturb the PAN-1131 stale-runId logic or PAN-1531 feedback archiving above it — archiving may stay before or move after the gate, but a gated dispatch must NOT archive the previous cycle's feedback (the work agent still needs it)."
+        },
+        "subItems": [
+          {
+            "id": "gate-review-dispatch.ac1",
+            "title": "Unit (review-agent test): fresh merge_conflict blocker → spawnRun never called, reviewStatus stays 'pending', result { success: false, gated: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-review-dispatch.ac2",
+            "title": "Unit: stale blocker (probe 'clean') → blocker cleared and the convoy spawn proceeds normally (reviewing status set, spawnRun called)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-review-dispatch.ac3",
+            "title": "Unit: gated dispatch does not archive .pan/feedback files and does not set reviewSpawnedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-review-dispatch.ac4",
+            "title": "force: true does NOT bypass the gate (test asserts gated result with force set)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-gated-deferral",
+        "title": "Deacon patrols and startup recovery treat gated dispatch as calm deferral — no retry-counter poisoning",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the three orchestrator call sites to recognize result.gated: (1) deacon.ts checkPostReviewCommits redispatch (~line 2904-2916): log action 'Deferred review re-dispatch for <issue> — merge conflict must be resolved first' instead of 'Failed to re-dispatch'; (2) deacon.ts orphan-pending redispatch (~line 1966-1986): same calm action wording; ensure the gated path does not increment reviewRetryCount and cannot trip the PAN-794 review-infra breaker (gated deferrals are expected steady-state while a resolver works, potentially for many patrol ticks); (3) service.ts startup recovery (~line 772): log deferral instead of claiming 'Re-dispatched recovery review'. Keep PAN-1665 advancing-ceiling logic untouched — the ceiling check may run before or after the gate, but a gated issue must not consume an advancing slot (release the slot if it was reserved before the gate result)."
+        },
+        "subItems": [
+          {
+            "id": "deacon-gated-deferral.ac1",
+            "title": "Unit: checkPostReviewCommits with a gated dispatch result records a 'Deferred' action (not 'Failed') and leaves reviewRetryCount unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-gated-deferral.ac2",
+            "title": "Unit: repeated patrol ticks against a gated issue never trip the review-infra breaker (reviewRetryCount stays below threshold across N simulated ticks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-gated-deferral.ac3",
+            "title": "A gated issue does not hold an advancing-role concurrency slot after the patrol tick completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-surface-gated",
+        "title": "HTTP trigger and review-request routes surface the gated outcome to humans",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/specialists.ts (review trigger, ~line 1577) and src/dashboard/server/routes/workspaces.ts (review-request dispatch paths, ~lines 3625 and 3831), pass the gated result through so the HTTP response/message tells the operator 'Review deferred: merge conflict must be resolved first — conflict resolver dispatched' rather than a generic dispatch failure. Status code for the trigger route: 409 (conflict) with the explanatory body, not 500. No frontend component changes — the existing message/toast surfaces the text."
+        },
+        "subItems": [
+          {
+            "id": "routes-surface-gated.ac1",
+            "title": "POST review trigger on a conflict-gated issue returns 409 with a message naming the merge conflict and the resolver dispatch (route test or unit test on the handler)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-surface-gated.ac2",
+            "title": "workspaces.ts review-request paths log/return the deferral message instead of treating gated as an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-service-stale-flags",
+        "title": "Merge-blocker reconcile service re-verifies blocker-flagged rows so stale conflict flags clear",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-11T07:04:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1765",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/dashboard/server/services/merge-blocker-reconcile-service.ts currently skips any row with existing blockerReasons (line 47, 'already flagged — leave it'), so a resolved conflict only clears when a webhook happens to arrive. Extend reconcileOnce: rows whose blockerReasons contain merge_conflict or not_mergeable get re-checked via refreshMergeStateFromGitHub on a slower per-issue cadence (e.g. 10 min, separate throttle map from the 3-min ready-row throttle) — refreshMergeStateFromGitHub already removes the merge_conflict blocker when GitHub reports mergeable (webhook-handlers.ts ~line 400). Keep the existing skip for rows with only non-mergeability blockers. Update the file header comment to describe both reconcile directions. Tests MUST use vi.useFakeTimers per the CLAUDE.md retry/delay rule."
+        },
+        "subItems": [
+          {
+            "id": "reconcile-service-stale-flags.ac1",
+            "title": "Unit (fake timers): a row with a merge_conflict blocker triggers refreshMergeStateFromGitHub after the stale-flag interval elapses, at most once per interval per issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-service-stale-flags.ac2",
+            "title": "Unit: rows with only failing_checks/draft_pr/etc. blockers are still skipped (no GitHub call)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-service-stale-flags.ac3",
+            "title": "Unit: ready-with-no-blockers behavior (PAN-1620 path) is unchanged — existing assertions still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mergeability-probe",
+        "to": "conflict-gate-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-timestamp-field",
+        "to": "conflict-gate-orchestrator",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-timestamp-field",
+        "to": "conflict-resolver-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-gate-orchestrator",
+        "to": "conflict-resolver-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-gate-orchestrator",
+        "to": "gate-review-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-resolver-dispatch",
+        "to": "gate-review-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-review-dispatch",
+        "to": "deacon-gated-deferral",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-review-dispatch",
+        "to": "routes-surface-gated",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-gate-orchestrator",
+        "to": "reconcile-service-stale-flags",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-11-PAN-1765-bug-pipeline-conflict-flagged-branches-churn-full-review-convoys-passed-verdicts-reset-minutes-later-conflict-resolution-should-gate-review-dispatch.vbrief.json"
+    }
+  }
+}
