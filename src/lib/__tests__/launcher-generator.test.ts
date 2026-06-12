@@ -899,7 +899,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
 
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
 
-  it('codex work agent (exec mode) emits approval_policy=never and workspace sandbox', () => {
+  it('codex exec mode emits approval_policy=never and workspace sandbox', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -914,14 +914,30 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--skip-git-repo-check/);
   });
 
-  it('codex work agent uses exec prefix when useExec=true (non-conversation non-plan)', () => {
+  it('codex work-tui mode emits interactive codex with work-agent flags', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
       model: 'codex-4o',
+      codexMode: 'work-tui',
     });
-    expect(script).toMatch(/^exec codex exec/m);
+    expect(script).toMatch(/^exec codex -m 'codex-4o' -s workspace-write -c approval_policy=never$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'work-tui',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o' -s workspace-write -c approval_policy=never$/m);
+    expect(script).not.toMatch(/codex exec/);
   });
 
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {

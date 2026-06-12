@@ -226,6 +226,21 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('codex work-tui agents use live-session delivery instead of exec resume', async () => {
+    const agentId = 'agent-codex-tui';
+    writeAgentState(agentId, {
+      harness: 'codex',
+      codexMode: 'work-tui',
+      channelsEnabled: false,
+      supervisorEnabled: true,
+    });
+
+    const result = await deliverAgentMessage(agentId, 'follow-up', 'caller-codex');
+
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'follow-up');
+  });
+
   it('supervisor POST can take longer than the old timeout without spurious fallback', async () => {
     vi.useFakeTimers();
     const agentId = 'agent-supervisor-budget';

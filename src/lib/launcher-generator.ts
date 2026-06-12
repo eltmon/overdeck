@@ -45,11 +45,12 @@ export interface LauncherConfig {
   piSessionDir?: string;
 
   /**
-   * Codex agent mode. Defaults to 'exec' (headless) for work agents.
-   *   - 'exec': non-interactive `codex exec` with approval_policy=never (work agents)
+   * Codex agent mode. Defaults to 'exec' (headless legacy mode).
+   *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
+   *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
    */
-  codexMode?: 'exec' | 'tui';
+  codexMode?: 'exec' | 'tui' | 'work-tui';
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.panopticon/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -602,6 +603,17 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // agent with project-level task-tracker rules.
   if (codexMode === 'tui') {
     const cmd = wrapWithSupervisor(config, 'codex -c project_doc_max_bytes=0');
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
+  if (codexMode === 'work-tui') {
+    const tokens: string[] = ['codex'];
+    if (config.model) {
+      tokens.push('-m', shellQuoteModelIdSync(config.model));
+    }
+    tokens.push('-s', toCodexSandboxValue(config.codexSandboxMode));
+    tokens.push('-c', 'approval_policy=never');
+    const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }
 
