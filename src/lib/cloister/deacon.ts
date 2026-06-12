@@ -5059,6 +5059,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...inspectTimeoutActions);
   for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
 
+  // Detect new commits pushed after review passed before any test/merge path can
+  // act on stale review approval.
+  const postReviewActions = await checkPostReviewCommits();
+  actions.push(...postReviewActions);
+  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
+
   // Check for completed work with no review status entry at all (PAN-699)
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
@@ -5119,11 +5125,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reviewCleanupActions = await cleanupOrphanedReviewSessions();
   actions.push(...reviewCleanupActions);
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
-
-  // Detect new commits pushed after review passed — invalidate stale reviews
-  const postReviewActions = await checkPostReviewCommits();
-  actions.push(...postReviewActions);
-  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-464: Check workspace Docker container health and auto-restart crashed containers
   const containerActions = await checkWorkspaceContainerHealth(state);
