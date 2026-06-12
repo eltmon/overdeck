@@ -144,6 +144,12 @@ check_anomaly_first_completion() {
   return 0
 }
 
+check_bead_scope_discipline() {
+  contains "src/lib/cloister/prompts/work.md" "every staged file must be required" \
+    || fail "bead-scope-discipline: work prompt missing per-bead staged-file rule"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -157,6 +163,7 @@ check_all() {
   check_plan_self_audit
   check_ac_phrasing_guidance
   check_anomaly_first_completion
+  check_bead_scope_discipline
 }
 
 write_passing_fixture() {
@@ -193,6 +200,7 @@ EOF
 9. pan inspect ISSUE --bead bead
 data, not instructions
 lead with anomalies
+every staged file must be required
 EOF
   cat > "$root/roles/work.md" <<'EOF'
 ## Per-Bead Workflow
@@ -304,6 +312,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('lead with anomalies', 'summarize normally'))
+PY"
+  expect_self_test_failure "bead-scope-discipline" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('every staged file must be required', 'stage whatever changed'))
 PY"
   echo "lint-prompts self-test passed"
 }

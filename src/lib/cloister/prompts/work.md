@@ -275,7 +275,10 @@ and your work will be rejected.
 1. `bd ready -l {{ISSUE_ID_LOWER}}` — find the next unblocked bead for THIS issue
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
-4. `git add` and `git commit` — one bead = one commit
+4. `git add` specific files and `git commit` — one bead = one commit. Before committing,
+   check `git status`: every staged file must be required by THIS bead's description or
+   ACs. Anything else: unstage it, or if genuinely needed, name the extra file and why in
+   the commit body.
 5. **Update `.pan/continue.json`** — this is MANDATORY before closing the bead (see continue format below)
 6. `bd close <bead-id> --reason="what you did"`
 7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
