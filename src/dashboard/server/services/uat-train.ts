@@ -115,7 +115,7 @@ async function runCleanup(root: string): Promise<void> {
 export type UatTrainReconcileResults = Record<string, ReconcileResult>;
 
 /** One reconciler pass. `force` rebuilds even when a live generation matches. */
-export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<UatTrainReconcileResults> {
+export async function runUatTrainReconcile(options: { force?: boolean; projectKey?: string } = {}): Promise<UatTrainReconcileResults> {
   const { listEligibleCandidatesByProject } = await import('../../../lib/flywheel-merge-order.js');
   const issueTitles = await buildIssueTitleMap();
   const candidatesByProject = listEligibleCandidatesByProject({
@@ -124,6 +124,7 @@ export async function runUatTrainReconcile(options: { force?: boolean } = {}): P
   const results: UatTrainReconcileResults = {};
 
   for (const { key, config } of listProjectsSync()) {
+    if (options.projectKey && key !== options.projectKey) continue;
     const root = config.path;
     if (!isMergeTrainEnabledForProject(key)) {
       results[key] = { action: 'disabled', invalidated: [] };
@@ -149,7 +150,7 @@ export async function runUatTrainReconcile(options: { force?: boolean } = {}): P
       teardownStack: (gen) => teardownUatStack(gen),
       cleanup: () => runCleanup(root),
       log: (msg) => console.log(msg),
-    }, options);
+    }, { force: options.force });
   }
 
   return results;

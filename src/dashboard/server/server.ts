@@ -63,6 +63,7 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
+import { mergeTrainRouteLayer } from './routes/merge-train.js';
 import { artifactsRouteLayer } from './routes/artifacts.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
@@ -327,6 +328,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   terminalsRouteLayer,
   discoveredSessionsRouteLayer,
   flywheelRouteLayer,
+  mergeTrainRouteLayer,
   artifactsRouteLayer,
   featureRegistryRouteLayer,
   staticRouteLayer,
