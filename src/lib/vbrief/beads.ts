@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
-import { runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
+import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -39,6 +39,7 @@ export interface CreateBeadsResult {
   success: boolean;
   created: string[];
   errors: string[];
+  transientFailure?: unknown;
   /** Map from vBRIEF item ID → created bead ID */
   beadIds: Map<string, string>;
 }
@@ -46,6 +47,7 @@ export interface CreateBeadsResult {
 export interface ClearBeadsResult {
   cleared: number;
   errors: string[];
+  transientFailure?: unknown;
 }
 
 function firstLine(value: unknown): string {
@@ -111,7 +113,11 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   try {
     existingBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
-    return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
+    return {
+      cleared: 0,
+      errors: [`list failed: ${execFileErrorMessage(error)}`],
+      transientFailure: error instanceof BdTransientFailure ? error : undefined,
+    };
   }
 
   const errors: string[] = [];
@@ -130,7 +136,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
     residualBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
-    return { cleared, errors };
+    return { cleared, errors, transientFailure: error instanceof BdTransientFailure ? error : undefined };
   }
 
   const residualIds = beadIdsFromList(residualBeads);
@@ -290,6 +296,7 @@ async function createBeadsFromVBriefPromise(
       success: false,
       created: [],
       errors: clearResult.errors.map(error => `dedup failed: ${error}`),
+      transientFailure: clearResult.transientFailure,
       beadIds: new Map(),
     };
   }

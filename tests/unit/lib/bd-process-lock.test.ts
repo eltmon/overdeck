@@ -171,6 +171,21 @@ describe('bd process lock', () => {
     expect(existsSync(path)).toBe(true);
   });
 
+  it('times out when a stale main lock cannot acquire the stale-breaker lock', async () => {
+    const path = await lockPath();
+    mkdirSync(dirname(path), { recursive: true });
+    writeLock(path, { pid: 999_999_999, ts: Date.now() - 301_000, caller: 'dead holder' });
+    writeLock(`${path}.break`, { pid: process.pid, ts: Date.now(), caller: 'live breaker' });
+
+    await expect(
+      acquireBdProcessLock('blocked caller', { workspacePath, staleLockMs: 300_000, acquisitionTimeoutMs: 0 }),
+    ).rejects.toMatchObject({
+      operation: 'acquireBdProcessLock',
+      holder: expect.objectContaining({ caller: 'dead holder' }),
+    });
+    expect(existsSync(path)).toBe(true);
+  });
+
   it('retries transient bd failures without reacquiring when the process lock is already held', async () => {
     vi.useFakeTimers();
     const path = await lockPath();

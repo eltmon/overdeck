@@ -562,6 +562,39 @@ describe('createBeadsFromVBrief', () => {
       rmSync(ws8.projectRoot, { recursive: true, force: true });
     });
 
+    it('preserves exhausted transient bd list failures during dedup', async () => {
+      vi.useFakeTimers();
+      const ws8 = createWorkspace('PAN-508');
+      setupRedirect(ws8.workspacePath);
+      writePlan(ws8.projectRoot, 'PAN-508', makeDoc('PAN-508', [{ id: 'item-1', title: 'Blocked task' }]));
+
+      mockExecAsync.mockImplementation(async (file: string, args: string[]) => {
+        if (file === 'which') return { stdout: '/usr/bin/bd', stderr: '' };
+        if (file === 'bd' && args[0] === 'ping') return { stdout: '', stderr: '' };
+        if (file === 'bd' && args[0] === 'list') throw Object.assign(new Error('database is locked'), { stderr: 'database is locked' });
+        return { stdout: 'unexpected\n', stderr: '' };
+      });
+
+      const resultPromise = Effect.runPromise(createBeadsFromVBrief(ws8.workspacePath, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+        maxDelayMs: 100,
+        random: () => 0,
+        sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+      }));
+
+      const result = await resultPromise;
+      expect(result).toMatchObject({
+        success: false,
+        transientFailure: expect.anything(),
+      });
+      expect(result.errors[0]).toContain('dedup failed:');
+      expect(result.errors[0]).toContain('list failed:');
+      expect(createCalls()).toHaveLength(0);
+
+      rmSync(ws8.projectRoot, { recursive: true, force: true });
+    });
+
     it('aborts when any bd delete fails during dedup', async () => {
       const ws8 = createWorkspace('PAN-509');
       setupRedirect(ws8.workspacePath);

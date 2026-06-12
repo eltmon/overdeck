@@ -1125,6 +1125,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
+          } else if (recovery.transientFailure) {
+            failTransientBeadsValidation(spinner, id, recovery.transientFailure);
           } else {
             await failPostCreateValidation({
               spinner,

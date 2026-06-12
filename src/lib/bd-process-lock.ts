@@ -369,8 +369,9 @@ export async function acquireBdProcessLock(
         continue;
       }
       if (existing.kind === 'valid' && isStale(existing.holder, now(), staleLockMs)) {
-        await reclaimStaleLock(path, caller, { now, staleLockMs });
-        continue;
+        if (await reclaimStaleLock(path, caller, { now, staleLockMs })) {
+          continue;
+        }
       }
 
       const remainingMs = deadline - now();
