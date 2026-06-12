@@ -442,7 +442,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
           aria-label="Flywheel control rail"
         >
-          <MergeQueueCard active={!!effectiveStatus || isPaused} onNavigateIssue={onNavigateIssue} />
+          <MergeQueueCard onNavigateIssue={onNavigateIssue} />
           <MergePolicySection onNavigateIssue={onNavigateIssue} />
           <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
 

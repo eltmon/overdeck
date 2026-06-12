@@ -84,7 +84,7 @@ function renderCard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MergeQueueCard active={false} />
+      <MergeQueueCard />
     </QueryClientProvider>,
   );
 }

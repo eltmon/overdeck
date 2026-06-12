@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   subscribeFlywheelStatus: vi.fn(),
   statusDetails: vi.fn(),
   conversationPane: vi.fn(),
+  mergeQueueCard: vi.fn(),
   statePane: vi.fn(),
   statsPanel: vi.fn(),
 }));
@@ -47,10 +48,14 @@ vi.mock('../../components/flywheel/FlywheelStatsPanel', () => ({
   },
 }));
 
-// Isolate FlywheelPage from the UAT batches card (which has its own queries +
-// useConfirm/DialogProvider dependency) — same pattern as the other rail panes.
+// Isolate FlywheelPage from the shared merge-train viewer (which has its own
+// queries + useConfirm/DialogProvider dependency) — same pattern as the other
+// rail panes.
 vi.mock('../../components/flywheel/MergeQueueCard', () => ({
-  MergeQueueCard: () => <div data-testid="uat-batches-card">uat batches</div>,
+  MergeQueueCard: (props: { active?: boolean; onNavigateIssue?: (issueId: string) => void }) => {
+    mocks.mergeQueueCard(props);
+    return <div data-testid="merge-train-view">shared merge train view</div>;
+  },
 }));
 
 function renderFlywheelPage(element: ReactElement) {
@@ -103,6 +108,7 @@ describe('FlywheelPage', () => {
     mocks.unsubscribe.mockReset();
     mocks.statusDetails.mockReset();
     mocks.conversationPane.mockReset();
+    mocks.mergeQueueCard.mockReset();
     mocks.statePane.mockReset();
     mocks.statsPanel.mockReset();
     mocks.subscribeFlywheelStatus.mockReset();
@@ -127,6 +133,8 @@ describe('FlywheelPage', () => {
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');
     expect(screen.getByTestId('conversation-pane')).toBeInTheDocument();
+    expect(screen.getByTestId('merge-train-view')).toHaveTextContent('shared merge train view');
+    expect(mocks.mergeQueueCard).toHaveBeenCalledWith({ onNavigateIssue: undefined });
   });
 
   it('shows the empty state when no run is active', () => {

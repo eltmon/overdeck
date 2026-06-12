@@ -134,7 +134,7 @@ function mergeProjects(queues: MergeTrainQueuePayload[] | undefined, generations
   return [...byKey.values()];
 }
 
-export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; onNavigateIssue?: (issueId: string) => void }) {
+export function MergeQueueCard({ onNavigateIssue }: { onNavigateIssue?: (issueId: string) => void }) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [expandedUat, setExpandedUat] = useState<Record<string, boolean>>({});
@@ -143,12 +143,12 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
   const generationsQuery = useQuery({
     queryKey: ['merge-train-generations'],
     queryFn: () => fetchJson<ProjectUatGenerationsPayload[]>('/api/merge-train/generations'),
-    refetchInterval: active ? 15000 : false,
+    refetchInterval: 15000,
   });
   const queuesQuery = useQuery({
     queryKey: ['merge-train-queues'],
     queryFn: () => fetchJson<MergeTrainQueuePayload[]>('/api/merge-train/queues'),
-    refetchInterval: active ? 15000 : false,
+    refetchInterval: 15000,
   });
 
   const projects = useMemo(() => mergeProjects(queuesQuery.data, generationsQuery.data), [queuesQuery.data, generationsQuery.data]);
