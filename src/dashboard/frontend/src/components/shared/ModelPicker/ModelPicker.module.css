@@ -83,12 +83,22 @@
 }
 
 .pickerGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px 2px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-foreground);
+}
+
+.providerLogo,
+.harnessLogo {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .pickerOption {
@@ -120,6 +130,15 @@
 
 .pickerOptionLabel {
   flex: 1;
+  white-space: nowrap;
+}
+
+.pickerOptionLabelWithIcon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
 }
 
