@@ -34,4 +34,34 @@ describe('AgentDock', () => {
     expect(screen.getByRole('button', { name: /Gemini/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Claude Code/ })).toBeNull()
   })
+
+  it('renders harness marks for claude-code, codex, and pi agents', () => {
+    render(
+      <AgentDock
+        agents={[
+          { id: 'claude-code', label: 'Claude Code' },
+          { id: 'codex', label: 'Codex' },
+          { id: 'pi', label: 'Pi' },
+        ]}
+        onSelectAgent={() => {}}
+      />,
+    )
+
+    expect(screen.getByLabelText('Claude Code logo')).toHaveAttribute('viewBox', '0 0 256 257')
+    expect(screen.getByLabelText('Codex logo')).toHaveAttribute('viewBox', '0 0 256 260')
+    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument()
+    expect(screen.getByText('π')).toBeInTheDocument()
+    expect(screen.queryByTestId('agent-icon-bot')).toBeNull()
+  })
+
+  it('keeps the bot fallback for unknown agent ids', () => {
+    render(
+      <AgentDock
+        agents={[{ id: 'gemini', label: 'Gemini' }]}
+        onSelectAgent={() => {}}
+      />,
+    )
+
+    expect(screen.getByTestId('agent-icon-bot')).toBeInTheDocument()
+  })
 })
