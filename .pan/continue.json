@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T17:15:27Z",
+  "updated": "2026-06-12T17:20:46Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "4c9adf32d",
+    "sha": "d58860365",
     "dirty": false
   },
   "decisions": [
@@ -133,11 +133,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Dead Settings Provider directory bead workspace-kl4k1 implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
-    "beadId": "workspace-kl4k1",
+    "description": "Shared branding registry bead workspace-a9852 implemented and ready to commit/close; run required inspection after close, then claim workspace-bzy4x.",
+    "beadId": "workspace-a9852",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Settings/Provider",
-      "scripts/build-cli.mjs"
+      "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+      "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx",
+      "src/dashboard/frontend/src/components/chat/ProviderIcons.tsx"
     ]
   },
   "beadsMapping": {},
@@ -205,6 +206,12 @@
       "timestamp": "2026-06-12T17:15:27Z",
       "reason": "bead-progress",
       "note": "Implemented workspace-kl4k1: deleted the dead Settings/Provider directory (ProviderCard, ProviderPanel, ThinkingLevelSlider); grep shows no source imports remain, only the preserved historical SettingsPage test comment. While running the required lint gate, scripts/build-cli.mjs failed moving dist/dashboard to /tmp with EXDEV, so the same bead commit includes a root-cause moveDirSync EXDEV fallback required for lint to complete. Verified with npm run typecheck, npm run lint, and npm --prefix ./src/dashboard/frontend run test.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:20:46Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-a9852: added shared/branding with typed PROVIDER_BRANDS for all 10 providers, HARNESS_BRANDS for claude-code/codex/pi, ProviderLogo, HarnessLogo, ProviderDot, and ProviderLetterBadge; Pi renders a π glyph tile; chat/ProviderIcons.tsx is now a compatibility re-export. Added branding component tests. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/shared/branding/__tests__/branding.test.tsx, full frontend tests, and npm run typecheck.",
       "agentModel": "gpt-5.5"
     }
   ],
