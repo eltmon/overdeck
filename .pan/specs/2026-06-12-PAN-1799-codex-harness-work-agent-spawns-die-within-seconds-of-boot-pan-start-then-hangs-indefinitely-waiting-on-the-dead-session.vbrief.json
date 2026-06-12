@@ -1,0 +1,85 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T19:42:12.196Z",
+    "updated": "2026-06-12T19:42:12.196Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1799: Codex-harness work agent spawns die within seconds of boot; pan start then hangs indefinitely waiting on the dead session",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1799",
+    "title": "Codex-harness work agent spawns die within seconds of boot; pan start then hangs indefinitely waiting on the dead session",
+    "status": "proposed",
+    "uid": "2bbcd8ca-6665-4428-a849-344a1c73e95f",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-12T19:42:12.196Z",
+    "updated": "2026-06-12T19:42:12.196Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1799",
+        "label": "PAN-1799",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1799-codex-harness-work-agent-spawns-die-within-seconds-of-boot-pan-start-then-hangs-indefinitely-waiting-on-the-dead-session.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):\n\n1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`.\n2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn.\n3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.\n\nContrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).\n\nSuspects: the codex TUI exiting when the rollout/thread-id capture fails; the work-agent kickoff delivery path not codex-aware (related: PAN-1793 pi delivery, PAN-1789 codex status tracking); or launcher env (the work launcher exports CLIProxy ANTHROPIC_* vars — fine for claude-code, possibly confusing for codex).\n\nImpact: the gpt-5.5+codex work-agent pairing — the built-in default for OpenAI models once PAN-1787 lands — cannot boot at all. This blocks PAN-1787's own implementation value and tonight's fleet rebalancing. Also fix the secondary bug: `pan start` must fail fast (bounded wait) when the spawned session dies, not hang.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T19:42:12.196Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):\n\n1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`.\n2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn.\n3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.\n\nContrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).\n\nSuspects: the codex TUI exiting when the rollout/thread-id capture fails; the work-agent kickoff delivery path not codex-aware (related: PAN-1793 pi delivery, PAN-1789 codex status tracking); or launcher env (the work launcher exports CLIProxy ANTHROPIC_* vars — fine for claude-code, possibly confusing for codex).\n\nImpact: the gpt-5.5+codex work-agent pairing — the built-in default for OpenAI models once PAN-1787 lands — cannot boot at all. This blocks PAN-1787's own implementation value and tonight's fleet rebalancing. Also fix the secondary bug: `pan start` must fail fast (bounded wait) when the spawned session dies, not hang.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):",
+            "status": "pending",
+            "created": "2026-06-12T19:42:12.196Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`. 2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn. 3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.",
+            "status": "pending",
+            "created": "2026-06-12T19:42:12.196Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Contrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).",
+            "status": "pending",
+            "created": "2026-06-12T19:42:12.196Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

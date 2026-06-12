@@ -1,0 +1,52 @@
+{
+  "version": "1",
+  "issueId": "PAN-18031",
+  "created": "2026-06-12T16:54:07.013Z",
+  "updated": "2026-06-12T17:31:11.882Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-12T17:31:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-18031\n\n# Review Synthesis — PAN-18031 — 2026-06-12T17:30:13Z\n\n## Verdict: CHANGES REQUESTED — work-tui launcher contract mismatch and CI worker serialization remain blocking\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/context.json\n- Branch: feature/pan-18031\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031\n- HEAD reviewed: 49f88000a8ac970136dcf13591e13dbc4f54813e\n- Cycle number: 2\n- Prior cycle SHA: 019db5b171682a5f31eb2e6eee16adcfd7e22a91\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/requirements.md | 2 |\n\n## Blocking Findings\n\n### [requirements] Work-tui launcher omits the command flags required by the committed kickoff — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/launcher-generator.ts:609`\nThe requirements reviewer classified this as `Scope: in_pr_scope`, and the cited requirement and implementation lines are inside the PR diff: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/kickoff.md` was added by this PR, while `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/launcher-generator.ts:609`-`/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/launcher-generator.ts:623` and `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/__tests__/launcher-generator.test.ts:917`-`/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/__tests__/launcher-generator.test.ts:930` changed in the PR.\n\nThe committed kickoff requires the work-agent Codex command shape `codex -m <model> -s <workspace-write> -c approval_policy=never --skip-git-repo-check` at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/kickoff.md:116` and repeats it at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/kickoff.md:147`. The implementation emits only `codex [-m model] --skip-git-repo-check` and the updated unit test asserts that `approval_policy=never` and `-s workspace-write` are absent. If the Settings-driven `config.toml` contract is the intended replacement, the authoritative PAN-18031/PAN-1803 requirement artifact must be updated to state that contract and include evidence that work agents always receive the required sandbox and approval values from `getCodexLauncherFields`.\n\n### [performance, requirements] CI still serializes the root Vitest suite instead of fixing the delay-test root cause — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/vitest.config.ts:20`\nThis duplicate finding appeared in both the performance and requirements reports; it is counted once here at blocker severity. The cited lines are inside the PR diff: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/vitest.config.ts:20`-`/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/vitest.config.ts:23` changed in this PR.\n\nThe configuration still sets `maxWorkers: process.env.CI ? 1 : 4`, and the adjacent comment says the one-worker CI path is to avoid OOM from reconciler tests with real async I/O, sleep, and retry behavior. That directly violates the repository fake-timers rule and the no-workaround policy: retry/backoff/delay tests must be fixed with `vi.useFakeTimers()` plus timer advancement, or genuine wall-clock tests must be isolated outside the default run, rather than serializing the whole default suite.\n\n## Non-blocking Findings\n\n### [requirements] Whole-feature live-session acceptance is not proven in static review\nThe requirements reviewer marked the scratch-issue acceptance in `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/kickoff.md:121` and `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/kickoff.md:152` as `Scope: whole_feature_scope`. The manifest and changed files do not contain live evidence that a Codex work agent survives idle, processes `pan tell`, closes a bead, and avoids orphaning. This should be verified by the test/UAT role rather than treated as a static-review blocker.\n\n### [requirements] Existing Codex readiness, delivery, resume, and recovery wiring is outside this PR's changed-file set\nThe requirements reviewer found current evidence in `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/src/lib/agents.ts`, but that file is outside the PR changed-file manifest. That evidence is useful context, but not an in-PR blocker for this synthesis.\n\n### [requirements] Codex conversation TUI behavior is pre-existing\nThe requirements reviewer marked the Codex conversation TUI path as `Scope: pre_existing`; it remains covered by existing launcher code/tests and is not a new PR deliverable.\n\n## Scope Note\nThe requirements manifest still has empty acceptance criteria, non-goals, and traces, so the requirements reviewer used the closed PAN-18031 bead mirror and committed kickoff artifact as the available requirement text. Whole-feature requirements involving live Codex agent behavior were kept non-blocking because they are outside the static changed-file set and should be exercised by the downstream test/UAT role.\n\n## Clean Sub-roles\n- security: no security blockers or advisory findings.\n- correctness: no correctness blockers or advisory findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-18031/.pan/review/agent-pan-18031-review-49f88000/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-18031 -m \"Fixed review issues\"`"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T16:54Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-12T16:54:07.013Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T16:55Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-12T16:55:04.086Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:09Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-12T17:09:59.039Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:16Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-12T17:16:21.350Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:20Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-12T17:20:25.445Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-12T17:31:11.882Z"
+    }
+  ]
+}

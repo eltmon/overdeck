@@ -1,0 +1,85 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T19:45:28.246Z",
+    "updated": "2026-06-12T19:45:28.246Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1807: Handoff agents complete fixes but nothing submits them — PAN-1800 fix sat pushed-but-PR-less while every PR inherited red CI",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1807",
+    "title": "Handoff agents complete fixes but nothing submits them — PAN-1800 fix sat pushed-but-PR-less while every PR inherited red CI",
+    "status": "proposed",
+    "uid": "495f86a5-4001-4fa7-94c1-37d69e7f3c7f",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-12T19:45:28.246Z",
+    "updated": "2026-06-12T19:45:28.246Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1807",
+        "label": "PAN-1807",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1807-handoff-agents-complete-fixes-but-nothing-submits-them-pan-1800-fix-sat-pushed-but-pr-less-while-every-pr-inherited-red-ci.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Evidence (2026-06-12)\n\nA handoff conversation agent in `workspaces/feature-pan-1800` fixed the broken Playwright spec from PAN-1800 (commit `53d4ac20f`, `test(dashboard): update resource strip spec`), pushed the branch to origin, verified the target spec green locally, and reported done in its pane.\n\nThen: nothing. No PR was opened, no `pan done`, no review request, no operator surface. Main stayed red for ~a day, every open PR (including the PAN-1803 keystone PR #1804) inherited the failure, and the fix was only discovered by manually auditing the workspace. The operator merged it by hand (`2148beaf7`).\n\n## Gap\n\nHandoff conversations (`pan handoff`) intentionally bypass the work-agent pipeline, but they have **no completion contract at all**. When one finishes real work on a feature branch, the work is invisible: not in `pan review pending`, not in the dashboard needs-you queue, not a PR.\n\n## Desired behavior\n\nWhen a handoff conversation working in a feature workspace pushes commits, at least one of:\n- it is instructed (in the handoff kickoff template) to finish by opening a PR or running the submit flow, or\n- the system detects pushed-but-unsubmitted feature branches with a recent handoff conversation and surfaces them in the dashboard needs-you / `pan review pending` as 'completed handoff work awaiting submission'.\n\n## Related\n- PAN-1790 (handoff CLI ergonomics), PAN-1802 (handoff prompt-too-long) — same flow, different gaps.\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T19:45:28.246Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Evidence (2026-06-12)\n\nA handoff conversation agent in `workspaces/feature-pan-1800` fixed the broken Playwright spec from PAN-1800 (commit `53d4ac20f`, `test(dashboard): update resource strip spec`), pushed the branch to origin, verified the target spec green locally, and reported done in its pane.\n\nThen: nothing. No PR was opened, no `pan done`, no review request, no operator surface. Main stayed red for ~a day, every open PR (including the PAN-1803 keystone PR #1804) inherited the failure, and the fix was only discovered by manually auditing the workspace. The operator merged it by hand (`2148beaf7`).\n\n## Gap\n\nHandoff conversations (`pan handoff`) intentionally bypass the work-agent pipeline, but they have **no completion contract at all**. When one finishes real work on a feature branch, the work is invisible: not in `pan review pending`, not in the dashboard needs-you queue, not a PR.\n\n## Desired behavior\n\nWhen a handoff conversation working in a feature workspace pushes commits, at least one of:\n- it is instructed (in the handoff kickoff template) to finish by opening a PR or running the submit flow, or\n- the system detects pushed-but-unsubmitted feature branches with a recent handoff conversation and surfaces them in the dashboard needs-you / `pan review pending` as 'completed handoff work awaiting submission'.\n\n## Related\n- PAN-1790 (handoff CLI ergonomics), PAN-1802 (handoff prompt-too-long) — same flow, different gaps.\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "it is instructed (in the handoff kickoff template) to finish by opening a PR or running the submit flow, or",
+            "status": "pending",
+            "created": "2026-06-12T19:45:28.246Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "the system detects pushed-but-unsubmitted feature branches with a recent handoff conversation and surfaces them in the dashboard needs-you / pan review pending as 'completed handoff work awaiting submission'.",
+            "status": "pending",
+            "created": "2026-06-12T19:45:28.246Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "PAN-1790 (handoff CLI ergonomics), PAN-1802 (handoff prompt-too-long) — same flow, different gaps.",
+            "status": "pending",
+            "created": "2026-06-12T19:45:28.246Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}
