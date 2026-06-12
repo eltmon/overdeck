@@ -17,7 +17,6 @@ import {
   BarChart3,
   Route,
   MessageCircle,
-  Lightbulb,
   AlertTriangle,
   Key,
   GitBranch,
@@ -52,6 +51,7 @@ import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
+import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -430,16 +430,16 @@ function formatCodexExpiry(expiresAt?: string): string | null {
 }
 
 // Provider definitions
-const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
-  { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
-  { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
-  { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
-  { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
-  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
-  { id: 'mimo', name: 'Xiaomi MiMo', icon: Zap, placeholder: 'sk-... or tp-...' },
-  { id: 'nous', name: 'Nous Portal', icon: Globe, placeholder: 'ns-...' },
-  { id: 'dashscope', name: 'Alibaba DashScope', icon: Globe, placeholder: 'sk-...' },
+const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
+  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
+  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
+  { id: 'google', name: 'Google', placeholder: 'AIza...' },
+  { id: 'kimi', name: 'Kimi (Moonshot)', placeholder: 'sk-kimi-...' },
+  { id: 'zai', name: 'Zhipu (GLM)', placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', placeholder: 'eyJ...' },
+  { id: 'mimo', name: 'Xiaomi MiMo', placeholder: 'sk-... or tp-...' },
+  { id: 'nous', name: 'Nous Portal', placeholder: 'ns-...' },
+  { id: 'dashscope', name: 'Alibaba DashScope', placeholder: 'sk-...' },
 ];
 
 const TTS_EVENT_KEYS = [
@@ -1644,7 +1644,7 @@ export function SettingsPage() {
               <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
                 {/* Summary row */}
                 <div className="flex items-center gap-3 px-3 py-2.5">
-                  <provider.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ProviderLogo provider={provider.id} label={provider.name} className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0">{provider.name}</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1835,16 +1835,19 @@ export function SettingsPage() {
                     )}
                     <label className="block space-y-1.5">
                       <span className="text-xs font-medium text-foreground">Default harness</span>
-                      <select
-                        value={providerHarness}
-                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
-                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                      >
-                        <option value="">Default ({harnessLabel(builtInHarness)})</option>
-                        <option value="claude-code">Claude Code</option>
-                        <option value="pi">Pi</option>
-                        <option value="codex">Codex</option>
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <HarnessLogo harness={(providerHarness || builtInHarness) as Harness} className="w-4 h-4 shrink-0" />
+                        <select
+                          value={providerHarness}
+                          onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
+                          className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">Default ({harnessLabel(builtInHarness)})</option>
+                          <option value="claude-code">Claude Code</option>
+                          <option value="pi">Pi</option>
+                          <option value="codex">Codex</option>
+                        </select>
+                      </div>
                     </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
@@ -1882,7 +1885,7 @@ export function SettingsPage() {
           {/* OpenRouter as part of providers */}
           <div className="border border-transparent rounded-lg hover:border-border transition-colors">
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+              <ProviderLogo provider="openrouter" label="OpenRouter" className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground flex-1">OpenRouter</span>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1919,16 +1922,22 @@ export function SettingsPage() {
               <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Default harness</span>
-                  <select
-                    value={formData.models.provider_harnesses?.openrouter ?? ''}
-                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
-                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
-                    <option value="claude-code">Claude Code</option>
-                    <option value="pi">Pi</option>
-                    <option value="codex">Codex</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <HarnessLogo
+                      harness={(formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter || 'claude-code') as Harness}
+                      className="w-4 h-4 shrink-0"
+                    />
+                    <select
+                      value={formData.models.provider_harnesses?.openrouter ?? ''}
+                      onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
+                      <option value="claude-code">Claude Code</option>
+                      <option value="pi">Pi</option>
+                      <option value="codex">Codex</option>
+                    </select>
+                  </div>
                 </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
