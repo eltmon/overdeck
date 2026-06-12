@@ -153,6 +153,10 @@ export function ConversationPanel({
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
   const streamMessagesEnabled = useConversationMessagesStream(conversation);
+  // Ref mirrors the latest streaming state so the HTTP queryFn can discard
+  // responses that were already in flight when streaming became active.
+  const streamActiveRef = useRef(streamMessagesEnabled);
+  streamActiveRef.current = streamMessagesEnabled;
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -192,7 +196,19 @@ export function ConversationPanel({
   // keep the existing polling path for non-claude harnesses and historical views.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
-    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
+    queryFn: async ({ signal }) => {
+      const fetched = await fetchMessages(conversation.name, signal);
+      // If the WS subscription became active while this HTTP request was in
+      // flight, the subscription (not this older HTTP response) is the
+      // authoritative cache writer for live Claude conversations. Return the
+      // existing cache value instead so newer streamed state is never
+      // overwritten by stale HTTP data.
+      if (streamActiveRef.current) {
+        const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
+        return cached ?? { messages: [], workLog: [] };
+      }
+      return fetched;
+    },
     enabled: !streamMessagesEnabled,
     refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
   });
