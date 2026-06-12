@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T17:11:24Z",
+  "updated": "2026-06-12T17:15:27Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "7321d85f8",
+    "sha": "4c9adf32d",
     "dirty": false
   },
   "decisions": [
@@ -133,11 +133,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Dashboard start-route harness forwarding bead workspace-wjwqy implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
-    "beadId": "workspace-wjwqy",
+    "description": "Dead Settings Provider directory bead workspace-kl4k1 implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
+    "beadId": "workspace-kl4k1",
     "filesToRead": [
-      "src/dashboard/server/routes/agents.ts",
-      "src/dashboard/server/routes/__tests__/agents-start-args.test.ts"
+      "src/dashboard/frontend/src/components/Settings/Provider",
+      "scripts/build-cli.mjs"
     ]
   },
   "beadsMapping": {},
@@ -199,6 +199,12 @@
       "timestamp": "2026-06-12T17:11:24Z",
       "reason": "bead-progress",
       "note": "Implemented workspace-wjwqy: extracted dashboard start-route pan start argument construction into buildPanStartArgs and used it in both local spawn paths so --harness is forwarded only when an explicit harness survives validation/policy collapse; unset harnesses now remain omitted from spawn args. Added route coverage for unset, explicit, and host-override args. Verified with npx vitest run src/dashboard/server/routes/__tests__/agents-start-args.test.ts --reporter=dot and npm run typecheck.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:15:27Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-kl4k1: deleted the dead Settings/Provider directory (ProviderCard, ProviderPanel, ThinkingLevelSlider); grep shows no source imports remain, only the preserved historical SettingsPage test comment. While running the required lint gate, scripts/build-cli.mjs failed moving dist/dashboard to /tmp with EXDEV, so the same bead commit includes a root-cause moveDirSync EXDEV fallback required for lint to complete. Verified with npm run typecheck, npm run lint, and npm --prefix ./src/dashboard/frontend run test.",
       "agentModel": "gpt-5.5"
     }
   ],
