@@ -131,19 +131,40 @@ if [[ "$AGENT_ID" =~ ^agent-.+-review-(security|correctness|performance|requirem
     R_SUB=$(sed -nE 's/.*"reviewSubRole"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
     R_SYNTH=$(sed -nE 's/.*"reviewSynthesisAgentId"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
     if [ -n "$R_OUT" ] && [ -n "$R_SUB" ] && [ -n "$R_SYNTH" ] && [ -s "$R_OUT" ]; then
+      # PAN-1498: requirements reports must pass the trace validator before
+      # synthesis is signaled. If the validator is unavailable, fall back to
+      # the legacy file-present contract with a warning.
+      R_TMP=$(mktemp)
+      R_SIGNAL="REVIEWER_READY"
+      if [ "$R_SUB" = "requirements" ] && command -v pan >/dev/null 2>&1 && pan review validate-trace --help >/dev/null 2>&1; then
+        R_REASON=$(mktemp)
+        if pan review validate-trace "$R_OUT" 2>"$R_REASON"; then
+          printf 'REVIEWER_READY %s %s' "$R_SUB" "$R_OUT" > "$R_TMP"
+        else
+          R_REASON_TEXT=$(cat "$R_REASON")
+          printf 'REVIEWER_FAILED %s %s' "$R_SUB" "$R_REASON_TEXT" > "$R_TMP"
+          R_SIGNAL="REVIEWER_FAILED"
+        fi
+        rm -f "$R_REASON"
+      else
+        if [ "$R_SUB" = "requirements" ]; then
+          echo "[$(date -Iseconds)] stop-hook: $AGENT_ID requirements trace validator unavailable — falling back to file-present READY" \
+            >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+        fi
+        printf 'REVIEWER_READY %s %s' "$R_SUB" "$R_OUT" > "$R_TMP"
+      fi
+
       # Deliver via the load-buffer + paste-buffer + Enter pattern on the
       # panopticon socket (matches the API-error nudge above and the project's
       # tmux-delivery rule). The synthesis session is always an interactive
       # tmux session, so the paste reaches its prompt.
-      R_TMP=$(mktemp)
-      printf 'REVIEWER_READY %s %s' "$R_SUB" "$R_OUT" > "$R_TMP"
       tmux -L panopticon load-buffer "$R_TMP" 2>/dev/null
       tmux -L panopticon paste-buffer -t "$R_SYNTH" 2>/dev/null
       sleep 0.3
       tmux -L panopticon send-keys -t "$R_SYNTH" C-m 2>/dev/null
       rm -f "$R_TMP"
       touch "$R_MARKER"
-      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID signaled REVIEWER_READY $R_SUB to $R_SYNTH" \
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID signaled $R_SIGNAL $R_SUB to $R_SYNTH" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true
     fi
   fi

@@ -5751,7 +5751,20 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     if (outputWrittenForThisRun) {
       // Report exists for this run but the Stop-hook didn't signal (no fresh
       // marker) — back it up with READY. Safe: the report is on disk.
-      signal = 'ready';
+      // PAN-1498: requirements reports must pass the trace validator before
+      // we back them up with READY. If the validator is unavailable, fall
+      // back to the legacy file-present contract.
+      if (state.reviewSubRole === 'requirements') {
+        const validation = await validateRequirementsTraceAsync(outputPath!);
+        if (validation.ok) {
+          signal = 'ready';
+        } else {
+          signal = 'failed';
+          reason = validation.reason;
+        }
+      } else {
+        signal = 'ready';
+      }
     } else if (reviewerSessionAlive) {
       // Still working or idling attachably. Only intervene if well past the
       // deadline (genuinely wedged).
@@ -6426,6 +6439,32 @@ export function startDeacon(): void {
 /**
  * Stop the deacon patrol loop
  */
+
+/**
+ * PAN-1498: validate a requirements review report via the CLI shim.
+ * Returns ok=true when the report passes or when the validator is unavailable
+ * (preserving the legacy file-present contract). Returns ok=false with the
+ * validator's one-line reason when validation fails.
+ */
+async function validateRequirementsTraceAsync(outputPath: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  // Probe whether the validator subcommand is available on this worker.
+  try {
+    await execFileAsync('pan', ['review', 'validate-trace', '--help']);
+  } catch {
+    return { ok: true };
+  }
+
+  try {
+    await execFileAsync('pan', ['review', 'validate-trace', outputPath]);
+    return { ok: true };
+  } catch (err) {
+    const stderr =
+      (err && typeof err === 'object' && 'stderr' in err ? String((err as { stderr?: unknown }).stderr) : '') ||
+      'requirements trace validation failed';
+    return { ok: false, reason: stderr.trim() };
+  }
+}
+
 export function stopDeacon(): void {
   if (deaconInterval) {
     clearInterval(deaconInterval);

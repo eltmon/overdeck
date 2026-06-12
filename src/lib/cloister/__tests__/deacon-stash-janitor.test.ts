@@ -115,9 +115,13 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 const execMock = vi.hoisted(() => vi.fn());
+const execFileMock = vi.hoisted(() => vi.fn((_file: unknown, _args: unknown, _opts: unknown, _callback: unknown) => {
+  const cb = typeof _opts === 'function' ? _opts : _callback;
+  if (typeof cb === 'function') cb(null, '', '');
+}));
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock, execFile: vi.fn() };
+  return { ...actual, exec: execMock, execFile: execFileMock };
 });
 
 import { checkInspectAgentTimeouts, cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
@@ -148,6 +152,7 @@ const mockGetReviewStatus = vi.mocked(getReviewStatusSync);
 const mockSetReviewStatus = vi.mocked(setReviewStatusSync);
 const mockCreateTracker = vi.mocked(createTracker);
 const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigSync);
+const mockExecFile = vi.mocked(execFileMock);
 
 function installExecMock(resultsByCommand: Record<string, string | Error>) {
   execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
@@ -396,6 +401,10 @@ describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
+    mockExecFile.mockImplementation((_file: unknown, _args: unknown, _opts: unknown, cb?: unknown) => {
+      const callback = typeof _opts === 'function' ? _opts : cb;
+      if (typeof callback === 'function') callback(null, '', '');
+    });
   });
 
   it('signals synthesis when a reviewer disappears before writing output', async () => {
@@ -498,6 +507,104 @@ describe('monitorReviewConvoySignals', () => {
     }));
     expect(actions).toEqual([
       `Signaled REVIEWER_READY security ${outputPath} to agent-pan-879-review`,
+    ]);
+  });
+
+  it('signals REVIEWER_FAILED when a requirements report fails trace validation', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-requirements/review-requirements.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-requirements'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review-requirements',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'stopped',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'requirements',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: outputPath,
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+
+    mockExecFile.mockImplementation((file: unknown, args: unknown, _opts: unknown, cb?: unknown) => {
+      const callback = typeof _opts === 'function' ? _opts : cb;
+      const argv = Array.isArray(args) ? args : [];
+      if (String(file) === 'pan' && argv[0] === 'review' && argv[1] === 'validate-trace' && argv[2] === '--help') {
+        if (typeof callback === 'function') callback(null, '', '');
+        return;
+      }
+      if (String(file) === 'pan' && argv[0] === 'review' && argv[1] === 'validate-trace') {
+        const err = new Error('validation failed') as any;
+        err.stderr = 'requirements review missing live code path trace for ACs: AC-1';
+        if (typeof callback === 'function') callback(err, '', err.stderr);
+        return;
+      }
+      if (typeof callback === 'function') callback(null, '', '');
+    });
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      'REVIEWER_FAILED requirements requirements review missing live code path trace for ACs: AC-1',
+    );
+    expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'failed',
+    }));
+    expect(actions).toEqual([
+      'Signaled REVIEWER_FAILED requirements requirements review missing live code path trace for ACs: AC-1 to agent-pan-879-review',
+    ]);
+  });
+
+  it('signals REVIEWER_READY when the requirements validator is unavailable', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-requirements/review-requirements.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-requirements'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review-requirements',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'stopped',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'requirements',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: outputPath,
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+
+    mockExecFile.mockImplementation((file: unknown, args: unknown, _opts: unknown, cb?: unknown) => {
+      const callback = typeof _opts === 'function' ? _opts : cb;
+      const argv = Array.isArray(args) ? args : [];
+      if (String(file) === 'pan' && argv[0] === 'review' && argv[1] === 'validate-trace' && argv[2] === '--help') {
+        const err = new Error('unknown command') as any;
+        err.stderr = 'unknown command';
+        if (typeof callback === 'function') callback(err, '', err.stderr);
+        return;
+      }
+      if (typeof callback === 'function') callback(null, '', '');
+    });
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      `REVIEWER_READY requirements ${outputPath}`,
+    );
+    expect(agents.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'ready',
+    }));
+    expect(actions).toEqual([
+      `Signaled REVIEWER_READY requirements ${outputPath} to agent-pan-879-review`,
     ]);
   });
 });
