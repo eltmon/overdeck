@@ -1,4 +1,18 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+
+const mergeTrainMocks = vi.hoisted(() => ({
+  resolveProjectFromIssueSync: vi.fn(),
+  isMergeTrainEnabledForProject: vi.fn(() => false),
+}));
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssueSync: mergeTrainMocks.resolveProjectFromIssueSync,
+}));
+
+vi.mock('../../../../src/lib/cloister/auto-merge-policy.js', () => ({
+  isMergeTrainEnabledForProject: mergeTrainMocks.isMergeTrainEnabledForProject,
+}));
+
 import { runMergeTrainReconcile } from '../../../../src/lib/cloister/merge-train.js';
 import type { ReconcileDeps } from '../../../../src/lib/cloister/merge-train-reconciler.js';
 
@@ -10,6 +24,12 @@ const mockDeps = (siblings: string[]): ReconcileDeps => ({
 });
 
 describe('runMergeTrainReconcile (PAN-1691 flag gating)', () => {
+  beforeEach(() => {
+    mergeTrainMocks.resolveProjectFromIssueSync.mockReset();
+    mergeTrainMocks.isMergeTrainEnabledForProject.mockReset();
+    mergeTrainMocks.isMergeTrainEnabledForProject.mockReturnValue(false);
+  });
+
   it('is a no-op when the merge-train flag is off and never touches the deps', async () => {
     const getReadySiblings = vi.fn(() => ['PAN-2']);
     const out = await runMergeTrainReconcile('PAN-1', {
@@ -29,5 +49,20 @@ describe('runMergeTrainReconcile (PAN-1691 flag gating)', () => {
       { issueId: 'PAN-2', result: 'unaffected' },
       { issueId: 'PAN-3', result: 'unaffected' },
     ]);
+  });
+
+  it('does not load git deps when the merged issue project disables merge train', async () => {
+    mergeTrainMocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'pan',
+      projectName: 'Panopticon',
+      projectPath: '/repo/pan',
+    });
+    mergeTrainMocks.isMergeTrainEnabledForProject.mockReturnValue(false);
+
+    const out = await runMergeTrainReconcile('PAN-1');
+
+    expect(out).toEqual([]);
+    expect(mergeTrainMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-1');
+    expect(mergeTrainMocks.isMergeTrainEnabledForProject).toHaveBeenCalledWith('pan');
   });
 });

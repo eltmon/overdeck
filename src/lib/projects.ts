@@ -126,6 +126,11 @@ export interface ProjectConfig {
    * Unset = fall through to the global require-UAT setting.
    */
   auto_merge_default?: 'auto' | 'hold';
+  /**
+   * PAN-1696: per-project merge-train override. 'enabled'/'disabled' force the
+   * project state; unset falls through to the global merge-train flag.
+   */
+  merge_train?: 'enabled' | 'disabled';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
@@ -244,6 +249,20 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   const updated: ProjectConfig = { ...config };
   if (value === null) delete updated.auto_merge_default;
   else updated.auto_merge_default = value;
+  registerProjectSync(key, updated);
+}
+
+/**
+ * PAN-1696: set or clear a project's merge-train override. `value === null`
+ * removes the field so the project falls through to the global merge-train flag.
+ * Preserves all other project config.
+ */
+export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  if (value === null) delete updated.merge_train;
+  else updated.merge_train = value;
   registerProjectSync(key, updated);
 }
 
@@ -728,4 +747,3 @@ export const initializeProjectsConfig = (): Effect.Effect<void, FsError> =>
     try: () => initializeProjectsConfigSync(),
     catch: (cause) => new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'initializeProjectsConfig', cause }),
   });
-

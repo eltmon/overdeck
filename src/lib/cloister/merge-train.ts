@@ -10,6 +10,8 @@
  * agent-spawn machinery.
  */
 import { isMergeTrainEnabled } from '../database/app-settings.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
+import { isMergeTrainEnabledForProject } from './auto-merge-policy.js';
 import { reconcileStaleSiblings, type ReconcileDeps, type SiblingOutcome } from './merge-train-reconciler.js';
 
 export interface RunMergeTrainOptions {
@@ -17,6 +19,12 @@ export interface RunMergeTrainOptions {
   enabled?: () => boolean;
   /** Inject reconcile deps (tests). Defaults to the real git/spawn wiring. */
   deps?: ReconcileDeps;
+}
+
+function isMergeTrainEnabledForMergedIssue(mergedIssueId: string): boolean {
+  const project = resolveProjectFromIssueSync(mergedIssueId);
+  if (!project) return isMergeTrainEnabled();
+  return isMergeTrainEnabledForProject(project.projectKey);
 }
 
 /**
@@ -27,7 +35,7 @@ export async function runMergeTrainReconcile(
   mergedIssueId: string,
   opts: RunMergeTrainOptions = {},
 ): Promise<SiblingOutcome[]> {
-  const enabled = (opts.enabled ?? isMergeTrainEnabled)();
+  const enabled = opts.enabled ? opts.enabled() : isMergeTrainEnabledForMergedIssue(mergedIssueId);
   if (!enabled) return [];
 
   const deps = opts.deps ?? (await import('./merge-train-deps.js')).buildRealReconcileDeps();

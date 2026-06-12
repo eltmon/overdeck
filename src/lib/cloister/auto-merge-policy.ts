@@ -8,8 +8,10 @@
  *   3. global `flywheel.require_uat_before_merge`
  */
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
+import { isMergeTrainEnabled } from '../database/app-settings.js';
 
 export type ProjectAutoMergeDefault = 'auto' | 'hold' | undefined;
+export type ProjectMergeTrainOverride = 'enabled' | 'disabled' | undefined;
 
 /**
  * Returns true when the issue must be held for UAT (not auto-merged). Pure.
@@ -33,4 +35,13 @@ export function getProjectAutoMergeDefault(issueId: string): ProjectAutoMergeDef
   const config = getProjectSync(project.projectKey);
   const d = config?.auto_merge_default;
   return d === 'auto' || d === 'hold' ? d : undefined;
+}
+
+/** Resolve the effective merge-train flag for a registered project. */
+export function isMergeTrainEnabledForProject(projectKey: string): boolean {
+  const config = getProjectSync(projectKey);
+  const override: ProjectMergeTrainOverride = config?.merge_train;
+  if (override === 'enabled') return true;
+  if (override === 'disabled') return false;
+  return isMergeTrainEnabled();
 }
