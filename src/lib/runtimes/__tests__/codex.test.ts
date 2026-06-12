@@ -224,6 +224,33 @@ describe('findLatestRollout', () => {
     mkdirSync(join(home, 'sessions'), { recursive: true })
     expect(findLatestRollout(home)).toBeNull()
   })
+
+  it('skips newer subagent (guardian) rollouts in favor of the user thread (PAN-1805)', () => {
+    const home = join(ctx.agentsHome, 'agent-x', 'codex-home')
+    const day = join(home, 'sessions', '2026', '06', '12')
+    mkdirSync(day, { recursive: true })
+    const userPath = join(day, 'rollout-2026-06-12T11-19-17-019ebc6a-8368-7263-8dae-fbd31fc6025c.jsonl')
+    const guardianPath = join(day, 'rollout-2026-06-12T11-19-57-019ebc6b-1fcb-7711-a3b2-52a7c5f00ea1.jsonl')
+    writeFileSync(userPath, JSON.stringify({ type: 'session_meta', payload: { thread_source: 'user' } }) + '\n')
+    writeFileSync(guardianPath, JSON.stringify({ type: 'session_meta', payload: { thread_source: 'subagent', source: { subagent: { other: 'guardian' } } } }) + '\n')
+    const { utimesSync } = require('node:fs')
+    // The guardian thread interleaves writes with the main thread and is the
+    // most recently modified here — it must still lose to the user thread.
+    utimesSync(userPath, new Date(1000), new Date(1000))
+    utimesSync(guardianPath, new Date(2000), new Date(2000))
+
+    expect(findLatestRollout(home)).toBe(userPath)
+  })
+
+  it('falls back to a subagent rollout when no user thread exists', () => {
+    const home = join(ctx.agentsHome, 'agent-y', 'codex-home')
+    const day = join(home, 'sessions', '2026', '06', '12')
+    mkdirSync(day, { recursive: true })
+    const guardianPath = join(day, 'rollout-2026-06-12T11-19-57-019ebc6b-1fcb-7711-a3b2-52a7c5f00ea2.jsonl')
+    writeFileSync(guardianPath, JSON.stringify({ type: 'session_meta', payload: { thread_source: 'subagent' } }) + '\n')
+
+    expect(findLatestRollout(home)).toBe(guardianPath)
+  })
 })
 
 describe('CodexRuntimeSync.killAgent — JSONL-is-sacred', () => {

@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdir, rm, writeFile } from 'fs/promises';
+import { mkdir, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 import {
   resolveClaudeSessionId,
+  resolveCodexRolloutPath,
   resolveJsonlPath,
 } from '../jsonl-resolver.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
@@ -199,5 +200,120 @@ describe('resolveJsonlPath (PAN-830)', () => {
 
     expect(path).toContain(encoded);
     expect(path).toContain(`${CLAUDE_SESSION_ID}.jsonl`);
+  });
+});
+
+describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
+  const CODEX_AGENT_ID = 'agent-pan-1803';
+  // Each test gets a distinct thread-id: findRolloutPath caches by
+  // (codexHome, threadId) at module level, and a per-test suffix keeps the
+  // tmp-dir keys unique even across reruns.
+  let threadCounter = 0;
+
+  async function setupCodexAgent(opts: { threadId?: boolean; rollouts?: number } = {}): Promise<string[]> {
+    threadCounter += 1;
+    const agentDir = join(agentsDir, CODEX_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: CODEX_AGENT_ID,
+      harness: 'codex',
+      codexMode: 'work-tui',
+    }));
+    const sessionsDay = join(agentDir, 'codex-home', 'sessions', '2026', '06', '12');
+    await mkdir(sessionsDay, { recursive: true });
+
+    const rolloutPaths: string[] = [];
+    const count = opts.rollouts ?? 0;
+    for (let i = 0; i < count; i++) {
+      const threadId = `019ebc6b-1fcb-7711-a3b2-${String(threadCounter).padStart(6, '0')}${String(i).padStart(6, '0')}`;
+      const p = join(sessionsDay, `rollout-2026-06-12T11-0${i}-00-${threadId}.jsonl`);
+      await writeFile(p, '{"type":"session_meta"}\n');
+      // Stagger mtimes so "latest" is deterministic (filesystem mtime
+      // granularity can otherwise make sequential writes tie).
+      const t = new Date(Date.now() - (count - i) * 60_000);
+      await utimes(p, t, t);
+      rolloutPaths.push(p);
+    }
+    if (opts.threadId && rolloutPaths.length > 0) {
+      // Persist the thread-id of the FIRST (oldest) rollout so the fast path
+      // is distinguishable from the latest-rollout fallback.
+      const first = rolloutPaths[0]!;
+      const threadId = /-([0-9a-f-]{36})\.jsonl$/.exec(first)![1]!;
+      await writeFile(join(agentDir, 'codex-thread-id'), threadId);
+    }
+    return rolloutPaths;
+  }
+
+  it('resolves the rollout via the persisted thread-id fast path', async () => {
+    const rollouts = await setupCodexAgent({ threadId: true, rollouts: 2 });
+
+    const path = await resolveJsonlPath(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(rollouts[0]);
+  });
+
+  it('falls back to the latest rollout when no thread-id is persisted', async () => {
+    const rollouts = await setupCodexAgent({ rollouts: 3 });
+
+    const path = await resolveJsonlPath(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(rollouts[2]);
+  });
+
+  it('returns null when the codex agent has no rollout yet', async () => {
+    await setupCodexAgent({ rollouts: 0 });
+
+    const path = await resolveJsonlPath(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBeNull();
+  });
+
+  it('codex harness wins over a stale claude session.id', async () => {
+    const rollouts = await setupCodexAgent({ rollouts: 1 });
+    // Simulate a stale claude session from an earlier run of the same agent id.
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"stale":"claude"}\n');
+    await writeFile(join(agentsDir, CODEX_AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+
+    const path = await resolveJsonlPath(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(rollouts[0]);
+  });
+
+  it('resolveCodexRolloutPath returns null for agents without a codex-home', async () => {
+    const path = await resolveCodexRolloutPath(AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBeNull();
+  });
+
+  it('claude agents without a harness field keep the claude lookup (regression)', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}');
+    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+    // state.json without harness — pre-harness agents
+    await writeFile(join(agentsDir, AGENT_ID, 'state.json'), JSON.stringify({ id: AGENT_ID }));
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
   });
 });
