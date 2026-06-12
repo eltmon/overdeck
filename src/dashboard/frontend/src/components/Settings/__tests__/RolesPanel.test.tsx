@@ -94,6 +94,12 @@ function installFetchMock(opts: {
           kimi: [
             { id: 'kimi-k2.6-flash', name: 'Kimi K2.6 Flash', costPer1MTokens: 1 },
           ],
+          mimo: [
+            { id: 'mimo-vl', name: 'MiMo VL', costPer1MTokens: 1 },
+          ],
+          dashscope: [
+            { id: 'qwen3-max', name: 'Qwen3 Max', costPer1MTokens: 2 },
+          ],
         }),
       } as Response);
     }
@@ -140,6 +146,8 @@ describe('RolesPanel', () => {
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('MiMo > MiMo VL').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Alibaba DashScope > Qwen3 Max').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Default: Workhorse: Expensive')[0]).toHaveAttribute(
       'title',
       'Workhorse: Expensive = claude-opus-4-7',
@@ -160,6 +168,7 @@ describe('RolesPanel', () => {
       expect(within(select).getByRole('option', { name: 'Pi' })).toHaveValue('pi');
       expect(within(select).getByRole('option', { name: 'Codex' })).toHaveValue('codex');
     }
+    expect(screen.getAllByLabelText('Claude Code logo')).toHaveLength(7);
   });
 
   it('persists explicit role harness overrides', async () => {
@@ -172,6 +181,7 @@ describe('RolesPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Work harness')).toHaveValue('pi');
     });
+    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
 
     const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
       url.toString() === '/api/settings' && init?.method === 'PUT'

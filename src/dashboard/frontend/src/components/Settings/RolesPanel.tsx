@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { HARNESS_BRANDS, HarnessLogo, PROVIDER_BRANDS } from '../shared/branding';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
@@ -145,20 +146,6 @@ const ROLES: RoleDefinition[] = [
   },
 ];
 
-const PROVIDER_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  google: 'Google',
-  minimax: 'MiniMax',
-  zai: 'Z.AI',
-  glm: 'Z.AI',
-  kimi: 'Kimi',
-  mimo: 'MiMo',
-  nous: 'Nous Portal',
-  dashscope: 'Alibaba DashScope',
-  openrouter: 'OpenRouter',
-};
-
 async function fetchSettings(): Promise<SettingsResponse> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
@@ -249,6 +236,11 @@ function providerForModel(value: ModelRef, groups: Array<{ provider: string; mod
   return groups.find((group) => group.models.some((model) => model.id === value))?.provider ?? null;
 }
 
+function providerLabel(provider: string): string {
+  const registryProvider = provider === 'glm' ? 'zai' : provider;
+  return PROVIDER_BRANDS[registryProvider as keyof typeof PROVIDER_BRANDS]?.label ?? provider;
+}
+
 function providerWarning(
   value: ModelRef,
   workhorses: Required<Record<WorkhorseSlot, ModelRef>>,
@@ -261,7 +253,7 @@ function providerWarning(
   const resolved = resolveModelRef(value, workhorses, parentModelRef);
   const provider = providerForModel(resolved, groups);
   if (!provider) return null;
-  const label = PROVIDER_LABELS[provider] ?? provider;
+  const label = providerLabel(provider);
   if (providers?.[provider] === false) return `${label} is not configured; this model will not be reachable until the provider is enabled with credentials.`;
   if (provider === 'anthropic') {
     // Only warn about spend when authenticated via ANTHROPIC_API_KEY — Claude
@@ -389,21 +381,32 @@ function RoleHarnessSelect({
   disabled: boolean;
   onChange: (value: Harness | undefined) => void;
 }) {
+  const logoHarness = value ?? 'claude-code';
+  const logoLabel = value ? HARNESS_BRANDS[value].label : 'Provider default';
+
   return (
     <label className="space-y-1.5">
       <span className="text-xs font-medium text-foreground">{label}</span>
-      <select
-        aria-label={label}
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value ? event.target.value as Harness : undefined)}
-        disabled={disabled}
-        className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-      >
-        <option value="">Provider default</option>
-        <option value="claude-code">Claude Code</option>
-        <option value="pi">Pi</option>
-        <option value="codex">Codex</option>
-      </select>
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-popover"
+          title={`${logoLabel} harness`}
+        >
+          <HarnessLogo harness={logoHarness} className="h-4 w-4" />
+        </span>
+        <select
+          aria-label={label}
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value ? event.target.value as Harness : undefined)}
+          disabled={disabled}
+          className="min-w-0 flex-1 px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+        >
+          <option value="">Provider default</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="pi">Pi</option>
+          <option value="codex">Codex</option>
+        </select>
+      </div>
     </label>
   );
 }
@@ -453,7 +456,7 @@ export function RolesPanel() {
     .filter(([, models]) => Array.isArray(models) && models.length > 0)
     .map(([provider, models]) => ({
       provider,
-      label: PROVIDER_LABELS[provider] ?? provider,
+      label: providerLabel(provider),
       models,
     }));
   const loading = settingsQuery.isLoading || availableModelsQuery.isLoading;

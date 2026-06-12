@@ -52,9 +52,9 @@ export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   minimax: { id: 'minimax', label: 'MiniMax', color: '#6366f1', Icon: createLetterIcon('M') },
   zai: { id: 'zai', label: 'Z.AI', color: '#ec4899', Icon: createLetterIcon('Z') },
   kimi: { id: 'kimi', label: 'Kimi', color: '#f59e0b', Icon: createLetterIcon('K') },
-  mimo: { id: 'mimo', label: 'Mimo', color: '#14b8a6', Icon: createLetterIcon('M') },
+  mimo: { id: 'mimo', label: 'MiMo', color: '#14b8a6', Icon: createLetterIcon('M') },
   nous: { id: 'nous', label: 'Nous Portal', color: '#8b5cf6', Icon: createLetterIcon('N') },
-  dashscope: { id: 'dashscope', label: 'DashScope', color: '#f97316', Icon: createLetterIcon('D') },
+  dashscope: { id: 'dashscope', label: 'Alibaba DashScope', color: '#f97316', Icon: createLetterIcon('D') },
   openrouter: { id: 'openrouter', label: 'OpenRouter', color: '#8b5cf6', Icon: createLetterIcon('O') },
 };
 
