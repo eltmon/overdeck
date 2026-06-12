@@ -4313,33 +4313,44 @@ function wrapDatabase(raw) {
 			return (...args) => {
 				if (transactionDepth === 0) {
 					raw.exec("BEGIN");
-					transactionDepth++;
+					transactionDepth = 1;
+					let committed = false;
 					try {
 						const result = fn(...args);
-						transactionDepth--;
 						raw.exec("COMMIT");
+						committed = true;
 						return result;
 					} catch (error) {
-						transactionDepth--;
-						raw.exec("ROLLBACK");
+						if (!committed) raw.exec("ROLLBACK");
 						throw error;
+					} finally {
+						transactionDepth = 0;
 					}
 				}
 				const savepoint = `panopticon_tx_${++savepointId}`;
 				raw.exec(`SAVEPOINT ${savepoint}`);
 				transactionDepth++;
+				let released = false;
 				try {
 					const result = fn(...args);
-					transactionDepth--;
 					raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+					released = true;
 					return result;
 				} catch (error) {
-					transactionDepth--;
-					raw.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-					raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+					if (!released) {
+						raw.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+						raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+					}
 					throw error;
+				} finally {
+					transactionDepth--;
 				}
 			};
+		},
+		loadExtension: (path) => {
+			if (!raw.loadExtension) throw new Error("SQLite driver does not support loadable extensions.");
+			raw.enableLoadExtension?.(true);
+			raw.loadExtension(path);
 		},
 		close: () => {
 			raw.close();
@@ -4355,13 +4366,13 @@ function loadNodeSqlite() {
 		throw new Error(`Unable to load node:sqlite (${message}). Panopticon requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`, { cause: error });
 	}
 }
-function openDatabase(path) {
+function openDatabase(path, options = {}) {
 	if (isBunRuntime()) {
 		const { Database } = _require("bun:sqlite");
 		return wrapDatabase(new Database(path));
 	}
 	const { DatabaseSync } = loadNodeSqlite();
-	return wrapDatabase(new DatabaseSync(path));
+	return wrapDatabase(new DatabaseSync(path, options));
 }
 function parseArrayColumn(value) {
 	if (!value) return [];
