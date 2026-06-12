@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { existsSync, unlinkSync } from 'fs';
+import { existsSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getAgentStateSync, getAgentDir, getLatestSessionIdSync } from '../../lib/agents.js';
 import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
@@ -44,9 +44,31 @@ export async function resetSessionCommand(id: string): Promise<void> {
     unlinkSync(sessionsFile);
   }
 
-  // claudeSessionId lives on the AgentRuntimeSnapshot in AgentStateService.
-  // The next SessionStart hook fire will emit agent.model_set with the fresh
-  // session id, overwriting the stale one — no explicit clear needed.
+  // Clear codex-thread-id — getLatestSessionIdSync's source #4. Leaving it made
+  // `pan start --fresh` refuse forever for any agent that ever attempted a
+  // codex spawn: reset cleared sources 1-2, then the fresh-start guard found
+  // the surviving thread-id and demanded --fresh again — a catch-22 (PAN-1799).
+  const codexThreadIdFile = join(agentDir, 'codex-thread-id');
+  if (existsSync(codexThreadIdFile)) {
+    unlinkSync(codexThreadIdFile);
+  }
+
+  // Clear runtime.json claudeSessionId (source #3). The old comment assumed
+  // "the next SessionStart hook overwrites it" — but the fresh-start guard
+  // consults getLatestSessionIdSync BEFORE any new session exists, so a
+  // surviving runtime id reproduces the same --fresh catch-22. The agent is
+  // stopped here (guarded above), so a direct read-modify-write is race-free.
+  // Keep this command in lockstep with getLatestSessionIdSync's source chain.
+  const runtimeFile = join(agentDir, 'runtime.json');
+  try {
+    if (existsSync(runtimeFile)) {
+      const runtime = JSON.parse(readFileSync(runtimeFile, 'utf-8'));
+      if (runtime.claudeSessionId) {
+        delete runtime.claudeSessionId;
+        writeFileSync(runtimeFile, JSON.stringify(runtime, null, 2));
+      }
+    }
+  } catch { /* non-fatal — file sources above are the primary chain */ }
 
   console.log(chalk.green(`✓ Reset session for ${agentId}`));
   console.log(chalk.dim(`  Previous session: ${previousSessionId}`));

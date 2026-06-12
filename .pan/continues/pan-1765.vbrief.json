@@ -1,0 +1,160 @@
+{
+  "version": "1",
+  "issueId": "PAN-1765",
+  "created": "2026-06-11T06:56:12.506Z",
+  "updated": "2026-06-11T13:18:18.759Z",
+  "gitState": {
+    "branch": "feature/pan-1765",
+    "sha": "8e3393c86",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Gate review dispatch at the single choke point spawnReviewRoleForIssuePromise (src/lib/cloister/review-agent.ts:296). All five dispatch paths route through it (deacon orphan-pending redispatch deacon.ts~1971, checkPostReviewCommits redispatch deacon.ts~2904, cloister startup recovery service.ts~773, HTTP trigger specialists.ts~1581, workspaces.ts review-request ~3625/~3831), so one gate covers everything. Verified: blockerReasons appears NOWHERE in src/lib/cloister/ today.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Gate scope: merge_conflict + not_mergeable blocker types only. Other blocker types (failing_checks, draft_pr, changes_requested, unresolved_conversations) do not gate review.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Freshness re-verification via local git probe (git fetch + git merge-tree --write-tree, non-destructive, git>=2.38), not GitHub API. Probe 'clean' clears the stale blocker and lets review proceed; 'conflicts' or 'unknown' defers review and dispatches a resolver.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Conflict resolution dispatched as work-role agent via spawnRun(issueId, 'work', {prompt}) reusing the PAN-1691 both-features-intent prompt pattern from merge-train-deps.dispatchConflictResolver. NOT syncMainIntoWorkspace (operator-surfaced since PAN-1531) and NOT ship role.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Gated result shape: { success: false, gated: true, message }. Review status stays 'pending' so the deacon pending-redispatch loop is the natural retry; callers log calm deferral and never increment reviewRetryCount (PAN-794 breaker must not trip on gated deferrals).",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Throttles: in-memory probe cache ~3 min per issue (deacon patrols every 60s must not git-fetch per tick); resolver re-dispatch >=30 min via new persisted ReviewStatus.conflictResolutionDispatchedAt (SQLite column conflict_resolution_dispatched_at, try/catch ALTER migration pattern schema.ts~1036ff) plus spawnRun session-exists idempotency.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "force:true does NOT bypass the gate — checkPostReviewCommits passes force:true so force cannot discriminate humans from automation, and verdicts on unmergeable branches are void regardless of who asked.",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Secondary fix (per issue text): merge-blocker-reconcile-service.ts line 47 currently skips rows that already have blockers, so stale flags never clear without a webhook. Extend reconcileOnce to re-verify merge_conflict/not_mergeable-flagged rows on a slower cadence (~10 min) via refreshMergeStateFromGitHub, which already removes the blocker when GitHub reports mergeable (webhook-handlers.ts~400).",
+      "recordedAt": "2026-06-11T07:04:43.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Stranding risk: a gated issue must self-recover. Review stays 'pending'; the deacon orphan-pending redispatch retries every patrol; once the resolver pushes a clean rebase the probe clears the blocker and dispatch proceeds. Do not flip review status to a new state ('blocked' etc.) — that would break the redispatch conditions (reviewStatus==='pending' && completed.processed && prUrl).",
+      "mitigation": "Keep status 'pending' + reviewNotes only. Verify the redispatch loop end-to-end in deacon-gated-deferral tests."
+    },
+    {
+      "id": "H2",
+      "summary": "Retry-counter poisoning: deacon paths increment reviewRetryCount and trip the PAN-794 review-infra breaker after repeated 'failed' dispatches. Gated deferrals are expected steady-state for many ticks while a resolver works.",
+      "mitigation": "gated results must never increment reviewRetryCount nor count toward the breaker; assert across N simulated patrol ticks."
+    },
+    {
+      "id": "H3",
+      "summary": "Probe cost: the gate runs on every dispatch attempt; deacon patrols are 60s. Unthrottled git fetch per issue per tick hammers origin across many flagged issues.",
+      "mitigation": "In-memory per-issue probe cache (~3 min) with a test-reset hook; resolver dispatch throttled via persisted conflictResolutionDispatchedAt (30 min)."
+    },
+    {
+      "id": "H4",
+      "summary": "spawnRun throws 'already running. Use pan tell' when the work session exists (agents.ts~3269). The resolver dispatch must catch this and treat it as already-dispatched, never crash the gate or the patrol.",
+      "mitigation": "Explicit catch in dispatchResolver; unit test for the already-running path."
+    },
+    {
+      "id": "H5",
+      "summary": "Do not regress adjacent review-agent logic: PAN-1131 stale-runId convoy respawn, PAN-1531 feedback archiving (a gated dispatch must NOT archive previous-cycle feedback the work agent still needs), PAN-1665 advancing-ceiling slot accounting (gated issue must not hold a slot), PAN-1213 tree-identical-rebase guard in checkPostReviewCommits.",
+      "mitigation": "Gate placement after session-idempotency but before reviewing-status write and before feedback archiving; release any reserved advancing slot on gated result; keep existing tests green."
+    },
+    {
+      "id": "H6",
+      "summary": "merge-train-deps.reDispatchVerification (merge-train-deps.ts:60) calls spawnRun(issueId,'review') directly, bypassing spawnReviewRoleForIssue — a pre-existing separate path. It only fires after a CLEAN rebase so conflict gating is not needed there. Out of scope; do not 'fix' it in this issue.",
+      "mitigation": "Leave untouched (surgical-changes rule). Noted for a future issue if it misbehaves."
+    },
+    {
+      "id": "H7",
+      "summary": "deacon hasPassedReview reads the LATEST history entry per type. Gating must not append misleading status_history entries (e.g. a synthetic 'pending' entry) that could confuse restore-from-history logic (deacon.ts~1811-1832).",
+      "mitigation": "Gated path writes reviewNotes only, never reviewStatus transitions or history-changing status flips."
+    },
+    {
+      "id": "H8",
+      "summary": "Timer-based tests (probe cache, dispatch throttle, reconcile-service cadence) must use vi.useFakeTimers — real delays cause OOM when parallelized (CLAUDE.md rule).",
+      "mitigation": "Fake timers in all throttle/cadence tests; no maxForks workarounds."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1765: bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
+      "timestamp": "2026-06-11T06:56:12.506Z"
+    },
+    {
+      "timestamp": "2026-06-11T07:04:43.000Z",
+      "reason": "planning",
+      "note": "Auto-mode discovery complete. Verified root causes: (1) no review dispatch path consults blockerReasons (zero hits in src/lib/cloister/); (2) checkPostReviewCommits resets passed verdicts on any HEAD tree change (the 05:31:56 signature) and force-redispatches convoys; (3) PAN-1620 reconcile service skips already-flagged rows so stale conflict flags never clear; (4) conflict resolution machinery exists only in the post-merge train reconciler. Plan: conflict gate at spawnReviewRoleForIssuePromise + resolver dispatch + stale-flag re-verification. 8 beads, vBRIEF written.",
+      "agentModel": "agent:claude-fable-5"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:09:45.545Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:10:19.994Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:11:40.894Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:13:53.840Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:14:20.253Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:01:08.022Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:18Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T13:18:18.687Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:18:18.759Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-11T13:18:18Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1765 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (46669ms):\n\nm\u001b[42m root \u001b[49m\u001b[39m tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m(d) settled but overflow persists → sends /clear followed by the reseed nudge\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 1st \"vi.fn()\" call to have been called with [ 'agent-pan-9001', '/clear' ], but called only 0 times\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/cloister/deacon-context-overflow.test.ts:\u001b[2m254:26\u001b[22m\u001b[39m\n    \u001b[90m252|\u001b[39m     \u001b[35mawait\u001b[39m \u001b[34mcheckApiErrorAgents\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m253|\u001b[39m\n    \u001b[90m254|\u001b[39m     \u001b[34mexpect\u001b[39m(mockSendKeys)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenNthCalledWith\u001b[39m(\u001b[34m1\u001b[39m\u001b[33m,\u001b[39m \u001b[33mSESSION\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'/clear'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                          \u001b[31m^\u001b[39m\n    \u001b[90m255|\u001b[39m     expect(mockSendKeys).toHaveBeenNthCalledWith(2, SESSION, expect.st…\n    \u001b[90m256|\u001b[39m     expect(mockSendKeys).toHaveBeenNthCalledWith(2, SESSION, expect.st…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m(e) loop guard: after /clear still overflowing → marks stuck, no further recovery\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected \"vi.fn()\" to be called with arguments: [ Array(3) ]\u001b[90m\n\nNumber of calls: \u001b[1m0\u001b[22m\n\u001b[31m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/lib/cloister/deacon-context-overflow.test.ts:\u001b[2m272:36\u001b[22m\u001b[39m\n    \u001b[90m270|\u001b[39m\n    \u001b[90m271|\u001b[39m     \u001b[34mexpect\u001b[39m(mockSendKeys)\u001b[33m.\u001b[39mnot\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalled\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m272|\u001b[39m     \u001b[34mexpect\u001b[39m(mockMarkWorkspaceStuck)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\n    \u001b[90m   |\u001b[39m                                    \u001b[31m^\u001b[39m\n    \u001b[90m273|\u001b[39m       \u001b[33mISSUE\u001b[39m\u001b[33m,\u001b[39m\n    \u001b[90m274|\u001b[39m       \u001b[32m'context_overflow'\u001b[39m\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯\u001b[22m\u001b[39m\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1765 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1765 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
+}

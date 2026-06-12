@@ -23,6 +23,9 @@ describe('auto-commit', () => {
     execSync('git commit -q -m "init"', { cwd: tmp });
     // Rename whatever the default branch is to `main` so the gate fires.
     execSync('git branch -M main', { cwd: tmp });
+    // Add a self-referencing origin so git pull --rebase origin main works
+    // (the auto-commit pulls before staging to prevent local/remote divergence).
+    execSync('git remote add origin .', { cwd: tmp });
   });
 
   afterEach(() => {
@@ -122,6 +125,7 @@ describe('queueBeadsAutoCommit (PAN-1441)', () => {
     execSync('git add README.md', { cwd: tmp });
     execSync('git commit -q -m "init"', { cwd: tmp });
     execSync('git branch -M main', { cwd: tmp });
+    execSync('git remote add origin .', { cwd: tmp });
   });
 
   afterEach(() => {

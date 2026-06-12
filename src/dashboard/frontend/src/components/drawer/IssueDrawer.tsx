@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
+import { toast } from 'sonner';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
@@ -252,6 +253,7 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
+        <DrawerPausedBanner agents={agents} />
         <DrawerTabs />
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div
@@ -303,6 +305,61 @@ export function IssueDrawer() {
         </div>
         <DrawerActionBar />
       </aside>
+    </div>
+  );
+}
+
+
+/** PAN-1779: a pause gate must be unmissable on the issue slideout — amber
+ * banner with the full reason (who paused it and the unpause condition) and a
+ * one-click Unpause. Amber = a human must act (style guide v1.2). */
+function DrawerPausedBanner({ agents }: { agents: ReadonlyArray<{ id: string; paused?: boolean; pausedReason?: string }> }) {
+  const paused = agents.filter((agent) => agent.paused === true);
+  if (paused.length === 0) return null;
+
+  const unpause = async (agentId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${agentId}/unpause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
+      toast.success(`${agentId} unpaused — deacon resumes it on the next patrol`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
+    }
+  };
+
+  return (
+    <div data-testid="drawer-paused-banner" className="space-y-[6px] border-b border-border px-[22px] py-[10px]">
+      {paused.map((agent) => (
+        <div
+          key={agent.id}
+          className="flex items-center gap-[10px] rounded-[var(--radius-sm)] border px-[12px] py-[8px] badge-border-warning badge-bg-warning"
+        >
+          <span className="text-[14px] leading-none text-warning-foreground">⏸</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium text-warning-foreground">
+              <span className="font-mono">{agent.id}</span> is paused
+            </div>
+            {agent.pausedReason && (
+              <div className="truncate text-[12px] text-warning-foreground/75" title={agent.pausedReason}>
+                {agent.pausedReason}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            data-testid={`drawer-unpause-${agent.id}`}
+            onClick={() => void unpause(agent.id)}
+            className="inline-flex shrink-0 items-center gap-[4px] rounded-[var(--radius-sm)] border px-[10px] py-[5px] text-[12px] font-medium badge-border-warning text-warning-foreground transition-colors hover:bg-warning/20"
+          >
+            ▶ Unpause
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

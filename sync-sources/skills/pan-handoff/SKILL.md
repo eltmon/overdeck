@@ -1,6 +1,6 @@
 ---
 name: pan-handoff
-description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation"
+description: "pan handoff <conv> — agent-authored conversation handoff that spawns a new conversation. The focus text MUST be ≤500 characters or the fork is rejected."
 triggers:
   - pan handoff
   - hand off conversation
@@ -23,6 +23,8 @@ pan handoff [conv] [focus text...]
 ```
 
 The trailing text after the conversation reference becomes the focus — no flag required.
+
+> ⚠️ **The focus MUST be ≤ 500 characters.** A longer focus is rejected outright with `Fork request rejected: focus must be 500 characters or fewer` and **no conversation is created** — so count it and keep it under 500 on the first try. Keep the focus short and steering; do NOT pack backstory/context into it — the author reads the full source transcript for that. This is the single most common handoff mistake.
 
 ## Handing off the conversation you are in (the common case)
 

@@ -8,6 +8,7 @@ import {
   generateFixedPointPromptSync,
   HookItem,
 } from '../../../lib/hooks.js';
+import { normalizeAgentId } from '../../../lib/agents.js';
 
 interface HookOptions {
   json?: boolean;
@@ -74,7 +75,7 @@ export async function hookCommand(
         process.exit(1);
       }
 
-      const item = pushToHookSync(targetAgent.startsWith('agent-') ? targetAgent : `agent-${targetAgent}`, {
+      const item = pushToHookSync(normalizeAgentId(targetAgent), {
         type: 'task',
         priority: 'normal',
         source: 'cli',
@@ -121,7 +122,7 @@ export async function hookCommand(
       }
 
       sendMailSync(
-        targetAgent.startsWith('agent-') ? targetAgent : `agent-${targetAgent}`,
+        normalizeAgentId(targetAgent),
         'cli',
         message
       );

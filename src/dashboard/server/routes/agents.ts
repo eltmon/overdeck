@@ -131,6 +131,7 @@ import {
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
+import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePane, killSession, listSessions, sessionExists } from '../../../lib/tmux.js';
@@ -1348,6 +1349,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 //   {kind: "model_set",         model, claudeSessionId?}
 //   {kind: "resolution_set",    resolution, resolutionCount}
 //   {kind: "current_issue_set", currentIssue?}
+//   {kind: "context_saturation_changed", contextSaturatedAt?}
 
 function emitAgentRuntimeEvent(id: string, body: Record<string, unknown>, timestamp: string) {
   return Effect.gen(function* () {
@@ -1973,7 +1975,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { message, model } = body as any;
+    const { message, model, harness, compact } = body as { message?: string; model?: string; harness?: RuntimeName; compact?: boolean };
     let resumeModel: string | undefined;
     try {
       resumeModel = normalizeModelOverrideSync(model);
@@ -1984,7 +1986,13 @@ const postAgentResumeRoute = HttpRouter.add(
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
     const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
-    if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck) {
+    // PAN-1675: a compact-resume targets a context-wedged agent that is usually
+    // still 'running' (a live but stuck session), which the normal gate rejects.
+    // Allow it through for compact === true — resumeAgent summarizes the wedged
+    // session out-of-band, kills it, and respawns a fresh session seeded with
+    // the summary (PAN-1781; its own canResume handles the running case).
+    // Non-compact resumes keep the strict gate.
+    if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck && compact !== true) {
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
         lifecycle: lifecycleBefore,
@@ -1994,9 +2002,13 @@ const postAgentResumeRoute = HttpRouter.add(
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
       model: resumeModel || undefined,
+      harness: harness || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeModel ? { model: resumeModel } : undefined));
+    const resumeOpts = resumeModel || harness || compact === true
+      ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}), ...(compact === true ? { compact: true } : {}) }
+      : undefined;
+    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
@@ -2012,6 +2024,7 @@ const postAgentResumeRoute = HttpRouter.add(
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
             workspace: agentState?.workspace,
+            runtime: agentState?.harness ?? 'claude-code',
             model: agentState?.model,
             status: 'running',
             startedAt: agentState?.startedAt,
@@ -2125,7 +2138,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'pi';
+      harness?: 'claude-code' | 'pi' | 'codex';
       graceful?: boolean;
       message?: string;
     };
@@ -2143,6 +2156,7 @@ const postAgentRestartRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
       model: restartModel || agentState.model,
+      harness: harness || undefined,
       graceful,
       hasMessage: !!message,
     }));
@@ -2376,6 +2390,10 @@ const getAgentCostRoute = HttpRouter.add(
     let cacheReadTokens = 0;
     let cacheWriteTokens = 0;
     let detectedModel = agentState.model || '';
+    // Claude Code repeats the same `usage` on every JSONL line of one API response
+    // (text line, each tool_use line, …). Dedup on requestId/message.id so a multi-block
+    // turn is counted once instead of inflating tokens/cost ~2-3×.
+    const countedUsageIds = new Set<string>();
 
     const homeDir = process.env.HOME || homedir();
     const claudeProjectsDir = join(homeDir, '.claude', 'projects');
@@ -2394,7 +2412,9 @@ const getAgentCostRoute = HttpRouter.add(
             const entry = JSON.parse(line);
             const usage = entry.message?.usage || entry.usage;
             const model = entry.message?.model || entry.model;
-            if (usage) {
+            const usageId = entry.requestId ?? entry.message?.id;
+            if (usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+              if (usageId !== undefined) countedUsageIds.add(usageId);
               inputTokens += usage.input_tokens || 0;
               outputTokens += usage.output_tokens || 0;
               cacheReadTokens += usage.cache_read_input_tokens || 0;
@@ -2599,12 +2619,13 @@ const postAgentsRoute = HttpRouter.add(
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
-      yield* Effect.promise(() => writeAutoStartVBrief(projectPath, workspacePath, {
+      // writeAutoStartVBrief is Effect-returning — yield it directly (PAN-1768).
+      yield* writeAutoStartVBrief(projectPath, workspacePath, {
         issueId,
         title: issueTitle,
         body: issueBody,
         url: cachedIssue?.url,
-      }));
+      });
       planPath = yield* findPlan(workspacePath);
     }
     if (!planPath) {
@@ -2774,29 +2795,34 @@ const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    try {
-      yield* Effect.promise(() => validateProviderHealth(spawnModel));
-    } catch (err) {
-      if (err instanceof ProviderHealthError) {
-        return jsonResponse({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: err.message,
-          hint: err.probeResult.kind === 'quota'
-            ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
-            : err.probeResult.kind === 'auth'
-              ? 'Check your API key in Settings → Providers.'
-              : 'The provider may be temporarily unavailable. Try again later or switch models.',
-          providerHealth: {
-            provider: err.provider.name,
-            model: err.model,
-            kind: err.probeResult.kind,
-            status: err.probeResult.status,
-          },
-        }, { status: 429 });
-      }
-      throw err;
+    // validateProviderHealth returns an Effect (typed ProviderHealthError
+    // channel) — wrapping it in Effect.promise handed a non-thenable to the
+    // runtime and crashed the whole request (PAN-1768).
+    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+      Effect.match({
+        onFailure: (err) => ({ _tag: 'failure' as const, err }),
+        onSuccess: () => ({ _tag: 'success' as const, err: null }),
+      }),
+    );
+    if (providerHealthCheck._tag === 'failure' && providerHealthCheck.err) {
+      const err = providerHealthCheck.err;
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: err.message,
+        hint: err.probeResult.kind === 'quota'
+          ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
+          : err.probeResult.kind === 'auth'
+            ? 'Check your API key in Settings → Providers.'
+            : 'The provider may be temporarily unavailable. Try again later or switch models.',
+        providerHealth: {
+          provider: err.provider.name,
+          model: err.model,
+          kind: err.probeResult.kind,
+          status: err.probeResult.status,
+        },
+      }, { status: 429 });
     }
 
     if (!isRemote) {
@@ -2877,25 +2903,27 @@ const postAgentsRoute = HttpRouter.add(
     // commit only happens when projectPath is on main; otherwise the on-disk
     // move still applies and a later sync will pick it up. Failure is non-fatal
     // — agent spawn proceeds even if the lifecycle move fails.
-    yield* Effect.promise(() =>
-      transitionVBriefOnMain(
-        projectPath,
-        issueId,
-        'active',
-        'approved',
-        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
-      )
-        .then((result) => {
+    // transitionVBriefOnMain is Effect-returning — match on it directly (PAN-1768).
+    yield* transitionVBriefOnMain(
+      projectPath,
+      issueId,
+      'active',
+      'approved',
+      `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+    ).pipe(
+      Effect.match({
+        onSuccess: (result) => {
           if (result.moved) {
             console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
           }
           if (result.committed) {
             console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
           }
-        })
-        .catch((err) => {
+        },
+        onFailure: (err) => {
           console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
-        }),
+        },
+      }),
     );
 
     // Running transition (PAN-946): set workspace plan.status to 'running'.
@@ -3126,9 +3154,9 @@ const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'pi' | null =
-      bodyHarness === 'pi' || bodyHarness === 'claude-code' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'pi' | null = null;
+    const userPickedHarness: 'claude-code' | 'pi' | 'codex' | null =
+      bodyHarness === 'pi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))

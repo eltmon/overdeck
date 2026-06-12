@@ -1,7 +1,7 @@
 /**
  * vBRIEF Module
  *
- * Panopticon's structured planning format based on the vBRIEF v0.5 spec.
+ * Panopticon's structured planning format based on the vBRIEF v0.6 spec.
  * See: https://github.com/deftai/vBRIEF
  *
  * All date fields MUST use RFC 3339 date-time format ("2025-09-01T00:00:00Z"),

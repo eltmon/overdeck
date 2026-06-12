@@ -12,6 +12,7 @@ const config: SupervisorWatchdogConfig = {
   dashboardApiPort: 3011,
   pollMs: 10_000,
   failThreshold: 1,
+  busyFailThreshold: 12,
   maxRestarts: 3,
   windowMs: 5 * 60_000,
   requestTimeoutMs: 2_000,
@@ -22,11 +23,13 @@ function makeWatchdog(overrides: Partial<{
   spawns: { count: number };
   logs: string[];
   fetchOk: boolean;
+  fetchTimeout: boolean;
   config: SupervisorWatchdogConfig;
 }> = {}): SupervisorWatchdog {
   const spawns = overrides.spawns ?? { count: 0 };
   const logs = overrides.logs ?? [];
   const fetchOk = overrides.fetchOk ?? false;
+  const fetchTimeout = overrides.fetchTimeout ?? false;
   return new SupervisorWatchdog({
     config: overrides.config ?? config,
     now: overrides.now ?? (() => Date.parse('2026-05-17T15:30:00.000Z')),
@@ -35,9 +38,12 @@ function makeWatchdog(overrides: Partial<{
       spawns.count += 1;
       return { pid: 1000 + spawns.count, error: null };
     },
-    fetchFn: async () => fetchOk
-      ? { ok: true, status: 200, statusText: 'OK' }
-      : { ok: false, status: 503, statusText: 'Service Unavailable' },
+    fetchFn: async () => {
+      if (fetchTimeout) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      return fetchOk
+        ? { ok: true, status: 200, statusText: 'OK' }
+        : { ok: false, status: 503, statusText: 'Service Unavailable' };
+    },
   });
 }
 
@@ -75,6 +81,53 @@ describe('SupervisorWatchdog', () => {
       consecutiveFailures: 3,
       gaveUp: false,
     });
+  });
+
+  it('does not restart on timeout failures at failThreshold — only at busyFailThreshold', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      fetchTimeout: true,
+      config: { ...config, failThreshold: 3, busyFailThreshold: 5 },
+    });
+
+    for (let i = 0; i < 4; i += 1) {
+      await watchdog.checkOnce();
+    }
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      healthy: false,
+      consecutiveFailures: 4,
+      consecutiveHardFailures: 0,
+    });
+    expect(logs.some((msg) => msg.includes('deferring restart'))).toBe(true);
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(logs.some((msg) => msg.includes('dashboard starved'))).toBe(true);
+  });
+
+  it('restarts at failThreshold when failures are hard (server actually down)', async () => {
+    const spawns = { count: 0 };
+    const logs: string[] = [];
+    const watchdog = makeWatchdog({
+      spawns,
+      logs,
+      config: { ...config, failThreshold: 3, busyFailThreshold: 12 },
+    });
+
+    await watchdog.checkOnce();
+    await watchdog.checkOnce();
+    expect(spawns.count).toBe(0);
+
+    await watchdog.checkOnce();
+
+    expect(spawns.count).toBe(1);
+    expect(watchdog.status().consecutiveHardFailures).toBe(3);
+    expect(logs.some((msg) => msg.includes('dashboard unreachable'))).toBe(true);
   });
 
   it('clears consecutive failures and restart attempts on health success', async () => {

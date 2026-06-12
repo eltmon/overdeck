@@ -120,6 +120,12 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Per-project auto-resume failure tracking and backoff overrides */
   autoResume?: Partial<AutoResumeConfig>;
+  /**
+   * PAN-1695: per-project auto-merge default for issues with no explicit
+   * per-issue setting. 'auto' = auto-merge when ready, 'hold' = hold for UAT.
+   * Unset = fall through to the global require-UAT setting.
+   */
+  auto_merge_default?: 'auto' | 'hold';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
@@ -225,6 +231,20 @@ export function registerProjectSync(key: string, projectConfig: ProjectConfig): 
   const config = loadProjectsConfigSync();
   config.projects[key] = projectConfig;
   saveProjectsConfigSync(config);
+}
+
+/**
+ * PAN-1695: set or clear a project's auto-merge default. `value === null`
+ * removes the field so the project falls through to the global require-UAT
+ * setting. Preserves all other project config.
+ */
+export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  if (value === null) delete updated.auto_merge_default;
+  else updated.auto_merge_default = value;
+  registerProjectSync(key, updated);
 }
 
 /**

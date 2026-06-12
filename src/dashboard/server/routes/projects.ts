@@ -14,7 +14,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -148,6 +148,21 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   return aId.localeCompare(bId);
 }
 
+/** Read the pause gate from an agent's state.json (PAN-1779): specialist
+ *  sessions are built from review history, not state, so the gate must be
+ *  looked up separately for them. Returns {} when not paused. */
+async function readSessionPauseFields(
+  sessionId: string,
+): Promise<{ paused?: true; pausedReason?: string; pausedAt?: string }> {
+  const stateText = await readOptional(join(homedir(), '.panopticon', 'agents', sessionId, 'state.json'));
+  if (!stateText) return {};
+  try {
+    const s = JSON.parse(stateText) as { paused?: boolean; pausedReason?: string; pausedAt?: string };
+    if (s.paused === true) return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
+  } catch { /* malformed state — treat as unpaused */ }
+  return {};
+}
+
 async function collectSessionTreeNodes(
   issueId: string,
   workspacePath: string,
@@ -186,7 +201,7 @@ async function collectSessionTreeNodes(
     if (!stateText) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' };
+      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string };
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
@@ -226,6 +241,9 @@ async function collectSessionTreeNodes(
         awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
         deliveryMethod: state.deliveryMethod,
+        paused: state.paused === true ? true : undefined,
+        pausedReason: state.paused === true ? state.pausedReason : undefined,
+        pausedAt: state.paused === true ? state.pausedAt : undefined,
       });
     } catch {
       // skip malformed state
@@ -280,6 +298,7 @@ async function collectSessionTreeNodes(
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
+        ...(await readSessionPauseFields(orchestratorSessionName)),
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -314,11 +333,12 @@ async function collectSessionTreeNodes(
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
+        ...(await readSessionPauseFields(testSessionName)),
       });
     }
 
-    // Ship role — final pipeline stage, spawnRun(issueId,'ship') →
-    // `agent-<issue>-ship`. The `merge` history type tracks its status.
+    // Merge/ship history — server-side shipping now prepares the branch, while
+    // historical `merge` entries still surface under the `ship` node identity.
     const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
     const latestMerge = mergeEntries[mergeEntries.length - 1];
     if (latestMerge) {
@@ -336,6 +356,7 @@ async function collectSessionTreeNodes(
         presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
+        ...(await readSessionPauseFields(shipSessionName)),
       });
     }
   }
@@ -543,9 +564,48 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
+const readProjectJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try { return text ? JSON.parse(text) : {}; } catch { return {}; }
+});
+
+// ─── Route: GET /api/projects/:projectKey/auto-merge-default ─────────────────
+const getProjectAutoMergeDefaultRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/auto-merge-default',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const config = getProjectSync(params['projectKey'] ?? '');
+    if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    return jsonResponse({ value: config.auto_merge_default ?? null });
+  })),
+);
+
+// ─── Route: POST /api/projects/:projectKey/auto-merge-default ────────────────
+// PAN-1695: set the per-project auto-merge default ('auto' | 'hold' | null=clear).
+const postProjectAutoMergeDefaultRoute = HttpRouter.add(
+  'POST',
+  '/api/projects/:projectKey/auto-merge-default',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const key = params['projectKey'] ?? '';
+    if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    const body = (yield* readProjectJsonBody) as { value?: unknown };
+    const v = body.value;
+    if (v !== 'auto' && v !== 'hold' && v !== null) {
+      return jsonResponse({ error: "value must be 'auto', 'hold', or null" }, { status: 400 });
+    }
+    setProjectAutoMergeDefaultSync(key, v);
+    return jsonResponse({ value: v });
+  })),
+);
+
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
+  getProjectAutoMergeDefaultRoute,
+  postProjectAutoMergeDefaultRoute,
 );
 
 export default projectsRouteLayer;

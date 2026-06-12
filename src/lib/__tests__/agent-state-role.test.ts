@@ -18,10 +18,16 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../config-yaml.js');
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
+    vi.doUnmock('../workspace/rebuild-stack.js');
     vi.doUnmock('../beads-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
+    vi.doUnmock('../agents.js');
+    vi.doUnmock('../cloister/agent-idle.js');
+    vi.doUnmock('../cloister/issue-closed.js');
+    vi.doUnmock('../cloister/specialists.js');
+    vi.doUnmock('../transcript-landing.js');
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
@@ -74,10 +80,11 @@ describe('AgentState role persistence', () => {
     expect(command).toContain('--effort low');
   });
 
-  it('preserves the flywheel singleton agent id during normalization', async () => {
+  it('preserves first-class runtime session ids during normalization', async () => {
     const { normalizeAgentId } = await import('../agents.js');
 
     expect(normalizeAgentId('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(normalizeAgentId('inspect-pan-1613-workspace-rn3ha')).toBe('inspect-pan-1613-workspace-rn3ha');
     expect(normalizeAgentId('PAN-1')).toBe('agent-pan-1');
   });
 
@@ -137,6 +144,96 @@ describe('AgentState role persistence', () => {
     expect(rawState.handoffCount).toBeUndefined();
     expect(rawState.agentPhase).toBeUndefined();
     expect(rawState.type).toBeUndefined();
+  });
+
+  it('persists lastResumeAt through normal state save and load', async () => {
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+    const lastResumeAt = '2026-06-10T00:01:00.000Z';
+
+    saveAgentStateSync({
+      id: 'agent-pan-resume-state',
+      issueId: 'PAN-1700',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt,
+    } as any);
+
+    expect(getAgentStateSync('agent-pan-resume-state')?.lastResumeAt).toBe(lastResumeAt);
+    const rawState = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-resume-state', 'state.json'), 'utf-8'));
+    expect(rawState.lastResumeAt).toBe(lastResumeAt);
+  });
+
+  it('lets the stalled-resume patrol observe a persisted lastResumeAt from disk', async () => {
+    const messageAgent = vi.fn(async () => undefined);
+    vi.doMock('../tmux.js', async () => ({
+      createSessionSync: vi.fn(),
+      createSession: vi.fn(() => Effect.void),
+      killSessionSync: vi.fn(),
+      killSession: vi.fn(() => Effect.void),
+      sendKeys: vi.fn(() => Effect.void),
+      sendKeysProgram: vi.fn(() => Effect.void),
+      sendRawKeystroke: vi.fn(() => Effect.void),
+      sessionExistsSync: vi.fn(() => true),
+      sessionExists: vi.fn(() => Effect.succeed(true)),
+      listSessions: vi.fn(() => Effect.succeed([])),
+      listSessionsSync: vi.fn(() => []),
+      listSessionNames: vi.fn(() => Effect.succeed([])),
+      capturePaneSync: vi.fn(() => ''),
+      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValuesSync: vi.fn(() => []),
+      listPaneValues: vi.fn(() => Effect.succeed([])),
+      setOption: vi.fn(() => Effect.void),
+      buildTmuxCommandString: vi.fn(() => 'tmux'),
+      isPaneDead: vi.fn(() => false),
+    }));
+    vi.doMock('../cloister/agent-idle.js', () => ({
+      isAgentIdleForNudge: vi.fn(() => true),
+    }));
+    vi.doMock('../cloister/issue-closed.js', () => ({
+      isIssueClosed: vi.fn(async () => false),
+    }));
+    vi.doMock('../cloister/specialists.js', () => ({
+      getTmuxSessionName: vi.fn(),
+      isRunning: vi.fn(async () => false),
+      getAllProjectSpecialistStatuses: vi.fn(() => []),
+    }));
+    vi.doMock('../transcript-landing.js', () => ({
+      captureTranscriptUserRecordSnapshot: vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 })),
+    }));
+    vi.doMock('../agents.js', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../agents.js')>()),
+      messageAgent,
+    }));
+
+    const { saveAgentStateSync, getAgentStateSync } = await import('../agents.js');
+    const { nudgeStalledResumeWorkAgents } = await import('../cloister/deacon.js');
+    const lastResumeAt = '2026-06-10T00:01:00.000Z';
+
+    saveAgentStateSync({
+      id: 'agent-pan-resume-persist',
+      issueId: 'PAN-1700',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      sessionId: 'session-1',
+      lastResumeAt,
+    } as any);
+
+    expect(getAgentStateSync('agent-pan-resume-persist')?.lastResumeAt).toBe(lastResumeAt);
+    await expect(nudgeStalledResumeWorkAgents()).resolves.toEqual([
+      'Re-sent stalled resume prompt to agent-pan-resume-persist (PAN-1700)',
+    ]);
+    expect(messageAgent).toHaveBeenCalledWith(
+      'agent-pan-resume-persist',
+      expect.stringContaining('You are resuming work on PAN-1700'),
+    );
   });
 
   it('accepts flywheel role in persisted state.json', async () => {
@@ -226,6 +323,11 @@ describe('AgentState role persistence', () => {
       getProject: vi.fn(() => projectConfig),
       getProjectSync: vi.fn(() => projectConfig),
     }));
+    // PAN-1618: the spawn gate now attempts an auto-rebuild before failing.
+    // Mock it to fail so the gate still blocks deterministically here.
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: false, error: 'rebuild unavailable in test' })),
+    }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
       sessionExists: vi.fn(() => Effect.succeed(false)),
@@ -257,10 +359,12 @@ describe('AgentState role persistence', () => {
     })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
+    // PAN-1618: an auto-rebuild is attempted first; when it fails the gate
+    // blocks and emits the failed-rebuild marker.
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       issueId: 'PAN-1140',
-      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+      message: 'agent-spawn-stack-rebuild-failed: PAN-1140',
     }));
     rmSync(workspace, { recursive: true, force: true });
   });
@@ -275,6 +379,11 @@ describe('AgentState role persistence', () => {
         reasons: ['panopticon-feature-pan-1140-init init exited non-zero (1)'],
         lastObserved: '2026-05-16T00:00:00.000Z',
       })),
+    }));
+    // PAN-1618: the spawn gate now attempts an auto-rebuild before failing.
+    // Mock it to fail so the gate still blocks deterministically here.
+    vi.doMock('../workspace/rebuild-stack.js', () => ({
+      rebuildWorkspaceStack: vi.fn(() => Effect.succeed({ success: false, error: 'rebuild unavailable in test' })),
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),
@@ -299,10 +408,11 @@ describe('AgentState role persistence', () => {
     })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
+    // PAN-1618: failed auto-rebuild → blocked with the failed-rebuild marker.
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       issueId: 'PAN-1140',
-      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+      message: 'agent-spawn-stack-rebuild-failed: PAN-1140',
     }));
     rmSync(workspace, { recursive: true, force: true });
   });
@@ -369,6 +479,68 @@ describe('AgentState role persistence', () => {
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
 
     await expect(assertWorkspaceStackHealthyForSpawn('MIN-1', 'work')).resolves.toBeUndefined();
+  });
+
+  it('PAN-1618: auto-rebuilds an unhealthy stack and then permits the spawn', async () => {
+    const emitActivityEntry = vi.fn();
+    const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: true }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['No Docker containers found for workspace stack pan-1579'],
+        lastObserved: '2026-06-04T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+    }));
+
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    // Unhealthy stack + successful rebuild ⇒ the gate resolves rather than throwing,
+    // so a `proposed` item reaches a running work agent with no human step.
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-1579', 'work')).resolves.toBeUndefined();
+    expect(rebuildWorkspaceStack).toHaveBeenCalledWith('PAN-1579', expect.any(Object));
+    expect(emitActivityEntry).not.toHaveBeenCalled();
+  });
+
+  it('PAN-1645: review/test/ship auto-fall-back to host (no throw) when the stack stays unhealthy; work still blocks', async () => {
+    const emitActivityEntry = vi.fn();
+    const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: false, error: 'init exited non-zero (1)' }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['panopticon-feature-init-1 init exited non-zero (1)'],
+        lastObserved: '2026-06-08T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityEntrySync: emitActivityEntry,
+    }));
+
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    // ship/review/test operate on the host (rebase/diff/host gates) — an
+    // unhealthy stack must NOT block them: the gate resolves (host fallback).
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7001', 'ship')).resolves.toBeUndefined();
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7002', 'review')).resolves.toBeUndefined();
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7003', 'test')).resolves.toBeUndefined();
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'warn',
+      message: expect.stringContaining('agent-spawn-host-fallback'),
+    }));
+    // work, by contrast, may need the dev container — it still blocks.
+    await expect(assertWorkspaceStackHealthyForSpawn('PAN-7004', 'work')).rejects.toThrow('is not healthy');
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('agent-spawn-stack-rebuild-failed'),
+    }));
   });
 
   it('treats state.json without a valid role as missing', async () => {

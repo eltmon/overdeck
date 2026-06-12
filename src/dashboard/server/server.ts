@@ -175,13 +175,15 @@ const dashboardSessionRouteLayer = HttpRouter.add(
     if (mintAuthError && sessionAuthError) return mintAuthError;
 
     let response = jsonResponse({ ok: true, csrfToken: dashboardCsrfToken() });
-    if (!mintAuthError) {
-      response = HttpServerResponse.setHeader(
-        response,
-        'Set-Cookie',
-        dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
-      );
-    }
+    // Re-issue the durable session cookie on every successful mint — not only when
+    // the one-time internal token is present. We only reach here if at least one of
+    // mint/session auth passed, so the caller is already trusted; refreshing the
+    // cookie gives an in-use session a rolling Max-Age instead of letting it lapse.
+    response = HttpServerResponse.setHeader(
+      response,
+      'Set-Cookie',
+      dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
+    );
 
     return allowDashboardSessionCors(
       HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store'),

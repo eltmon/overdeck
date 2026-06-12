@@ -66,6 +66,9 @@ describe('closeOutCommand', () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it so the
+    // function returns and these assertions run, instead of vitest trapping the exit.
+    vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => {}) as never);
     installIssueState([]);
     answerConfirmation('yes');
   });
@@ -94,5 +97,31 @@ describe('closeOutCommand', () => {
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
     expect(mocks.closeOut).toHaveBeenCalledOnce();
+  });
+
+  it('allows the flywheel orchestrator to close out', async () => {
+    vi.stubEnv('PANOPTICON_AGENT_ID', 'flywheel-orchestrator');
+    await closeOutCommand('PAN-1190', { force: true });
+
+    // Not barred by the caller guard, and the close-out actually runs.
+    expect(process.exit).not.toHaveBeenCalledWith(1);
+    expect(mocks.closeOut).toHaveBeenCalledOnce();
+  });
+
+  it('allows an operator conversation (conv-*) to close out', async () => {
+    vi.stubEnv('PANOPTICON_AGENT_ID', 'conv-20260608-1234');
+    await closeOutCommand('PAN-1190', { force: true });
+
+    expect(process.exit).not.toHaveBeenCalledWith(1);
+    expect(mocks.closeOut).toHaveBeenCalledOnce();
+  });
+
+  it('bars other autonomous agents (agent-*/planning-*/strike-*) from closing out', async () => {
+    vi.stubEnv('PANOPTICON_AGENT_ID', 'agent-pan-123');
+    await closeOutCommand('PAN-1190', { force: true });
+
+    expect(process.exit).toHaveBeenCalledWith(1);
+    const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0])).join('\n');
+    expect(errors).toContain('not permitted');
   });
 });

@@ -42,6 +42,22 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });
 
+  it('instructs the test role to write the .pan/test/result.json verdict artifact before POSTing (PAN-1681)', () => {
+    const prompt = buildTestRolePrompt({ issueId: 'PAN-503' });
+
+    // The verdict artifact write is a required step with the exact shape the
+    // deacon failsafe (checkCompletedButUnsignaledTests) reads back.
+    expect(prompt).toContain('.pan/test/result.json');
+    expect(prompt).toContain('{"status":"passed","notes":');
+
+    // It must come BEFORE the curl POST so the verdict survives an interrupted POST.
+    const artifactIdx = prompt.indexOf('.pan/test/result.json');
+    const postIdx = prompt.indexOf('/api/review/PAN-503/status');
+    expect(artifactIdx).toBeGreaterThan(-1);
+    expect(postIdx).toBeGreaterThan(-1);
+    expect(artifactIdx).toBeLessThan(postIdx);
+  });
+
   it('starts spawnRun(issueId, test) and marks testing', async () => {
     const notifyAgent = vi.fn(async () => {});
 

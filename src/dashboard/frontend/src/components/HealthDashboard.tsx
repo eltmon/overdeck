@@ -33,6 +33,7 @@ const STATUS_CONFIG: Record<AgentHealth['status'], { icon: typeof CheckCircle; c
   healthy: { icon: CheckCircle, color: 'text-success', bg: 'badge-bg-success' },
   warning: { icon: AlertTriangle, color: 'text-warning', bg: 'badge-bg-warning' },
   stuck: { icon: Clock, color: 'text-warning', bg: 'badge-bg-warning' },
+  stalled: { icon: Clock, color: 'text-warning', bg: 'badge-bg-warning' },
   dead: { icon: XCircle, color: 'text-destructive', bg: 'badge-bg-destructive' },
 };
 

@@ -11,6 +11,7 @@ import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { toContextWindowSnapshot } from '../../lib/contextWindow';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
@@ -31,6 +32,23 @@ import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+
+// PAN-1635: a turn that has shown no transcript progress for this long is
+// stalled, not working. Covers a slow compaction + response (a Claude-native
+// /compact here ran ~128s before any follow-up); finite so a prompt that was
+// eaten by submit-time compaction can't strand the spinner forever.
+const TURN_STALL_MS = 4 * 60_000;
+
+/**
+ * Whether the conversation's latest transcript entry is recent enough that the
+ * agent could still be mid-turn. Empty/loading history counts as recent (startup).
+ */
+function lastActivityRecent(lastMsg: ChatMessage | undefined): boolean {
+  if (!lastMsg) return true;
+  const ts = Date.parse(lastMsg.completedAt || lastMsg.createdAt || '');
+  if (Number.isNaN(ts)) return true;
+  return Date.now() - ts < TURN_STALL_MS;
+}
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
 
@@ -67,6 +85,11 @@ interface ConversationPanelProps {
   embedded?: boolean;
   /** Agent ID for fetching turn diffs. Omit to skip diff display. */
   agentId?: string;
+  /** Message target requested by palette conversation search. */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -107,6 +130,10 @@ export function ConversationPanel({
   roundMetadata,
   embedded = false,
   agentId,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
+  onTargetMessageHandled,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -128,6 +155,10 @@ export function ConversationPanel({
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  useEffect(() => {
+    setAboutOpen(false);
+  }, [conversation.name]);
 
   // Sync the picker when the backing conversation's model changes (e.g. after a
   // resume/switch-model that persisted a new model). useState's lazy initializer
@@ -156,7 +187,7 @@ export function ConversationPanel({
   // Query messages at this level so we can drive the header working-spinner
   const { data: messagesData } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
-    queryFn: () => fetchMessages(conversation.name),
+    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
     refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
   const headerMessages = messagesData?.messages ?? [];
@@ -164,11 +195,15 @@ export function ConversationPanel({
   const headerLastMsg = headerMessages[headerMessages.length - 1];
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
+  // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
+  // recent — otherwise a prompt eaten by submit-time compaction spins the header forever.
   const isWorking = conversation.sessionAlive && (
     messagesData == null ||
     headerMessages.length === 0 ||
-    headerLastMsg?.role === 'user' ||
-    (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
+    (lastActivityRecent(headerLastMsg) && (
+      headerLastMsg?.role === 'user' ||
+      (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
+    ))
   );
   const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
@@ -491,12 +526,14 @@ export function ConversationPanel({
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  // v1.2 signal law: blue = machine activity (forking/starting/alive),
+  // red = failed, neutral = ended. Amber is reserved for human-action states.
   const statusColor = isForkingHeader || isSpawningHeader
-    ? 'var(--warning)'
+    ? 'var(--info)'
     : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
-    ? 'var(--success)'
+    ? 'var(--info)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
   return (
@@ -576,6 +613,17 @@ export function ConversationPanel({
                 </div>
               )}
 
+              <button
+                className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
+                onClick={() => setAboutOpen(v => !v)}
+                title={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
+                aria-label={aboutOpen ? 'Hide about this conversation' : 'Show about this conversation'}
+                aria-pressed={aboutOpen}
+              >
+                <Info size={14} />
+                <span>About</span>
+              </button>
+
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -631,17 +679,6 @@ export function ConversationPanel({
                         <Wrench size={14} />
                         Hide tool calls
                         {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
-                      </button>
-
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${aboutOpen ? styles.headerMenuItemActive : ''}`}
-                        onClick={() => { setAboutOpen(v => !v); setMenuOpen(false); }}
-                        aria-expanded={aboutOpen}
-                      >
-                        <Info size={14} />
-                        About this conversation
-                        {aboutOpen && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
                       </button>
 
                       {conversation.harness === 'claude-code' && (
@@ -858,6 +895,10 @@ export function ConversationPanel({
               agentId={agentId}
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
+              targetMessageId={targetMessageId}
+              targetMessageIndex={targetMessageIndex}
+              targetMessageNonce={targetMessageNonce}
+              onTargetMessageHandled={onTargetMessageHandled}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -990,8 +1031,12 @@ interface MessagesResponse {
   contextUsage?: ContextUsage | null;
 }
 
-async function fetchMessages(name: string): Promise<MessagesResponse> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/messages`);
+async function fetchMessages(name: string, signal?: AbortSignal): Promise<MessagesResponse> {
+  // PAN-1705: timeout + React Query's abort signal so a request in flight
+  // during a server restart rejects (and retries) instead of pinning the
+  // panel on "Loading…" forever, and switching conversations cancels the
+  // previous conversation's fetch.
+  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }
@@ -1016,11 +1061,15 @@ interface ConversationViewProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1051,7 +1100,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
-    queryFn: () => fetchMessages(conversation.name),
+    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
     // Poll every 2s while session is active for live updates.
     // Since we don't have WebSocket push (unlike T3Code), polling is our streaming mechanism.
     refetchInterval: conversation.sessionAlive ? 2000 : false,
@@ -1125,6 +1174,30 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     if (serverCaughtUp) clearOptimistic(conversation.name);
   }, [serverCaughtUp, clearOptimistic, conversation.name]);
 
+  // PAN-1635: a sent message can be silently eaten when Claude Code compacts on
+  // submit (the paste+Enter races the compaction state-transition) — the prompt
+  // is dropped and never echoes, leaving the optimistic bubble "Sending…" forever.
+  // Detect it: a compact boundary that appeared at/after the send means the prompt
+  // was eaten (surface fast); otherwise fall back to a plain stall timeout. Either
+  // way, move it to the retry outbox so the user can re-send instead of waiting on
+  // a response that will never come.
+  useEffect(() => {
+    if (visibleOptimistic.length === 0) return;
+    const oldest = visibleOptimistic[0];
+    const sentTs = Date.parse(oldest.createdAt || '');
+    if (Number.isNaN(sentTs)) return;
+    const eatenByCompaction = (data?.compactBoundaries ?? []).some((b) => {
+      const bt = Date.parse(b.timestamp);
+      return !Number.isNaN(bt) && bt >= sentTs;
+    });
+    const deadline = sentTs + (eatenByCompaction ? 20_000 : TURN_STALL_MS);
+    const timer = setTimeout(
+      () => failSend(conversation.name, oldest.text),
+      Math.max(0, deadline - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [visibleOptimistic, data?.compactBoundaries, failSend, conversation.name]);
+
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
@@ -1139,10 +1212,16 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
   // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
   const lastMsg = messages[messages.length - 1];
+  // PAN-1635: an in-progress compaction keeps us working; otherwise a trailing
+  // user/incomplete-assistant entry only implies "working" while it's recent, so a
+  // prompt eaten by Claude's submit-time compaction can't spin the panel forever.
   const isWorking = conversation.sessionAlive && (
+    isCompacting ||
     messages.length === 0 ||
-    lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    (lastActivityRecent(lastMsg) && (
+      lastMsg?.role === 'user' ||
+      (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+    ))
   );
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;
@@ -1229,6 +1308,10 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           resolvedTheme={resolvedTheme}
           hideToolCalls={hideToolCalls}
           workingPhase={workingPhase}
+          targetMessageId={targetMessageId}
+          targetMessageIndex={targetMessageIndex}
+          targetMessageNonce={targetMessageNonce}
+          onTargetMessageHandled={onTargetMessageHandled}
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a

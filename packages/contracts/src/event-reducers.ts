@@ -663,7 +663,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               issueId,
               status: 'running',
               startedAt: event.timestamp,
-              runtime: 'claude-code',
+              runtime: (event.payload.harness as 'claude-code' | 'pi' | 'codex') ?? 'claude-code',
               role: 'plan' as const,
             },
           },
@@ -1120,6 +1120,23 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...prev,
         currentIssue,
         lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.context_saturation_changed': {
+      const { agentId, contextSaturatedAt } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        contextSaturatedAt,
         updatedAtSequence: event.sequence,
       }
       return {

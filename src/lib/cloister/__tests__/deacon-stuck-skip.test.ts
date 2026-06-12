@@ -20,6 +20,7 @@ vi.mock('../../../lib/agents.js', () => ({
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   saveSessionId: vi.fn(),
+  resumeAgent: vi.fn(),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
@@ -105,14 +106,17 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { existsSync, readFileSync } from 'fs';
-import { isSynthesisForActiveReviewRun, patrolWorkAgentResolutions } from '../deacon.js';
-import { listRunningAgentsSync, getAgentRuntimeStateSync } from '../../../lib/agents.js';
+import { checkApiErrorAgents, contextOverflowRecoveryState, isSynthesisForActiveReviewRun, patrolWorkAgentResolutions } from '../deacon.js';
+import { listRunningAgentsSync, getAgentRuntimeStateSync, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
-import { sendKeys } from '../../../lib/tmux.js';
+import { capturePane, listSessionNames, sendKeys } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeStateSync);
 const mockGetReviewStatus = vi.mocked(getReviewStatusSync);
+const mockResumeAgent = vi.mocked(resumeAgent);
+const mockCapturePane = vi.mocked(capturePane);
+const mockListSessionNames = vi.mocked(listSessionNames);
 const mockSendKeysAsync = vi.mocked(sendKeys);
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -278,5 +282,55 @@ describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => 
 
     // No auto-complete action should have fired
     expect(actions).toHaveLength(0);
+  });
+});
+
+describe('checkApiErrorAgents context overflow recovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    contextOverflowRecoveryState.clear();
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    } as ReturnType<typeof getAgentRuntimeStateSync>);
+    mockGetReviewStatus.mockReturnValue(undefined);
+    mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
+    mockListSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1781']));
+    mockCapturePane.mockReturnValue(Effect.succeed([
+      'API Error: 400 Your input exceeds the context window of this model.',
+      '❯',
+    ].join('\n')));
+  });
+
+  afterEach(() => {
+    contextOverflowRecoveryState.clear();
+  });
+
+  it('recovers work-agent context overflow by compact-respawning instead of sending /clear', async () => {
+    const actions = await checkApiErrorAgents();
+
+    expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1781', undefined, { compact: true });
+    expect(mockSendKeysAsync).not.toHaveBeenCalledWith('agent-pan-1781', '/clear');
+    expect(mockSendKeysAsync).not.toHaveBeenCalledWith('agent-pan-1781', '/compact');
+    expect(actions).toContain('Context overflow recovery: compact-respawned agent-pan-1781 (attempt 1)');
+    expect(contextOverflowRecoveryState.get('agent-pan-1781')).toMatchObject({
+      compactAttempts: 1,
+      mechanism: 'respawn',
+    });
+  });
+
+  it('keeps specialist sessions on harness /compact because they cannot be respawned as work agents', async () => {
+    mockListSessionNames.mockReturnValue(Effect.succeed(['specialist-review-pan-1781']));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockSendKeysAsync).toHaveBeenCalledWith('specialist-review-pan-1781', '/compact');
+    expect(mockSendKeysAsync).not.toHaveBeenCalledWith('specialist-review-pan-1781', '/clear');
+    expect(actions).toContain('Context overflow recovery: compacting specialist-review-pan-1781 (attempt 1)');
+    expect(contextOverflowRecoveryState.get('specialist-review-pan-1781')).toMatchObject({
+      compactAttempts: 1,
+      mechanism: 'harness-compact',
+    });
   });
 });

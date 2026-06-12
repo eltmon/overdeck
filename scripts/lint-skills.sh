@@ -9,7 +9,9 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 
 ROOT = Path.cwd()
 DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
@@ -17,13 +19,16 @@ DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
 SKILLS = ROOT / "sync-sources" / "skills"
 LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
+RUN_PAN_CACHE_LOCK = Lock()
 LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}
 
 
 def run_pan(*args: str) -> str:
     key = tuple(args)
-    if key in RUN_PAN_CACHE:
-        return RUN_PAN_CACHE[key]
+    with RUN_PAN_CACHE_LOCK:
+        cached = RUN_PAN_CACHE.get(key)
+    if cached is not None:
+        return cached
 
     last: subprocess.CompletedProcess[str] | None = None
     for _attempt in range(3):
@@ -36,7 +41,8 @@ def run_pan(*args: str) -> str:
             check=False,
         )
         if last.returncode == 0:
-            RUN_PAN_CACHE[key] = last.stdout
+            with RUN_PAN_CACHE_LOCK:
+                RUN_PAN_CACHE[key] = last.stdout
             return last.stdout
 
     assert last is not None
@@ -108,6 +114,17 @@ def usage_allows_positional_arg(help_text: str) -> bool:
     return any(placeholder not in {"[options]", "[command]", "<command>"} for placeholder in placeholders)
 
 
+def subcommand_help(verb: str, subcommand: str) -> str:
+    last: subprocess.CalledProcessError | None = None
+    for args in ((verb, subcommand, "--help"), (verb, "help", subcommand), ("help", verb, subcommand)):
+        try:
+            return run_pan(*args)
+        except subprocess.CalledProcessError as error:
+            last = error
+    assert last is not None
+    raise last
+
+
 def validate_legacy_redirects() -> list[str]:
     errors: list[str] = []
     for legacy, canonical in LEGACY_REDIRECTS.items():
@@ -148,13 +165,15 @@ def validate_command(
             break
 
     if first_arg and subcommands and first_arg in subcommands and first_arg != "help":
+        flag_tokens = tokens[3:]
+        has_flag_tokens = any(token.startswith("-") for token in flag_tokens)
         try:
-            sub_help = run_pan(verb, first_arg, "--help")
+            sub_help = subcommand_help(verb, first_arg)
         except subprocess.CalledProcessError:
-            errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
+            if has_flag_tokens:
+                errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb} {first_arg}")
             return errors
         flags = option_names(sub_help) | global_flags
-        flag_tokens = tokens[3:]
     else:
         flags = set(verb_flags) | set(global_flags)
         flag_tokens = tokens[2:]
@@ -189,15 +208,30 @@ def main() -> int:
     errors: list[str] = []
     errors.extend(validate_legacy_redirects())
 
+    skills_to_check: list[tuple[Path, str]] = []
     for skill_md in sorted(SKILLS.glob("pan-*/SKILL.md")):
         skill_name = skill_md.parent.name.removeprefix("pan-")
         if skill_name == "help" or skill_name not in top_commands or skill_name in exclusions:
             continue
+        skills_to_check.append((skill_md, skill_name))
 
-        try:
-            help_text = run_pan(skill_name, "--help")
-        except subprocess.CalledProcessError:
-            errors.append(f"{skill_md}: pan {skill_name} exists in top-level help but --help failed")
+    help_by_skill: dict[str, str] = {}
+    max_workers = min(16, max(1, len(skills_to_check)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_skill = {
+            executor.submit(run_pan, skill_name, "--help"): (skill_md, skill_name)
+            for skill_md, skill_name in skills_to_check
+        }
+        for future in as_completed(future_to_skill):
+            skill_md, skill_name = future_to_skill[future]
+            try:
+                help_by_skill[skill_name] = future.result()
+            except subprocess.CalledProcessError:
+                errors.append(f"{skill_md}: pan {skill_name} exists in top-level help but --help failed")
+
+    for skill_md, skill_name in skills_to_check:
+        help_text = help_by_skill.get(skill_name)
+        if help_text is None:
             continue
 
         flags = option_names(help_text)

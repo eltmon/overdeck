@@ -37,6 +37,8 @@ export interface ProviderConfig {
   enabled: boolean;
   /** API key (optional, can use env var) */
   api_key?: string;
+  /** Default harness for this provider's models. Role/request harnesses override this. */
+  harness?: RuntimeName;
   /** Authentication mode: api-key (default) or subscription (OAuth) */
   auth?: AuthMode;
   /** Subscription plan tier (only used when auth is 'subscription') */
@@ -161,6 +163,29 @@ export interface ConversationsConfig {
     max_parallel?: number;
     cost_confirm_threshold?: number;
   };
+}
+
+export type ConversationSearchProvider = 'openai';
+
+export interface ConversationSearchConfig {
+  /** Whether conversation semantic search is enabled. Default: false. */
+  enabled?: boolean;
+  /** Embedding provider. Default: 'openai'. */
+  provider?: ConversationSearchProvider;
+  /** Embedding model. Default: 'text-embedding-3-small'. */
+  model?: string;
+  /** Name of an env var or config key holding the API key. Default: provider's standard env var. */
+  apiKeyRef?: string;
+  /** Path to the sidecar embeddings DB. Default: ~/.panopticon/conversations/embeddings.db. */
+  dbPath?: string;
+}
+
+export interface NormalizedConversationSearchConfig {
+  enabled: boolean;
+  provider: ConversationSearchProvider;
+  model: string;
+  apiKeyRef: string | undefined;
+  dbPath: string;
 }
 
 export type DocsEmbeddingProvider = 'local' | 'openai';
@@ -321,7 +346,7 @@ export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
   model: ModelRef;
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   effort?: RoleEffort;
   /**
    * Target minimum concurrent agents the role should keep launched. The
@@ -384,7 +409,6 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   // slot because strike skips the normal review pipeline and lands directly.
   strike: { model: 'workhorse:expensive' },
   flywheel: {
-    harness: 'claude-code',
     model: 'claude-opus-4-8',
     effort: 'high',
     minAgents: 20,
@@ -485,6 +509,9 @@ export interface YamlConfig {
   /** Panopticon docs RAG configuration */
   docs?: DocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch?: ConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory?: MemoryConfig;
 
@@ -513,6 +540,8 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
     /** RTK Bash output compression configuration */
     rtk?: RtkConfig;
+    /** TLDR token-efficient code-analysis configuration */
+    tldr?: TldrConfig;
   };
 
   /** TTS configuration */
@@ -537,11 +566,27 @@ export interface YamlConfig {
    *
    * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
    * blocks destructive ops while still running fully autonomously. `'bypass'` emits
-   * `--dangerously-skip-permissions --permission-mode bypassPermissions` (legacy).
-   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   * `--permission-mode bypassPermissions` (the standalone `--dangerously-skip-permissions`
+   * flag was removed). Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';
+  };
+
+  /**
+   * Codex spawn behavior for conversation sessions (TUI mode).
+   *
+   * 'read-only'   — approval_policy=on-request + sandbox_mode=read-only:
+   *                 Codex can browse files but asks before any write or command.
+   * 'workspace'   — approval_policy=on-request + sandbox_mode=workspace-write (default):
+   *                 Codex works freely inside the cwd, asks before going outside or using the network.
+   * 'auto-review' — approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write:
+   *                 A sub-agent reviews and auto-answers approval requests instead of prompting the user.
+   * 'full-access' — approval_policy=never + sandbox_mode=danger-full-access:
+   *                 No approval prompts; full filesystem and network access.
+   */
+  codex?: {
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }
 
@@ -608,6 +653,21 @@ export interface RtkConfig {
 }
 
 /**
+ * TLDR (token-efficient code analysis) configuration.
+ *
+ * When enabled, work/planning agents whose workspace has a TLDR `.venv` get the
+ * TLDR MCP tools wired in and their prompt advertises TLDR as available; the
+ * per-workspace TLDR daemon is started at spawn. When disabled, agents fall back
+ * to direct file reads regardless of whether a `.venv` is present. Default ON to
+ * preserve historical behaviour (TLDR was implicitly on whenever a `.venv`
+ * existed). Changing this only affects sessions launched/resumed AFTER the
+ * change — running agents must be resumed to pick it up.
+ */
+export interface TldrConfig {
+  enabled?: boolean;
+}
+
+/**
  * Normalized shadow configuration
  */
 export interface NormalizedShadowConfig {
@@ -654,6 +714,9 @@ export interface NormalizedConfig {
 
   /** Provider subscription plan by provider */
   providerPlan: Partial<Record<ModelProvider, SubscriptionPlan>>;
+
+  /** Default harness by provider. Role/request harnesses override these defaults. */
+  providerHarnesses: Partial<Record<ModelProvider, RuntimeName>>;
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
@@ -704,6 +767,9 @@ export interface NormalizedConfig {
   /** Panopticon docs RAG behavior */
   docs: NormalizedDocsConfig;
 
+  /** Semantic conversation search configuration (Phase 2 palette) */
+  conversationSearch: NormalizedConversationSearchConfig;
+
   /** Durable memory extraction and retrieval configuration */
   memory: {
     extraction: {
@@ -742,6 +808,9 @@ export interface NormalizedConfig {
   /** RTK Bash output compression configuration (normalised, never undefined) */
   rtk: NormalizedRtkConfig;
 
+  /** TLDR token-efficient code-analysis configuration (normalised, never undefined) */
+  tldr: NormalizedTldrConfig;
+
   /** TTS daemon configuration (normalised, never undefined) */
   tts: NormalizedTtsDaemonConfig;
 
@@ -766,6 +835,11 @@ export interface NormalizedConfig {
   /** Permission-mode for spawned Claude Code agents. Always defined; defaults to 'auto'. */
   claude: {
     permissionMode: 'auto' | 'bypass';
+  };
+
+  /** Permission-mode for Codex TUI conversation sessions. Always defined; defaults to 'workspace'. */
+  codex: {
+    permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }
 
@@ -800,6 +874,11 @@ export interface NormalizedRtkConfig {
   enabled: boolean;
 }
 
+/** Normalized TLDR configuration (never undefined). */
+export interface NormalizedTldrConfig {
+  enabled: boolean;
+}
+
 /**
  * Model ID migration result
  *
@@ -830,6 +909,11 @@ export function getConversationsConfigSync(): RuntimeConversationsConfig {
 }
 
 
+
+export function getConversationSearchConfigSync(): NormalizedConversationSearchConfig {
+  const { config } = loadConfigSync();
+  return config.conversationSearch;
+}
 
 export interface MigrationResult {
   /** List of migrated model IDs */
@@ -880,6 +964,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
+  providerHarnesses: {},
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
@@ -941,6 +1026,13 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       timeoutMs: 1500,
     },
   },
+  conversationSearch: {
+    enabled: false,
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+    apiKeyRef: undefined,
+    dbPath: join(homedir(), '.panopticon', 'conversations', 'embeddings.db'),
+  },
   memory: {
     extraction: {
       fallbackChain: [],
@@ -989,6 +1081,12 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   rtk: {
     enabled: false,
   },
+  tldr: {
+    // Default ON: TLDR was historically active whenever a workspace `.venv`
+    // existed. The toggle lets operators turn it off (e.g. to reclaim the disk
+    // the per-workspace .venv consumes — PAN-1674).
+    enabled: true,
+  },
   tts: {
     enabled: false,
     lifecycle: true,
@@ -1023,6 +1121,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   claude: {
     permissionMode: 'auto',
   },
+  codex: {
+    permissionMode: 'auto-review',
+  },
 };
 
 /**
@@ -1036,7 +1137,7 @@ const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
 function normalizeProviderConfig(
   providerConfig: ProviderConfig | boolean | undefined,
   fallbackKey?: string
-): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan } {
+): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan; harness?: RuntimeName } {
   if (providerConfig === undefined) {
     return { enabled: false };
   }
@@ -1048,9 +1149,23 @@ function normalizeProviderConfig(
   return {
     enabled: providerConfig.enabled,
     api_key: providerConfig.api_key || fallbackKey,
+    harness: providerConfig.harness,
     auth: providerConfig.auth,
     plan: providerConfig.plan,
   };
+}
+
+function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+  }
+}
+
+function applyProviderHarness(result: NormalizedConfig, provider: ModelProvider, harness: RuntimeName | undefined): void {
+  validateProviderHarness(provider, harness);
+  if (harness !== undefined) {
+    result.providerHarnesses[provider] = harness;
+  }
 }
 
 /**
@@ -1267,6 +1382,15 @@ function mergeRtkConfig(result: NormalizedRtkConfig, config: YamlConfig | null):
 
   if (rtk.enabled !== undefined) {
     result.enabled = rtk.enabled;
+  }
+}
+
+function mergeTldrConfig(result: NormalizedTldrConfig, config: YamlConfig | null): void {
+  const tldr = config?.agents?.tldr;
+  if (!tldr) return;
+
+  if (tldr.enabled !== undefined) {
+    result.enabled = tldr.enabled;
   }
 }
 
@@ -1516,8 +1640,8 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
 }
 
 function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
-  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi') {
-    throw new Error(`config.yaml: roles.${role}.harness must be claude-code or pi`);
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi' && roleConfig.harness !== 'codex') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
   }
   if (roleConfig.effort !== undefined && !ROLE_EFFORTS.includes(roleConfig.effort)) {
     throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(', ')}`);
@@ -1582,6 +1706,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.tmux,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
     memory: {
@@ -1618,6 +1743,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.rtk.enabled,
     },
     docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+    conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
     tts: {
       enabled: DEFAULT_CONFIG.tts.enabled,
       lifecycle: DEFAULT_CONFIG.tts.lifecycle,
@@ -1652,6 +1778,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
     },
+    codex: {
+      permissionMode: DEFAULT_CONFIG.codex.permissionMode,
+    },
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -1670,6 +1799,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Anthropic
       const anthropic = normalizeProviderConfig(providers.anthropic, undefined);
+      applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
       } else if (providers.anthropic !== undefined) {
@@ -1679,6 +1809,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // OpenAI
       const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
+      applyProviderHarness(result, 'openai', openai.harness);
       if (openai.enabled) {
         result.enabledProviders.add('openai');
         if (openai.api_key) {
@@ -1692,6 +1823,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Google
       const google = normalizeProviderConfig(providers.google, legacyKeys.google);
+      applyProviderHarness(result, 'google', google.harness);
       if (google.enabled) {
         result.enabledProviders.add('google');
         if (google.api_key) {
@@ -1705,6 +1837,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // MiniMax
       const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+      applyProviderHarness(result, 'minimax', minimax.harness);
       if (minimax.enabled) {
         result.enabledProviders.add('minimax');
         if (minimax.api_key) {
@@ -1716,6 +1849,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Z.AI
       const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      applyProviderHarness(result, 'zai', zai.harness);
       if (zai.enabled) {
         result.enabledProviders.add('zai');
         if (zai.api_key) {
@@ -1727,6 +1861,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Kimi
       const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+      applyProviderHarness(result, 'kimi', kimi.harness);
       if (kimi.enabled) {
         result.enabledProviders.add('kimi');
         if (kimi.api_key) {
@@ -1738,6 +1873,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // OpenRouter
       const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
+      applyProviderHarness(result, 'openrouter', openrouter.harness);
       if (openrouter.enabled) {
         result.enabledProviders.add('openrouter');
         if (openrouter.api_key) {
@@ -1749,6 +1885,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // MiMo
       const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+      applyProviderHarness(result, 'mimo', mimo.harness);
       if (mimo.enabled) {
         result.enabledProviders.add('mimo');
         if (mimo.api_key) {
@@ -1760,6 +1897,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Nous Portal
       const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+      applyProviderHarness(result, 'nous', nous.harness);
       if (nous.enabled) {
         result.enabledProviders.add('nous');
         if (nous.api_key) {
@@ -1771,6 +1909,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Alibaba DashScope
       const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+      applyProviderHarness(result, 'dashscope', dashscope.harness);
       if (dashscope.enabled) {
         result.enabledProviders.add('dashscope');
         if (dashscope.api_key) {
@@ -1998,6 +2137,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge RTK configuration
     mergeRtkConfig(result.rtk, config);
 
+    // Merge TLDR configuration
+    mergeTldrConfig(result.tldr, config);
+
     // Merge docs RAG configuration
     mergeDocsConfig(result.docs, config);
 
@@ -2059,6 +2201,30 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
       result.claude.permissionMode = config.claude.permissionMode;
+    }
+
+    if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {
+      result.codex.permissionMode = config.codex.permissionMode;
+    }
+
+    // Merge conversationSearch configuration
+    if (config.conversationSearch) {
+      const cs = config.conversationSearch;
+      if (typeof cs.enabled === 'boolean') {
+        result.conversationSearch.enabled = cs.enabled;
+      }
+      if (cs.provider !== undefined) {
+        result.conversationSearch.provider = cs.provider;
+      }
+      if (cs.model !== undefined) {
+        result.conversationSearch.model = cs.model;
+      }
+      if (cs.apiKeyRef !== undefined) {
+        result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+      }
+      if (cs.dbPath !== undefined) {
+        result.conversationSearch.dbPath = cs.dbPath;
+      }
     }
   }
 
@@ -2404,6 +2570,20 @@ export function isClaudeCodeChannelsEnabled(): boolean {
 
 export function isClaudeCodeChannelsMcpEnabled(): boolean {
   return loadConfigSync().config.experimental.claudeCodeChannelsMcp;
+}
+
+/**
+ * Whether TLDR (token-efficient code analysis) is enabled. Gates whether agents
+ * advertise/use the TLDR MCP tools and whether the per-workspace TLDR daemon is
+ * started at spawn. Read at session launch — a change only affects sessions
+ * launched/resumed after it. Defaults to true when unset.
+ */
+export function isTldrEnabledSync(): boolean {
+  try {
+    return loadConfigSync().config.tldr.enabled;
+  } catch {
+    return DEFAULT_CONFIG.tldr.enabled;
+  }
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

@@ -58,7 +58,7 @@ export interface StageProps {
   terminalCwd?: string
   /** Create a conversation for the deck's project (for the "+" New conversation
    * action); returns the new conversation name. */
-  onCreateConversation?: (agentId: string) => Promise<string | undefined>
+  onCreateConversation?: (agentId: string, message?: string) => Promise<string | undefined>
   /** Render the permanent HOME tab (project-scoped). */
   renderHome: (api: StageApi) => ReactNode
   /** Render an `issue` tab's body for the given issue id. */

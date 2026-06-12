@@ -1,0 +1,24 @@
+{
+  "version": "1",
+  "issueId": "PAN-1719",
+  "created": "2026-06-10T08:43:54.641Z",
+  "updated": "2026-06-11T00:30:58.143Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T08:43Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-10T08:43:54.641Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-10T08:43:54.698Z"
+    }
+  ]
+}

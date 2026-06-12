@@ -10,6 +10,7 @@ import { getPanopticonHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
+import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,6 +26,9 @@ const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
+  '# PAN-1798: keep the server alive at zero sessions so a dedicated, cleanly-named',
+  '# server process can be founded ahead of any agent spawn and persist between them.',
+  'set -g exit-empty off',
   'set -g mouse on',
   '# Panopticon owns the browser-facing context menu. Prevent tmux defaults',
   '# from opening a competing right-click menu inside managed sessions.',
@@ -80,6 +84,48 @@ async function ensureManagedTmuxDirAsync(): Promise<void> {
   await mkdir(getTmuxDir(), { recursive: true });
 }
 
+/**
+ * True when a tmux server is already answering on the managed socket.
+ * `list-sessions` exits 0 (possibly with empty output) on a live server and
+ * fails with "no server running" / ENOENT when there is none.
+ */
+function isManagedServerAliveSync(): boolean {
+  try {
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'list-sessions'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-1798: found the shared tmux server with a CLEAN command line, detached
+ * from any agent's process tree. Two reasons this must never happen implicitly
+ * via an agent spawn's `new-session`:
+ *  1. The founding command line would embed the agent's launcher path, so the
+ *     per-agent `pgrep -f launcher.sh` kill sweep matches the SERVER and
+ *     `pan kill <founder>` destroys every session on the socket.
+ *  2. The server lands in the founding spawn's systemd scope, dying with it.
+ * `systemd-run --user --scope` puts the daemonized server in its own scope
+ * with cmdline `tmux -L panopticon -f <conf> start-server` — matchable by
+ * nothing agent-specific. Falls back to a plain start-server (status quo)
+ * when systemd-run is unavailable (macOS / non-systemd Linux).
+ */
+function foundManagedServerSync(cleanEnv: NodeJS.ProcessEnv): void {
+  const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
+  try {
+    execFileSync(
+      'systemd-run',
+      ['--user', '--scope', '--collect', `--unit=panopticon-tmux-${Date.now()}`, '--quiet', 'tmux', ...args],
+      { stdio: 'ignore', env: cleanEnv },
+    );
+    return;
+  } catch {
+    // systemd-run unavailable or refused — fall through to direct founding.
+  }
+  execFileSync('tmux', args, { stdio: 'ignore', env: cleanEnv });
+}
+
 function reloadManagedTmuxConfigSync(): void {
   try {
     // Strip provider env vars (ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, etc.) so
@@ -87,6 +133,9 @@ function reloadManagedTmuxConfigSync(): void {
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
     const cleanEnv = buildChildEnvSync();
+    if (!isManagedServerAliveSync()) {
+      foundManagedServerSync(cleanEnv);
+    }
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -98,6 +147,11 @@ function reloadManagedTmuxConfigSync(): void {
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
     const cleanEnv = buildChildEnvSync();
+    if (!isManagedServerAliveSync()) {
+      // Founding is a rare, fast, one-shot event (server lifetime spans many
+      // sessions); the sync helper keeps one founding path for both variants.
+      foundManagedServerSync(cleanEnv);
+    }
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -448,6 +502,80 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
   }
 }
 
+/**
+ * Process names that mean a launcher session is a keep-alive *corpse*, not a
+ * live harness. Launchers end with `while true; do sleep 60; done`
+ * (src/lib/launcher-generator.ts), so after the harness process (Claude/Pi/…)
+ * exits the tmux session stays alive running that loop — its process tree is
+ * then only the hosting shell and `sleep`, never the harness, which surfaces
+ * as `node`/`claude`/the runtime binary.
+ */
+const KEEPALIVE_FOREGROUND_COMMANDS = new Set(['sleep', 'bash', 'sh', 'dash', 'zsh', 'ash']);
+
+/**
+ * Pure tree walk behind isHarnessProcessAlive, exported for tests: true when
+ * any process in the pane's tree (the pane pids themselves or any descendant)
+ * is something other than a shell or `sleep`. `psTable` is `ps -eo
+ * pid=,ppid=,comm=` output.
+ */
+export function paneTreeHasHarnessProcess(panePids: number[], psTable: string): boolean {
+  const childrenByPpid = new Map<number, number[]>();
+  const commByPid = new Map<number, string>();
+  for (const line of psTable.split('\n')) {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);
+    if (!match) continue;
+    const pid = Number(match[1]);
+    const ppid = Number(match[2]);
+    commByPid.set(pid, match[3].trim());
+    const siblings = childrenByPpid.get(ppid);
+    if (siblings) siblings.push(pid);
+    else childrenByPpid.set(ppid, [pid]);
+  }
+  const queue = [...panePids];
+  const seen = new Set<number>();
+  while (queue.length > 0) {
+    const pid = queue.pop()!;
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    const comm = commByPid.get(pid);
+    if (comm && !KEEPALIVE_FOREGROUND_COMMANDS.has(comm)) return true;
+    const children = childrenByPpid.get(pid);
+    if (children) queue.push(...children);
+  }
+  return false;
+}
+
+/**
+ * Honest liveness signal for a launcher-managed session: true only when the
+ * session exists AND a real harness process is running in it — not the post-exit
+ * keep-alive loop. `sessionExists` alone cannot tell a live session from a
+ * corpse because the keep-alive loop outlives the harness. PAN-1637/PAN-1638.
+ *
+ * The check must walk the pane's process TREE, not read
+ * `#{pane_current_command}`: launcher scripts run the harness without job
+ * control, so the pane's foreground process group stays the launcher shell and
+ * tmux reports `bash` for a pane whose live tree is
+ * bash → node (pty-supervisor) → claude. Trusting pane_current_command marked
+ * every live supervisor-wrapped conversation as a corpse ~37s after spawn
+ * (PAN-1769, conv 2701/2707 false-"ended").
+ */
+export async function isHarnessProcessAlive(sessionName: string): Promise<boolean> {
+  const panePids = (await listPaneValuesText(sessionName, '#{pane_pid}'))
+    .map((value) => Number.parseInt(value, 10))
+    .filter((pid) => Number.isInteger(pid) && pid > 0);
+  if (panePids.length === 0) return false;
+  let psTable: string;
+  try {
+    const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,comm='], { encoding: 'utf-8' });
+    psTable = String(stdout);
+  } catch {
+    // Can't inspect the process table — report alive so a probe hiccup never
+    // corpse-marks (and auto-ends) a live session.
+    return true;
+  }
+  return paneTreeHasHarnessProcess(panePids, psTable);
+}
+
 
 /**
  * Categorizes an API failure surfaced inside an interactive Claude Code pane.
@@ -682,7 +810,25 @@ export const createSession = (
   options?: { env?: Record<string, string>; width?: number; height?: number },
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
-    try: () => tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' }).then(() => undefined),
+    try: async () => {
+      await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
+      // Stamp the initial window's background with the dashboard theme so tmux
+      // answers OSC 11 background queries even with no client attached. Claude
+      // Code's `theme: auto` queries once at startup; without this, headless
+      // agents get no answer and fall back to dark regardless of the
+      // dashboard theme (conv 2547).
+      try {
+        const theme = await getUiTheme();
+        // window-style is a window option: the trailing ':' targets the
+        // session's (only) window — a bare '=name' fails with "no such window".
+        await tmuxExecAsync(
+          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          { encoding: 'utf-8' },
+        );
+      } catch {
+        // Best-effort: a failed theme stamp must not fail session creation.
+      }
+    },
     catch: (cause) => toTmuxError('create-session', cause),
   });
 
@@ -806,12 +952,19 @@ export const sendKeys = (
         if (verifyLine.length >= 3) {
           const SUBMIT_TIMEOUT_MS = 2_000;
           const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+          let stillPendingSubmit = true;
           while (Date.now() < submitDeadline) {
             const pane = await capturePaneText(sessionName, 5);
             if (!pane.includes(verifyLine.slice(0, 40))) {
+              stillPendingSubmit = false;
               break;
             }
             await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+          }
+          if (stillPendingSubmit) {
+            console.warn(`[tmux] Submitted text still visible on ${sessionName} after ${SUBMIT_TIMEOUT_MS}ms; sending Enter once more.`);
+            await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+            logSendKeys(sessionName, '[Enter resent after submit verification timeout]', caller);
           }
         }
       } finally {

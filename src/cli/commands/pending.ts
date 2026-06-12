@@ -5,8 +5,28 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../../lib/paths.js';
 
-export async function pendingCommand(): Promise<void> {
+export async function pendingCommand(options: { ready?: boolean } = {}): Promise<void> {
   const allStatuses = getAllReviewStatusesFromDb();
+
+  if (options.ready) {
+    // Mergeable work regardless of origin — review+test green, not merged.
+    // Used by the flywheel tick to adopt externally-completed issues into
+    // the merge queue (PAN-1735).
+    const ready = Object.values(allStatuses).filter(
+      s => s.readyForMerge && s.mergeStatus !== 'merged'
+    );
+    if (ready.length === 0) {
+      console.log(chalk.dim('No issues are ready for merge.'));
+      return;
+    }
+    console.log(chalk.bold('\nReady for Merge\n'));
+    for (const status of ready) {
+      console.log(`${chalk.green(status.issueId)}  review=${status.reviewStatus} test=${status.testStatus}${status.prUrl ? `  ${chalk.dim(status.prUrl)}` : ''}`);
+    }
+    console.log('');
+    return;
+  }
+
   const pending = Object.values(allStatuses).filter(s => s.reviewStatus === 'pending');
 
   if (pending.length === 0) {

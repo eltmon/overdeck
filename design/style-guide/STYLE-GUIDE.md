@@ -1,13 +1,15 @@
 # Panopticon Style Guide
 
-**Version:** 1.1
-**Issue:** PAN-460
-**Last Updated:** 2026-04-07
+**Version:** 1.2
+**Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening)
+**Last Updated:** 2026-06-11
 **Design Reference:** T3Code (`/home/eltmon/Projects/t3code/apps/web/src/index.css`)
 
 ---
 
 This is the canonical reference for all Panopticon dashboard UI decisions. Every new feature and every existing component must conform to this guide. If something isn't covered here, look at T3Code's implementation first, then ask.
+
+**Visual reference:** [`docs/design/mockups/system-map-opus.html`](../../docs/design/mockups/system-map-opus.html) — the PAN-1148 unified-redesign system map. Section **05 · Color discipline** renders the signal-color table below as live swatches with where-used examples; sections 03 (shared primitives) and 02 (the five surfaces) show the components of this guide composed in context. The written counterpart of section 05 is [`docs/prds/planned/pan-dashboard-unified-redesign.md`](../../docs/prds/planned/pan-dashboard-unified-redesign.md) §4.5 "Color & Style Discipline". Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
 
 ---
 
@@ -247,14 +249,23 @@ Colors are defined as CSS custom properties on `:root` (light) and via `@variant
 
 ### Signal Color Usage
 
-| Token | Color | Meaning |
-|-------|-------|---------|
-| `--info` / `--primary` | Blue | Primary actions, active state, machine working |
-| `--success` | Emerald | Healthy, running, completed, merged |
-| `--warning` | Amber | Needs human attention, in review, waiting for action |
-| `--destructive` | Red | Error, stuck, dead, failed, urgent |
-| `--signal-review` | Purple | In review, specialist activity |
-| `--signal-cost` | Cyan | Cost figures, token counts, metrics |
+Tightened in PAN-1148 (see the system-map visual reference, section 05: "Color always means
+the same thing"). Each token has exactly one meaning and an explicit never-list:
+
+| Token | Color | Always means | Never used for |
+|-------|-------|--------------|----------------|
+| `--destructive` | Red | Action required — broken, stuck, failed gate, urgent priority | Decoration; label backgrounds |
+| `--warning` | Amber | A **human** needs to do something (In Review phase, awaiting approval, paused-for-operator) | Machine activity; cost figures |
+| `--info` / `--primary` | Blue | A **machine** is actively doing something (running/working agents, In Progress) | Static state; secondary actions |
+| `--signal-review` | Purple | Review / ship / planning **specialist activity** (the verbs, live convoy work) | The In Review *phase* (that's amber — a human gate); general-purpose accents |
+| `--success` | Emerald | Done — merged, completed, verification passing | Idle agents; queued items; *running* agents (running = blue) |
+| `--signal-cost` | Cyan | Money — runtime spend, model cost, fleet totals. Always tabular numerals | Anything that isn't currency (token counts and other metrics are neutral) |
+| `--muted-foreground` | Neutral | No live signal — the rest state (labels, idle, queued, Backlog/Todo) | Active signals masquerading as neutral |
+
+> **v1.1 → v1.2 deltas** (for components written against the old table): "running/healthy"
+> moved from emerald to blue — emerald is *outcome*, blue is *activity*. `--signal-review`
+> no longer describes the In Review phase — that phase is an amber human-gate; purple marks
+> specialist/ship/planning activity. `--signal-cost` narrowed to currency only.
 
 ### Color Restraint (Data-Dense Views)
 
@@ -289,6 +300,7 @@ Column top borders communicate pipeline state, not arbitrary decoration:
 | Backlog / To Do | `border-divider-strong` | Neutral | Queued — no action needed |
 | In Progress | `border-primary` | Blue | Machine actively working |
 | In Review | `border-warning` | Amber | Waiting for human action |
+| Ship (PAN-1148 IA) | `border-signal-review` | Purple | Specialist pipeline activity (ship/planning verbs) |
 | Done | `border-success` | Green | Work complete |
 
 This means amber always means "a human needs to do something." Blue means "a machine is doing something." This mapping must be consistent across all views.

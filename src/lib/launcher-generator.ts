@@ -1,10 +1,13 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
+import { toCodexSandboxValue } from './runtimes/codex.js';
+import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
+import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'pi';
+export type LauncherHarness = 'claude-code' | 'pi' | 'codex';
 
 export interface LauncherConfig {
   role: Role;
@@ -40,6 +43,29 @@ export interface LauncherConfig {
   piFifoPath?: string;
   /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
   piSessionDir?: string;
+
+  /**
+   * Codex agent mode. Defaults to 'exec' (headless legacy mode).
+   *   - 'exec': non-interactive `codex exec` with approval_policy=never
+   *   - 'tui': bare `codex` interactive TUI (conversation panels)
+   *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
+   */
+  codexMode?: 'exec' | 'tui' | 'work-tui';
+  /**
+   * Per-agent CODEX_HOME directory path (e.g. ~/.panopticon/agents/<id>/codex-home).
+   * When set, exported as CODEX_HOME before launching codex.
+   */
+  codexHome?: string;
+  /**
+   * Absolute path to the per-agent codex session directory.
+   * (Informational — codex writes rollout JSONL here; not passed as a flag.)
+   */
+  codexSessionDir?: string;
+  /**
+   * Sandbox mode for `codex exec -s <mode>`. Defaults to 'workspace' (allows
+   * reading and writing files in the working directory).
+   */
+  codexSandboxMode?: string;
 
   // Command construction
   /**
@@ -209,12 +235,24 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   // Trust mkcert CA so agent CLI commands can reach https://pan.localhost
   lines.push('command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"');
 
+  // PAN-1678: skip the heavy ~10-core build:docs-index job in any `npm run
+  // build` an agent runs in its session. The docs search index is irrelevant
+  // to whether an issue's code compiles/tests, and building it across many
+  // concurrent agent workspaces stampedes the host to OOM. Release/publish
+  // builds the index through a separate path that never sources this launcher.
+  lines.push('export SKIP_DOCS_INDEX=1');
+
   // Terminal env (TERM/COLORTERM/LANG/LC_ALL)
   if (config.setTerminalEnv) {
     lines.push('export TERM=xterm-256color');
     lines.push('export COLORTERM=truecolor');
     lines.push('export LANG=C.UTF-8');
     lines.push('export LC_ALL=C.UTF-8');
+    // Claude Code `theme: auto` fallback when its OSC 11 background query
+    // goes unanswered: COLORFGBG bg index 15 = light terminal, 0 = dark.
+    // Captured at spawn time from the dashboard theme, mirroring the tmux
+    // pane-bg stamp in createSession() (the OSC 11 primary path).
+    lines.push(`export COLORFGBG='${colorFgBgForTheme(getUiThemeSync())}'`);
   }
 
   // Remote PATH
@@ -247,6 +285,11 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     for (const expr of config.extraEnvExports) {
       lines.push(expr);
     }
+  }
+
+  // Codex: per-agent CODEX_HOME so each agent has isolated sessions/config
+  if (config.codexHome) {
+    lines.push(`export CODEX_HOME=${shellQuote(config.codexHome)}`);
   }
 
   // Change directory (after env setup, before command)
@@ -373,6 +416,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.harness === 'pi') {
       return buildPiCommand(config, false);
     }
+    if (config.harness === 'codex') {
+      return buildCodexCommand(config, false);
+    }
 
 
     // Conversation panel doesn't use exec — it runs the command then loops
@@ -457,6 +503,9 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.harness === 'pi') {
     return buildPiCommand(config, useExec);
+  }
+  if (config.harness === 'codex') {
+    return buildCodexCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -545,6 +594,79 @@ function systemPromptFiles(config: LauncherConfig): string[] {
   ];
 }
 
+function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const codexMode = config.codexMode ?? 'exec';
+
+  // TUI / conversation mode: interactive terminal, optionally under the PTY
+  // supervisor for conversation delivery. Keep CODEX_HOME/AGENTS.md, but do
+  // not let repo AGENTS.md turn a normal dashboard conversation into a work
+  // agent with project-level task-tracker rules.
+  if (codexMode === 'tui') {
+    const cmd = wrapWithSupervisor(config, 'codex -c project_doc_max_bytes=0');
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
+  if (codexMode === 'work-tui') {
+    // PAN-1803: approval_policy and sandbox_mode come from the per-agent
+    // config.toml that initCodexHome seeds from the user's Settings →
+    // Permissions → Codex level (getCodexLauncherFields). Do NOT pass `-s` or
+    // `-c approval_policy=` on the CLI — those override config.toml and would
+    // ignore the Settings choice. Mirror the conversation path (codexMode
+    // 'tui'), which relies entirely on the seeded config.toml. Only `-m`
+    // (per-agent model) is passed here.
+    const tokens: string[] = ['codex'];
+    if (config.model) {
+      tokens.push('-m', shellQuoteModelIdSync(config.model));
+    }
+    const cmd = wrapWithSupervisor(config, tokens.join(' '));
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
+  const isResume = Boolean(config.resumeSessionId);
+
+  // Headless exec mode — fresh spawn or resume.
+  // Resume: `codex exec resume <threadId> [prompt]`
+  //   Note: `codex exec resume` rejects -s; sandbox must be set via -c.
+  // Fresh: `codex exec [-m model] -c approval_policy=never -s sandbox --skip-git-repo-check [prompt]`
+  const tokens: string[] = ['codex', 'exec'];
+  if (isResume) {
+    tokens.push('resume');
+  }
+
+  if (config.model) {
+    tokens.push('-m', shellQuoteModelIdSync(config.model));
+  }
+
+  // Disable approval prompts (codex exec rejects --ask-for-approval; use -c instead)
+  tokens.push('-c', 'approval_policy=never');
+
+  // Sandbox mode: translate Panopticon's abstract 'workspace' token to the
+  // codex CLI's 'workspace-write' (PAN-1799 — raw 'workspace' is rejected and
+  // the agent dies at boot). Resume path uses -c (not -s) because
+  // `codex exec resume` rejects -s.
+  const sandbox = toCodexSandboxValue(config.codexSandboxMode);
+  if (isResume) {
+    tokens.push('-c', `sandbox_mode=${sandbox}`);
+  } else {
+    tokens.push('-s', sandbox);
+  }
+
+  tokens.push('--skip-git-repo-check');
+
+  if (isResume) {
+    tokens.push(shellQuote(config.resumeSessionId!));
+  }
+
+  if (config.promptFile) {
+    tokens.push('"$prompt"');
+  } else if (config.promptInline) {
+    tokens.push(shellQuote(config.promptInline));
+  }
+
+  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
+  return [useExec ? `exec ${cmd}` : cmd];
+}
+
 function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
@@ -564,7 +686,10 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    // Provider-qualify so Pi binds the model to the intended provider
+    // (bare 'kimi-k2.6' resolves to keyless moonshotai instead of
+    // kimi-coding — agent boots but every prompt fails; PAN-1799).
+    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {

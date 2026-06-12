@@ -14,6 +14,7 @@ import {
 import { Data, Effect } from 'effect';
 import { resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
+import { clearIssueClosedCache } from './cloister/issue-closed.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -44,6 +45,8 @@ export interface ReopenOptions {
     continueFileUpdated: false,
     reason: options.reason,
   };
+
+  clearIssueClosedCache(issueId);
 
   // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
   // setReviewStatus() reads only this issue's row and upserts only this issue's row.

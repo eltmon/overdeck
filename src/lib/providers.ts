@@ -62,7 +62,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
-    models: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -103,9 +103,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
-    models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
+    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
     haikuModel: 'minimax-m2.7-highspeed',
-    tierModels: { opus: 'minimax-m2.7', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
+    tierModels: { opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
     description: 'Route directly to MiniMax Anthropic-compatible endpoint using MINIMAX_API_KEY.',
   },
@@ -191,7 +191,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Anthropic models
-  if (['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 
@@ -207,7 +207,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check MiniMax models
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(modelId)) {
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'].includes(modelId)) {
     return PROVIDERS.minimax;
   }
 
@@ -271,6 +271,26 @@ export function getProviderEnvSync(
       // Static providers use a long-lived API key
       env.ANTHROPIC_AUTH_TOKEN = apiKey;
     }
+  }
+
+  // Pi-native provider env vars so the Pi harness can authenticate directly
+  // when driving non-Anthropic models (Pi has its own provider registry).
+  if (provider.name === 'kimi') {
+    env.KIMI_API_KEY = apiKey;
+  } else if (provider.name === 'minimax') {
+    env.MINIMAX_API_KEY = apiKey;
+  } else if (provider.name === 'zai') {
+    env.ZAI_API_KEY = apiKey;
+  } else if (provider.name === 'mimo') {
+    env.MIMO_API_KEY = apiKey;
+  } else if (provider.name === 'openrouter') {
+    env.OPENROUTER_API_KEY = apiKey;
+  } else if (provider.name === 'nous') {
+    env.NOUS_API_KEY = apiKey;
+  } else if (provider.name === 'dashscope') {
+    env.DASHSCOPE_API_KEY = apiKey;
+  } else if (provider.name === 'google') {
+    env.GEMINI_API_KEY = apiKey;
   }
 
   // MiniMax, Z.AI, and MiMo recommend longer timeouts
@@ -413,3 +433,46 @@ export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<vo
       await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     } catch { /* non-fatal */ }
   });
+
+/**
+ * Map a Panopticon provider to the Pi harness's provider name for that
+ * vendor. Pi resolves bare model ids against its own registry order, which
+ * can pick the wrong provider entirely — e.g. bare `kimi-k2.6` resolves to
+ * `moonshotai` (no API key configured) instead of `kimi-coding`, leaving the
+ * agent alive but unable to complete any prompt (PAN-1799 follow-up). Pi
+ * sessions rely on the user's own Pi auth (`~/.pi/agent/auth.json`); we only
+ * constrain WHICH Pi provider is used — we never inject keys.
+ */
+export function piProviderForModel(modelId: string): string | undefined {
+  const provider = getProviderForModelSync(modelId).name;
+  switch (provider) {
+    case 'openai':
+      return 'openai-codex';
+    case 'anthropic':
+      return 'anthropic';
+    case 'google':
+      return 'google';
+    case 'minimax':
+      return 'minimax';
+    case 'zai':
+      return 'zai';
+    case 'kimi':
+      return 'kimi-coding';
+    case 'mimo':
+      return 'xiaomi';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Provider-qualify a model id for Pi (`kimi-coding/kimi-k2.6`). Returns the
+ * bare id unchanged when no Pi provider mapping exists.
+ */
+export function qualifyPiModel(modelId: string): string {
+  // Idempotent: conversations pre-qualify (`anthropic/claude-...`) before the
+  // launcher sees the model — never double-prefix an already-qualified id.
+  if (modelId.includes('/')) return modelId;
+  const piProvider = piProviderForModel(modelId);
+  return piProvider ? `${piProvider}/${modelId}` : modelId;
+}

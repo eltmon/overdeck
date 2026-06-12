@@ -67,6 +67,7 @@ type HeartbeatBody =
   | { kind: 'model_set'; model: string; claudeSessionId?: string }
   | { kind: 'resolution_set'; resolution: AgentResolution; resolutionCount: number }
   | { kind: 'current_issue_set'; currentIssue?: string }
+  | { kind: 'context_saturation_changed'; contextSaturatedAt?: string }
 
 /**
  * Emit a runtime event. Returns true if the dashboard accepted it, false on
@@ -136,3 +137,8 @@ export const emitResolution = (
   resolution: AgentResolution,
   resolutionCount: number,
 ): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'resolution_set', resolution, resolutionCount })
+
+export const emitContextSaturationChanged = (
+  agentId: string,
+  contextSaturatedAt?: string,
+): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'context_saturation_changed', contextSaturatedAt })

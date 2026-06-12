@@ -3,6 +3,8 @@ title: Mission Control
 description: Unified monitoring dashboard for projects, features, and AI agent activity
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Mission Control
 
 Mission Control is Panopticon's default landing view — a unified monitoring interface for all active projects, features, and AI agent activity. It includes **Shadow Engineering**, a companion mode for teams adopting AI-assisted development incrementally.
@@ -29,6 +31,12 @@ State labels are computed from multiple signals: tmux session presence, heartbea
 ## Activity View
 
 When you click a feature, the main panel shows all agent sessions unified into one scrollable view. Each session appears as a collapsible section with:
+
+<ThemedImage
+  light="/images/dashboard/activity-light.png"
+  dark="/images/dashboard/activity-dark.png"
+  alt="Activity view: a real-time log of agent command output streaming as agents work"
+/>
 
 - **Type badge**: PLANNING (blue), WORK (green), REVIEW (amber), TEST (indigo), MERGE (pink)
 - **Model**: Which Claude/LLM model the agent used (e.g., Opus 4.6, Sonnet 4.5)
@@ -129,6 +137,20 @@ Use the **Upload** badge to attach markdown or text files. Files are categorized
 ### Syncing Discussions
 
 Click **Sync** to pull the latest comments from GitHub Issues or Linear. Discussions are converted to markdown and stored in `.planning/discussions/`.
+
+## Pipeline View
+
+Where the project tree organizes work by project and feature, the **Pipeline** page reorganizes the same issues by lifecycle phase. A metric strip — Active issues, Work running, Review queue, Ship, and Spend — sits above phase-grouped rows (Ship, Review, Verifying), with a live activity feed on the right.
+
+<ThemedImage
+  light="/images/dashboard/pipeline-light.png"
+  dark="/images/dashboard/pipeline-dark.png"
+  alt="Pipeline page: a metric strip over phase-grouped issue rows with a live activity feed"
+/>
+
+<Tip>
+  Use the project tree when you're following a single feature's agent conversation end to end, and the Pipeline view when you want to see every issue's phase across all projects at once.
+</Tip>
 
 ## Configuration
 

@@ -4,17 +4,17 @@
     "created": "2026-05-23T11:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1417: POST /api/review/:id/request is destructive on already-passed reviews — should refuse or take a --nudge flag",
-    "updated": "2026-05-23T11:28:22.561Z"
+    "updated": "2026-06-11T05:55:33.767Z"
   },
   "plan": {
     "id": "pan-1417",
     "title": "POST /api/review/:id/request is destructive on already-passed reviews — should refuse or take a --nudge flag",
-    "status": "proposed",
+    "status": "completed",
     "uid": "665a3247-e895-4bb4-bf2f-1f6d6e5fa93c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-23T11:45:00.000Z",
-    "updated": "2026-05-23T11:28:22.561Z",
+    "updated": "2026-06-11T05:55:33.767Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1417",
@@ -184,5 +184,5 @@
       "canonicalFilename": "2026-05-23-PAN-1417-post-api-review-id-request-is-destructive-on-already-passed-reviews-should-refuse-or-take-a-nudge-flag.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -124,6 +124,9 @@ vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   };
 });
 
+const agentsRouteLayerPromise = import('../agents.js').then((module) => module.agentsRouteLayer);
+const issuesRouteLayerPromise = import('../issues.js').then((module) => module.issuesRouteLayer);
+
 function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
     append: (event: Record<string, unknown>) => Effect.sync(() => {
@@ -164,13 +167,11 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
 }
 
 async function requestAgents(path: string, init: RequestInit = {}) {
-  const { agentsRouteLayer } = await import('../agents.js');
-  return runRoute(agentsRouteLayer, path, init);
+  return runRoute(await agentsRouteLayerPromise, path, init);
 }
 
 async function requestIssues(path: string, init: RequestInit = {}) {
-  const { issuesRouteLayer } = await import('../issues.js');
-  return runRoute(issuesRouteLayer, path, init);
+  return runRoute(await issuesRouteLayerPromise, path, init);
 }
 
 const agentState = {
@@ -224,12 +225,17 @@ describe('operator.intervention dashboard routes', () => {
     }));
   });
 
-  it('emits restart from the successful dashboard restart route', async () => {
+  it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {
     const { response, appendedEvents } = await requestAgents('/api/agents/agent-pan-1/restart', {
-      body: JSON.stringify({ graceful: false }),
+      body: JSON.stringify({ model: 'gpt-5.5', harness: 'pi', graceful: false }),
     });
 
     expect(response.status).toBe(200);
+    expect(agentMocks.restartAgent).toHaveBeenCalledWith('agent-pan-1', expect.objectContaining({
+      model: 'gpt-5.5',
+      harness: 'pi',
+      graceful: false,
+    }));
     expect(appendedEvents).toContainEqual(expect.objectContaining({
       type: 'operator.intervention',
       payload: { issueId: 'PAN-1', kind: 'restart', source: 'dashboard' },

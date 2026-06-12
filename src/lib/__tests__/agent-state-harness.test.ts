@@ -45,6 +45,13 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
     expect(cmd).not.toMatch(/--permission-mode/)
     expect(cmd).toMatch(/^pi --mode rpc /)
   })
+
+  it('codex harness returns "codex" base command — no permission flags (AC10)', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('codex-4o', undefined, undefined, 'codex')
+    expect(cmd).toBe('codex')
+    expect(cmd).not.toMatch(/--permission-mode/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+  })
 })
 
 // Integration coverage for the new permission-mode plumbing.

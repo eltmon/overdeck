@@ -87,7 +87,7 @@ import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 interface IssueOptions {
   model: string;
   /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
   effort?: RoleEffort;
   dryRun?: boolean;
@@ -373,6 +373,11 @@ async function handleRemoteWorkspace(
   if (!credsSynced.github) {
     spinner.warn('Could not sync GitHub CLI auth - gh commands may fail');
   }
+
+  // Re-apply Claude Code config (onboarding marker, /workspace trust,
+  // settings.json permission mode) — idempotent, heals VMs created before
+  // a config change.
+  await fly.configureClaudeCode(remoteMetadata.vmName);
 
   // Spawn remote agent
   spinner.text = 'Spawning remote agent...';
@@ -701,9 +706,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // with the human-readable reason text on stderr (no spinner, no
   // workspace setup) so callers don't get a half-prepared workspace
   // when they pick something the gate refuses.
-  const requestedHarness: 'claude-code' | 'pi' = options.harness ?? 'claude-code';
-  if (requestedHarness !== 'claude-code' && requestedHarness !== 'pi') {
-    process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code' or 'pi'.\n`);
+  const requestedHarness: 'claude-code' | 'pi' | 'codex' = options.harness ?? 'claude-code';
+  if (requestedHarness !== 'claude-code' && requestedHarness !== 'pi' && requestedHarness !== 'codex') {
+    process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
     process.exit(1);
   }
   if (options.model) {
@@ -795,8 +800,27 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
+    // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
+    // explicit --local) routes to a fly.io machine when the local work pool is
+    // already at max_work_agents and remote.overflow_to_remote is enabled.
+    let overflowToRemote = false;
+    if (!isRemote && !workspacePath && !options.local && locationPreference !== 'local') {
+      const overflowConfig = loadConfigSync().remote;
+      if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
+        const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
+        const limits = getConcurrencyLimits();
+        const counts = countRunningAgents();
+        if (counts.work >= limits.maxWorkAgents) {
+          overflowToRemote = true;
+          console.log(chalk.cyan(
+            `Local work pool full (${counts.work}/${limits.maxWorkAgents}) — overflowing ${id} to a remote fly.io machine.`
+          ));
+        }
+      }
+    }
+
     // Handle remote workspace
-    if (isRemote || (locationPreference === 'remote' && !workspacePath)) {
+    if (isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath)) {
       await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }

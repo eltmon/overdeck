@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // "In container" and "behind Traefik" are two different things and must NOT be
@@ -29,8 +29,34 @@ export function resolveProxy(
 
 const { behindTraefik, apiTarget, wsTarget } = resolveProxy();
 
+// PAN-1670: `pan dev` hot-reload restarts only the API child (3011); Vite (3010)
+// stays up, so the index.html boot watchdog never fires (no asset 404) and the
+// browser is left reconnecting through a Vite /ws proxy wedged on the dead
+// upstream. The dev supervisor touches PAN_DEV_RELOAD_SIGNAL once the API child
+// is healthy again; this plugin watches that file and pushes a full browser
+// reload, which re-runs boot against the healthy stack and re-establishes the
+// proxied WS — turning a frozen tab back into a brief "Reconnecting…" blip.
+function panDevFullReloadOnSignal(): Plugin {
+  const signalPath = process.env.PAN_DEV_RELOAD_SIGNAL;
+  return {
+    name: 'pan-dev-full-reload-on-signal',
+    apply: 'serve',
+    configureServer(server: ViteDevServer) {
+      if (!signalPath) return;
+      server.watcher.add(signalPath);
+      const trigger = (file: string) => {
+        if (file !== signalPath) return;
+        server.ws.send({ type: 'full-reload', path: '*' });
+        server.config.logger.info('[pan dev] API hot-reloaded → triggering full browser reload (PAN-1670)');
+      };
+      server.watcher.on('add', trigger);
+      server.watcher.on('change', trigger);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), panDevFullReloadOnSignal()],
   server: {
     port: 3010,
     host: '0.0.0.0',

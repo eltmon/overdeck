@@ -8,6 +8,10 @@ export interface ITurnEmitter {
   onCommitted(cb: (text: string) => void): void;
   onError(cb: (error: Error) => void): void;
   sendAudio(pcm: Buffer): boolean;
+  /** False once the underlying engine process has exited or been closed. */
+  isAlive(): boolean;
+  /** Most recent error reported by the engine (e.g. a startup crash), if any. */
+  getLastError(): string | null;
   stop(): Promise<void>;
   close(): void;
 }
@@ -19,7 +23,7 @@ type SidecarMessage =
   | { type: 'transcript:finalized' }
   | { type: 'error'; error: string };
 
-const SAMPLE_RATE = 24000;
+const SAMPLE_RATE = 16000;
 const MAX_BACKEND_AUDIO_BUFFER_BYTES = 1_000_000;
 
 function resolveSidecarBinary(): string {
@@ -44,6 +48,8 @@ class MoonshineTranscription implements ITurnEmitter {
   private stdoutBuffer = '';
   private closed = false;
   private stopping = false;
+  private exited = false;
+  private lastError: string | null = null;
   private stopResolver: (() => void) | null = null;
 
   constructor(modelSize: string) {
@@ -61,10 +67,19 @@ class MoonshineTranscription implements ITurnEmitter {
     this.child.stderr.on('data', (chunk) => this.emitError(new Error(String(chunk).trim())));
     this.child.on('error', (error) => this.emitError(error));
     this.child.on('exit', (code, signal) => {
+      this.exited = true;
       if (!this.closed && !this.stopping) {
         this.emitError(new Error(`Moonshine sidecar exited unexpectedly (code=${code ?? 'null'}, signal=${signal ?? 'null'})`));
       }
     });
+  }
+
+  isAlive(): boolean {
+    return !this.closed && !this.exited && !this.child.stdin.destroyed;
+  }
+
+  getLastError(): string | null {
+    return this.lastError;
   }
 
   onPartial(cb: (text: string) => void): void {
@@ -150,6 +165,7 @@ class MoonshineTranscription implements ITurnEmitter {
   }
 
   private emitError(error: Error): void {
+    this.lastError = error.message;
     for (const cb of this.errorCallbacks) cb(error);
   }
 }

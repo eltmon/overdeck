@@ -16,7 +16,7 @@ const MODEL_BY_PROVIDER = {
   openrouter: 'qwen/qwen3.6-plus:free',
 } as const
 
-const HARNESSES: RuntimeName[] = ['claude-code', 'pi']
+const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'codex']
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
@@ -55,6 +55,19 @@ describe('canUseHarness', () => {
     }
   })
 
+  it.each(PROVIDERS)('allows codex + %s on every authMode', provider => {
+    const model = MODEL_BY_PROVIDER[provider]
+    for (const authMode of AUTH_MODES) {
+      expect(canUseHarnessSync('codex', model, authMode)).toEqual({ allowed: true })
+    }
+  })
+
+  it('explicitly allows canUseHarnessSync("codex", ...) — no ToS block', () => {
+    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, 'subscription')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.openai, 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
+  })
+
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
       const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')
@@ -76,7 +89,7 @@ describe('canUseHarness', () => {
     }
   })
 
-  it('covers the full 2 x 5 x 3 matrix with explicit per-cell expectations', () => {
+  it('covers the full 3 x 5 x 3 matrix with explicit per-cell expectations', () => {
     const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
@@ -87,7 +100,7 @@ describe('canUseHarness', () => {
         }
       }
     }
-    expect(cells).toHaveLength(2 * 5 * 3)
+    expect(cells).toHaveLength(3 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

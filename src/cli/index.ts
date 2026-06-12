@@ -85,6 +85,7 @@ import { registerTtsCommands } from './commands/tts.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { registerConversationsCommands } from './commands/conversations/index.js';
+import { registerPiAuthCommands } from './commands/pi-auth.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
@@ -104,6 +105,7 @@ import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { ensureNativeSqliteAbi } from '../lib/native-sqlite-guard.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
@@ -124,10 +126,12 @@ import { registerArtifactCommands } from './commands/artifacts.js';
     const arg = argv[i];
     let value: string | undefined;
     if (arg === '--yolo') {
-      // Bare flag — peek at next arg if it doesn't look like another option
+      // Bare flag means true. Only consume an explicit boolean-ish value;
+      // otherwise `pan --yolo up` would swallow `up` as the flag value.
       const next = argv[i + 1];
-      value = next && !next.startsWith('-') ? next : 'true';
-      argv.splice(i, value === 'true' ? 1 : 2);
+      const hasExplicitValue = next !== undefined && /^(true|false|1|0|yes|no)$/i.test(next);
+      value = hasExplicitValue ? next : 'true';
+      argv.splice(i, hasExplicitValue ? 2 : 1);
       i--;
     } else if (arg.startsWith('--yolo=')) {
       value = arg.slice('--yolo='.length);
@@ -320,6 +324,7 @@ const review = program
 review
   .command('pending')
   .description('List completed work awaiting review')
+  .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
   .action(pendingCommand);
 
 review
@@ -365,6 +370,8 @@ const planCmd = program
   .description('Planning lifecycle commands')
   .argument('[id]', 'Issue ID to plan')
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
+  .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
+  .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
   .option('--effort <level>', 'Planning effort: low | medium | high')
@@ -378,6 +385,7 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
+  .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
   .action(planFinalizeCommand);
 
 planCmd
@@ -423,13 +431,13 @@ program
 
 program
   .command('handoff [conv] [focus...]')
-  .description('Conversation handoff that spawns a new conversation; omit <conv> to hand off the conversation you are in; trailing text becomes the focus')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters (put longer briefs in a file and point the focus at it)')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
-  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
+  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code, pi, or codex')
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
-  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code or pi (only when --author=external)')
+  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code, pi, or codex (only when --author=external)')
   .action(handoffCommand);
 
 program
@@ -442,6 +450,7 @@ program
   .description('Resume from saved Claude session')
   .option('--host', 'Bypass workspace docker stack-health gate and resume on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
+  .option('--compact', 'Summarize the saved session out-of-band and respawn a fresh session seeded with the summary (recovers a context-wedged agent without the harness /compact deadlock)')
   .action(resumeCommand);
 
 program
@@ -551,6 +560,9 @@ registerAdminCommands(program);
 // Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
 registerConversationsCommands(program);
 
+// Register pi-auth commands (pan pi-auth status|login)
+registerPiAuthCommands(program);
+
 // Register install command
 registerInstallCommand(program);
 
@@ -590,6 +602,7 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(async (options) => {
+    const noResume = isNoResumeCliOptionEnabled(options);
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
@@ -638,7 +651,7 @@ program
       }
     }
 
-    if (options.noResume) {
+    if (noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
 
@@ -936,7 +949,7 @@ program
         stdio: 'ignore',
         env: {
           ...process.env,
-          ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+          ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
         },
       });
 
@@ -1019,7 +1032,7 @@ program
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -1078,7 +1091,7 @@ program
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -1402,9 +1415,22 @@ if (process.argv.length === 2) {
   process.argv.push('serve');
 }
 
+const isHelpOrVersionInvocation = (argv: string[]): boolean => {
+  const args = argv.slice(2);
+  return args[0] === 'help'
+    || args.includes('--help')
+    || args.includes('-h')
+    || args.includes('--version')
+    || args.includes('-V');
+};
+
 // Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
 // under one Node major, loaded under another) before any command opens the DB.
-ensureNativeSqliteAbi();
+// Help/version rendering must stay side-effect-free: lint-skills shells out to
+// many `pan ... --help` forms, and those commands do not need SQLite.
+if (!isHelpOrVersionInvocation(process.argv)) {
+  ensureNativeSqliteAbi();
+}
 
 // Parse and execute
 await program.parseAsync();

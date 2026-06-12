@@ -19,7 +19,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 48;
+export const SCHEMA_VERSION = 53;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -213,6 +213,10 @@ export function initSchema(db: Database.Database): void {
       review_status         TEXT NOT NULL DEFAULT 'pending',
       test_status           TEXT NOT NULL DEFAULT 'pending',
       merge_status          TEXT,
+      inspect_status        TEXT,
+      inspect_notes         TEXT,
+      inspect_started_at    TEXT,
+      inspect_bead_id       TEXT,
       verification_status   TEXT,
       verification_notes    TEXT,
       verification_cycle_count  INTEGER DEFAULT 0,
@@ -252,7 +256,9 @@ export function initSchema(db: Database.Database): void {
       -- PAN-938: pre-review verification gate commit SHA
       last_verified_commit    TEXT,
       -- PAN-938: current merge pipeline step
-      merge_step              TEXT
+      merge_step              TEXT,
+      -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
+      auto_merge              INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -341,6 +347,31 @@ export function initSchema(db: Database.Database): void {
       value       TEXT NOT NULL,
       updated_at  TEXT NOT NULL
     );
+
+    -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
+    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
+    -- chain: lifecycle transitions are status flips, rows are never deleted
+    -- (auditable history of what was bundled, resolved, and promoted).
+    CREATE TABLE IF NOT EXISTS uat_generations (
+      name             TEXT PRIMARY KEY,
+      worktree_path    TEXT NOT NULL,
+      project_root     TEXT NOT NULL,
+      base_sha         TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'assembling',
+      members          TEXT NOT NULL DEFAULT '[]',
+      held_out         TEXT NOT NULL DEFAULT '[]',
+      resolutions      TEXT NOT NULL DEFAULT '[]',
+      stack_started_at TEXT,
+      cleaned_at       TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+      ON uat_generations(status);
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+      ON uat_generations(project_root, created_at DESC);
 
     -- ===== Rate Limits =====
     CREATE TABLE IF NOT EXISTS rate_limits (
@@ -431,7 +462,9 @@ export function initSchema(db: Database.Database): void {
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
       fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
-      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
+      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -1389,6 +1422,55 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
     } catch { /* already exists */ }
+  }
+
+  // v48 → v49: persist per-bead inspect status metadata for watchdogs (PAN-1616)
+  if (currentVersion < 49) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`); } catch { /* already exists */ }
+  }
+
+  // v49 → v50: add per-issue auto_merge routing key to review_status (PAN-1691)
+  if (currentVersion < 50) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`); } catch { /* already exists */ }
+  }
+
+  // v50 → v51: uat_generations chain for UAT batch trains (PAN-1737)
+  if (currentVersion < 51) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS uat_generations (
+        name             TEXT PRIMARY KEY,
+        worktree_path    TEXT NOT NULL,
+        project_root     TEXT NOT NULL,
+        base_sha         TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'assembling',
+        members          TEXT NOT NULL DEFAULT '[]',
+        held_out         TEXT NOT NULL DEFAULT '[]',
+        resolutions      TEXT NOT NULL DEFAULT '[]',
+        stack_started_at TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+        ON uat_generations(status);
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+        ON uat_generations(project_root, created_at DESC);
+    `);
+  }
+
+  // v51 → v52: mark UAT generation artifacts as cleaned after branch/worktree cleanup (PAN-1737)
+  if (currentVersion < 52) {
+    try { db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`); } catch { /* already exists */ }
+  }
+
+  // v52 → v53: persist fork pipeline restart recovery parameters (PAN-1744)
+  if (currentVersion < 53) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

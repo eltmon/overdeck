@@ -23,6 +23,7 @@ vi.mock('../config-yaml.js', () => ({
     test: 'workhorse:mid',
     ship: 'workhorse:mid',
     flywheel: 'claude-opus-4-7',
+    strike: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -35,7 +36,8 @@ vi.mock('../config-yaml.js', () => ({
     review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
-    flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+    strike: { model: 'workhorse:expensive' },
+    flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
   loadConfig: () => mockLoadConfig(),
@@ -105,6 +107,13 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         manualCompactMode: 'claude-code',
         richCompaction: true,
         titleModel: 'claude-haiku-4-5',
+      },
+      conversationSearch: {
+        enabled: false,
+        provider: 'openai',
+        model: 'text-embedding-3-small',
+        apiKeyRef: undefined,
+        dbPath: '/tmp/conversations/embeddings.db',
       },
       memory: {
         extraction: { fallbackChain: [] },
@@ -224,7 +233,7 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
-      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+      flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
   });
@@ -248,7 +257,6 @@ describe('loadSettingsApi', () => {
     const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
 
     expect(getRoleConfig('flywheel')).toEqual({
-      harness: 'claude-code',
       model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,
@@ -431,6 +439,31 @@ describe('saveSettingsApi', () => {
     }));
 
     expect(loadSettingsApi().roles?.review?.sub?.security?.model).toBe('parent');
+  });
+
+  it('persists conversation search settings', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.conversationSearch?.enabled).toBe(false);
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      conversationSearch: {
+        enabled: true,
+        provider: 'openai',
+        model: 'text-embedding-3-large',
+        apiKeyRef: 'OPENAI_SEARCH_KEY',
+        dbPath: '/tmp/search.db',
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('conversationSearch:');
+    expect(written).toContain('enabled: true');
+    expect(written).toContain('model: text-embedding-3-large');
+    expect(written).toContain('apiKeyRef: OPENAI_SEARCH_KEY');
+    expect(written).toContain('dbPath: /tmp/search.db');
   });
 
   it('persists DashScope provider enablement and API key', async () => {
@@ -616,7 +649,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code or pi');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, pi, or codex');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');

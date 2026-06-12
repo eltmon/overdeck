@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1395",
   "created": "2026-05-31T22:28:56.001Z",
-  "updated": "2026-05-31T22:28:56.001Z",
+  "updated": "2026-06-08T16:00:20.695Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,52 @@
       "reason": "resume",
       "agentModel": "claude-opus-4-8",
       "timestamp": "2026-05-31T22:28:56.001Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T08:48:28.609Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T21:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T21:51:17.281Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T22:04Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T22:04:44.678Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T22:13Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-07T22:13:37.854Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T22:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T22:26:52.175Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T22:26:53.037Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-08T02:05:47.971Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T15:36:16.191Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:53Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-08T15:53:23.598Z"
     }
-  ]
+  ],
+  "feedback": []
 }

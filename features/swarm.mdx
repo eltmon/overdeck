@@ -3,6 +3,8 @@ title: Swarm
 description: Per-item DAG dispatch — many work agents on one issue, in parallel
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Swarm: Per-Item DAG Dispatch
 
 A swarm runs one work agent per plan item, in parallel, on the same issue. Each agent gets its own git worktree and slot branch. The dispatcher uses the plan's `blocks` edges as a DAG: an item becomes dispatchable the moment every blocking parent has merged or completed, not when its wave does.
@@ -37,6 +39,14 @@ Items A, B, C, D, E are vBRIEF items wired by `blocks` edges. A has merged into 
 Every slot-branch merge fires `/api/swarm/slot-merged`. The route marks the slot `merged`, re-runs `getDispatchableItems`, and dispatches any newly-ready items (subject to capacity and file-overlap rules). The per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges into `main` — slot merges return early.
 
 A slot whose status is `'failed'` does **not** unblock its dependents.
+
+Each running slot is a registered work agent, so the dashboard's **Agents** page surfaces every slot in flight alongside its model, runtime, and last activity — the same place you watch any single-agent run. The metric strip (Running, Stuck, Cost 24h, Tokens 24h, Queue) lets you confirm at a glance how many slots a swarm currently occupies.
+
+<ThemedImage
+  light="/images/dashboard/agents-light.png"
+  dark="/images/dashboard/agents-dark.png"
+  alt="Agents page: metric strip over agent cards showing model, runtime, and last activity for each running work agent, including swarm slots"
+/>
 
 ## CLI
 
@@ -105,6 +115,16 @@ interface SwarmRuntime {
   updatedAt: string;
 }
 ```
+
+## Watching a Swarm in the Pipeline
+
+A swarm is still one issue moving through the pipeline — the parallelism is internal to its work phase. The **Pipeline** page groups every issue by phase (Ship / Review / Verifying) under a metric strip (Active issues, Work running, Review queue, Ship, Spend), with a live activity feed on the right. Once a swarm's slots merge up into `feature/<issue>` and the issue advances, you track its progress here just like any other issue.
+
+<ThemedImage
+  light="/images/dashboard/pipeline-light.png"
+  dark="/images/dashboard/pipeline-dark.png"
+  alt="Pipeline page: metric strip over phase-grouped issue rows (Ship / Review / Verifying) with a live activity feed"
+/>
 
 ## Related
 

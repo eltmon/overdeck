@@ -248,8 +248,10 @@ describe('FlywheelConversationPane', () => {
     renderPane();
 
     await screen.findByText('RUN-2');
-    fireEvent.click(screen.getByRole('button', { name: /Pause/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Open Run Report/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Pause$/i }));
+    // Open Run Report lives in the ⋯ More menu (PAN-1694 v3).
+    fireEvent.click(screen.getByRole('button', { name: /^More$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Open Run Report/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/pause', expect.objectContaining({ method: 'POST' }));
@@ -303,17 +305,19 @@ describe('FlywheelConversationPane', () => {
    * silently encoded this regression with `expect(...).not.toBeInTheDocument()`,
    * making it self-reinforcing.
    *
-   * Contract going forward (PAN RUN-11 restoration): the seven action
-   * buttons — Pause, Resume, New Run, Pop out, Write Report, Abort, and
-   * Open Run Report — are ALWAYS rendered. Each button's `disabled` prop
-   * reflects whether the action is legal in the current run state. If a
-   * future change re-introduces conditional rendering of these buttons,
-   * these tests fail loudly.
+   * Contract going forward (PAN RUN-11 restoration, PAN-1694 v3 layout): the
+   * seven actions — Pause, Resume, New Run, Pop out, Write Report, Abort, and
+   * Open Run Report — are ALWAYS reachable, never state-gated-away. Pause,
+   * Resume, and Abort sit directly in the control bar; New Run, Write Report,
+   * Open Run Report, and Pop out live one click into the ⋯ More menu (the v3
+   * declutter). Each action's `disabled` prop still reflects whether it is
+   * legal in the current run state. The original regression was actions
+   * VANISHING based on run state with no way to reach them — a stable,
+   * always-present More menu does not reintroduce that.
    *
-   * DO NOT change these assertions to query-by-role-with-not-in-document.
-   * If a button needs to be hidden, remove it deliberately and update both
-   * the documentation in docs/flywheel-brief.md and these tests in the
-   * same PR.
+   * DO NOT re-gate these actions behind run state, and DO NOT assert
+   * not-in-document. If an action's home changes, update this guard and
+   * docs/flywheel-brief.md in the same PR.
    */
   describe('toolbar action-button regression guard', () => {
     const ALWAYS_VISIBLE_BUTTONS = [
@@ -326,7 +330,15 @@ describe('FlywheelConversationPane', () => {
       /^Open Run Report$/i,
     ] as const;
 
+    // PAN-1694: New Run / Write Report / Open Run Report / Pop out are reachable
+    // via the ⋯ More menu. Opening it makes all seven actions present at once.
+    async function openMoreMenu() {
+      fireEvent.click(screen.getByRole('button', { name: /^More$/i }));
+      await screen.findByRole('menu', { name: /More flywheel actions/i });
+    }
+
     async function expectAllButtonsRendered() {
+      await openMoreMenu();
       for (const name of ALWAYS_VISIBLE_BUTTONS) {
         await waitFor(() => {
           expect(screen.getByRole('button', { name })).toBeInTheDocument();
@@ -388,7 +400,7 @@ describe('FlywheelConversationPane', () => {
       stubRunStatus('none');
       renderPane();
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /^New Run$/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^More$/i })).toBeInTheDocument();
       });
       await expectAllButtonsRendered();
 

@@ -56,6 +56,13 @@ export async function isAutoMergeEligible(
     return { eligible: false, reason: 'review status is not readyForMerge' };
   }
 
+  // PAN-1691: an issue explicitly held for UAT (autoMerge === false) is never
+  // auto-merge eligible. undefined (follow project default) and true are
+  // unaffected — this can only make auto-merge more conservative.
+  if (reviewStatus.autoMerge === false) {
+    return { eligible: false, reason: 'held for UAT (auto-merge toggled off)' };
+  }
+
   const prRef = parsePullRequestUrl(reviewStatus.prUrl);
   if (!prRef) {
     return { eligible: false, reason: 'review status PR URL is missing or invalid' };

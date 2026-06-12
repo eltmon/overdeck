@@ -26,6 +26,7 @@ import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.
 
 let testDir: string;
 let oldDashboardUrl: string | undefined;
+let oldPanopticonHome: string | undefined;
 
 function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'draft'): VBriefDocument {
   return {
@@ -35,8 +36,48 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
       title: `${issueId} auto promote regression`,
       status,
       items: [
-        { id: 'item-1', title: 'Promote the spec', status: 'pending' },
-        { id: 'item-2', title: 'Start the work agent', status: 'pending' },
+        {
+          id: 'item-1',
+          title: 'Promote the spec',
+          status: 'pending',
+          narrative: { Action: 'Promote the finalized workspace spec into the project specs directory' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-1.ac1',
+              title: 'The project specs directory stores the proposed vBRIEF',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-1.ac2',
+              title: 'The promoted vBRIEF persists proposed status',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
+        {
+          id: 'item-2',
+          title: 'Start the work agent',
+          status: 'pending',
+          narrative: { Action: 'Start the work agent only when auto-start policy allows it' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-2.ac1',
+              title: 'Default planning returns without spawning a work agent',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-2.ac2',
+              title: 'Stamped planning spawns the work agent after promotion',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
       ],
       edges: [],
     },
@@ -87,6 +128,19 @@ function writeWorkAgentState(panopticonHome: string, issueId: string, status: 's
   return agentId;
 }
 
+function writePlanningAgentState(panopticonHome: string, issueId: string, autoSpawnOnFinalize: boolean): void {
+  const agentId = `planning-${issueId.toLowerCase()}`;
+  const stateDir = join(panopticonHome, 'agents', agentId);
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(join(stateDir, 'state.json'), JSON.stringify({
+    id: agentId,
+    issueId,
+    status: 'running',
+    role: 'plan',
+    autoSpawnOnFinalize,
+  }, null, 2));
+}
+
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
 }
@@ -94,6 +148,7 @@ function readJson<T>(path: string): T {
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'auto-promote-chain-'));
   oldDashboardUrl = process.env.DASHBOARD_URL;
+  oldPanopticonHome = process.env.PANOPTICON_HOME;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
   mocks.createBeadsFromVBrief.mockReset();
   mocks.emitActivityEntrySync.mockReset();
@@ -105,14 +160,97 @@ afterEach(() => {
   vi.unstubAllGlobals();
   if (oldDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
   else process.env.DASHBOARD_URL = oldDashboardUrl;
+  if (oldPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
+  else process.env.PANOPTICON_HOME = oldPanopticonHome;
   if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
 });
 
 describe('plan-finalize auto-promote chain regression', () => {
-  it('finalizes planning, writes a proposed spec, materializes matching beads, and reports a running work agent', async () => {
+  it('finalizes planning, writes a proposed spec, materializes matching beads, and waits for manual start by default', async () => {
     vi.useFakeTimers();
     const issueId = 'PAN-3401';
     const panopticonHome = join(testDir, 'panopticon-home');
+    process.env.PANOPTICON_HOME = panopticonHome;
+    const { projectPath, workspacePath } = makeProject(issueId);
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    mocks.createBeadsFromVBrief.mockImplementation((path: string) => Effect.succeed({
+      success: true,
+      created: writeBeads(projectPath, issueId).map((id) => `${id}: ${path}`),
+      errors: [],
+      beadIds: new Map(),
+    }));
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(`http://dashboard.test/api/issues/${issueId}/complete-planning`);
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(String(init?.body))).toEqual({});
+
+      const artifacts = await completePlanningArtifacts({
+        projectPath,
+        workspacePath,
+        issueId,
+        createBeads: async () => ({
+          success: true,
+          created: writeBeads(projectPath, issueId),
+          errors: [],
+          beadIds: new Map(),
+        }),
+      });
+
+      const spawn = await completePlanningAutoSpawn({
+        issueId,
+        autoSpawn: false,
+        dashboardOrigin: 'http://dashboard.test',
+        fetchImpl: async () => {
+          throw new Error('work-agent spawn should not be requested');
+        },
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Planning complete and pushed to git - ready for execution',
+        proposedSpec: artifacts.proposed.filename,
+        beadCount: artifacts.beadCount,
+        ...spawn,
+      }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await planFinalizeCommand({ workspace: workspacePath, json: true });
+
+    const printed = JSON.parse(String(consoleLog.mock.calls.at(-1)?.[0] ?? '{}')) as Record<string, unknown>;
+    const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
+    const proposed = readJson<{ plan: { status: string; items: unknown[] } }>(join(projectPath, '.pan', 'specs', specFiles[0]));
+
+    expect(printed).toMatchObject({
+      success: true,
+      planStatus: 'proposed',
+      promoted: true,
+      workAgentSpawned: false,
+    });
+    expect(specFiles).toHaveLength(1);
+    expect(proposed.plan.status).toBe('proposed');
+    expect(countIssueBeads(projectPath, issueId)).toBe(proposed.plan.items.length);
+    expect(existsSync(join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json'))).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const activityEvents = mocks.emitActivityEntrySync.mock.calls.map(([event]) => event);
+    expect(activityEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=createBeads', issueId }),
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=completePlanning', issueId }),
+      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=terminal', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=beadsMaterialize', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=specWrite', issueId }),
+      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=autoSpawn', issueId }),
+    ]));
+  });
+
+  it('auto-spawns a work agent when the planning state is stamped', async () => {
+    vi.useFakeTimers();
+    const issueId = 'PAN-3406';
+    const panopticonHome = join(testDir, 'panopticon-home');
+    process.env.PANOPTICON_HOME = panopticonHome;
+    writePlanningAgentState(panopticonHome, issueId, true);
     const tmuxSessions = new Set<string>();
     const { projectPath, workspacePath } = makeProject(issueId);
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -167,8 +305,6 @@ describe('plan-finalize auto-promote chain regression', () => {
     await planFinalizeCommand({ workspace: workspacePath, json: true });
 
     const printed = JSON.parse(String(consoleLog.mock.calls.at(-1)?.[0] ?? '{}')) as Record<string, unknown>;
-    const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
-    const proposed = readJson<{ plan: { status: string; items: unknown[] } }>(join(projectPath, '.pan', 'specs', specFiles[0]));
     const agentStatePath = join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json');
     const agentState = readJson<{ status: string }>(agentStatePath);
 
@@ -179,20 +315,12 @@ describe('plan-finalize auto-promote chain regression', () => {
       workAgentSpawned: true,
       workAgentMessage: `Session: agent-${issueId.toLowerCase()}`,
     });
-    expect(specFiles).toHaveLength(1);
-    expect(proposed.plan.status).toBe('proposed');
-    expect(countIssueBeads(projectPath, issueId)).toBe(proposed.plan.items.length);
     expect(agentState.status).toMatch(/^(starting|running)$/);
     expect(tmuxSessions.has(`agent-${issueId.toLowerCase()}`)).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const activityEvents = mocks.emitActivityEntrySync.mock.calls.map(([event]) => event);
-    expect(activityEvents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=createBeads', issueId }),
-      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=completePlanning', issueId }),
-      expect.objectContaining({ source: 'plan-finalize', message: 'auto-promote.phase=terminal', issueId }),
-      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=beadsMaterialize', issueId }),
-      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=specWrite', issueId }),
-      expect.objectContaining({ source: 'complete-planning', message: 'complete-planning.phase=autoSpawn', issueId }),
+    const ttsEvents = mocks.emitActivityTtsSync.mock.calls.map(([event]) => event);
+    expect(ttsEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ utterance: `${issueId} planned, starting implementation` }),
     ]));
   });
 

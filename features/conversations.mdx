@@ -1,0 +1,233 @@
+---
+title: Conversations & Handoff
+description: 'Spawn agents, talk to them, branch a conversation to try another approach, and carry context across the context wall with a deliberate handoff — all from Command Deck'
+---
+
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
+# Conversations & Handoff
+
+Panopticon is as much a tool for **managing conversations with agents** as it is a
+workflow engine. Command Deck treats every agent session as a first-class
+conversation: you spawn it, watch it work, talk to it mid-task, branch it to try
+a different approach, and — when it nears the context wall or you want to switch
+models — hand it off to a fresh conversation that inherits the context that
+matters.
+
+<ThemedImage
+  light="/images/dashboard/command-deck-hero-light.png"
+  dark="/images/dashboard/command-deck-hero-dark.png"
+  alt="Command Deck with a live conversation: project and conversation sidebar, issue tree, the agent's turn-by-turn tool calls, and the awareness rail"
+/>
+
+## The conversation surface
+
+Each conversation has a live **Conversation** view and a **Terminal** view of the
+same session. The conversation pane streams the agent's turns — reasoning, tool
+calls, file reads and edits, command output — as they happen. Below it sits the
+composer, where you type to steer the agent the way you'd pair-program with a
+colleague.
+
+| Control | What it does |
+|:--------|:-------------|
+| **Composer** | Send a message to the running agent mid-task — correct its approach, point it at a file, or tell it to stop and rethink |
+| **Model picker** | Hot-swap the model for the next message — Sonnet → Opus → Kimi/GPT/Gemini — without losing the conversation |
+| **Reasoning effort** | Tune how hard the model thinks per message (e.g. *Extra High*) |
+| **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw tmux terminal of the same session |
+| **Copy link** | Grab the `pan.localhost/conv/<id>` URL to share or reopen a conversation |
+| **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
+
+The model picker spans the harness (Claude Code, Pi, Codex) and every routed
+provider, each with live per-million pricing — so a mid-conversation swap is one
+click:
+
+<ThemedImage
+  light="/images/dashboard/model-picker-light.png"
+  dark="/images/dashboard/model-picker-dark.png"
+  alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
+/>
+
+## Why hand off?
+
+A conversation accumulates context as it works: dead ends it already ruled out,
+the file relationships it discovered, the half-finished approach it's mid-stride
+on. When the context window fills up, that knowledge is the most expensive thing
+to lose. A naive "summarize and continue" throws away the nuance.
+
+A **handoff** is a deliberate context transfer. Instead of a passive summary, an
+agent reads the conversation and writes a structured Markdown handoff document —
+capturing the dead ends, the important files, and the suggested next steps — and
+that document becomes the seed message for a brand-new conversation. The new
+agent starts with a clean context window but inherits what mattered.
+
+Reach for a handoff when:
+
+- A long-running conversation is near the context wall.
+- The current agent knows dead ends, hazards, or file relationships a passive summary would miss.
+- You want a deliberate context transfer before switching models, harnesses, or tasks.
+
+Use a plain **Fresh summary** when a quick passive summary is enough; use **Exact
+copy** only when you need to carry the raw history verbatim within a
+Claude-Code-compatible session.
+
+## Continue: the three ways to start a new conversation
+
+Open the **Continue** dialog from a conversation's action menu, or type
+`/handoff` (optionally followed by focus text) in the composer to jump straight
+to handoff mode. The dialog presents three intents, ordered richest to lightest:
+
+<ThemedImage
+  light="/images/handoff/continue-modal-light.png"
+  dark="/images/handoff/continue-modal-dark.png"
+  alt="The Continue dialog with Agent handoff selected, a new-conversation name, harness and launch-model pickers, and a focus field"
+/>
+
+| Intent | What it does | Best for |
+|:-------|:-------------|:---------|
+| **Fresh summary** *(recommended)* | An LLM distills the prior context into a seed message. For very large conversations the history is chunked, each chunk building on the previous summary. | Most cases — a clean, structured starting point |
+| **Agent handoff** | An agent writes a Markdown handoff document, optionally focused on a specific next task, that becomes the seed message. | Deliberate handoffs where dead ends, key files, and next steps matter |
+| **Exact copy** | Copies the raw conversation history verbatim — no summary generated. | Picking up exactly where you left off, **same model only** |
+
+<Note>
+**Fast summary** is an advanced toggle under *Fresh summary* that skips the LLM
+and extracts a bullet list of user messages, files modified, and tools used
+directly from the history — cheaper and instant, but rougher.
+</Note>
+
+<Warning>
+**Exact copy** carries raw history that may contain model-specific data (such as
+signed thinking blocks) that won't validate on a different provider. Use a
+**summary** or **handoff** when switching models.
+</Warning>
+
+### Launch model vs. authoring model
+
+Two model choices live in this dialog, and they are independent:
+
+- **Launch model** — the model the *new conversation* will run on. Defaults to the parent conversation's model.
+- **Authoring model** — the model that *writes the summary or handoff document*. Independent of the launch model; cheaper models like Haiku work well for straightforward cases, larger models for nuanced conversations.
+
+## Progressive disclosure: Advanced options
+
+The dialog keeps the common case to one screen. Everything else lives behind
+**Advanced options**, which expands to reveal the authoring controls:
+
+<ThemedImage
+  light="/images/handoff/continue-modal-advanced-light.png"
+  dark="/images/handoff/continue-modal-advanced-dark.png"
+  alt="The Continue dialog with Advanced options expanded, showing the authored-by choice (external vs source), authoring harness, and authoring model"
+/>
+
+| Authored by | Behavior |
+|:------------|:---------|
+| **External session** *(default)* | A clean session reads the transcript from disk and writes the document. The source conversation is never touched — its context stays clean, and the source can even be ended. Pick the authoring model and harness here. |
+| **Source session** | The live source agent writes the document in-conversation. This adds the prompt and document to the source's context, and uses whatever model the source is running. Right when the source has live state — open files, recent commands, in-flight reasoning — a transcript reader would miss. |
+
+If a source-authored handoff stalls or produces an invalid document, Panopticon
+falls back to a summary fork automatically.
+
+## The help panel
+
+Every option in the dialog is explained inline — click the **?** to open the
+*Continue Options* reference without leaving the flow:
+
+<ThemedImage
+  light="/images/handoff/continue-help-light.png"
+  dark="/images/handoff/continue-help-dark.png"
+  alt="The Continue Options help panel explaining fresh summary, fast summary, agent handoff, and exact copy"
+/>
+
+## Handing off from the CLI
+
+The dialog is the visual front-end for `pan handoff`. The CLI does exactly what
+the dialog does, and the two are interchangeable.
+
+```bash
+pan handoff [conv] [focus...]
+```
+
+The trailing text after the conversation reference becomes the **focus** — no
+flag required.
+
+### Hand off the conversation you're in
+
+If you're an agent inside a conversation and want to hand off *your own*
+conversation, omit `<conv>` (or pass `self`). The command identifies your
+conversation deterministically from the session you're running in — no scanning,
+no guessing.
+
+```bash
+pan handoff                               # hand off this conversation, no focus
+pan handoff self wire the Stripe webhook  # hand off this conversation, with focus
+```
+
+Because focus text is positional, prefer the explicit `self` token whenever you
+pass focus — a bare first word like `pan handoff continue the wiring` is read as
+a *conversation reference* named "continue", not as focus. `self` removes the
+ambiguity. Run `pan conv current` (alias `pan conv whoami`) to print exactly
+which conversation you resolve to.
+
+### Hand off a specific conversation
+
+```bash
+pan handoff 42
+pan handoff source-conv continue the API wiring
+pan handoff source-conv --model claude-sonnet-4-6
+pan handoff source-conv --harness pi
+pan handoff source-conv --cwd /path/to/project
+pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
+pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
+```
+
+### Options
+
+| Option | Description |
+|:-------|:------------|
+| `[conv]` | Conversation id or name. Omit (or pass `self`) to hand off the conversation you're in. |
+| `[focus...]` | Positional focus text — what the successor should concentrate on. **≤ 500 characters.** |
+| `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
+| `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
+| `--cwd <path>` | Working directory for the new conversation. |
+| `--author <who>` | Who authors the handoff doc: `external` (default) or `source`. |
+| `--author-model <model>` | Model for the external authoring session (only when `--author=external`). |
+| `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
+
+<Note>
+**Focus is hard-capped at 500 characters.** A longer focus is rejected with
+`Fork request rejected: focus must be 500 characters or fewer` and no
+conversation is created. Keep it short and task-oriented — the detail belongs in
+the transcript the author reads; the focus only steers what the author
+emphasizes.
+</Note>
+
+### Fallback behavior
+
+`pan handoff <conv>` always tries to create a usable new conversation. If the
+live-agent handoff can't complete, Panopticon falls back to a summary fork and
+prints the reason:
+
+| Reason | Meaning |
+|:-------|:--------|
+| `source-ended` | The source conversation is already ended. |
+| `handoff-timeout` | The source didn't write both the document and its `.done` sentinel in time. |
+| `handoff-validation` | The document didn't satisfy the handoff contract. |
+| `source-workspace-devcontainer` | The source can't write to the host handoff directory from inside a workspace container. |
+
+A successful handoff prints the new conversation id, tmux session, model,
+harness, dashboard link, and the handoff document path. Fallbacks print the same
+details plus a yellow fallback notice.
+
+## Branch to explore
+
+A handoff isn't only for the context wall — it's also how you **branch**. Fork a
+conversation to try an alternative approach, keep the original intact, compare
+both, and continue with the one you like. Cheaper than restarting from scratch,
+and the original's context is never lost.
+
+## See also
+
+- [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations
+- [Cloister](/features/cloister) — model routing, stuck-agent detection, and lifecycle management
+- [Harnesses](/configuration/harnesses) — `claude-code` vs `pi`, and the ToS rules that gate them
+- `pan conv current` (alias `pan conv whoami`) — print the conversation you're running inside
+- `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff

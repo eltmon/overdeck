@@ -3,9 +3,19 @@ title: Workspaces
 description: Git worktree-based isolated development environments
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Workspaces
 
 Workspaces provide isolated development environments for each issue, enabling multiple agents to work on different features simultaneously without conflicts.
+
+Each workspace is where an agent's conversation and its work live together: the dashboard's board surfaces every issue alongside the agent acting on it, so you manage the running conversations and the workflow from one place.
+
+<ThemedImage
+  light="/images/dashboard/board-light.png"
+  dark="/images/dashboard/board-dark.png"
+  alt="Kanban board: issue columns with cost badges, agent status dots, and workspace controls, one card per issue/workspace"
+/>
 
 ## What Are Workspaces?
 
@@ -375,6 +385,14 @@ pan workspace list
 pan workspace destroy MIN-123
 pan workspace destroy MIN-456
 ```
+
+Because each running workspace carries its own agents, conversations, and processes, parallel work also consumes RAM. The dashboard's Resources page breaks down system memory by agents, conversations, and processes so you can see which workspaces are heaviest before deciding which to destroy.
+
+<ThemedImage
+  light="/images/dashboard/resources-light.png"
+  dark="/images/dashboard/resources-dark.png"
+  alt="Resources page: system RAM usage broken down by agents, conversations, and processes"
+/>
 
 ## Related Guides
 

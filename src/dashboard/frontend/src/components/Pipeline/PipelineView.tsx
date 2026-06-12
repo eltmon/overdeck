@@ -10,6 +10,7 @@ import type { Agent, Issue } from '../../types';
 import MetricStrip from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
+import { AutoMergeToggle } from '../AutoMergeToggle';
 import TopBar from '../primitives/TopBar';
 import VerbBadge from '../primitives/VerbBadge';
 import { IssueActionMenu } from '../IssueActionMenu';
@@ -195,6 +196,10 @@ type PipelineIssueRowProps = {
 
 function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: PipelineIssueRowProps) {
   const [openSignal, setOpenSignal] = useState(0);
+  // PAN-1692: per-issue auto-merge policy badge, read from the store snapshot.
+  const autoMerge = useDashboardStore(
+    (s) => (s.reviewStatusByIssueId[issue.identifier] ?? s.reviewStatusByIssueId[issue.identifier.toUpperCase()])?.autoMerge,
+  );
   const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
   const ledger = {
     runtime: agent?.startedAt
@@ -218,6 +223,7 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen }: Pipe
       onOpen={onOpen}
       onContextMenu={() => setOpenSignal((value) => value + 1)}
       actionMenu={<IssueActionMenu issueId={issue.identifier} mode="overflow-only" className="inline-flex" openSignal={openSignal} />}
+      trailingBadge={<AutoMergeToggle issueId={issue.identifier} autoMerge={autoMerge} variant="badge" compact />}
     />
   );
 }

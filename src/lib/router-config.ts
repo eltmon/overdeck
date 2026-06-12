@@ -55,7 +55,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
     name: 'anthropic',
     baseURL: 'https://api.anthropic.com/v1',
     apiKey: '$ANTHROPIC_API_KEY',
-    models: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
   });
 
   // OpenAI provider (only if API key configured)
@@ -125,7 +125,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     name: 'anthropic',
     baseURL: 'https://api.anthropic.com/v1',
     apiKey: '$ANTHROPIC_API_KEY',
-    models: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
   });
 
   // OpenAI provider (only if enabled)
@@ -148,7 +148,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  for (const role of ['plan', 'work', 'review', 'test', 'ship', 'flywheel'] as const) {
+  for (const role of ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike'] as const) {
     router[`role:${role}`] = { model: resolveModel(role, undefined, config) };
   }
   for (const subRole of ['inspect', 'inspect-deep'] as const) {

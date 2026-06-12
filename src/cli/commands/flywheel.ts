@@ -19,6 +19,7 @@ import { abortFlywheelRun, clearFlywheelGate, getFlywheelRunDetail, getFlywheelR
 import { loadConfigSync, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { stopAgent } from '../../lib/agents.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
 import {
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
@@ -84,7 +85,7 @@ interface FlywheelGateSnapshot {
 }
 
 interface ResolvedFlywheelRoleConfig {
-  harness: 'claude-code' | 'pi';
+  harness: 'claude-code' | 'pi' | 'codex';
   model: string;
   effort: RoleEffort;
   minAgents: number;
@@ -271,7 +272,7 @@ async function createInitialFlywheelStatus(
   startedAt: string,
   cwd: string,
   agentModel: string | undefined,
-  agentHarness: 'claude-code' | 'pi' | undefined,
+  agentHarness: RuntimeName | undefined,
   roleConfig: ResolvedFlywheelRoleConfig,
 ): Promise<FlywheelStatus> {
   const ramTotalMb = mb(totalmem());

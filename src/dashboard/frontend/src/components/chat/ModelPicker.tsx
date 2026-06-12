@@ -30,6 +30,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
   'claude-code': 'claude-sonnet-4-6',
   'pi': 'gpt-5.5',
+  'codex': 'codex-4o',
 };
 
 /**
@@ -89,10 +90,11 @@ interface ModelGroup {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-fable-5': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-8': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-7': ['low', 'medium', 'high', 'xhigh', 'max'],
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
@@ -122,6 +124,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-fable-5', label: 'Claude Fable 5', provider: 'anthropic', costDisplay: '$90/1M', costPer1MTokens: 90, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
       { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high'] },
@@ -170,7 +173,7 @@ export function saveStoredModel(modelId: string): void {
 export function loadStoredHarness(): Harness {
   try {
     const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
-    if (stored === 'pi' || stored === 'claude-code') return stored;
+    if (stored === 'pi' || stored === 'claude-code' || stored === 'codex') return stored;
   } catch { /* ignore */ }
   return 'claude-code';
 }
@@ -350,6 +353,9 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         <span className={styles.pickerLabel}>{label}</span>
         {harness === 'pi' && (
           <span className={styles.harnessIndicator} title="Pi harness active">Pi</span>
+        )}
+        {harness === 'codex' && (
+          <span className={styles.harnessIndicator} title="Codex harness active">Codex</span>
         )}
         {selectedWarning && (
           <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />

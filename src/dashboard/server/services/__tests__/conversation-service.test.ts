@@ -106,7 +106,10 @@ describe('computeContextUsage', () => {
     expect(result).toMatchObject({
       activeBytes: buffer.length,
       estimatedTokens: 5_000,
-      contextWindow: 1_050_000,
+      // gpt-5.5 routes through CLIProxy, whose effective ceiling is the
+      // conservative CLIPROXY_CODEX_CONTEXT_WINDOW (150k), not the 200k
+      // marketing window — see model-capabilities.ts (PAN-1672).
+      contextWindow: 150_000,
     });
   });
 
@@ -399,6 +402,59 @@ describe('parseConversationMessages', () => {
     ]);
   });
 
+  it('counts usage once when one API response spans multiple JSONL lines (same requestId)', async () => {
+    // Claude Code writes one response across several lines (a text line, then a
+    // tool_use line) that each repeat the SAME usage block. Summing every line
+    // double-counts cost/tokens — dedup by requestId must count it once.
+    const usage = {
+      input_tokens: 1000,
+      output_tokens: 500,
+      cache_read_input_tokens: 200000,
+      cache_creation_input_tokens: 10000,
+    };
+    const lines = [
+      {
+        type: 'assistant',
+        uuid: 'asst-text',
+        requestId: 'req-1',
+        timestamp: '2024-01-01T00:00:01.000Z',
+        message: {
+          id: 'resp-1',
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'text', text: 'Working on it' }],
+          stop_reason: null,
+          usage,
+        },
+      },
+      {
+        type: 'assistant',
+        uuid: 'asst-tool',
+        requestId: 'req-1',
+        timestamp: '2024-01-01T00:00:02.000Z',
+        message: {
+          id: 'resp-1',
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [{ type: 'tool_use', id: 'tu-1', name: 'Bash', input: { command: 'ls' } }],
+          stop_reason: 'tool_use',
+          usage,
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    // Tokens counted once: 1000 + 500 + 200000 + 10000 = 211500 (not doubled).
+    expect(result.totalTokens).toBe(211500);
+    // Cost counted once with cache-aware opus-4-8 pricing:
+    //   1000/1k*0.005 + 500/1k*0.025 + 200000/1k*0.0005 + 10000/1k*0.00625
+    //   = 0.005 + 0.0125 + 0.1 + 0.0625 = 0.18
+    expect(result.totalCost).toBeCloseTo(0.18, 6);
+  });
+
   it('marks assistant message as streaming when no stop_reason and file is fresh', async () => {
     const lines = [
       {
@@ -466,6 +522,31 @@ describe('parseConversationMessages', () => {
 
     expect(result.streaming).toBe(false);
     expect(result.isWorking).toBe(true);
+  });
+
+  it('does NOT mark a stale user-last conversation as working (PAN-1635: post-compaction idle)', async () => {
+    // After a compaction the only post-boundary entry is a user-role meta line
+    // (the continuation summary) with no following assistant turn — if the
+    // follow-up prompt was eaten by the compaction, the agent is actually idle.
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-1',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        message: {
+          content: [{ type: 'text', text: 'This session is being continued from a previous conversation' }],
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+    // JSONL idle for >3min (WORKING_STALENESS_MS) — last entry is user-role but
+    // the file is stale, so the agent is not working.
+    mockStat.mockResolvedValue({ mtimeMs: Date.now() - 200_000, birthtimeMs: Date.now() - 200_000, size: (await mockReadFile()).length });
+
+    const { summarizeConversationActivity } = await import('../conversation-service.js');
+    const result = await summarizeConversationActivity('/fake/session.jsonl');
+
+    expect(result.isWorking).toBe(false);
   });
 
   it('summarizes a completed assistant-last conversation as idle', async () => {

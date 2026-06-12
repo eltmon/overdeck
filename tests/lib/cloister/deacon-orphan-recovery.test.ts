@@ -47,6 +47,11 @@ vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
 const mockGetTmuxSessionName = vi.fn();
 const mockSpawnRun = vi.fn();
 const mockSpawnReviewRoleForIssue = vi.fn();
+const mockIsIssueClosed = vi.fn();
+
+vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
+}));
 
 vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
   // PAN-1048 R3/R4: deacon now spawns the review role primitive instead of
@@ -55,6 +60,17 @@ vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
     try: () => Promise.resolve(mockSpawnReviewRoleForIssue(...args)),
     catch: (cause) => cause as any,
   }),
+}));
+
+// PAN-1665: permissive concurrency governor — these tests assert the dispatch
+// logic itself, not the slot budget, so always allow a slot.
+vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
+  resetPatrolDispatchBudget: () => {},
+  tryReserveAdvancingSlot: () => true,
+  canDispatchAdvancing: () => true,
+  getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
+  countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+  workResumeSlotsAvailable: () => 6,
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
@@ -127,7 +143,7 @@ vi.mock('../../../src/lib/workspace/rebuild-stack.js', () => ({
 }));
 
 // Import after mocks are in place
-import { checkOrphanedReviewStatuses } from '../../../src/lib/cloister/deacon.js';
+import { checkOrphanedReviewStatuses, checkPendingTestDispatch } from '../../../src/lib/cloister/deacon.js';
 
 // ---------------------------------------------------------------------------
 // Test data helpers
@@ -155,6 +171,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockResolveProjectFromIssue.mockReturnValue(null);
     // Default: empty review status store (DB-backed via loadReviewStatuses mock)
     mockLoadReviewStatuses.mockReturnValue({});
+    mockIsIssueClosed.mockResolvedValue(false);
     // Default: parallel review dispatch succeeds (review orphan re-dispatch path)
     mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
     // Default: workspace docker stack is healthy, so orphan-test recovery
@@ -170,6 +187,49 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   afterEach(() => {
     // Clean up agent state dirs and completed.processed markers created by tests
     rmSync(join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`), { recursive: true, force: true });
+  });
+
+  it('skips review and test re-dispatch when the issue is closed', async () => {
+    mockIsIssueClosed.mockResolvedValue(true);
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-369-REVIEW': {
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/369',
+      },
+      'PAN-369-TEST': {
+        reviewStatus: 'passed',
+        testStatus: 'testing',
+      },
+    });
+
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(actions).toEqual([]);
+    expect(mockSpawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-369-REVIEW');
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-369-TEST');
+  });
+
+  it('skips pending test dispatch retry when the issue is closed', async () => {
+    mockIsIssueClosed.mockResolvedValue(true);
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-369-RETRY': {
+        reviewStatus: 'passed',
+        testStatus: 'dispatch_failed',
+        testRetryCount: 0,
+      },
+    });
+
+    const actions = await checkPendingTestDispatch();
+
+    expect(actions).toEqual([]);
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockResolveProjectFromIssue).not.toHaveBeenCalled();
+    expect(mockIsIssueClosed).toHaveBeenCalledWith('PAN-369-RETRY');
   });
 
   // -------------------------------------------------------------------------

@@ -1,9 +1,11 @@
 import { execSync, spawn, ChildProcess } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
+import { isNoResumeCliOptionEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 import { getInternalTokenSync } from '../../lib/internal-token.js';
 
@@ -98,11 +100,49 @@ async function waitForHttp200(port: number, timeoutMs = 10000): Promise<void> {
   throw new Error(`Frontend at ${url} did not return 200 within ${timeoutMs}ms`);
 }
 
-function killPort(port: number): void {
+function killPort(port: number, signal: 'TERM' | 'KILL' = 'TERM'): void {
   try {
-    execSync(`fuser -k -TERM ${port}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`fuser -k -${signal} ${port}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Kill ALL bundled dashboard-server processes by path — not just the current port
+ * owner. An orphan that already lost the port (e.g. after a failed restart) is
+ * invisible to killPort(), survives forever, and can run a second Deacon racing
+ * the live one. PAN-1622.
+ *
+ * Host-side only (PAN-1763): workspace/UAT stack `server` containers run the same
+ * `node dist/dashboard/server.js` cmdline and are visible to host pkill, so a bare
+ * pattern kill SIGTERMs every stack's server container, flipping stacks unhealthy.
+ * Skip any PID whose cgroup shows it lives inside a container.
+ */
+function killAllDashboardServers(signal: 'TERM' | 'KILL' = 'TERM'): void {
+  let pids = '';
+  try {
+    pids = execSync(`pgrep -f 'dist/dashboard/server\\.js' 2>/dev/null || true`, {
+      stdio: 'pipe',
+    }).toString();
+  } catch {
+    return;
+  }
+  for (const line of pids.split('\n')) {
+    const pid = Number(line.trim());
+    if (!pid || pid === process.pid) continue;
+    let cgroup = '';
+    try {
+      cgroup = readFileSync(`/proc/${pid}/cgroup`, 'utf-8');
+    } catch {
+      continue; // process already gone
+    }
+    if (/docker|containerd|libpod/.test(cgroup)) continue; // in-container peer, not ours
+    try {
+      process.kill(pid, signal === 'KILL' ? 'SIGKILL' : 'SIGTERM');
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -173,7 +213,9 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean; resume?: boolean }) {
+  const noResume = isNoResumeCliOptionEnabled(options);
+
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -181,6 +223,10 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const node22 = resolveNode22();
   const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
   const frontendDir = join(__dirname, '..', '..', 'src', 'dashboard', 'frontend');
+  // PAN-1670: sentinel file the Vite plugin watches; touched after a hot-reload's
+  // API child is healthy again so Vite pushes a full browser reload (recovers the
+  // tab instead of leaving it stuck on "Reconnecting…").
+  const reloadSignalPath = join(tmpdir(), `pan-dev-fullreload-${config.dashboardPort}.signal`);
 
   console.log(chalk.bold('Starting Panopticon in development mode...\n'));
 
@@ -198,7 +244,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }
   }
 
-  if (options.noResume) {
+  if (noResume) {
     console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
   }
 
@@ -276,15 +322,35 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
   // ── Kill existing processes ────────────────────────────────────────────────
   console.log(chalk.dim('Cleaning up existing dashboard processes...'));
-  killPort(config.dashboardPort);
-  killPort(config.dashboardApiPort);
+  // PAN-1622: kill ALL dashboard servers (not just the port owner) so orphans
+  // can't keep serving stale data or run a second Deacon. Escalate SIGTERM →
+  // SIGKILL if the ports don't free, and ABORT rather than spawn a doomed child
+  // that can't bind (which silently leaves the stale server serving).
+  killAllDashboardServers('TERM');
+  killPort(config.dashboardPort, 'TERM');
+  killPort(config.dashboardApiPort, 'TERM');
   try {
     await Promise.all([
       waitForPortFree(config.dashboardPort, 5000),
       waitForPortFree(config.dashboardApiPort, 5000),
     ]);
   } catch {
-    // proceed anyway
+    console.log(chalk.yellow('Ports still busy after SIGTERM — escalating to SIGKILL...'));
+    killAllDashboardServers('KILL');
+    killPort(config.dashboardPort, 'KILL');
+    killPort(config.dashboardApiPort, 'KILL');
+    try {
+      await Promise.all([
+        waitForPortFree(config.dashboardPort, 5000),
+        waitForPortFree(config.dashboardApiPort, 5000),
+      ]);
+    } catch {
+      console.error(chalk.red(
+        `Port ${config.dashboardApiPort} is still in use after SIGKILL. A stuck process ` +
+        `is holding it — run \`pan down\`, or kill it manually, then retry \`pan dev\`.`,
+      ));
+      process.exit(1);
+    }
   }
 
   // Tracked here (not in shutdown()) so child-close handlers can see it.
@@ -305,6 +371,15 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   let apiRestarts: number[] = [];
   let viteRestarts: number[] = [];
 
+  // PAN-1662: hot-reload coordination. `intentionalApiKill` tells the API
+  // child's close handler that the next death is a deliberate reload (rebuild +
+  // restart in place) — NOT a crash — so it respawns immediately without
+  // counting toward the crash-loop guard. `apiReloading`/`reloadPending`
+  // single-flight concurrent reload triggers.
+  let intentionalApiKill = false;
+  let apiReloading = false;
+  let reloadPending = false;
+
   const tooManyRestarts = (stamps: number[]): boolean => {
     const now = Date.now();
     const recent = stamps.filter((t) => now - t < 60_000);
@@ -323,7 +398,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
         API_PORT: String(config.dashboardApiPort),
         PANOPTICON_MODE: 'development',
         ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-        ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[server] ${data}`)));
@@ -343,6 +418,18 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
         return;
       }
       if (shuttingDown) return;
+      if (intentionalApiKill) {
+        // Deliberate reload restart — respawn immediately with the freshly-built
+        // bundle and do NOT count it as a crash (PAN-1662).
+        intentionalApiKill = false;
+        void (async () => {
+          killPort(config.dashboardApiPort);
+          try { await waitForPortFree(config.dashboardApiPort, 3000); } catch { /* proceed */ }
+          if (!supervising || shuttingDown) return;
+          apiChild = startApi();
+        })();
+        return;
+      }
       scheduleApiRespawn();
     });
     return child;
@@ -372,6 +459,74 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }, delayMs);
   };
 
+  // ── Hot reload (PAN-1662) ─────────────────────────────────────────────────────
+  // Rebuild the dashboard server bundle and restart the API child in place, so
+  // merged/edited server code goes live WITHOUT tearing down `pan dev`. Triggered
+  // by SIGUSR2 — e.g. `pan reload` run against a live dev session, or the flywheel
+  // after merging server-code changes. Pairs with the frontend's graceful
+  // reconnect (PAN-1580) so the browser tab recovers on its own.
+  const rebuildServerBundle = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      let settled = false;
+      // PAN-1664: use the NON-destructive hot build. The normal build:dashboard:server
+      // runs build:contracts which `rmrf`s packages/contracts/dist (and tsdown cleans
+      // it) — deleting index.mjs out from under the running Vite frontend, which 404s
+      // the @panctl/contracts module and wedges open tabs on "Reconnecting…".
+      // build:dashboard:server:hot + PAN_HOT_RELOAD=1 overwrites dist in place instead.
+      const build = spawn('npm', ['run', 'build:dashboard:server:hot'], {
+        cwd: join(__dirname, '..', '..'),
+        stdio: 'pipe',
+        env: { ...process.env, SKIP_DOCS_INDEX: '1', PAN_HOT_RELOAD: '1' },
+      });
+      // PAN-1664: bound the build so a hung rebuild can never leave the promise
+      // unresolved (which would wedge the reloadApi single-flight flag forever).
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        console.error(chalk.red('[pan dev] server rebuild timed out (120s) — aborting reload'));
+        try { build.kill('SIGKILL'); } catch { /* ignore */ }
+        resolve(false);
+      }, 120_000);
+      const done = (ok: boolean) => { if (settled) return; settled = true; clearTimeout(timer); resolve(ok); };
+      build.stdout?.on('data', (d) => process.stdout.write(chalk.dim(`[reload] ${d}`)));
+      build.stderr?.on('data', (d) => process.stderr.write(chalk.dim(`[reload] ${d}`)));
+      build.on('error', () => done(false));
+      build.on('close', (code) => done(code === 0));
+    });
+
+  const reloadApi = async (reason: string): Promise<void> => {
+    if (!supervising || shuttingDown) return;
+    if (apiReloading) { reloadPending = true; return; }
+    apiReloading = true;
+    try {
+      console.log(chalk.cyan(`[pan dev] ${reason} — rebuilding server bundle…`));
+      const ok = await rebuildServerBundle();
+      if (!ok) {
+        console.error(chalk.red('[pan dev] server rebuild FAILED — keeping the current server running. Fix the error, then reload again.'));
+        return;
+      }
+      if (!supervising || shuttingDown) return;
+      console.log(chalk.cyan('[pan dev] rebuild OK — restarting API server in place…'));
+      intentionalApiKill = true;
+      apiChild.kill('SIGTERM');
+      try {
+        await waitForHealth(config.dashboardApiPort, '/api/health', 15000);
+        console.log(chalk.green('✓ Dashboard server reloaded'));
+        // PAN-1670: API is healthy again — tell Vite to full-reload open tabs so
+        // they re-establish the proxied WS instead of wedging on "Reconnecting…".
+        try { writeFileSync(reloadSignalPath, String(Date.now())); } catch { /* best effort */ }
+      } catch (err: any) {
+        console.error(chalk.red('[pan dev] server unhealthy after reload:'), err.message);
+      }
+    } finally {
+      apiReloading = false;
+      if (reloadPending) {
+        reloadPending = false;
+        void reloadApi('coalesced reload');
+      }
+    }
+  };
+
   // ── Vite dev server ──────────────────────────────────────────────────────────
   const startVite = (): ChildProcess => {
     const child = spawn('npx', ['vite', '--host', '0.0.0.0', '--port', String(config.dashboardPort)], {
@@ -381,6 +536,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       env: {
         ...process.env,
         TRAEFIK_ENABLED: config.traefikEnabled ? 'true' : 'false',
+        PAN_DEV_RELOAD_SIGNAL: reloadSignalPath,
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[vite] ${data}`)));
@@ -525,6 +681,10 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGHUP', () => shutdown('SIGHUP'));
+  // PAN-1662: reload-in-place signal. `pan reload` (and the flywheel) send
+  // SIGUSR2 to this supervisor to rebuild the server bundle and hot-restart the
+  // API child without dropping the dev session.
+  process.on('SIGUSR2', () => { void reloadApi('reload signal (SIGUSR2)'); });
 
   // Keep the process alive
   await new Promise(() => {});

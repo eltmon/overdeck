@@ -4,7 +4,7 @@ import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-05-23)
   | 'gpt-5.5'
@@ -25,7 +25,7 @@ export type OpenAIModel =
   | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
-export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
+export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
@@ -237,6 +237,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   dashscope: DashScopeModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
+    'claude-fable-5',
     'claude-opus-4-8',
     'claude-opus-4-7',
     'claude-opus-4-6',
@@ -298,6 +299,9 @@ export function isAnthropicModelSync(modelId: ModelId | string): boolean {
  */
 export function getClaudeModelFlagSync(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
+    // Fable has no short `claude` CLI alias (like opus/sonnet); pass the full
+    // API model ID through to `--model`.
+    'claude-fable-5': 'claude-fable-5',
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',
     'claude-opus-4-6': 'opus',

@@ -227,6 +227,13 @@ describe('agents auth routing', () => {
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
         'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+        'unset KIMI_API_KEY',
+        'unset MINIMAX_API_KEY',
+        'unset ZAI_API_KEY',
+        'unset MIMO_API_KEY',
+        'unset OPENROUTER_API_KEY',
+        'unset NOUS_API_KEY',
+        'unset DASHSCOPE_API_KEY',
         '',
       ].join('\n')
     );

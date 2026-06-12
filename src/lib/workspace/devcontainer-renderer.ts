@@ -81,6 +81,12 @@ export function createWorkspacePlaceholdersSync(
 /**
  * Replace hardcoded user home paths in a compose file with `${HOME}` so the
  * file works across machines and after `cp -r` between users.
+ *
+ * `/home/node/` is excluded: that is the CONTAINER user's home (the mount
+ * TARGET side of bind mounts), not a host path. Rewriting it made compose
+ * interpolate the host's `${HOME}` on the container side, silently moving
+ * mounts like `.codex` (PAN-1619) and the shared caches (PAN-1764) to a path
+ * the in-container `node` user never reads.
  */
 export function sanitizeComposeFileSync(filePath: string): void {
   if (!existsSync(filePath)) return;
@@ -89,7 +95,7 @@ export function sanitizeComposeFileSync(filePath: string): void {
   const original = content;
 
   const homePatterns = [
-    /\/home\/[a-zA-Z0-9_-]+\//g,
+    /\/home\/(?!node\/)[a-zA-Z0-9_-]+\//g,
     /\/Users\/[a-zA-Z0-9_-]+\//g,
   ];
   for (const pattern of homePatterns) {
@@ -171,6 +177,8 @@ export interface DevcontainerRenderOptions {
   projectConfig: ProjectConfig;
   /** Feature name without the `feature-` prefix (e.g. `min-846`). */
   featureName: string;
+  /** Optional caller-owned overrides for non-feature workspaces such as UAT batches. */
+  placeholderOverrides?: Partial<TemplatePlaceholders>;
 }
 
 /**
@@ -208,10 +216,20 @@ export function renderDevcontainerSync(
 
   mkdirSync(result.devcontainerDir, { recursive: true });
 
+  // Pre-create the shared host-side caches the compose file bind-mounts
+  // (PAN-1764). Docker auto-creates missing bind sources as root, which the
+  // container's `node` user (uid 1000) cannot write to.
+  for (const cacheDir of ['bun', 'npm']) {
+    mkdirSync(join(homedir(), '.cache', 'panopticon-devcontainer', cacheDir), {
+      recursive: true,
+    });
+  }
+
   const placeholders = createWorkspacePlaceholdersSync(
     opts.projectConfig,
     opts.featureName,
     opts.workspacePath,
+    opts.placeholderOverrides,
   );
 
   // 1. Render every *.template file.

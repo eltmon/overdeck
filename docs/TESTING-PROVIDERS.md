@@ -1,27 +1,40 @@
 # Provider Testing Guide
 
-Guide for testing Panopticon's hybrid provider approach with direct APIs and claude-code-router.
+Guide for testing Panopticon's provider routing with both the Claude Code and Pi harnesses.
 
 ## Provider Compatibility Overview
 
 | Provider | Compatibility | Testing Status | Notes |
 |----------|---------------|----------------|-------|
 | Anthropic | Direct (native) | ✅ Always works | Default provider |
-| Kimi (Moonshot) | Direct | ✅ Tested 2026-01-28 | Uses Anthropic-compatible API |
-| GLM (Z.AI) | Direct | ✅ Tested 2026-01-28 | Uses Anthropic-compatible API |
-| OpenAI | Router | 🔍 Needs testing | Requires claude-code-router |
-| Google Gemini | Router | 🔍 Needs testing | Requires claude-code-router |
+| Kimi (Moonshot) | Direct | ✅ Tested 2026-01-28 | Anthropic-compatible endpoint; Pi native |
+| GLM (Z.AI) | Direct | ✅ Tested 2026-01-28 | Anthropic-compatible endpoint; Pi native |
+| OpenAI | CLIProxy sidecar | ✅ Tested | Subscription via Codex CLI / CLIProxy |
+| Google Gemini | CLIProxy sidecar | ✅ Tested | API key bridged into CLIProxy |
+| MiniMax | Direct | ✅ Tested | Anthropic-compatible endpoint; Pi native |
+| MiMo | Direct | ✅ Tested | Anthropic-compatible endpoint; Pi native |
+| OpenRouter | Direct | ✅ Tested | Anthropic-compatible endpoint; Pi native |
+| Nous Portal | Direct | ✅ Tested | OpenAI-compatible via local adapter; Pi native |
+| DashScope | Direct | 🔍 Needs testing | OpenAI-compatible via local adapter; Pi native |
 
 ## Prerequisites
 
-### For Direct Providers (Kimi, GLM)
+### For Direct Providers (Kimi, GLM, MiniMax, MiMo, OpenRouter)
+
 - API key from provider
 - No additional setup needed
 
-### For Router Providers (OpenAI, Gemini)
-- API key from provider
-- claude-code-router installed (`npm install -g @musistudio/claude-code-router`)
-- Router running on localhost:8000
+### For CLIProxy Providers (OpenAI, Google)
+
+- OpenAI: Codex/ChatGPT subscription (OAuth) or OpenAI API key
+- Google: `GOOGLE_API_KEY` configured in Settings or `~/.panopticon.env`
+- CLIProxyAPI sidecar runs automatically with the dashboard
+
+### For Pi Harness Testing
+
+- Pi installed (`npm install -g @mariozechner/pi-coding-agent`)
+- `pan doctor` reports Pi OK
+- Panopticon bridges API keys into Pi automatically; no separate Pi auth needed for API-key providers
 
 ## Testing Direct Providers
 
@@ -29,188 +42,123 @@ Guide for testing Panopticon's hybrid provider approach with direct APIs and cla
 
 **Setup:**
 ```bash
-# Create test settings
-cat > ~/.panopticon/settings.json << 'EOF'
-{
-  "models": {
-    "specialists": {
-      "review_agent": "claude-sonnet-4-5",
-      "test_agent": "claude-sonnet-4-5",
-      "merge_agent": "claude-sonnet-4-5"
-    },
-    "planning_agent": "claude-sonnet-4-5",
-    "complexity": {
-      "trivial": "claude-haiku-4-5",
-      "simple": "claude-haiku-4-5",
-      "medium": "claude-sonnet-4-5",
-      "complex": "claude-sonnet-4-5",
-      "expert": "claude-opus-4-6"
-    }
-  },
-  "api_keys": {
-    "kimi": "sk-kimi-YOUR_KEY_HERE"
-  }
-}
-EOF
+# Add Kimi API key to ~/.panopticon.env
+export KIMI_API_KEY="sk-kimi-YOUR_KEY_HERE"
+# or KIMI_CODING_API_KEY for coding-endpoint keys
 ```
 
-**Test direct API:**
+**Test Claude Code harness:**
 ```bash
-# Test Kimi directly with Claude Code
-export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
-export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
-claude "What is 2+2?"
+# Spawn an agent with Kimi via Claude Code
+pan start PAN-999 --model kimi-k2.5
+
+# Verify env in tmux session
+tmux -L panopticon show-environment -t agent-pan-999 | grep ANTHROPIC
+# Expected: ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic (or api.kimi.com/coding for sk-kimi-* keys)
+# Expected: ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
 ```
 
-**Expected Result:** Response "2+2 equals 4" or similar
-
-**Test via Panopticon agent:**
+**Test Pi harness:**
 ```bash
-# Update settings to use Kimi for test agent
-# Then spawn an agent and verify it uses Kimi's API
+# Spawn an agent with Kimi via Pi
+pan start PAN-999 --harness pi --model kimi-k2.5
+
+# Verify env in tmux session
+tmux -L panopticon show-environment -t agent-pan-999 | grep KIMI_API_KEY
+# Expected: KIMI_API_KEY=sk-kimi-YOUR_KEY_HERE
 ```
+
+**Expected Result:** Agent responds using Kimi's API regardless of harness.
 
 ### Test GLM (Z.AI)
 
 **Setup:**
 ```bash
-# Add GLM API key to settings
-cat > ~/.panopticon/settings.json << 'EOF'
-{
-  "models": {
-    "specialists": {
-      "review_agent": "glm-4.7",
-      "test_agent": "glm-4.7",
-      "merge_agent": "glm-4.7"
-    },
-    "planning_agent": "glm-4.7",
-    "complexity": {
-      "trivial": "glm-4.7-flash",
-      "simple": "glm-4.7-flash",
-      "medium": "glm-4.7",
-      "complex": "glm-4.7",
-      "expert": "glm-4.7"
-    }
-  },
-  "api_keys": {
-    "zai": "YOUR_ZAI_API_KEY"
-  }
-}
-EOF
+# Add Z.AI API key to ~/.panopticon.env
+export ZAI_API_KEY="YOUR_ZAI_API_KEY"
 ```
 
-**Test direct API:**
+**Test via Panopticon agent:**
 ```bash
-# Test GLM directly with Claude Code
-export ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
-export ANTHROPIC_AUTH_TOKEN=YOUR_ZAI_API_KEY
-export API_TIMEOUT_MS=300000
-claude "What is 2+2?"
+pan start PAN-998 --model glm-4.7
+# Verify: ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+# Verify: API_TIMEOUT_MS=300000
 ```
 
-**Expected Result:** Response from GLM-4.7 model
+## Testing CLIProxy Providers
 
-**Verification:**
-- Check Z.AI usage dashboard for new requests
-- Verify request shows GLM model used
-
-## Testing Router Providers
-
-### Test OpenAI
+### Test OpenAI (Codex subscription)
 
 **Setup:**
 ```bash
-# Install router if not already installed
-npm install -g @musistudio/claude-code-router
-
-# Configure router
-mkdir -p ~/.claude-code-router
-cat > ~/.claude-code-router/config.json << 'EOF'
-{
-  "providers": [
-    {
-      "name": "anthropic",
-      "baseURL": "https://api.anthropic.com/v1",
-      "apiKey": "$ANTHROPIC_API_KEY",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"]
-    },
-    {
-      "name": "openai",
-      "baseURL": "https://api.openai.com/v1",
-      "apiKey": "YOUR_OPENAI_API_KEY",
-      "models": ["gpt-5.2-codex", "o3-deep-research", "gpt-4o", "gpt-4o-mini"]
-    }
-  ],
-  "router": {
-    "default": "claude-sonnet-4-5"
-  }
-}
-EOF
-
-# Start router
-claude-code-router start
+# Authenticate via Codex CLI
+pan admin specialists codex login
+# or: Dashboard → Settings → Codex Login
 ```
 
-**Test router API:**
+**Test via Panopticon agent:**
 ```bash
-# Test OpenAI via router
-export ANTHROPIC_BASE_URL=http://localhost:8000
-export ANTHROPIC_AUTH_TOKEN=router-managed
-claude --model gpt-4o "What is 2+2?"
+pan start PAN-997 --model gpt-5.4
+
+# Verify: ANTHROPIC_BASE_URL points to CLIProxy sidecar
+# Verify: No ANTHROPIC_AUTH_TOKEN (subscription auth is session-based via CLIProxy)
 ```
-
-**Expected Result:** Response from GPT-4o via router translation
-
-**Verification:**
-- Check router logs for API translation
-- Verify OpenAI API call in OpenAI usage dashboard
-- Confirm response format matches Claude Code expectations
 
 ### Test Google Gemini
 
 **Setup:**
 ```bash
-# Update router config to include Gemini
-cat > ~/.claude-code-router/config.json << 'EOF'
-{
-  "providers": [
-    {
-      "name": "anthropic",
-      "baseURL": "https://api.anthropic.com/v1",
-      "apiKey": "$ANTHROPIC_API_KEY",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"]
-    },
-    {
-      "name": "google",
-      "baseURL": "https://generativelanguage.googleapis.com/v1beta",
-      "apiKey": "YOUR_GOOGLE_API_KEY",
-      "models": ["gemini-3-pro-preview", "gemini-3-flash-preview"]
-    }
-  ],
-  "router": {
-    "default": "claude-sonnet-4-5"
-  }
-}
-EOF
-
-# Restart router
-claude-code-router restart
+export GOOGLE_API_KEY="AIza..."
 ```
 
-**Test router API:**
+**Test via Panopticon agent:**
 ```bash
-# Test Gemini via router
-export ANTHROPIC_BASE_URL=http://localhost:8000
-export ANTHROPIC_AUTH_TOKEN=router-managed
-claude --model gemini-3-pro-preview "What is 2+2?"
+pan start PAN-996 --model gemini-3.1-pro-preview
+
+# Verify: ANTHROPIC_BASE_URL points to CLIProxy Gemini backend
 ```
 
-**Expected Result:** Response from Gemini via router translation
+## Testing Pi Harness
 
-**Verification:**
-- Check router logs
-- Verify Google AI API call in console
-- Confirm response formatting
+### Pi with API-key providers
+
+For all API-key providers, Panopticon automatically injects the native env var
+into Pi's environment at launch. You do **not** need to run `/login` inside Pi
+or edit `~/.pi/agent/auth.json` manually.
+
+| Provider | Panopticon Config | Pi Env Var Injected |
+|----------|-------------------|---------------------|
+| Kimi | `api_keys.kimi` or `KIMI_API_KEY` | `KIMI_API_KEY` |
+| MiniMax | `api_keys.minimax` or `MINIMAX_API_KEY` | `MINIMAX_API_KEY` |
+| Z.AI | `api_keys.zai` or `ZAI_API_KEY` | `ZAI_API_KEY` |
+| MiMo | `api_keys.mimo` or `MIMO_API_KEY` | `MIMO_API_KEY` |
+| OpenRouter | `api_keys.openrouter` or `OPENROUTER_API_KEY` | `OPENROUTER_API_KEY` |
+| Nous | `api_keys.nous` or `NOUS_API_KEY` | `NOUS_API_KEY` |
+| DashScope | `api_keys.dashscope` or `DASHSCOPE_API_KEY` | `DASHSCOPE_API_KEY` |
+| Google | `api_keys.google` or `GOOGLE_API_KEY` | `GEMINI_API_KEY` |
+
+**Test:**
+```bash
+# Ensure Pi is installed
+pan doctor
+
+# Spawn a Pi work agent with Kimi
+pan start PAN-995 --harness pi --model kimi-k2.5
+
+# Attach to tmux session and inspect env
+tmux -L panopticon show-environment -t agent-pan-995
+# Should contain: KIMI_API_KEY=...
+```
+
+### Pi with subscription providers
+
+Pi with Anthropic or OpenAI subscription auth requires separate Pi-side auth:
+
+```bash
+# Inside a Pi session
+/login
+# → Select subscription provider (Anthropic / OpenAI)
+```
 
 ## Integration Testing
 
@@ -223,43 +171,38 @@ pan start PAN-999 --model claude-sonnet-4-5
 # Verify: No custom env vars set
 ```
 
-**Test 2: Spawn agent with Kimi (direct)**
+**Test 2: Spawn agent with Kimi via Claude Code**
 ```bash
-# Configure settings.json with Kimi API key
-# Set review_agent to use claude-sonnet-4-5 (will use Kimi endpoint)
-pan start PAN-998
-
-# Verify in agent state:
-# - ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
+pan start PAN-998 --model kimi-k2.5
+# Verify in agent env:
+# - ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic (or api.kimi.com/coding)
 # - ANTHROPIC_AUTH_TOKEN=sk-kimi-...
 # - Agent responds using Kimi's API
 ```
 
-**Test 3: Spawn agent with GLM (direct)**
+**Test 3: Spawn agent with Kimi via Pi**
 ```bash
-# Configure settings.json with GLM API key
-# Set review_agent to use glm-4.7
-pan start PAN-997
+pan start PAN-997 --harness pi --model kimi-k2.5
+# Verify in agent env:
+# - KIMI_API_KEY=sk-kimi-...
+# - Agent responds using Kimi's API through Pi
+```
 
-# Verify in agent state:
+**Test 4: Spawn agent with GLM via Claude Code**
+```bash
+pan start PAN-996 --model glm-4.7
+# Verify in agent env:
 # - ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
 # - ANTHROPIC_AUTH_TOKEN=...
 # - API_TIMEOUT_MS=300000
-# - Agent responds using GLM
 ```
 
-**Test 4: Spawn agent with OpenAI (router)**
+**Test 5: Spawn agent with OpenAI (CLIProxy)**
 ```bash
-# Configure settings.json with OpenAI API key
-# Ensure router is running
-# Set review_agent to use gpt-4o
-pan start PAN-996
-
-# Verify in agent state:
-# - ANTHROPIC_BASE_URL=http://localhost:8000
-# - ANTHROPIC_AUTH_TOKEN=router-managed
-# - Router translates API calls
-# - Agent responds using GPT-4o
+pan start PAN-995 --model gpt-5.4
+# Verify in agent env:
+# - ANTHROPIC_BASE_URL=http://127.0.0.1:8317 (CLIProxy)
+# - No ANTHROPIC_AUTH_TOKEN (subscription auth via CLIProxy)
 ```
 
 ## Troubleshooting
@@ -276,67 +219,56 @@ pan start PAN-996
 - Verify network connectivity
 - For GLM: Ensure API_TIMEOUT_MS is set
 
-**Problem:** Model not found
-- Verify model name matches provider's model list
-- Check if model is available in your region
-- Confirm API tier supports the model
+**Problem:** "No API key found for kimi-coding" (Pi)
+- Verify `KIMI_API_KEY` is set in `~/.panopticon.env` or dashboard Settings
+- Verify the agent was spawned with `--harness pi`
+- Check `tmux -L panopticon show-environment -t agent-<id>` for `KIMI_API_KEY`
 
-### Router Provider Issues
+### CLIProxy Provider Issues
 
-**Problem:** Router not responding
+**Problem:** CLIProxy not responding
 ```bash
-# Check if router is running
-ps aux | grep claude-code-router
+# Check if CLIProxy is running
+ps aux | grep cliproxy
 
-# Restart router
-claude-code-router restart
-
-# Check router logs
-claude-code-router logs
+# Restart dashboard (CLIProxy starts with it)
+pan down && pan up
 ```
 
-**Problem:** API translation errors
-- Check router config.json syntax
-- Verify provider API keys in router config
-- Review router logs for detailed errors
+### Pi Harness Issues
 
-**Problem:** Model mismatch
-- Ensure model name in Panopticon matches router config
-- Verify router provider configuration
-- Check router model mapping
+**Problem:** Pi spawns but provider auth fails
+- Verify the provider API key is configured in Panopticon Settings
+- Pi auth is bridged automatically; manual `/login` in Pi is only needed for subscription providers
+- Check `~/.pi/agent/auth.json` only if you intentionally want Pi-managed auth separate from Panopticon
 
 ## Test Checklist
 
-### Direct Provider (Kimi/GLM) Testing
+### Direct Provider Testing
 ```
-[ ] API key configured in settings.json
-[ ] Direct Claude Code test successful
+[ ] API key configured in Settings or ~/.panopticon.env
+[ ] Claude Code harness test successful
+[ ] Pi harness test successful (if applicable)
 [ ] Agent spawning with provider works
 [ ] Provider dashboard shows usage
-[ ] No router needed/used
 [ ] Error handling works (invalid key, etc.)
 ```
 
-### Router Provider (OpenAI/Gemini) Testing
+### CLIProxy Provider Testing
 ```
-[ ] claude-code-router installed
-[ ] Router config.json created
-[ ] Router starts successfully
-[ ] Direct router test successful
-[ ] Agent spawning with router works
+[ ] CLIProxy running (check dashboard startup)
+[ ] Auth configured (Codex login or API key)
+[ ] Agent spawning with provider works
 [ ] Provider dashboard shows usage
-[ ] Router logs show translation
 [ ] Error handling works
 ```
 
-### Integration Testing
+### Pi Harness Testing
 ```
-[ ] Can switch between providers dynamically
-[ ] Settings UI shows provider compatibility
-[ ] Router only used when needed
-[ ] Direct providers have lower latency
-[ ] Cost tracking works for all providers
-[ ] Fallback to Anthropic works when provider unavailable
+[ ] Pi installed and `pan doctor` OK
+[ ] API-key provider spawn works without manual `/login`
+[ ] Subscription provider spawn works after Pi `/login`
+[ ] Env vars bridged correctly (tmux show-environment)
 ```
 
 ## Performance Benchmarks
@@ -348,10 +280,8 @@ claude-code-router logs
 | Anthropic | Direct | ~500ms | ~2s | Baseline |
 | Kimi | Direct | ~600ms | ~2.5s | Similar to Anthropic |
 | GLM | Direct | ~700ms | ~3s | Slightly slower |
-| OpenAI | Router | ~800ms | ~3.5s | +router overhead |
-| Gemini | Router | ~900ms | ~4s | +router overhead |
-
-**Note:** Router adds ~200-500ms overhead for API translation
+| OpenAI | CLIProxy | ~800ms | ~3s | +sidecar overhead |
+| Gemini | CLIProxy | ~900ms | ~4s | +sidecar overhead |
 
 ## Cost Comparison
 

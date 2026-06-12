@@ -1,8 +1,9 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
-import { join } from 'path';
+import { mkdtempSync, rmSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { loadConfigSync } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
@@ -246,6 +247,27 @@ describe('settings-api', () => {
         expect(result.valid).toBe(true);
       }
     });
+
+    it('accepts every RoleId the RolesPanel offers (PAN-1753 frontend/backend drift)', () => {
+      const testDir = dirname(fileURLToPath(import.meta.url));
+      const panelSource = readFileSync(
+        join(testDir, '../../src/dashboard/frontend/src/components/Settings/RolesPanel.tsx'),
+        'utf8',
+      );
+      const unionMatch = panelSource.match(/type RoleId\s*=\s*([^;]+);/);
+      expect(unionMatch).not.toBeNull();
+      const panelRoleIds = [...unionMatch![1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+      expect(panelRoleIds.length).toBeGreaterThan(0);
+
+      for (const roleId of panelRoleIds) {
+        const settings = {
+          ...validSettings,
+          roles: { [roleId]: { model: 'workhorse:mid' } },
+        };
+        const result = validateSettingsApi(settings);
+        expect(result.errors).not.toContain(`Unknown role "${roleId}"`);
+      }
+    });
   });
 
   describe('getAvailableModelsApi', () => {
@@ -364,6 +386,7 @@ describe('settings-api', () => {
             zai: false,
             kimi: false,
             minimax: false,
+            mimo: false,
             openrouter: false,
             nous: false,
             dashscope: false,
@@ -373,6 +396,22 @@ describe('settings-api', () => {
       const result = validateSettingsApi(allDisabled);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('At least one provider must be enabled');
+    });
+
+    it('rejects invalid provider default harnesses', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const result = validateSettingsApi({
+        ...settings,
+        models: {
+          ...settings.models,
+          provider_harnesses: {
+            openai: 'bad' as never,
+          },
+        },
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, or codex');
     });
   });
 
@@ -401,6 +440,39 @@ describe('settings-api', () => {
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
+    });
+
+    it('persists provider default harnesses in object-form provider config', async () => {
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: true,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            mimo: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          provider_harnesses: {
+            openai: 'codex',
+          },
+          overrides: {},
+        },
+        api_keys: {},
+      };
+
+      await Effect.runPromise(saveSettingsApi(settings));
+
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('openai:');
+      expect(yamlContent).toContain('enabled: true');
+      expect(yamlContent).toContain('harness: codex');
     });
 
     it('getDefaultConversationModelApi prefers stored defaultConversationModel over provider heuristics', () => {
@@ -471,6 +543,39 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('zai: zai-test-123');
       expect(yamlContent).toContain('dashscope: dashscope-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
+    });
+
+    it('persists background_ai.cheap_mode: false to YAML (Low-cost mode toggle sticks)', async () => {
+      // Regression: writeYamlConfigPreservingComments omitted the background_ai
+      // section from the persisted allow-list, so toggling Low-cost mode off
+      // never reached disk and the read path defaulted cheap_mode back to true.
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        background_ai: {
+          cheap_mode: false,
+          features: { conversationTitles: true },
+        },
+      };
+      await Effect.runPromise(saveSettingsApi(settings));
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('background_ai:');
+      expect(yamlContent).toContain('cheap_mode: false');
     });
   });
 

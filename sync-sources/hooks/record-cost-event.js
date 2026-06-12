@@ -3900,6 +3900,16 @@ TaggedError("ProcessTimeoutError");
 const DEFAULT_PRICING = [
 	{
 		provider: "anthropic",
+		model: "claude-fable-5",
+		inputPer1k: .01,
+		outputPer1k: .05,
+		cacheReadPer1k: .001,
+		cacheWrite5mPer1k: .0125,
+		cacheWrite1hPer1k: .02,
+		currency: "USD"
+	},
+	{
+		provider: "anthropic",
 		model: "claude-opus-4-8",
 		inputPer1k: .005,
 		outputPer1k: .025,
@@ -4036,6 +4046,22 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "openai",
+		model: "codex-4o",
+		inputPer1k: .00175,
+		outputPer1k: .014,
+		cacheReadPer1k: 175e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "codex-4o-mini",
+		inputPer1k: 75e-5,
+		outputPer1k: .0045,
+		cacheReadPer1k: 75e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
 		model: "gpt-5.2",
 		inputPer1k: .00125,
 		outputPer1k: .01,
@@ -4128,6 +4154,13 @@ const DEFAULT_PRICING = [
 	{
 		provider: "custom",
 		model: "MiniMax-M2.7-highspeed",
+		inputPer1k: 3e-4,
+		outputPer1k: .0012,
+		currency: "USD"
+	},
+	{
+		provider: "custom",
+		model: "MiniMax-M3",
 		inputPer1k: 3e-4,
 		outputPer1k: .0012,
 		currency: "USD"
@@ -4340,6 +4373,10 @@ function initSchema(db) {
       review_status         TEXT NOT NULL DEFAULT 'pending',
       test_status           TEXT NOT NULL DEFAULT 'pending',
       merge_status          TEXT,
+      inspect_status        TEXT,
+      inspect_notes         TEXT,
+      inspect_started_at    TEXT,
+      inspect_bead_id       TEXT,
       verification_status   TEXT,
       verification_notes    TEXT,
       verification_cycle_count  INTEGER DEFAULT 0,
@@ -4379,7 +4416,9 @@ function initSchema(db) {
       -- PAN-938: pre-review verification gate commit SHA
       last_verified_commit    TEXT,
       -- PAN-938: current merge pipeline step
-      merge_step              TEXT
+      merge_step              TEXT,
+      -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
+      auto_merge              INTEGER
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -4468,6 +4507,31 @@ function initSchema(db) {
       value       TEXT NOT NULL,
       updated_at  TEXT NOT NULL
     );
+
+    -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
+    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
+    -- chain: lifecycle transitions are status flips, rows are never deleted
+    -- (auditable history of what was bundled, resolved, and promoted).
+    CREATE TABLE IF NOT EXISTS uat_generations (
+      name             TEXT PRIMARY KEY,
+      worktree_path    TEXT NOT NULL,
+      project_root     TEXT NOT NULL,
+      base_sha         TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'assembling',
+      members          TEXT NOT NULL DEFAULT '[]',
+      held_out         TEXT NOT NULL DEFAULT '[]',
+      resolutions      TEXT NOT NULL DEFAULT '[]',
+      stack_started_at TEXT,
+      cleaned_at       TEXT,
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+      ON uat_generations(status);
+
+    CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+      ON uat_generations(project_root, created_at DESC);
 
     -- ===== Rate Limits =====
     CREATE TABLE IF NOT EXISTS rate_limits (
@@ -4558,7 +4622,9 @@ function initSchema(db) {
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
       fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
-      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
+      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -4763,7 +4829,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 48`);
+	db.pragma(`user_version = 53`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4771,7 +4837,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 48) return;
+	if (currentVersion === 53) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5355,7 +5421,56 @@ function runMigrations(db) {
 	if (currentVersion < 48) try {
 		db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
 	} catch {}
-	db.pragma(`user_version = 48`);
+	if (currentVersion < 49) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`);
+		} catch {}
+	}
+	if (currentVersion < 50) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`);
+	} catch {}
+	if (currentVersion < 51) db.exec(`
+      CREATE TABLE IF NOT EXISTS uat_generations (
+        name             TEXT PRIMARY KEY,
+        worktree_path    TEXT NOT NULL,
+        project_root     TEXT NOT NULL,
+        base_sha         TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'assembling',
+        members          TEXT NOT NULL DEFAULT '[]',
+        held_out         TEXT NOT NULL DEFAULT '[]',
+        resolutions      TEXT NOT NULL DEFAULT '[]',
+        stack_started_at TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_status
+        ON uat_generations(status);
+
+      CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
+        ON uat_generations(project_root, created_at DESC);
+    `);
+	if (currentVersion < 52) try {
+		db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
+	} catch {}
+	if (currentVersion < 53) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+	}
+	db.pragma(`user_version = 53`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

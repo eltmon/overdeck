@@ -6,13 +6,14 @@
  */
 
 import chalk from 'chalk';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
+import { writeRemoteFile } from './remote/remote-agents.js';
 import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
@@ -88,52 +89,97 @@ export interface CreateRemoteWorkspaceOptions {
   }
 
   // Step 1: Create VM
-  await Effect.runPromise(fly.createVm(vmName));
+  const vmInfo = await Effect.runPromise(fly.createVm(vmName));
 
-  // Step 2: Add GitHub host key and clone repository on VM
+  // Step 2: Sync credentials BEFORE cloning — git push needs gh auth wired as
+  // the https credential helper, and the agent needs Claude credentials.
+  if (options.spinner) {
+    options.spinner.text = 'Syncing credentials to VM...';
+  }
+  await fly.syncAllCredentials(vmName);
+
+  // Step 3: Clone repository on VM into /workspace (the image WORKDIR — the
+  // agent spawn path and prompt both assume /workspace, never ~/workspace).
+  // Use the https URL: VMs have no GitHub SSH key, only the synced gh token.
   if (options.spinner) {
     options.spinner.text = 'Cloning repository on VM...';
   }
-  await Effect.runPromise(fly.ssh(vmName, 'mkdir -p ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null'));
-  const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${repoUrl} ~/workspace`));
+  const httpsRepoUrl = repoUrl.replace(/^git@github\.com:/, 'https://github.com/');
+  const cloneResult = await Effect.runPromise(fly.ssh(vmName, `git clone ${httpsRepoUrl} /workspace`));
   if (cloneResult.exitCode !== 0) {
     await Effect.runPromise(fly.deleteVm(vmName));
     throw new Error(`Failed to clone: ${cloneResult.stderr}`);
   }
+  await Effect.runPromise(
+    fly.ssh(vmName, `cd /workspace && git config user.email "panopticon-agent[bot]@users.noreply.github.com" && git config user.name "panopticon-agent[bot]"`)
+  );
 
-  // Step 3: Create feature branch
+  // Step 4: Check out the feature branch — track the existing origin branch if
+  // one exists (e.g. the issue already has local work pushed), else create it.
   if (options.spinner) {
     options.spinner.text = 'Creating feature branch...';
   }
-  const branchResult = await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`));
-  if (branchResult.exitCode !== 0) {
-    await Effect.runPromise(fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`));
+  await Effect.runPromise(
+    fly.ssh(
+      vmName,
+      `cd /workspace && (git fetch origin ${branchName} && git checkout ${branchName}) || git checkout -b ${branchName}`
+    )
+  );
+
+  // Step 5: Configure Claude Code on the VM (onboarding-complete marker +
+  // ~/.claude/settings.json honoring the user's Panopticon permission mode).
+  if (options.spinner) {
+    options.spinner.text = 'Configuring Claude Code on VM...';
   }
-
-  // Step 4: Configure environment for shared infra
-  const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
-  const envContent = `
-# Panopticon Remote Workspace
-WORKSPACE_ID=${normalizedId}
-ISSUE_ID=${issueId.toUpperCase()}
-
-DATABASE_NAME=${dbName}
-`;
-
-  await Effect.runPromise(fly.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
-${envContent}
-EOF`));
+  await fly.configureClaudeCode(vmName);
 
   // Step 6: Install beads CLI globally on remote VM
   if (options.spinner) {
     options.spinner.text = 'Installing beads CLI...';
   }
   const bdInstalled = await fly.installBeads(vmName);
-  if (bdInstalled) {
-    await fly.initBeads(vmName, '~/workspace');
+  if (!bdInstalled) {
+    console.warn('  ⚠ beads CLI (bd) install failed on VM — agent will have no bead tracking');
   }
 
-  // Step 6.5: Copy essential skills to remote VM
+  // Step 6.5: Sync planning artifacts from the local workspace, if one exists.
+  // `.pan/continue.json` is gitignored and `.beads/issues.jsonl` is created by
+  // planning in the local worktree — neither arrives via the clone.
+  const localWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
+  if (existsSync(localWorkspacePath)) {
+    if (options.spinner) {
+      options.spinner.text = 'Syncing planning artifacts to VM...';
+    }
+    const artifacts: Array<[string, string]> = [
+      [join(localWorkspacePath, '.pan', 'continue.json'), '/workspace/.pan/continue.json'],
+      [join(localWorkspacePath, '.beads', 'issues.jsonl'), '/workspace/.beads/issues.jsonl'],
+    ];
+    for (const [localPath, remotePath] of artifacts) {
+      if (!existsSync(localPath)) continue;
+      // Chunked + size-verified: a single base64 exec silently truncates past
+      // the ~16KB payload cap, and these files are the agent's resume state.
+      await writeRemoteFile(fly, vmName, remotePath, readFileSync(localPath, 'utf-8'));
+    }
+  }
+
+  // Step 6.6: Initialize the beads DB and import the synced JSONL. Must run
+  // AFTER the artifact sync — `bd init` does not auto-import a pre-existing
+  // issues.jsonl, so init-then-sync leaves the dolt DB empty and the agent
+  // sees zero beads.
+  if (bdInstalled) {
+    const initOk = await fly.initBeads(vmName, '/workspace');
+    if (!initOk) {
+      console.warn('  ⚠ bd init failed on VM — beads DB unavailable to the agent');
+    }
+    const importResult = await Effect.runPromise(
+      fly.ssh(vmName, 'cd /workspace && if [ -f .beads/issues.jsonl ]; then bd import -i .beads/issues.jsonl 2>&1; fi')
+    );
+    if (importResult.exitCode !== 0) {
+      console.warn(`  ⚠ bd import failed on VM: ${importResult.stderr || importResult.stdout}`);
+    }
+  }
+
+  // Step 6.7: Copy essential skills to remote VM
   if (options.spinner) {
     options.spinner.text = 'Copying skills to remote VM...';
   }
@@ -144,15 +190,15 @@ EOF`));
   let frontendUrl = '';
   let apiUrl = '';
 
-  const composeCheck = await Effect.runPromise(fly.ssh(vmName, 'ls ~/workspace/docker-compose.yml ~/workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1'));
+  const composeCheck = await Effect.runPromise(fly.ssh(vmName, 'ls /workspace/docker-compose.yml /workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1'));
 
   if (composeCheck.stdout.trim()) {
     if (options.spinner) {
       options.spinner.text = 'Starting containers...';
     }
     const composeDir = composeCheck.stdout.includes('.devcontainer')
-      ? '~/workspace/.devcontainer'
-      : '~/workspace';
+      ? '/workspace/.devcontainer'
+      : '/workspace';
 
     const upResult = await Effect.runPromise(fly.ssh(vmName, `cd ${composeDir} && docker compose up -d 2>&1`));
     containersStarted = upResult.exitCode === 0;
@@ -170,12 +216,15 @@ EOF`));
     }
   }
 
-  // Step 8: Save workspace metadata
+  // Step 8: Save workspace metadata. machineId/appName let resolveVm() find
+  // the machine directly instead of scanning every machine in the app.
   const metadata: RemoteWorkspaceMetadata = {
     id: normalizedId,
     issue: issueId.toUpperCase(),
     provider: 'fly',
     vmName,
+    machineId: vmInfo.machineId,
+    appName: fly.getAppName(),
     urls: {
       frontend: frontendUrl || undefined,
       api: apiUrl || undefined,

@@ -21,11 +21,6 @@ import React from 'react';
 
 const OVERLAY_ID = 'pan-recovery-overlay';
 const LAST_RELOAD_KEY = 'pan.recovery.lastReload';
-// Separate guard for render-crash auto-reload (distinct from asset-404 reloads):
-// auto-reload a generic render crash at most once per cooldown, so a genuine
-// persistent bug surfaces the manual fallback instead of looping.
-const CRASH_RELOAD_KEY = 'pan.recovery.lastCrashReload';
-const CRASH_RELOAD_COOLDOWN_MS = 30_000;
 let reconnecting = false;
 
 /** Does this error/reason look like a failed dynamic-import / module-script load? */
@@ -46,8 +41,8 @@ export function isModuleLoadError(reasonOrError: unknown): boolean {
   );
 }
 
-function showOverlay(message: string): void {
-  if (document.getElementById(OVERLAY_ID)) return;
+export function showOverlay(message: string, action?: { label: string; onClick: () => void }): void {
+  document.getElementById(OVERLAY_ID)?.remove();
   const el = document.createElement('div');
   el.id = OVERLAY_ID;
   el.style.cssText = [
@@ -67,9 +62,21 @@ function showOverlay(message: string): void {
   el.innerHTML = `
     <div style="width:34px;height:34px;border:3px solid rgba(255,255,255,0.18);border-top-color:#6aa0ff;border-radius:50%;animation:pan-recovery-spin 0.8s linear infinite"></div>
     <div>${message}</div>
+    ${action ? '<button type="button" data-pan-recovery-action="true" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:#1b2533;color:#e6e6e6;cursor:pointer;font-size:14px"></button>' : ''}
     <style>@keyframes pan-recovery-spin{to{transform:rotate(360deg)}}</style>
   `;
+  if (action) {
+    const button = el.querySelector<HTMLButtonElement>('[data-pan-recovery-action="true"]');
+    if (button) {
+      button.textContent = action.label;
+      button.addEventListener('click', action.onClick);
+    }
+  }
   document.body.appendChild(el);
+}
+
+export function hideOverlay(): void {
+  document.getElementById(OVERLAY_ID)?.remove();
 }
 
 /**
@@ -161,26 +168,6 @@ export class RootErrorBoundary extends React.Component<
   componentDidCatch(error: unknown): void {
     if (isModuleLoadError(error)) {
       void waitForServerThenReload();
-      return;
-    }
-    // A render crash that is NOT a module-load error is usually a transient
-    // mismatch between an already-loaded chunk and freshly-bootstrapped data
-    // after a server restart — a one-time auto-reload clears it. Guard against
-    // looping on a genuine, persistent app bug: only auto-reload if we haven't
-    // already auto-reloaded for a crash very recently; otherwise fall through to
-    // the manual "Reload dashboard" fallback so the operator isn't stuck in a
-    // reload storm. This is what turns "blank page forever" into self-recovery.
-    try {
-      const last = Number(sessionStorage.getItem(CRASH_RELOAD_KEY) || '0');
-      if (Date.now() - last > CRASH_RELOAD_COOLDOWN_MS) {
-        sessionStorage.setItem(CRASH_RELOAD_KEY, String(Date.now()));
-        showOverlay('Recovering the dashboard…');
-        void waitForServerThenReload();
-      }
-      // else: recent auto-reload already happened and we crashed again → this is
-      // a real bug, not a restart race. Show the manual fallback (render()).
-    } catch {
-      /* sessionStorage unavailable — leave the manual fallback */
     }
   }
 

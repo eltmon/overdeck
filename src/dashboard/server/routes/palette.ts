@@ -20,6 +20,11 @@ import { jsonResponse } from '../http-helpers.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
+import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
+import { searchConversationChunks } from '../services/conversation-search-service.js';
+import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { validateOrigin } from './origin-validation.js';
 
 // ─── Pan command catalog ──────────────────────────────────────────────────────
 //
@@ -185,6 +190,102 @@ function splitTags(value: string): string[] {
   return value.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
 
+export interface PaletteConversationHit {
+  sessionId: string;
+  conversationId: string;
+  projectId: string;
+  /** Dashboard project key (name ?? key) this conversation's cwd lives under, so
+   *  the palette can route to the right deck. Null when under no registered project. */
+  projectKey: string | null;
+  role: string;
+  ts: string | null;
+  byteOffset: number;
+  displayContent: string;
+  excerpt: string;
+  excerptSegments: Array<{ text: string; match: boolean }>;
+  rank: number;
+}
+
+function routeableConversationName(sessionId: string, cache: Map<string, string>): string {
+  const cached = cache.get(sessionId);
+  if (cached) return cached;
+  let routeable = sessionId;
+  try {
+    routeable = getConversationByClaudeSessionId(sessionId)?.name ?? sessionId;
+  } catch {
+    routeable = sessionId;
+  }
+  cache.set(sessionId, routeable);
+  return routeable;
+}
+
+interface ProjectDirMatch {
+  enc: string;
+  key: string;
+}
+
+/**
+ * Encode a cwd the way Claude Code names its `~/.claude/projects/<dir>` folders —
+ * path separators and dots become hyphens. A conversation chunk's `projectId` IS
+ * that dir name, so encoding each registered project's real path the same way lets
+ * us match a hit back to its dashboard project.
+ */
+function registeredProjectDirs(): ProjectDirMatch[] {
+  try {
+    return listProjectsSync().map((p) => ({
+      enc: p.config.path.replace(/[/.]/g, '-'),
+      key: p.config.name ?? p.key,
+    }));
+  } catch (error) {
+    console.error('[palette] failed to list projects for conversation routing:', error);
+    return [];
+  }
+}
+
+/**
+ * The dashboard project key (`name ?? key`) whose cwd contains this conversation,
+ * or null when it is under no registered project. Longest-prefix wins so a
+ * workspace path (`…-panopticon-cli-workspaces-feature-x`) resolves to its parent
+ * project's deck rather than a phantom one.
+ */
+function resolveConversationProjectKey(projectId: string, dirs: ProjectDirMatch[]): string | null {
+  let best: ProjectDirMatch | null = null;
+  for (const dir of dirs) {
+    if (!dir.enc) continue;
+    if (projectId === dir.enc || projectId.startsWith(`${dir.enc}-`)) {
+      if (!best || dir.enc.length > best.enc.length) best = dir;
+    }
+  }
+  return best?.key ?? null;
+}
+
+function toPaletteConversationHit(
+  hit: ConversationSearchHit,
+  routeableNames: Map<string, string>,
+  projectDirs: ProjectDirMatch[],
+): PaletteConversationHit {
+  return {
+    sessionId: hit.sessionId,
+    conversationId: routeableConversationName(hit.sessionId, routeableNames),
+    projectId: hit.projectId,
+    projectKey: resolveConversationProjectKey(hit.projectId, projectDirs),
+    role: hit.role,
+    ts: hit.ts,
+    byteOffset: hit.byteOffset,
+    displayContent: hit.text.slice(0, 240),
+    excerpt: hit.excerpt,
+    excerptSegments: hit.excerptSegments,
+    rank: hit.rank,
+  };
+}
+
+async function searchConversations(rawQuery: string, matchQuery: string, limit: number): Promise<PaletteConversationHit[]> {
+  const hits = await searchConversationChunks({ rawQuery, matchQuery, limit });
+  const routeableNames = new Map<string, string>();
+  const projectDirs = registeredProjectDirs();
+  return hits.map((hit) => toPaletteConversationHit(hit, routeableNames, projectDirs));
+}
+
 async function searchProjectMemory(
   projectId: string,
   matchQuery: string,
@@ -245,20 +346,20 @@ const getPaletteCommandsRoute = HttpRouter.add(
 
 // ─── Route: GET /api/palette/search?q=&limit= ─────────────────────────────────
 
-async function runPaletteSearch(rawQuery: string, limit: number) {
-  if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [] };
+export async function runPaletteSearch(rawQuery: string, limit: number) {
+  if (rawQuery.length === 0) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   const matchQuery = buildMatchQuery(rawQuery);
-  if (!matchQuery) return { memory: [], observations: [], summaries: [] };
+  if (!matchQuery) return { memory: [], observations: [], summaries: [], conversations: [] };
 
   let projects: string[] = [];
   try {
     projects = listProjectsSync().map((p) => p.key);
   } catch (error) {
     console.error('[palette] failed to list projects:', error);
-    return { memory: [], observations: [], summaries: [] };
+    return { memory: [], observations: [], summaries: [], conversations: [] };
   }
-  if (projects.length === 0) return { memory: [], observations: [], summaries: [] };
+  if (projects.length === 0) return { memory: [], observations: [], summaries: [], conversations: await searchConversations(rawQuery, matchQuery, limit) };
 
   const perProject = Math.max(5, Math.ceil((limit * 2) / projects.length));
   const nested = await Promise.all(
@@ -274,10 +375,12 @@ async function runPaletteSearch(rawQuery: string, limit: number) {
     else if (hit.kind === 'summary') summaries.push(hit);
     else memory.push(hit);
   }
+  const conversations = await searchConversations(rawQuery, matchQuery, limit);
   return {
     memory: memory.slice(0, limit),
     observations: observations.slice(0, limit),
     summaries: summaries.slice(0, limit),
+    conversations,
   };
 }
 
@@ -286,6 +389,11 @@ const getPaletteSearchRoute = HttpRouter.add(
   '/api/palette/search',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
     const url = new URL(request.url, 'http://localhost');
     const rawQuery = (url.searchParams.get('q') ?? '').trim();
     const limitParam = url.searchParams.get('limit');

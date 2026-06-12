@@ -24,6 +24,7 @@ import {
   applyManagedRegion,
   hasManagedRegion,
   piGlobalContextFile,
+  codexGlobalContextFile,
 } from './context-layers/index.js';
 import { backupFileSync, createBackupTimestamp } from './backup.js';
 
@@ -515,6 +516,8 @@ export interface ContextLayerSyncResult {
   projectsWritten: string[];
   /** True when ~/.panopticon/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
+  /** True when ~/.panopticon/context/codex-global.md was written this run. */
+  codexGlobalWritten: boolean;
   /** Files where a managed region was injected into pre-existing content for
    *  the first time this run (each backed up first). */
   firstInjections: ContextFirstInjection[];
@@ -561,6 +564,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     globalStubCreated: false,
     projectsWritten: [],
     piGlobalWritten: false,
+    codexGlobalWritten: false,
     firstInjections: [],
     errors: [],
   };
@@ -591,6 +595,22 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     }
   } catch (err: any) {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
+  }
+
+  // PAN-1574: Global layer → ~/.panopticon/context/codex-global.md
+  // This static file is copied into each agent's CODEX_HOME/AGENTS.md at spawn time
+  // by initCodexHome(), keeping Codex context isolated from the project-root AGENTS.md.
+  try {
+    const codexManaged = renderGlobalLayer('codex', isDevMode());
+    const codexGlobalFile = codexGlobalContextFile();
+    const existingCodex = existsSync(codexGlobalFile) ? readFileSync(codexGlobalFile, 'utf-8') : '';
+    if (codexManaged.trim() !== existingCodex.trim()) {
+      mkdirSync(dirname(codexGlobalFile), { recursive: true });
+      writeFileSync(codexGlobalFile, codexManaged.trim() + '\n', 'utf-8');
+      result.codexGlobalWritten = true;
+    }
+  } catch (err: any) {
+    result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
   // Project layers → <projectRoot>/CLAUDE.md (claude-code) + <projectRoot>/AGENTS.md (pi).

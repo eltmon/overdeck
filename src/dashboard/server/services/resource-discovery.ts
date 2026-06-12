@@ -21,7 +21,7 @@ const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
 
 export interface ResourcePullRequest {
   number: number;
@@ -46,6 +46,8 @@ export interface ResourceDetails {
   branchDrifted: boolean;
   /** True when the workspace path is configured but missing on disk. */
   workspaceMissing: boolean;
+  /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
+  remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -96,6 +98,7 @@ interface InternalResourceDetails {
   actualBranch: string | null;
   branchDrifted: boolean;
   workspaceMissing: boolean;
+  remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
 }
 
 interface MutableResourceIssue {
@@ -213,6 +216,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     actualBranch: details.actualBranch,
     branchDrifted: details.branchDrifted,
     workspaceMissing: details.workspaceMissing,
+    remoteAgent: details.remoteAgent,
   };
 }
 
@@ -242,6 +246,20 @@ function isLiveResource(issue: MutableResourceIssue): boolean {
     || issue.resourceDetails.prs.length > 0
     || issue.agentStatus === 'active'
     || hasRecentActivity(issue.lastActivity);
+}
+
+/**
+ * tmux session-name prefixes that map a session to its issue in the Command Deck
+ * tree. `strike-` MUST be included (PAN-1682): strike sessions are named
+ * `strike-<issue>` and a strike issue is typically `todo` (not an active tracker
+ * state), so without registering the tmux resource the issue is filtered out of
+ * the tree entirely. Keep this list in sync with the agent-session prefixes the
+ * dashboard recognizes elsewhere (e.g. routes/agents.ts).
+ */
+const DISCOVERABLE_SESSION_PREFIXES = ['agent-', 'planning-', 'specialist-', 'review-', 'strike-'] as const;
+
+export function isDiscoverableAgentSession(sessionName: string): boolean {
+  return DISCOVERABLE_SESSION_PREFIXES.some((prefix) => sessionName.startsWith(prefix));
 }
 
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
@@ -451,6 +469,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         actualBranch: null,
         branchDrifted: false,
         workspaceMissing: false,
+        remoteAgent: null,
       },
     };
     issueMap.set(upper, created);
@@ -468,7 +487,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   for (const sessionName of tmuxSessions) {
-    if (!sessionName.startsWith('agent-') && !sessionName.startsWith('planning-') && !sessionName.startsWith('specialist-') && !sessionName.startsWith('review-')) {
+    if (!isDiscoverableAgentSession(sessionName)) {
       continue;
     }
     const issueId = parseIssueIdFromTextSync(sessionName);
@@ -479,6 +498,27 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     if (!issue.resourceDetails.tmuxSessions.includes(sessionName)) {
       issue.resourceDetails.tmuxSessions.push(sessionName);
     }
+  }
+
+  // Remote (fly.io) work agents have no local tmux session — surface them
+  // from their remote-state.json so the tree shows the issue as actively
+  // worked (PAN-1676).
+  try {
+    const { listActiveRemoteAgentStates } = await import('../../../lib/remote/remote-agents.js');
+    for (const remoteState of listActiveRemoteAgentStates()) {
+      const issue = ensureIssue(remoteState.issueId);
+      if (!issue) continue;
+      issue.resourceSources.add('remote-agent');
+      issue.resourceDetails.remoteAgent = {
+        vmName: remoteState.vmName,
+        status: remoteState.status,
+        model: remoteState.model,
+        startedAt: remoteState.startedAt,
+      };
+      if (!issue.agentStatus) issue.agentStatus = 'active';
+    }
+  } catch {
+    // Remote module unavailable — tree simply omits remote agents.
   }
 
   for (const containerName of dockerContainers) {
@@ -558,13 +598,25 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   await Promise.all([...issueMap.values()].map(async (issue) => {
     if (issue.resourceDetails.tmuxSessions.length === 0) return;
 
-    const issueLower = issue.issueId.toLowerCase();
-    const agentId = `agent-${issueLower}`;
-    const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId)).catch(() => null);
-    if (!runtimeState) return;
+    // Runtime-state ids equal session names (agent-<issue>, strike-<issue>,
+    // planning-<issue>, ...). Probe every discovered session — not just
+    // agent-<issue> — so strike/planning sessions surface as live agents.
+    // PAN-1682 made these sessions discoverable but left attribution
+    // agent-only, which rendered a running strike as a lifeless node.
+    const states = (await Promise.all(
+      issue.resourceDetails.tmuxSessions.map((sessionName) =>
+        Effect.runPromise(getAgentRuntimeState(sessionName)).catch(() => null),
+      ),
+    )).filter((state): state is NonNullable<typeof state> => state !== null);
+    if (states.length === 0) return;
 
-    issue.agentStatus = runtimeState.state;
-    const lastActivity = Date.parse(runtimeState.lastActivity);
+    const best = states.find((state) => state.state === 'active')
+      ?? states.reduce((a, b) => (Date.parse(a.lastActivity) >= Date.parse(b.lastActivity) ? a : b));
+    issue.agentStatus = best.state;
+
+    const lastActivity = Math.max(
+      ...states.map((state) => Date.parse(state.lastActivity)).filter(Number.isFinite),
+    );
     issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
@@ -576,6 +628,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     state === 'in_progress' || state === 'in_review' || state === 'started';
 
   const isLiveResource = (issue: MutableResourceIssue): boolean => {
+    if (issue.resourceDetails.remoteAgent) return true;
     if (issue.resourceDetails.tmuxSessions.length > 0) return true;
     if (issue.resourceDetails.dockerContainers.length > 0) return true;
     if (issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open')) return true;
@@ -589,7 +642,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
         const stateLabel = deriveStateLabel(issue, hasTmux, hasRecentHeartbeat);
-        const status = hasTmux && (issue.agentStatus === 'active' || hasRecentHeartbeat)
+        const isRemoteRunning = issue.resourceDetails.remoteAgent?.status === 'running'
+          || issue.resourceDetails.remoteAgent?.status === 'starting';
+        const status = (hasTmux && (issue.agentStatus === 'active' || hasRecentHeartbeat)) || isRemoteRunning
           ? 'running'
           : issue.hasState
             ? 'has_state'
@@ -693,6 +748,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
+      remoteAgent: issue.resourceDetails.remoteAgent ?? null,
     },
   }));
 }

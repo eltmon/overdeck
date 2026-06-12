@@ -19,6 +19,12 @@ export {
   createPiRuntime,
   PiSpawnTimeout,
 } from './pi.js';
+export {
+  CodexRuntimeSync,
+  CodexRuntime,
+  createCodexRuntimeSync,
+  createCodexRuntime,
+} from './codex.js';
 
 import type {
   AgentRuntimeSync,
@@ -28,6 +34,7 @@ import type {
 import { getAgentStateSync } from '../agents.js';
 import { createClaudeCodeRuntimeSync } from './claude-code.js';
 import { createPiRuntimeSync } from './pi.js';
+import { createCodexRuntimeSync } from './codex.js';
 
 /**
  * Runtime registry implementation
@@ -75,6 +82,9 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'pi') {
       return this.get('pi') ?? null;
     }
+    if (harness === 'codex') {
+      return this.get('codex') ?? null;
+    }
     return this.get('claude-code') ?? null;
   }
 }
@@ -94,9 +104,10 @@ export function getGlobalRegistry(): RuntimeRegistry {
   if (!globalRegistry) {
     globalRegistry = new RuntimeRegistry();
 
-    // Register Claude Code (default) and Pi runtimes (PAN-636).
+    // Register Claude Code (default), Pi (PAN-636), and Codex (PAN-1574) runtimes.
     globalRegistry.register(createClaudeCodeRuntimeSync());
     globalRegistry.register(createPiRuntimeSync());
+    globalRegistry.register(createCodexRuntimeSync());
   }
   return globalRegistry;
 }

@@ -6,7 +6,7 @@ export type FlywheelRunId = typeof FlywheelRunId.Type
 export const FlywheelHttpUrl = Schema.String.check(Schema.isPattern(/^https?:\/\/\S+$/i))
 export type FlywheelHttpUrl = typeof FlywheelHttpUrl.Type
 
-export const FlywheelHarness = Schema.Literals(["claude-code", "pi"])
+export const FlywheelHarness = Schema.Literals(["claude-code", "pi", "codex"])
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
   model: string
@@ -38,6 +38,19 @@ export const FlywheelHeadline = Schema.Struct({
   awaitingUat: Schema.Number,
 })
 
+/**
+ * Pipeline verbs and the merge-queue contract (PAN-1736):
+ *
+ * `computeMergeQueue` treats an item as AT THE MERGE GATE when its verb is
+ * "shipping" OR "merging" — both are natural emissions for a merge-ready
+ * issue, and orchestrators have used each. Emitting any OTHER verb for an
+ * issue that is ready_for_merge in the review DB silently drops it from the
+ * merge queue and from UAT batch assembly (PAN-1737). RUN-18 shipped an
+ * empty queue with five ready issues exactly this way.
+ *
+ * If you add a verb that can describe a merge-ready issue, extend
+ * MERGE_GATE_VERBS in src/lib/flywheel-merge-order.ts in the same change.
+ */
 export const FlywheelPipelineVerb = Schema.Literals([
   "planning",
   "working",

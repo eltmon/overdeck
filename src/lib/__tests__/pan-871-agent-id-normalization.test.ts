@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('fs', () => ({
-  existsSync: vi.fn((path: string) => String(path).includes('agent-pan-871/state.json') || String(path) === '/tmp/test-agents'),
+  existsSync: vi.fn((path: string) => String(path).includes('agent-pan-871/state.json') || String(path) === '/tmp/test/agents'),
   readFileSync: vi.fn(() => JSON.stringify({
     issueId: 'PAN-871',
     workspace: '/tmp/workspace',
@@ -40,7 +40,7 @@ vi.mock('../tmux.js', () => ({
   // listRunningAgentsSync now matches liveness against ALL panopticon-socket
   // sessions via listSessionsSync (360edc268), not just agent-* sessions.
   listSessions: vi.fn(() => [{ name: 'agent-pan-871' }]),
-  listSessionsSync: vi.fn(() => [{ name: 'agent-pan-871' }]),
+  listSessionsSync: vi.fn(() => [{ name: 'agent-pan-871', created: new Date(0), attached: false, windows: 1 }]),
   capturePane: vi.fn(() => ''),
   capturePaneAsync: vi.fn(async () => ''),
   listPaneValues: vi.fn(() => []),
@@ -74,7 +74,11 @@ vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }))
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
-vi.mock('../paths.js', () => ({ AGENTS_DIR: '/tmp/test-agents' }));
+vi.mock('../paths.js', () => ({
+  AGENTS_DIR: '/tmp/test/agents',
+  COSTS_DIR: '/tmp/test-costs',
+  getPanopticonHome: () => '/tmp/test',
+}));
 
 import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
 

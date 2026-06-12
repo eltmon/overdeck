@@ -11,7 +11,7 @@ interface RestartResult {
 export function useRestartAgent(agentId: string | undefined) {
   const queryClient = useQueryClient();
 
-  const restartMutation = useMutation<RestartResult, Error, { model?: string; harness?: 'claude-code' | 'pi'; graceful?: boolean; message?: string }>({
+  const restartMutation = useMutation<RestartResult, Error, { model?: string; harness?: 'claude-code' | 'pi' | 'codex'; graceful?: boolean; message?: string }>({
     mutationFn: async ({ model, harness, graceful = true, message }) => {
       if (!agentId) throw new Error('No agent to restart');
 

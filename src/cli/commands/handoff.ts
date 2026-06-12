@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
-import { forkConversationViaServer, ForkServerError } from './fork-client.js';
+import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 
@@ -25,10 +25,10 @@ function resolveConversation(convRef: string) {
 const SELF_REFS = new Set(['self', '.', 'current', 'me']);
 
 function validateHarness(harness: string | undefined): RuntimeName | undefined {
-  if (harness === undefined || harness === 'claude-code' || harness === 'pi') {
+  if (harness === undefined || harness === 'claude-code' || harness === 'pi' || harness === 'codex') {
     return harness;
   }
-  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code or pi.`));
+  console.log(chalk.yellow(`Invalid harness: ${harness}. Expected claude-code, pi, or codex.`));
   process.exit(1);
 }
 
@@ -60,6 +60,13 @@ export async function handoffCommand(
   }
 
   const focus = focusArgs.join(' ').trim() || undefined;
+  const FOCUS_MAX_CHARS = 500;
+  if (focus && focus.length > FOCUS_MAX_CHARS) {
+    console.log(chalk.yellow(`Focus is ${focus.length} characters — the limit is ${FOCUS_MAX_CHARS}. No conversation was created.`));
+    console.log(chalk.gray('  Put the full brief in a file in the target cwd and point a short focus at it,'));
+    console.log(chalk.gray('  e.g. "Read .pan/handoff-brief.md FIRST and follow it exactly. <one-line goal>".'));
+    process.exit(1);
+  }
   const harness = validateHarness(options.harness);
   const authorHarness = validateHarness(options.authorHarness);
   const author = options.author === 'source' ? 'source' : 'external';
@@ -100,6 +107,12 @@ export async function handoffCommand(
   if (newConv.forkStatus === 'failed') {
     console.log(chalk.red(`Handoff failed: ${newConv.forkError ?? 'unknown error'}`));
     console.log(chalk.gray(`  Conv ID: ${newConv.id} (Dashboard: https://pan.localhost/conv/${newConv.id})`));
+    process.exit(1);
+  }
+  if (isForkResultInProgress(newConv)) {
+    console.log(chalk.yellow(`Handoff is still in progress — watch https://pan.localhost/conv/${newConv.id}`));
+    console.log(chalk.gray(`  Conv ID: ${newConv.id}`));
+    console.log(chalk.gray(`  Session: ${newConv.tmuxSession}${newConv.sessionAlive ? ' (live)' : ''}`));
     process.exit(1);
   }
   if (newConv.forkFallbackReason) {

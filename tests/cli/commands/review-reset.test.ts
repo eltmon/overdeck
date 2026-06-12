@@ -1,9 +1,8 @@
 /**
  * Tests for `pan review reset` command.
  *
- * Regression: the --session flag previously REPLACED the review reset with
- * resetSessionCommand. It must be ADDITIVE — review is always reset; --session
- * also clears the Claude session.
+ * --session is ADDITIVE: review is always reset; --session also clears the
+ * Claude session resume pointers (never the JSONL transcript).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -39,10 +38,7 @@ describe('resetReviewCommand (pan review reset)', () => {
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
-  it('--session: additively resets review AND clears the Claude session', async () => {
-    // PAN-1584: the prior hard-block (bf77f0194) made this reject; restored to the
-    // additive behavior this file's header documents. resetSessionCommand is
-    // non-destructive (clears resume pointers only, never the JSONL transcript).
+  it('--session: resets review AND calls resetSessionCommand (additive)', async () => {
     await resetReviewCommand('PAN-2', { session: true });
 
     expect(fetchMock).toHaveBeenCalledWith(

@@ -65,9 +65,13 @@ vi.mock('fs', async (importActual) => ({
 
 import { reloadCommand } from '../reload.js';
 
-function mockBuildExit(code: number): void {
-  mocks.spawn.mockImplementation(() => {
+// reloadCommand spawns `bun install` then `npm run build`. Let tests set each
+// step's exit code independently; default both to success.
+function mockSpawnExits(opts: { install?: number; build?: number } = {}): void {
+  mocks.spawn.mockImplementation((command: string, args: string[]) => {
     const child = new EventEmitter();
+    const isBuild = command === 'npm' && args[0] === 'run' && args[1] === 'build';
+    const code = isBuild ? (opts.build ?? 0) : (opts.install ?? 0);
     process.nextTick(() => child.emit('close', code));
     return child;
   });
@@ -95,22 +99,61 @@ describe('reloadCommand', () => {
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
   });
 
-  it('calls restartDashboard after a successful build refreshes the dashboard bundle', async () => {
-    mocks.statSync
-      .mockReturnValueOnce({ mtimeMs: 1000 })
-      .mockReturnValueOnce({ mtimeMs: 2000 });
-    mockBuildExit(0);
+  it('signals a running pan dev supervisor (SIGUSR2) instead of refusing or restarting (PAN-1662)', async () => {
+    mocks.readDevSupervisorMarker.mockReturnValue({
+      pid: 424242,
+      dashboardPort: 3010,
+      apiPort: 3011,
+      startedAt: '2026-06-07T00:00:00.000Z',
+    });
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
 
     await reloadCommand({});
 
+    expect(killSpy).toHaveBeenCalledWith(424242, 'SIGUSR2');
+    // It signals the dev supervisor to hot-restart in place — it must NOT run a
+    // production restart or refuse with a non-zero exit code.
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+
+    killSpy.mockRestore();
+  });
+
+  it('runs bun install before the build, then restartDashboard, on success', async () => {
+    mocks.statSync
+      .mockReturnValueOnce({ mtimeMs: 1000 })
+      .mockReturnValueOnce({ mtimeMs: 2000 });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    // Deps are installed before the build so a rebase-added runtime dep can't
+    // produce a server bundle that boot-crashes (ERR_MODULE_NOT_FOUND).
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
     expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ stdio: 'inherit' }));
+    const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === 'bun');
+    const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
+    expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
   });
 
+  it('aborts without building or restarting when bun install fails', async () => {
+    mockSpawnExits({ install: 1 });
+
+    await reloadCommand({});
+
+    expect(mocks.spawn).toHaveBeenCalledWith('bun', ['install'], expect.objectContaining({ stdio: 'inherit' }));
+    expect(mocks.spawn).not.toHaveBeenCalledWith('npm', ['run', 'build'], expect.anything());
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.spawnDashboardDetached).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
+
   it('does not restart or stop the dashboard when the build fails', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
-    mockBuildExit(1);
+    mockSpawnExits({ build: 1 });
 
     await reloadCommand({});
 

@@ -30,6 +30,13 @@ export interface ActivitySessionFeedEntry extends SessionFeedEntryBase {
   narrative?: string;
   files?: readonly string[];
   tags?: readonly string[];
+  /** Dashboard route to navigate to on click; takes precedence over issueId routing. */
+  link?: string;
+  /**
+   * System-level news (dashboard restarts, supervisor watchdog actions) —
+   * shown in every feed scope, never filtered out by project issue scoping.
+   */
+  systemWide?: boolean;
 }
 
 export interface GitSessionFeedEntry extends SessionFeedEntryBase {

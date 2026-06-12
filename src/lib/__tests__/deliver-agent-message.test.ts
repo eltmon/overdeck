@@ -45,7 +45,7 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
-import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, deliverResumeMessageWithTranscriptConfirmation, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
@@ -126,6 +126,66 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
   });
 }
 
+describe('resume auto-continue transcript confirmation', () => {
+  const baseArgs = {
+    agentId: 'agent-resume-confirm',
+    workspace: '/tmp/workspace',
+    sessionId: 'session-1',
+    message: 'continue',
+    caller: 'resumeAgent:auto-continue',
+    timeoutMs: 300,
+    intervalMs: 100,
+  };
+
+  it('confirms landing on first delivery without redelivery', async () => {
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
+    const deliver = vi.fn(async () => {
+      userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    await expect(deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot })).resolves.toMatchObject({
+      delivered: true,
+      attempts: 1,
+    });
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('redelivers exactly once and reports false when no user record lands', async () => {
+    vi.useFakeTimers();
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 }));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(result).resolves.toMatchObject({ delivered: false, attempts: 2 });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports delivered when the user record lands after the one redelivery', async () => {
+    vi.useFakeTimers();
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({ sessionFile: '/tmp/session.jsonl', userRecordCount }));
+    const deliver = vi.fn(async () => {
+      if (deliver.mock.calls.length === 2) userRecordCount = 1;
+      return { ok: true, path: 'supervisor' as const };
+    });
+
+    const result = deliverResumeMessageWithTranscriptConfirmation({ ...baseArgs, deliver, snapshot });
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.waitFor(() => expect(deliver).toHaveBeenCalledTimes(2));
+
+    await expect(result).resolves.toMatchObject({ delivered: true, attempts: 2 });
+    expect(deliver).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('channel bridge delivery', () => {
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-deliver-'));
@@ -151,7 +211,8 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'supervisor hi', 'caller-supervisor');
+      const result = await deliverAgentMessage(agentId, 'supervisor hi', 'caller-supervisor');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       expect(JSON.parse(capture.lastBody!)).toMatchObject({
@@ -165,6 +226,54 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('codex work-tui agents use live-session delivery instead of exec resume', async () => {
+    const agentId = 'agent-codex-tui';
+    writeAgentState(agentId, {
+      harness: 'codex',
+      codexMode: 'work-tui',
+      channelsEnabled: false,
+      supervisorEnabled: true,
+    });
+
+    const result = await deliverAgentMessage(agentId, 'follow-up', 'caller-codex');
+
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'follow-up');
+  });
+
+  it('supervisor POST can take longer than the old timeout without spurious fallback', async () => {
+    vi.useFakeTimers();
+    const agentId = 'agent-supervisor-budget';
+    writeAgentState(agentId, { channelsEnabled: true });
+    await writePtyToken(agentId);
+    writeBridgeTokenSync(agentId);
+    const capture: { lastBody?: string } = {};
+    const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+      delayMs: 2_500,
+      capture,
+    });
+    const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
+      status: 200,
+      body: 'channel should not be used',
+    });
+    try {
+      const delivered = deliverAgentMessage(agentId, 'confirmed within budget', 'caller-budget');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(2_500);
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'supervisor' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
+    } finally {
+      vi.useRealTimers();
+      await Promise.all([
+        new Promise<void>((r) => supervisor.close(() => r())),
+        new Promise<void>((r) => channel.close(() => r())),
+      ]);
+    }
+  });
+
   it('plain fork conversation delivery routes to supervisor without Channels state', async () => {
     const agentId = 'conv-plain-fork';
     const token = await writePtyToken(agentId);
@@ -172,11 +281,33 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'plain fork hi', 'plain-fork-test');
+      const result = await deliverAgentMessage(agentId, 'plain fork hi', 'plain-fork-test');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(JSON.parse(capture.lastBody!)).toMatchObject({
         content: 'plain fork hi',
         meta: { caller: 'plain-fork-test' },
+      });
+      expect(capture.lastHeaders?.[PTY_TOKEN_HEADER]).toBe(token);
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('Codex conversation delivery routes to supervisor when no agent state exists', async () => {
+    const agentId = 'conv-codex-supervisor';
+    const token = await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string; lastHeaders?: Record<string, string> } = {};
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
+    try {
+      const result = await deliverAgentMessage(agentId, 'codex tui hi', 'codex-conversation-test');
+      expect(result).toEqual({ ok: true, path: 'supervisor' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'codex tui hi',
+        meta: { caller: 'codex-conversation-test' },
       });
       expect(capture.lastHeaders?.[PTY_TOKEN_HEADER]).toBe(token);
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'supervisor' });
@@ -192,7 +323,8 @@ describe('channel bridge delivery', () => {
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
-      await deliverAgentMessage(agentId, 'channel hi', 'caller-channel');
+      const result = await deliverAgentMessage(agentId, 'channel hi', 'caller-channel');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
         path: 'channel',
@@ -207,8 +339,9 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-no-sockets';
     writeAgentState(agentId, { channelsEnabled: true });
 
-    await deliverAgentMessage(agentId, 'tmux hi', 'caller-tmux');
+    const result = await deliverAgentMessage(agentId, 'tmux hi', 'caller-tmux');
 
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'socket-missing' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'tmux hi');
     expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
@@ -232,7 +365,8 @@ describe('channel bridge delivery', () => {
       body: 'ok',
     });
     try {
-      await deliverAgentMessage(agentId, 'fallback channel', 'caller-500');
+      const result = await deliverAgentMessage(agentId, 'fallback channel', 'caller-500');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
       expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
@@ -244,16 +378,56 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('supervisor POST non-2xx: falls through to tmux when channels are disabled', async () => {
+    const agentId = 'agent-supervisor-non-2xx-tmux';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 502,
+      body: '{"error":"input echo confirmation failed"}',
+    });
+    try {
+      const result = await deliverAgentMessage(agentId, 'fallback tmux', 'caller-non-2xx');
+      expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled' });
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback tmux');
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'tmux' });
+      expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
+    } finally {
+      await new Promise<void>((r) => supervisor.close(() => r()));
+    }
+  });
+
+  it('deliveryMethod supervisor is strict when the PTY socket returns non-2xx', async () => {
+    const agentId = 'agent-supervisor-strict-non-2xx';
+    writeAgentState(agentId, { channelsEnabled: true });
+    await writePtyToken(agentId);
+    const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 502,
+      body: '{"error":"input echo confirmation failed"}',
+    });
+    try {
+      await expect(deliverAgentMessage(agentId, 'strict hi', 'caller-strict-non-2xx', 'supervisor')).rejects.toThrow(
+        /MessageDeliveryFailed: PTY supervisor delivery failed/,
+      );
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => supervisor.close(() => r()));
+    }
+  });
+
   it('supervisor POST timeout: falls through to channels using fake timers', async () => {
     vi.useFakeTimers();
     const agentId = 'agent-supervisor-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
+    const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'late',
-      delayMs: 3_500,
+      delayMs: 8_500,
+      capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
       status: 200,
@@ -261,8 +435,9 @@ describe('channel bridge delivery', () => {
     });
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
-      await vi.advanceTimersByTimeAsync(2_500);
-      await delivered;
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(8_100);
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });
       expect(readDeliveryLog(agentId).at(-1)?.['pty-supervisor']).toMatch(/^socket-post-failed:/);
@@ -288,13 +463,15 @@ describe('channel bridge delivery', () => {
   it('deliverAgentMessage flag-off: delegates to sendKeysProgram exactly once with no socket attempt', async () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
-    await deliverAgentMessage(agentId, 'hello', 'test');
+    const result = await deliverAgentMessage(agentId, 'hello', 'test');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'hello');
   });
 
   it('state-file missing: delegates to sendKeysProgram (treat as flag-off)', async () => {
-    await deliverAgentMessage('agent-no-state', 'hello', 'test');
+    const result = await deliverAgentMessage('agent-no-state', 'hello', 'test');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'channels-disabled' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
   });
 
@@ -306,7 +483,8 @@ describe('channel bridge delivery', () => {
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
     try {
-      await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
+      const result = await deliverAgentMessage(agentId, 'channel hi', 'caller-x');
+      expect(result).toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
@@ -321,25 +499,32 @@ describe('channel bridge delivery', () => {
     const agentId = 'agent-no-sock';
     writeAgentState(agentId, { channelsEnabled: true });
     // Do NOT start a bridge — socket file does not exist.
-    await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
+    const result = await deliverAgentMessage(agentId, 'fallback hi', 'caller-y');
+    expect(result).toEqual({ ok: true, path: 'tmux', failure: 'socket-missing' });
     expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback hi');
   });
 
   it('flag-on, socket-timeout: falls back to sendKeysProgram', async () => {
+    vi.useFakeTimers();
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
     writeBridgeTokenSync(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
     // Bridge that delays its response longer than the deliver timeout.
-    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500 });
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500, capture });
     try {
-      await deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
+      const delivered = deliverAgentMessage(agentId, 'timeout hi', 'caller-z');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(2_500);
+      await expect(delivered).resolves.toMatchObject({ ok: true, path: 'tmux' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
     } finally {
+      vi.useRealTimers();
       await new Promise<void>((r) => server.close(() => r()));
     }
-  }, 10_000);
+  });
 
   it('flag-on, missing bridge token: falls back to sendKeysProgram', async () => {
     const agentId = 'agent-no-token';
@@ -347,7 +532,8 @@ describe('channel bridge delivery', () => {
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
     try {
-      await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
+      const result = await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
+      expect(result).toEqual({ ok: true, path: 'tmux', failure: 'bridge-token-missing' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback no token');
     } finally {

@@ -92,6 +92,11 @@ describe('role definitions', () => {
     expect(body).toContain('INSPECTION BLOCKED');
     expect(body).toContain('{{issueId}}');
     expect(body).toContain('{{beadId}}');
+
+    const dispatcher = readRepoFile('src/lib/cloister/inspect-agent.ts');
+    expect(dispatcher).toContain("baseCommand: 'claude'");
+    expect(dispatcher).toContain('permissionFlags: getClaudePermissionFlagsSync()');
+    expect(dispatcher).not.toContain('--agent .claude/agents/${subRole}.md');
   });
 
   it('defines the review role as convoy synthesis with no merge authority', () => {
