@@ -10,7 +10,6 @@ import {
   Eye,
   Zap,
   CheckCircle,
-  Globe,
   Terminal,
   Brain,
   SplitSquareVertical,
@@ -3591,10 +3590,11 @@ export function SettingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-3">
-                {(() => {
-                  const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
-                })()}
+                <ProviderLogo
+                  provider={modelsModalProvider}
+                  label={PROVIDERS.find(p => p.id === modelsModalProvider)?.name}
+                  className="w-5 h-5 shrink-0"
+                />
                 <h3 className="text-foreground text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
                 </h3>

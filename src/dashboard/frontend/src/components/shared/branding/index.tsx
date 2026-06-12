@@ -23,19 +23,6 @@ export const OpenAIIcon = (props: IconProps) => (
   </svg>
 );
 
-function createLetterIcon(letter: string): ComponentType<IconProps> {
-  return function LetterBrandIcon(props: IconProps) {
-    return (
-      <svg viewBox="0 0 24 24" role="img" aria-label={`${letter} provider mark`} {...props}>
-        <rect width="24" height="24" rx="5" fill="currentColor" />
-        <text x="12" y="16" textAnchor="middle" fontSize="12" fontWeight="700" fill="white">
-          {letter}
-        </text>
-      </svg>
-    );
-  };
-}
-
 function createPathIcon(paths: string[], viewBox = '0 0 24 24'): ComponentType<IconProps> {
   return function PathBrandIcon(props: IconProps) {
     return (
