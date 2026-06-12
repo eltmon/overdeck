@@ -122,6 +122,18 @@ Use AskUserQuestion tool to ask contextual questions:
 - Are there edge cases we need to handle?
 - **Are there foundational decisions later beads will depend on?** Flag those for `metadata.requiresInspection: true` (see "Inspection Requirement" below). The rest default to `false`.
 
+**Question discipline:** one focused question per AskUserQuestion call; mark the
+recommended option first with "(Recommended)" and state the principle behind the
+recommendation in one sentence in its description.
+
+**Discovery is complete only when ALL of these hold:**
+- Every major decision (approach, affected subsystems, library/pattern choices) has an answer
+- Edge cases and failure modes have been addressed or explicitly deferred into NonGoals
+- The user has confirmed key tradeoffs (interactive mode) or defaults are recorded in autoDecisions[] (--auto)
+- You can state what "done" looks like as testable acceptance criteria
+
+If any of these is unmet, ask the next question instead of starting Phase 3.
+
 ### Playwright Isolation
 
 If the issue will require browser-based verification, encode that expectation clearly in continue.json and acceptance criteria:

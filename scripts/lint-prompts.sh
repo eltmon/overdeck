@@ -106,6 +106,12 @@ check_handoff_consistency() {
   return 0
 }
 
+check_discovery_completeness() {
+  contains "src/lib/cloister/prompts/planning.md" "Discovery is complete only when" \
+    || fail "discovery-completeness: planning.md missing discovery completion criteria"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -113,6 +119,7 @@ check_all() {
   check_single_workflow_copy
   check_schema_key_agreement
   check_handoff_consistency
+  check_discovery_completeness
 }
 
 write_passing_fixture() {
@@ -127,6 +134,7 @@ write_passing_fixture() {
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
 Run pan plan finalize. The issue waits in Planned until pan start or Start Agent unless --auto-start was stamped.
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
+Discovery is complete only when
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -211,6 +219,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('pan start', 'Start Agent'))
+PY"
+  expect_self_test_failure "discovery-completeness" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('Discovery is complete only when', 'Discovery continues until'))
 PY"
   echo "lint-prompts self-test passed"
 }
