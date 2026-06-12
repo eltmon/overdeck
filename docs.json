@@ -97,6 +97,7 @@
             "pages": [
               "configuration/projects",
               "configuration/harnesses",
+              "configuration/context-layers",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge"

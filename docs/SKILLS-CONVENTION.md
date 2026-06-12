@@ -53,6 +53,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan caveman-compress` | Internal-only utility. |
 | `pan fork`, `pan unarchive-conversation`, `pan resume` | Single-purpose, output is self-explanatory. |
 | `pan inspect` | Diagnostic output is intended for humans to read directly. |
+| `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.pan/context/codebase/` orientation files. |
 | `pan open` | Trivial — opens an editor. |
 | `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`, `pan-workflow`). |
 | `pan scope`, `pan swarm`, `pan workspace`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |

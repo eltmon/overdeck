@@ -20,6 +20,9 @@ Review only requirements coverage:
 - vBRIEF items and sub-items included in the manifest
 - Bead/task claims included in the manifest
 - Explicit "must not" constraints and out-of-scope boundaries
+- `plan.narratives.NonGoals` entries are must-not constraints: verify the PR does not
+  implement excluded scope. A violation is a `⊗` finding regardless of scope bucket
+  (the prohibition is what matters).
 - Required wiring between changed artifacts, such as route-to-UI, config-to-consumer, or producer-to-caller links
 - Scope creep that changes user-visible behavior beyond the stated requirement
 

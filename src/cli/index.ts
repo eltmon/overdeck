@@ -370,6 +370,8 @@ const planCmd = program
   .description('Planning lifecycle commands')
   .argument('[id]', 'Issue ID to plan')
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
+  .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
+  .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
   .option('--effort <level>', 'Planning effort: low | medium | high')
@@ -383,6 +385,7 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
+  .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
   .action(planFinalizeCommand);
 
 planCmd
@@ -428,13 +431,13 @@ program
 
 program
   .command('handoff [conv] [focus...]')
-  .description('Conversation handoff that spawns a new conversation; omit <conv> to hand off the conversation you are in; trailing text becomes the focus')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters (put longer briefs in a file and point the focus at it)')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
-  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code or pi')
+  .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code, pi, or codex')
   .option('--cwd <path>', 'Working directory for the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
-  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code or pi (only when --author=external)')
+  .option('--author-harness <harness>', 'Harness for the external authoring session: claude-code, pi, or codex (only when --author=external)')
   .action(handoffCommand);
 
 program

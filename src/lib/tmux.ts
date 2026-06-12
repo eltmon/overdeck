@@ -26,6 +26,9 @@ const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
+  '# PAN-1798: keep the server alive at zero sessions so a dedicated, cleanly-named',
+  '# server process can be founded ahead of any agent spawn and persist between them.',
+  'set -g exit-empty off',
   'set -g mouse on',
   '# Panopticon owns the browser-facing context menu. Prevent tmux defaults',
   '# from opening a competing right-click menu inside managed sessions.',
@@ -81,6 +84,48 @@ async function ensureManagedTmuxDirAsync(): Promise<void> {
   await mkdir(getTmuxDir(), { recursive: true });
 }
 
+/**
+ * True when a tmux server is already answering on the managed socket.
+ * `list-sessions` exits 0 (possibly with empty output) on a live server and
+ * fails with "no server running" / ENOENT when there is none.
+ */
+function isManagedServerAliveSync(): boolean {
+  try {
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'list-sessions'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * PAN-1798: found the shared tmux server with a CLEAN command line, detached
+ * from any agent's process tree. Two reasons this must never happen implicitly
+ * via an agent spawn's `new-session`:
+ *  1. The founding command line would embed the agent's launcher path, so the
+ *     per-agent `pgrep -f launcher.sh` kill sweep matches the SERVER and
+ *     `pan kill <founder>` destroys every session on the socket.
+ *  2. The server lands in the founding spawn's systemd scope, dying with it.
+ * `systemd-run --user --scope` puts the daemonized server in its own scope
+ * with cmdline `tmux -L panopticon -f <conf> start-server` — matchable by
+ * nothing agent-specific. Falls back to a plain start-server (status quo)
+ * when systemd-run is unavailable (macOS / non-systemd Linux).
+ */
+function foundManagedServerSync(cleanEnv: NodeJS.ProcessEnv): void {
+  const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
+  try {
+    execFileSync(
+      'systemd-run',
+      ['--user', '--scope', '--collect', `--unit=panopticon-tmux-${Date.now()}`, '--quiet', 'tmux', ...args],
+      { stdio: 'ignore', env: cleanEnv },
+    );
+    return;
+  } catch {
+    // systemd-run unavailable or refused — fall through to direct founding.
+  }
+  execFileSync('tmux', args, { stdio: 'ignore', env: cleanEnv });
+}
+
 function reloadManagedTmuxConfigSync(): void {
   try {
     // Strip provider env vars (ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, etc.) so
@@ -88,6 +133,9 @@ function reloadManagedTmuxConfigSync(): void {
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
     const cleanEnv = buildChildEnvSync();
+    if (!isManagedServerAliveSync()) {
+      foundManagedServerSync(cleanEnv);
+    }
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -99,6 +147,11 @@ function reloadManagedTmuxConfigSync(): void {
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
     const cleanEnv = buildChildEnvSync();
+    if (!isManagedServerAliveSync()) {
+      // Founding is a rare, fast, one-shot event (server lifetime spans many
+      // sessions); the sync helper keeps one founding path for both variants.
+      foundManagedServerSync(cleanEnv);
+    }
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -899,12 +952,19 @@ export const sendKeys = (
         if (verifyLine.length >= 3) {
           const SUBMIT_TIMEOUT_MS = 2_000;
           const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+          let stillPendingSubmit = true;
           while (Date.now() < submitDeadline) {
             const pane = await capturePaneText(sessionName, 5);
             if (!pane.includes(verifyLine.slice(0, 40))) {
+              stillPendingSubmit = false;
               break;
             }
             await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+          }
+          if (stillPendingSubmit) {
+            console.warn(`[tmux] Submitted text still visible on ${sessionName} after ${SUBMIT_TIMEOUT_MS}ms; sending Enter once more.`);
+            await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+            logSendKeys(sessionName, '[Enter resent after submit verification timeout]', caller);
           }
         }
       } finally {

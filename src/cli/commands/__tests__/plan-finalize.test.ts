@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
+import { evaluatePlanFinalizeQualityGate, promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 
 let TEST_DIR: string;
@@ -18,7 +18,27 @@ function makePlanDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDoc
       status: 'draft',
       sequence: 3,
       created: '2026-05-03T00:00:00Z',
-      items: [],
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'Implement the change with exact files and verification steps' },
+        metadata: { requiresInspection: false },
+        subItems: [
+          {
+            id: 'task-1.ac1',
+            title: 'Given valid input then it returns success',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+          {
+            id: 'task-1.ac2',
+            title: 'The command rejects invalid input with a clear error',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+        ],
+      }],
       edges: [],
       ...overrides,
     },
@@ -50,9 +70,36 @@ afterEach(() => {
 });
 
 describe('promotePlanning', () => {
-  it('posts complete-planning with autoSpawn and no separate agents request', async () => {
+  it('posts complete-planning without autoSpawn by default', async () => {
     vi.useFakeTimers();
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      message: 'Planning complete and pushed to git - ready for execution',
+      workAgentSpawned: false,
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(promotePlanning('PAN-1509')).resolves.toEqual({
+      success: true,
+      message: 'Planning complete and pushed to git - ready for execution',
+      error: null,
+      workAgentSpawned: false,
+      workAgentMessage: null,
+      workAgentError: null,
+      workAgentSkipReason: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://dashboard.test/api/issues/PAN-1509/complete-planning');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({});
+    expect(String(url)).not.toContain('/api/agents');
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 90_000);
+  });
+
+  it('posts complete-planning with autoSpawn when requested and no separate agents request', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       success: true,
       message: 'Planning complete and work agent spawn requested',
@@ -61,7 +108,7 @@ describe('promotePlanning', () => {
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(promotePlanning('PAN-1509')).resolves.toEqual({
+    await expect(promotePlanning('PAN-1509', true)).resolves.toEqual({
       success: true,
       message: 'Planning complete and work agent spawn requested',
       error: null,
@@ -77,7 +124,6 @@ describe('promotePlanning', () => {
     expect(init?.method).toBe('POST');
     expect(JSON.parse(String(init?.body))).toEqual({ autoSpawn: true });
     expect(String(url)).not.toContain('/api/agents');
-    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 90_000);
   });
 
   it('surfaces autoSpawn skip reasons from complete-planning', async () => {
@@ -90,7 +136,7 @@ describe('promotePlanning', () => {
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(promotePlanning('PAN-1509')).resolves.toMatchObject({
+    await expect(promotePlanning('PAN-1509', true)).resolves.toMatchObject({
       success: true,
       workAgentSpawned: false,
       workAgentMessage: 'Skip reason: stack-unhealthy',
@@ -98,6 +144,60 @@ describe('promotePlanning', () => {
       workAgentSkipReason: 'stack-unhealthy',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('evaluatePlanFinalizeQualityGate', () => {
+  it('rejects plans with banned AC phrasing', () => {
+    const doc = makePlanDoc({
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'Implement the change with exact files and verification steps' },
+        metadata: { requiresInspection: false },
+        subItems: [
+          {
+            id: 'task-1.ac1',
+            title: 'Feature works as expected',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+          {
+            id: 'task-1.ac2',
+            title: 'Given valid input then it returns success',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+        ],
+      }],
+    });
+
+    const result = evaluatePlanFinalizeQualityGate(doc);
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'ac-banned-phrase', message: expect.stringContaining('works as expected') }),
+    ]));
+  });
+
+  it('skips quality lint when --no-quality-lint is set', () => {
+    const doc = makePlanDoc({
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'thin' },
+        metadata: { requiresInspection: false },
+        subItems: [],
+      }],
+    });
+
+    expect(evaluatePlanFinalizeQualityGate(doc, { qualityLint: false })).toEqual({
+      ok: true,
+      skipped: true,
+      issues: [],
+    });
   });
 });
 

@@ -60,6 +60,13 @@ export async function handoffCommand(
   }
 
   const focus = focusArgs.join(' ').trim() || undefined;
+  const FOCUS_MAX_CHARS = 500;
+  if (focus && focus.length > FOCUS_MAX_CHARS) {
+    console.log(chalk.yellow(`Focus is ${focus.length} characters — the limit is ${FOCUS_MAX_CHARS}. No conversation was created.`));
+    console.log(chalk.gray('  Put the full brief in a file in the target cwd and point a short focus at it,'));
+    console.log(chalk.gray('  e.g. "Read .pan/handoff-brief.md FIRST and follow it exactly. <one-line goal>".'));
+    process.exit(1);
+  }
   const harness = validateHarness(options.harness);
   const authorHarness = validateHarness(options.authorHarness);
   const author = options.author === 'source' ? 'source' : 'external';

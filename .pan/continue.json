@@ -1,0 +1,101 @@
+{
+  "version": "1",
+  "issueId": "PAN-1491",
+  "created": "2026-06-12T18:10:00.000Z",
+  "updated": "2026-06-12T18:10:00.000Z",
+  "gitState": { "branch": "feature/pan-1491", "sha": "05c4d18a4", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "All PAN-1491 beads were already implemented and closed in prior sessions; this session is performing completion paperwork and submission.",
+      "recordedAt": "2026-06-12T18:10:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Initial rebase onto origin/main failed with conflicts in workspace planning artifacts (.pan/continue.json, .pan/spec.vbrief.json) and roles/flywheel.md; aborted per PAN-1491 restart guidance and will use merge/pan-done conflict path instead.",
+      "recordedAt": "2026-06-12T18:10:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Merged origin/main into feature/pan-1491 to resolve pan-done rebase conflicts; kept PAN-1491 Flywheel-Affects-Criterion trailer and weight sorting in roles/flywheel.md while adopting main's --auto-start launch syntax.",
+      "recordedAt": "2026-06-12T18:10:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Feature branch contains recent auto-commits and merges from other issues (PAN-1190/PAN-1675); pan done may encounter merge conflicts requiring resolution.",
+      "mitigation": "Follow pan done failure guidance: merge origin/main, resolve conflicts preserving PAN-1491 changes, re-run tests, push, and re-call pan done."
+    }
+  ],
+  "resumePoint": {
+    "description": "Submit completed PAN-1491 work: push feature/pan-1491 and run pan done PAN-1491.",
+    "beadId": null,
+    "filesToRead": [".pan/continue.json"]
+  },
+  "beadsMapping": {
+    "workspace-etp22": "b1-contract",
+    "workspace-qu7iw": "b2-parser",
+    "workspace-3ezba": "b3-weight-fn",
+    "workspace-3ye4a": "b4-server-route",
+    "workspace-unefu": "b5-cli-command",
+    "workspace-cst7j": "b6-prompt-update",
+    "workspace-tyx8s": "b7-ui-surface",
+    "workspace-bg8ya": "b8-trailer-hook",
+    "workspace-5udw0": "b9-docs"
+  },
+  "agentModel": "claude-opus-4",
+  "sessionHistory": [
+    { "timestamp": "2026-06-12T18:10:00.000Z", "reason": "resume", "note": "Verified all PAN-1491 beads closed, tests pass, and implementation complete; preparing to push and submit.", "agentModel": "claude-opus-4" },
+    { "timestamp": "2026-06-12T18:10:00.000Z", "reason": "merge", "note": "Merged origin/main into feature/pan-1491 to resolve pan-done rebase conflicts.", "agentModel": "claude-opus-4" }
+  ],
+  "statusOverrides": {
+    "b1-contract": "completed",
+    "b1-contract.ac1": "completed",
+    "b1-contract.ac2": "completed",
+    "b1-contract.ac3": "completed",
+    "b1-contract.ac4": "completed",
+    "b2-parser": "completed",
+    "b2-parser.ac1": "completed",
+    "b2-parser.ac2": "completed",
+    "b2-parser.ac3": "completed",
+    "b2-parser.ac4": "completed",
+    "b2-parser.ac5": "completed",
+    "b3-weight-fn": "completed",
+    "b3-weight-fn.ac1": "completed",
+    "b3-weight-fn.ac2": "completed",
+    "b3-weight-fn.ac3": "completed",
+    "b3-weight-fn.ac4": "completed",
+    "b3-weight-fn.ac5": "completed",
+    "b3-weight-fn.ac6": "completed",
+    "b4-server-route": "completed",
+    "b4-server-route.ac1": "completed",
+    "b4-server-route.ac2": "completed",
+    "b4-server-route.ac3": "completed",
+    "b4-server-route.ac4": "completed",
+    "b4-server-route.ac5": "completed",
+    "b5-cli-command": "completed",
+    "b5-cli-command.ac1": "completed",
+    "b5-cli-command.ac2": "completed",
+    "b5-cli-command.ac3": "completed",
+    "b5-cli-command.ac4": "completed",
+    "b6-prompt-update": "completed",
+    "b6-prompt-update.ac1": "completed",
+    "b6-prompt-update.ac2": "completed",
+    "b6-prompt-update.ac3": "completed",
+    "b6-prompt-update.ac4": "completed",
+    "b7-ui-surface": "completed",
+    "b7-ui-surface.ac1": "completed",
+    "b7-ui-surface.ac2": "completed",
+    "b7-ui-surface.ac3": "completed",
+    "b7-ui-surface.ac4": "completed",
+    "b8-trailer-hook": "completed",
+    "b8-trailer-hook.ac1": "completed",
+    "b8-trailer-hook.ac2": "completed",
+    "b8-trailer-hook.ac3": "completed",
+    "b9-docs": "completed",
+    "b9-docs.ac1": "completed",
+    "b9-docs.ac2": "completed",
+    "b9-docs.ac3": "completed"
+  }
+}

@@ -386,6 +386,7 @@ describe('settings-api', () => {
             zai: false,
             kimi: false,
             minimax: false,
+            mimo: false,
             openrouter: false,
             nous: false,
             dashscope: false,
@@ -395,6 +396,22 @@ describe('settings-api', () => {
       const result = validateSettingsApi(allDisabled);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('At least one provider must be enabled');
+    });
+
+    it('rejects invalid provider default harnesses', () => {
+      const settings = getMiniMaxDefaultsApi();
+      const result = validateSettingsApi({
+        ...settings,
+        models: {
+          ...settings.models,
+          provider_harnesses: {
+            openai: 'bad' as never,
+          },
+        },
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, or codex');
     });
   });
 
@@ -423,6 +440,39 @@ describe('settings-api', () => {
       const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
       const yamlContent = callArgs[1] as string;
       expect(yamlContent).toContain('default_conversation_model: gpt-5.4');
+    });
+
+    it('persists provider default harnesses in object-form provider config', async () => {
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: true,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            mimo: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          provider_harnesses: {
+            openai: 'codex',
+          },
+          overrides: {},
+        },
+        api_keys: {},
+      };
+
+      await Effect.runPromise(saveSettingsApi(settings));
+
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('openai:');
+      expect(yamlContent).toContain('enabled: true');
+      expect(yamlContent).toContain('harness: codex');
     });
 
     it('getDefaultConversationModelApi prefers stored defaultConversationModel over provider heuristics', () => {

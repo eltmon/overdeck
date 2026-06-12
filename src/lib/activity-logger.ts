@@ -180,41 +180,79 @@ export function emitDashboardLifecycleSync(
   },
 ): void {
   try {
+    const timestamp = new Date().toISOString();
     let event: Omit<DomainEvent, 'sequence'>;
+    let activity: EmitActivityOptions;
+    const source: ActivitySource = options.trigger === 'deploy-script' ? 'deploy-script' : 'dashboard';
+    const issue = options.issueId ? ` for ${options.issueId}` : '';
 
     if (status === 'started') {
+      const trigger = options.trigger ?? 'unknown';
       event = {
         type: 'dashboard.lifecycle_started' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
           issueId: options.issueId,
-          trigger: options.trigger ?? 'unknown',
+          trigger,
         },
       };
+      activity = {
+        source,
+        level: 'info',
+        message: `Dashboard restart started via ${trigger}${issue} (${options.reason})`,
+        issueId: options.issueId,
+      };
     } else if (status === 'completed') {
+      const seconds = ((options.durationMs ?? 0) / 1000).toFixed(1);
       event = {
         type: 'dashboard.lifecycle_completed' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
           issueId: options.issueId,
           durationMs: options.durationMs ?? 0,
         },
       };
+      activity = {
+        source,
+        level: 'success',
+        message: `Dashboard restart completed${issue} (${seconds}s, ${options.reason})`,
+        issueId: options.issueId,
+      };
     } else {
       event = {
         type: 'dashboard.lifecycle_failed' as const,
-        timestamp: new Date().toISOString(),
+        timestamp,
         payload: {
           reason: options.reason,
           issueId: options.issueId,
           error: options.error ?? 'unknown error',
         },
       };
+      activity = {
+        source,
+        level: 'error',
+        message: `Dashboard restart failed${issue} (${options.reason})`,
+        details: options.error ?? 'unknown error',
+        issueId: options.issueId,
+      };
     }
 
     appendActivityEvent(event);
+    appendActivityEvent({
+      type: 'activity.entry' as const,
+      timestamp,
+      payload: {
+        id: randomUUID(),
+        source: activity.source,
+        level: activity.level,
+        message: activity.message,
+        details: activity.details,
+        issueId: activity.issueId,
+        link: activity.link,
+      },
+    });
   } catch {
     // Non-fatal
   }

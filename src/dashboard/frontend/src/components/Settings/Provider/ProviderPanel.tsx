@@ -1,12 +1,14 @@
-import { Provider, ProvidersConfig, ApiKeysConfig } from '../types';
+import { Provider, ProvidersConfig, ApiKeysConfig, type Harness } from '../types';
 import { ProviderCard } from './ProviderCard';
 
 export interface ProviderPanelProps {
   providers: ProvidersConfig;
+  providerHarnesses?: Partial<Record<Provider, Harness>>;
   apiKeys: ApiKeysConfig;
   thinkingLevel: number;
   onProviderToggle: (provider: Provider) => void;
   onApiKeyChange: (provider: Provider, key: string) => void;
+  onProviderHarnessChange: (provider: Provider, harness: Harness) => void;
   onThinkingLevelChange: (level: number) => void;
   onTestConnection: (provider: Provider) => Promise<void>;
 }
@@ -29,10 +31,12 @@ const PROVIDER_INFO: Record<
 
 export function ProviderPanel({
   providers,
+  providerHarnesses,
   apiKeys,
   thinkingLevel,
   onProviderToggle,
   onApiKeyChange,
+  onProviderHarnessChange,
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderPanelProps) {
@@ -66,6 +70,7 @@ export function ProviderPanel({
               iconColor={info.iconColor}
               compatibility={info.compatibility}
               enabled={providers[provider]}
+              harness={providerHarnesses?.[provider] ?? 'claude-code'}
               connected={isConnected(provider)}
               apiKey={getApiKey(provider)}
               locked={false}
@@ -73,6 +78,7 @@ export function ProviderPanel({
               thinkingLevel={thinkingLevel}
               onToggle={() => onProviderToggle(provider)}
               onApiKeyChange={(key) => onApiKeyChange(provider, key)}
+              onHarnessChange={(harness) => onProviderHarnessChange(provider, harness)}
               onThinkingLevelChange={provider === 'google' ? onThinkingLevelChange : undefined}
               onTestConnection={async () => onTestConnection(provider)}
             />

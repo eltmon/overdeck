@@ -5,7 +5,7 @@ description: >
   launching the interactive planning agent. Use when the work is well-understood
   and the agent can author the plan from the issue body and codebase alone.
   Also use when you ARE the work agent and need to self-plan before implementing.
-  Covers the full vBRIEF v0.5 schema, continue.json format, bead sizing rules,
+  Covers the full vBRIEF v0.6 schema, continue.json format, bead sizing rules,
   inspection gates, and the `pan plan finalize` handoff command.
 triggers:
   - write vbrief
@@ -51,14 +51,14 @@ Minimum exploration:
 
 ## Step 2 — Write `.pan/spec.vbrief.json`
 
-The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform to vBRIEF v0.5.
+The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform to vBRIEF v0.6.
 
 ### Full schema
 
 ```json
 {
   "vBRIEFInfo": {
-    "version": "0.5",
+    "version": "0.6",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/<VERSION>",
     "description": "Plan for <ISSUE-ID>: <issue title>"
@@ -78,7 +78,8 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
     "tags": ["<relevant tags>"],
     "narratives": {
       "Problem": "<what problem this solves>",
-      "Proposal": "<the approach chosen>"
+      "Proposal": "<the approach chosen>",
+      "NonGoals": "<explicitly out of scope; behaviors this issue must NOT introduce — one per line, prefixed '- '>"
     },
     "autoDecisions": [],
     "items": [
@@ -92,10 +93,11 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
           "difficulty": "trivial|simple|medium|complex|expert",
           "issueLabel": "<issue-id-lowercase>",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
-        "subItems": [
+        "items": [
           {
             "id": "<parent-id>.ac1",
             "title": "<specific testable acceptance criterion>",
@@ -119,10 +121,12 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
 | `plan.id` | Issue ID in **lowercase** — e.g. `"pan-1234"`. Never `issueId`, never `issue_id`. |
 | `plan.uid` | Fresh UUID v4. Generate with `node -e "console.log(crypto.randomUUID())"`. |
 | `plan.status` | Must be `"approved"` when written by a self-planning agent (skip `draft`/`proposed`). |
-| `items[].status` | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled`. Use `"pending"` for new items. |
+| `items[].status` | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled`, `failed`. Use `"pending"` for new items. |
+| `plan.narratives.NonGoals` | Required narrative. List everything discovery established as out of scope (`"none"` if genuinely nothing); review enforces these as must-not constraints. |
 | `items[].metadata.requiresInspection` | **Required on every item.** See inspection rules below. |
 | `items[].metadata.inspectionDepth` | `"fast"` (default) or `"deep"`. Only matters when `requiresInspection: true`. |
-| `subItems` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one AC sub-item. |
+| `items[].metadata.traces` | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) this item satisfies. |
+| nested `items` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one acceptance-criterion child item. |
 
 ---
 
@@ -263,7 +267,7 @@ Before running `pan plan finalize`:
 - [ ] `plan.uid` is a fresh UUID v4
 - [ ] `plan.status` is `"approved"`
 - [ ] Every item has `metadata.requiresInspection` (boolean)
-- [ ] Every item has at least one `subItems` AC entry
+- [ ] Every item has at least one nested `items` AC entry
 - [ ] `foundationFor` populated on every `requiresInspection: true` item
 - [ ] No spurious edges
 - [ ] `.pan/continue.json` written with at least one `decisions[]` entry

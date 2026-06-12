@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPlanningPrompt, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
+import { buildPlanningAgentState, buildPlanningPrompt, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
 import { PAN_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 describe('buildPlanningPrompt', () => {
@@ -76,6 +76,57 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).toContain('Do not use AskUserQuestion');
     expect(prompt).toContain('plan.autoDecisions[]');
     expect(prompt).toContain('Halt only for a genuine contradiction');
+  });
+
+  it('renders probe pass instructions when --probe is set', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, false, true);
+
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).toContain('attack your own plan');
+    expect(prompt).toContain('PROBE: no findings');
+  });
+
+  it('renders probe pass instructions for high effort planning', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, 'high');
+
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).toContain('Which edge is missing');
+  });
+
+  it('does not render probe pass instructions by default', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+
+    expect(prompt).not.toContain('Probe Pass (required before finalize)');
+    expect(prompt).not.toContain('PROBE: no findings');
+  });
+});
+
+describe('buildPlanningAgentState', () => {
+  const baseState = {
+    sessionName: 'planning-pan-123',
+    issueId: 'PAN-123',
+    workspacePath: '/repo/workspaces/feature-pan-123',
+    model: 'claude-opus-4-7',
+    harness: 'claude-code' as const,
+    workspaceLocation: 'local' as const,
+    startedAt: '2026-06-12T00:00:00.000Z',
+  };
+
+  it('defaults autoSpawnOnFinalize to false', () => {
+    expect(buildPlanningAgentState(baseState)).toMatchObject({
+      id: 'planning-pan-123',
+      issueId: 'PAN-123',
+      autoSpawnOnFinalize: false,
+    });
+  });
+
+  it('persists autoSpawnOnFinalize when requested', () => {
+    expect(buildPlanningAgentState({
+      ...baseState,
+      autoSpawnOnFinalize: true,
+    })).toMatchObject({
+      autoSpawnOnFinalize: true,
+    });
   });
 });
 

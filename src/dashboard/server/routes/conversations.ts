@@ -92,6 +92,7 @@ import {
   killSession,
   createSession,
   setOption,
+  exactPaneTarget,
   listSessionNames,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
@@ -118,7 +119,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { getProviderForModelSync } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -712,36 +713,9 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
  * indicates Pi has drawn at least its title/prompt line. This is the same
  * shape of readiness check we use for Claude Code's interactive prompt.
  */
-/**
- * Map a Panopticon model id to the matching Pi-side provider name. Pi has
- * its own provider taxonomy (`pi --list-models`); the IDs differ from our
- * internal {@link getProviderForModelSync}. Returning `undefined` lets Pi fall
- * back to its registry order.
- *
- * Pi conversations rely on the user's own Pi auth (`~/.pi/agent/auth.json`).
- * We only constrain *which* Pi provider Pi uses; we never inject keys.
- */
-function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModelSync(modelId).name;
-  switch (provider) {
-    case 'openai':
-      return 'openai-codex';
-    case 'anthropic':
-      return 'anthropic';
-    case 'google':
-      return 'google';
-    case 'minimax':
-      return 'minimax';
-    case 'zai':
-      return 'zai';
-    case 'kimi':
-      return 'kimi-coding';
-    case 'mimo':
-      return 'xiaomi';
-    default:
-      return undefined;
-  }
-}
+// piProviderForModel moved to src/lib/providers.ts so the work-agent launcher
+// (launcher-generator.ts buildPiCommand) and conversations share one source of
+// truth for the Pi provider taxonomy (PAN-1799 follow-up).
 
 async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -1548,16 +1522,26 @@ export async function spawnConversationSession(
       // Pre-seed the per-agent config so Codex never shows its first-run
       // "Decide how much autonomy" / folder-trust wizard (which otherwise fires
       // on every fresh CODEX_HOME and blocks the pane). Autonomy follows the
-      // global Panopticon yolo setting: bypass → never + danger-full-access,
-      // auto → on-request + workspace-write. This is the Codex analog of
-      // preTrustDirectory(cwd) below, which only pre-accepts Claude Code trust.
+      // codex.permissionMode setting (separate from Claude's permission mode):
+      //   read-only   → approval_policy=on-request + sandbox_mode=read-only
+      //   workspace   → approval_policy=on-request + sandbox_mode=workspace-write (default)
+      //   full-access → approval_policy=never + sandbox_mode=danger-full-access
+      // This is the Codex analog of preTrustDirectory(cwd) below, which only
+      // pre-accepts Claude Code trust.
       const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
-      const codexYolo = resolvePermissionModeSync() === 'bypass';
+      const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
+      const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
+      const codexSandboxMode =
+        codexPermMode === 'full-access' ? 'danger-full-access'
+        : codexPermMode === 'read-only' ? 'read-only'
+        : 'workspace-write';
+      const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
       const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
-        approvalPolicy: codexYolo ? 'never' : 'on-request',
-        sandboxMode: codexYolo ? 'danger-full-access' : 'workspace-write',
+        approvalPolicy: codexApprovalPolicy,
+        sandboxMode: codexSandboxMode,
+        approvalsReviewer: codexApprovalsReviewer,
       });
       codexFields = {
         harness: 'codex',
@@ -1769,7 +1753,7 @@ export async function spawnConversationSession(
 
   // Keep session alive when clients disconnect
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(tmuxSession, 'remain-on-exit', 'on'));
+  await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
 
 /**
@@ -1935,6 +1919,7 @@ function scheduleTitleRefinement(conversationName: string): void {
 
 /** Conversations with a retitle currently running — guards against double-clicks. */
 const retitleInFlight = new Set<string>();
+const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
 
 interface ConversationAboutSummary {
   summary: string;
@@ -4752,8 +4737,9 @@ const postConversationRetitleRoute = HttpRouter.add(
 
         retitleInFlight.add(name);
         try {
-          console.log(`[claude-invoke] purpose=conversation-retitle | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript, configuredTitleModel());
+          const model = configuredTitleModel();
+          console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
+          const title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }
@@ -4767,7 +4753,7 @@ const postConversationRetitleRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[conversations] retitle failed for "${name}":`, msg);
-        return jsonResponse({ error: 'Failed to regenerate title' }, { status: 500 });
+        return jsonResponse({ error: `Failed to regenerate title: ${msg}` }, { status: 500 });
       }
     });
   }),
@@ -4818,8 +4804,9 @@ const getConversationAboutRoute = HttpRouter.add(
         }
 
         const transcript = serializeConversationTranscript(messages);
-        console.log(`[claude-invoke] purpose=conversation-about | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-        const summary = await summarizeTranscriptAbout(transcript, configuredTitleModel());
+        const aboutModel = configuredTitleModel();
+        console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
+        const summary = await summarizeTranscriptAbout(transcript, aboutModel);
         if (!summary) {
           return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
         }

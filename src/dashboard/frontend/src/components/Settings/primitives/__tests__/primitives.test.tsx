@@ -161,82 +161,26 @@ describe('SettingsLayout', () => {
 });
 
 describe('SettingsHeader', () => {
-  it('renders title and save/reset buttons', () => {
-    render(
-      <SettingsHeader
-        title="Settings"
-        hasChanges={true}
-        saving={false}
-        saveSuccess={false}
-        saveError={false}
-        onSave={() => {}}
-        onReset={() => {}}
-      />
-    );
+  it('renders title and the autosave hint when idle — no Save/Reset buttons', () => {
+    render(<SettingsHeader title="Settings" status="idle" />);
     expect(screen.getByText('Settings')).toBeInTheDocument();
-    expect(screen.getByText('Save')).toBeInTheDocument();
-    expect(screen.getByText('Reset')).toBeInTheDocument();
-  });
-
-  it('disables save when no changes', () => {
-    render(
-      <SettingsHeader
-        title="Settings"
-        hasChanges={false}
-        saving={false}
-        saveSuccess={false}
-        saveError={false}
-        onSave={() => {}}
-        onReset={() => {}}
-      />
-    );
-    expect(screen.getByText('Save')).toBeDisabled();
-    expect(screen.getByText('Reset')).toBeDisabled();
+    expect(screen.getByText('Changes save automatically')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('shows saving state', () => {
-    render(
-      <SettingsHeader
-        title="Settings"
-        hasChanges={true}
-        saving={true}
-        saveSuccess={false}
-        saveError={false}
-        onSave={() => {}}
-        onReset={() => {}}
-      />
-    );
+    render(<SettingsHeader title="Settings" status="saving" />);
     expect(screen.getByText('Saving…')).toBeInTheDocument();
   });
 
   it('shows success indicator', () => {
-    render(
-      <SettingsHeader
-        title="Settings"
-        hasChanges={false}
-        saving={false}
-        saveSuccess={true}
-        saveError={false}
-        onSave={() => {}}
-        onReset={() => {}}
-      />
-    );
+    render(<SettingsHeader title="Settings" status="saved" />);
     expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
   it('shows error indicator', () => {
-    render(
-      <SettingsHeader
-        title="Settings"
-        hasChanges={false}
-        saving={false}
-        saveSuccess={false}
-        saveError={true}
-        onSave={() => {}}
-        onReset={() => {}}
-      />
-    );
-    expect(screen.getByText('Save failed')).toBeInTheDocument();
+    render(<SettingsHeader title="Settings" status="error" />);
+    expect(screen.getByText(/Save failed/)).toBeInTheDocument();
   });
 });
 

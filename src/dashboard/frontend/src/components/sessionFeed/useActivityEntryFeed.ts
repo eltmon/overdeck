@@ -5,6 +5,14 @@ import type { ActivitySessionFeedEntry } from './types';
 
 export const MAX_ACTIVITY_ENTRY_FEED_ENTRIES = 500;
 
+/**
+ * Activity sources that report system-level news (dashboard restarts,
+ * supervisor watchdog actions, deploy-script restarts). These entries are
+ * relevant regardless of which project is active, so the feed shows them in
+ * every scope instead of dropping them through the issue-id filter.
+ */
+export const SYSTEM_ACTIVITY_SOURCES = new Set(['dashboard', 'supervisor', 'deploy-script']);
+
 interface ActivityEntryShape {
   id?: unknown;
   timestamp?: unknown;
@@ -49,6 +57,7 @@ export function createActivityEntryFeedSelector() {
           files: [],
           tags,
           link,
+          systemWide: SYSTEM_ACTIVITY_SOURCES.has(sourceName),
         };
       })
       .filter((entry): entry is ActivitySessionFeedEntry => entry !== null)

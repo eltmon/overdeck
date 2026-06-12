@@ -3033,6 +3033,33 @@
   user-select: none;
 }
 
+.conversationAboutToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.conversationAboutToggle:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.conversationAboutToggleActive {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--background));
+  color: var(--primary);
+}
+
 /* ⋮ overflow menu */
 .headerMenuWrap {
   position: relative;
