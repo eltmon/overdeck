@@ -30,6 +30,20 @@ There is no "global context template". A request phrased that way means either
 a **bundled rule** (every machine) or the **global layer** (one machine).
 </Info>
 
+### The shorthand: "add a `<scope>` rule"
+
+In practice you (and your agents) only need four phrases — the scope word
+alone routes the content:
+
+| You say | Applies to | Destination |
+| --- | --- | --- |
+| "add a **universal rule**: …" | every machine, every project | `sync-sources/rules/<name>.md`, `scope: universal` |
+| "add a **dev rule**: …" | Panopticon development only | `sync-sources/rules/<name>.md`, `scope: dev` |
+| "add a **project rule**: …" | one project | `<root>/.pan/context/project.md` |
+| "add a **machine rule**: …" | one machine | `~/.panopticon/context/global.md` |
+
+After any of them: `pan sync`, and the change reaches new sessions.
+
 ## Bundled rules
 
 Panopticon ships engineering rules inside the package under

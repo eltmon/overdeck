@@ -39,6 +39,19 @@ There is no "global context template": a request phrased that way means either
 a **bundled rule** (every machine) or the **global layer** (this machine). The
 `context-nomenclature` bundled rule ships this table to every agent session.
 
+**Shorthand:** placement requests use "add a `<scope>` rule" — the scope word
+alone routes the content:
+
+| You say | Destination |
+|---|---|
+| "add a **universal rule**" | `sync-sources/rules/<name>.md`, `scope: universal` |
+| "add a **dev rule**" | `sync-sources/rules/<name>.md`, `scope: dev` |
+| "add a **project rule**" | `<root>/.pan/context/project.md` |
+| "add a **machine rule**" | `~/.panopticon/context/global.md` |
+
+The `rule-authoring` bundled rule (`scope: dev`) carries the authoring
+procedure for the first two.
+
 Register projects with `pan projects add <path>`. The older singular
 `pan project add <path>` command remains available as a compatibility alias,
 but new docs and examples should use the plural command group.

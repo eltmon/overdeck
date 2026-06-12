@@ -1,32 +1,27 @@
 ---
 scope: universal
 ---
-### Context placement nomenclature — canonical terms
+### Context placement — say "add a `<scope>` rule"
 
-Panopticon distributes context through the **context layers** system (see
-`docs/CONTEXT-LAYERS.md` in panopticon-cli). Use these exact terms when adding,
-moving, or discussing context, and map user requests onto them:
+Panopticon distributes context through the **context layers** system
+(`docs/CONTEXT-LAYERS.md`; user docs:
+https://panopticon-cli.com/configuration/context-layers). All placement
+requests use one shorthand — **"add a `<scope>` rule: `<content>`"** — where the
+scope word alone determines the destination:
 
-| Term | Source file | Use for |
+| You say | Applies to | Where it goes |
 | --- | --- | --- |
-| **Bundled rule** | `sync-sources/rules/<name>.md` in panopticon-cli, with `scope: universal` or `scope: dev` | Engineering rules and behavioral guidance for **every machine**; ships with `pan install` / `pan sync` |
-| **Global layer** (a.k.a. machine context) | `~/.panopticon/context/global.md` | Genuinely **machine-specific** quirks only ("this laptop's GPU is an RTX 3090") |
-| **Project layer** | `<projectRoot>/.pan/context/project.md` | Guidance for **one project**; committed to that repo |
-| **Workspace layer** | `<workspace>/.pan/context/workspace.md` | Auto-assembled per issue workspace; **never hand-edit** |
+| **universal rule** | every machine, every project | bundled rule: `sync-sources/rules/<name>.md` in panopticon-cli, `scope: universal` |
+| **dev rule** | Panopticon development only | bundled rule: `sync-sources/rules/<name>.md`, `scope: dev` |
+| **project rule** | one project | `<projectRoot>/.pan/context/project.md` (project layer) |
+| **machine rule** | this machine only | `~/.panopticon/context/global.md` (global layer) |
 
-The rendered outputs — the managed region of `~/.claude/CLAUDE.md`, each
-project's `CLAUDE.md` and `AGENTS.md`, and `~/.panopticon/context/pi-global.md` /
-`codex-global.md` — are **harness context files**. Never edit them directly:
-edit the source layer or bundled rule, then run `pan sync`.
+After writing any of them, run `pan sync`. Changes reach **new** sessions only.
 
-Default routing for requests:
+The rendered outputs — the managed region of `~/.claude/CLAUDE.md`, project
+`CLAUDE.md`/`AGENTS.md`, and `pi-global.md`/`codex-global.md` — are **harness
+context files**; never edit them directly.
 
-- "make all agents do X everywhere" → **bundled rule**, `scope: universal`
-- "only when developing Panopticon itself" → **bundled rule**, `scope: dev`
-- "only in this project" → **project layer**
-- "only on this machine" → **global layer**
-
-When a request uses a vague or ad-hoc term (e.g. "global context template",
-"the CLAUDE.md template"), translate it to one of the four canonical terms above
-and confirm the routing if the universal-rule vs project-layer choice is
-ambiguous.
+Translate vague or ad-hoc terms ("global context template", "the CLAUDE.md
+template") into one of the four scopes above, and confirm the routing when the
+universal-vs-project choice is ambiguous.
