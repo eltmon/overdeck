@@ -3670,8 +3670,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }));
   await saveAgentRuntimeState(agentId, {
-    state: 'active',
-    lastActivity: new Date().toISOString(),
     sessionModel: selectedModel,
     sessionHarness: resolvedHarness,
   });
