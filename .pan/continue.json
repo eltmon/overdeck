@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-12T18:10:00.000Z",
-  "updated": "2026-06-12T18:10:00.000Z",
-  "gitState": { "branch": "feature/pan-1491", "sha": "05c4d18a4", "dirty": false },
+  "updated": "2026-06-12T18:16:28.905Z",
+  "gitState": {
+    "branch": "feature/pan-1491",
+    "sha": "05c4d18a4",
+    "dirty": false
+  },
   "decisions": [
     {
       "id": "D1",
@@ -31,7 +35,9 @@
   "resumePoint": {
     "description": "Submit completed PAN-1491 work: push feature/pan-1491 and run pan done PAN-1491.",
     "beadId": null,
-    "filesToRead": [".pan/continue.json"]
+    "filesToRead": [
+      ".pan/continue.json"
+    ]
   },
   "beadsMapping": {
     "workspace-etp22": "b1-contract",
@@ -46,8 +52,18 @@
   },
   "agentModel": "claude-opus-4",
   "sessionHistory": [
-    { "timestamp": "2026-06-12T18:10:00.000Z", "reason": "resume", "note": "Verified all PAN-1491 beads closed, tests pass, and implementation complete; preparing to push and submit.", "agentModel": "claude-opus-4" },
-    { "timestamp": "2026-06-12T18:10:00.000Z", "reason": "merge", "note": "Merged origin/main into feature/pan-1491 to resolve pan-done rebase conflicts.", "agentModel": "claude-opus-4" }
+    {
+      "timestamp": "2026-06-12T18:10:00.000Z",
+      "reason": "resume",
+      "note": "Verified all PAN-1491 beads closed, tests pass, and implementation complete; preparing to push and submit.",
+      "agentModel": "claude-opus-4"
+    },
+    {
+      "timestamp": "2026-06-12T18:10:00.000Z",
+      "reason": "merge",
+      "note": "Merged origin/main into feature/pan-1491 to resolve pan-done rebase conflicts.",
+      "agentModel": "claude-opus-4"
+    }
   ],
   "statusOverrides": {
     "b1-contract": "completed",
