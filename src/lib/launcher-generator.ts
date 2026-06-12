@@ -48,7 +48,7 @@ export interface LauncherConfig {
    * Codex agent mode. Defaults to 'exec' (headless legacy mode).
    *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
-   *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
+   *   - 'work-tui': interactive work-agent TUI with sandbox/approval/repo flags
    */
   codexMode?: 'exec' | 'tui' | 'work-tui';
   /**
@@ -613,6 +613,7 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
     }
     tokens.push('-s', toCodexSandboxValue(config.codexSandboxMode));
     tokens.push('-c', 'approval_policy=never');
+    tokens.push('--skip-git-repo-check');
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }

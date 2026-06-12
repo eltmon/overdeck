@@ -74,7 +74,10 @@ vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }))
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
-vi.mock('../paths.js', () => ({ AGENTS_DIR: '/tmp/test-agents' }));
+vi.mock('../paths.js', () => ({
+  AGENTS_DIR: '/tmp/test-agents',
+  COSTS_DIR: '/tmp/test-costs',
+}));
 
 import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
 

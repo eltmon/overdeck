@@ -11,6 +11,18 @@ const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(tmpdir(), `panopticon-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
 
+const moveDirSync = (src, dst) => {
+  try {
+    renameSync(src, dst);
+  } catch (error) {
+    if (error?.code !== 'EXDEV') {
+      throw error;
+    }
+    cpSync(src, dst, { recursive: true });
+    rmSync(src, { recursive: true, force: true });
+  }
+};
+
 const restoreDashboard = () => {
   if (!existsSync(preservedDashboardDir)) {
     return;
@@ -20,7 +32,7 @@ const restoreDashboard = () => {
   if (existsSync(dashboardDir)) {
     rmSync(dashboardDir, { recursive: true, force: true });
   }
-  renameSync(preservedDashboardDir, dashboardDir);
+  moveDirSync(preservedDashboardDir, dashboardDir);
 };
 
 const copyMatching = (srcDir, dstDir, predicate) => {
@@ -69,7 +81,7 @@ const copyCloisterPrompts = () => {
 try {
   if (existsSync(dashboardDir)) {
     mkdirSync(preservedRoot, { recursive: true });
-    renameSync(dashboardDir, preservedDashboardDir);
+    moveDirSync(dashboardDir, preservedDashboardDir);
   }
 
   const build = spawnSync('tsdown', { cwd: projectRoot, stdio: 'inherit', shell: true });
