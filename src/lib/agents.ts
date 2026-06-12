@@ -3864,6 +3864,20 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
  * sync-by-nature already and is only called from CLI contexts and existing
  * sync internals.
  */
+/**
+ * True when the PID is a tmux process (client or server). Used to keep the
+ * per-agent launcher kill sweep from ever signalling the shared tmux server
+ * (PAN-1798). Reads /proc/<pid>/comm; on non-Linux or read failure returns
+ * false (fail-open matches pre-fix behavior for non-tmux processes).
+ */
+function isTmuxProcessSync(pid: number): boolean {
+  try {
+    return readFileSync(`/proc/${pid}/comm`, 'utf-8').trim() === 'tmux';
+  } catch {
+    return false;
+  }
+}
+
 function killLauncherProcessSync(agentId: string): void {
   const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
   let pidsOut: string;
@@ -3879,7 +3893,13 @@ function killLauncherProcessSync(agentId: string): void {
   const pids = pidsOut
     .split('\n')
     .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
+    // PAN-1798: when this agent's spawn FOUNDED the shared tmux server, the
+    // server's cmdline embeds this launcher path (`tmux ... new-session ...
+    // bash .../launcher.sh`), so pgrep -f matches the server itself. Killing
+    // it destroys every session on the socket — agents, reviews, and all
+    // conversations. Never signal a tmux process from the per-agent sweep.
+    .filter(pid => !isTmuxProcessSync(pid));
   if (pids.length === 0) return;
 
   for (const pid of pids) {
@@ -3920,7 +3940,10 @@ async function killLauncherProcessAsync(agentId: string): Promise<void> {
   const pids = pidsOut
     .split('\n')
     .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
+    // PAN-1798: see killLauncherProcessSync — the founding tmux server's
+    // cmdline embeds this launcher path; never signal tmux from this sweep.
+    .filter(pid => !isTmuxProcessSync(pid));
   if (pids.length === 0) return;
 
   for (const pid of pids) {
