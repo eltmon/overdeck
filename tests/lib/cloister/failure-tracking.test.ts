@@ -47,7 +47,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     else process.env.PANOPTICON_HOME = originalHome;
     if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
     else process.env.PANOPTICON_NO_RESUME = originalNoResume;
-    rmSync(tempHome, { recursive: true, force: true });
+    rmSync(tempHome, { recursive: true, force: true, maxRetries: 3 });
   });
 
   async function loadAgents() {
