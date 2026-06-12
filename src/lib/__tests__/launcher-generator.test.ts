@@ -911,10 +911,10 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/-m 'codex-4o'/);
     expect(script).toMatch(/-c approval_policy=never/);
     expect(script).toMatch(/-s workspace/);
-    expect(script).toMatch(/--skip-git-repo-check/);
+    expect(script).not.toMatch(/--skip-git-repo-check/);
   });
 
-  it('codex work-tui mode emits interactive codex with model and repo-check bypass only', () => {
+  it('codex work-tui mode emits interactive codex with model only', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -924,10 +924,11 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     });
     // PAN-1803: approval_policy/sandbox_mode come from the seeded config.toml
     // (Settings-driven), NOT CLI flags that would override the user's choice.
-    expect(script).toMatch(/^exec codex -m 'codex-4o' --skip-git-repo-check$/m);
+    expect(script).toMatch(/^exec codex -m 'codex-4o'$/m);
     expect(script).not.toMatch(/codex exec/);
     expect(script).not.toMatch(/approval_policy=never/);
     expect(script).not.toMatch(/-s workspace-write/);
+    expect(script).not.toMatch(/--skip-git-repo-check/);
   });
 
   it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
@@ -940,8 +941,9 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o' --skip-git-repo-check$/m);
+    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o'$/m);
     expect(script).not.toMatch(/codex exec/);
+    expect(script).not.toMatch(/--skip-git-repo-check/);
   });
 
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {

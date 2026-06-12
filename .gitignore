@@ -58,6 +58,7 @@ CLAUDE.md
 # remain tracked — only the workspace working copies are excluded.
 .pan/spec.vbrief.json
 .pan/continue.json
+.pan/kickoff.md
 
 # Docs-index builder scratch dir (buildDocsIndex writes docs-index.*.tmp.sqlite
 # here, renames the result into dist/, but never removes the dir). Transient —

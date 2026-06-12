@@ -613,12 +613,12 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
     // `-c approval_policy=` on the CLI — those override config.toml and would
     // ignore the Settings choice. Mirror the conversation path (codexMode
     // 'tui'), which relies on the seeded config.toml. Only `-m` (per-agent
-    // model) and the repo-check bypass flag are passed here.
+    // model) is passed here; current Codex rejects the legacy
+    // `--skip-git-repo-check` flag before the TUI can boot.
     const tokens: string[] = ['codex'];
     if (config.model) {
       tokens.push('-m', shellQuoteModelIdSync(config.model));
     }
-    tokens.push('--skip-git-repo-check');
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }
@@ -628,7 +628,7 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // Headless exec mode — fresh spawn or resume.
   // Resume: `codex exec resume <threadId> [prompt]`
   //   Note: `codex exec resume` rejects -s; sandbox must be set via -c.
-  // Fresh: `codex exec [-m model] -c approval_policy=never -s sandbox --skip-git-repo-check [prompt]`
+  // Fresh: `codex exec [-m model] -c approval_policy=never -s sandbox [prompt]`
   const tokens: string[] = ['codex', 'exec'];
   if (isResume) {
     tokens.push('resume');
@@ -651,8 +651,6 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   } else {
     tokens.push('-s', sandbox);
   }
-
-  tokens.push('--skip-git-repo-check');
 
   if (isResume) {
     tokens.push(shellQuote(config.resumeSessionId!));
