@@ -164,8 +164,8 @@ The hook resolves issue IDs in this order:
 
 ### Build Requirements
 
-The `record-cost-event.js` is bundled with tsdown (`scripts/tsdown.config.ts`). Because it imports `better-sqlite3` (CJS native module) and runs as ESM, the build uses:
-- `shims: true` — auto-injects `createRequire` for CJS compatibility
+The `record-cost-event.js` script is bundled with tsdown (`scripts/tsdown.config.ts`). It uses the shared SQLite driver adapter, which selects the runtime's built-in SQLite implementation instead of a native npm addon:
+- `shims: true` — keeps ESM output compatible with any remaining CJS dependencies
 - Everything is bundled (the script runs standalone from `~/.panopticon/bin/` where `node_modules` is not available)
 
 ### Error Handling Concern
@@ -286,9 +286,9 @@ For the cost breakdown modal (PAN-77), costs need to be attributed by pipeline s
 
 ### 1. record-cost-event.js esbuild bundle broken
 
-The `build:scripts` command in `package.json` used `--format=esm` without the `createRequire` banner. `better-sqlite3` uses CJS `require("fs")` internally, which fails in ESM without the polyfill. The script crashed with `Dynamic require of "fs" is not supported` but the heartbeat hook swallowed the error silently.
+The `build:scripts` command in `package.json` used `--format=esm` without the `createRequire` banner. At the time, the cost script depended on a CJS SQLite module that required Node built-ins dynamically, which failed in ESM without the polyfill. The script crashed with `Dynamic require of "fs" is not supported` but the heartbeat hook swallowed the error silently.
 
-**Fix**: Created proper build config (originally esbuild, now `scripts/tsdown.config.ts` with `shims: true`).
+**Fix**: Created proper build config (originally esbuild, now `scripts/tsdown.config.ts` with `shims: true`). The cost path now uses the shared SQLite driver adapter.
 
 ### 2. Deacon patrolWorkAgentResolutions — getEnabledSpecialists not defined
 

@@ -5,7 +5,7 @@
  * - In-memory PubSub for live streaming to WebSocket clients
  * - Monotonic, gap-free sequence numbers (SQLite AUTOINCREMENT)
  * - 7-day retention with startup compaction
- * - Dual-runtime: bun:sqlite on Bun, better-sqlite3 on Node
+ * - Dual-runtime: shared SQLite driver adapter (bun:sqlite on Bun, node:sqlite on Node)
  *
  * Usage:
  *   const store = await initEventStore();
@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
+import type { SqliteDatabase } from '../../lib/database/driver.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,13 +69,11 @@ export interface EventStore {
   getLatestSequence(): number;
 }
 
-// ─── Minimal DB interface (compatible with bun:sqlite and better-sqlite3) ────
+// ─── Minimal DB interface (compatible with the shared SQLite driver) ─────────
 //
 // Uses positional parameters (?) in all SQL to avoid runtime differences in
-// named-parameter binding syntax:
-//   - bun:sqlite requires sigil in binding keys: { $name: value }
-//   - better-sqlite3 requires no sigil:          { name: value }
-// Positional parameters + arrays work identically in both runtimes.
+// named-parameter binding syntax. Positional parameters + arrays work through
+// the shared adapter in both runtimes.
 
 interface PreparedStatement<R = Record<string, unknown>> {
   run(params?: unknown[]): { changes: number };
@@ -156,7 +155,7 @@ export async function openEventDb(): Promise<DbAdapter> {
         updated_at TEXT NOT NULL
       )
     `);
-    initWorkspaceDiscoveredSessionsSchema(db as unknown as import('better-sqlite3').Database);
+    initWorkspaceDiscoveredSessionsSchema(db as unknown as SqliteDatabase);
     return db as unknown as DbAdapter;
   } else {
     // Node.js: use shared database connection — migrations run there
@@ -179,8 +178,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   emitter.setMaxListeners(0);
 
   // Prepared statements for hot path performance.
-  // All SQL uses positional parameters (?) — both bun:sqlite and better-sqlite3
-  // accept arrays for positional bindings with no runtime-specific differences.
+  // All SQL uses positional parameters (?) via shared-adapter array binding.
   const insertStmt = db.prepare<void>(
     `INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`,
   );

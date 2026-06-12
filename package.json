@@ -60,7 +60,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.5.0"
   },
   "overrides": {
     "@effect/platform-node-shared": "4.0.0-beta.73"
@@ -123,7 +123,6 @@
     "@types/ws": "^8.18.1",
     "@xenova/transformers": "^2.17.2",
     "ai": "^6.0.180",
-    "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
     "commander": "^12.1.0",
@@ -143,7 +142,6 @@
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@effect/vitest": "catalog:",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/inquirer": "^9.0.9",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.0",

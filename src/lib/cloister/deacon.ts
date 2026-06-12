@@ -4971,6 +4971,20 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-1778: proactively refresh Claude credentials on active remote agents
+  // when the host credentials file changes, with a 15 min fallback cadence.
+  // Runs before the reactive 401 heal/reap path so long remote runs get fresh
+  // OAuth tokens before they stall. Zero active remote agents is a local state
+  // scan only — no Fly provider construction and no Fly API calls.
+  try {
+    const { refreshClaudeCredentialsForActiveRemoteAgents } = await import('../remote/remote-completion.js');
+    const remoteCredentialActions = await refreshClaudeCredentialsForActiveRemoteAgents();
+    actions.push(...remoteCredentialActions);
+    for (const a of remoteCredentialActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
+  } catch (err: any) {
+    addLog('warn', `Remote credential refresh patrol failed: ${err.message}`, state.patrolCycle);
+  }
+
   // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
   // Cheap no-op when no remote-state.json is active (local file scan only —
   // no fly API calls); otherwise checks each VM for the REMOTE_DONE sentinel,

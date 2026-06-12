@@ -10,14 +10,12 @@ import { existsSync, readdirSync, copyFileSync, chmodSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
-import { spawnSync } from 'child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = dirname(__dirname);
 const BIN_DIR = join(homedir(), '.panopticon', 'bin');
 // PAN-1201: hook scripts live under sync-sources/hooks/, not scripts/.
 const HOOKS_SOURCE_DIR = join(PACKAGE_ROOT, 'sync-sources', 'hooks');
-const NATIVE_MODULES = ['better-sqlite3'];
 
 function syncHooksIfInitialized() {
   if (!existsSync(join(homedir(), '.panopticon'))) {
@@ -56,42 +54,7 @@ function syncHooksIfInitialized() {
   }
 }
 
-function rebuildNativeModules() {
-  if (process.env.PANOPTICON_SKIP_NATIVE_POSTINSTALL === '1') {
-    return;
-  }
-
-  const npmExecPath = process.env.npm_execpath;
-  const userAgent = process.env.npm_config_user_agent || '';
-  const packageManager = userAgent.startsWith('bun/') ? 'bun' : 'npm';
-
-  if (!npmExecPath && packageManager === 'npm') {
-    console.warn('! Skipping native module rebuild: npm_execpath is unavailable.');
-    return;
-  }
-
-  const command = packageManager === 'bun'
-    ? 'bun'
-    : process.execPath;
-  const args = packageManager === 'bun'
-    ? ['rebuild', ...NATIVE_MODULES]
-    : [npmExecPath, 'rebuild', ...NATIVE_MODULES];
-
-  const result = spawnSync(command, args, {
-    cwd: PACKAGE_ROOT,
-    stdio: 'inherit',
-    env: process.env,
-  });
-
-  if (result.status !== 0) {
-    const managerLabel = packageManager === 'bun' ? 'bun rebuild' : 'npm rebuild';
-    console.warn(`! Native module rebuild failed. Run \
-\`${managerLabel} ${NATIVE_MODULES.join(' ')}\` manually if Panopticon cannot start.`);
-  }
-}
-
 syncHooksIfInitialized();
-rebuildNativeModules();
 
 // Suggest running full sync
 console.log('Run `pan sync` to sync skills and commands to AI tools.');

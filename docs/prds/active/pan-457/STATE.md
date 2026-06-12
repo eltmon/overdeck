@@ -189,8 +189,8 @@ via domain events on `/ws/rpc`.
 
 ## Risks
 
-1. **FTS5 availability** — better-sqlite3 ships with FTS5 by default; verified in existing
-   `database/index.ts`. Low risk.
+1. **FTS5 availability** — the SQLite driver adapter must provide FTS5 in the active
+   runtime; verified in existing `database/index.ts`. Low risk.
 2. **Enrichment cost explosion** — mitigated by `--dry-run` + `costConfirmThreshold` +
    explicit `--limit` default.
 3. **Hash collision resolution ambiguity** — accepted; when both JSONL cwd is missing AND

@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../database/driver.js';
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { dirname, join, sep } from 'path';
@@ -46,8 +46,8 @@ function docsConfig(overrides: {
   };
 }
 
-function openIndex(path: string): Database.Database {
-  return new Database(path, { readonly: true });
+function openIndex(path: string): SqliteDatabase {
+  return openDatabase(path);
 }
 
 function testEmbeddingFn() {

@@ -5,7 +5,6 @@ import { exec, execFileSync } from "child_process";
 import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
-import { createRequire as createRequire$1 } from "module";
 import { promisify } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -4196,6 +4195,185 @@ function getPricingSync(provider, model) {
 	return pricing || null;
 }
 join(COSTS_DIR, "budgets.json");
+//#endregion
+//#region ../../src/lib/database/driver.ts
+const _require = createRequire(import.meta.url);
+const SQLITE_WARNING_FILTER = Symbol.for("panopticon.sqliteWarningFilterInstalled");
+function isBunRuntime() {
+	return typeof Bun !== "undefined";
+}
+function warningName(args) {
+	const [warning, typeOrOptions] = args;
+	if (warning instanceof Error) return warning.name;
+	if (typeof typeOrOptions === "string") return typeOrOptions;
+	return typeOrOptions?.type;
+}
+function warningMessage(args) {
+	const [warning] = args;
+	return warning instanceof Error ? warning.message : String(warning);
+}
+function isSqliteExperimentalWarning(args) {
+	return warningName(args) === "ExperimentalWarning" && /SQLite/.test(warningMessage(args));
+}
+function installSqliteWarningFilter() {
+	const processWithFlag = process;
+	if (processWithFlag[SQLITE_WARNING_FILTER]) return;
+	const previousEmitWarning = process.emitWarning.bind(process);
+	process.emitWarning = ((...args) => {
+		if (isSqliteExperimentalWarning(args)) return;
+		return previousEmitWarning(...args);
+	});
+	processWithFlag[SQLITE_WARNING_FILTER] = true;
+}
+installSqliteWarningFilter();
+function assertNoBooleanBind(value) {
+	if (typeof value === "boolean") throw new TypeError("SQLite boolean bind values are not supported; bind 0 or 1 explicitly.");
+	if (Array.isArray(value)) {
+		for (const item of value) assertNoBooleanBind(item);
+		return;
+	}
+	if (value && typeof value === "object" && !(value instanceof Uint8Array)) for (const item of Object.values(value)) assertNoBooleanBind(item);
+}
+function validateBindParams(params) {
+	for (const param of params) assertNoBooleanBind(param);
+}
+function isBindRecord(value) {
+	return !!value && typeof value === "object" && !Array.isArray(value) && !(value instanceof Uint8Array);
+}
+function normalizeNamedBindRecord(sql, record) {
+	const normalized = {};
+	let changed = false;
+	for (const [key, value] of Object.entries(record)) {
+		if (/^[:@$]/.test(key)) {
+			if (sql.includes(key)) normalized[key] = value;
+			else changed = true;
+			continue;
+		}
+		const prefixedKey = [
+			`@${key}`,
+			`:${key}`,
+			`$${key}`
+		].find((candidate) => sql.includes(candidate));
+		if (!prefixedKey) {
+			changed = true;
+			continue;
+		}
+		normalized[prefixedKey] = value;
+		changed = true;
+	}
+	return changed ? normalized : record;
+}
+function normalizeBindParams(sql, params) {
+	return (params.length === 1 && Array.isArray(params[0]) ? params[0] : params).map((param) => isBindRecord(param) ? normalizeNamedBindRecord(sql, param) : param);
+}
+function wrapStatement(sql, statement) {
+	return {
+		run: (...params) => {
+			validateBindParams(params);
+			return statement.run(...normalizeBindParams(sql, params));
+		},
+		get: (...params) => {
+			validateBindParams(params);
+			return statement.get(...normalizeBindParams(sql, params));
+		},
+		all: (...params) => {
+			validateBindParams(params);
+			return statement.all(...normalizeBindParams(sql, params));
+		},
+		iterate: (...params) => {
+			validateBindParams(params);
+			return statement.iterate(...normalizeBindParams(sql, params));
+		}
+	};
+}
+function rawPrepare(db, sql) {
+	if (db.prepare) return db.prepare(sql);
+	if (db.query) return db.query(sql);
+	throw new Error("SQLite driver does not expose prepare() or query().");
+}
+function readFirstColumn(row) {
+	if (!row || typeof row !== "object") return null;
+	const values = Object.values(row);
+	return values.length === 0 ? null : values[0];
+}
+function wrapDatabase(raw) {
+	let transactionDepth = 0;
+	let savepointId = 0;
+	const db = {
+		exec: (sql) => {
+			raw.exec(sql);
+		},
+		prepare: (sql) => wrapStatement(sql, rawPrepare(raw, sql)),
+		pragma: (sql, options) => {
+			const rows = db.prepare(`PRAGMA ${sql}`).all();
+			if (options?.simple) return readFirstColumn(rows[0]);
+			return rows;
+		},
+		transaction: (fn) => {
+			return (...args) => {
+				if (transactionDepth === 0) {
+					raw.exec("BEGIN");
+					transactionDepth = 1;
+					let committed = false;
+					try {
+						const result = fn(...args);
+						raw.exec("COMMIT");
+						committed = true;
+						return result;
+					} catch (error) {
+						if (!committed) raw.exec("ROLLBACK");
+						throw error;
+					} finally {
+						transactionDepth = 0;
+					}
+				}
+				const savepoint = `panopticon_tx_${++savepointId}`;
+				raw.exec(`SAVEPOINT ${savepoint}`);
+				transactionDepth++;
+				let released = false;
+				try {
+					const result = fn(...args);
+					raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+					released = true;
+					return result;
+				} catch (error) {
+					if (!released) {
+						raw.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+						raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+					}
+					throw error;
+				} finally {
+					transactionDepth--;
+				}
+			};
+		},
+		loadExtension: (path) => {
+			if (!raw.loadExtension) throw new Error("SQLite driver does not support loadable extensions.");
+			raw.enableLoadExtension?.(true);
+			raw.loadExtension(path);
+		},
+		close: () => {
+			raw.close();
+		}
+	};
+	return db;
+}
+function loadNodeSqlite() {
+	try {
+		return _require("node:sqlite");
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Unable to load node:sqlite (${message}). Panopticon requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`, { cause: error });
+	}
+}
+function openDatabase(path, options = {}) {
+	if (isBunRuntime()) {
+		const { Database } = _require("bun:sqlite");
+		return wrapDatabase(new Database(path));
+	}
+	const { DatabaseSync } = loadNodeSqlite();
+	return wrapDatabase(new DatabaseSync(path, options));
+}
 function parseArrayColumn(value) {
 	if (!value) return [];
 	try {
@@ -5475,15 +5653,23 @@ function runMigrations(db) {
 //#endregion
 //#region ../../src/lib/database/index.ts
 /**
+* Panopticon Unified Database
+*
+* Single panopticon.db at ~/.panopticon/panopticon.db.
+* Singleton pattern — one connection shared across the process.
+*
+* IMPORTANT: This module is safe to import in both server and CLI contexts.
+* Never use execSync here — this is synchronous SQLite, not a subprocess.
+*
+* Dual-runtime (PAN-1579): uses the shared SQLite driver adapter, which selects
+* bun:sqlite under Bun and node:sqlite under Node.
+*/
+/**
 * PAN-1249: Local typed error for SQLite failures against panopticon.db.
 * Used by callers that want to surface DB faults instead of swallowing them.
 * Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
 */
 var DatabaseError$1 = class extends TaggedError("DatabaseError") {};
-function isBunRuntime() {
-	return typeof Bun !== "undefined";
-}
-const _require = createRequire$1(import.meta.url);
 let _db = null;
 /**
 * Get the path to panopticon.db (dynamic, respects PANOPTICON_HOME override for tests)
@@ -5499,19 +5685,7 @@ function getDatabase() {
 	if (_db) return _db;
 	const home = getPanopticonHome();
 	if (!existsSync(home)) mkdirSync(home, { recursive: true });
-	const dbPath = getDatabasePath();
-	if (isBunRuntime()) {
-		const { Database: BunDatabase } = _require("bun:sqlite");
-		const bunDb = new BunDatabase(dbPath);
-		bunDb.pragma = function(sql, options) {
-			if (options?.simple) {
-				const key = sql.trim();
-				return bunDb.query(`PRAGMA ${key}`).get()?.[key] ?? null;
-			}
-			bunDb.exec(`PRAGMA ${sql}`);
-		};
-		_db = bunDb;
-	} else _db = new (_require("better-sqlite3"))(dbPath);
+	_db = openDatabase(getDatabasePath());
 	_db.pragma("journal_mode = WAL");
 	_db.pragma("foreign_keys = ON");
 	_db.pragma("synchronous = NORMAL");
