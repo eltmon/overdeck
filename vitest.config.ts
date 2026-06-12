@@ -17,12 +17,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    poolOptions: {
-      // GitHub Actions runners have limited memory (~7GB). Use 1 fork in CI to prevent OOM.
-      // Local development can use up to 4 concurrent workers. PAN-805 root cause: multiple
-      // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
-      forks: { minForks: 1, maxForks: process.env.CI ? 1 : 4, singleFork: false },
-    },
+    // GitHub Actions runners have limited memory (~7GB). Use 1 fork in CI to prevent OOM.
+    // Local development can use up to 4 concurrent workers. PAN-805 root cause: multiple
+    // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
+    // Vitest 4 moved these settings out of poolOptions; keeping the old shape is ignored.
+    forks: { minForks: 1, maxForks: process.env.CI ? 1 : 4, singleFork: false },
     experimental: {
       // Persist transformed module cache across runs in node_modules/.experimental-vitest-cache.
       // Vitest v4 introduced this; meaningful on a ~200-file suite where re-running a
