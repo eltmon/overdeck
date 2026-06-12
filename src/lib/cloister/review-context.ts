@@ -246,7 +246,7 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
   return acs;
 }
 
-function flattenNonGoals(doc: { plan?: { narratives?: { NonGoals?: string } } }): string[] {
+function flattenNonGoals(doc: { plan?: { narratives?: Record<string, string | undefined> } }): string[] {
   const raw = doc.plan?.narratives?.NonGoals?.trim();
   if (!raw || raw.toLowerCase() === 'none') return [];
   return raw
