@@ -272,4 +272,43 @@ describe('SessionFeedSidebar', () => {
     expect(debug).toHaveBeenCalledOnce();
     debug.mockRestore();
   });
-});
+
+  it('shows system-wide activity (dashboard restarts) in project scope even when its issueId is outside the project', () => {
+    useDashboardStore.setState({
+      observationsByIssueId: {},
+      recentActivity: [
+        {
+          id: 'restart-entry-1',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'dashboard',
+          level: 'info',
+          message: 'Dashboard restarted via pan reload by conversation 2762 ("Some title") (31.0s)',
+          details: null,
+          issueId: 'RUN-23',
+          link: '/conv/2762',
+        },
+        {
+          id: 'project-entry-1',
+          timestamp: '2026-05-23T01:03:00.000Z',
+          source: 'work',
+          level: 'info',
+          message: 'Work agent committed bead-3',
+          details: null,
+          issueId: 'OTHER-99',
+        },
+      ],
+    });
+
+    // Project scope limited to PAN-1389 — neither entry's issueId matches.
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} issueIds={['PAN-1389']} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+
+    // The restart (system-wide) survives the scope filter; the work entry does not.
+    expect(screen.getByText(/Dashboard restarted via pan reload/)).toBeTruthy();
+    expect(screen.queryByText('Work agent committed bead-3')).toBeNull();
+  });
+
+  it('navigates restart entries to their initiator conversation via the link field', () => {
+    const onPopState = vi.fn();
+    window.addEventListener('popstate', onPopState);
+    useDashboardStore.setSta

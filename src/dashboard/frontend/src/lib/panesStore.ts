@@ -43,6 +43,9 @@ export interface WorkspacePane {
   agentType?: string
   isRunning?: boolean
   viewMode?: 'conversation' | 'terminal' | 'findings'
+  targetMessageId?: string
+  targetMessageIndex?: number
+  targetMessageNonce?: number
   // terminal pane
   terminalId?: string | null
   // files / commits pane

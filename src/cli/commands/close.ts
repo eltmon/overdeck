@@ -71,9 +71,21 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     process.exit(1);
   }
 
-  // Human-only guard: reject if running as an agent
-  if (process.env.PANOPTICON_AGENT_ID) {
-    console.error(chalk.red('Close-out is a human-only operation. Agents cannot close out issues.'));
+  // Close-out caller guard. Close-out is destructive (closes the tracker issue +
+  // tears down the workspace/branches), so it is gated to:
+  //   - `conv-*` — operator-driven conversations (the human is in the loop and
+  //     explicitly asked). PAN-1621.
+  //   - `flywheel-*` — the autonomous lifecycle orchestrator, now trusted to run
+  //     close-out as the final step of the pipeline it manages. The close-out's
+  //     own verify-merged step + the verifying-on-main state are the safety net
+  //     against closing unfinished work.
+  // All other autonomous pipeline agents (`agent-*`, `planning-*`, `strike-*`,
+  // `inspect-*`, …) remain barred.
+  const agentId = process.env.PANOPTICON_AGENT_ID;
+  const isOperatorConversation = agentId?.startsWith('conv-') ?? false;
+  const isFlywheelOrchestrator = agentId?.startsWith('flywheel-') ?? false;
+  if (agentId && !isOperatorConversation && !isFlywheelOrchestrator) {
+    console.error(chalk.red('Close-out is not permitted for this agent. Only operator conversations (conv-*) and the flywheel orchestrator may close out issues.'));
     process.exit(1);
   }
 
@@ -198,9 +210,9 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
 
   if (result.success) {
     console.log(chalk.green(`Close-out complete for ${issueUpper}.`));
-  } else {
-    const failedStep = result.steps.find(s => !s.success && !s.skipped);
-    console.log(chalk.red(`Close-out failed: ${failedStep?.error || 'Unknown error'}`));
-    process.exit(1);
-  }
-}
+    // Exit explicitly: close-out opens the SQLite handle (and other resources)
+    // whose open handles otherwise keep the event loop alive, so the command
+    // hangs after printing "complete". The failure path below already exits;
+    // this makes success symmetric. (PAN-1621)
+    process.exit(0);
+  } els

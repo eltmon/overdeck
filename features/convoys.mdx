@@ -3,6 +3,8 @@ title: Convoys
 description: Multi-agent parallel orchestration system
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Convoys: Multi-Agent Orchestration
 
 Convoys enable Panopticon to run multiple AI agents in parallel for complex tasks like code review. Instead of a single agent doing everything, specialized agents focus on specific concerns and a synthesis agent combines their findings.
@@ -263,6 +265,14 @@ The Panopticon dashboard shows:
 - Individual agent status
 - Output file links
 
+Convoy agents share the same lifecycle surfaces as the rest of the pipeline. The Pipeline page groups every issue and its agents by phase — Ship, Review, Verifying — with a metric strip across the top (Active issues, Work running, Review queue, Ship, Spend) and a live activity feed on the right, so a code-review convoy spawned for an issue shows up alongside the work agents it's reviewing.
+
+<ThemedImage
+  light="/images/dashboard/pipeline-light.png"
+  dark="/images/dashboard/pipeline-dark.png"
+  alt="Pipeline page: a metric strip showing Active issues, Work running, Review queue, Ship, and Spend over phase-grouped issue rows, with a live activity feed on the right."
+/>
+
 **CLI monitoring:**
 
 ```bash
@@ -312,6 +322,14 @@ With more agents, the speedup is even more dramatic.
 - Check status of all running agents
 - Detect stuck or crashed agents
 - Analyze system health across projects
+
+When convoys are running across several projects at once, the God View gives an aggregate cross-project picture of every agent's activity in one place — useful for spotting a convoy whose parallel reviewers have stalled or are burning more than expected.
+
+<ThemedImage
+  light="/images/dashboard/god-view-light.png"
+  dark="/images/dashboard/god-view-dark.png"
+  alt="God View: an aggregate cross-project view of all agent activity across every Panopticon-monitored project."
+/>
 
 ## Best Practices
 

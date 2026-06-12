@@ -4,17 +4,17 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.11.1",
     "description": "Plan for PAN-1487: feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "updated": "2026-05-25T14:21:24.452Z"
+    "updated": "2026-06-11T05:55:14.074Z"
   },
   "plan": {
     "id": "pan-1487",
     "title": "feat(flywheel): substrate-bug provenance + telemetry for v1.0 readiness criteria",
-    "status": "proposed",
+    "status": "completed",
     "uid": "d5b3c6f4-8a91-4e2c-9f87-3b21c4d8e5a6",
     "author": "agent:claude-opus-4-7",
-    "sequence": 41,
+    "sequence": 42,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T14:21:24.452Z",
+    "updated": "2026-06-11T05:55:14.074Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1487",
@@ -1840,5 +1840,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

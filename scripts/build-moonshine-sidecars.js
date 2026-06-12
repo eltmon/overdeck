@@ -49,6 +49,10 @@ async function main() {
     await run(bin('pyinstaller'), [
       '--onefile',
       '--clean',
+      // Bundle the moonshine_voice package data (bundled tiny-en model assets)
+      // and its native ctypes libraries into the onefile binary.
+      '--collect-all',
+      'moonshine_voice',
       '--name',
       'moonshine-sidecar',
       '--distpath',

@@ -60,7 +60,7 @@ type SettingsResponse = {
     plan?: {
       model?: string;
       // PAN-1055: per-role harness override surfaced through Settings → Roles.
-      harness?: 'claude-code' | 'pi';
+      harness?: 'claude-code' | 'pi' | 'codex';
     };
   };
 };
@@ -134,7 +134,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   useEffect(() => {
     if (harnessOverrideTouched.current) return;
-    if (defaultPlanningHarness === 'pi' || defaultPlanningHarness === 'claude-code') {
+    if (defaultPlanningHarness === 'pi' || defaultPlanningHarness === 'claude-code' || defaultPlanningHarness === 'codex') {
       setHarnessOverride(defaultPlanningHarness);
     }
   }, [defaultPlanningHarness]);

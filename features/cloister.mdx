@@ -3,6 +3,8 @@ title: Cloister
 description: AI lifecycle manager with intelligent model routing
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 
 # Cloister: AI Lifecycle Manager
 
@@ -169,6 +171,20 @@ Cloister detects situations that require intervention:
 | **planning_complete** | Planning session finishes | Transition to implementation |
 | **merge_requested** | User clicks "Approve & Merge" | Wake merge-agent |
 
+<Note>
+The same lifecycle signals that drive these handoffs also feed the **Fix-All
+Flywheel** orchestrator, which keeps the pipeline turning autonomously —
+prioritizing what to work on next, launching planning and work agents, and
+escalating where Cloister flags a problem. Cloister is the per-agent lifecycle
+layer; the Flywheel is the cross-issue orchestrator built on top of it.
+</Note>
+
+<ThemedImage
+  light="/images/dashboard/flywheel-light.png"
+  dark="/images/dashboard/flywheel-dark.png"
+  alt="Fix-All Flywheel orchestrator view, the autonomous loop that prioritizes work and launches planning and work agents across the pipeline"
+/>
+
 ### Handoff Methods
 
 Cloister supports two handoff methods, automatically selected based on agent type:
@@ -223,6 +239,18 @@ Agents send heartbeats via Claude Code hooks. Cloister tracks:
 - Git branch and workspace
 - Process health
 
+What Cloister tracks per agent surfaces directly on the dashboard's Agents page,
+which rolls the live heartbeat data up into a fleet view: each card shows the
+agent's model, runtime, and last activity, topped by a metric strip (Running,
+Stuck, Cost 24h, Tokens 24h, runtime, Queue). This is where the stuck-detection
+and process-health signals described below become operator-visible.
+
+<ThemedImage
+  light="/images/dashboard/agents-light.png"
+  dark="/images/dashboard/agents-dark.png"
+  alt="Agents page: a metric strip showing Running, Stuck, Cost 24h, Tokens 24h, runtime, and Queue over agent cards listing each agent's model, runtime, and last activity"
+/>
+
 Heartbeat files are stored in `~/.panopticon/heartbeats/`:
 
 ```json
@@ -270,6 +298,18 @@ pan sync  # Syncs all skills, agents, AND hooks
 - The hook script has errors
 
 This prevents hook failures from interrupting agent work.
+
+If heartbeats stop arriving — or any other part of the lifecycle plumbing drifts
+— the dashboard's Health page surfaces it. Its system health checks and
+diagnostics cover the same hooks, sockets, and services Cloister depends on, so
+you can confirm the monitoring stack itself is sound before trusting the
+stuck-detection signals it produces.
+
+<ThemedImage
+  light="/images/dashboard/health-light.png"
+  dark="/images/dashboard/health-dark.png"
+  alt="Health page showing system health checks and diagnostics for Panopticon's services and agent monitoring plumbing"
+/>
 
 ## Configuration
 

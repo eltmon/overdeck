@@ -288,8 +288,12 @@ function FeedTabContent({ tab, onSelect, now, issueIds, unscoped }: { tab: Wired
     [issueIds],
   );
   const scope = useMemo(() => {
-    const keep = (e: SessionFeedEntry) =>
-      unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+    const keep = (e: SessionFeedEntry) => {
+      // System news (dashboard restarts, supervisor actions) is relevant in
+      // every scope — never drop it through the issue filter.
+      if (e.kind === 'activity' && e.systemWide) return true;
+      return unscoped ? e.issueId == null : !idSet || (!!e.issueId && idSet.has(e.issueId.toLowerCase()));
+    };
     return {
       entries: unscoped || idSet ? feed.entries.filter(keep) : feed.entries,
       allEntries: unscoped || idSet ? feed.allEntries.filter(keep) : feed.allEntries,
@@ -368,6 +372,10 @@ function navigateToFeedEntry(entry: SessionFeedEntry) {
       pushRoute(`/conv/${encodeURIComponent(entry.conversationName)}`);
       return;
     case 'activity':
+      if (entry.link) {
+        pushRoute(entry.link);
+        return;
+      }
       if (entry.issueId) pushRoute(`/command-deck?issue=${encodeURIComponent(entry.issueId)}&tab=activity`);
       return;
     case 'git':

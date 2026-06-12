@@ -64,13 +64,29 @@ vi.mock('../../../lib/issue-id.js', () => ({
   resolveBareNumericIdSync: issueIdMocks.resolveBareNumericIdSync,
 }));
 
-vi.mock('../../../lib/agents.js', () => ({
-  getAgentStateSync: agentMocks.getAgentStateSync,
-  setAgentPausedSync: agentMocks.setAgentPausedSync,
-  clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-  clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
-  stopAgentSync: agentMocks.stopAgentSync,
-}));
+vi.mock('../../../lib/agents.js', () => {
+  // Mirror the real prefix/singleton routing (PAN-1760) so command targeting
+  // stays under test while the heavy agents module remains mocked.
+  const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
+  const isQualifiedAgentId = (input: string) => {
+    const lower = input.toLowerCase();
+    return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
+  };
+  return {
+    getAgentStateSync: agentMocks.getAgentStateSync,
+    setAgentPausedSync: agentMocks.setAgentPausedSync,
+    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
+    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
+    stopAgentSync: agentMocks.stopAgentSync,
+    isQualifiedAgentId,
+    normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
+    resolveAgentTargetSync: (input: string) => {
+      if (isQualifiedAgentId(input)) return input.toLowerCase();
+      const issueId = issueIdMocks.resolveBareNumericIdSync(input);
+      return issueId ? `agent-${String(issueId).toLowerCase()}` : null;
+    },
+  };
+});
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -347,7 +363,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     await expect(pauseCommand('9999', {})).rejects.toThrow('process.exit:1');
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve issue ID "9999"'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Could not resolve agent target "9999"'));
     expect(agentMocks.setAgentPausedSync).not.toHaveBeenCalled();
   });
 

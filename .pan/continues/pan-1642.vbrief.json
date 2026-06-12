@@ -1,0 +1,206 @@
+{
+  "version": "1",
+  "issueId": "PAN-1642",
+  "created": "2026-06-07T02:10:48.815Z",
+  "updated": "2026-06-11T13:16:59.160Z",
+  "gitState": {
+    "branch": "feature/pan-1642",
+    "sha": "ab4ba668c",
+    "dirty": false
+  },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Part 1 streaming is primarily a FRONTEND wiring task — the server already streams. `subscribeConversationMessages` (packages/contracts/src/rpc.ts:39,187,384) + the server handler (src/dashboard/server/ws-rpc.ts:590-652) + `watchConversation()` (src/dashboard/server/services/conversation-service.ts:1239) already do fs.watch + byte-offset incremental tail and push `ConversationEvent` over /ws/rpc. The frontend has ZERO consumers (grep confirmed) and instead 2s-HTTP-polls via useQuery refetchInterval in ConversationPanel.tsx:174-178 and the ConversationView at ~1073-1078. Do NOT rebuild a tailer; consume the existing subscription.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Gate the WS subscription to `conversation.harness === 'claude-code'` AND `sessionAlive === true`. For pi/codex/unknown harness, and for ended/historical conversations, KEEP the existing HTTP fetch path (one-shot for ended; 2s poll for live non-claude). This satisfies the 'degrade gracefully' acceptance criterion without touching the Pi parser. The conversation record already carries `harness?: 'claude-code' | 'pi' | 'codex' | null` (ConversationList.tsx:45).",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Server `watchConversation`/`parseConversationMessages` always uses the Claude parser and is NOT Pi-aware (Pi parser parsePiConversationMessages has no incremental/byte-offset support). Add a server-side safety guard so `subscribeConversationMessages` never emits Claude-parsed garbage for a Pi session file (detect via isPiSessionFile and emit `{kind:'discovering'}`/stop, letting the client keep polling). This is defense-in-depth on top of the frontend gating in D2.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Message-level streaming only — explicitly NOT token-by-token. The JSONL has no intra-message deltas (one complete record per line). Document this limitation in a code comment in the stream hook so nobody later mistakes the absence of a typing effect for a bug. True token streaming would require tapping the PTY/tmux byte stream — out of scope.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Part 3 table fix is CSS-ONLY using the github-markdown-css approach: `display:block; width:max-content; min-width:100%; overflow-x:auto` on the table element for both `.chatMarkdown table` (command-deck.module.css:3499) and `.markdownContent table` (:1725). `display:block` makes the table its own scroll container so a long unbreakable cell scrolls horizontally instead of squishing neighbors — no `<table>` component-wrapper override needed in ChatMarkdown.tsx. Simpler and lower-risk than the wrapper-div approach the issue sketched.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "The `experimental.streamdownRenderer` flag must round-trip through the explicitly-enumerated config sites (no schema accepts arbitrary keys): src/lib/config-yaml.ts (ExperimentalConfig interface ~555, NormalizedExperimentalConfig ~773, defaults ~1019, merge ~2051) AND src/lib/settings-api.ts (ApiSettingsConfig type ~209, loadSettingsApi normalization ~613, save serialization ~780, validateSettings ~983) AND the frontend SettingsConfig.experimental type (Settings/types.ts:174). Mirror `claudeCodeChannels` exactly. Default false.",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Streamdown integration must reuse the EXISTING customizations from ChatMarkdown.tsx, not reimplement them: the `components` map (file-link chip `a` override via resolveMarkdownFileLinkMeta + MaybeFileLinkChip; CodeBlock `pre` override), the `remarkPlugins` (remarkGfm + remarkBareFileTextLinks), and the `transformMarkdownUrl` URL transform incl. javascript:/data:/vbscript: blocking. Streamdown is a react-markdown wrapper and accepts the same `components`/`remarkPlugins` props; pass them through. Verify Streamdown's built-in rehype-harden/urlTransform does not strip our file-link hrefs (shouldPreserveMarkdownFileLinkHref).",
+      "recordedAt": "2026-06-07T02:16:46.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Routing a Pi (or codex) conversation through the Claude-only `subscribeConversationMessages`/`watchConversation` path would mis-parse the file and render corrupted messages.",
+      "mitigation": "Frontend gates subscription on harness==='claude-code' (D2); server adds isPiSessionFile guard in subscribeConversationMessages (D3). Both layers; test a Pi conversation still renders via polling."
+    },
+    {
+      "id": "H2",
+      "summary": "Double-fetch / cache contention: ConversationPanel.tsx and the inner ConversationView BOTH run the same useQuery(['conversation-messages', name]). If one switches to WS and the other keeps polling, they fight over the same react-query cache key.",
+      "mitigation": "Drive both from a single shared hook. When subscribed (live Claude), feed WS ConversationEvent payloads into the same query cache (queryClient.setQueryData) and disable refetchInterval so the components stay in sync without polling."
+    },
+    {
+      "id": "H3",
+      "summary": "WS subscription lifecycle: subscriptions must start when a live Claude conversation is opened and be torn down on close/unmount and when the session ends (sessionAlive flips false), otherwise leaked watchers accumulate on the server (each holds an fs.watch handle).",
+      "mitigation": "Tie WsTransport.subscribe()'s unsubscribe to the hook's useEffect cleanup; re-evaluate when name/harness/sessionAlive change. WsTransport.subscribe already auto-reconnects; verify reconnect re-emits initial state (handler parses from offset 0)."
+    },
+    {
+      "id": "H4",
+      "summary": "Streamdown may bundle its own Shiki highlighter / KaTeX / large deps, bloating the frontend bundle, and its rehype-harden may conflict with our transformMarkdownUrl or strip the file-link chip hrefs.",
+      "mitigation": "Flag defaults off; verify bundle build still passes. In the Streamdown path, confirm file-link chips, bare-path autolinks, issue/PR links, and URL sanitization all still work (AC). Pin streamdown to a known version."
+    },
+    {
+      "id": "H5",
+      "summary": "Browser/UAT verification of streaming must use an isolated Playwright browser instance/profile and must not depend on another agent's session or shared browser state.",
+      "mitigation": "Any UAT spins up its own isolated browser context; open a live conversation on pan.localhost and observe messages appearing incrementally without manual refresh."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session for PAN-1642 (auto mode). Discovery completed: confirmed server-side streaming infra (subscribeConversationMessages) already exists and is unconsumed by the frontend; confirmed table fix can be CSS-only; confirmed streamdown not yet installed and the settings-flag round-trip sites. Full orchestration context omitted from this summary entry.",
+      "note": "Planning session started for PAN-1642: Stream conversation view + Streamdown renderer (flag) + fix markdown table rendering",
+      "timestamp": "2026-06-07T02:10:48.815Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-07T03:21:58.378Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T03:21:58.455Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:22Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T03:22:21.841Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T03:22Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-07T03:22:45.965Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T04:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T04:45:19.372Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T04:45:21.091Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T06:19Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T06:19:56.738Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T15:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T15:46:24.387Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T16:00Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-08T16:00:21.838Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T16:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T16:23:41.950Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T16:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T16:47:01.084Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T17:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-08T17:11:22.852Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-08T17:17:31.009Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-08T17:17:45.232Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-08T17:23Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-08T17:23:11.801Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-09T22:21:33.731Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T19:11:53.215Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:01:17.357Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:09Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:09:59.341Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:20Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:20:12.809Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T13:16:56.428Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:16:59.160Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T13:16:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1642\n\n# Review Synthesis — PAN-1642 — 2026-06-11T13:16:05Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/context.json\n- Branch: feature/pan-1642\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642\n- HEAD reviewed: 4b50618a4e085ef0fb44e4cd18f8b55ed8e73796\n- Cycle number: 9\n- Prior cycle SHA: 71aa8dbdd7f5f91a9de5e7f3e1c10914842c363f\n- PR base: 8958380924e1da424bdc590e816b023c2d116154\n- Proportionality: 2 reviewer blockers across 38 PR commits, below the 3× threshold.\n- Scope/convergence checks:\n  - The correctness finding is PR-scoped and remains promotable in cycle 9: the cited `ConversationPanel` shared query/cache-writer block at /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx:186-189 was touched since the prior synthesis (`queryFn` changed at line 188), but the change kept the HTTP query enabled while the WebSocket stream writes the same cache key.\n  - The performance finding cites /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1195. It is PR-scoped through the live stream call pattern, but no `conversation-service.ts` or `ws-rpc.ts` hunks relevant to that path changed from `71aa8dbdd7f5f91a9de5e7f3e1c10914842c363f..4b50618a4e085ef0fb44e4cd18f8b55ed8e73796`; per the convergence gate, it is demoted as previously reviewed.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/performance.md | 0 (1 demoted by convergence gate) |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Live streamed messages can be overwritten by a stale HTTP fetch — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx:186\n`ConversationPanel` still mounts the HTTP `useQuery` for `conversationMessagesQueryKey(conversation.name)` while `useConversationMessagesStream()` writes WebSocket snapshot/delta events into the same React Query cache key. The current cycle changed this shared query block to pass React Query's abort signal into `fetchMessages()`, but did not make the live WebSocket stream the only authoritative cache writer for live Claude conversations and did not guard stale HTTP responses.\n\nA stale HTTP response can therefore replace newer WebSocket-delivered assistant messages, tool calls, or tool results. Because polling is disabled when streaming is enabled, that stale cache state can remain until a later WebSocket event, remount, conversation switch, or manual refresh. This violates the live streaming acceptance criteria and the explicit no-duplicate-fetch cache requirement.\n\nRequired fix: for live Claude conversations, disable or cancel/ignore the HTTP messages query once the WebSocket stream is active and let the subscription's initial snapshot populate the cache, or add a source/version guard so older HTTP results cannot overwrite newer streamed state.\n\n## Non-blocking Findings\n\n### [correctness] Async watcher callbacks are fire-and-forget and can offer deltas out of order — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1261\n`watchConversation()` still treats callbacks as synchronous, while the subscription callback awaits `readContextUsage()` before offering a stream event. The ignored promise can let a later parse/event offer before an earlier one finishes. This is advisory because the reviewer did not justify blocker severity after the convergence gate; it should still be addressed if ordering-sensitive header or optimistic-message state proves unstable.\n\n### [performance] [demoted: previously reviewed] Live conversation updates rescan and allocate the full active JSONL window — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1195\nThe performance reviewer found that `subscribeConversationMessages` can call `readContextUsage()` before emitting the initial snapshot and again for usage-bearing watcher results. That path reaches `readLatestAssistantUsage()`, which allocates and parses the whole active transcript window. Large active JSONL sessions can therefore cause repeated disk reads, large allocations, and WebSocket update latency per connected viewer.\n\nThis is PR-scoped through the live stream call pattern, but it is not promotable in cycle 9: the cited scanner and relevant server stream call sites were already present before the prior synthesis, and the current cycle diff contains no relevant `conversation-service.ts` or `ws-rpc.ts` hunks. Per the convergence gate, it remains non-blocking for this cycle.\n\n### [performance] Client-side delta merge is O(history) for normal appends — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts:20\n`mergeById()` builds duplicate-detection structures over the full prior transcript/work-log arrays on each delta. This is much smaller than the server-side scan, but can still create frontend jank for very long live conversations. Consider adding a true append fast path or carrying an id index with cached state.\n\n## Clean Sub-roles\n- security — no findings.\n- requirements — all 24 in-PR acceptance criteria were reported implemented with no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1642 -m \"Fixed review issues\"`"
+    }
+  ]
+}

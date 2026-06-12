@@ -228,6 +228,7 @@ export interface PullRequestData {
   isDraft: boolean;
   baseRefName: string;
   headRefName: string;
+  headRefOid?: string;
   author: { login?: string; name?: string } | null;
   createdAt: string;
   updatedAt: string;
@@ -265,6 +266,50 @@ export interface PrDiffResponse {
 
 export interface PrDetailsResponse extends PrEndpointResponse {
   diff: string | null;
+}
+
+export interface IssueCheckRun {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  detailsUrl?: string | null;
+  htmlUrl?: string | null;
+  app?: string | null;
+  workflowName?: string | null;
+}
+
+export interface IssueCheckRunsSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  running: number;
+  skipped: number;
+  pending: number;
+  cancelled: number;
+}
+
+export interface IssueCheckRunsResponse {
+  issueId: string;
+  pr: Pick<PullRequestData, 'number' | 'url' | 'headRefName' | 'headRefOid' | 'mergeable' | 'statusCheckRollup'> | null;
+  checkRuns: IssueCheckRun[];
+  summary: IssueCheckRunsSummary;
+  error?: string;
+}
+
+export function useIssueCheckRunsQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<IssueCheckRunsResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<IssueCheckRunsResponse> {
+  return useQuery({
+    queryKey: ['issueCheckRuns', issueId],
+    queryFn: () => fetchJson<IssueCheckRunsResponse>(`/api/issues/${issueId}/check-runs`),
+    refetchInterval: 30_000,
+    enabled: !!issueId,
+    ...options,
+  });
 }
 
 export function usePrQuery(

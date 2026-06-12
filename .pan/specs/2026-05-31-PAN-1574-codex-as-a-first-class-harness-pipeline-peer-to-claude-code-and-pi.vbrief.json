@@ -4,17 +4,17 @@
     "created": "2026-05-31T07:48:02Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1574: Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
-    "updated": "2026-05-31T07:52:04.706Z"
+    "updated": "2026-06-05T01:41:21.576Z"
   },
   "plan": {
     "id": "pan-1574",
     "title": "Codex as a first-class harness (pipeline peer to Claude Code and Pi)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "74c6fa4c-897f-49d7-9f34-e9b4a443d1a0",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 105,
     "created": "2026-05-31T07:48:02Z",
-    "updated": "2026-05-31T07:52:04.706Z",
+    "updated": "2026-06-05T01:41:21.576Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1574",
@@ -1171,8 +1171,67 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-31-PAN-1574-codex-as-a-first-class-harness-pipeline-peer-to-claude-code-and-pi.vbrief.json"
+      "canonicalFilename": "2026-05-31-PAN-1574-codex-as-a-first-class-harness-pipeline-peer-to-claude-code-and-pi.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1574",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-02T13:18:59.226Z",
+        "work": {
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "history": []
+        },
+        "verification": {
+          "status": "running",
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "history": [
+            {
+              "status": "running",
+              "at": "2026-06-02T13:18:59.226Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "notes": "Verification failed at vbrief-ac",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-02T13:18:59.226Z",
+              "notes": "Verification failed at vbrief-ac"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-02T13:18:59.226Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-02T13:18:59.226Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-02T13:18:59.226Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1587"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

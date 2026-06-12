@@ -1,12 +1,20 @@
 # vBRIEF Plan Format & Lifecycle
 
-Panopticon uses [vBRIEF v0.5](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
+Panopticon uses [vBRIEF v0.6](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
 
 ## Specification
 
 The canonical vBRIEF specification is maintained at **[github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)**.
 
-Panopticon's vBRIEF files conform to the v0.5 spec with metadata extensions for issue tracking and difficulty estimation. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
+Panopticon emits vBRIEF v0.6 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 documents. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
+
+## v0.6 Compatibility
+
+Panopticon emits `"version": "0.6"` for new vBRIEF documents. Readers accept both `"0.5"` and `"0.6"` documents.
+
+v0.6 uses nested `items` for acceptance-criterion child items. Legacy v0.5 `subItems` are still read as an alias, and readers prefer `items` when both fields are present.
+
+The item status enum includes `failed` in addition to `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, and `cancelled`.
 
 ---
 
@@ -180,7 +188,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 ```json
 {
   "vBRIEFInfo": {
-    "version": "0.5",
+    "version": "0.6",
     "created": "2026-04-04T12:00:00Z",
     "author": "panopticon-cli/0.6.0",
     "description": "Plan for PAN-436: Dashboard skeleton loading states"
@@ -201,7 +209,8 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
     "tags": ["frontend", "ux"],
     "narratives": {
       "Problem": "Dashboard shows zeros on load — no loading indicators",
-      "Proposal": "BootstrapGate wrapper + shimmer skeleton components"
+      "Proposal": "BootstrapGate wrapper + shimmer skeleton components",
+      "NonGoals": "- Replacing the existing dashboard routing\n- Changing issue lifecycle statuses"
     },
     "items": [
       {
@@ -212,12 +221,13 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
         "created": "2026-04-04T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-436"
+          "issueLabel": "pan-436",
+          "traces": ["FR-1"]
         },
         "narrative": {
           "Action": "Component that checks selectIsBootstrapped and renders fallback or children"
         },
-        "subItems": [
+        "items": [
           {
             "id": "bootstrap-gate.ac1",
             "title": "Renders fallback when bootstrapComplete is false",
@@ -244,7 +254,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `vBRIEFInfo.version` | YES | Must be `"0.5"` |
+| `vBRIEFInfo.version` | YES | Emit `"0.6"`; readers accept `"0.5"` and `"0.6"` |
 | `vBRIEFInfo.created` | YES | ISO 8601 timestamp — when the document was created |
 | `vBRIEFInfo.updated` | NO | ISO 8601 timestamp — updated automatically on every write |
 | `vBRIEFInfo.author` | NO | Tool identifier, e.g. `"panopticon-cli/0.6.0"` |
@@ -256,7 +266,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 |-------|----------|-------------|
 | `plan.id` | YES | Issue ID in lowercase (e.g., `"pan-436"`) |
 | `plan.title` | YES | Human-readable plan title |
-| `plan.status` | YES | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled` |
+| `plan.status` | YES | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled`, `failed` |
 | `plan.items` | YES | Array of work items |
 | `plan.edges` | NO | Dependency edges between items |
 | `plan.uid` | NO | UUID v4, generated once at creation — stable identifier for the plan |
@@ -266,7 +276,8 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 | `plan.created` | NO | ISO 8601 timestamp — when the plan was first created |
 | `plan.updated` | NO | ISO 8601 timestamp — updated automatically on every status write |
 | `plan.tags` | NO | Tags for categorization |
-| `plan.narratives` | NO | Problem/Proposal/Constraint/Risk narratives |
+| `plan.narratives` | NO | Problem/Proposal/NonGoals/Constraint/Risk narratives |
+| `plan.narratives.NonGoals` | NO | Explicitly out-of-scope behaviors, one per line prefixed `- `, or `"none"` if genuinely nothing. Review enforces these as must-not constraints. |
 
 #### `plan.status` Enum
 
@@ -304,7 +315,7 @@ The `plan.status` field drives lifecycle transitions:
 | `created` | NO | ISO 8601 timestamp — when the item was created |
 | `completed` | NO | ISO 8601 timestamp — set automatically when status → `completed` |
 | `narrative` | NO | `{ "Action": "what to do" }` |
-| `subItems` | NO | Child items (used for acceptance criteria) |
+| `items` | NO | Child items (used for acceptance criteria). Legacy v0.5 `subItems` are read as an alias. |
 
 ### Edges (dependency graph)
 
@@ -324,13 +335,17 @@ Only `blocks` edges are used for critical path computation and bead scheduling (
 
 ### Panopticon Extensions (via `metadata`)
 
-The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon uses these metadata fields:
+The vBRIEF spec supports arbitrary `metadata` on items and child items. Panopticon uses these metadata fields:
 
 | Field | Location | Description |
 |-------|----------|-------------|
 | `metadata.difficulty` | items | `trivial`, `simple`, `medium`, `complex`, `expert` — used for model routing |
 | `metadata.issueLabel` | items | Issue ID for beads label filtering (e.g., `"pan-436"`) |
-| `metadata.kind` | subItems | `"acceptance_criterion"` — marks subItem as an AC for verification gate |
+| `metadata.requiresInspection` | items | Boolean decision for whether a bead must pass the work.inspect gate before downstream work proceeds |
+| `metadata.inspectionDepth` | items | `"fast"` or `"deep"` review depth when `requiresInspection` is true |
+| `metadata.foundationFor` | items | Downstream bead IDs that depend on this inspection-gated item |
+| `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
+| `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
 These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them: **[deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)**.
@@ -377,7 +392,7 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 3. **`complete-planning`** promotes the vBRIEF to `.pan/specs/` on main with an issue-keyed filename and sets `plan.status` to `proposed`.
 4. **`pan start`** updates `plan.status` to `active` on main. Work agents read the spec from main via `findPlan()`.
 5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
-6. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
+6. **Verification gate** checks all child items with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
 7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `.pan/specs/` on main.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).
 
@@ -422,7 +437,7 @@ Continue files on the main side live at `<projectRoot>/.pan/continues/<issue-low
 ```json
 // CORRECT
 {
-  "vBRIEFInfo": { "version": "0.5", "created": "..." },
+  "vBRIEFInfo": { "version": "0.6", "created": "..." },
   "plan": { "id": "pan-436", ... }
 }
 ```
@@ -436,7 +451,7 @@ The `readPlan()` function in `src/lib/vbrief/io.ts` normalizes flat format plans
 - `issue`, `issueId`, `issue_id`, `id` → `plan.id`
 - `description` → `narrative.Action`
 - `difficulty` → `metadata.difficulty`
-- `acceptance[]` (string array) → `subItems[]` with `metadata.kind: "acceptance_criterion"`
+- `acceptance[]` (string array) → `items[]` with `metadata.kind: "acceptance_criterion"`
 
 ---
 

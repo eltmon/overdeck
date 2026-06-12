@@ -3,7 +3,15 @@ title: Quick Start
 description: 'Get Command Deck running in one command'
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Quick Start
+
+<ThemedImage
+  light="/images/dashboard/command-deck-hero-light.png"
+  dark="/images/dashboard/command-deck-hero-dark.png"
+  alt="Command Deck showing a live agent conversation: project and conversation sidebar, the issue tree, the agent's turn-by-turn tool calls and reasoning, and the Needs-you / Project / Global awareness rail."
+/>
 
 ## One Command
 
@@ -27,7 +35,15 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 4. **Spawn an agent** — Panopticon creates an isolated workspace and the agent starts planning and coding
 5. **Stay in control** — watch diffs land as the agent works, send messages to steer it, swap models if the task shifts, fork the conversation to explore alternatives
 
-Work at whatever level of involvement you want. Pair-program hands-on with a single agent, or let the specialist pipeline take issues from plan to merged PR while you focus elsewhere.
+<ThemedImage
+  light="/images/dashboard/board-light.png"
+  dark="/images/dashboard/board-dark.png"
+  alt="The kanban board: issue columns with per-issue cost badges, agent status dots, and inline workspace controls."
+/>
+
+The board is the usual place to pick an issue: each card carries a cost badge, a live agent status dot, and workspace controls, so you can spawn or check in on an agent without leaving the column it lives in.
+
+Work at whatever level of involvement you want. Pair-program hands-on with a single agent in the conversation view above, or let the specialist pipeline take issues from plan to merged PR while you focus elsewhere — Command Deck is built to manage both the agents and the workflow they move through.
 
 ## Headless / CI
 

@@ -77,12 +77,14 @@
             "group": "Features",
             "pages": [
               "features/mission-control",
+              "features/conversations",
               "features/specialists",
               "features/cloister",
               "features/skills",
               "features/workspaces",
               "features/convoys",
-              "features/swarm"
+              "features/swarm",
+              "features/merge-batches"
             ]
           }
         ]
@@ -95,6 +97,7 @@
             "pages": [
               "configuration/projects",
               "configuration/harnesses",
+              "configuration/context-layers",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge"
@@ -134,7 +137,7 @@
     ]
   },
   "metadata": {
-    "og:image": "/docs/screenshot-board-light.png",
+    "og:image": "/images/dashboard/command-deck-hero-light.png",
     "og:type": "website"
   },
   "footerSocials": {

@@ -46,6 +46,15 @@ export interface DashboardStore extends DashboardState {
   syncSnapshot(snapshot: DashboardSnapshot): void
   applyEvent(event: DomainEvent): void
   applyEvents(events: DomainEvent[]): void
+  /**
+   * Seed recentActivity with persisted entries fetched over HTTP at bootstrap.
+   * The WS snapshot carries no activity history, so without this the feed only
+   * shows events emitted while the page was connected — which silently hides
+   * anything announced during boot (e.g. dashboard restart announcements,
+   * which are emitted before any client can reconnect). Live entries already
+   * in the store win on id collisions.
+   */
+  seedRecentActivity(entries: unknown[]): void
   openIssue(issueId: string, tab?: string): void
   closeIssue(): void
   setDrawerTab(tab: string): void
@@ -129,6 +138,23 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   applyEvents: (events) =>
     set((state) => applyEvents(state, events)),
+
+  seedRecentActivity: (entries) =>
+    set((state) => {
+      const byId = new Map<string, Record<string, unknown>>()
+      // Live entries first so they win id collisions over the HTTP fetch.
+      for (const entry of [
+        ...(state.recentActivity as Array<Record<string, unknown>>),
+        ...(entries as Array<Record<string, unknown>>),
+      ]) {
+        const id = typeof entry?.['id'] === 'string' ? (entry['id'] as string) : null
+        if (id && !byId.has(id)) byId.set(id, entry)
+      }
+      const merged = [...byId.values()]
+        .sort((a, b) => String(b['timestamp'] ?? '').localeCompare(String(a['timestamp'] ?? '')))
+        .slice(0, 50)
+      return { recentActivity: merged }
+    }),
 
   openIssue: (issueId, tab = 'overview') => {
     const drawer = { issueId, tab }
@@ -435,12 +461,4 @@ export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =
     },
   )
 
-// ─── Debug / test hook ────────────────────────────────────────────────────────
-
-if (typeof window !== 'undefined') {
-  (window as unknown as { useDashboardStore?: typeof useDashboardStore }).useDashboardStore = useDashboardStore
-}
-
-// ─── Export pure functions for testing ────────────────────────────────────────
-
-export { syncSnapshot as syncSnapshotReducer, applyEvent as applyEventReducer, applyEvents as applyEventsReducer }
+//

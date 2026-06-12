@@ -1,0 +1,78 @@
+{
+  "version": "1",
+  "issueId": "PAN-1547",
+  "created": "2026-06-04T06:10:36.787Z",
+  "updated": "2026-06-04T06:18:20.000Z",
+  "gitState": { "branch": "feature/pan-1547", "sha": "96cd2a1a6", "dirty": true },
+  "agentModel": "agent:claude-opus-4-8",
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Verified the EXACT warning set: a real production install (`npm install @panctl/cli --omit=dev`) of published 0.21.0 on Node 22.22.0 emits 4 warnings — ini@7.0.0 EBADENGINE, glob@10.5.0 (security) deprecated, node-domexception@1.0.0 deprecated, prebuild-install@7.1.3 deprecated. The @panctl/cli engine warning itself only appears on Node <22 (correct/intentional).",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Proven empirically that a package's own `overrides` field is IGNORED by npm when the package is installed as a dependency / globally (only the ROOT project's overrides win). Therefore @panctl/cli's `overrides` cannot fix any transitive warning for end users running `npm install -g @panctl/cli`. The only mechanisms that reach end users are (a) changing our direct `dependencies`, or (b) publishing an `npm-shrinkwrap.json`.",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Exact dependency chains: ini@7 ← effect@4.0.0-beta.73 (direct). glob@10.5 ← @google-cloud/speech → google-gax → rimraf@5. node-domexception ← @google-cloud/speech → google-gax → node-fetch@3 → fetch-blob. prebuild-install ← node-pty + better-sqlite3 + @xenova/transformers→sharp.",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "FIX glob@10.5 + node-domexception at the root cause we own: make `@google-cloud/speech` a NOT-auto-installed optional dependency. It is referenced ONLY at one dynamic-import site (src/voice/google-cloud-transcription.ts:88) with NO static type imports, so removing it from `dependencies` is low-risk for typecheck/build. This single move eliminates BOTH the scary glob CVE deprecation and node-domexception.",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Mirror the same optional pattern for `@xenova/transformers` (one dynamic-import site, src/lib/docs/index-builder.ts:417, no static type imports). Removes sharp (and its own deprecations) from the default install and lightens it. NOTE: it does NOT remove prebuild-install (node-pty + better-sqlite3 still require it).",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "ACCEPT prebuild-install@7.1.3 deprecation as unavoidable: node-pty and better-sqlite3 are core, both hard-require prebuild-install, and there is no non-deprecated replacement. Document as a known upstream notice rather than chase it.",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "ACCEPT ini@7.0.0 EBADENGINE residual (only affects Node <22.22.2) and document it. REJECTED alternatives: (a) npm-shrinkwrap.json — disproportionate, fragile maintenance burden on a bun-managed monorepo, risks npm-tree vs bun-tree divergence; (b) bumping the engines floor to >=22.22.2 — past the maintainer's own Node 22.22.0, would warn on the maintainer's machine. Surface the requirement in README (Node 22+, recommend latest 22.x) instead.",
+      "recordedAt": "2026-06-04T06:18:20.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Making @google-cloud/speech / @xenova/transformers optional-peer-deps changes out-of-box behavior: Google Cloud STT and local doc-embedding indexing will require an explicit `npm install` of the package.",
+      "mitigation": "Both features are niche and already lazy-loaded. Wrap each dynamic import in a try/catch that emits an ACTIONABLE error naming the exact install command. Document the opt-in install in README."
+    },
+    {
+      "id": "H2",
+      "summary": "Dev environment (typecheck/lint/test) must still have both packages resolvable, or the build breaks. peerDependencies are not always auto-installed by every package manager.",
+      "mitigation": "Keep both packages present for development — declare them in `peerDependencies` + `peerDependenciesMeta.optional:true` AND in `devDependencies` (or rely on bun installing them) so the monorepo dev tree still resolves them. Verify `npm run typecheck && npm run build && npm test` pass after the change."
+    },
+    {
+      "id": "H3",
+      "summary": "The mechanism choice matters: `optionalDependencies` are STILL installed by default (they only tolerate install failure) and would NOT remove the warnings. The change must actually remove the packages from the default-installed set.",
+      "mitigation": "Use peerDependencies + peerDependenciesMeta.optional (npm does NOT auto-install optional peer deps). Confirm with a real `npm install @panctl/cli --omit=dev` probe that the package is absent from the resolved tree."
+    },
+    {
+      "id": "H4",
+      "summary": "A fully warning-free install is NOT achievable: prebuild-install (upstream, core native addons) and ini@7 on Node <22.22.2 (upstream effect) cannot be removed without forking core deps or a shrinkwrap.",
+      "mitigation": "Target the issue's stated minimum bar — eliminate the misleading/security noise (ini is misleading on supported Node; glob is a CVE notice) and document the unavoidable residuals. Capture before/after warning sets as evidence."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-04T06:18:20.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning for PAN-1547. Empirically traced the production warning set and dependency chains; proved overrides don't reach global installs; chose to make the two lazy-loaded heavyweight deps optional (kills glob + node-domexception) and accept/document the upstream-owned ini + prebuild-install residuals.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}

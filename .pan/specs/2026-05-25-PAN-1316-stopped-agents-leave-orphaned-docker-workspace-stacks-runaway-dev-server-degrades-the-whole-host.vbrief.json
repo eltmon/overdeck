@@ -4,17 +4,17 @@
     "created": "2026-05-25T16:35:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1316: Stopped agents leave orphaned Docker workspace stacks — runaway dev server degrades the whole host",
-    "updated": "2026-05-25T16:27:18.399Z"
+    "updated": "2026-06-11T05:55:08.373Z"
   },
   "plan": {
     "id": "pan-1316",
     "title": "Stopped agents leave orphaned Docker workspace stacks — runaway dev server degrades the whole host",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7b2e9a4d-3c81-4f15-9b6e-2d8c4f1a3b5e",
     "author": "agent:claude-opus-4-7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-25T16:35:00.000Z",
-    "updated": "2026-05-25T16:27:18.399Z",
+    "updated": "2026-06-11T05:55:08.373Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1316",
@@ -184,5 +184,5 @@
       "canonicalFilename": "2026-05-25-PAN-1316-stopped-agents-leave-orphaned-docker-workspace-stacks-runaway-dev-server-degrades-the-whole-host.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

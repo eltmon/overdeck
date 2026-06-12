@@ -46,9 +46,9 @@ export type VerificationStatusValue = typeof VerificationStatusValue.Type
 // consumer that branches on harness MUST go through getHarness() so unknown or
 // legacy values normalize to 'claude-code'.
 
-export type Harness = 'claude-code' | 'pi'
+export type Harness = 'claude-code' | 'pi' | 'codex'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi', 'codex'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.
@@ -242,6 +242,8 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   resolutionUpdatedAt: Schema.optional(Schema.String),
   // For specialists: the issue currently being processed.
   currentIssue: Schema.optional(IssueId),
+  // Set while the agent's recent terminal tail shows a hard context-window overflow.
+  contextSaturatedAt: Schema.optional(Schema.String),
   updatedAtSequence: SequenceNumber,              // event sequence that produced this snapshot
 })
 export type AgentRuntimeSnapshot = typeof AgentRuntimeSnapshot.Type
@@ -358,6 +360,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   deaconIgnored: Schema.optional(Schema.Boolean),
   deaconIgnoredAt: Schema.optional(Schema.String),
   deaconIgnoredReason: Schema.optional(Schema.String),
+  /** PAN-1691: per-issue auto-merge routing key. undefined = project default, true = auto-merge (fast lane), false = hold for UAT. */
+  autoMerge: Schema.optional(Schema.Boolean),
   /** Active review orchestrator tmux session name (e.g. agent-pan-540-review). */
   reviewCoordinatorSessionName: Schema.optional(Schema.String),
   /** Active review sub-role tmux session names (e.g. agent-pan-540-review-correctness). Discovered at emission time. */
@@ -549,6 +553,12 @@ export const SessionNode = Schema.Struct({
   awaitingInputReason: Schema.optional(Schema.String),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
   deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
+  // Pause gate (PAN-1779 issue-tree redesign): a paused agent is deliberately
+  // suppressed from deacon auto-resume — the tree must show it as paused with
+  // the reason, never as a generic "stopped".
+  paused: Schema.optional(Schema.Boolean),
+  pausedReason: Schema.optional(Schema.String),
+  pausedAt: Schema.optional(Schema.String),
 })
 export type SessionNode = typeof SessionNode.Type
 
@@ -648,6 +658,4 @@ export const ScanResult = Schema.Struct({
   updated: Schema.Number,
   skipped: Schema.Number,
   errors: Schema.Number,
-  durationMs: Schema.Number,
-})
-export type ScanResult = typeof ScanResult.Type
+  durationMs: Sch

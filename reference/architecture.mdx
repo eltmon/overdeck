@@ -3,6 +3,8 @@ title: Architecture
 description: Technical architecture and design decisions
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Architecture
 
 Deep dive into Panopticon's technical architecture and design decisions.
@@ -41,6 +43,14 @@ Panopticon consists of three main components:
 ```
 
 The dashboard uses **React + Vite** for the frontend and **Express** for the API server. There is no SSR layer — the frontend is a standard SPA served by the Express API.
+
+Because the `projects.yaml` registry (see [Directory Structure](#directory-structure)) lets one Panopticon instance manage many repositories at once, the dashboard's **God View** aggregates every project's agents and conversations into a single cross-project surface — one place to see what every agent is doing, regardless of which repo it belongs to.
+
+<ThemedImage
+  light="/images/dashboard/god-view-light.png"
+  dark="/images/dashboard/god-view-dark.png"
+  alt="God View: aggregate cross-project view of all agent activity across every registered project"
+/>
 
 ## Directory Structure
 
@@ -164,6 +174,14 @@ When an agent is stuck (no activity for 30+ minutes), Panopticon will:
 1. Force kill the tmux session
 2. Record the kill in health.json
 3. Respawn with crash recovery context
+
+The runtime data captured here — persisted to `runtime-metrics.json` in the state directory — feeds the dashboard's **Metrics** page, where per-model runtime comparisons and performance analytics let you see how different models perform across your workflow.
+
+<ThemedImage
+  light="/images/dashboard/metrics-light.png"
+  dark="/images/dashboard/metrics-dark.png"
+  alt="Metrics page: runtime comparison and performance analytics across models"
+/>
 
 ## FPP (Fixed Point Principle)
 

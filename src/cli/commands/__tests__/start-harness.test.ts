@@ -104,7 +104,7 @@ describe('pan start --harness flag (PAN-636)', () => {
     await expect(
       issueCommand('PAN-X', {
         model: 'claude-sonnet-4-6',
-        harness: 'codex' as any,
+        harness: 'cursor' as any,
       } as any),
     ).rejects.toThrow(/__exit__:1/)
     const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')

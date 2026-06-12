@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue Cockpit v3 — Mission Control · PAN-1395 (live data)</title>
+<style>
+  :root{
+    --bg:#0c0f14; --panel:#11161e; --panel2:#151c26; --panel3:#1b2430;
+    --line:#222d3a; --line2:#2c3a4c;
+    --txt:#e6edf3; --muted:#8b9aad; --faint:#5d6b7d;
+    --teal:#2dd4bf; --tealdim:#0f3d3a;
+    --blue:#5b9dff; --amber:#f2b65a; --green:#46d18a; --red:#ff6b6b; --violet:#b08cff; --pink:#ff8fc7;
+    --radius:14px; --radius-sm:9px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--txt);font:13px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  .app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+
+  .cmdbar{background:linear-gradient(180deg,#121925,#0f141c);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;flex-direction:column;gap:10px}
+  .cb-top{display:flex;align-items:center;gap:14px}
+  .crumb{color:var(--faint);font-size:11px}
+  .crumb b{color:var(--muted);font-weight:600}
+  .id{font-weight:700;letter-spacing:.3px}
+  .title{font-size:15px;font-weight:650}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:650;border:1px solid var(--line2)}
+  .pill .dot{width:7px;height:7px;border-radius:50%}
+  .pill.blocked{background:rgba(255,107,107,.12);color:#ffb3b3;border-color:#5a2030}
+  .pill.blocked .dot{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .spacer{flex:1}
+  .stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+  .stat .k{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .stat .v{font-size:13px;font-weight:650}
+  .stat .v.cost{color:var(--amber)}
+  .stat .v.ok{color:var(--green)}
+  .btn{border:1px solid var(--line2);background:var(--panel3);color:var(--txt);padding:7px 13px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+  .btn:hover{border-color:var(--teal)}
+  .btn.primary{background:linear-gradient(180deg,#1b6f67,#155a54);border-color:#2dd4bf;color:#eafffb}
+  .btn.primary.disabled{filter:grayscale(.6) brightness(.8);cursor:not-allowed}
+  .btn.ghost{background:transparent}
+
+  .timeline{display:flex;align-items:center;gap:0;margin-top:2px}
+  .seg{flex:1;display:flex;align-items:center;gap:8px;padding:0 2px}
+  .seg .bar{height:6px;border-radius:4px;flex:1;background:var(--panel3);position:relative;overflow:hidden}
+  .seg .bar i{position:absolute;inset:0;border-radius:4px}
+  .seg.done .bar i{background:linear-gradient(90deg,#1f8f6f,#46d18a)}
+  .seg.active .bar i{background:linear-gradient(90deg,#6b4bd6,#b08cff);width:45%;animation:pulse 1.8s ease-in-out infinite}
+  .seg.fail .bar i{background:linear-gradient(90deg,#a33,#ff6b6b)}
+  .seg.todo .bar i{background:#1b2430}
+  .seg .lbl{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .seg .lbl b{color:var(--txt);font-weight:600}
+  .seg .tick{width:15px;height:15px;border-radius:50%;display:grid;place-items:center;font-size:9px;border:1px solid var(--line2);background:var(--panel)}
+  .seg.done .tick{background:var(--tealdim);border-color:#1f8f6f;color:var(--green)}
+  .seg.active .tick{background:#241a3d;border-color:#6b4bd6;color:var(--violet)}
+  .seg.fail .tick{background:#3a1f24;border-color:#a33;color:var(--red)}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+  .gates{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .gate{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+  .gate .g{width:8px;height:8px;border-radius:2px}
+  .g.ok{background:var(--green)} .g.bad{background:var(--red)} .g.run{background:var(--violet)} .g.wait{background:var(--faint)}
+  .gate b{color:var(--muted);font-weight:600}
+
+  .body{display:grid;grid-template-columns:344px 1fr;min-height:0}
+  .pipeline{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px}
+  .focus{display:grid;grid-template-rows:auto 1fr;min-height:0;min-width:0}
+  .lane-h{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 10px;color:var(--faint);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+
+  .node{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;background:var(--panel2);overflow:hidden}
+  .node .nh{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}
+  .node .nh:hover{background:#16202c}
+  .node .stagedot{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;flex:none;border:1px solid var(--line2);background:var(--panel)}
+  .node.s-done .stagedot{color:var(--green);border-color:#1f8f6f;background:var(--tealdim)}
+  .node.s-active .stagedot{color:var(--violet);border-color:#6b4bd6;background:#241a3d}
+  .node.s-fail .stagedot{color:var(--red);border-color:#a33;background:#3a1f24}
+  .node.s-todo .stagedot{color:var(--faint)}
+  .node .nmeta{flex:1;min-width:0}
+  .node .nmeta .nt{font-weight:650;font-size:12.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .node .nmeta .ns{color:var(--muted);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--line2);color:var(--muted)}
+  .chip.model{color:#bfe9ff;border-color:#27506b;background:#0e2530}
+  .chip.pass{color:var(--green);border-color:#1f8f6f;background:var(--tealdim)}
+  .chip.fail{color:var(--red);border-color:#a33;background:#3a1f24}
+  .chip.run{color:var(--violet);border-color:#6b4bd6;background:#241a3d}
+  .chip.wait{color:var(--amber);border-color:#5a4620;background:#241d0e}
+  .caret{color:var(--faint);transition:transform .15s;font-size:10px}
+  .node.open .caret{transform:rotate(90deg)}
+  .node .nbody{display:none;border-top:1px solid var(--line);padding:10px 12px;background:var(--panel)}
+  .node.open .nbody{display:block}
+
+  .subrow{display:flex;align-items:center;gap:9px;padding:6px 4px;border-bottom:1px dashed var(--line)}
+  .subrow:last-child{border-bottom:none}
+  .subrow .nm{flex:1;font-size:12px}
+  .subrow .nm small{color:var(--faint);display:block;font-size:10.5px}
+  .avatar{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;background:#0e2530;border:1px solid #27506b;color:#bfe9ff}
+
+  .loglines{background:#0a0e13;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px}
+  .loglines div{white-space:pre-wrap}
+  .log-ok{color:var(--green)} .log-bad{color:var(--red)} .log-dim{color:var(--faint)} .log-amber{color:var(--amber)}
+  .miniact{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .miniact .btn{padding:5px 9px;font-size:11px}
+
+  .tabs{display:flex;gap:2px;align-items:center;border-bottom:1px solid var(--line);background:var(--panel);padding:8px 12px 0;overflow-x:auto}
+  .tab{padding:8px 13px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:8px 8px 0 0;white-space:nowrap;border:1px solid transparent;border-bottom:none;position:relative;top:1px}
+  .tab .badge{margin-left:6px;font-size:9.5px;background:#3a1f24;color:var(--red);border-radius:999px;padding:0 6px;border:1px solid #a33}
+  .tab .badge.run{background:#241a3d;color:var(--violet);border-color:#6b4bd6}
+  .tab .badge.ok{background:var(--tealdim);color:var(--green);border-color:#1f8f6f}
+  .tab:hover{color:var(--txt)}
+  .tab.active{color:var(--txt);background:var(--panel2);border-color:var(--line)}
+  .pane{display:none;padding:16px 18px;overflow:auto;min-height:0}
+  .pane.active{display:block}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2)}
+  .card .ch{padding:10px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .card .ch h3{margin:0;font-size:12px;letter-spacing:.02em}
+  .card .cb{padding:12px 13px}
+  .krow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12px;gap:10px}
+  .krow:last-child{border:none}
+  .krow .k{color:var(--muted)}
+
+  .spotlight{border:1px solid #5a2030;background:linear-gradient(180deg,#241016,#1a0d12);border-radius:var(--radius);padding:14px 16px;display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+  .spotlight .ic{width:34px;height:34px;border-radius:9px;background:#3a1f24;border:1px solid #a33;display:grid;place-items:center;color:var(--red);font-size:16px;flex:none}
+  .spotlight h2{margin:0 0 3px;font-size:14px}
+  .spotlight p{margin:0;color:var(--muted);font-size:12px}
+
+  .check{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:var(--panel)}
+  .check .st{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;flex:none}
+  .st.ok{background:var(--tealdim);color:var(--green);border:1px solid #1f8f6f}
+  .st.bad{background:#3a1f24;color:var(--red);border:1px solid #a33}
+  .st.run{background:#241a3d;color:var(--violet);border:1px solid #6b4bd6}
+  .st.skip{background:#1b2430;color:var(--faint);border:1px solid var(--line2)}
+  .check .nm{flex:1;font-weight:600;font-size:12px}
+  .check .nm small{display:block;color:var(--faint);font-weight:400;font-size:10.5px}
+  .check .dur{color:var(--faint);font-size:11px}
+
+  .msg{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .msg .av{width:24px;height:24px;border-radius:7px;flex:none;display:grid;place-items:center;font-size:11px}
+  .av.work{background:#0e2530;border:1px solid #27506b;color:#bfe9ff}
+  .av.rev{background:#241a3d;border:1px solid #6b4bd6;color:var(--violet)}
+  .av.sys{background:#1b2430;border:1px solid var(--line2);color:var(--muted)}
+  .msg .who{font-weight:650;font-size:12px}
+  .msg .when{color:var(--faint);font-size:10.5px;margin-left:6px}
+  .msg .tx{color:var(--muted);font-size:12px;margin-top:2px}
+
+  .actions-pop{position:absolute;right:18px;top:54px;width:560px;background:var(--panel2);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:0 18px 50px rgba(0,0,0,.55);padding:12px;display:none;z-index:30}
+  .actions-pop.open{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px}
+  .ag h4{margin:6px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)}
+  .ai{display:block;padding:6px 8px;border-radius:7px;font-size:12px;color:var(--txt);cursor:pointer}
+  .ai:hover{background:var(--panel3)}
+  .ai.danger{color:#ff9b9b}
+  .banner{display:flex;align-items:center;gap:8px;background:#241d0e;border:1px solid #5a4620;color:#f2d59a;font-size:11.5px;border-radius:9px;padding:7px 11px;margin-bottom:10px}
+  .note{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:#0e2530;border:1px solid #27506b;color:#bfe9ff;font-size:11px;padding:6px 12px;border-radius:999px;opacity:.92}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ======= COMMAND BAR ======= -->
+  <div class="cmdbar">
+    <div class="cb-top">
+      <div>
+        <div class="crumb"><b>Eltmon</b> / panopticon-cli / Issues</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:3px">
+          <span class="id mono">PAN-1395</span>
+          <span class="title">Ctrl+K palette: semantic conversation search with excerpts (Phase 2)</span>
+          <span class="pill blocked"><span class="dot"></span> REVIEW · BLOCKED</span>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="stat"><span class="k">Branch</span><span class="v mono">feature/pan-1395</span></div>
+      <div class="stat"><span class="k">PR</span><span class="v ok">#1634 · CI ✓ · CLEAN</span></div>
+      <div class="stat"><span class="k">Review</span><span class="v mono">gpt-5.5</span></div>
+      <div class="stat"><span class="k">Cost</span><span class="v cost">live</span></div>
+      <button class="btn primary disabled" title="Blocked: review returned BLOCKED (Security); test pending">⛔ Merge — blocked by review</button>
+      <button class="btn" onclick="toggleActions()">⌘ Actions ▾</button>
+    </div>
+
+    <!-- phase timeline — REAL: plan✓ work✓ review✗ test(pending) verification✓ CI✓ -->
+    <div class="timeline">
+      <div class="seg done"><span class="tick">✓</span><span class="lbl"><b>Plan</b></span><div class="bar"><i></i></div></div>
+      <div class="seg done"><span class="tick">✓</span><span class="lbl"><b>Work</b> done</span><div class="bar"><i></i></div></div>
+      <div class="seg fail"><span class="tick">✗</span><span class="lbl"><b>Review</b> blocked</span><div class="bar"><i></i></div></div>
+      <div class="seg todo"><span class="tick">○</span><span class="lbl"><b>Test</b> pending</span><div class="bar"><i></i></div></div>
+      <div class="seg done"><span class="tick">✓</span><span class="lbl"><b>CI/CD</b> green</span><div class="bar"><i></i></div></div>
+      <div class="seg todo"><span class="tick">○</span><span class="lbl"><b>Ship</b></span><div class="bar"><i></i></div></div>
+      <div class="seg todo"><span class="tick">○</span><span class="lbl"><b>Merge</b></span><div class="bar"><i></i></div></div>
+    </div>
+
+    <div class="gates">
+      <span class="gate"><span class="g bad"></span><b>Review</b> BLOCKED · Security</span>
+      <span class="gate"><span class="g wait"></span><b>Test</b> pending (not dispatched)</span>
+      <span class="gate"><span class="g ok"></span><b>Verification gate</b> passed</span>
+      <span class="gate"><span class="g ok"></span><b>CI</b> 6/6 ✓ (1 skipped)</span>
+      <span class="gate"><span class="g ok"></span><b>PR</b> mergeable · CLEAN</span>
+      <span class="gate"><span class="g bad"></span><b>Merge-ready</b> no</span>
+    </div>
+  </div>
+
+  <!-- ======= BODY ======= -->
+  <div class="body">
+
+    <!-- ===== LEFT: PIPELINE LANE ===== -->
+    <div class="pipeline">
+      <div class="lane-h"><span>◢ Pipeline · live</span><span>select a stage →</span></div>
+
+      <div class="node s-done" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">✓</div>
+          <div class="nmeta"><div class="nt">Plan <span class="chip">vBRIEF</span></div>
+            <div class="ns">approved · proposed→approved</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody"><div class="krow"><span class="k">Status</span><span>plan.status: approved</span></div>
+          <div class="miniact"><button class="btn ghost">View vBRIEF</button><button class="btn ghost">View PRD draft</button></div></div>
+      </div>
+
+      <div class="node s-done" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">✓</div>
+          <div class="nmeta"><div class="nt">Work <span class="chip model">gpt-5.5</span></div>
+            <div class="ns">handed off via <span class="mono">done</span> · 1 health event</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody" onclick="event.stopPropagation()">
+          <div class="krow"><span class="k">Agent</span><span class="mono">agent-pan-1395</span></div>
+          <div class="banner">⚠ Health: <b style="margin:0 4px">context_overflow</b> on Jun 5 — 3 compaction attempts. Recovered &amp; handed off.</div>
+          <div class="miniact"><button class="btn ghost">Terminal</button><button class="btn ghost">Resume</button><button class="btn ghost">Tell</button><button class="btn ghost">Switch model · harness</button></div>
+        </div>
+      </div>
+
+      <!-- REVIEW: the real blocker -->
+      <div class="node s-fail open" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">✗</div>
+          <div class="nmeta"><div class="nt">Review <span class="chip model">gpt-5.5</span> <span class="chip fail">BLOCKED</span></div>
+            <div class="ns">synthesis: 1 Security blocker · re-dispatched 21:41</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody" onclick="event.stopPropagation()">
+          <div class="subrow"><span class="avatar">S</span><div class="nm">Security <small>gpt-5.5 · produced the blocker</small></div><span class="chip fail">BLOCK</span></div>
+          <div class="subrow"><span class="avatar">C</span><div class="nm">Correctness <small>gpt-5.5</small></div><span class="chip">done</span></div>
+          <div class="subrow"><span class="avatar">P</span><div class="nm">Performance <small>gpt-5.5</small></div><span class="chip">done</span></div>
+          <div class="subrow"><span class="avatar">R</span><div class="nm">Requirements <small>gpt-5.5</small></div><span class="chip">done</span></div>
+          <div class="loglines">
+            <div class="log-bad">SECURITY ✗ "reindex route is CSRFable and can upload local transcripts"</div>
+            <div class="log-dim">synthesis verdict: BLOCKED → feedback routed to work agent</div>
+          </div>
+          <div class="miniact">
+            <button class="btn ghost">Restart review ▾ (model · harness)</button>
+            <button class="btn ghost">Recover review</button>
+            <button class="btn ghost">Status review</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEST + verification, now visible -->
+      <div class="node s-todo" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">○</div>
+          <div class="nmeta"><div class="nt">Test <span class="chip wait">pending</span></div>
+            <div class="ns">not dispatched — gated behind review verdict</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody" onclick="event.stopPropagation()">
+          <div class="krow"><span class="k">testStatus</span><span class="log-amber">pending</span></div>
+          <div class="krow"><span class="k">Local verification gate (PAN-174)</span><span class="log-ok">passed · 0 cycles</span></div>
+          <div class="krow"><span class="k">Last verified commit</span><span class="mono">0f80ae6</span></div>
+          <div class="ns" style="margin-top:8px">Test/UAT dispatch resumes once the review blocker is fixed. Browser UAT (Playwright) not yet run.</div>
+        </div>
+      </div>
+
+      <!-- CI/CD: real checks, all green -->
+      <div class="node s-done" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">✓</div>
+          <div class="nmeta"><div class="nt">GitHub CI/CD <span class="chip pass">6 ✓ · 1 skip</span></div>
+            <div class="ns">PR #1634 · mergeable: CLEAN</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody" onclick="event.stopPropagation()">
+          <div class="check"><span class="st ok">✓</span><div class="nm">build (22)</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">lint</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">Clean install + server smoke test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">CodeRabbit</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">panopticon/test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st skip">–</span><div class="nm">Mintlify Deployment <small>skipped</small></div><span class="dur">SKIPPED</span></div>
+          <div class="miniact"><button class="btn ghost">Open PR ↗</button><button class="btn ghost">Re-run checks</button></div>
+        </div>
+      </div>
+
+      <div class="node s-todo" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">○</div>
+          <div class="nmeta"><div class="nt">Ship</div><div class="ns">waiting on review pass + test</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody"><div class="ns">Rebase → verify → push for human merge. Not started.</div></div>
+      </div>
+
+      <div class="node s-todo" onclick="tog(this)">
+        <div class="nh"><div class="stagedot">○</div>
+          <div class="nmeta"><div class="nt">Merge</div><div class="ns">blocked — review BLOCKED, test pending</div></div>
+          <span class="caret">▸</span></div>
+        <div class="nbody"><div class="ns">CI is green &amp; PR is mergeable, but the pipeline gates merge on the <b>review</b> + <b>test</b> verdicts — not just GitHub CI.</div></div>
+      </div>
+    </div>
+
+    <!-- ===== RIGHT: FOCUS ===== -->
+    <div class="focus">
+      <div class="tabs">
+        <div class="tab active" onclick="seltab(this,'overview')">Overview</div>
+        <div class="tab" onclick="seltab(this,'review')">Review <span class="badge">1</span></div>
+        <div class="tab" onclick="seltab(this,'test')">Test</div>
+        <div class="tab" onclick="seltab(this,'ci')">PR &amp; CI <span class="badge ok">✓</span></div>
+        <div class="tab" onclick="seltab(this,'conv')">Conversation</div>
+        <div class="tab" onclick="seltab(this,'diff')">Diff</div>
+        <div class="tab" onclick="seltab(this,'files')">Files</div>
+        <div class="tab" onclick="seltab(this,'terminal')">Terminal</div>
+        <div class="tab" onclick="seltab(this,'plan')">PRD / Plan</div>
+        <div class="tab" onclick="seltab(this,'beads')">Beads</div>
+        <div class="tab" onclick="seltab(this,'disc')">Discussion</div>
+        <div class="tab" onclick="seltab(this,'costs')">Costs</div>
+        <div class="tab" onclick="seltab(this,'activity')">Activity</div>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="pane active" id="p-overview">
+        <div class="spotlight">
+          <div class="ic">⛔</div>
+          <div>
+            <h2>Blocked by review — Security finding (not CI)</h2>
+            <p><b>"reindex route is CSRFable and can upload local transcripts."</b> CI is fully green and the PR is mergeable, but the pipeline holds merge until the work agent fixes this and the review passes (test still pending). The work agent auto-resumes on the blocked verdict.</p>
+            <div class="miniact"><button class="btn primary" style="margin-top:10px">Send fix feedback → work agent</button><button class="btn ghost" style="margin-top:10px">Restart review (gpt-5.5)</button></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card"><div class="ch"><h3>Now</h3><span class="chip fail">blocked</span></div><div class="cb">
+            <div class="krow"><span class="k">Phase</span><span>Review → BLOCKED</span></div>
+            <div class="krow"><span class="k">Blocker</span><span class="log-bad">Security: CSRFable reindex route</span></div>
+            <div class="krow"><span class="k">Test</span><span class="log-amber">pending (gated)</span></div>
+            <div class="krow"><span class="k">Next action</span><span>work agent fixes → re-review</span></div>
+          </div></div>
+          <div class="card"><div class="ch"><h3>Issue</h3></div><div class="cb">
+            <div class="krow"><span class="k">Tracker</span><span>GitHub #1395 · open</span></div>
+            <div class="krow"><span class="k">PR</span><span>#1634 · mergeable CLEAN</span></div>
+            <div class="krow"><span class="k">Verification</span><span class="log-ok">gate passed (0 cycles)</span></div>
+            <div class="krow"><span class="k">Health</span><span class="log-amber">context_overflow ×3 (Jun 5)</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- REVIEW -->
+      <div class="pane" id="p-review">
+        <div class="grid2">
+          <div class="card"><div class="ch"><h3>Reviewer convoy</h3><span class="chip model">gpt-5.5</span></div><div class="cb">
+            <div class="subrow"><span class="avatar">S</span><div class="nm">Security <small>produced the blocker</small></div><span class="chip fail">BLOCK</span></div>
+            <div class="subrow"><span class="avatar">C</span><div class="nm">Correctness <small>gpt-5.5</small></div><span class="chip">done</span></div>
+            <div class="subrow"><span class="avatar">P</span><div class="nm">Performance <small>gpt-5.5</small></div><span class="chip">done</span></div>
+            <div class="subrow"><span class="avatar">R</span><div class="nm">Requirements <small>gpt-5.5</small></div><span class="chip">done</span></div>
+          </div></div>
+          <div class="card"><div class="ch"><h3>Synthesis verdict</h3><span class="chip fail">BLOCKED</span></div><div class="cb">
+            <div class="loglines"><div class="log-bad">reindex route is CSRFable and can upload local transcripts</div></div>
+            <p style="color:var(--muted);margin:8px 0 0">History: reviewing 20:25 → <b style="color:var(--red)">blocked 21:51</b> (re-dispatched 21:41 on gpt-5.5).</p>
+            <div class="miniact"><button class="btn ghost">Restart review ▾ model · harness</button><button class="btn ghost">Recover review</button><button class="btn ghost">Inspect bead</button></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- TEST -->
+      <div class="pane" id="p-test">
+        <div class="card"><div class="ch"><h3>Test &amp; verification</h3><span class="chip wait">pending</span></div><div class="cb">
+          <div class="krow"><span class="k">Pipeline test (testStatus)</span><span class="log-amber">pending — not dispatched</span></div>
+          <div class="krow"><span class="k">Why</span><span>gated behind the review verdict (blocked)</span></div>
+          <div class="krow"><span class="k">Local verification gate (PAN-174)</span><span class="log-ok">passed — typecheck · lint · test</span></div>
+          <div class="krow"><span class="k">Verification cycles</span><span>0</span></div>
+          <div class="krow"><span class="k">Browser UAT (Playwright)</span><span>not yet run</span></div>
+          <div class="ns" style="margin-top:10px">When review passes, the test role dispatches automatically; its terminal + vitest/UAT results appear here live.</div>
+        </div></div>
+      </div>
+
+      <!-- CI -->
+      <div class="pane" id="p-ci">
+        <div class="card"><div class="ch"><h3>PR #1634 — GitHub checks</h3><span class="chip pass">mergeable · CLEAN</span></div><div class="cb">
+          <div class="check"><span class="st ok">✓</span><div class="nm">build (22)</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">lint</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">Clean install + server smoke test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">CodeRabbit</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st ok">✓</span><div class="nm">panopticon/test</div><span class="dur">SUCCESS</span></div>
+          <div class="check"><span class="st skip">–</span><div class="nm">Mintlify Deployment</div><span class="dur">SKIPPED</span></div>
+          <p style="color:var(--muted);margin:6px 0 0">All required checks green — yet merge stays blocked because review + test gates aren't met. <b>This is the distinction the old UI hid.</b></p>
+        </div></div>
+      </div>
+
+      <!-- CONVERSATION (real-ish from history) -->
+      <div class="pane" id="p-conv">
+        <div class="msg"><div class="av sys">◆</div><div><div class="who">pipeline <span class="when">Jun 2</span></div><div class="tx">PR #1634 opened · merge status pending.</div></div></div>
+        <div class="msg"><div class="av sys">◆</div><div><div class="who">deacon <span class="when">Jun 5</span></div><div class="tx">Work agent hit context_overflow (3 compaction attempts) — recovered.</div></div></div>
+        <div class="msg"><div class="av rev">R</div><div><div class="who">review · synthesis <span class="when">today 20:25</span></div><div class="tx">Review dispatched (convoy, gpt-5.5).</div></div></div>
+        <div class="msg"><div class="av rev">R</div><div><div class="who">review · security <span class="when">today 21:51</span></div><div class="tx">BLOCK: reindex route is CSRFable and can upload local transcripts.</div></div></div>
+      </div>
+
+      <div class="pane" id="p-diff"><div class="card"><div class="ch"><h3>Diff vs main</h3><span class="chip">PR #1634</span></div><div class="cb mono" style="font-size:11.5px;color:var(--muted)">Palette search + excerpts + reindex route. (file-by-file diff renders here)</div></div></div>
+      <div class="pane" id="p-files"><div class="card"><div class="ch"><h3>Workspace files</h3></div><div class="cb mono" style="color:var(--muted)">workspaces/feature-pan-1395/ … (file browser)</div></div></div>
+      <div class="pane" id="p-terminal"><div class="card"><div class="ch"><h3>Terminal — agent-pan-1395-review</h3><span class="chip run">live</span></div><div class="cb mono loglines"><div class="log-dim">gpt-5.5 · review synthesis</div><div>❯ verdict delivered: BLOCKED (security)</div></div></div></div>
+      <div class="pane" id="p-plan"><div class="card"><div class="ch"><h3>PRD / vBRIEF</h3><span class="chip pass">approved</span></div><div class="cb"><div class="krow"><span class="k">PRD draft</span><span class="mono">.pan/drafts/pan-1395.md</span></div><div class="krow"><span class="k">vBRIEF</span><span>list · DAG · raw</span></div></div></div></div>
+      <div class="pane" id="p-beads"><div class="card"><div class="ch"><h3>Beads</h3></div><div class="cb" style="color:var(--muted)">Per-issue bead checklist with statuses renders here.</div></div></div>
+      <div class="pane" id="p-disc"><div class="card"><div class="ch"><h3>Discussion (GitHub #1395)</h3></div><div class="cb" style="color:var(--muted)">Synced comments …</div></div></div>
+      <div class="pane" id="p-costs"><div class="card"><div class="ch"><h3>Cost — live</h3></div><div class="cb"><div class="krow"><span class="k">review synthesis · gpt-5.5</span><span>$0.23 (running)</span></div><div class="krow"><span class="k">convoy + work</span><span>accumulating</span></div><div class="ns" style="margin-top:6px">Canonical 24h spend on /costs.</div></div></div></div>
+      <div class="pane" id="p-activity"><div class="card"><div class="ch"><h3>Activity</h3></div><div class="cb loglines"><div class="log-dim">21:51 review → blocked (security)</div><div class="log-dim">21:41 review re-dispatched (gpt-5.5)</div><div class="log-dim">20:25 review → reviewing</div><div class="log-dim">Jun 5 context_overflow ×3</div><div class="log-dim">Jun 2 PR #1634 opened</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- ALL actions kept (grouped) -->
+  <div class="actions-pop" id="actions">
+    <div class="ag"><h4>Planning</h4><span class="ai">Plan</span><span class="ai">Auto-plan</span><span class="ai">Watch planning</span><span class="ai">Done planning</span></div>
+    <div class="ag"><h4>Work</h4><span class="ai">Start agent</span><span class="ai">Start without planning</span><span class="ai">Done</span><span class="ai">Restart from plan</span></div>
+    <div class="ag"><h4>Review &amp; Test</h4><span class="ai">Review &amp; test</span><span class="ai">Request review</span><span class="ai">Restart review (model · harness)</span><span class="ai">Recover review</span><span class="ai">Inspect bead</span><span class="ai">Status review</span></div>
+    <div class="ag"><h4>Agent</h4><span class="ai">Tell agent</span><span class="ai">Switch model · harness</span><span class="ai">Pause</span><span class="ai">Unpause</span><span class="ai">Recover agent</span><span class="ai">Resume session</span><span class="ai">Restart agent</span><span class="ai">Clear troubled</span><span class="ai">Stop agent</span></div>
+    <div class="ag"><h4>Workspace</h4><span class="ai">Sync main</span><span class="ai">Create workspace</span><span class="ai">Copy settings</span><span class="ai">View state / vBRIEF</span></div>
+    <div class="ag"><h4>Artifacts</h4><span class="ai">Beads</span><span class="ai">Discussions</span><span class="ai">Transcripts</span><span class="ai">Upload transcript</span><span class="ai">Inference</span></div>
+    <div class="ag"><h4>Navigation</h4><span class="ai">Open workspace</span><span class="ai">View PR ↗</span><span class="ai">Copy session id / tmux</span></div>
+    <div class="ag"><h4>Danger</h4><span class="ai danger">Reopen</span><span class="ai danger">Close out</span><span class="ai danger">Cancel issue</span><span class="ai danger">Reset issue / session</span><span class="ai danger">Destroy workspace</span><span class="ai danger">Deep wipe</span></div>
+  </div>
+
+  <div class="note">Mockup · Issue Cockpit v3 “Mission Control” — <b>live data from PAN-1395</b> (review BLOCKED on Security; test pending; CI green; PR mergeable). Tabs clickable; pipeline stages expand.</div>
+</div>
+
+<script>
+  function tog(n){ if(window.getSelection().toString())return; n.classList.toggle('open'); }
+  function seltab(el,id){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+    document.getElementById('p-'+id).classList.add('active');
+  }
+  function toggleActions(){ document.getElementById('actions').classList.toggle('open'); }
+  document.addEventListener('click',e=>{ if(!e.target.closest('.actions-pop')&&!e.target.closest('.btn')){document.getElementById('actions').classList.remove('open');}});
+</script>
+</body>
+</html>

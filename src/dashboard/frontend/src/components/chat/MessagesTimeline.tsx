@@ -216,6 +216,12 @@ export interface MessagesTimelineProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  /** Message target requested by palette conversation search. */
+  targetMessageId?: string;
+  targetMessageIndex?: number;
+  targetMessageNonce?: number;
+  /** Called after a requested target message has been scrolled into view. */
+  onTargetMessageHandled?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -239,6 +245,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   resolvedTheme,
   hideToolCalls = false,
   workingPhase,
+  targetMessageId,
+  targetMessageIndex,
+  targetMessageNonce,
+  onTargetMessageHandled,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -260,6 +270,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [searchRenderTick, setSearchRenderTick] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousSearchQueryRef = useRef('');
+  const handledTargetKeyRef = useRef<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
@@ -472,6 +483,25 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, [rows, searchQuery]);
 
   const currentMatch = searchMatches[currentMatchIndex] ?? null;
+  const targetMessageRow = useMemo(() => {
+    if (!targetMessageId && targetMessageIndex === undefined) return null;
+    const byId = targetMessageId
+      ? rows.findIndex((row) => row.kind === 'message' && row.message.id === targetMessageId)
+      : -1;
+    if (byId >= 0) return { row: rows[byId]!, index: byId };
+    if (targetMessageIndex === undefined) return null;
+    let messageIndex = 0;
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex]!;
+      if (row.kind !== 'message') continue;
+      if (messageIndex === targetMessageIndex) return { row, index: rowIndex };
+      messageIndex += 1;
+    }
+    return null;
+  }, [rows, targetMessageId, targetMessageIndex]);
+  const targetMessageKey = targetMessageId || targetMessageIndex !== undefined
+    ? `${targetMessageNonce ?? 'no-nonce'}:${targetMessageId ?? ''}:${targetMessageIndex ?? ''}`
+    : null;
   const searchHighlightTerms = useMemo(() => extractSearchHighlightTerms(searchQuery), [searchQuery]);
 
   const scrollToRow = useCallback((rowIndex: number, rowId: string) => {
@@ -502,6 +532,14 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     const match = searchMatches[normalized]!;
     scrollToRow(match.index, match.row.id);
   }, [scrollToRow, searchMatches]);
+
+  useEffect(() => {
+    if (!targetMessageRow || !targetMessageKey) return;
+    if (handledTargetKeyRef.current === targetMessageKey) return;
+    handledTargetKeyRef.current = targetMessageKey;
+    scrollToRow(targetMessageRow.index, targetMessageRow.row.id);
+    onTargetMessageHandled?.();
+  }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -595,7 +633,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
                     background: 'var(--background)',
-                    outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                    outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
                     outlineOffset: '-2px',
                     borderRadius: 8,
                   }}
@@ -632,7 +670,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               key={row.id}
               data-search-row-id={row.id}
               style={{
-                outline: currentMatch?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
                 outlineOffset: '-2px',
                 borderRadius: 8,
               }}
@@ -1283,248 +1321,4 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
   const isThinking = entry.tone === 'thinking';
-  const hasResult = !!entry.result;
-  const hasToolBody = !!entry.toolInput && entry.tone === 'tool';
-  const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
-
-  return (
-    <div>
-      <div
-        className={styles.workLogEntry}
-        style={isExpandable ? { cursor: 'pointer' } : undefined}
-        onClick={isExpandable ? () => setShowResult(prev => !prev) : undefined}
-      >
-        {isTerminal ? (
-          <span
-            className={styles.workLogTerminalIcon}
-            style={{ color: toneColor[entry.tone] }}
-          >
-            {'>_'}
-          </span>
-        ) : (
-          <Circle
-            size={6}
-            style={{
-              fill: toneColor[entry.tone],
-              color: toneColor[entry.tone],
-              flexShrink: 0,
-              marginTop: 2,
-            }}
-          />
-        )}
-        <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
-        {entry.detail && (
-          <span className={styles.workLogDetail} title={entry.detail}>
-            {entry.detail.slice(0, 80)}
-            {entry.detail.length > 80 ? '…' : ''}
-          </span>
-        )}
-        {isExpandable && (
-          <ChevronRight
-            size={10}
-            style={{
-              flexShrink: 0,
-              marginLeft: 'auto',
-              transition: 'transform 0.15s',
-              transform: showResult ? 'rotate(90deg)' : 'none',
-              color: 'var(--muted-foreground)',
-            }}
-          />
-        )}
-      </div>
-      {showResult && (
-        <>
-          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} />}
-          {isThinking && entry.detail && (
-            <div className={styles.workLogResult}>
-              <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />
-            </div>
-          )}
-          {entry.result && (
-            isTerminal ? (
-              <pre className={styles.workLogResult}>{entry.result}</pre>
-            ) : (
-              <div className={styles.workLogResult}>
-                <ChatMarkdown text={entry.result} cwd={cwd} issueId={issueId} />
-              </div>
-            )
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ─── Working indicator ────────────────────────────────────────────────────────
-
-function WorkingIndicator({ startedAt, phase }: { startedAt: string | null; phase?: WorkingPhase }) {
-  const [elapsed, setElapsed] = useState(0);
-  const startMs = startedAt ? new Date(startedAt).getTime() : Date.now();
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startMs) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startMs]);
-
-  const isToolPhase = phase === 'tool';
-
-  return (
-    <div className={styles.workingIndicator}>
-      {isToolPhase ? (
-        <Wrench size={14} className={styles.pulseIcon} aria-label="Using tool" />
-      ) : (
-        <span className={styles.workingDots}>
-          <span />
-          <span />
-          <span />
-        </span>
-      )}
-      <span className={styles.workingLabel}>
-        Working{elapsed > 0 ? ` for ${elapsed}s` : '…'}
-      </span>
-    </div>
-  );
-}
-
-// ─── Round divider ────────────────────────────────────────────────────────────
-
-const ROUND_VERDICT_COLOR: Record<RoundVerdict, string> = {
-  pending: 'var(--muted-foreground)',
-  passed: 'var(--success)',
-  failed: 'var(--destructive)',
-  running: 'var(--primary)',
-};
-
-const ROUND_VERDICT_LABEL: Record<RoundVerdict, string> = {
-  pending: 'Pending',
-  passed: 'Passed',
-  failed: 'Failed',
-  running: 'Running',
-};
-
-function RoundDivider({ marker }: { marker: RoundMarker }) {
-  const color = ROUND_VERDICT_COLOR[marker.verdict];
-  const verdictLabel = ROUND_VERDICT_LABEL[marker.verdict];
-  return (
-    <div
-      data-testid={`round-divider-${marker.round}`}
-      data-round={marker.round}
-      data-verdict={marker.verdict}
-      role="separator"
-      aria-label={`Round ${marker.round} — ${verdictLabel}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        margin: '12px 0',
-        width: '100%',
-      }}
-    >
-      <div
-        style={{
-          flex: 1,
-          height: 1,
-          background: 'var(--border)',
-        }}
-      />
-      <span
-        style={{
-          padding: '2px 10px',
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: '0.05em',
-          textTransform: 'uppercase',
-          color,
-          border: `1px solid ${color}`,
-          background: 'var(--card, var(--background))',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Round {marker.round} · {verdictLabel}
-        {marker.label ? ` · ${marker.label}` : ''}
-      </span>
-      <div
-        style={{
-          flex: 1,
-          height: 1,
-          background: 'var(--border)',
-        }}
-      />
-    </div>
-  );
-}
-
-// ─── Session permissions banner ──────────────────────────────────────────────
-
-function SessionPermissionsRow({ message }: { message: ChatMessage }) {
-  return (
-    <div className={styles.sessionPermissionsRow}>
-      <ShieldCheck size={11} className={styles.sessionPermissionsIcon} />
-      <span className={styles.sessionPermissionsLabel}>Permissions:</span>
-      <span className={styles.sessionPermissionsTools}>{message.text}</span>
-    </div>
-  );
-}
-
-// ─── Slash-command divider (PAN-1458) ────────────────────────────────────────
-
-/**
- * Renders a Claude Code slash command (the kind Claude Code emits as a user
- * message wrapped in `<command-name>X</command-name>`) as a horizontal divider
- * instead of a regular message bubble. Most relevant for `/clear`, which
- * signals the JSONL boundary — see PAN-1458 — but applies to any slash command
- * Claude Code happens to record this way.
- */
-function SlashCommandDivider({ command, createdAt }: { command: string; createdAt: string }) {
-  const isClear = command === '/clear';
-  const label = isClear ? 'Conversation cleared' : `Slash command: ${command}`;
-  return (
-    <div className={styles.compactBoundaryDivider}>
-      <div className={styles.compactBoundaryLine} />
-      <div className={styles.compactBoundaryLabel}>
-        <RotateCcw size={12} />
-        <span>{label}</span>
-        <span className={styles.compactBoundaryDetail}>{formatTimestamp(createdAt)}</span>
-      </div>
-      <div className={styles.compactBoundaryLine} />
-    </div>
-  );
-}
-
-// ─── Compact boundary divider ────────────────────────────────────────────────
-
-function CompactBoundaryDivider({ boundary }: { boundary: CompactBoundary }) {
-  const label = boundary.preTokens
-    ? `Compacted (${Math.round(boundary.preTokens / 1000)}k tokens)`
-    : 'Conversation compacted';
-  const detail = [
-    boundary.trigger && boundary.trigger !== 'panopticon-native' ? boundary.trigger : null,
-    boundary.model,
-  ].filter(Boolean).join(' · ');
-
-  return (
-    <div className={styles.compactBoundaryDivider}>
-      <div className={styles.compactBoundaryLine} />
-      <div className={styles.compactBoundaryLabel}>
-        <Scissors size={12} />
-        <span>{label}</span>
-        {detail && <span className={styles.compactBoundaryDetail}>{detail}</span>}
-      </div>
-      <div className={styles.compactBoundaryLine} />
-    </div>
-  );
-}
-
-// ─── Compacting indicator ────────────────────────────────────────────────────
-
-function CompactingIndicator() {
-  return (
-    <div className={styles.compactingIndicator}>
-      <Scissors size={14} className={styles.compactingIcon} />
-      <span>Compacting conversation...</span>
-    </div>
-  );
-}
+  const hasResult = !!entry.result

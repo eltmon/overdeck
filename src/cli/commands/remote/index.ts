@@ -11,6 +11,7 @@ import { statusCommand } from './status.js';
 import { initCommand } from './init.js';
 import { resourcesCommand } from './resources.js';
 import { setupCommand } from './setup.js';
+import { reapCommand } from './reap.js';
 
 export function registerRemoteCommands(program: Command): void {
   const remote = program
@@ -45,4 +46,12 @@ export function registerRemoteCommands(program: Command): void {
     .command('setup')
     .description('Setup Fly.io integration (install flyctl, configure auth)')
     .action(setupCommand);
+
+  // pan remote reap
+  remote
+    .command('reap')
+    .description('Hand completed remote agents (PAN_REMOTE_DONE) to the review pipeline and stop their machines')
+    .option('--issue <id>', 'Target a single issue instead of scanning all remote agents')
+    .option('--dry-run', 'Report what would be reaped without acting')
+    .action(reapCommand);
 }

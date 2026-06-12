@@ -3,6 +3,8 @@ title: Project Registry
 description: Managing multiple projects with Panopticon
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Project Registry
 
 Panopticon's project registry enables multi-project management with intelligent issue routing and label-based workspace creation.
@@ -14,6 +16,21 @@ Projects are registered in `~/.panopticon/projects.yaml`. Each project can have:
 - **Issue routing rules** - Route issues to different subdirectories based on labels
 - **Custom workspace commands** - For complex polyrepo setups
 - **Linear team mapping** - Connect projects to Linear teams
+
+While `projects.yaml` is the source of truth, much of this configuration is also surfaced in the dashboard's **Settings** page, alongside model routing for the agents and conversations Panopticon runs and tracker API keys.
+
+<ThemedImage
+  light="/images/dashboard/settings-light.png"
+  dark="/images/dashboard/settings-dark.png"
+  alt="Panopticon Settings page showing model routing, tracker API keys, and project configuration"
+/>
+
+<Note>
+  Panopticon manages both the workflow pipeline and the agents and conversations
+  that move issues through it. The Settings page is where model routing for those
+  agents lives, while per-project routing and workspace rules below are edited in
+  `~/.panopticon/projects.yaml`.
+</Note>
 
 ## Registering Projects
 

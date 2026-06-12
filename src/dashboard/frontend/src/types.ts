@@ -83,9 +83,9 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
-  harness?: 'claude-code' | 'pi' | null;
+  harness?: 'claude-code' | 'pi' | 'codex' | null;
   model: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
+  status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
   error?: string;
   pid?: number;
   startedAt: string;
@@ -148,7 +148,7 @@ export interface Agent {
 
 export interface AgentHealth {
   agentId: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead';
+  status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead';
   reason?: string;
   lastPing?: string;
   consecutiveFailures: number;

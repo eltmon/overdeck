@@ -51,13 +51,29 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
-vi.mock('../../../lib/agents.js', () => ({
-  getAgentStateSync: agentMocks.getAgentStateSync,
-  clearAgentPausedSync: agentMocks.clearAgentPausedSync,
-  clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
-  setAgentPausedSync: agentMocks.setAgentPausedSync,
-  stopAgentSync: agentMocks.stopAgentSync,
-}));
+vi.mock('../../../lib/agents.js', () => {
+  // Mirror the real prefix/singleton routing (PAN-1760) so command targeting
+  // stays under test while the heavy agents module remains mocked.
+  const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
+  const isQualifiedAgentId = (input: string) => {
+    const lower = input.toLowerCase();
+    return lower === 'flywheel-orchestrator' || AGENT_PREFIXES.some(p => lower.startsWith(p));
+  };
+  return {
+    getAgentStateSync: agentMocks.getAgentStateSync,
+    clearAgentPausedSync: agentMocks.clearAgentPausedSync,
+    clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
+    setAgentPausedSync: agentMocks.setAgentPausedSync,
+    stopAgentSync: agentMocks.stopAgentSync,
+    isQualifiedAgentId,
+    normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
+    resolveAgentTargetSync: (input: string) => {
+      if (isQualifiedAgentId(input)) return input.toLowerCase();
+      const issueId = issueIdMocks.resolveBareNumericIdSync(input);
+      return issueId ? `agent-${String(issueId).toLowerCase()}` : null;
+    },
+  };
+});
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -151,7 +167,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits a pause intervention when pan pause sets the pause gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ status: 'stopped' });
+    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', status: 'stopped' });
     tmuxMocks.sessionExistsSync.mockReturnValue(false);
 
     const { pauseCommand } = await import('../pause.js');
@@ -272,7 +288,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits an unpause intervention when pan unpause clears a pause gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ paused: true });
+    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', paused: true });
 
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
@@ -286,7 +302,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('does not emit an unpause intervention when the agent was already unpaused', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ paused: false });
+    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-1', paused: false });
 
     const { unpauseCommand } = await import('../unpause.js');
     await unpauseCommand('PAN-1');
@@ -295,7 +311,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('emits an untroubled intervention when pan untroubled clears a troubled gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ troubled: false, consecutiveFailures: 2 });
+    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 2 });
 
     const { untroubledCommand } = await import('../untroubled.js');
     await untroubledCommand('PAN-2');
@@ -309,7 +325,7 @@ describe('operator intervention CLI emission', () => {
   });
 
   it('does not emit an untroubled intervention when the agent was already untroubled', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ troubled: false, consecutiveFailures: 0 });
+    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 0 });
 
     const { untroubledCommand } = await import('../untroubled.js');
     await untroubledCommand('PAN-2');

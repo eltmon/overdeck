@@ -59,6 +59,11 @@ CLAUDE.md
 .pan/spec.vbrief.json
 .pan/continue.json
 
+# Docs-index builder scratch dir (buildDocsIndex writes docs-index.*.tmp.sqlite
+# here, renames the result into dist/, but never removes the dir). Transient —
+# must never block the work-completion clean-tree check. See src/lib/docs/index-builder.ts.
+.pan-docs-index-tmp/
+
 # Planning artifacts — tracked on feature branches, excluded from merges to main.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
 # DO NOT gitignore .planning/ — agents and dashboard need these files throughout
@@ -123,6 +128,10 @@ temp/
 .pan/specs/*.tmp
 .pan/specs/*.writer.lock/
 
+# Scratch/temp working dir — holds throwaway mockups, draft issue notes, and a
+# machine-specific V8 node-compile-cache. Never belongs in git history.
+.tmp/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
@@ -152,3 +161,16 @@ multica/
 .cache/
 .tldr/
 .claude/mcp.json
+
+# Local junk / debugging artifacts (PAN session 2026-06-07) — never commit
+__pycache__/
+.beads/.~issues.jsonl.*
+/.brake-salvage/
+/conv-*.jpeg
+/reconnect-*.jpeg
+/deeplink-*.jpeg
+/panopticon-feature-graph.png
+/SYSTEM-RESOURCE-REPORT-*.md
+
+# Pre-launch sensitive marketing strategy (rebrand candidates, fundraising) — keep local
+/docs/marketing/private/

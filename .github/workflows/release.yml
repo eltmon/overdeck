@@ -107,6 +107,22 @@ jobs:
       - name: Build
         run: bun run build
 
+      # PAN-1609: gate the release on the full test suite. release.yml is a
+      # separate workflow from ci.yml (it fires on tag push, not PR), so without
+      # this a `v*` tag could publish a red vitest suite to npm. This runs in the
+      # same job as `npm publish` below, so a test failure aborts BEFORE publish
+      # (and blocks the GitHub Release job, which `needs: npm`). chromium is
+      # required by the Playwright-backed UAT tests in the suite; SKIP_DOCS_INDEX
+      # matches ci.yml (the docs index is a publish-time artifact, irrelevant to
+      # verifying code).
+      - name: Install Playwright browsers (chromium) for vitest UAT
+        run: npx playwright install --with-deps chromium
+
+      - name: Test (full suite — gate the release)
+        env:
+          SKIP_DOCS_INDEX: '1'
+        run: npm test
+
       - name: Test CLI
         run: |
           node dist/cli/index.js --version

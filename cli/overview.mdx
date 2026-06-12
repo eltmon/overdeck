@@ -3,9 +3,23 @@ title: CLI Overview
 description: Introduction to Panopticon's command-line interface
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # CLI Overview
 
 The Panopticon CLI (`pan`) provides a comprehensive set of commands for managing agents, workspaces, and multi-project orchestration.
+
+Every CLI command has a counterpart in the dashboard, where the same agents, conversations, and workflow are managed visually. The Command Deck below shows a live agent: the project and conversation sidebar on the left, the issue tree, the agent's turn-by-turn tool calls and reasoning in the center, and a Needs-you / Project / Global awareness rail on the right.
+
+<ThemedImage
+  light="/images/dashboard/command-deck-hero-light.png"
+  dark="/images/dashboard/command-deck-hero-dark.png"
+  alt="Command Deck: project and conversation sidebar, issue tree, an agent's turn-by-turn tool calls and reasoning, and the Needs-you/Project/Global awareness rail"
+/>
+
+<Tip>
+  The CLI and dashboard operate on the same state. You can spawn an agent from the terminal with `pan work issue MIN-123` and watch its reasoning stream into the Command Deck, or start it from the board and drive it from the CLI — they are two views of one orchestrator.
+</Tip>
 
 ## Philosophy
 

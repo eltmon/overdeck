@@ -1,4 +1,4 @@
-import { Mic, MicOff, Send, Square, X } from 'lucide-react';
+import { Mic, MicOff, Send, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useVoiceTranscription } from '../../hooks/useVoiceTranscription';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -27,7 +27,7 @@ export function VoiceWidget({
       if (directModeRef.current === 'direct') onSendDirect(text);
     },
   });
-  const previewText = partialText || committedText;
+  const previewText = [committedText, partialText].filter(Boolean).join(' ');
 
   useEffect(() => {
     directModeRef.current = mode;
@@ -96,6 +96,7 @@ export function VoiceWidget({
             type="button"
             className={mode === 'edit' ? styles.voiceModeActive : styles.voiceModeButton}
             onClick={() => setMode('edit')}
+            title="Transcript fills the composer so you can review and edit before sending"
           >
             Edit
           </button>
@@ -103,6 +104,7 @@ export function VoiceWidget({
             type="button"
             className={mode === 'direct' ? styles.voiceModeActive : styles.voiceModeButton}
             onClick={() => setMode('direct')}
+            title="Each finished sentence is sent to the agent immediately"
           >
             Direct
           </button>
@@ -130,6 +132,12 @@ export function VoiceWidget({
         placeholder={error ? `Voice error: ${error}` : 'Live transcript preview will appear here…'}
       />
 
+      <div className={styles.voiceWidgetMeta}>
+        {mode === 'edit'
+          ? 'Edit mode — Send drops the transcript into the composer to review before you send it.'
+          : 'Direct mode — each finished sentence is sent to the agent as you speak.'}
+      </div>
+
       <div className={styles.voiceWidgetActions}>
         <button
           type="button"
@@ -138,9 +146,6 @@ export function VoiceWidget({
         >
           {isListening ? <MicOff size={14} /> : <Mic size={14} />}
           {isListening ? 'Listening' : 'Start'}
-        </button>
-        <button type="button" className={styles.voiceSecondaryButton} onClick={stopAndApply}>
-          <Square size={14} /> Stop
         </button>
         <button type="button" className={styles.voiceSecondaryButton} onClick={cancel}>
           <X size={14} /> Cancel

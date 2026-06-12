@@ -3,6 +3,8 @@ title: Workspace Commands
 description: Managing isolated development workspaces
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Workspace Commands
 
 Create and manage isolated workspaces for agent work.
@@ -16,6 +18,24 @@ Create and manage isolated workspaces for agent work.
 - Is located at `{project}/workspaces/{issue-id}/`
 
 This allows multiple agents to work on different features simultaneously without conflicts.
+
+Because each running workspace carries its own agent process, builds, and (when
+Dockerized) containers, several active at once add up. The dashboard's
+**Resources** page breaks down system RAM by agents, conversations, and other
+processes so you can see what each workspace is costing before spinning up
+another.
+
+<ThemedImage
+  light="/images/dashboard/resources-light.png"
+  dark="/images/dashboard/resources-dark.png"
+  alt="Resources page showing system RAM usage broken down by agents, conversations, and processes"
+/>
+
+<Tip>
+  Pair the **Resources** view with `pan resources` on the CLI to spot orphaned
+  workspace agents — processes still holding memory after their work is done — and
+  reclaim it before launching new workspaces.
+</Tip>
 
 ## pan workspace create
 
@@ -98,6 +118,18 @@ List all workspaces and their status:
 ```bash
 pan workspace list
 ```
+
+Each workspace owns a feature branch, and when that branch is verified and ready
+the dashboard's **Awaiting Merge** page surfaces it for a human to merge — one
+card per feature branch, grouped alongside the issue it belongs to. The CLI list
+gives you the local view; the dashboard gives you the cross-workspace view of
+which branches are queued for the final merge step.
+
+<ThemedImage
+  light="/images/dashboard/awaiting-merge-light.png"
+  dark="/images/dashboard/awaiting-merge-dark.png"
+  alt="Awaiting Merge page showing feature branches from completed workspaces ready for human merge"
+/>
 
 ## pan workspace destroy
 

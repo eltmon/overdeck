@@ -71,7 +71,7 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: deviceId ? { deviceId: { exact: deviceId } } : true,
       });
-      const audioContext = new AudioContext({ sampleRate: 24000 });
+      const audioContext = new AudioContext({ sampleRate: 16000 });
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       const processor = audioContext.createScriptProcessor(4096, 1, 1);

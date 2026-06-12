@@ -17,6 +17,8 @@ import {
   packageRoot,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
+import { normalizeAgentId } from '../../lib/agents.js';
+import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
@@ -36,6 +38,37 @@ function compareSemver(a: string, b: string): number {
     if (da !== db) return da - db;
   }
   return 0;
+}
+
+export function checkCodex(): CheckResult[] {
+  if (!checkCommand('codex')) {
+    return [
+      {
+        name: 'Codex CLI',
+        status: 'warn',
+        message: 'Not installed (optional alternative harness)',
+        fix: 'Install: npm install -g @openai/codex',
+      },
+    ];
+  }
+  const version = readCodexVersion();
+  return [
+    {
+      name: 'Codex CLI',
+      status: 'ok',
+      message: version ? `v${version}` : 'Installed (version unknown)',
+    },
+  ];
+}
+
+function readCodexVersion(): string | null {
+  try {
+    const out = execSync('codex --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const m = out.match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
 }
 
 export function checkPi(strict: boolean): CheckResult[] {
@@ -87,6 +120,29 @@ export function checkPi(strict: boolean): CheckResult[] {
       status: 'ok',
       message: 'packages/pi-extension/dist/index.js present',
     });
+  }
+
+  // ChatGPT/Codex (openai-codex) OAuth used by GPT-5.x Pi conversations. Only
+  // surfaced when a credential exists — users who never use codex aren't
+  // bothered. Expiry is a sync read; `pan pi-auth status` does the live
+  // refresh check.
+  const codexCred = readPiCodexCredential();
+  if (codexCred) {
+    const mins = Math.round((codexCred.expires - Date.now()) / 60_000);
+    if (mins > 1) {
+      out.push({
+        name: 'Pi ChatGPT/Codex auth',
+        status: 'ok',
+        message: `openai-codex token valid (${mins > 120 ? `~${Math.round(mins / 60)}h` : `~${mins}m`})`,
+      });
+    } else {
+      out.push({
+        name: 'Pi ChatGPT/Codex auth',
+        status: 'warn',
+        message: 'openai-codex token expired',
+        fix: 'Refresh/re-auth: pan pi-auth status (auto-refresh) or pan pi-auth login',
+      });
+    }
   }
   return out;
 }
@@ -232,7 +288,9 @@ type DoctorDashboardAgent = {
 };
 
 function normalizeDoctorAgentId(agentId: string): string {
-  return /^(agent|planning|conv)-/.test(agentId) ? agentId : `agent-${agentId.toLowerCase()}`;
+  // PAN-1760: route through normalizeAgentId so strike-/inspect- prefixed
+  // agents and singleton IDs aren't blindly re-prefixed with 'agent-'.
+  return normalizeAgentId(agentId);
 }
 
 function stringField(value: unknown): string | undefined {
@@ -563,6 +621,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Pi is optional: missing → warn (or error under --strict). When installed, version
   // is compared against SUPPORTED_PI_VERSION_MIN and the bundled extension is checked.
   for (const c of checkPi(options.strict ?? false)) checks.push(c);
+
+  // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
+  for (const c of checkCodex()) checks.push(c);
 
   // Check Panopticon directories
   const directories = [

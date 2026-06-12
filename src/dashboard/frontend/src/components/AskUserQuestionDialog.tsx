@@ -60,6 +60,10 @@ export function AskUserQuestionDialog({
   const agent = subject
   const pending = agent?.pendingAskUserQuestion
   const questions = pending?.questions ?? []
+  // PAN-1690 — Codex approval menus are answered by selecting a numbered
+  // option (delivered as a keystroke), not free text, so the custom-answer box
+  // is hidden for them.
+  const isCodexApproval = pending?.toolUseId?.startsWith('codex-approval:') ?? false
   // One selected label per question, initialized empty so we can validate.
   const [selections, setSelections] = useState<string[]>(() => questions.map(() => ''))
   const [customText, setCustomText] = useState('')
@@ -164,24 +168,26 @@ export function AskUserQuestionDialog({
             </div>
           ))}
 
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Or type a custom answer
-            </p>
-            <textarea
-              value={customText}
-              onChange={(e) => {
-                setCustomText(e.target.value)
-                if (e.target.value.length > 0) {
-                  setSelections(questions.map(() => ''))
-                }
-              }}
-              disabled={isSubmitting}
-              rows={2}
-              placeholder="Free-form prose response — submitted instead of any clicked option."
-              className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </div>
+          {!isCodexApproval && (
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Or type a custom answer
+              </p>
+              <textarea
+                value={customText}
+                onChange={(e) => {
+                  setCustomText(e.target.value)
+                  if (e.target.value.length > 0) {
+                    setSelections(questions.map(() => ''))
+                  }
+                }}
+                disabled={isSubmitting}
+                rows={2}
+                placeholder="Free-form prose response — submitted instead of any clicked option."
+                className="w-full rounded-md border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-border bg-card/40 px-5 py-4">

@@ -1,0 +1,226 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-04T06:15:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-538: npm run build sometimes skips Vite frontend rebuild",
+    "updated": "2026-06-04T06:16:49.667Z"
+  },
+  "plan": {
+    "id": "pan-538",
+    "title": "npm run build sometimes skips Vite frontend rebuild",
+    "status": "proposed",
+    "uid": "7c1e9a42-3b6d-4f08-9a2e-5d7c1b4f8e30",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-04T06:15:00.000Z",
+    "updated": "2026-06-04T06:16:49.667Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/538",
+        "label": "PAN-538",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "build",
+      "dashboard",
+      "frontend",
+      "vite",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "`dist/dashboard/public` (the Vite frontend bundle) goes stale silently. The frontend build is `tsc && vite build`; vite uses emptyOutDir:true so it only wipes+regenerates WHEN it runs. When `tsc` fails, the `&&` short-circuits, vite is skipped, and the prior bundle is left untouched (same hash, stale timestamp). The staleness is then invisible because (1) `pan up` only rebuilds a MISSING bundle, not a stale one (ensureDashboardBundle, src/cli/index.ts:155), and (2) `pan reload`'s 'Build did not refresh' guard only stats the SERVER bundle (dashboardBundleMtimeMs, src/cli/commands/reload.ts:27-34, 100-117) — which always rebuilds — so the guard passes even when the frontend was skipped. Net effect: dashboard changes don't appear after rebuild; the old bundle is served.",
+      "Proposal": "Two root-cause fixes that mirror existing repo patterns. (A) Clean dist/dashboard/public at the start of build:dashboard:frontend (mirroring build:contracts' rmrf of packages/contracts/dist) so a skipped/failed frontend build leaves NO stale bundle — downstream consumers then detect absence loudly instead of serving old code. (B) Extend pan reload's freshness guard to also stat the frontend bundle (dist/dashboard/public/index.html) so a skipped frontend build trips the existing 'Build did not refresh' error. The intentional `tsc && vite build` typecheck gate is preserved — only its silent failure mode is fixed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix at the build script + reload guard level rather than removing the `tsc && vite build` typecheck gate.",
+        "rationale": "The typecheck gate is intentional and valuable (blocks bad code from shipping). The defect is the SILENT staleness on failure, not the gate itself. Cleaning the output dir before build turns silent-stale into loud-missing, and extending the reload guard closes the detection gap — both are surgical and match patterns already in the repo (build:contracts rmrf; the existing server-bundle freshness guard)."
+      },
+      {
+        "summary": "Place the public-dir clean in the ROOT package.json build:dashboard:frontend script, root-relative path `dist/dashboard/public`.",
+        "rationale": "fs-helper.mjs rmrf resolves relative to cwd, and root build scripts run from the repo root — identical to build:contracts which passes the root-relative `packages/contracts/dist`. Keeping it in the root script (not the frontend package) makes the pattern consistent and the cwd predictable."
+      },
+      {
+        "summary": "Derive the frontend bundle path in reload from resolveBundledServerPath() rather than duplicating bundle-candidate resolution.",
+        "rationale": "server.js and public/index.html are siblings under dist/dashboard, so join(dirname(serverPath),'public','index.html') reuses the existing, already-tested resolver and avoids a second copy of the candidate-search logic in restart.ts."
+      },
+      {
+        "summary": "Scope kept to build reliability; no change to pan up start-vs-build semantics and no new 'rebuild on every up' behavior.",
+        "rationale": "Fix (A) makes a failed frontend build leave the bundle MISSING, which pan up's ensureDashboardBundle already handles loudly (rebuild + surface failure). Adding rebuild-on-up would be scope creep and slow every start."
+      }
+    ],
+    "items": [
+      {
+        "id": "clean-public-before-build",
+        "title": "Clean dist/dashboard/public before the frontend build",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-538",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In the ROOT package.json, change `build:dashboard:frontend` to remove dist/dashboard/public before invoking the frontend build, mirroring `build:contracts`. New value: `node scripts/fs-helper.mjs rmrf dist/dashboard/public && npm --prefix ./src/dashboard/frontend run build`. This ensures a skipped/failed `vite build` (e.g. when the preceding `tsc` fails) leaves NO stale bundle, so pan up / pan reload detect the absence loudly instead of serving old code."
+        },
+        "subItems": [
+          {
+            "id": "clean-public-before-build.ac1",
+            "title": "Root package.json build:dashboard:frontend runs `fs-helper.mjs rmrf dist/dashboard/public` before `npm --prefix ./src/dashboard/frontend run build`, mirroring the build:contracts rmrf pattern.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-public-before-build.ac2",
+            "title": "A clean `npm run build` still succeeds and produces a fresh dist/dashboard/public/index.html plus hashed assets (no regression on the happy path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-public-before-build.ac3",
+            "title": "Reproduce-and-confirm: with a deliberate frontend tsc error in place, `npm run build:dashboard:frontend` leaves dist/dashboard/public EMPTY (not a stale bundle); the deliberate error is removed afterward and the build passes again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reload-guard-frontend-bundle",
+        "title": "Extend pan reload freshness guard to cover the frontend bundle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-538",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Make pan reload's 'Build did not refresh' guard watch the frontend bundle in addition to the server bundle. Add `resolveBundledPublicIndexPath()` to src/cli/commands/restart.ts, derived as join(dirname(resolveBundledServerPath()),'public','index.html'). In src/cli/commands/reload.ts, capture the frontend bundle mtime before and after runBuild() (reusing the existing ENOENT->0 statSync pattern) and fail with the existing 'Build did not refresh … old dashboard left running' error if EITHER the server OR the frontend bundle mtime did not advance."
+        },
+        "subItems": [
+          {
+            "id": "reload-guard-frontend-bundle.ac1",
+            "title": "restart.ts exports resolveBundledPublicIndexPath() returning dist/dashboard/public/index.html derived from resolveBundledServerPath()'s directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-guard-frontend-bundle.ac2",
+            "title": "reload.ts captures before/after mtimes for BOTH the server bundle and the frontend bundle, tolerating ENOENT as mtime 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reload-guard-frontend-bundle.ac3",
+            "title": "When the frontend bundle mtime does not advance across the build (skipped frontend), reload exits non-zero with the existing 'Build did not refresh … old dashboard left running' message and does NOT restart the dashboard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-reload-guard",
+        "title": "Unit test: reload guard catches a skipped frontend bundle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-538",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a focused unit test (Vitest) that exercises the reload freshness check: server bundle mtime advances but frontend bundle mtime does not → the guard reports the 'Build did not refresh' failure and does not proceed to restart. Follow the repo's existing test style for cli/commands; mock the build and stat/mtime sources rather than running a real build. No real wall-clock delays.",
+          "_note": "If the freshness comparison is not currently factored into a testable unit, extract a small pure helper (e.g. bundlesRefreshed(before, after)) as part of reload-guard-frontend-bundle so this test targets it directly."
+        },
+        "subItems": [
+          {
+            "id": "test-reload-guard.ac1",
+            "title": "A new test fails on the pre-fix logic (server-only check passes a stale frontend) and passes after the guard is extended.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-reload-guard.ac2",
+            "title": "The test uses mocked mtimes (no real build, no real setTimeout/wall-clock delays) and runs in the default `npm test` suite.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-build-script-contract",
+        "title": "Contract test: build:dashboard:frontend cleans public before building",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-538",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a small test that reads the root package.json and asserts the `build:dashboard:frontend` script removes dist/dashboard/public before the `npm --prefix ./src/dashboard/frontend run build` step (rmrf token precedes the build token). This pins the PAN-538 fix so a future edit cannot silently reintroduce the stale-bundle regression. Place it alongside existing repo-config/contract tests; if none exists, a minimal Vitest file under tests/ that requires package.json is sufficient."
+        },
+        "subItems": [
+          {
+            "id": "test-build-script-contract.ac1",
+            "title": "Test asserts package.json scripts['build:dashboard:frontend'] contains an `fs-helper.mjs rmrf dist/dashboard/public` step that appears before the frontend build invocation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-build-script-contract.ac2",
+            "title": "Test runs in the default `npm test` suite and passes against the fixed package.json.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reload-guard-frontend-bundle",
+        "to": "test-reload-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "clean-public-before-build",
+        "to": "test-build-script-contract",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-04-PAN-538-npm-run-build-sometimes-skips-vite-frontend-rebuild.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

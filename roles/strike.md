@@ -74,11 +74,17 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
 
 Do NOT call `pan done`. The strike role does NOT use the review pipeline.
 
-## Boundaries
+## Signal the flywheel before you stall
 
-- Never `cd` outside the strike workspace except the explicit final `git checkout main` step (which is the merge ceremony).
-- Never history-rewrite branches other than `strike/<id>`.
-- Never delete `.jsonl` Claude session files.
-- Never send destructive HTTP requests speculatively.
-- Never approve permission prompts via `tmux send-keys` or any session-input mechanism.
-- If the post-merge `npm test` fails, report the failure clearly and stop — do not attempt to "fix forward" without an explicit follow-up issue. The merge already landed, so the operator must decide whether to revert or chase the regression.
+If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park at the `❯` prompt:
+
+```bash
+pan tell flywheel-orchestrator "strike <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
+```
+
+Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick (file the follow-up, launch a re-strike or full plan) instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+
+The four push-back shapes that require this signal:
+
+- **Self-abort** — you've decided the strike can't or shouldn't proceed as scoped.
+- **Refuse

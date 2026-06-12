@@ -3,6 +3,8 @@ title: Agent Commands
 description: Commands for managing autonomous AI agents
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Agent Commands
 
 Spawn, monitor, and control autonomous AI coding agents.
@@ -38,6 +40,18 @@ Shows:
 - Current status
 - Runtime duration
 - Workspace location
+
+The dashboard's **Agents** page is the visual counterpart to this command. A metric strip across the top tallies how many agents are running, how many are stuck, and the rolling cost and token spend over the last 24 hours, with each agent rendered as a card showing its model, runtime, and last activity.
+
+<ThemedImage
+  light="/images/dashboard/agents-light.png"
+  dark="/images/dashboard/agents-dark.png"
+  alt="Agents page: a metric strip for Running, Stuck, Cost 24h, Tokens 24h, runtime, and Queue over agent cards showing each agent's model, runtime, and last activity"
+/>
+
+<Tip>
+Use `pan work status` from the terminal for a quick check, and the Agents page when you want to watch many agents at once and spot stuck ones at a glance.
+</Tip>
 
 ## pan work tell
 

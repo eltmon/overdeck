@@ -3,6 +3,8 @@ title: Convoy Commands
 description: Multi-agent parallel orchestration commands
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Convoy Commands
 
 Orchestrate multiple agents working in parallel on related tasks.
@@ -10,6 +12,18 @@ Orchestrate multiple agents working in parallel on related tasks.
 ## Overview
 
 Convoys enable running multiple AI agents in parallel, combining their specialized expertise to tackle complex tasks more effectively. See the [Convoys feature guide](/features/convoys) for conceptual overview.
+
+When several convoys (and ordinary work agents) run at once, the dashboard's **God View** gives you a single aggregate, cross-project picture of every active agent — so the conversations and the workflow stay observable side by side.
+
+<ThemedImage
+  light="/images/dashboard/god-view-light.png"
+  dark="/images/dashboard/god-view-dark.png"
+  alt="God View: aggregate cross-project view of all running agents and their live activity"
+/>
+
+<Tip>
+  Use `pan convoy status` and `pan convoy list` for a per-convoy CLI view; reach for God View in the dashboard when you want to watch every parallel agent across all projects at a glance.
+</Tip>
 
 ## pan convoy start
 

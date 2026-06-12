@@ -1,0 +1,672 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-06-04T06:10:35.762Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1579: Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
+    "updated": "2026-06-04T06:14:01.802Z"
+  },
+  "plan": {
+    "id": "pan-1579",
+    "title": "Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
+    "status": "proposed",
+    "uid": "f2d47439-4aa7-413e-983c-926543b7cb8e",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-04T06:10:35.762Z",
+    "updated": "2026-06-04T06:14:01.802Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1579",
+        "label": "PAN-1579",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "sqlite",
+      "database",
+      "dependencies",
+      "runtime",
+      "abi",
+      "bun",
+      "node"
+    ],
+    "narratives": {
+      "Problem": "better-sqlite3 is a V8-ABI native addon whose compiled .node binary is locked to one Node major. Under npx the prebuilt binary is cached per package version, not per Node version, so a Node major change yields ERR_DLOPEN_FAILED (NODE_MODULE_VERSION mismatch) at the first new Database(). The shipped self-heal (native-sqlite-guard.ts) shells out to npm rebuild and re-execs — a band-aid that depends on network and a writable install dir.",
+      "Proposal": "Move the synchronous SQLite layer behind ONE shared adapter (src/lib/database/driver.ts: openDatabase(path) + SqliteDatabase/SqliteStatement types) that selects bun:sqlite under Bun and node:sqlite under Node — both runtime-bundled and ABI-proof. The adapter shims the two methods node:sqlite lacks (pragma(), transaction() with savepoint nesting) and suppresses the SQLite ExperimentalWarning. Migrate all 8 runtime DB-open sites and all type-only imports to the adapter, delete native-sqlite-guard.ts, then drop better-sqlite3 + @types/better-sqlite3 and bump engines to >=22.5.0. Verified on Node 22.22: node:sqlite loads flag-free, bundles FTS5, has iterate(), accepts Float32Array/Buffer binds, returns BLOB as Uint8Array (existing read code already compatible)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose node:sqlite (built-in) over @sqlite.org/sqlite-wasm.",
+        "rationale": "Issue lists node:sqlite as the primary path; it keeps the existing synchronous run/get/all surface (WASM is async/bigger API change with perf cost) and pairs naturally with bun:sqlite behind one adapter, both runtime-bundled. Verified FTS5, iterate(), and BLOB round-trip work on Node 22.22."
+      },
+      {
+        "summary": "Engines floor set to >=22.5.0, not >=24.",
+        "rationale": "node:sqlite shipped in 22.5.0 and loads flag-free on the verified dev Node (22.22). The issue acceptance criterion says >=22.5. Docs recommend 22.16+/24 for stability without forcing a Node-24-only floor on users."
+      },
+      {
+        "summary": "transaction() implemented uniformly in the adapter for both runtimes instead of delegating to bun:sqlite's native transaction.",
+        "rationale": "Guarantees identical commit/rollback/nesting semantics regardless of runtime and keeps a single tested code path; node:sqlite has no transaction() at all, so a shim is required for Node anyway."
+      },
+      {
+        "summary": "Do NOT add --experimental-sqlite to launch paths; suppress only the SQLite ExperimentalWarning in-process.",
+        "rationale": "Flag is not required on the verified Node and adding it across bin shebang/pty-supervisor/launchers is broad and fragile. A tightly-scoped process.emitWarning filter removes the log noise without hiding other warnings; early-22.5.x flag-required failures get a clear actionable error instead."
+      }
+    ],
+    "items": [
+      {
+        "id": "driver-adapter",
+        "title": "Create shared SQLite driver adapter (driver.ts) with pragma/transaction shims and runtime selection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1579",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "migrate-panopticon-db",
+            "migrate-cloister-db",
+            "migrate-docs-db",
+            "migrate-artifacts-db",
+            "migrate-cache-service-db",
+            "migrate-memory-fts-db",
+            "migrate-registry-db",
+            "swap-residual-types",
+            "migrate-tests-off-bsqlite"
+          ]
+        },
+        "narrative": {
+          "Action": "Add src/lib/database/driver.ts exporting openDatabase(path: string): SqliteDatabase and the SqliteDatabase / SqliteStatement TypeScript interfaces that all DB code will depend on. Select bun:sqlite when typeof Bun !== 'undefined', else node:sqlite (via createRequire). Present a better-sqlite3-compatible surface: exec(sql), prepare(sql)->{run(...params)->{changes,lastInsertRowid}, get(...params), all(...params), iterate(...params)}, close(). Shim pragma(sql, {simple?}) (exec for sets; prepare(`PRAGMA ${key}`).get() for {simple:true} reads, returning the scalar). Shim transaction(fn)->callable that runs BEGIN/COMMIT/ROLLBACK at depth 0 and SAVEPOINT/RELEASE/ROLLBACK TO when nested (track depth on the connection). At module import, install a targeted process.emitWarning filter that swallows ONLY name==='ExperimentalWarning' && /SQLite/.test(message). Wrap the node:sqlite require in try/catch and, on a flag-required error, throw a clear message recommending Node 22.16+/24. The SqliteDatabase type must model BLOB results as Uint8Array. Do NOT auto-coerce booleans. This bead does NOT modify any existing call site."
+        },
+        "subItems": [
+          {
+            "id": "driver-adapter.ac1",
+            "title": "openDatabase(':memory:') returns a working connection under both Node (node:sqlite) and Bun (bun:sqlite); exec/prepare/run/get/all/iterate/close all function",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac2",
+            "title": "pragma('journal_mode = WAL') sets and pragma('user_version', {simple:true}) reads back the scalar value correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac3",
+            "title": "transaction(fn) commits on success, rolls back the whole transaction when fn throws, and a nested transaction inside an outer one uses SAVEPOINT so the inner can roll back while the outer commits — all covered by unit tests using fake timers where any delay is involved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac4",
+            "title": "Unit test asserts a raw boolean bind throws (documents the strict-no-coercion contract, H1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac5",
+            "title": "Float32Array blob round-trips: bind a Buffer-of-Float32Array, read the column back as Uint8Array, reconstruct the Float32Array, assert values equal (covers BLOB type + alignment, H4/D6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac6",
+            "title": "Importing driver.ts suppresses the SQLite ExperimentalWarning only; a non-SQLite ExperimentalWarning still emits (asserted in a unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "driver-adapter.ac7",
+            "title": "typecheck + lint pass; no import of better-sqlite3 anywhere in driver.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-panopticon-db",
+        "title": "Migrate panopticon.db chokepoint (database/index.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace getDatabase()'s inline isBunRuntime() branch and require('better-sqlite3') in src/lib/database/index.ts with a single openDatabase(dbPath) call from driver.ts. Swap `import type Database from 'better-sqlite3'` to the adapter's SqliteDatabase type. Preserve all existing pragmas (journal_mode/foreign_keys/synchronous/journal_size_limit), the one-time incremental_vacuum migration, and the 15-minute incremental_vacuum setInterval exactly as-is — they go through the adapter's pragma/exec."
+        },
+        "subItems": [
+          {
+            "id": "migrate-panopticon-db.ac1",
+            "title": "database/index.ts contains no better-sqlite3 import and no isBunRuntime branch; getDatabase() uses openDatabase()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-panopticon-db.ac2",
+            "title": "All WAL/foreign_keys/synchronous/journal_size_limit pragmas and the auto_vacuum=INCREMENTAL migration still run and succeed at first getDatabase()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-panopticon-db.ac3",
+            "title": "Dashboard server boots and opens panopticon.db cleanly under Node 22 (built dist) with no native rebuild step and no ERR_DLOPEN_FAILED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-cloister-db",
+        "title": "Migrate cloister.db (cloister/database.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete the inline openSqliteDb() helper and its Bun branch in src/lib/cloister/database.ts; open via openDatabase(CLOISTER_DB_PATH). Swap the better-sqlite3 type import to SqliteDatabase. The writeHealthEventsSync transaction (line ~177) must run through the adapter's transaction() shim. Leave the Effect.try wrapper variants (CloisterDatabaseError) untouched."
+        },
+        "subItems": [
+          {
+            "id": "migrate-cloister-db.ac1",
+            "title": "cloister/database.ts has no better-sqlite3 import and no inline openSqliteDb; uses openDatabase() and the adapter SqliteDatabase type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cloister-db.ac2",
+            "title": "writeHealthEventsSync batch insert runs in a single transaction via the adapter and a test asserts a mid-batch throw rolls back all rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cloister-db.ac3",
+            "title": "Existing cloister/health DB tests pass unchanged (aside from the type import)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-docs-db",
+        "title": "Migrate docs index DB (docs/query.ts + docs/index-builder.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the top-level `import Database from 'better-sqlite3'` default imports in src/lib/docs/query.ts and src/lib/docs/index-builder.ts (currently Node-only — would throw under Bun) with openDatabase() from the adapter. These two files share the docs index DB and use FTS5 (verified bundled in node:sqlite), a transaction (index-builder.ts:144), and Float32 embedding blobs. Ensure float32ArrayToBuffer (write) and bufferToFloat32Array (read at index-builder.ts:383) handle Uint8Array results: widen the bufferToFloat32Array param type from Buffer to Uint8Array and keep its dim validation. Verify the FTS5 MATCH query in query.ts works through the adapter."
+        },
+        "subItems": [
+          {
+            "id": "migrate-docs-db.ac1",
+            "title": "Neither docs/query.ts nor docs/index-builder.ts imports better-sqlite3; both open via openDatabase()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-docs-db.ac2",
+            "title": "Docs index build inserts chunks+embeddings inside a transaction and a docs FTS5 MATCH query returns results — exercised by the existing docs index-builder test (migrated off better-sqlite3 in its own bead)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-docs-db.ac3",
+            "title": "Embedding blob written via float32ArrayToBuffer reads back through bufferToFloat32Array as an equal Float32Array under node:sqlite (Uint8Array result, alignment-safe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-artifacts-db",
+        "title": "Migrate artifacts index store (artifacts/index-store.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the Node-only require('better-sqlite3') (line ~300) in src/lib/artifacts/index-store.ts with openDatabase(); swap the better-sqlite3 type import to SqliteDatabase. This makes the artifacts index work under Bun where it previously would have thrown."
+        },
+        "subItems": [
+          {
+            "id": "migrate-artifacts-db.ac1",
+            "title": "artifacts/index-store.ts has no better-sqlite3 import; opens via openDatabase() and uses the adapter type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-artifacts-db.ac2",
+            "title": "Artifacts index read/write paths typecheck and existing artifacts behavior is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-cache-service-db",
+        "title": "Migrate dashboard cache-service DB to the driver adapter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the require('better-sqlite3') (line ~35) in src/dashboard/server/services/cache-service.ts with openDatabase(); swap the better-sqlite3 type import to SqliteDatabase. Confirm no execSync/event-loop-blocking is introduced (adapter is sync SQLite, which is the existing contract)."
+        },
+        "subItems": [
+          {
+            "id": "migrate-cache-service-db.ac1",
+            "title": "cache-service.ts has no better-sqlite3 import; opens via openDatabase() and uses the adapter type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-cache-service-db.ac2",
+            "title": "Dashboard server build (npm run build) succeeds and the cache service operates after boot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-memory-fts-db",
+        "title": "Migrate memory FTS DB (memory/fts-db.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the require.resolve('better-sqlite3') guard and require('better-sqlite3') (lines ~15/111) in src/lib/memory/fts-db.ts with openDatabase(); swap the better-sqlite3 type import to SqliteDatabase. Memory search uses FTS5 (bundled, verified) and the conditional transaction at line ~266 (db.transaction(execute)()) — that must route through the adapter transaction shim. Remove the now-unnecessary 'run bun install' resolve-failure guard (the adapter owns driver resolution)."
+        },
+        "subItems": [
+          {
+            "id": "migrate-memory-fts-db.ac1",
+            "title": "memory/fts-db.ts has no better-sqlite3 import or require.resolve guard; opens via openDatabase()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-memory-fts-db.ac2",
+            "title": "Memory FTS5 search returns results and the conditional transaction path commits/rolls back correctly via the adapter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-memory-fts-db.ac3",
+            "title": "Existing memory FTS tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-registry-db",
+        "title": "Migrate feature registry storage (registry/feature-registry-storage.ts) to the driver adapter",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace the require.resolve('better-sqlite3') check and the better-sqlite3 open in src/lib/registry/feature-registry-storage.ts with openDatabase(); remove the resolve-failure 'run bun install' guard. Preserve the existing pragma usage (3 sites)."
+        },
+        "subItems": [
+          {
+            "id": "migrate-registry-db.ac1",
+            "title": "feature-registry-storage.ts has no better-sqlite3 import or require.resolve guard; opens via openDatabase()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-registry-db.ac2",
+            "title": "Registry tag/list/show storage operations typecheck and function unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swap-residual-types",
+        "title": "Swap residual type-only better-sqlite3 imports/annotations to the adapter type",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Replace all remaining `import type Database from 'better-sqlite3'` and inline `import('better-sqlite3').Database` annotations that were not already swapped by the per-site beads — at minimum src/lib/database/schema.ts, src/dashboard/server/event-store.ts (line ~159 cast), src/lib/database/cost-events-db.ts (lines ~489/505 param annotations) — to the adapter's SqliteDatabase type. Run a final grep to ensure no `from 'better-sqlite3'` / `import('better-sqlite3')` remains in src/ except inside the test-migration and capstone scopes."
+        },
+        "subItems": [
+          {
+            "id": "swap-residual-types.ac1",
+            "title": "grep for `better-sqlite3` across src/ (excluding the 4 test files and package.json) returns no type imports or annotations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swap-residual-types.ac2",
+            "title": "npm run typecheck passes with all db params/returns typed via SqliteDatabase/SqliteStatement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-native-guard",
+        "title": "Delete native-sqlite-guard.ts and its two call sites",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Delete src/lib/native-sqlite-guard.ts and remove the ensureNativeSqliteAbi() import + call in src/cli/index.ts (~line 107 import, ~1407 call) and src/dashboard/server/main.ts (~line 10 import, ~58 call). Remove the now-orphaned explanatory comments at those call sites. There is no ABI to heal once the native addon is gone."
+        },
+        "subItems": [
+          {
+            "id": "remove-native-guard.ac1",
+            "title": "native-sqlite-guard.ts no longer exists and no file imports ensureNativeSqliteAbi",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-native-guard.ac2",
+            "title": "CLI and dashboard entrypoints typecheck and start with no orphaned imports or dead comments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-tests-off-bsqlite",
+        "title": "Migrate test files off better-sqlite3 to the adapter / node:sqlite",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update the three real test imports — src/lib/database/__tests__/pending-auto-merges-schema.test.ts, src/lib/database/__tests__/stuck-schema.test.ts (dynamic import), src/lib/docs/__tests__/index-builder.test.ts — to build in-memory DBs via openDatabase(':memory:') (or node:sqlite directly). Review the command-string fixture in src/dashboard/server/services/__tests__/format-tool-input.test.ts that mentions better-sqlite3 and update it to a generic command if it no longer reflects reality. Keep all assertions intact."
+        },
+        "subItems": [
+          {
+            "id": "migrate-tests-off-bsqlite.ac1",
+            "title": "No test file imports better-sqlite3; the three schema/docs tests build DBs via openDatabase()/node:sqlite and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-tests-off-bsqlite.ac2",
+            "title": "format-tool-input.test.ts fixture no longer hardcodes a better-sqlite3 require (or is justified to remain) and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-dependency-bump-engines",
+        "title": "Remove better-sqlite3 dependency, bump engines, clean build externals and comments (capstone)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-04T06:10:35.762Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1579",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Remove better-sqlite3 and @types/better-sqlite3 from package.json dependencies/devDependencies and bump engines.node to '>=22.5.0'. Remove 'better-sqlite3' from the tsdown external list in src/dashboard/server/tsdown.config.ts (and any root tsdown.config.ts external list). Run bun install to update the lockfile. Update stale comments/doc text that describe better-sqlite3 as the Node driver, and add a one-line note in .claude/rules/dashboard-node22-only.md clarifying that the DB layer is now node:sqlite/bun:sqlite (still Node-22-only for node-pty/circular-ESM reasons, unrelated to SQLite). Final verification across runtimes."
+        },
+        "subItems": [
+          {
+            "id": "drop-dependency-bump-engines.ac1",
+            "title": "package.json has no better-sqlite3 or @types/better-sqlite3 entry; engines.node is '>=22.5.0'; lockfile updated via bun install",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-dependency-bump-engines.ac2",
+            "title": "grep -r 'better-sqlite3' src/ returns nothing except incidental historical mentions in unrelated comments; tsdown external lists no longer mention it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-dependency-bump-engines.ac3",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-dependency-bump-engines.ac4",
+            "title": "Dashboard and CLI start cleanly under Node 22 (built dist), Node 24, and Bun with NO native rebuild step and no ERR_DLOPEN_FAILED — confirming the root-cause fix from the issue acceptance list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "driver-adapter",
+        "to": "migrate-panopticon-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-cloister-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-docs-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-artifacts-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-cache-service-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-memory-fts-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-registry-db",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "swap-residual-types",
+        "type": "blocks"
+      },
+      {
+        "from": "driver-adapter",
+        "to": "migrate-tests-off-bsqlite",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-docs-db",
+        "to": "migrate-tests-off-bsqlite",
+        "type": "informs"
+      },
+      {
+        "from": "migrate-panopticon-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-cloister-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-docs-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-artifacts-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-cache-service-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-memory-fts-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-registry-db",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "swap-residual-types",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-native-guard",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-tests-off-bsqlite",
+        "to": "drop-dependency-bump-engines",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

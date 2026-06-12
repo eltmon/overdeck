@@ -29,9 +29,10 @@ import { getDirectRestartRequest } from '../../lib/restartRouting';
 import { WS_METHODS } from '@panctl/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 
 async function fetchConversations(): Promise<Conversation[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json();
 }
@@ -135,6 +136,14 @@ interface CommandDeckProps {
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
   conversationViewMode?: ViewMode;
+  pendingConversationTarget?: {
+    conversationName: string;
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+    label: string;
+  } | null;
+  onPendingConversationTargetConsumed?: () => void;
   /** Called when the selected conversation changes so App can sync the URL */
   onConvIdChange?: (id: string | null) => void;
   onConversationViewModeChange?: (mode: ViewMode) => void;
@@ -155,6 +164,8 @@ const SECTION_SPLIT_KEY = 'mc-section-split';
 export function CommandDeck({
   issues = [],
   convId,
+  pendingConversationTarget = null,
+  onPendingConversationTargetConsumed,
   onConvIdChange,
   selectedProject = null,
   onSelectProject,
@@ -337,6 +348,14 @@ export function CommandDeck({
     });
   }, [projects, sessionTreeMap]);
 
+  useEffect(() => {
+    if (selectedProject || !onSelectProject) return;
+    const projectsWithFeatures = projectsWithSessions.filter((project) => project.features.length > 0);
+    if (projectsWithFeatures.length === 1) {
+      onSelectProject(projectsWithFeatures[0]!.name);
+    }
+  }, [onSelectProject, projectsWithSessions, selectedProject]);
+
   const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
 
   // Poll container stats every 5s when issues have containers
@@ -465,13 +484,24 @@ export function CommandDeck({
     else store.addPane(projectKey, { paneType: 'issue', label, issueId });
   }, []);
 
-  const openConversationTabIn = useCallback((projectKey: string, name: string, label: string) => {
+  const openConversationTabIn = useCallback((projectKey: string, name: string, label: string, target?: {
+    messageId: string;
+    messageIndex: number;
+    nonce: number;
+  }) => {
     const store = usePanesStore.getState();
     store.ensureHome(projectKey);
     const panes = store.panesByWorkspace[projectKey] ?? [];
     const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-    if (existing) store.setActivePane(projectKey, existing.paneId);
-    else store.addPane(projectKey, { paneType: 'agent', label, conversationId: name });
+    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name });
+    store.setActivePane(projectKey, paneId);
+    if (target) {
+      usePanesStore.getState().updatePane(projectKey, paneId, {
+        targetMessageId: target.messageId,
+        targetMessageIndex: target.messageIndex,
+        targetMessageNonce: target.nonce,
+      });
+    }
   }, []);
 
   const openTerminalTabIn = useCallback((projectKey: string, sessionId: string) => {
@@ -502,11 +532,19 @@ export function CommandDeck({
       setSelectedConversation(conv.name);
       setSelectedFeature(null);
       const projectName = resolveConversationProjectName(conv) ?? NO_PROJECT_KEY;
+      const target = pendingConversationTarget?.conversationName === conv.name
+        ? {
+            messageId: pendingConversationTarget.messageId,
+            messageIndex: pendingConversationTarget.messageIndex,
+            nonce: pendingConversationTarget.nonce,
+          }
+        : undefined;
       onSelectProject?.(projectName);
-      openConversationTabIn(projectName, conv.name, conv.title ?? 'Agent');
+      openConversationTabIn(projectName, conv.name, pendingConversationTarget?.label ?? conv.title ?? 'Agent', target);
+      if (target) onPendingConversationTargetConsumed?.();
       appliedConvId.current = convId;
     }
-  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn]);
+  }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
   // Auto-select first conversation on initial load if no deep-link and no feature selected
   const hasAutoSelected = useRef(false);
@@ -643,7 +681,25 @@ export function CommandDeck({
     }
   }, [queryClient]);
 
-  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => {
+  // PAN-1779: clear a persistent pause gate. Distinct from resume — unpause
+  // removes the gate without spawning; the deacon's next patrol resumes it.
+  const handleUnpauseSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${sessionId}/unpause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
+      toast.success('Agent unpaused — deacon will resume it on the next patrol');
+      await refreshDashboardState(queryClient);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
+    }
+  }, [queryClient]);
+
+  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => {
     try {
       // Find project key for this issue. Primary: resource-allocated issue list.
       // Fallback: session tree (covers issues where the work agent is done but
@@ -655,7 +711,7 @@ export function CommandDeck({
           tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
         )?.[0];
 
-      const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model });
+      const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model, harness });
       if (directRestartRequest) {
         const res = await fetch(directRestartRequest.endpoint, {
           method: 'POST',
@@ -674,7 +730,10 @@ export function CommandDeck({
       const resumeRes = await fetch(`/api/agents/${sessionId}/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(model ? { model } : {}),
+        body: JSON.stringify({
+          ...(model ? { model } : {}),
+          ...(harness ? { harness } : {}),
+        }),
       });
       const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
@@ -689,7 +748,10 @@ export function CommandDeck({
         const resumeRetryRes = await fetch(`/api/agents/${sessionId}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(model ? { model } : {}),
+          body: JSON.stringify({
+            ...(model ? { model } : {}),
+            ...(harness ? { harness } : {}),
+          }),
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
@@ -709,6 +771,7 @@ export function CommandDeck({
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       const requestBody: Record<string, unknown> = { issueId };
       if (model) requestBody.model = model;
+      if (harness) requestBody.harness = harness;
       let lastRequestBody = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -840,13 +903,15 @@ export function CommandDeck({
   // agent tab in the current project's deck. Returns the new conversation's
   // name so the deck's launch components can focus the tab.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string): Promise<string | undefined> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
           harness: harnessOverride ?? sidebarHarness,
         };
         if (projectKey) payload.projectKey = projectKey;
+        const trimmedMessage = message?.trim();
+        if (trimmedMessage) payload.message = trimmedMessage;
         const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -891,11 +956,11 @@ export function CommandDeck({
   // a project conversation for the chosen agent and return its name so the deck
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
-    (agentId: string): Promise<string | undefined> => {
+    (agentId: string, message?: string): Promise<string | undefined> => {
       const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
-      return createConversationForProject(projectKey, harness);
+      return createConversationForProject(projectKey, harness, message);
     },
     [createConversationForProject, selectedProject],
   );
@@ -1162,6 +1227,7 @@ export function CommandDeck({
                     onViewTerminal={handleViewTerminal}
                     onPauseSession={handlePauseSession}
                     onResumeSession={handleResumeSession}
+                    onUnpauseSession={handleUnpauseSession}
                     onRestartSession={handleRestartSession}
                     onDeepWipe={handleDeepWipe}
                     onOpenStateDir={handleOpenStateDir}
@@ -1221,6 +1287,7 @@ export function CommandDeck({
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
+                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   features={selectedProjectData?.features}
@@ -1237,6 +1304,7 @@ export function CommandDeck({
                     issueId={issueId}
                     title={info.title}
                     branch={info.branch}
+                    projectName={selectedProject ?? undefined}
                     createdAt={info.createdAt}
                     agentId={info.agentId}
                     conversations={conversations}

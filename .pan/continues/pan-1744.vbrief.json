@@ -1,0 +1,177 @@
+{
+  "version": "1",
+  "issueId": "PAN-1744",
+  "created": "2026-06-11T00:57:26.844Z",
+  "updated": "2026-06-11T08:51:35.136Z",
+  "gitState": {
+    "branch": "feature/pan-1744",
+    "sha": "b1ff24876",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Boot recovery re-enters the SAME runForkPipeline (made resume-safe) rather than a duplicate recovery code path — one pipeline, no drift between live and recovery behavior.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Persist the full fork request as a JSON column (fork_request) on the fork conversation row at creation. The runForkPipeline params today live only in the dead process's memory; this is the minimal durable state needed to reconstruct the call after a restart.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Retry guard fork_retry_count capped at 2, incremented and persisted BEFORE each recovery attempt so a fork that crashes the dashboard during its own recovery still burns a retry and cannot crash-loop the server on every boot.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Recovery runs on a short delay after boot (scheduled setTimeout), not inline at the old clearStuckForks call site, so tmux/runtime-mirror/lifecycle services have settled enough to classify session state and avoid killing a working agent.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Legacy in-flight forks with no persisted fork_request fall back to the old behavior (mark failed). Only forks created after this change are recoverable; older ones degrade rather than guess parameters.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "CLI honesty applies to BOTH consumers — handoff.ts and fork.ts — because they share forkConversationViaServer and contain the identical 'only check forkStatus===failed then print green' false-success bug.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Include the bounded graceful-shutdown grace window (the issue's 'cheap complement'): on SIGTERM/INT/HUP, await in-flight forks up to a cap before exit so the common pan-reload case never interrupts a fork.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "No new config flags and no dashboard UI work. The change is confined to the server pipeline, the conversations DB schema, and the two CLI commands. This is a correctness/resilience bug, not a feature.",
+      "recordedAt": "2026-06-11T01:01:38.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "tmux-alive-but-not-injected: a fork whose tmux session spawned but whose brief never landed must NOT be classified as 'completed' and marked active.",
+      "mitigation": "The 'completed' dispatch branch requires BOTH the tmux session alive AND the runtime mirror reporting active/waiting-on-human (getAgentRuntimeStateSync). tmux-alive-but-idle re-enters the resumable pipeline to re-inject, it does not mark active."
+    },
+    {
+      "id": "H2",
+      "summary": "Double-authoring or double-spawn when the pipeline is re-entered during recovery.",
+      "mitigation": "resumable-fork-pipeline bead makes runForkPipeline reuse an existing handoff_doc_path+file (skip authoring) and skip spawnConversationSession when the tmux session already exists (sessionExists)."
+    },
+    {
+      "id": "H3",
+      "summary": "A fork that crashes the dashboard could send recovery into an infinite crash-loop on every boot.",
+      "mitigation": "incrementForkRetryCount is called and persisted BEFORE each attempt; at retry_count >= 2 the fork is marked failed instead of re-attempted."
+    },
+    {
+      "id": "H4",
+      "summary": "clearStuckForks is currently called synchronously at boot and may be covered by an existing test; removing/repurposing it can break that test.",
+      "mitigation": "Locate any clearStuckForks test; update or remove it as part of the boot-fork-recovery bead. Keep clearStuckForks only if still needed as a narrow terminal fail-marker, otherwise remove it and its callers/tests cleanly."
+    },
+    {
+      "id": "H5",
+      "summary": "Migration correctness: a non-additive or non-idempotent migration corrupts existing databases.",
+      "mitigation": "Add columns to BOTH the CREATE TABLE block (fresh DBs) AND a try/catch ALTER TABLE migration step (existing DBs), bump SCHEMA_VERSION to 53, matching the established pattern in schema.ts. Verify running migrations twice does not throw."
+    },
+    {
+      "id": "H6",
+      "summary": "Graceful shutdown could block a restart indefinitely if an in-flight fork hangs.",
+      "mitigation": "The shutdown wait is strictly bounded (~10s cap); a fork that does not settle in the window is logged and the process exits anyway. Boot recovery is the backstop for anything dropped."
+    },
+    {
+      "id": "H7",
+      "summary": "fork_request must contain every parameter runForkPipeline needs — an omitted field would make recovery re-enter with wrong/default behavior (silent wrong-fork).",
+      "mitigation": "Define a single shared ForkRequest type enumerating all runForkPipeline args + parent conv name + sessionId; the persist bead serializes from exactly that type. This is the foundation bead's deep-inspection focus."
+    },
+    {
+      "id": "H8",
+      "summary": "Dashboard server is Node 22 only and must be rebuilt before restart; recovery/shutdown code runs in dist.",
+      "mitigation": "After server changes, run npm run build before any restart; never run the server under Bun. (Project rule: dashboard-node22-only.)"
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-11T00:57:26.844Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:05Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T02:05:11.979Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:11Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T02:11:14.238Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:15Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T02:15:25.344Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T02:18:04.966Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T02:18:10.376Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T02:36:47.022Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T02:47Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T02:47:32.837Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:30Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T07:30:27.598Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T07:52:45.320Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:06Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T08:06:09.648Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:33Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T08:33:14.867Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:37Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T08:37:15.938Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:44Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T08:44:49.305Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:46Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T08:46:26.575Z"
+    }
+  ],
+  "feedback": []
+}

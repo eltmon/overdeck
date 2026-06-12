@@ -11,6 +11,7 @@ import { currentAction } from './current.js';
 import { costAction } from './cost.js';
 import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
+import { jsonlAction } from './jsonl.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -88,6 +89,14 @@ export function registerConversationsCommands(program: Command): void {
     .description('Show detailed information for a session by ID')
     .option('--json', 'Output as JSON')
     .action((id: string, opts: { json?: boolean }) => showAction(id, opts));
+
+  // ── jsonl ───────────────────────────────────────────────────────────────────
+  conversations
+    .command('jsonl <conv-id>')
+    .alias('transcript')
+    .description('Print the Claude JSONL transcript path for a conversation id (the /conv/<N> number)')
+    .option('--json', 'Output status/path as JSON; read the status field')
+    .action((id: string, opts: { json?: boolean }) => jsonlAction(id, opts));
 
   // ── current ───────────────────────────────────────────────────────────────────
   conversations

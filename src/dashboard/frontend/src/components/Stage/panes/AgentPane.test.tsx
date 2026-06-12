@@ -11,13 +11,29 @@ vi.mock('../../chat/ConversationPanel', () => ({
     conversation,
     viewMode,
     onViewModeChange,
+    targetMessageId,
+    targetMessageIndex,
+    targetMessageNonce,
+    onTargetMessageHandled,
   }: {
     conversation: { name: string }
     viewMode: string
     onViewModeChange: (m: string) => void
+    targetMessageId?: string
+    targetMessageIndex?: number
+    targetMessageNonce?: number
+    onTargetMessageHandled?: () => void
   }) => (
-    <div data-testid="conversation-panel" data-view={viewMode} data-conv={conversation.name}>
+    <div
+      data-testid="conversation-panel"
+      data-view={viewMode}
+      data-conv={conversation.name}
+      data-target-id={targetMessageId ?? ''}
+      data-target-index={targetMessageIndex ?? ''}
+      data-target-nonce={targetMessageNonce ?? ''}
+    >
       <button onClick={() => onViewModeChange('terminal')}>to-terminal</button>
+      <button onClick={() => onTargetMessageHandled?.()}>target-handled</button>
     </div>
   ),
 }))
@@ -73,6 +89,27 @@ describe('AgentPane', () => {
     fireEvent.click(screen.getByText('to-terminal'))
     const updated = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
     expect(updated.viewMode).toBe('terminal')
+  })
+
+  it('clears one-shot target message fields after the conversation handles them', () => {
+    const id = usePanesStore.getState().addPane(WS, {
+      paneType: 'agent',
+      label: 'Agent',
+      conversationId: 'conv-1',
+      targetMessageId: 'msg-1',
+      targetMessageIndex: 3,
+      targetMessageNonce: 7,
+    })
+    const pane = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
+    render(<AgentPane pane={pane} ctx={ctxWith({ conversation: { name: 'conv-1' } as unknown as Conversation })} />)
+
+    expect(screen.getByTestId('conversation-panel')).toHaveAttribute('data-target-id', 'msg-1')
+    fireEvent.click(screen.getByText('target-handled'))
+
+    const updated = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
+    expect(updated.targetMessageId).toBeUndefined()
+    expect(updated.targetMessageIndex).toBeUndefined()
+    expect(updated.targetMessageNonce).toBeUndefined()
   })
 
   it('shows an unavailable state when no backing data resolves', () => {

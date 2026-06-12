@@ -3,6 +3,8 @@ title: "Token Spend Report"
 description: "Live analysis of Panopticon's AI token consumption, costs, and codebase evolution"
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Token Spend Report
 
 Panopticon tracks every API call, token, and dollar spent across its AI coding pipeline. This interactive report visualizes that data — from model breakdowns to monthly trajectories to the actual codebase evolution video.
@@ -15,6 +17,17 @@ Panopticon tracks every API call, token, and dollar spent across its AI coding p
 />
 
 ## What's Inside
+
+This published report is a point-in-time snapshot. For live spend while agents
+and conversations are running, the dashboard's **Cost Tracking** page tracks the
+same SQLite + JSONL event streams in real time — total cost, event count, budget
+warnings, a 30-day trend chart, and a per-issue breakdown.
+
+<ThemedImage
+  light="/images/dashboard/costs-light.png"
+  dark="/images/dashboard/costs-dark.png"
+  alt="Cost Tracking page showing total cost, event count, budget warnings, a 30-day cost-trend chart, and per-issue costs"
+/>
 
 The report pulls from two data sources:
 
@@ -35,6 +48,19 @@ The report pulls from two data sources:
 | **Cache Savings** | Tokens and dollars saved from prompt caching |
 | **Cost-Reduction Features** | RTK, Caveman, TLDR — what's working and what's not |
 | **Codebase Timelapse** | Gource visualization of the entire git history |
+
+## Beyond Cost: Runtime Metrics
+
+Cost is only half the picture. The dashboard's **Metrics** page pairs the spend
+data above with runtime comparison and performance analytics — useful when
+deciding which model to route a given role to, since the cheapest model per call
+isn't always the cheapest per completed task.
+
+<ThemedImage
+  light="/images/dashboard/metrics-light.png"
+  dark="/images/dashboard/metrics-dark.png"
+  alt="Metrics page showing runtime comparison and performance analytics"
+/>
 
 ## Regenerating the Report
 

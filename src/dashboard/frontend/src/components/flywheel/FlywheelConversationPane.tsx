@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, FileText, Loader2, Maximize2, Pause, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, Maximize2, MoreHorizontal, Pause, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
@@ -17,14 +17,6 @@ interface FlywheelRunSummary {
   status: 'running' | 'paused' | 'complete' | 'aborted';
 }
 
-interface MergeQueueItem {
-  issueId: string;
-  title: string;
-  pr?: number;
-  mergeOrder: number;
-  conflictsWith: string[];
-}
-
 interface FlywheelRunDetail extends FlywheelRunSummary {
   latest: FlywheelStatus | null;
   paths: {
@@ -35,7 +27,7 @@ interface FlywheelRunDetail extends FlywheelRunSummary {
 }
 
 interface FlywheelRoleConfig {
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   model?: string;
   effort?: 'low' | 'medium' | 'high';
   maxAgents?: number;
@@ -111,6 +103,7 @@ type FlywheelPaneViewMode = 'conversation' | 'terminal';
 
 export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversationPaneProps) {
   const [viewMode, setViewMode] = useState<FlywheelPaneViewMode>('conversation');
+  const [moreOpen, setMoreOpen] = useState(false);
   const isPopoutWindow = typeof window !== 'undefined' && window.location.pathname === '/popout/flywheel-conversation';
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
@@ -135,19 +128,11 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
     queryFn: () => fetchJson<SettingsResponse>('/api/settings'),
     staleTime: 30000,
   });
-  const mergeQueueQuery = useQuery({
-    queryKey: ['flywheel-merge-queue'],
-    queryFn: () => fetchJson<MergeQueueItem[]>('/api/flywheel/merge-queue'),
-    refetchInterval: latestRun?.status === 'running' ? 15000 : false,
-    enabled: !!latestRun,
-  });
-
   const run = runDetailQuery.data ?? null;
   const activeRun = run?.status === 'running' ? run : null;
   const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
-  const mergeQueue = mergeQueueQuery.data ?? [];
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -305,14 +290,14 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
                 Terminal
               </button>
             </div>
-            {/* Action buttons are always visible and self-explanatory via disabled state.
-                Removed runState gating that was introduced in a67ee20a9 (PAN-RUN-11
-                regression report). Original toolbar (commit e8e6f977e) showed all
-                actions unconditionally; gating hid the buttons operators expect to
-                see at all times. handleNewRun guards the destructive case via confirm. */}
+            {/* v3 control bar (PAN-1694): Pause/Resume primary, secondary actions under
+                ⋯ More, Abort red + isolated. PAN-RUN-11 guard preserved — no action is
+                state-gated-away: Pause/Resume/Abort are always visible, and New Run /
+                Write Report / Open Run Report / Pop out / Configure are always reachable
+                one click into the More menu. Each keeps its disabled-by-legality logic. */}
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 disabled:opacity-50"
               onClick={() => pauseMutation.mutate()}
               disabled={actionPending || runState !== 'running'}
               title={runState !== 'running' ? 'No active run to pause' : 'Pause the orchestrator'}
@@ -330,35 +315,96 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               <RotateCcw className="h-3.5 w-3.5" />
               Resume
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
+                onClick={() => setMoreOpen((o) => !o)}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+                More
+              </button>
+              {moreOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" aria-hidden="true" onClick={() => setMoreOpen(false)} />
+                  <div role="menu" aria-label="More flywheel actions" className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card p-1 shadow-lg">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                      onClick={() => { setMoreOpen(false); void handleNewRun(); }}
+                      disabled={actionPending}
+                      title={runState === 'running'
+                        ? 'Abort the active run and start a new one'
+                        : runState === 'paused'
+                          ? 'Report the paused run and start a new one'
+                          : 'Start a new Flywheel run'}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New Run
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                      onClick={() => { setMoreOpen(false); void handleReport(); }}
+                      disabled={actionPending || runState === 'none'}
+                      title={runState === 'none'
+                        ? 'No active run to report'
+                        : 'Finalize the run report and close out (orchestrator must be paused/stopped)'}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Write Report
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                      onClick={() => { setMoreOpen(false); openReportMutation.mutate(); }}
+                      disabled={actionPending || !run?.paths.report}
+                      title={run?.paths.report ?? 'No run report yet'}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Open Run Report
+                    </button>
+                    {!isPopoutWindow && (
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent"
+                        onClick={() => {
+                          setMoreOpen(false);
+                          window.open(
+                            '/popout/flywheel-conversation',
+                            'flywheel-conversation-popout',
+                            'width=1100,height=750,menubar=no,toolbar=no,location=no,status=no',
+                          );
+                        }}
+                        title="Open this view in a separate window"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Pop out
+                      </button>
+                    )}
+                    <a
+                      href="/settings#roles"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-accent"
+                      onClick={(event) => {
+                        setMoreOpen(false);
+                        if (onOpenSettings) {
+                          event.preventDefault();
+                          onOpenSettings();
+                        }
+                      }}
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      Configure
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={handleNewRun}
-              disabled={actionPending}
-              title={runState === 'running'
-                ? 'Abort the active run and start a new one'
-                : runState === 'paused'
-                  ? 'Report the paused run and start a new one'
-                  : 'Start a new Flywheel run'}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Run
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={handleReport}
-              disabled={actionPending || runState === 'none'}
-              title={runState === 'none'
-                ? 'No active run to report'
-                : 'Finalize the run report and close out (orchestrator must be paused/stopped)'}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Write Report
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-background px-2.5 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/10 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md border border-destructive/50 bg-destructive/5 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/15 disabled:opacity-50"
               onClick={handleAbort}
               disabled={actionPending || runState === 'none'}
               title={runState === 'none' ? 'No active run to abort' : 'Discard this run without writing a report'}
@@ -366,46 +412,6 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               <StopCircle className="h-3.5 w-3.5" />
               Abort
             </button>
-            {!isPopoutWindow && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
-                onClick={() => {
-                  window.open(
-                    '/popout/flywheel-conversation',
-                    'flywheel-conversation-popout',
-                    'width=1100,height=750,menubar=no,toolbar=no,location=no,status=no',
-                  );
-                }}
-                title="Open this view in a separate window"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-                Pop out
-              </button>
-            )}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              onClick={() => openReportMutation.mutate()}
-              disabled={actionPending || !run?.paths.report}
-              title={run?.paths.report ?? 'No run report yet'}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Open Run Report
-            </button>
-            <a
-              href="/settings#roles"
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
-              onClick={(event) => {
-                if (onOpenSettings) {
-                  event.preventDefault();
-                  onOpenSettings();
-                }
-              }}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              Configure
-            </a>
           </div>
         </div>
       </header>
@@ -433,36 +439,6 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       </div>
 
       <footer className="border-t border-border bg-card/60 p-4 space-y-3">
-        {mergeQueue.length > 0 && (
-          <div className="rounded-lg border border-border bg-background p-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Merge Queue
-              </span>
-              <span className="text-xs text-muted-foreground">{mergeQueue.length} ready</span>
-            </div>
-            <ol className="space-y-1">
-              {mergeQueue.map((item) => (
-                <li key={item.issueId} className="flex items-start gap-2 text-xs">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                    {item.mergeOrder}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="font-medium text-foreground">{item.issueId}</span>
-                    {item.pr != null && (
-                      <span className="ml-1 text-muted-foreground">#{item.pr}</span>
-                    )}
-                    {item.conflictsWith.length > 0 && (
-                      <span className="ml-1.5 text-amber-600 dark:text-amber-400" title={`File overlap with: ${item.conflictsWith.join(', ')}`}>
-                        ⚠ conflicts with {item.conflictsWith.join(', ')}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
         <button
           type="button"
           className="w-full rounded-lg border border-border bg-background p-3 text-left hover:bg-accent/60"

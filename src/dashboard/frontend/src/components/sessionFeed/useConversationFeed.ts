@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { IssueId } from '@panctl/contracts';
 import type { ConversationSessionFeedEntry } from './types';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 
 export interface ConversationFeedRow {
   id: number;
@@ -13,7 +14,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | null;
+  harness?: 'claude-code' | 'pi' | 'codex' | null;
   archivedAt?: string | null;
   messageCount?: number;
 }
@@ -25,7 +26,7 @@ export interface UseConversationFeedResult {
 }
 
 async function fetchConversations(): Promise<ConversationFeedRow[]> {
-  const res = await fetch('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json() as Promise<ConversationFeedRow[]>;
 }
@@ -74,8 +75,9 @@ export function useConversationFeed(): UseConversationFeedResult {
   };
 }
 
-function mapHarnessToAgent(harness: ConversationFeedRow['harness']): 'claude_code' | 'pi' | 'unknown' {
+function mapHarnessToAgent(harness: ConversationFeedRow['harness']): 'claude_code' | 'pi' | 'codex' | 'unknown' {
   if (harness === 'claude-code') return 'claude_code';
   if (harness === 'pi') return 'pi';
+  if (harness === 'codex') return 'codex';
   return 'unknown';
 }

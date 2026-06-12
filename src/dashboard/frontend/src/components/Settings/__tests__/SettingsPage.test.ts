@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildMiniMaxFormData, buildTtsAutosavePayload } from '../SettingsPage';
+import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { SettingsConfig } from '../types';
 
@@ -83,21 +83,50 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
 
-  it('serializes TTS settings autosaves through a TTS-only latest-snapshot queue', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef = useRef<TtsConfig | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveSettings(buildTtsAutosavePayload(latest, snapshot))');
-    expect(SETTINGS_PAGE_SOURCE).toContain('scheduleTtsSave(nextTts, options.debounce === true)');
+  it('serializes all settings autosaves through one latest-snapshot queue', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveInFlightRef');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const drainSaveQueue = useCallback');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const scheduleAutosave = useCallback');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const flushAutosave = useCallback');
   });
 
-  it('debounces high-frequency TTS autosaves', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('const TTS_AUTOSAVE_DEBOUNCE_MS = 400');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+  it('autosaves every control — no global Save/Reset buttons', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('status={saveStatus}');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('onSave={');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('onReset={');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('hasChanges');
+    // Draft-style handlers now persist through the autosave pipeline.
+    expect(SETTINGS_PAGE_SOURCE).toContain('const applySettings = (next: SettingsConfig');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const applyVoiceSettings = (next: VoiceSettings');
+    // Text-input handlers debounce; click handlers save immediately.
+    expect(SETTINGS_PAGE_SOURCE).toContain("}, { debounce: true });");
+    // Deprecated-model migration kept its own explicit action.
+    expect(SETTINGS_PAGE_SOURCE).toContain('Migrate now');
+  });
+
+  it('debounces high-frequency autosaves', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
     expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
+  });
+
+  it('surfaces conversation search controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
+    expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
+    // cee57d395: conversation search uses the standard API Keys section now.
+    expect(SETTINGS_PAGE_SOURCE).toContain('Using OpenAI key from API Keys section');
+    expect(SETTINGS_PAGE_SOURCE).toContain('No OpenAI key set — configure in API Keys above');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Last indexed:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimated reindex cost:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Estimate & reindex all conversations');
+    // window.confirm was replaced by the confirm-modal + confirmationNonce flow
+    // (reindex is a paid operation — server requires the nonce from the estimate).
+    expect(SETTINGS_PAGE_SOURCE).toContain('confirmReindex');
+    expect(SETTINGS_PAGE_SOURCE).toContain('confirmationNonce');
   });
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
@@ -130,25 +159,6 @@ describe('MODELS_BY_PROVIDER', () => {
 });
 
 
-describe('buildTtsAutosavePayload', () => {
-  it('overlays only TTS settings onto the latest server snapshot', () => {
-    const latest: SettingsConfig = {
-      ...MINIMAX_DEFAULTS,
-      api_keys: { openai: 'server-key' },
-      tracker_keys: { github: 'server-token' },
-      tmux: { config_mode: 'managed' },
-      tts: { enabled: false, volume: 0.4 },
-    };
-    const result = buildTtsAutosavePayload(latest, { enabled: true, volume: 0.8 });
-
-    expect(result).toEqual({
-      ...latest,
-      tts: { enabled: true, volume: 0.8 },
-    });
-  });
-});
-
-
 describe('buildMiniMaxFormData', () => {
   it('applies MiniMax providers and overrides', () => {
     const result = buildMiniMaxFormData(null, MINIMAX_DEFAULTS);
@@ -166,6 +176,15 @@ describe('buildMiniMaxFormData', () => {
     expect(result.conversations?.compaction_model).toBe('claude-haiku-4-5');
     expect(result.conversations?.manual_compact_mode).toBe('panopticon-native');
     expect(result.conversations?.rich_compaction).toBe(true);
+  });
+
+  it('preserves existing conversation search settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      conversationSearch: { enabled: true, provider: 'openai', model: 'text-embedding-3-large', apiKeyRef: 'OPENAI_SEARCH_KEY' },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.conversationSearch).toEqual(existing.conversationSearch);
   });
 
   it('preserves existing tmux settings from formData', () => {

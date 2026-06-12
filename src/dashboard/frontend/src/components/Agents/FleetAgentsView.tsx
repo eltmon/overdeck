@@ -25,7 +25,7 @@ const ROLE_ORDER = {
   flywheel: 6,
 } satisfies Record<AgentCardRole, number>;
 
-const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed', 'error', 'unknown']);
+const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stalled', 'starting', 'running', 'failed', 'error', 'unknown']);
 const PHASE_FILTERS = ['work', 'strike', 'review', 'ship', 'plan', 'stuck'] as const;
 type AgentPhaseFilter = typeof PHASE_FILTERS[number];
 

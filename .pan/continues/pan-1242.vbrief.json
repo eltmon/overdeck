@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1242",
   "created": "2026-05-26T02:46:10.046Z",
-  "updated": "2026-05-26T02:46:10.046Z",
+  "updated": "2026-06-11T09:13:39.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,157 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-05-26T02:46:10.046Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T09:22:35.891Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T13:59:18.848Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T20:42:05.244Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-06T21:00Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-06T21:00:19.656Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T21:00:19.703Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-06T21:02Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-06T21:02:28.888Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-06T21:11Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-06T21:11:04.252Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T21:11:04.296Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-06T21:11Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-06T21:11:34.337Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-06T21:16Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-06-06T21:16:13.225Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-06T21:16:13.284Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:12Z] verification-gate → FAILED — seq 6",
+      "timestamp": "2026-06-07T05:12:41.400Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:19Z] verification-gate → FAILED — seq 7",
+      "timestamp": "2026-06-07T05:19:05.892Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:37Z] verification-gate → FAILED — seq 8",
+      "timestamp": "2026-06-07T05:37:57.190Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:41Z] verification-gate → FAILED — seq 9",
+      "timestamp": "2026-06-07T05:41:04.525Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T05:41:06.212Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:41Z] verification-gate → FAILED — seq 10",
+      "timestamp": "2026-06-07T05:41:23.688Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:43Z] verification-gate → FAILED — seq 11",
+      "timestamp": "2026-06-07T05:43:52.841Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T05:44Z] verification-gate → FAILED — seq 12",
+      "timestamp": "2026-06-07T05:44:29.759Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T18:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T18:44:32.308Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T18:44:33.221Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T18:55Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-07T18:55:20.865Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-07T19:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-07T19:19:45.404Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-07T19:19:46.293Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-08T02:18:04.915Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T19:11:46.972Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T08:47:22.332Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:54Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T08:54:20.529Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:03Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T09:03:45.869Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:08Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-11T09:08:36.538Z"
     }
-  ]
+  ],
+  "feedback": []
 }

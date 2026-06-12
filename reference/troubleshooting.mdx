@@ -3,6 +3,8 @@ title: Troubleshooting
 description: Common issues and solutions
 ---
 
+import { ThemedImage } from "/snippets/themed-image.mdx";
+
 # Troubleshooting
 
 Solutions to common problems and issues with Panopticon.
@@ -354,6 +356,26 @@ docker system prune -a
 ```
 
 ## Getting Help
+
+### Health page
+
+Before reaching for the CLI, the dashboard's **Health** page surfaces the same
+diagnostics as `pan doctor` in one place — system health checks across the
+orchestrator, trackers, Docker, networking, and the agents and conversations
+it's managing. Use it as the first stop when something looks off across the
+fleet rather than a single agent.
+
+<ThemedImage
+  light="/images/dashboard/health-light.png"
+  dark="/images/dashboard/health-dark.png"
+  alt="Panopticon Health page showing system health checks and diagnostics"
+/>
+
+<Tip>
+The Health page is the visual equivalent of the `pan doctor` output below —
+handy when you want to scan overall system state, but the CLI commands are
+still the right thing to paste into a bug report.
+</Tip>
 
 ### Diagnostic Information
 

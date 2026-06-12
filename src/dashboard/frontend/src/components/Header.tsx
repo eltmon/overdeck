@@ -18,5 +18,6 @@ export type Tab =
   | 'autopreso'
   | 'settings'
   | 'god-view'
+  | 'deacon'
   | 'sessions'
   | 'awaiting-merge';

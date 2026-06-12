@@ -54,6 +54,11 @@ vi.mock('../../../lib/formatRelativeTime', () => ({
 }));
 
 vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
+  HARNESS_OPTIONS: [
+    { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
+    { id: 'pi', label: 'Pi', description: 'Alternative harness for non-Anthropic models' },
+  ],
+  canUsePickerHarness: () => ({ allowed: true }),
   useAvailableModels: () => ({ groups: [] }),
 }));
 
@@ -96,6 +101,14 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionStatus_thinking: 'sessionStatus_thinking',
     sessionStatus_waiting: 'sessionStatus_waiting',
     sessionStatus_stopping: 'sessionStatus_stopping',
+    sessionStatus_paused: 'sessionStatus_paused',
+    sessionIconRunning: 'sessionIconRunning',
+    sessionIconReview: 'sessionIconReview',
+    sessionIconPaused: 'sessionIconPaused',
+    sessionIconError: 'sessionIconError',
+    sessionModel: 'sessionModel',
+    sessionPausedReason: 'sessionPausedReason',
+    unpauseBtn: 'unpauseBtn',
     sessionDuration: 'sessionDuration',
   },
 }));
@@ -112,6 +125,45 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
     ...overrides,
   };
 }
+
+describe('SessionNode paused gate (PAN-1779)', () => {
+  it('renders paused status, reason line, and unpause control for a paused session', () => {
+    const onUnpauseSession = vi.fn();
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'agent-pan-1642',
+          status: 'stopped',
+          presence: 'ended',
+          paused: true,
+          pausedReason: 'Operator drain 2026-06-10',
+          pausedAt: '2026-05-06T09:00:00.000Z',
+        })}
+        issueId="PAN-1642"
+        onUnpauseSession={onUnpauseSession}
+      />,
+    );
+
+    // No 'paused' pill — the amber icon tile + reason line + Unpause carry it.
+    expect(screen.queryByText('paused')).toBeNull();
+    expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconPaused')).toBeTruthy();
+    expect(screen.getByTestId('session-paused-reason').textContent).toContain('Operator drain 2026-06-10');
+    screen.getByTestId('session-unpause').click();
+    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-1642');
+  });
+
+  it('does not render unpause control for unpaused sessions', () => {
+    render(
+      <SessionNode
+        session={makeSession({ sessionId: 'agent-pan-1', status: 'stopped', presence: 'ended' })}
+        issueId="PAN-1"
+        onUnpauseSession={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('session-unpause')).toBeNull();
+    expect(screen.queryByTestId('session-paused-reason')).toBeNull();
+  });
+});
 
 describe('SessionNode', () => {
   beforeEach(() => {
@@ -144,10 +196,12 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Security (opus-4-7)')).toHaveAttribute(
+    // Redesign: bare role label; model renders as its own span.
+    expect(screen.getByText('Security')).toHaveAttribute(
       'title',
       'Security specialist reviewer in the review pipeline. Model: opus-4-7. Session: reviewer-1. Last heard: 5m ago.',
     );
+    expect(screen.getByText('opus-4-7')).toBeInTheDocument();
   });
 
   it('adds contextual working tooltip text to the session status pill', () => {
@@ -168,13 +222,12 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('working')).toHaveAttribute(
-      'title',
-      'Actively using tools or just finished a tool run. tmux session is live. Current tool: Bash. Last heard: 5m ago.',
-    );
+    // Redesign: no 'working' pill — the blue icon tile carries live state.
+    expect(screen.queryByText('working')).toBeNull();
+    expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconRunning')).toBeTruthy();
   });
 
-  it('adds contextual stopped tooltip text to the session status pill', () => {
+  it('renders no status pill for quietly-stopped sessions (PAN-1779)', () => {
     render(
       <SessionNode
         session={makeSession({
@@ -185,10 +238,9 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('stopped')).toHaveAttribute(
-      'title',
-      'Session ended cleanly and is no longer live.',
-    );
+    // Redesign: idle/stopped rows stay quiet — only live, paused, or error
+    // states render a status pill.
+    expect(screen.queryByText('stopped')).toBeNull();
   });
 
   it('keeps Work and expandable Review status dots in the same grid slot', () => {
@@ -203,13 +255,15 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    const workRow = screen.getByText('Work (sonnet-4-6)').closest('button');
-    const reviewRow = screen.getByText('Review (sonnet-4-6)').closest('button');
+    const workRow = screen.getByText('Work').closest('button');
+    const reviewRow = screen.getByText('Review').closest('button');
 
     expect(workRow?.children[1]).toHaveClass('sessionDotSlot');
     expect(reviewRow?.children[1]).toHaveClass('sessionDotSlot');
-    expect(workRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
-    expect(reviewRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
+    // Redesign: no status dots — state lives on the icon tile; the slot
+    // remains for reviewer verdict glyphs and grid alignment.
+    expect(workRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeNull();
+    expect(reviewRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeNull();
   });
 
   it('adds contextual error tooltip text to the session status pill', () => {

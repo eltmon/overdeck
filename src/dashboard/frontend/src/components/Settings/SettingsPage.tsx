@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -48,6 +48,7 @@ import { VoiceDesignTab } from './VoiceDesignTab';
 import { VoicePresetsTab } from './VoicePresetsTab';
 import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
+import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
@@ -59,7 +60,7 @@ import {
   SettingsRow,
   type NavItem,
 } from './primitives';
-import { ensureDashboardSession } from '../../lib/wsTransport';
+import { dashboardMutationJsonHeaders, ensureDashboardSession } from '../../lib/wsTransport';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -92,6 +93,57 @@ async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | nul
 async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
+  return res.json();
+}
+
+interface ConversationSearchStatusResponse {
+  enabled: boolean;
+  available: boolean;
+  unavailableReason?: string;
+  dbPath: string;
+  chunkCount: number;
+  indexedFileCount: number;
+  lastIndexedAt: string | null;
+}
+
+async function fetchConversationSearchStatus(): Promise<ConversationSearchStatusResponse> {
+  const res = await fetch('/api/settings/conversation-search/status', { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to fetch conversation search status');
+  return res.json();
+}
+
+interface ConversationSearchCostEstimate {
+  provider: 'openai';
+  model: string;
+  tokenCount: number;
+  pricePerMillionTokens: number;
+  estimatedUsd: number;
+  filesScanned: number;
+  chunksEstimated: number;
+  disabled: boolean;
+  unavailableReason?: string;
+  confirmationNonce?: string;
+}
+
+async function estimateConversationSearchReindex(model?: string): Promise<ConversationSearchCostEstimate> {
+  // Pass ?model= to price a prospective model switch before it's saved.
+  const qs = model ? `?model=${encodeURIComponent(model)}` : '';
+  const res = await fetch(`/api/settings/conversation-search/reindex-estimate${qs}`, { credentials: 'include' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to estimate reindex cost (${res.status})`);
+  }
+  return res.json();
+}
+
+async function reindexConversationSearch(confirmationNonce?: string): Promise<{ filesScanned: number; chunksIndexed: number; disabled: boolean; unavailableReason?: string }> {
+  const res = await fetch('/api/settings/conversation-search/reindex', {
+    method: 'POST',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify({ confirmationNonce }),
+  });
+  if (!res.ok) throw new Error('Failed to reindex conversations');
   return res.json();
 }
 
@@ -158,10 +210,6 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
-export function buildTtsAutosavePayload(latest: SettingsConfig, tts: TtsConfig): SettingsConfig {
-  return { ...latest, tts };
-}
-
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
   // workhorses + roles via their own PUTs. SettingsPage's parent formData is
@@ -193,6 +241,24 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
         : {}),
       ...(settings.conversations?.title_model !== undefined
         ? { title_model: settings.conversations.title_model }
+        : {}),
+      // Background AI section edits these through the parent too; the embedding
+      // card syncs its own saves back into parent formData, so the parent's
+      // values are never stale for them (PAN-1589).
+      ...(settings.conversations?.enrichment !== undefined
+        ? { enrichment: settings.conversations.enrichment }
+        : {}),
+      ...(settings.conversations?.embeddings !== undefined
+        ? { embeddings: settings.conversations.embeddings }
+        : {}),
+      ...(settings.conversations?.embedding_provider !== undefined
+        ? { embedding_provider: settings.conversations.embedding_provider }
+        : {}),
+      ...(settings.conversations?.embedding_model !== undefined
+        ? { embedding_model: settings.conversations.embedding_model }
+        : {}),
+      ...(settings.conversations?.embedding_auto_on_deep !== undefined
+        ? { embedding_auto_on_deep: settings.conversations.embedding_auto_on_deep }
         : {}),
     };
     merged = {
@@ -319,6 +385,7 @@ export function buildMiniMaxFormData(
     api_keys: { ...(formData?.api_keys || {}) },
     agents: { ...(formData?.agents || miniMaxDefaults.agents || {}) },
     tracker_keys: { ...(formData?.tracker_keys || {}) },
+    conversationSearch: { ...(formData?.conversationSearch || miniMaxDefaults.conversationSearch || {}) },
     conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
     memory: { ...(formData?.memory || miniMaxDefaults.memory || {}) },
     tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
@@ -385,7 +452,17 @@ const TTS_EVENT_KEYS = [
   'readyForMerge',
 ] as const;
 
-const TTS_AUTOSAVE_DEBOUNCE_MS = 400;
+/**
+ * Debounce window for autosaves driven by high-frequency inputs (text fields,
+ * sliders). Click-style controls (toggles, selects, radios) save immediately.
+ */
+const AUTOSAVE_DEBOUNCE_MS = 600;
+
+/** One pending autosave: the full settings + voice payload, latest-wins. */
+interface AutosavePayload {
+  settings: SettingsConfig;
+  voiceSettings: VoiceSettings;
+}
 
 const ACTIVITY_SOURCE_OPTIONS = [
   'merge-agent',
@@ -420,10 +497,26 @@ const BG_FEATURE_COST_SOURCE: Record<BackgroundAiFeature, string> = {
 };
 
 /** Known embedding models per provider for the embeddings picker (PAN-1589). */
-const EMBEDDING_MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'],
-  voyage: ['voyage-code-3', 'voyage-3'],
-  ollama: ['nomic-embed-text', 'mxbai-embed-large'],
+interface EmbeddingModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const EMBEDDING_MODELS_BY_PROVIDER: Record<string, EmbeddingModelOption[]> = {
+  openai: [
+    { id: 'text-embedding-3-small', label: 'text-embedding-3-small', description: 'Recommended · 1536-dim · $0.02 / 1M tokens — cheap & fast' },
+    { id: 'text-embedding-3-large', label: 'text-embedding-3-large', description: 'Higher quality · 3072-dim · $0.13 / 1M tokens' },
+    { id: 'text-embedding-ada-002', label: 'text-embedding-ada-002', description: 'Legacy · 1536-dim — prefer 3-small' },
+  ],
+  voyage: [
+    { id: 'voyage-code-3', label: 'voyage-code-3', description: 'Code-optimized · $0.18 / 1M tokens' },
+    { id: 'voyage-3', label: 'voyage-3', description: 'General-purpose semantic embeddings' },
+  ],
+  ollama: [
+    { id: 'nomic-embed-text', label: 'nomic-embed-text', description: 'Local via Ollama · free · nothing leaves your machine' },
+    { id: 'mxbai-embed-large', label: 'mxbai-embed-large', description: 'Local via Ollama · free · larger, higher quality' },
+  ],
 };
 
 const SETTINGS_NAV_ITEMS: NavItem[] = [
@@ -456,6 +549,11 @@ export function SettingsPage() {
     queryKey: ['tts-health'],
     queryFn: fetchTtsHealth,
     refetchInterval: 10_000,
+  });
+  const { data: conversationSearchStatus } = useQuery({
+    queryKey: ['conversation-search-status'],
+    queryFn: fetchConversationSearchStatus,
+    refetchInterval: 30_000,
   });
   // Last-24h spend per background-AI source, for the Background AI section (PAN-1589).
   const { data: backgroundCost } = useQuery({
@@ -495,6 +593,7 @@ export function SettingsPage() {
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [orCatalog, setOrCatalog] = useState<OpenRouterCatalogResponse | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
+  const [reloadingTldr, setReloadingTldr] = useState(false);
   const [claudeAuth, setClaudeAuth] = useState<{
     installed: boolean;
     loggedIn: boolean;
@@ -507,9 +606,16 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('model-routing');
   const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-  const pendingTtsSaveRef = useRef<TtsConfig | null>(null);
-  const ttsSaveInFlightRef = useRef(false);
-  const ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Autosave pipeline ───────────────────────────────────────────────────────
+  // Every control persists on change through one serialized latest-wins queue:
+  // rapid edits collapse into the newest snapshot, saves never overlap, and
+  // text inputs debounce so half-typed values don't hit the server.
+  const pendingSaveRef = useRef<AutosavePayload | null>(null);
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaveOkRef = useRef(true);
+  const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -561,8 +667,25 @@ export function SettingsPage() {
   } | null>(null);
   const [convConfigDirty, setConvConfigDirty] = useState(false);
   const [convConfigSaving, setConvConfigSaving] = useState(false);
+  const [convConfigLoading, setConvConfigLoading] = useState(true);
+  const [convConfigError, setConvConfigError] = useState<string | null>(null);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [testingEmbedding, setTestingEmbedding] = useState(false);
+  const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
+  const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
+  const [reindexConfirm, setReindexConfirm] = useState<{
+    kind: 'manual' | 'model';
+    newModel?: string;
+    estimate: ConversationSearchCostEstimate | null;
+  } | null>(null);
+  const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
+  const [reindexProgress, setReindexProgress] = useState<{
+    active: boolean;
+    filesScanned: number;
+    filesIndexed: number;
+    chunksIndexed: number;
+    currentFile?: string;
+  } | null>(null);
 
   const fetchClaudeAuth = async () => {
     try {
@@ -573,13 +696,21 @@ export function SettingsPage() {
 
   useEffect(() => { void fetchClaudeAuth(); }, []);
 
-  useEffect(() => {
+  const loadConvConfig = useCallback(() => {
+    setConvConfigLoading(true);
+    setConvConfigError(null);
     ensureDashboardSession()
       .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setConvConfig(d); })
-      .catch(() => undefined);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Failed to load embedding settings (HTTP ${r.status})`);
+        return r.json();
+      })
+      .then((d) => setConvConfig(d))
+      .catch((e) => setConvConfigError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setConvConfigLoading(false));
   }, []);
+
+  useEffect(() => { loadConvConfig(); }, [loadConvConfig]);
 
   const handleConvConfigChange = (patch: Partial<typeof convConfig>) => {
     setConvConfig((prev) => prev ? { ...prev, ...patch } : null);
@@ -671,7 +802,7 @@ export function SettingsPage() {
       if (settings.deprecation_warnings && settings.deprecation_warnings.length > 0) {
         const count = settings.deprecation_warnings.length;
         toast.warning(
-          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Save" to migrate automatically.`,
+          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Migrate now" in the Settings banner to update them.`,
           { duration: 10000 }
         );
       }
@@ -688,41 +819,169 @@ export function SettingsPage() {
     window.localStorage.setItem(VOICE_HARDWARE_STORAGE_KEY, JSON.stringify(voiceHardwareSettings));
   }, [voiceHardwareSettings]);
 
-  const saveMutation = useMutation({
-    mutationFn: async ({
-      settings: nextSettings,
-      voiceSettings: nextVoiceSettings,
-    }: {
-      settings: SettingsConfig;
-      voiceSettings: VoiceSettings;
-    }) => {
-      const [response, savedVoiceSettings] = await Promise.all([
-        saveSettings(nextSettings),
-        saveVoiceSettings(nextVoiceSettings),
-      ]);
-      return { response, savedVoiceSettings };
-    },
-    onSuccess: ({ response, savedVoiceSettings }) => {
-      invalidateAvailableModelsCache();
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
-      queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
-      setVoiceFormData(savedVoiceSettings);
+  // Drain the autosave queue: one save in flight at a time, always taking the
+  // newest pending snapshot. Returns the in-flight drain so callers can await
+  // a flush (e.g. before triggering a paid reindex).
+  const drainSaveQueue = useCallback((): Promise<void> => {
+    if (saveInFlightRef.current) return saveInFlightRef.current;
+    const run = (async () => {
+      while (pendingSaveRef.current) {
+        const snapshot = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        setSaveStatus('saving');
+        try {
+          const [response, savedVoiceSettings] = await Promise.all([
+            saveSettings(snapshot.settings),
+            saveVoiceSettings(snapshot.voiceSettings),
+          ]);
+          lastSaveOkRef.current = true;
+          invalidateAvailableModelsCache();
+          queryClient.invalidateQueries({ queryKey: ['settings'] });
+          queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
+          queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
+          queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
+          if (response.warnings && response.warnings.length > 0) {
+            response.warnings.forEach((warning) => {
+              toast.warning(warning, { duration: 8000 });
+            });
+          }
+          setSaveStatus('saved');
+          if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+          savedStatusResetRef.current = setTimeout(() => {
+            savedStatusResetRef.current = null;
+            setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
+          }, 2500);
+        } catch (error) {
+          lastSaveOkRef.current = false;
+          setSaveStatus('error');
+          toast.error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    })();
+    saveInFlightRef.current = run.finally(() => {
+      saveInFlightRef.current = null;
+    });
+    return saveInFlightRef.current;
+  }, [queryClient]);
 
-      // Show success toast
-      toast.success('Settings saved successfully');
+  // Schedule an autosave of the given snapshot. Click-style controls save
+  // immediately; text inputs and sliders pass debounce to wait for typing to
+  // pause. A newer schedule always supersedes the pending snapshot.
+  const scheduleAutosave = useCallback((payload: AutosavePayload, opts: { debounce?: boolean } = {}) => {
+    pendingSaveRef.current = payload;
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+    if (opts.debounce) {
+      saveDebounceRef.current = setTimeout(() => {
+        saveDebounceRef.current = null;
+        void drainSaveQueue();
+      }, AUTOSAVE_DEBOUNCE_MS);
+    } else {
+      void drainSaveQueue();
+    }
+  }, [drainSaveQueue]);
 
-      // Show warnings if present
-      if (response.warnings && response.warnings.length > 0) {
-        response.warnings.forEach((warning) => {
-          toast.warning(warning, { duration: 8000 });
-        });
+  // Force any pending (possibly debounced) save through and report whether the
+  // final save succeeded. Used by flows that must persist before acting.
+  const flushAutosave = useCallback(async (): Promise<boolean> => {
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+    await drainSaveQueue();
+    return lastSaveOkRef.current;
+  }, [drainSaveQueue]);
+
+  const conversationSearchReindexMutation = useMutation({
+    mutationFn: reindexConversationSearch,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
+      if (result.disabled) {
+        toast.warning(result.unavailableReason ?? 'Conversation search is disabled');
+      } else {
+        toast.success(`Reindexed ${result.chunksIndexed} chunk${result.chunksIndexed === 1 ? '' : 's'} from ${result.filesScanned} file${result.filesScanned === 1 ? '' : 's'}`);
       }
     },
     onError: (error: Error) => {
-      toast.error(`Failed to save settings: ${error.message}`);
+      toast.error(`Failed to reindex conversations: ${error.message}`);
     },
   });
+
+  // Poll live reindex progress while a reindex is running so the UI can show a real bar.
+  const conversationSearchReindexPending = conversationSearchReindexMutation.isPending;
+  useEffect(() => {
+    if (!conversationSearchReindexPending) {
+      setReindexProgress(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/settings/conversation-search/reindex-progress', { credentials: 'include' });
+        if (res.ok && !cancelled) setReindexProgress(await res.json());
+      } catch { /* ignore transient poll errors */ }
+    };
+    void poll();
+    const id = setInterval(poll, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [conversationSearchReindexPending]);
+
+  // Open the confirm modal immediately, then fill in the cost estimate (scanning every
+  // transcript can take a few seconds). `model` prices a prospective switch.
+  const openReindexConfirm = async (kind: 'manual' | 'model', newModel?: string) => {
+    setReindexConfirm({ kind, newModel, estimate: null });
+    setEstimatingConversationSearch(true);
+    try {
+      const estimate = await estimateConversationSearchReindex(newModel);
+      setConversationSearchEstimate(estimate);
+      setReindexConfirm((prev) => (prev && prev.kind === kind && prev.newModel === newModel ? { ...prev, estimate } : prev));
+    } catch (error) {
+      toast.error(`Failed to estimate reindex cost: ${error instanceof Error ? error.message : String(error)}`);
+      setReindexConfirm(null);
+    } finally {
+      setEstimatingConversationSearch(false);
+    }
+  };
+
+  const handleConversationSearchReindex = () => { void openReindexConfirm('manual'); };
+
+  // Switching the embedding model invalidates every cached vector (they're model-specific)
+  // and forces a paid full reindex, so confirm before applying.
+  const handleEmbeddingModelChange = (newModel: string) => {
+    if (newModel === conversationSearchModel) return;
+    void openReindexConfirm('model', newModel);
+  };
+
+  const cancelReindexConfirm = () => { if (!reindexConfirmBusy) setReindexConfirm(null); };
+
+  const confirmReindex = async () => {
+    if (!reindexConfirm || !reindexConfirm.estimate || reindexConfirm.estimate.disabled) return;
+    const { kind, newModel, estimate } = reindexConfirm;
+    if (kind === 'model' && newModel) {
+      if (!formData || !voiceFormData) return;
+      setReindexConfirmBusy(true);
+      const next: SettingsConfig = {
+        ...formData,
+        conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
+      };
+      setFormData(next);
+      scheduleAutosave({ settings: next, voiceSettings: voiceFormData });
+      const saved = await flushAutosave();
+      if (!saved) {
+        // The autosave pipeline surfaces its own error toast; leave the modal open to retry.
+        setReindexConfirmBusy(false);
+        return;
+      }
+      conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+      setReindexConfirmBusy(false);
+      setReindexConfirm(null);
+      return;
+    }
+    conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
+    setReindexConfirm(null);
+  };
 
   const ttsStartMutation = useMutation({
     mutationFn: startTtsDaemonRequest,
@@ -736,52 +995,16 @@ export function SettingsPage() {
     },
   });
 
-  const queueTtsSave = useCallback((next: TtsConfig) => {
-    pendingTtsSaveRef.current = next;
-    if (ttsSaveInFlightRef.current) return;
-
-    ttsSaveInFlightRef.current = true;
-    void (async () => {
-      while (true) {
-        const snapshot = pendingTtsSaveRef.current;
-        if (!snapshot) {
-          ttsSaveInFlightRef.current = false;
-          return;
-        }
-
-        pendingTtsSaveRef.current = null;
-        try {
-          const latest = await fetchSettings();
-          await saveSettings(buildTtsAutosavePayload(latest, snapshot));
-        } catch {
-          void 0;
-        }
-      }
-    })();
-  }, []);
-
-  const scheduleTtsSave = useCallback((next: TtsConfig, debounce = false) => {
-    if (ttsSaveDebounceRef.current) {
-      clearTimeout(ttsSaveDebounceRef.current);
-      ttsSaveDebounceRef.current = null;
-    }
-
-    if (!debounce) {
-      queueTtsSave(next);
-      return;
-    }
-
-    pendingTtsSaveRef.current = next;
-    ttsSaveDebounceRef.current = setTimeout(() => {
-      ttsSaveDebounceRef.current = null;
-      const snapshot = pendingTtsSaveRef.current;
-      if (snapshot) queueTtsSave(snapshot);
-    }, TTS_AUTOSAVE_DEBOUNCE_MS);
-  }, [queueTtsSave]);
-
+  // On unmount, flush any debounced edit immediately so navigating away
+  // doesn't drop the last change (the fetch survives SPA navigation).
   useEffect(() => () => {
-    if (ttsSaveDebounceRef.current) clearTimeout(ttsSaveDebounceRef.current);
-  }, []);
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+      void drainSaveQueue();
+    }
+    if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+  }, [drainSaveQueue]);
 
   // Shared chat-model <option> list (same catalog as the Conversations selects).
   // MUST be declared before the early returns below — it's a hook (PAN-1597 fix:
@@ -816,12 +1039,24 @@ export function SettingsPage() {
     );
   }
 
-  const hasSettingsChanges = JSON.stringify(formData) !== JSON.stringify(settings);
-  const hasVoiceSettingsChanges = JSON.stringify(voiceFormData) !== JSON.stringify(voiceSettings);
-  const hasChanges = hasSettingsChanges || hasVoiceSettingsChanges;
+  const conversationSearch = formData.conversationSearch ?? {};
+  const conversationSearchEnabled = conversationSearch.enabled ?? false;
+  const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
+
+  // Apply a settings patch and autosave it. Pass debounce for text inputs and
+  // sliders; click-style controls save immediately.
+  const applySettings = (next: SettingsConfig, opts: { debounce?: boolean } = {}) => {
+    setFormData(next);
+    scheduleAutosave({ settings: next, voiceSettings: voiceFormData }, opts);
+  };
+
+  const applyVoiceSettings = (next: VoiceSettings, opts: { debounce?: boolean } = {}) => {
+    setVoiceFormData(next);
+    scheduleAutosave({ settings: formData, voiceSettings: next }, opts);
+  };
 
   const handleProviderToggle = (provider: Provider) => {
-    setFormData({
+    applySettings({
       ...formData,
       models: {
         ...formData.models,
@@ -835,27 +1070,40 @@ export function SettingsPage() {
 
   const handleApiKeyChange = (provider: Provider, key: string) => {
     if (provider === 'anthropic') return;
-    setFormData({
+    applySettings({
       ...formData,
       api_keys: {
         ...formData.api_keys,
         [provider]: key || undefined,
       },
+    }, { debounce: true });
+  };
+
+  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+    applySettings({
+      ...formData,
+      models: {
+        ...formData.models,
+        provider_harnesses: {
+          ...formData.models.provider_harnesses,
+          [provider]: harness,
+        },
+      },
     });
   };
 
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
-    setFormData({
+    applySettings({
       ...formData,
       tracker_keys: {
         ...formData.tracker_keys,
         [tracker]: key || undefined,
       },
-    });
+    }, { debounce: true });
   };
 
   const handleTmuxConfigModeChange = (configMode: 'managed' | 'inherit-user') => {
-    setFormData({
+    applySettings({
       ...formData,
       tmux: {
         ...formData.tmux,
@@ -869,12 +1117,10 @@ export function SettingsPage() {
       ...formData.tts,
       ...patch,
     };
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       tts: nextTts,
-    };
-    setFormData(next);
-    scheduleTtsSave(nextTts, options.debounce === true);
+    }, { debounce: options.debounce === true });
   };
 
   const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {
@@ -928,7 +1174,7 @@ export function SettingsPage() {
   };
 
   const handleVoiceProviderChange = (provider: VoiceSettings['stt']['provider']) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -938,7 +1184,7 @@ export function SettingsPage() {
   };
 
   const handleMoonshineModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -948,7 +1194,7 @@ export function SettingsPage() {
   };
 
   const handleGoogleCloudApiKeyChange = (apiKey: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -957,11 +1203,11 @@ export function SettingsPage() {
           apiKey,
         },
       },
-    });
+    }, { debounce: true });
   };
 
   const handleGoogleCloudModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -974,7 +1220,7 @@ export function SettingsPage() {
   };
 
   const handleAutoPresoProviderChange = (provider: VoiceSettings['autopreso']['provider']) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       autopreso: {
         ...voiceFormData.autopreso,
@@ -984,13 +1230,13 @@ export function SettingsPage() {
   };
 
   const handleAutoPresoModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       autopreso: {
         ...voiceFormData.autopreso,
         model,
       },
-    });
+    }, { debounce: true });
   };
 
   const handleVoiceHardwareChange = <K extends keyof VoiceHardwareSettings>(
@@ -1003,7 +1249,7 @@ export function SettingsPage() {
     });
   };
   const handleCompactionModelChange = (modelId: ModelId) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1013,7 +1259,7 @@ export function SettingsPage() {
   };
 
   const handleTitleModelChange = (modelId: ModelId) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1023,7 +1269,7 @@ export function SettingsPage() {
   };
 
   const handleManualCompactModeChange = (mode: 'claude-code' | 'panopticon-native') => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1033,7 +1279,7 @@ export function SettingsPage() {
   };
 
   const handleRichCompactionChange = (enabled: boolean) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1042,27 +1288,37 @@ export function SettingsPage() {
     });
   };
 
-  const updateMemorySettings = (memory: NonNullable<SettingsConfig['memory']>) => {
-    setFormData({
+  const handleConversationSearchChange = (patch: Partial<ConversationSearchConfig>) => {
+    applySettings({
+      ...formData,
+      conversationSearch: {
+        ...(formData.conversationSearch ?? {}),
+        ...patch,
+      },
+    });
+  };
+
+  const updateMemorySettings = (memory: NonNullable<SettingsConfig['memory']>, opts: { debounce?: boolean } = {}) => {
+    applySettings({
       ...formData,
       memory: {
         ...formData.memory,
         ...memory,
       },
-    });
+    }, opts);
   };
 
   const handleMemoryNumberChange = (
     key: 'per_day_cost_cap_usd' | 'rollup_pending_threshold' | 'sidebar_refresh_interval_ms' | 'worker_concurrency',
     value: string,
   ) => {
-    updateMemorySettings({ [key]: value === '' ? undefined : Number(value) });
+    updateMemorySettings({ [key]: value === '' ? undefined : Number(value) }, { debounce: true });
   };
 
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
     if (!formData) return;
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       background_ai: {
         cheap_mode: patch.cheap_mode ?? formData.background_ai?.cheap_mode ?? false,
@@ -1071,16 +1327,13 @@ export function SettingsPage() {
           ...patch.features,
         },
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+    });
   };
 
-  // Apply an arbitrary settings patch and persist immediately (used by the
-  // per-feature model pickers in the Background AI section — PAN-1589).
-  const applyBackgroundModelPatch = (next: SettingsConfig) => {
-    setFormData(next);
-    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+  // Apply an arbitrary settings patch and persist (used by the per-feature
+  // model pickers in the Background AI section — PAN-1589).
+  const applyBackgroundModelPatch = (next: SettingsConfig, opts: { debounce?: boolean } = {}) => {
+    applySettings(next, opts);
   };
 
   const bgSelectClass = 'bg-background border border-border rounded-md px-2 py-1 text-[11px] text-foreground focus:ring-1 focus:ring-primary';
@@ -1119,8 +1372,8 @@ export function SettingsPage() {
       case 'memoryExtraction':
       case 'memoryQueryExpansion': {
         const provider = formData?.memory?.provider || 'anthropic';
-        const setMem = (patch: NonNullable<SettingsConfig['memory']>) =>
-          applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } });
+        const setMem = (patch: NonNullable<SettingsConfig['memory']>, opts: { debounce?: boolean } = {}) =>
+          applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } }, opts);
         return (
           <div className="flex items-center gap-1">
             <select value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
@@ -1128,7 +1381,7 @@ export function SettingsPage() {
               <option value="cliproxy">cliproxy</option>
             </select>
             <input type="text" value={formData?.memory?.model || ''}
-              onChange={(e) => setMem({ model: e.target.value || undefined })}
+              onChange={(e) => setMem({ model: e.target.value || undefined }, { debounce: true })}
               placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
               className="w-36 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary" />
           </div>
@@ -1137,18 +1390,18 @@ export function SettingsPage() {
       case 'sessionEmbeddings': {
         const provider = formData?.conversations?.embedding_provider || 'openai';
         const models = EMBEDDING_MODELS_BY_PROVIDER[provider] ?? [];
-        const model = formData?.conversations?.embedding_model || models[0] || '';
+        const model = formData?.conversations?.embedding_model || models[0]?.id || '';
         return (
           <div className="flex items-center gap-1">
             <select value={provider}
-              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0] }); }}
+              onChange={(e) => { const p = e.target.value as 'openai' | 'voyage' | 'ollama'; setConv({ embedding_provider: p, embedding_model: EMBEDDING_MODELS_BY_PROVIDER[p]?.[0]?.id }); }}
               className={`${bgSelectClass} max-w-[100px]`}>
               <option value="openai">OpenAI</option>
               <option value="voyage">Voyage</option>
               <option value="ollama">Ollama</option>
             </select>
             <select value={model} onChange={(e) => setConv({ embedding_model: e.target.value })} className={`${bgSelectClass} max-w-[170px]`}>
-              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              {models.map((m) => <option key={m.id} value={m.id} title={m.description}>{m.label}</option>)}
             </select>
           </div>
         );
@@ -1167,22 +1420,17 @@ export function SettingsPage() {
   };
 
   const handleClaudeCodeChannelsToggle = (enabled: boolean) => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
   const handleRtkToggle = (enabled: boolean) => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       agents: {
         ...formData.agents,
@@ -1191,37 +1439,40 @@ export function SettingsPage() {
           enabled,
         },
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
+    });
+  };
+
+  const handleTldrToggle = (enabled: boolean) => {
+    applySettings({
+      ...formData,
+      agents: {
+        ...formData.agents,
+        tldr: {
+          ...formData.agents?.tldr,
+          enabled,
+        },
+      },
     });
   };
 
   const handlePermissionModeChange = (mode: 'auto' | 'bypass') => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       claude: {
         ...formData.claude,
         permissionMode: mode,
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
-
-  const handleSave = () => saveMutation.mutate({
-    settings: formData,
-    voiceSettings: voiceFormData,
-  });
-  const handleReset = () => {
-    setFormData(settings || null);
-    setVoiceFormData(voiceSettings || DEFAULT_VOICE_SETTINGS);
+  const handleCodexPermissionModeChange = (mode: 'read-only' | 'workspace' | 'auto-review' | 'full-access') => {
+    applySettings({
+      ...formData,
+      codex: {
+        ...formData.codex,
+        permissionMode: mode,
+      },
+    });
   };
 
 
@@ -1291,12 +1542,7 @@ export function SettingsPage() {
       header={
         <SettingsHeader
           title="Settings"
-          hasChanges={hasChanges}
-          saving={saveMutation.isPending}
-          saveSuccess={saveMutation.isSuccess}
-          saveError={saveMutation.isError}
-          onSave={handleSave}
-          onReset={handleReset}
+          status={saveStatus}
         />
       }
       sidebar={
@@ -1327,9 +1573,13 @@ export function SettingsPage() {
                   </p>
                 ))}
               </div>
-              <p className="text-muted-foreground text-xs mt-2">
-                Save to migrate automatically.
-              </p>
+              <button
+                type="button"
+                onClick={() => scheduleAutosave({ settings: formData, voiceSettings: voiceFormData })}
+                className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
+              >
+                Migrate now
+              </button>
             </div>
           </div>
         </div>
@@ -1356,6 +1606,7 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1567,6 +1818,18 @@ export function SettingsPage() {
                         )}
                       </div>
                     )}
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-foreground">Default harness</span>
+                      <select
+                        value={providerHarness}
+                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
+                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="claude-code">Claude Code</option>
+                        <option value="pi">Pi</option>
+                        <option value="codex">Codex</option>
+                      </select>
+                    </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
                       <div className="flex items-center gap-2">
@@ -1637,7 +1900,19 @@ export function SettingsPage() {
               </div>
             </div>
             {expandedProviders.openrouter && (
-              <div className="px-3 pb-3 pt-0 ml-7">
+              <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Default harness</span>
+                  <select
+                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
+                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="claude-code">Claude Code</option>
+                    <option value="pi">Pi</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
                   enabled={!!formData.models.providers.openrouter}
@@ -1656,74 +1931,156 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Permissions — controls what flags get passed to spawned `claude` processes */}
+      {/* Permissions — controls what flags get passed to spawned agents */}
       <section id="permissions" className="py-6 scroll-mt-4">
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-muted-foreground" />
           Permissions
         </h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          How spawned Claude Code agents are gated. Applies to work agents, specialists,
-          conversations, and remote agents. Override per-invocation with{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+        <p className="text-xs text-muted-foreground mb-6">
+          How spawned agents are gated, configured per harness. Applies to work agents, specialists,
+          conversations, and remote agents.
         </p>
 
-        <div className="space-y-2">
-          {([
-            {
-              value: 'auto',
-              title: 'Auto (recommended)',
-              flag: '--permission-mode auto',
-              description:
-                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
-            },
-            {
-              value: 'bypass',
-              title: 'Bypass (yolo)',
-              flag: '--dangerously-skip-permissions --permission-mode bypassPermissions',
-              description:
-                'Legacy Panopticon behavior. Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
-            },
-          ] as const).map((opt) => {
-            const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                data-testid={`permission-mode-${opt.value}`}
-                onClick={() => handlePermissionModeChange(opt.value)}
-                disabled={saveMutation.isPending}
-                className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
-                  selected
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-transparent hover:bg-muted/30'
-                }`}
-              >
-                <span
-                  className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    selected ? 'border-primary' : 'border-muted-foreground/40'
+        {/* Claude Code */}
+        <div className="mb-6">
+          <p className="text-xs font-medium text-foreground mb-1">Claude Code</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Override per-invocation with{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'auto' as const,
+                title: 'Auto (recommended)',
+                flag: '--permission-mode auto',
+                description:
+                  "Claude Code's built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.",
+              },
+              {
+                value: 'bypass' as const,
+                title: 'Bypass (yolo)',
+                flag: '--permission-mode bypassPermissions',
+                description:
+                  'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when the classifier interferes with intentionally destructive automation.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`permission-mode-${opt.value}`}
+                  onClick={() => handlePermissionModeChange(opt.value)}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
                   }`}
                 >
-                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{opt.title}</span>
-                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      {opt.flag}
-                    </code>
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                    {opt.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Codex */}
+        <div>
+          <p className="text-xs font-medium text-foreground mb-1">Codex</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Applies to Codex TUI conversation sessions. Takes effect on the next resume or new conversation.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'read-only' as const,
+                title: 'Read-only',
+                flag: 'approval_policy=on-request + sandbox=read-only',
+                description:
+                  'Codex can browse files but asks before making any changes or running commands.',
+              },
+              {
+                value: 'workspace' as const,
+                title: 'Workspace',
+                flag: 'approval_policy=on-request + sandbox=workspace-write',
+                description:
+                  'Codex works freely inside the working directory, but asks before going outside it or using the network.',
+              },
+              {
+                value: 'auto-review' as const,
+                title: 'Auto-review (recommended)',
+                flag: 'approvals_reviewer=auto_review + sandbox=workspace-write',
+                description:
+                  'A sub-agent automatically reviews and answers approval requests instead of prompting you. Codex still runs inside the workspace sandbox — the reviewer decides whether to allow escapes.',
+              },
+              {
+                value: 'full-access' as const,
+                title: 'Full access (yolo)',
+                flag: 'approval_policy=never + sandbox=danger-full-access',
+                description:
+                  'No approval prompts — Codex has full filesystem and network access. Use with care.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.codex?.permissionMode ?? 'auto-review') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`codex-permission-mode-${opt.value}`}
+                  onClick={() => handleCodexPermissionModeChange(opt.value)}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
+                  }`}
+                >
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -2021,12 +2378,145 @@ export function SettingsPage() {
 
           <div className="border-t border-border my-2" />
 
-          {!convConfig ? (
+          <div className="px-4 py-3 rounded-lg bg-muted/15 border border-border/50">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Conversation Search</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Index Claude JSONL transcripts for Ctrl+K semantic search. Disabled by default; enabling sends transcript chunks to the configured embedding provider.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={conversationSearchEnabled}
+                aria-label="Toggle conversation search"
+                onClick={() => handleConversationSearchChange({ enabled: !conversationSearchEnabled })}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                  conversationSearchEnabled ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  conversationSearchEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`} />
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <label className="text-xs text-muted-foreground">
+                Provider
+                <select
+                  value={conversationSearch.provider ?? 'openai'}
+                  onChange={(e) => handleConversationSearchChange({ provider: e.target.value as 'openai' })}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                >
+                  <option value="openai">OpenAI</option>
+                </select>
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Model
+                <select
+                  value={conversationSearchModel}
+                  onChange={(e) => handleEmbeddingModelChange(e.target.value)}
+                  className="mt-1 w-full bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                >
+                  {(EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
+                  ))}
+                </select>
+                {(() => {
+                  const desc = (EMBEDDING_MODELS_BY_PROVIDER[conversationSearch.provider ?? 'openai'] ?? [])
+                    .find((m) => m.id === conversationSearchModel)?.description;
+                  return desc ? <span className="mt-1 block text-[11px] leading-snug text-muted-foreground/80">{desc}</span> : null;
+                })()}
+              </label>
+              <div className="flex items-end text-xs">
+                {formData?.api_keys?.openai ? (
+                  <span className="text-success">✓ Using OpenAI key from API Keys section</span>
+                ) : (
+                  <span className="text-warning">No OpenAI key set — configure in API Keys above</span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div>
+                <span>Last indexed: </span>
+                <span className="text-foreground">
+                  {conversationSearchStatus?.lastIndexedAt
+                    ? conversationSearchStatus.lastIndexedAt.slice(0, 19).replace('T', ' ')
+                    : 'Never'}
+                </span>
+                {conversationSearchStatus && (
+                  <span className="ml-2">
+                    ({conversationSearchStatus.chunkCount} chunks · {conversationSearchStatus.indexedFileCount} files)
+                  </span>
+                )}
+                {conversationSearchStatus && !conversationSearchStatus.available && (
+                  <span className="ml-2 text-destructive">{conversationSearchStatus.unavailableReason}</span>
+                )}
+                {conversationSearchEstimate && !conversationSearchEstimate.disabled && (
+                  <span className="block mt-1">
+                    Estimated reindex cost: <span className="text-foreground">${conversationSearchEstimate.estimatedUsd.toFixed(4)}</span>
+                    {' '}({conversationSearchEstimate.tokenCount.toLocaleString()} tokens · {conversationSearchEstimate.chunksEstimated} chunks)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleConversationSearchReindex()}
+                disabled={!conversationSearchEnabled || estimatingConversationSearch || conversationSearchReindexMutation.isPending}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
+              >
+                {estimatingConversationSearch || conversationSearchReindexMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Estimate & reindex all conversations
+              </button>
+            </div>
+
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground/80">
+              <span className="text-foreground">Estimate &amp; reindex</span> rebuilds the entire semantic-search index from your conversation transcripts: it shows the one-time embedding-API cost, asks you to confirm, then re-embeds every conversation. Run it after switching the model, or to pick up transcripts created before search was enabled.
+            </p>
+
+            {conversationSearchReindexMutation.isPending && reindexProgress && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-1">
+                  <span className="truncate">
+                    {reindexProgress.currentFile ? `Indexing ${reindexProgress.currentFile}…` : 'Finishing up…'}
+                  </span>
+                  <span className="text-foreground tabular-nums shrink-0">
+                    {reindexProgress.filesIndexed}/{reindexProgress.filesScanned || '—'} files · {reindexProgress.chunksIndexed.toLocaleString()} chunks
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${reindexProgress.filesScanned > 0 ? Math.min(100, Math.round((reindexProgress.filesIndexed / reindexProgress.filesScanned) * 100)) : 5}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border my-2" />
+
+          {convConfigLoading ? (
             <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Loading embedding settings…
             </div>
-          ) : (
+          ) : convConfigError ? (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-muted-foreground">{convConfigError}</span>
+              <button
+                type="button"
+                onClick={loadConvConfig}
+                className="ml-1 inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                <RefreshCw className="w-3 h-3" /> Retry
+              </button>
+            </div>
+          ) : convConfig ? (
             <>
               <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
                 <div className="min-w-0">
@@ -2161,7 +2651,7 @@ export function SettingsPage() {
                 </>
               )}
             </>
-          )}
+          ) : null}
         </div>
       </section>
 
@@ -2200,7 +2690,7 @@ export function SettingsPage() {
             <input
               type="text"
               value={formData.memory?.model || ''}
-              onChange={(e) => updateMemorySettings({ model: e.target.value || undefined })}
+              onChange={(e) => updateMemorySettings({ model: e.target.value || undefined }, { debounce: true })}
               placeholder={formData.memory?.provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
               className="w-64 bg-background border border-border rounded-md px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
             />
@@ -2224,7 +2714,7 @@ export function SettingsPage() {
               <input
                 type="text"
                 value={formData.memory?.fallback_model || ''}
-                onChange={(e) => updateMemorySettings({ fallback_model: e.target.value || undefined })}
+                onChange={(e) => updateMemorySettings({ fallback_model: e.target.value || undefined }, { debounce: true })}
                 placeholder="fallback model"
                 className="w-44 bg-background border border-border rounded-md px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
               />
@@ -2368,923 +2858,4 @@ export function SettingsPage() {
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 (formData.background_ai?.cheap_mode ?? false) ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-
-          {BACKGROUND_AI_FEATURE_META.map((feature) => {
-            const cheapMode = formData.background_ai?.cheap_mode ?? false;
-            const featureOn = formData.background_ai?.features?.[feature.key] ?? true;
-            const effectiveOn = !cheapMode && featureOn;
-            const cost24h = backgroundCost?.bySource?.[BG_FEATURE_COST_SOURCE[feature.key]];
-            return (
-              <div
-                key={feature.key}
-                className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg transition-colors hover:bg-muted/30"
-              >
-                <div className="min-w-0">
-                  <span className={`text-sm font-medium ${effectiveOn ? 'text-foreground' : 'text-muted-foreground'}`}>{feature.label}</span>
-                  {!effectiveOn && (
-                    <span
-                      className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                      title="This feature is off, so it isn't running — but you can still change its model below; the new model takes effect when you enable it (or turn off low-cost mode)."
-                    >
-                      not active
-                    </span>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {backgroundModelControl(feature.key)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span
-                    className="font-mono tabular-nums text-[11px] text-muted-foreground w-16 text-right"
-                    title="Spend over the last 24 hours"
-                  >
-                    {typeof cost24h === 'number' ? `$${cost24h.toFixed(2)}` : '—'}
-                    <span className="block text-[9px] uppercase tracking-wide text-muted-foreground/60">24h</span>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={effectiveOn}
-                    aria-label={`Toggle ${feature.label}`}
-                    disabled={cheapMode}
-                    onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-                      effectiveOn ? 'bg-primary' : 'bg-muted'
-                    }`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                      effectiveOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                    }`} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-3 px-4">
-          You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the
-          choice is saved and takes effect when the feature runs, but a model shown under a
-          <span className="mx-1 rounded bg-muted px-1 py-0.5 font-medium">not active</span>
-          feature isn't being used yet. 24h figures are actual recorded spend. Models shared between
-          rows (titles + refinement, memory extraction + query expansion) edit the same setting.
-        </p>
-      </section>
-
-      {/* Terminal */}
-      <section id="terminal" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
-          Terminal
-        </h2>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">tmux configuration</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {(formData.tmux?.config_mode || 'managed') === 'managed'
-                  ? 'Using Panopticon-managed tmux socket and config'
-                  : 'Inheriting your user tmux configuration'}
-              </p>
-            </div>
-            <select
-              value={formData.tmux?.config_mode || 'managed'}
-              onChange={(e) => handleTmuxConfigModeChange(e.target.value as 'managed' | 'inherit-user')}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-            >
-              <option value="managed">Managed</option>
-              <option value="inherit-user">Inherit user</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <SettingsSection
-        id="tts"
-        title="TTS"
-        description="Built-in voice playback"
-        actions={
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs ${
-            ttsHealth === undefined
-              ? 'bg-muted/50 text-muted-foreground'
-              : ttsDaemonOnline
-                ? 'bg-success/10 text-success'
-                : ttsDaemonStarting
-                  ? 'bg-warning/10 text-warning'
-                  : 'bg-destructive/10 text-destructive'
-          }`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
-            Daemon status: {ttsDaemonStatus}
-          </span>
-        }
-      >
-        <SettingsRow
-          label="Enable TTS"
-          description="Speak activity events through the local Qwen3-TTS daemon"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={!!ttsConfig.enabled}
-            aria-label="Toggle TTS"
-            onClick={() => handleTtsConfigChange({ enabled: !ttsConfig.enabled })}
-            disabled={saveMutation.isPending}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-              ttsConfig.enabled ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              ttsConfig.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`} />
-          </button>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Daemon"
-          description={ttsDaemonDetails || ttsHealth?.error || 'Live Qwen TTS daemon status'}
-        >
-          <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : ttsDaemonStarting ? 'text-warning' : 'text-muted-foreground'}`}>
-              {ttsDaemonOnline ? 'running' : ttsDaemonStatus}
-            </span>
-            {ttsDaemonModel && (
-              <span className="max-w-xs truncate text-xs text-muted-foreground">{ttsDaemonModel}</span>
-            )}
-            {!ttsDaemonOnline && !ttsDaemonStarting && (
-              <button
-                type="button"
-                onClick={() => ttsStartMutation.mutate()}
-                disabled={ttsStartMutation.isPending}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-              >
-                {ttsStartMutation.isPending ? 'Starting…' : 'Start daemon'}
-              </button>
-            )}
-          </div>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Volume"
-          description={`${Math.round(ttsVolume * 100)}% output volume`}
-        >
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ttsVolume}
-            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
-            className="w-40 accent-primary disabled:opacity-50"
-          />
-          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
-            {Math.round(ttsVolume * 100)}%
-          </span>
-        </SettingsRow>
-
-        <SettingsRow
-          label="Rate"
-          description="Speech speed multiplier"
-        >
-          <input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={ttsRate}
-            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
-            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          label="Max chars"
-          description="Maximum text length per spoken utterance"
-        >
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={ttsMaxChars}
-            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
-            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          label="Drop info when queue full"
-          description="Skip low-priority speech when the daemon queue is saturated"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={ttsConfig.dropInfoWhenFull ?? true}
-            aria-label="Toggle dropping low-priority TTS when queue is full"
-            onClick={() => handleTtsConfigChange({ dropInfoWhenFull: !(ttsConfig.dropInfoWhenFull ?? true) })}
-            disabled={saveMutation.isPending}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-              (ttsConfig.dropInfoWhenFull ?? true) ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              (ttsConfig.dropInfoWhenFull ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
-            }`} />
-          </button>
-        </SettingsRow>
-
-        <TtsSystemVoicePicker
-          voices={ttsVoices}
-          isLoading={ttsVoicesQuery.isLoading}
-          systemVoiceId={ttsConfig.voice}
-          statusVoiceId={ttsConfig.statusVoice}
-          disabled={saveMutation.isPending}
-          onSetSystemVoice={(voiceId) => handleTtsConfigChange({ voice: voiceId })}
-          onSetStatusVoice={(voiceId) => handleTtsConfigChange({ statusVoice: voiceId })}
-        />
-
-        <div className="mt-6" data-testid="tts-voice-library-tabs">
-          <div className="rounded-t-xl border border-border/70 bg-card/40 p-2">
-            <div className="inline-flex rounded-lg bg-background/60 p-1">
-              {([
-                ['presets', 'CustomVoice Presets'],
-                ['design', 'VoiceDesign'],
-              ] as const).map(([tabId, label]) => (
-                <button
-                  key={tabId}
-                  type="button"
-                  onClick={() => setActiveTtsVoiceTab(tabId)}
-                  aria-pressed={activeTtsVoiceTab === tabId}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    activeTtsVoiceTab === tabId
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-popover'
-                  }`}
-                  data-testid={`tts-voice-library-tab-${tabId}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {activeTtsVoiceTab === 'presets' ? <VoicePresetsTab /> : <VoiceDesignTab />}
-        </div>
-
-        <SavedVoicesTab />
-
-        <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Route event types to specific voices, silence noisy activity sources, and override spoken text.
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Voice Map</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Use default falls back to the configured TTS voice.</p>
-                </div>
-                <span className="text-[10px] text-muted-foreground">{ttsVoices.length} saved voices</span>
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] bg-muted/30 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  <span>Event key</span>
-                  <span>Voice</span>
-                </div>
-                {TTS_EVENT_KEYS.map((eventKey) => (
-                  <div key={eventKey} className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] items-center gap-3 border-t border-border px-3 py-2">
-                    <code className="truncate text-xs text-foreground">{eventKey}</code>
-                    <select
-                      value={ttsConfig.voiceMap?.[eventKey] ?? ''}
-                      onChange={(e) => handleTtsVoiceMapChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
-                      aria-label={`Voice for ${eventKey}`}
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    >
-                      <option value="">Use default</option>
-                      {ttsVoices.map((voice) => (
-                        <option key={voice.id} value={voice.id}>{voice.name} ({voice.kind})</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Muted Sources</h4>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {ACTIVITY_SOURCE_OPTIONS.map((source) => (
-                  <label key={source} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={ttsConfig.mutedSources?.includes(source) ?? false}
-                      onChange={(e) => handleTtsMutedSourceChange(source, e.target.checked)}
-                      disabled={saveMutation.isPending}
-                      className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
-                    />
-                    <span>{source}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Utterance Templates</h4>
-                  <p className="text-xs text-muted-foreground mt-1">Templates may include {'{issueId}'}.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddTtsTemplate}
-                  disabled={!canAddTtsTemplate || saveMutation.isPending}
-                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-popover disabled:opacity-50"
-                >
-                  Add template
-                </button>
-              </div>
-              <div className="space-y-2">
-                {ttsTemplateEntries.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    No utterance templates configured.
-                  </p>
-                )}
-                {ttsTemplateEntries.map(([eventKey, template]) => (
-                  <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
-                    <select
-                      value={eventKey}
-                      onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
-                      aria-label="Template event key"
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    >
-                      {TTS_EVENT_KEYS.map((key) => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={template}
-                      onChange={(e) => handleTtsTemplateChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
-                      placeholder="e.g. {issueId} passed review"
-                      aria-label={`Template text for ${eventKey}`}
-                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTtsTemplate(eventKey)}
-                      disabled={saveMutation.isPending}
-                      className="inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                      aria-label={`Remove template for ${eventKey}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </SettingsSection>
-
-      {/* Tracker Keys */}
-      <section id="tracker-keys" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
-          Tracker Keys
-        </h2>
-        <p className="text-xs text-muted-foreground mb-3">
-          Override environment variables ({TRACKERS.map(t => t.envVar).join(', ')}).
-        </p>
-        <div className="space-y-1">
-          {TRACKERS.map((tracker) => {
-            const trackerKey = formData.tracker_keys?.[tracker.id] || '';
-
-            return (
-              <div key={tracker.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-                <tracker.icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">{tracker.name}</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">{tracker.envVar}</span>
-                  </div>
-                  {trackerKey.startsWith('$') && (
-                    <p className="text-[10px] text-warning mt-0.5">
-                      Configured via env: <code className="font-mono">{trackerKey}</code>
-                    </p>
-                  )}
-                </div>
-                <div className="relative w-[200px] shrink-0">
-                  <input
-                    type={showTrackerKey[tracker.id] ? 'text' : 'password'}
-                    value={trackerKey.startsWith('$') ? '' : trackerKey}
-                    onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
-                    placeholder={trackerKey.startsWith('$') ? 'Override env value...' : tracker.placeholder}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    data-form-type="other"
-                    className="w-full bg-background border border-border rounded-md px-2.5 py-1.5 pr-8 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
-                  />
-                  {(trackerKey && !trackerKey.startsWith('$')) && (
-                    <button
-                      onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={showTrackerKey[tracker.id] ? 'Hide key' : 'Show key'}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Appearance */}
-      <section id="appearance" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
-          Appearance
-        </h2>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Ready to Merge shimmer</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Animate the badge with a subtle shimmer for cards awaiting merge approval
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={uiPrefs.readyToMergeShimmer}
-              aria-label="Toggle Ready to Merge shimmer"
-              onClick={() => updateUIPrefs({ readyToMergeShimmer: !uiPrefs.readyToMergeShimmer })}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                uiPrefs.readyToMergeShimmer ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                uiPrefs.readyToMergeShimmer ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Diff */}
-      <section id="diff" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">Diff</h2>
-        <div className="space-y-1">
-          {/* diffRenderMode */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Diff style</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Unified (stacked) or split (side-by-side)</p>
-            </div>
-            <select
-              value={diffPrefs.diffRenderMode}
-              onChange={(e) => updateDiffPrefs({ diffRenderMode: e.target.value as 'stacked' | 'split' })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              <option value="stacked">Stacked (unified)</option>
-              <option value="split">Split (side-by-side)</option>
-            </select>
-          </div>
-
-          {/* diffWordWrap */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Line wrapping</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Wrap long lines instead of scrolling horizontally</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={diffPrefs.diffWordWrap}
-              aria-label="Toggle line wrapping"
-              onClick={() => updateDiffPrefs({ diffWordWrap: !diffPrefs.diffWordWrap })}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                diffPrefs.diffWordWrap ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                diffPrefs.diffWordWrap ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-
-          {/* lineDiffType */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Intra-line diff granularity</span>
-              <p className="text-xs text-muted-foreground mt-0.5">How finely to highlight changes within a single line</p>
-            </div>
-            <select
-              value={diffPrefs.lineDiffType}
-              onChange={(e) => updateDiffPrefs({ lineDiffType: e.target.value as 'word-alt' | 'word' | 'char' | 'none' })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              <option value="word-alt">Word-alt (join adjacent)</option>
-              <option value="word">Word</option>
-              <option value="char">Character</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-
-          {/* diffIndicators */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Change indicators</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Classic +/- prefixes, colored bars, or none</p>
-            </div>
-            <select
-              value={diffPrefs.diffIndicators}
-              onChange={(e) => updateDiffPrefs({ diffIndicators: e.target.value as 'classic' | 'bars' | 'none' })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              <option value="bars">Bars</option>
-              <option value="classic">Classic (+/-)</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-
-          {/* hunkSeparators */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Hunk separators</span>
-              <p className="text-xs text-muted-foreground mt-0.5">How collapsed hunks are displayed between change groups</p>
-            </div>
-            <select
-              value={diffPrefs.hunkSeparators}
-              onChange={(e) => updateDiffPrefs({ hunkSeparators: e.target.value as 'simple' | 'metadata' | 'line-info' | 'line-info-basic' })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              <option value="line-info">Line info</option>
-              <option value="line-info-basic">Line info (basic)</option>
-              <option value="simple">Simple</option>
-              <option value="metadata">Metadata</option>
-            </select>
-          </div>
-
-          {/* expandUnchanged */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Expand unchanged</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Auto-expand all unchanged context lines</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={diffPrefs.expandUnchanged}
-              aria-label="Toggle expand unchanged"
-              onClick={() => updateDiffPrefs({ expandUnchanged: !diffPrefs.expandUnchanged })}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                diffPrefs.expandUnchanged ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                diffPrefs.expandUnchanged ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-
-          {/* collapsedContextThreshold */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Collapsed context threshold</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Lines of context before collapsing unchanged blocks</p>
-            </div>
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={diffPrefs.collapsedContextThreshold}
-              onChange={(e) => updateDiffPrefs({ collapsedContextThreshold: Math.max(0, Math.min(20, Number(e.target.value))) })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary w-[80px]"
-            />
-          </div>
-
-          {/* lineHoverHighlight */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Line hover highlight</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Highlight lines on mouse hover</p>
-            </div>
-            <select
-              value={diffPrefs.lineHoverHighlight}
-              onChange={(e) => updateDiffPrefs({ lineHoverHighlight: e.target.value as 'disabled' | 'both' | 'number' | 'line' })}
-              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
-            >
-              <option value="disabled">Disabled</option>
-              <option value="both">Both (number + line)</option>
-              <option value="number">Number only</option>
-              <option value="line">Line only</option>
-            </select>
-          </div>
-
-          {/* disableLineNumbers */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Hide line numbers</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Remove line number columns from diff view</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={diffPrefs.disableLineNumbers}
-              aria-label="Toggle hide line numbers"
-              onClick={() => updateDiffPrefs({ disableLineNumbers: !diffPrefs.disableLineNumbers })}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                diffPrefs.disableLineNumbers ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                diffPrefs.disableLineNumbers ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-
-          {/* enableLineSelection */}
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Enable line selection</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Multi-line selection with shift-click</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={diffPrefs.enableLineSelection}
-              aria-label="Toggle enable line selection"
-              onClick={() => updateDiffPrefs({ enableLineSelection: !diffPrefs.enableLineSelection })}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                diffPrefs.enableLineSelection ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                diffPrefs.enableLineSelection ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Maintenance */}
-      <section id="maintenance" className="py-6 scroll-mt-4">
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">Maintenance</h2>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Issue cache</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Clear cached issue data and re-fetch from all trackers
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                setClearingCache(true);
-                try {
-                  const res = await fetch('/api/cache/clear', { method: 'POST' });
-                  if (!res.ok) throw new Error(await res.text());
-                  toast.success('Issue cache cleared and re-fetched');
-                  queryClient.invalidateQueries({ queryKey: ['issues'] });
-                } catch (err: any) {
-                  toast.error(`Failed to clear cache: ${err.message}`);
-                } finally {
-                  setClearingCache(false);
-                }
-              }}
-              disabled={clearingCache}
-              className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:border-warning/50 hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {clearingCache ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Desktop App settings — shown only inside Electron */}
-      <div id="desktop" className="py-6 scroll-mt-4">
-        <DesktopSettingsSection />
-      </div>
-
-      {/* Provider Models Modal */}
-      {modelsModalProvider && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
-                })()}
-                <h3 className="text-foreground text-lg font-bold">
-                  {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
-                </h3>
-              </div>
-              <button
-                onClick={() => setModelsModalProvider(null)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {(() => {
-                const providerApiKey = formData?.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
-                const isEnvVarRef = providerApiKey.startsWith('$');
-
-                if (!providerApiKey) {
-                  return (
-                    <div className="text-center py-8">
-                      <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
-                      <p className="text-muted-foreground">Enter an API key to test models</p>
-                    </div>
-                  );
-                }
-
-                if (isEnvVarRef) {
-                  return (
-                    <div className="text-center py-8">
-                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
-                      <p className="text-warning">API key configured via environment variable</p>
-                      <p className="text-muted-foreground text-sm mt-1">
-                        <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
-                      </p>
-                      <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-3">
-                  {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
-                    const testKey = `${modelsModalProvider}:${model.id}`;
-                    const testResult = modelTestResults[testKey];
-                    const isTesting = testingModel === testKey;
-
-                    return (
-                      <div
-                        key={model.id}
-                        className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              {/* Model icons are strings (Material Symbols names) - render as text fallback */}
-                              <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
-                                {typeof model.icon === 'string' ? model.icon[0] : '◆'}
-                              </div>
-                              <h4 className="text-foreground font-semibold">{model.name}</h4>
-                              {model.tier && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
-                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
-                                  'badge-bg-success text-success-foreground'
-                                }`}>
-                                  {model.tier}
-                                </span>
-                              )}
-                            </div>
-                            {model.description && (
-                              <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
-                            )}
-                            <div className="flex flex-wrap gap-1">
-                              {model.capabilities.map((cap) => (
-                                <span
-                                  key={cap}
-                                  className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
-                                >
-                                  {cap}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <button
-                              onClick={() => handleTestModel(modelsModalProvider, model.id)}
-                              disabled={isTesting}
-                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
-                            >
-                              {isTesting ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Zap className="w-3.5 h-3.5" />
-                              )}
-                              Test 2+3
-                            </button>
-                            {testResult && (
-                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
-                                {testResult.success ? (
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                ) : (
-                                  <AlertTriangle className="w-3.5 h-3.5" />
-                                )}
-                                {testResult.success
-                                  ? `${testResult.latencyMs}ms`
-                                  : (testResult.error?.slice(0, 30) || 'Failed')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-border bg-card">
-              <p className="text-xs text-muted-foreground text-center">
-                Test verifies API key and model availability by asking "What is 2+3?"
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Experimental — research-preview features, must remain the LAST section on the page */}
-      <section
-        id="experimental"
-        data-testid="experimental-section"
-        aria-label="Experimental"
-        className="py-6 scroll-mt-4 border-t border-warning/30 mt-4"
-      >
-        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
-          <Beaker className="w-4 h-4 text-warning" />
-          Experimental
-        </h2>
-        <p className="text-xs text-muted-foreground mb-3">
-          Research-preview features that may change or be removed without notice.
-        </p>
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">RTK Bash compression</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Filters Bash command outputs through rtk-ai/rtk to reduce token consumption. Opt-in.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(formData.agents?.rtk?.enabled)}
-              aria-label="Enable RTK Bash compression"
-              data-testid="experimental-rtk-toggle"
-              onClick={() => handleRtkToggle(!formData.agents?.rtk?.enabled)}
-              disabled={saveMutation.isPending}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-                formData.agents?.rtk?.enabled ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                formData.agents?.rtk?.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-            <div className="min-w-0">
-              <span className="text-sm font-medium text-foreground">Claude Code Channels</span>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Use Channels transport for conversation delivery; work-agent MCP wiring is YAML-only
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={Boolean(formData.experimental?.claudeCodeChannels)}
-              aria-label="Use Claude Code Channels for prompt delivery (work agents only)"
-              data-testid="experimental-claude-code-channels-toggle"
-              onClick={() => handleClaudeCodeChannelsToggle(!formData.experimental?.claudeCodeChannels)}
-              disabled={saveMutation.isPending}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
-                formData.experimental?.claudeCodeChannels ? 'bg-primary' : 'bg-muted'
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                formData.experimental?.claudeCodeChannels ? 'translate-x-[18px]' : 'translate-x-[3px]'
-              }`} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-    </SettingsLayout>
-  );
-}
+         

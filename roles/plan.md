@@ -44,8 +44,9 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
+5. **Codebase map** under `<projectRoot>/.pan/context/codebase/` — bootstrapped if missing, corrected if stale.
 
-`pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`, commit it on main, push, transition the issue to Planned, and terminate this planning session. You do not write to `.pan/specs/` directly. The legacy Done button still exists for humans running planning manually with `--no-promote`. See docs/VBRIEF.md for the four-artifact model.
+`pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`, commit it on main, push, transition the issue to Planned, and terminate this planning session. You do not write to `.pan/specs/` directly. Whether a work agent starts afterward is decided by deterministic state, not by you: human-initiated planning waits in Planned for `pan start` / Start Agent; flywheel-initiated planning (launched with `--auto-start`) auto-spawns. The dashboard Done button is the manual handoff path for `--no-promote` runs. See docs/VBRIEF.md for the four-artifact model.
 
 ## Edge semantics for the executor
 
@@ -72,7 +73,7 @@ If two items are independent, leave them unconnected. The work agent reads the D
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
 5. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
-6. Run `pan plan finalize` — that materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `<projectRoot>/.pan/specs/`, commits on main, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required.
+6. Run `pan plan finalize` — that materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, and (unless invoked with `--no-promote`) promotes the canonical spec to `<projectRoot>/.pan/specs/`, commits on main, transitions the issue, and terminates this planning session. Your final action is this single command; no separate "Done" click is required. Do not start, request, or wait for the work agent — the handoff gate (human approval or the auto-spawn stamp) lives outside your session.
 7. Stop after `pan plan finalize` returns; do not start implementation work. Stop after planning is complete. The session may be killed mid-shutdown — that is the expected end-of-planning signal.
 
 ## TLDR: prefer code summaries over full reads
@@ -90,8 +91,19 @@ Read full files only when you need exact line numbers for a citation in the plan
 
 Status is a JSON field, not a directory. `plan.status` advances `draft → proposed → approved → running → completed/cancelled` via atomic field flips on the same spec file. **Files never move between directories.** Legacy paths (`docs/prds/planned/`, `vbrief/proposed/`, `.planning/`) are retired — do not write to them.
 
+## Signal the flywheel before you stall
+
+If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park:
+
+```bash
+pan tell flywheel-orchestrator "plan <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
+```
+
+Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+
+The four push-back shapes that require this signal: **self-abort** (planning can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing). This sits alongside `AskUserQuestion` — surface the question to the operator *and* tell the orchestrator, then keep moving; don't silently wait at the prompt.
+
 ## Boundaries
 
 - No implementation code. No commits to feature files. The implementation agent does that.
-- Caveman compression is disabled for this agent — narrative fields in continue.json must remain full prose so crash recovery and downstream specialists have the context they need.
-- Inspect-on-bead-close is disabled — planning beads are administrative, not code.
+- Caveman compression is disabled for this agent — narrative fields in continue.json must remain full prose so crash recovery and dow

@@ -5,6 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
+import { toast } from 'sonner';
 import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
@@ -252,6 +253,7 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
+        <DrawerPausedBanner agents={agents} />
         <DrawerTabs />
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div
@@ -306,3 +308,13 @@ export function IssueDrawer() {
     </div>
   );
 }
+
+
+/** PAN-1779: a pause gate must be unmissable on the issue slideout — amber
+ * banner with the full reason (who paused it and the unpause condition) and a
+ * one-click Unpause. Amber = a human must act (style guide v1.2). */
+function DrawerPausedBanner({ agents }: { agents: ReadonlyArray<{ id: string; paused?: boolean; pausedReason?: string }> }) {
+  const paused = agents.filter((agent) => agent.paused === true);
+  if (paused.length === 0) return null;
+
+  c

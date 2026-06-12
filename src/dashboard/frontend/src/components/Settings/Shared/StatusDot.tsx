@@ -7,9 +7,10 @@ export interface StatusDotProps {
 
 export function StatusDot({ status, className }: StatusDotProps) {
   const colorStyles = {
-    connected: 'bg-[#10b981]',
+    connected: 'bg-success', // connection liveness is a verified outcome
     disconnected: 'bg-muted-foreground',
-    testing: 'bg-[#fbbf24] animate-pulse',
+    testing: 'bg-info animate-pulse', // v1.2: machine activity = blue
+
   };
 
   return <span className={cn('inline-block size-1.5 rounded-full', colorStyles[status], className)} />;
