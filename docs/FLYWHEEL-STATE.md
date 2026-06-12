@@ -2156,3 +2156,27 @@ after RUN-27 (assumed reboot casualty like RUN-19/RUN-21):
   tick-9 correction, full swap with 22 GB available RAM is cold-page eviction,
   not OOM pressure. Still, launching more work agents into a 16-active pool
   above the configured cap is unwise until blocked items drain or slots free.
+
+## RUN-28 tick 2 (2026-06-12) — freed slots, pruned docker networks, launched planning on 4 critical substrate bugs
+
+- **Paused three more done/ready work agents** to free governor work slots:
+  PAN-1491 (review APPROVED, PR clean), PAN-1778 (PR #1780 all checks passing),
+  PAN-1787 (work complete, no open beads). Classifier "stuck" was idle-at-prompt
+  after completion, not genuine blockage.
+- **Docker network exhaustion surfaced:** `pan start PAN-1798 --auto` failed
+  with "all predefined address pools have been fully subnetted". Pruned 8 unused
+  workspace devnets (including deleted/merged issue workspaces), freeing pools.
+- **`pan start --auto` beads-recovery path is broken for fresh critical issues.**
+  PAN-1799/1805/1807/1798 all failed with `bd list`/`bd ping` errors during the
+  auto-start synthesized-vBRIEF recovery. This is the same family as PAN-1647
+  (flywheel's own `pan start --auto` path broken). Workaround: launched
+  `pan plan <id> --auto` for all four instead; they are now planning. Will need
+  plain `pan start` after finalize per the stop-at-proposed contract.
+- **Launched one direct work agent:** PAN-1808 via `pan start --host --yes`
+  (test-leak tmux-session bug; host-runnable test fix). Agent is up and
+  nucleating.
+- **Memory climbed to 49.9/64.1 GB used** with planning burst and PAN-1808 spawn.
+  Available RAM still ~14 GB; not at OOM but headroom shrinking. Swap remains full.
+- **Main green, unchanged** at origin `2148beaf7` (CI success 16:24Z). The local
+  FLYWHEEL-STATE.md commit was pushed (`10425baa0`), moving local main 62 ahead
+  of origin.
