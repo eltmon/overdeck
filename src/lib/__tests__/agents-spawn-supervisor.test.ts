@@ -10,6 +10,7 @@ let workspace: string;
 let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
+let resolveHarnessMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -38,6 +39,16 @@ function writeSupervisorArtifact(): string {
 function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
+  resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
+    if (explicit) return explicit;
+    if (model === 'gpt-5.5') return 'codex';
+    if (model === 'kimi-k2.6') return 'pi';
+    return 'claude-code';
+  });
+
+  vi.doMock('../harness-resolve.js', () => ({
+    resolveHarness: resolveHarnessMock,
+  }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../paths.js')>();
@@ -88,6 +99,9 @@ function mockSpawnDependencies(): void {
         config: {
           workhorses: actual.DEFAULT_WORKHORSES,
           roles: actual.DEFAULT_ROLES,
+          providerHarnesses: {},
+          providerAuth: {},
+          apiKeys: { kimi: 'test-kimi-key' },
           caveman: { enabled: false },
         },
       }),
@@ -95,6 +109,19 @@ function mockSpawnDependencies(): void {
   });
   vi.doMock('../claude-auth.js', () => ({
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
+  }));
+  vi.doMock('../openai-auth.js', () => ({
+    getOpenAIAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false })),
+    getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
+  }));
+  vi.doMock('../cliproxy.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../cliproxy.js')),
+    bridgeGeminiAuthToCliproxy: vi.fn(() => Effect.succeed(true)),
+    getCliproxyClientEnv: vi.fn(() => ({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:4141' })),
+    isCliproxyRunning: vi.fn(() => Effect.succeed(true)),
+  }));
+  vi.doMock('../provider-health.js', () => ({
+    validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
   }));
   vi.doMock('../database/app-settings.js', () => ({
     getFlywheelActiveRunId: () => activeFlywheelRunId,
@@ -120,6 +147,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.doUnmock('../harness-resolve.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
@@ -128,6 +156,9 @@ afterEach(() => {
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
   vi.doUnmock('../claude-auth.js');
+  vi.doUnmock('../openai-auth.js');
+  vi.doUnmock('../cliproxy.js');
+  vi.doUnmock('../provider-health.js');
   vi.doUnmock('../database/app-settings.js');
   vi.doUnmock('../projects.js');
   delete process.env.PANOPTICON_HOME;
@@ -237,6 +268,36 @@ describe('spawnAgent PTY supervisor wiring', () => {
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.any(Object),
     );
+  });
+
+  it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
+    writeSupervisorArtifact();
+    process.env.KIMI_API_KEY = 'test-kimi-key';
+    try {
+      const { spawnAgent } = await import('../agents.js');
+
+      const openaiState = await spawnAgent({
+        issueId: 'PAN-1406',
+        workspace,
+        role: 'work',
+        model: 'gpt-5.5',
+      });
+      const kimiState = await spawnAgent({
+        issueId: 'PAN-1407',
+        workspace,
+        role: 'work',
+        model: 'kimi-k2.6',
+      });
+
+      expect(openaiState.harness).toBe('codex');
+      expect(openaiState.codexMode).toBe('work-tui');
+      expect(kimiState.harness).toBe('pi');
+      expect(kimiState.codexMode).toBeUndefined();
+      expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
+      expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
+    } finally {
+      delete process.env.KIMI_API_KEY;
+    }
   });
 
   it('threads active flywheel provenance env into spawnRun work agents', async () => {

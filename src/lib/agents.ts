@@ -38,7 +38,7 @@ import { buildCompactRecoverySeedMessage } from './context-overflow.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
-import { canUseHarnessSync } from './harness-policy.js';
+import { resolveHarness } from './harness-resolve.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { Effect } from 'effect';
@@ -379,15 +379,6 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
     }
     throw err;
   }
-}
-
-async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
-  const providerDefault = loadYamlConfig().config.providerHarnesses?.[getProviderForModelSync(model).name];
-  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex'
-    ? harness
-    : providerDefault ?? 'claude-code';
-  const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
-  return decision.allowed ? requested : 'claude-code';
 }
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
@@ -3090,22 +3081,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   initHookSync(agentId);
 
-  // PAN-1048 C5: Resolve the harness for this role from config.roles[role].harness
-  // before falling back to claude-code. Explicit options.harness takes precedence
-  // (used by the dashboard run picker), then config, then default. Without this
-  // step, every role spawned through spawnRun ignored the per-role harness slot
-  // surfaced in the Settings UI.
-  //
-  // PAN-1048 review feedback 005 (C4): every spawn entry point must pass the
-  // requested harness through canUseHarness() before persisting or launching
-  // (harness-policy.ts:3-6). resolveEffectiveHarness() collapses the requested
-  // harness to claude-code when the policy gate (e.g. Pi + Anthropic
-  // subscription auth, a ToS violation) blocks it, so a config-level
-  // `roles.work.harness: pi` cannot silently bypass the gate just because the
-  // model+auth combination is illegal.
-  const requestedHarness: RuntimeName | undefined = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness;
-  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveHarness({
+    explicit: options.harness,
+    role,
+    model: selectedModel,
+  });
 
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
@@ -3422,18 +3402,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
-  // PAN-1048 review feedback 003: respect roles.work.harness from config when
-  // the caller did not pass an explicit options.harness. Without this, every
-  // work spawn ignored the per-role harness slot surfaced in Settings → Roles
-  // and silently fell back to claude-code — the same bug spawnRun() already
-  // fixed for non-work roles at line 1665.
-  //
-  // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
-  // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
-  // runs before we persist the resolved harness or hand it to the launcher.
-  const requestedHarness: RuntimeName | undefined = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness;
-  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveHarness({
+    explicit: options.harness,
+    role,
+    model: selectedModel,
+  });
 
   // Create state
   const existingState = getAgentStateSync(agentId);
@@ -4591,7 +4564,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
-    const effectiveHarness = await resolveEffectiveHarness(opts?.harness ?? agentState.harness, model);
+    const effectiveHarness = await resolveHarness({
+      explicit: opts?.harness ?? agentState.harness,
+      role: agentState.role,
+      model,
+    });
     agentState.harness = effectiveHarness;
     if (effectiveHarness === 'codex') {
       agentState.codexMode = 'work-tui';
@@ -4828,8 +4805,11 @@ export async function restartAgent(
   await Effect.runPromise(stopAgent(normalizedId));
 
   const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
-  const requestedHarness = newHarness ?? agentState.harness;
-  const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
+  const effectiveHarness = await resolveHarness({
+    explicit: newHarness ?? agentState.harness,
+    role: agentState.role,
+    model: effectiveModel,
+  });
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }
