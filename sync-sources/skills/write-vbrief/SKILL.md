@@ -78,7 +78,8 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
     "tags": ["<relevant tags>"],
     "narratives": {
       "Problem": "<what problem this solves>",
-      "Proposal": "<the approach chosen>"
+      "Proposal": "<the approach chosen>",
+      "NonGoals": "<explicitly out of scope; behaviors this issue must NOT introduce — one per line, prefixed '- '>"
     },
     "autoDecisions": [],
     "items": [
@@ -120,6 +121,7 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
 | `plan.uid` | Fresh UUID v4. Generate with `node -e "console.log(crypto.randomUUID())"`. |
 | `plan.status` | Must be `"approved"` when written by a self-planning agent (skip `draft`/`proposed`). |
 | `items[].status` | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled`. Use `"pending"` for new items. |
+| `plan.narratives.NonGoals` | Required narrative. List everything discovery established as out of scope (`"none"` if genuinely nothing); review enforces these as must-not constraints. |
 | `items[].metadata.requiresInspection` | **Required on every item.** See inspection rules below. |
 | `items[].metadata.inspectionDepth` | `"fast"` (default) or `"deep"`. Only matters when `requiresInspection: true`. |
 | `subItems` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one AC sub-item. |

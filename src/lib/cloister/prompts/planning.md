@@ -251,7 +251,8 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "tags": ["<relevant tags>"],
     "narratives": {
       "Problem": "<what problem this solves>",
-      "Proposal": "<the approach chosen>"
+      "Proposal": "<the approach chosen>",
+      "NonGoals": "<explicitly out of scope; behaviors this issue must NOT introduce — one per line, prefixed '- '>"
     },
     "autoDecisions": [
       { "summary": "<inferred choice made in --auto mode>", "rationale": "<why this default is defensible>" }
@@ -294,6 +295,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
 - Acceptance criteria MUST be `subItems` with `metadata.kind: "acceptance_criterion"`
+- `narratives.NonGoals` MUST list everything discovery established as out of scope ("none" if genuinely nothing). Review enforces these as must-not constraints.
 - `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, and `metadata.inspectionDepth` are Panopticon extensions to the vBRIEF spec
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
 - `metadata.inspectionDepth` defaults to `"fast"` when omitted. Set it to `"deep"` only when `requiresInspection` is true and the bead needs a stronger architecture/safety review.

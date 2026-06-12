@@ -86,6 +86,7 @@ check_schema_key_agreement() {
     "difficulty"
     "foundationFor"
     "acceptance_criterion"
+    "NonGoals"
   )
   for file in "${files[@]}"; do
     for key in "${keys[@]}"; do
@@ -125,7 +126,7 @@ write_passing_fixture() {
 
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
 Run pan plan finalize. The issue waits in Planned until pan start or Start Agent unless --auto-start was stamped.
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -158,7 +159,7 @@ Close every completed bead with bd close.
 EOF
   for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
     cat > "$file" <<'EOF'
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
 EOF
   done
 }
@@ -196,6 +197,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('foundationFor ', ''))
+PY"
+  expect_self_test_failure "schema-key-agreement-nongoals" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace(' NonGoals', ''))
 PY"
   expect_self_test_failure "handoff-consistency" \
     "python3 - <<'PY' \"\$tmp/roles/plan.md\"

@@ -201,7 +201,8 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
     "tags": ["frontend", "ux"],
     "narratives": {
       "Problem": "Dashboard shows zeros on load — no loading indicators",
-      "Proposal": "BootstrapGate wrapper + shimmer skeleton components"
+      "Proposal": "BootstrapGate wrapper + shimmer skeleton components",
+      "NonGoals": "- Replacing the existing dashboard routing\n- Changing issue lifecycle statuses"
     },
     "items": [
       {
@@ -266,7 +267,8 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 | `plan.created` | NO | ISO 8601 timestamp — when the plan was first created |
 | `plan.updated` | NO | ISO 8601 timestamp — updated automatically on every status write |
 | `plan.tags` | NO | Tags for categorization |
-| `plan.narratives` | NO | Problem/Proposal/Constraint/Risk narratives |
+| `plan.narratives` | NO | Problem/Proposal/NonGoals/Constraint/Risk narratives |
+| `plan.narratives.NonGoals` | NO | Explicitly out-of-scope behaviors, one per line prefixed `- `, or `"none"` if genuinely nothing. Review enforces these as must-not constraints. |
 
 #### `plan.status` Enum
 
