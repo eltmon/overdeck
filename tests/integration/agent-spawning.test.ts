@@ -148,6 +148,14 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/lib/github-app.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/github-app.js')>();
+  return {
+    ...actual,
+    isGitHubAppConfigured: vi.fn().mockReturnValue(false),
+  };
+});
+
 // Mock config loading: surface the canonical workhorses + roles defaults so
 // resolveModel() and the role harness lookup find consistent values.
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
@@ -210,6 +218,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testAgentsDir: string;
   let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
+  const originalPromptReadyTimeout = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
 
   beforeEach(async () => {
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -222,6 +231,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testAgentsDir, { recursive: true });
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
+    process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = '1';
     transcriptLandingMocks.snapshotCount = 0;
     transcriptLandingMocks.landed = false;
     transcriptLandingMocks.useLandedFlag = false;
@@ -255,6 +265,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       process.env.PANOPTICON_HOME = originalPanopticonHome;
     } else {
       delete process.env.PANOPTICON_HOME;
+    }
+    if (originalPromptReadyTimeout) {
+      process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = originalPromptReadyTimeout;
+    } else {
+      delete process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
     }
     if (existsSync(testPanopticonHome)) {
       rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
@@ -340,24 +355,17 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     });
 
     it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
-      let created!: () => void;
-      const createdPromise = new Promise<void>((resolve) => { created = resolve; });
-      vi.mocked(tmux.createSession).mockImplementation(() => Effect.sync(() => { created(); }));
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.void);
 
       try {
-        const spawned = spawnAgent({
+        const state = await spawnAgent({
           issueId: 'PAN-KICKOFF-FAIL',
           workspace: testWorkspace,
           role: 'work',
           prompt: 'do the work',
         });
-
-        await createdPromise;
-        await Promise.resolve();
-        await vi.advanceTimersByTimeAsync(61_000);
-        const state = await spawned;
         const reloaded = getAgentStateSync('agent-pan-kickoff-fail');
 
         expect(state.status).toBe('running');
@@ -372,7 +380,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     });
 
     it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', async () => {
-      vi.useFakeTimers();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
       const tmux = await import('../../src/lib/tmux.js');
       const workspace = join(testPanopticonHome, 'ghost-workspace');
@@ -395,16 +403,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       }));
 
       try {
-        const spawned = spawnAgent({
+        await spawnAgent({
           issueId: 'PAN-GHOST-LIFE',
           workspace,
           role: 'work',
           prompt: 'original ghost kickoff',
         });
         await firstCreatedPromise;
-        await Promise.resolve();
-        await vi.advanceTimersByTimeAsync(61_000);
-        await spawned;
 
         writeFileSync(join(getAgentDir('agent-pan-ghost-life'), 'session.id'), 'agent-pan-ghost-life-session');
 
@@ -413,7 +418,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         expect(reloaded?.kickoffDelivered).toBe(false);
         expect(reloaded?.lastFailureReason).toBe('kickoff delivery failed');
 
-        await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+        vi.advanceTimersByTime(5 * 60 * 1000);
         await expect(Effect.runPromise(determineHealthStatus(
           'agent-pan-ghost-life',
           join(getAgentDir('agent-pan-ghost-life'), 'state.json'),

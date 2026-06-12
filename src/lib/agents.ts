@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, getPanopticonHome, packageRoot, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
@@ -803,6 +803,13 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
   return false;
 }
 
+function promptReadyTimeoutSeconds(): number {
+  const raw = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  if (!raw) return 30;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+}
+
 /**
  * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
  * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
@@ -920,7 +927,7 @@ export interface AgentState {
 }
 
 export function getAgentDir(agentId: string): string {
-  return join(AGENTS_DIR, agentId);
+  return join(getPanopticonHome(), 'agents', agentId);
 }
 
 function isRole(value: unknown): value is Role {
@@ -1641,10 +1648,11 @@ async function deliverInitialPromptWithRetry(
     } catch {
       harness = undefined;
     }
-    const ready = await waitForPromptReady(agentId, harness, 30);
+    const readyTimeoutSeconds = promptReadyTimeoutSeconds();
+    const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
       lastFailure = 'ready-signal-timeout';
-      console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s (kickoff attempt ${attempt}/2)`);
+      console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
       continue;
     }
 
