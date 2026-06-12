@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
 import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelScope } from '../../../lib/config-yaml.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelGloballyPaused,
@@ -29,6 +30,7 @@ export interface FlywheelRunSummary {
   id: string;
   startedAt: string;
   status: FlywheelRunStatus;
+  scope?: FlywheelScope;
 }
 
 export interface FlywheelRunDetail extends FlywheelRunSummary {
@@ -46,6 +48,7 @@ export interface FlywheelLaunchMetadata {
   workspace: string;
   briefPath: string;
   briefDisplayPath: string;
+  scope?: FlywheelScope;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -154,6 +157,9 @@ function decodeLaunchMetadata(payload: unknown): FlywheelLaunchMetadata {
   for (const key of ['runId', 'workspace', 'briefPath', 'briefDisplayPath']) {
     if (typeof record[key] !== 'string' || !record[key]) throw new Error(`Invalid Flywheel launch metadata: ${key}`);
   }
+  if (record['scope'] !== undefined && record['scope'] !== 'pan-only' && record['scope'] !== 'all-tracked-projects') {
+    throw new Error('Invalid Flywheel launch metadata: scope');
+  }
   return record as unknown as FlywheelLaunchMetadata;
 }
 
@@ -208,10 +214,12 @@ async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Pr
   const runDir = getFlywheelRunDir(runId, options);
   const latest = await readLatestFlywheelStatus(runId, options);
   const status = await deriveRunStatus(runDir, runId);
+  const launch = await readFlywheelLaunchMetadata(runId, options);
   return {
     id: runId,
     startedAt: latest?.startedAt ?? '',
     status,
+    ...(launch?.scope ? { scope: launch.scope } : {}),
   };
 }
 
@@ -314,6 +322,7 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelRunSt
   const latest = await readLatestFlywheelStatus(runId, options);
   if (!latest) return null;
   const status = await deriveRunStatus(runDir, runId);
+  const launch = await readFlywheelLaunchMetadata(runId, options);
   const reportPath = join(runDir, 'report.md');
   const openedPrPath = join(runDir, 'opened-pr.json');
   // PAN-1528: overlay the live work-agent count so the field reflects reality
@@ -323,6 +332,7 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelRunSt
     id: runId,
     startedAt: latest.startedAt,
     status,
+    ...(launch?.scope ? { scope: launch.scope } : {}),
     latest: withLiveAgentsActive(latest, liveCount),
     paths: {
       latest: join(runDir, 'latest.json'),

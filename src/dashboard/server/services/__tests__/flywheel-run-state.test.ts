@@ -27,7 +27,9 @@ import {
   getFlywheelRunDetail,
   listFlywheelRuns,
   nextFlywheelRunId,
+  readFlywheelLaunchMetadata,
   resolveLiveFlywheelRunId,
+  writeFlywheelLaunchMetadata,
   writeLatestFlywheelStatus,
 } from '../flywheel-run-state.js';
 
@@ -117,6 +119,31 @@ describe('flywheel run state', () => {
       { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'complete' },
       { id: 'RUN-3', startedAt: '2026-05-18T11:00:00.000Z', status: 'aborted' },
       { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
+    ]);
+  });
+
+  it('persists run scope in launch metadata and exposes it in list/detail payloads', async () => {
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { panopticonHome });
+    await writeFlywheelLaunchMetadata({
+      version: 1,
+      runId: 'RUN-1',
+      workspace: '/repo',
+      briefPath: '/repo/docs/flywheel-brief.md',
+      briefDisplayPath: 'docs/flywheel-brief.md',
+      scope: 'all-tracked-projects',
+    }, { panopticonHome });
+
+    await expect(readFlywheelLaunchMetadata('RUN-1', { panopticonHome })).resolves.toMatchObject({
+      runId: 'RUN-1',
+      scope: 'all-tracked-projects',
+    });
+    await expect(getFlywheelRunDetail('RUN-1', { panopticonHome })).resolves.toMatchObject({
+      id: 'RUN-1',
+      status: 'running',
+      scope: 'all-tracked-projects',
+    });
+    await expect(listFlywheelRuns({ panopticonHome })).resolves.toEqual([
+      { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running', scope: 'all-tracked-projects' },
     ]);
   });
 

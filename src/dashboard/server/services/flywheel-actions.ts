@@ -204,14 +204,15 @@ export async function startFlywheelRunForDashboard(options: StartOptions = {}): 
   const brief = await requireFlywheelBrief(cwd, options.brief ?? DEFAULT_BRIEF_PATH);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
+  const roleConfig = await resolveFlywheelRoleConfig();
   await writeFlywheelLaunchMetadata({
     version: 1,
     runId,
     workspace: cwd,
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
+    scope: roleConfig.scope,
   });
-  const roleConfig = await resolveFlywheelRoleConfig();
   const agent = await spawnFlywheelAgent(runId, {
     briefPath: brief.absolutePath,
     workspace: cwd,
@@ -283,6 +284,7 @@ export async function resumeFlywheelRunForDashboard(): Promise<{ before: Flywhee
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = await resolveFlywheelRoleConfig();
   const resumeSessionId = await loadResumeSessionId(before.activeRunId) ?? undefined;
+  await writeFlywheelLaunchMetadata({ ...launch, scope: roleConfig.scope });
   await spawnFlywheelAgent(before.activeRunId, {
     workspace: launch.workspace,
     briefPath: brief.absolutePath,

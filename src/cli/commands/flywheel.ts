@@ -354,14 +354,15 @@ export async function startFlywheelRun(options: StartOptions = {}): Promise<Star
   const brief = await requireFlywheelBrief(cwd, options.brief);
   const runId = await nextFlywheelRunId();
   const startedAt = new Date().toISOString();
+  const roleConfig = resolveFlywheelRoleConfig();
   await writeFlywheelLaunchMetadata({
     version: 1,
     runId,
     workspace: cwd,
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
+    scope: roleConfig.scope,
   });
-  const roleConfig = resolveFlywheelRoleConfig();
   const agent = await spawnFlywheel({
     runId,
     briefPath: brief.absolutePath,
@@ -754,6 +755,7 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
   }
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = resolveFlywheelRoleConfig();
+  await writeFlywheelLaunchMetadata({ ...launch, scope: roleConfig.scope });
   await resumeFlywheel({
     workspace: launch.workspace,
     briefPath: brief.absolutePath,

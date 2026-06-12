@@ -11,10 +11,13 @@ import { useConfirm } from '../DialogProvider';
 
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 
+type FlywheelScope = 'pan-only' | 'all-tracked-projects';
+
 interface FlywheelRunSummary {
   id: string;
   startedAt: string;
   status: 'running' | 'paused' | 'complete' | 'aborted';
+  scope?: FlywheelScope;
 }
 
 interface FlywheelRunDetail extends FlywheelRunSummary {
@@ -31,7 +34,7 @@ interface FlywheelRoleConfig {
   model?: string;
   effort?: 'low' | 'medium' | 'high';
   maxAgents?: number;
-  scope?: 'pan-only' | 'all-tracked-projects';
+  scope?: FlywheelScope;
 }
 
 interface SettingsResponse {
@@ -80,7 +83,7 @@ function formatPercent(value: number | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value)}%` : '—';
 }
 
-function formatScope(value: string): string {
+function formatScope(value: FlywheelScope | string): string {
   if (value === 'pan-only') return 'PAN only';
   if (value === 'all-tracked-projects') return 'All tracked projects';
   return value;
@@ -130,9 +133,12 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   });
   const run = runDetailQuery.data ?? null;
   const activeRun = run?.status === 'running' ? run : null;
+  const liveRunScope = (run?.status === 'running' || run?.status === 'paused') ? run.scope : undefined;
   const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
+  const displayedScope = liveRunScope ?? config.scope;
+  const scopeMismatch = liveRunScope !== undefined && liveRunScope !== config.scope;
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -467,9 +473,15 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
             </div>
             <div className="col-span-2">
               <dt className="text-muted-foreground">Scope</dt>
-              <dd className="font-medium text-foreground">{formatScope(config.scope)}</dd>
+              <dd className="font-medium text-foreground">{formatScope(displayedScope)}</dd>
             </div>
           </dl>
+          <p className="mt-2 text-xs text-muted-foreground">Scope changes apply at the next run start or resume.</p>
+          {scopeMismatch && (
+            <p className="mt-1 text-xs font-medium text-amber-500">
+              Configured scope is {formatScope(config.scope)}; active run remains {formatScope(liveRunScope)} until resume.
+            </p>
+          )}
         </button>
       </footer>
     </section>

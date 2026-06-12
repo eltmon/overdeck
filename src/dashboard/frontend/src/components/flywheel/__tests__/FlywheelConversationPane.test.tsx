@@ -92,13 +92,14 @@ function mockFetch() {
       return Response.json({ ok: true });
     }
     if (url === '/api/flywheel/runs?limit=10') {
-      return Response.json([{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status: 'running' }]);
+      return Response.json([{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status: 'running', scope: 'pan-only' }]);
     }
     if (url === '/api/flywheel/runs/RUN-2') {
       return Response.json({
         id: 'RUN-2',
         startedAt: flywheelStatus.startedAt,
         status: 'running',
+        scope: 'pan-only',
         latest: flywheelStatus,
         paths: { latest: '/tmp/latest.json', report: '/tmp/report.md' },
       });
@@ -185,17 +186,45 @@ describe('FlywheelConversationPane', () => {
     expect(fetch).not.toHaveBeenCalledWith('/api/conversations');
   });
 
-  it('shows the current roles.flywheel config and opens settings from the config card', async () => {
+  it('shows the active run scope and opens settings from the config card', async () => {
     const onOpenSettings = vi.fn();
     renderPane(onOpenSettings);
 
     expect(await screen.findByText('RUN-2')).toBeInTheDocument();
     expect(screen.getByText('pi')).toBeInTheDocument();
     expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument();
-    expect(screen.getByText('All tracked projects')).toBeInTheDocument();
+    expect(screen.getByText('PAN only')).toBeInTheDocument();
+    expect(screen.getByText('Scope changes apply at the next run start or resume.')).toBeInTheDocument();
+    expect(screen.getByText('Configured scope is All tracked projects; active run remains PAN only until resume.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Settings → Roles → Flywheel'));
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it('falls back to configured scope when no run is active', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/flywheel/runs?limit=10') return Response.json([]);
+      if (url === '/api/flywheel/conversation') return Response.json(null);
+      if (url === '/api/settings') {
+        return Response.json({
+          roles: {
+            flywheel: {
+              scope: 'all-tracked-projects',
+            },
+          },
+        });
+      }
+      if (url === '/api/flywheel/merge-queue') return Response.json([]);
+      return Response.json({ error: 'not found' }, { status: 404 });
+    }));
+
+    renderPane();
+
+    expect(await screen.findByText('No active run')).toBeInTheDocument();
+    expect(await screen.findByText('All tracked projects')).toBeInTheDocument();
+    expect(screen.getByText('Scope changes apply at the next run start or resume.')).toBeInTheDocument();
+    expect(screen.queryByText(/active run remains/i)).not.toBeInTheDocument();
   });
 
   it('toggles between Conversation and Terminal views once the orchestrator session exists', async () => {
@@ -289,8 +318,8 @@ describe('FlywheelConversationPane', () => {
     // so operators always see the same affordances regardless of run state.
     // See "Flywheel toolbar regression guard" tests below for the contract this
     // upholds. Pause/Resume are present but disabled here because the run is complete.
-    expect(screen.getByRole('button', { name: /Pause/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Resume/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Pause$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Resume$/i })).toBeDisabled();
   });
 
   /**
@@ -358,6 +387,7 @@ describe('FlywheelConversationPane', () => {
             id: 'RUN-2',
             startedAt: flywheelStatus.startedAt,
             status,
+            scope: 'pan-only',
             latest: flywheelStatus,
             paths: { latest: '/tmp/latest.json', report: '/tmp/report.md' },
           });
