@@ -146,6 +146,27 @@ describe('createBeadsFromVBrief', () => {
     expect(mockExecAsync).toHaveBeenCalledTimes(3);
   });
 
+  it('retries transient list failures while the bd process lock is already held', async () => {
+    vi.useFakeTimers();
+    setupRedirect(WORKSPACE_DIR);
+    mockExecAsync
+      .mockRejectedValueOnce(new Error('database is locked'))
+      .mockResolvedValueOnce({ stdout: '[]' })
+      .mockResolvedValueOnce({ stdout: '[]' });
+
+    const result = await clearBeadsForIssue(WORKSPACE_DIR, 'pan-500', {
+      lockAlreadyHeld: true,
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    });
+
+    expect(result).toEqual({ cleared: 0, errors: [] });
+    expect(mockExecAsync).toHaveBeenCalledTimes(3);
+  });
+
   it('creates beads from the workspace draft before a canonical spec exists', async () => {
     setupRedirect(WORKSPACE_DIR);
     writeWorkspaceDraft(WORKSPACE_DIR, makeDoc('PAN-500', [

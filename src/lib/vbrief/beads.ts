@@ -90,7 +90,6 @@ async function listBeadsForIssueRaw(workspacePath: string, issueLabel: string): 
 }
 
 async function listBeadsForIssue(workspacePath: string, issueLabel: string, options: ClearBeadsOptions = {}): Promise<any[]> {
-  if (options.lockAlreadyHeld) return listBeadsForIssueRaw(workspacePath, issueLabel);
   return runBdWithRetry(
     `list beads for ${issueLabel}`,
     () => listBeadsForIssueRaw(workspacePath, issueLabel),
@@ -104,7 +103,6 @@ async function deleteBeadForIssue(workspacePath: string, issueLabel: string, id:
       encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
     });
   };
-  if (options.lockAlreadyHeld) return deleteBead();
   return runBdWithRetry(`delete bead ${id} for ${issueLabel}`, deleteBead, { ...options, workspacePath });
 }
 

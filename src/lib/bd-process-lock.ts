@@ -60,6 +60,7 @@ export type RunBdWithRetryOptions = BdProcessLockOptions & {
   maxDelayMs?: number;
   random?: RandomFn;
   onRetry?: (context: { attempt: number; delayMs: number; error: unknown }) => void | Promise<void>;
+  lockAlreadyHeld?: boolean;
 };
 
 export class BdProcessLockError extends Data.TaggedError('BdProcessLockError')<{
@@ -202,7 +203,12 @@ export async function bdProcessLockPath(workspacePath = process.cwd()): Promise<
   return join(getPanopticonHome(), 'locks', `bd-${digest}.lock`);
 }
 
-async function readHolderFromPath(path: string): Promise<BdProcessLockHolder | null> {
+type LockFileState =
+  | { kind: 'missing' }
+  | { kind: 'valid'; holder: BdProcessLockHolder }
+  | { kind: 'invalid'; error?: unknown };
+
+async function readLockFileState(path: string): Promise<LockFileState> {
   try {
     const parsed = JSON.parse(await readFile(path, 'utf8')) as Partial<BdProcessLockHolder>;
     if (
@@ -212,13 +218,18 @@ async function readHolderFromPath(path: string): Promise<BdProcessLockHolder | n
       !Number.isFinite(parsed.ts) ||
       typeof parsed.caller !== 'string'
     ) {
-      return null;
+      return { kind: 'invalid' };
     }
-    return { pid: parsed.pid, ts: parsed.ts, caller: parsed.caller };
+    return { kind: 'valid', holder: { pid: parsed.pid, ts: parsed.ts, caller: parsed.caller } };
   } catch (error) {
-    if (isErrnoException(error) && error.code === 'ENOENT') return null;
-    return null;
+    if (isErrnoException(error) && error.code === 'ENOENT') return { kind: 'missing' };
+    return { kind: 'invalid', error };
   }
+}
+
+async function readHolderFromPath(path: string): Promise<BdProcessLockHolder | null> {
+  const state = await readLockFileState(path);
+  return state.kind === 'valid' ? state.holder : null;
 }
 
 export async function readBdProcessLockHolder(options: BdProcessLockOptions = {}): Promise<BdProcessLockHolder | null> {
@@ -284,8 +295,9 @@ async function acquireStaleBreaker(
       };
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
-      const existing = await readHolderFromPath(breakerPath);
-      if (existing && !isStale(existing, options.now(), options.staleLockMs)) return null;
+      const existing = await readLockFileState(breakerPath);
+      if (existing.kind === 'invalid') return null;
+      if (existing.kind === 'valid' && !isStale(existing.holder, options.now(), options.staleLockMs)) return null;
       await unlinkIfExists(breakerPath);
     }
   }
@@ -301,8 +313,9 @@ async function reclaimStaleLock(
   if (!breaker) return false;
 
   try {
-    const existing = await readHolderFromPath(path);
-    if (existing && !isStale(existing, options.now(), options.staleLockMs)) return false;
+    const existing = await readLockFileState(path);
+    if (existing.kind === 'invalid') return false;
+    if (existing.kind === 'valid' && !isStale(existing.holder, options.now(), options.staleLockMs)) return false;
     await unlinkIfExists(path);
     return true;
   } finally {
@@ -351,20 +364,32 @@ export async function acquireBdProcessLock(
         });
       }
 
-      const existing = await readHolderFromPath(path);
-      if (!existing || isStale(existing, now(), staleLockMs)) {
+      const existing = await readLockFileState(path);
+      if (existing.kind === 'missing') {
+        continue;
+      }
+      if (existing.kind === 'valid' && isStale(existing.holder, now(), staleLockMs)) {
         await reclaimStaleLock(path, caller, { now, staleLockMs });
         continue;
       }
 
       const remainingMs = deadline - now();
       if (remainingMs <= 0) {
+        if (existing.kind === 'invalid') {
+          throw new BdProcessLockError({
+            operation: 'acquireBdProcessLock',
+            message: `Timed out waiting for unreadable bd process lock at ${path}`,
+            path,
+            caller,
+          });
+        }
+
         throw new BdProcessLockError({
           operation: 'acquireBdProcessLock',
-          message: `Timed out waiting for bd process lock held by pid ${existing.pid} (${existing.caller})`,
+          message: `Timed out waiting for bd process lock held by pid ${existing.holder.pid} (${existing.holder.caller})`,
           path,
           caller,
-          holder: existing,
+          holder: existing.holder,
         });
       }
 
@@ -410,7 +435,7 @@ export async function runBdWithRetry<T>(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      return await withBdProcessLock(caller, fn, options);
+      return await (options.lockAlreadyHeld ? fn() : withBdProcessLock(caller, fn, options));
     } catch (error) {
       lastError = error;
       if (!isRetryableBdFailure(error) || attempt >= maxAttempts) break;

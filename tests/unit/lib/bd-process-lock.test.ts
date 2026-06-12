@@ -157,6 +157,43 @@ describe('bd process lock', () => {
     ).rejects.toMatchObject({ operation: 'acquireBdProcessLock' });
   });
 
+  it('does not reclaim an unreadable lock holder file as stale', async () => {
+    const path = await lockPath();
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, '', 'utf8');
+
+    await expect(
+      acquireBdProcessLock('blocked caller', { workspacePath, acquisitionTimeoutMs: 0 }),
+    ).rejects.toMatchObject({
+      operation: 'acquireBdProcessLock',
+      message: expect.stringContaining('unreadable bd process lock'),
+    });
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it('retries transient bd failures without reacquiring when the process lock is already held', async () => {
+    vi.useFakeTimers();
+    const path = await lockPath();
+    const operation = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce({ stderr: 'database is locked' })
+      .mockResolvedValueOnce('ok');
+
+    const resultPromise = runBdWithRetry('retry caller', operation, {
+      workspacePath,
+      lockAlreadyHeld: true,
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    });
+
+    await expect(resultPromise).resolves.toBe('ok');
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(existsSync(path)).toBe(false);
+  });
+
   it('retries transient bd failures with fake-timer backoff', async () => {
     vi.useFakeTimers();
     const operation = vi

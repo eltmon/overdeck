@@ -55,4 +55,22 @@ describe('queryBeadsForIssuePromise', () => {
     ]);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
+
+  it('propagates exhausted transient bd failures instead of falling back to jsonl', async () => {
+    vi.useFakeTimers();
+    childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
+      callback(new Error('database is locked'), '', 'database is locked');
+    });
+    const { BdTransientFailure } = await import('../../../src/lib/bd-process-lock.js');
+    const { queryBeadsForIssuePromise } = await import('../../../src/lib/beads-query.js');
+
+    await expect(queryBeadsForIssuePromise(workspacePath, 'PAN-1094', {
+      maxAttempts: 2,
+      initialDelayMs: 100,
+      maxDelayMs: 100,
+      random: () => 0,
+      sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+    })).rejects.toBeInstanceOf(BdTransientFailure);
+    expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
+  });
 });
