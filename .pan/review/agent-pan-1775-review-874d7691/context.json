@@ -1,0 +1,107 @@
+{
+  "runId": "agent-pan-1775-review-874d7691",
+  "issueId": "PAN-1775",
+  "generatedAt": "2026-06-11T13:47:35.242Z",
+  "branch": "feature/1775",
+  "headSha": "874d769152b623023fa46770cf6034a926655092",
+  "diff": {
+    "stat": ".panopticon/projects.yaml                          |  50 +++++++---\n packages/contracts/src/types.ts                    |   4 +\n .../CommandDeck/ProjectTree/FeatureItem.test.tsx   |  19 ++++\n .../CommandDeck/ProjectTree/FeatureItem.tsx        |  18 ++--\n .../CommandDeck/SessionView/SessionPanel.test.tsx  |  22 +++++\n .../CommandDeck/SessionView/SessionPanel.tsx       |  52 +++++++++-\n src/dashboard/server/routes/projects.ts            |  51 +++++++---\n tests/lib/agents-compact-session.test.ts           | 110 ++++++++++++---------\n tests/lib/cloister/deacon-context-overflow.test.ts |  62 ++++++------\n tests/lib/context-overflow.test.ts                 |  14 +--\n .../unit/dashboard/server/routes/projects.test.ts  |  57 +++++++++++\n 11 files changed, 332 insertions(+), 127 deletions(-)",
+    "truncated": true
+  },
+  "changedFiles": [
+    {
+      "path": "src/dashboard/server/routes/projects.ts",
+      "status": "M",
+      "additions": 37,
+      "deletions": 14,
+      "riskScore": 3
+    },
+    {
+      "path": ".panopticon/projects.yaml",
+      "status": "M",
+      "additions": 35,
+      "deletions": 15,
+      "riskScore": 2
+    },
+    {
+      "path": "packages/contracts/src/types.ts",
+      "status": "M",
+      "additions": 4,
+      "deletions": 0,
+      "riskScore": 2
+    },
+    {
+      "path": "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "status": "M",
+      "additions": 9,
+      "deletions": 9,
+      "riskScore": 2
+    },
+    {
+      "path": "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
+      "status": "M",
+      "additions": 47,
+      "deletions": 5,
+      "riskScore": 2
+    },
+    {
+      "path": "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "status": "M",
+      "additions": 19,
+      "deletions": 0,
+      "riskScore": 1
+    },
+    {
+      "path": "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
+      "status": "M",
+      "additions": 22,
+      "deletions": 0,
+      "riskScore": 1
+    },
+    {
+      "path": "tests/lib/agents-compact-session.test.ts",
+      "status": "M",
+      "additions": 65,
+      "deletions": 45,
+      "riskScore": 1
+    },
+    {
+      "path": "tests/lib/cloister/deacon-context-overflow.test.ts",
+      "status": "M",
+      "additions": 29,
+      "deletions": 33,
+      "riskScore": 1
+    },
+    {
+      "path": "tests/lib/context-overflow.test.ts",
+      "status": "M",
+      "additions": 8,
+      "deletions": 6,
+      "riskScore": 1
+    },
+    {
+      "path": "tests/unit/dashboard/server/routes/projects.test.ts",
+      "status": "M",
+      "additions": 57,
+      "deletions": 0,
+      "riskScore": 1
+    }
+  ],
+  "acceptanceCriteria": [
+    "**PAN-1765 (local agent):** full session row — Work (gpt-5.5) · 9s ago · working · 20m with live last-heard, current tool, and an openable terminal.",
+    "**PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read 1 session idle · ! INPUT while a work agent was actively implementing on Fly."
+  ],
+  "policyNotes": [
+    "NEVER apply workarounds, hacks, or \"just get it working\" fixes.** Every issue, no matter how minor, must be addressed at its root cause as soon as it arises. If something is broken, find out WHY it's broken and fix the underlying problem — don't paper over symptoms with fallback chains or special-case handling.",
+    "CRITICAL: Never Work Around Broken Things — Fix Them",
+    "CRITICAL: Never Do Agent Work — Fix the System",
+    "CRITICAL: Deliver Complete Features — No Partial Implementations",
+    "CRITICAL: JSONL Session Files Are Sacred — NEVER Delete",
+    "NEVER delete, overwrite, or truncate Claude Code JSONL session files** (`~/.claude/projects/*/*.jsonl`). These files are the only record of conversation history — they contain the user's work, context, and decisions. Losing them is irreversible data loss.",
+    "CRITICAL: Releases Go Through `pan release stable` — Never Manual",
+    "NEVER symlink node_modules** — `bun install` uses hardlinks from the global cache and is",
+    "CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation",
+    "CRITICAL RULES:**"
+  ],
+  "manifestPath": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-874d7691/context.json"
+}
