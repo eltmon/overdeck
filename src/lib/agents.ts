@@ -261,15 +261,20 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
     try {
       if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
       const pane = await Effect.runPromise(capturePane(agentId, 80));
-      if (
-        /\bcodex\b/i.test(pane)
-        && (
-          /press enter to continue/i.test(pane)
-          || /ctrl[+-][cj]/i.test(pane)
-          || /enter to send/i.test(pane)
-          || /›\s*$/.test(pane.trim())
-        )
-      ) {
+      // The codex TUI is ready when its input prompt (a line starting with the
+      // `›` glyph) AND its status line (`<model> ... · <cwd>`) are both on
+      // screen. PAN-1803: the previous check keyed off the first-run
+      // trust-wizard markers ("press enter to continue") — but pre-trusting the
+      // workspace (correctly) skips that wizard, so those markers never appear
+      // and the kickoff never fired. Detect the actual ready prompt instead.
+      const hasInputPrompt = /^\s*[›>]\s/m.test(pane);
+      const hasStatusLine = /·\s+[~/]/.test(pane);
+      if (hasInputPrompt && hasStatusLine) {
+        return true;
+      }
+      // Fallback: if pre-trust ever fails and the wizard does appear, treat its
+      // markers as ready (the kickoff paste will dismiss + drive it).
+      if (/press enter to continue/i.test(pane) || /ctrl[+-][cj]/i.test(pane)) {
         return true;
       }
     } catch {
