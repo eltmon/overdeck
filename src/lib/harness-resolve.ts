@@ -1,0 +1,74 @@
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { canUseHarnessSync } from './harness-policy.js';
+import { getBuiltInDefaultHarness, getProviderForModelSync } from './providers.js';
+import type { RuntimeName } from './runtimes/types.js';
+import type { Role } from './agents.js';
+import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
+
+const execAsync = promisify(exec);
+const BINARY_BY_HARNESS: Partial<Record<RuntimeName, string>> = {
+  pi: 'pi',
+  codex: 'codex',
+};
+const harnessAvailabilityCache = new Map<RuntimeName, Promise<boolean>>();
+const builtInDefaultNoticeProviders = new Set<string>();
+
+export type ResolveHarnessInput = {
+  explicit?: RuntimeName;
+  role?: Role;
+  model: string;
+};
+
+async function getProviderAuthModeForModel(model: string) {
+  const { getProviderAuthMode } = await import('./agents.js');
+  return getProviderAuthMode(model);
+}
+
+async function hasHarnessBinary(harness: RuntimeName): Promise<boolean> {
+  const binary = BINARY_BY_HARNESS[harness];
+  if (!binary) return true;
+
+  const cached = harnessAvailabilityCache.get(harness);
+  if (cached) return cached;
+
+  const check = execAsync(`command -v ${binary}`).then(
+    () => true,
+    () => false
+  );
+  harnessAvailabilityCache.set(harness, check);
+  return check;
+}
+
+function logBuiltInDefaultNotice(provider: string, harness: RuntimeName): void {
+  if (builtInDefaultNoticeProviders.has(provider)) return;
+  builtInDefaultNoticeProviders.add(provider);
+  console.info(`harness ${harness} chosen by provider default — override in Settings → Providers`);
+}
+
+export async function resolveHarness(input: ResolveHarnessInput): Promise<RuntimeName> {
+  const provider = getProviderForModelSync(input.model).name;
+  const { config } = loadYamlConfig();
+  const roleHarness = input.role ? config.roles?.[input.role]?.harness : undefined;
+  const providerHarness = config.providerHarnesses?.[provider];
+  const builtInHarness = getBuiltInDefaultHarness(provider);
+
+  const winner = input.explicit ?? roleHarness ?? providerHarness ?? builtInHarness ?? 'claude-code';
+
+  if (!input.explicit && !roleHarness && !providerHarness) {
+    logBuiltInDefaultNotice(provider, winner);
+  }
+
+  const decision = canUseHarnessSync(winner, input.model, await getProviderAuthModeForModel(input.model));
+  if (!decision.allowed) {
+    return 'claude-code';
+  }
+
+  if (!(await hasHarnessBinary(winner))) {
+    const binary = BINARY_BY_HARNESS[winner];
+    console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to claude-code`);
+    return 'claude-code';
+  }
+
+  return winner;
+}
