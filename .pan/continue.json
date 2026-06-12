@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T17:24:01Z",
+  "updated": "2026-06-12T17:25:32Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "09fb08db7",
+    "sha": "dde3511fb",
     "dirty": false
   },
   "decisions": [
@@ -133,11 +133,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Settings Roles harness-select bead workspace-bzy4x implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
-    "beadId": "workspace-bzy4x",
+    "description": "Inspection fix for shared branding registry bead workspace-a9852 implemented; commit it, close workspace-a9852 again, rerun pan inspect PAN-1787 --bead workspace-a9852, then continue with bd ready -l pan-1787.",
+    "beadId": "workspace-a9852",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
-      "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx"
+      "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -217,6 +216,12 @@
       "timestamp": "2026-06-12T17:24:01Z",
       "reason": "bead-progress",
       "note": "Implemented workspace-bzy4x: extracted RoleHarnessSelect and rendered Provider default/Claude Code/Pi/Codex harness controls for plan, work, strike, review, test, ship, and flywheel role cards. Explicit selections save roles.<role>.harness; Provider default saves undefined and clears the key. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/RolesPanel.test.tsx and npm run typecheck.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:25:32Z",
+      "reason": "inspection-fix",
+      "note": "Addressed INSPECTION BLOCKED for workspace-a9852: extended the branding test so HarnessLogo claude-code must render the Anthropic SVG viewBox, codex must render the OpenAI SVG viewBox, and pi still renders the π tile. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/shared/branding/__tests__/branding.test.tsx.",
       "agentModel": "gpt-5.5"
     }
   ],

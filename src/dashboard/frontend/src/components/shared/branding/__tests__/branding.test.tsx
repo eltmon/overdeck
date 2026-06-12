@@ -32,9 +32,15 @@ describe('shared branding registry', () => {
     }
   });
 
-  it('renders harness logos, including the pi glyph tile', () => {
-    render(<HarnessLogo harness="pi" />);
+  it('renders harness logos with the expected provider marks and pi glyph tile', () => {
+    const { rerender } = render(<HarnessLogo harness="claude-code" />);
 
+    expect(screen.getByLabelText('Claude Code logo')).toHaveAttribute('viewBox', '0 0 256 257');
+
+    rerender(<HarnessLogo harness="codex" />);
+    expect(screen.getByLabelText('Codex logo')).toHaveAttribute('viewBox', '0 0 256 260');
+
+    rerender(<HarnessLogo harness="pi" />);
     expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
     expect(screen.getByText('π')).toBeInTheDocument();
   });
