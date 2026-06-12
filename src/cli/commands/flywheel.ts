@@ -32,7 +32,13 @@ import {
 } from '../../lib/database/app-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
-import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { findProjectByPathSync, listProjectsSync } from '../../lib/projects.js';
+import {
+  computeMergeQueueFromCandidates,
+  listEligibleCandidatesByProject,
+  resolveMergeQueuePrUrl,
+  type MergeQueueItem,
+} from '../../lib/flywheel-merge-order.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -42,6 +48,7 @@ interface EmitStatusOptions {
 
 interface StatusOptions {
   json?: boolean;
+  cwd?: string;
 }
 
 interface StatsOptions {
@@ -435,16 +442,48 @@ export function formatFlywheelStatus(status: FlywheelStatus): string {
   ].join('\n');
 }
 
+function formatMergeQueueStatus(mergeQueue: MergeQueueItem[]): string {
+  const rows = mergeQueue.length > 0
+    ? mergeQueue.map((item) => {
+      const prCell = item.pr != null ? `#${item.pr}` : '—';
+      const conflictsCell = item.conflictsWith.length > 0 ? item.conflictsWith.join(', ') : '—';
+      return `| ${item.mergeOrder} | ${item.issueId} | ${prCell} | ${conflictsCell} |`;
+    }).join('\n')
+    : '| _None_ |  |  |  |';
+  return `Merge Queue:
+| # | Issue | PR | Conflicts With |
+|---|---|---|---|
+${rows}`;
+}
+
+async function computeCwdMergeQueue(cwd: string): Promise<MergeQueueItem[]> {
+  const project = findProjectByPathSync(cwd);
+  if (!project) return [];
+  const projectEntry = listProjectsSync().find((entry) => resolve(entry.config.path) === resolve(project.path));
+  if (!projectEntry) return [];
+  const candidates = listEligibleCandidatesByProject().get(projectEntry.key)?.candidates ?? [];
+  return Effect.runPromise(
+    computeMergeQueueFromCandidates(candidates, cwd, {
+      getPrUrl: resolveMergeQueuePrUrl,
+    }).pipe(Effect.provide(nodeServicesLayer)),
+  );
+}
+
 export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
   try {
+    const cwd = options.cwd ?? process.cwd();
     const status = await loadActiveFlywheelStatus();
+    const mergeQueue = await computeCwdMergeQueue(cwd);
     if (!status) {
-      console.error('no active flywheel run');
-      process.exitCode = 1;
+      if (options.json) {
+        console.log(JSON.stringify({ status: null, mergeQueue }, null, 2));
+      } else {
+        console.log(['No active Flywheel run.', formatMergeQueueStatus(mergeQueue)].join('\n\n'));
+      }
       return;
     }
 
-    console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+    console.log(options.json ? JSON.stringify(status, null, 2) : [formatFlywheelStatus(status), formatMergeQueueStatus(mergeQueue)].join('\n\n'));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -816,9 +855,7 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     }
 
     const runNumber = runNumberFromRunId(status.runId);
-    const mergeQueue = await Effect.runPromise(
-      computeMergeQueue(status.activePipeline, cwd).pipe(Effect.provide(nodeServicesLayer)),
-    );
+    const mergeQueue = await computeCwdMergeQueue(cwd);
     const runReport = formatFlywheelStateReport(status, mergeQueue);
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
 

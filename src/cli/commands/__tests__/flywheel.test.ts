@@ -37,6 +37,14 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
   stopAgentProgram: vi.fn(),
 }));
 
+const mergeQueueMocks = vi.hoisted(() => ({
+  findProjectByPathSync: vi.fn(() => null),
+  listProjectsSync: vi.fn(() => []),
+  listEligibleCandidatesByProject: vi.fn(() => new Map()),
+  computeMergeQueueFromCandidates: vi.fn(),
+  resolveMergeQueuePrUrl: vi.fn(() => undefined),
+}));
+
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
   FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
   pauseFlywheel: flywheelLifecycleMocks.pauseFlywheel,
@@ -63,6 +71,17 @@ vi.mock('../../../lib/database/app-settings.js', () => ({
   setFlywheelRequireUatBeforeMerge: (required: boolean) => {
     flywheelLifecycleMocks.requireUatBeforeMerge = required;
   },
+}));
+
+vi.mock('../../../lib/projects.js', () => ({
+  findProjectByPathSync: mergeQueueMocks.findProjectByPathSync,
+  listProjectsSync: mergeQueueMocks.listProjectsSync,
+}));
+
+vi.mock('../../../lib/flywheel-merge-order.js', () => ({
+  listEligibleCandidatesByProject: mergeQueueMocks.listEligibleCandidatesByProject,
+  computeMergeQueueFromCandidates: mergeQueueMocks.computeMergeQueueFromCandidates,
+  resolveMergeQueuePrUrl: mergeQueueMocks.resolveMergeQueuePrUrl,
 }));
 
 vi.mock('../../../lib/tmux.js', async () => {
@@ -239,6 +258,16 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
     flywheelLifecycleMocks.stopAgentProgram.mockClear();
+    mergeQueueMocks.findProjectByPathSync.mockReset();
+    mergeQueueMocks.findProjectByPathSync.mockReturnValue(null);
+    mergeQueueMocks.listProjectsSync.mockReset();
+    mergeQueueMocks.listProjectsSync.mockReturnValue([]);
+    mergeQueueMocks.listEligibleCandidatesByProject.mockReset();
+    mergeQueueMocks.listEligibleCandidatesByProject.mockReturnValue(new Map());
+    mergeQueueMocks.computeMergeQueueFromCandidates.mockReset();
+    mergeQueueMocks.computeMergeQueueFromCandidates.mockReturnValue(Effect.succeed([]));
+    mergeQueueMocks.resolveMergeQueuePrUrl.mockReset();
+    mergeQueueMocks.resolveMergeQueuePrUrl.mockReturnValue(undefined);
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -372,11 +401,40 @@ describe('flywheel CLI commands', () => {
     expect(output).toContain('\x1b[31m●\x1b[0m red');
   });
 
-  it('exits 1 when no active run exists', async () => {
+  it('prints an empty merge queue when no active run exists', async () => {
     await flywheelStatusCommand({});
 
-    expect(process.exitCode).toBe(1);
-    expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
+    expect(process.exitCode).toBeUndefined();
+    expect(errorSpy).not.toHaveBeenCalled();
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain('No active Flywheel run.');
+    expect(output).toContain('Merge Queue:');
+    expect(output).toContain('| _None_ |  |  |  |');
+  });
+
+  it('prints the cwd project merge queue from pipeline-ready candidates without an active run', async () => {
+    mergeQueueMocks.findProjectByPathSync.mockReturnValue({ name: 'Panopticon', path: '/repo/pan', issue_prefix: 'PAN' });
+    mergeQueueMocks.listProjectsSync.mockReturnValue([
+      { key: 'pan', config: { name: 'Panopticon', path: '/repo/pan', issue_prefix: 'PAN' } },
+    ]);
+    mergeQueueMocks.listEligibleCandidatesByProject.mockReturnValue(new Map([
+      ['pan', { projectKey: 'pan', projectRoot: '/repo/pan', candidates: [{ issueId: 'PAN-1', title: 'Ready feature', pr: 123 }] }],
+    ]));
+    mergeQueueMocks.computeMergeQueueFromCandidates.mockReturnValue(Effect.succeed([
+      { issueId: 'PAN-1', title: 'Ready feature', branchName: 'feature/pan-1', pr: 123, mergeOrder: 1, conflictsWith: [], batchGroup: 'batch' },
+    ]));
+
+    await flywheelStatusCommand({ cwd: '/repo/pan' });
+
+    expect(process.exitCode).toBeUndefined();
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain('No active Flywheel run.');
+    expect(output).toContain('| 1 | PAN-1 | #123 | — |');
+    expect(mergeQueueMocks.computeMergeQueueFromCandidates).toHaveBeenCalledWith(
+      [{ issueId: 'PAN-1', title: 'Ready feature', pr: 123 }],
+      '/repo/pan',
+      expect.any(Object),
+    );
   });
 
   it('prints all flywheel config values', async () => {
