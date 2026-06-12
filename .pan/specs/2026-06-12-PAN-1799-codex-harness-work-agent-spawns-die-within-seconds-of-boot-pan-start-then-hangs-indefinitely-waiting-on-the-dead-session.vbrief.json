@@ -1,78 +1,381 @@
 {
   "vBRIEFInfo": {
     "version": "0.6",
-    "created": "2026-06-12T19:42:12.196Z",
-    "updated": "2026-06-12T19:42:12.196Z",
-    "author": "panopticon-cli/auto-start",
-    "description": "Auto-synthesized minimal plan for PAN-1799: Codex-harness work agent spawns die within seconds of boot; pan start then hangs indefinitely waiting on the dead session",
-    "inspectionPolicy": "never"
+    "created": "2026-06-12T20:04:22Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1799: Codex-harness work agent spawns die within seconds of boot; pan start then hangs indefinitely waiting on the dead session",
+    "updated": "2026-06-12T20:22:52.583Z"
   },
   "plan": {
     "id": "pan-1799",
     "title": "Codex-harness work agent spawns die within seconds of boot; pan start then hangs indefinitely waiting on the dead session",
     "status": "proposed",
-    "uid": "2bbcd8ca-6665-4428-a849-344a1c73e95f",
-    "author": "panopticon-cli/auto-start",
-    "sequence": 1,
-    "created": "2026-06-12T19:42:12.196Z",
-    "updated": "2026-06-12T19:42:12.196Z",
+    "uid": "6b5da569-dde5-47c4-ba95-ca9c308398a8",
+    "author": "agent:claude-fable-5",
+    "sequence": 13,
+    "created": "2026-06-12T20:04:22Z",
+    "updated": "2026-06-12T20:22:52.583Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1799",
         "label": "PAN-1799",
         "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1799.md",
+        "label": "PRD draft (verified file/line references, FR/NFR definitions)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1803",
+        "label": "PAN-1803 (adjacent codex work-tui pipeline — do not duplicate)",
+        "type": "issue"
       }
     ],
     "tags": [
-      "auto-start"
+      "codex",
+      "spawn",
+      "lifecycle",
+      "cli",
+      "fail-fast"
     ],
-    "metadata": {
-      "canonicalFilename": "2026-06-12-PAN-1799-codex-harness-work-agent-spawns-die-within-seconds-of-boot-pan-start-then-hangs-indefinitely-waiting-on-the-dead-session.vbrief.json"
-    },
     "narratives": {
-      "Problem": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):\n\n1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`.\n2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn.\n3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.\n\nContrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).\n\nSuspects: the codex TUI exiting when the rollout/thread-id capture fails; the work-agent kickoff delivery path not codex-aware (related: PAN-1793 pi delivery, PAN-1789 codex status tracking); or launcher env (the work launcher exports CLIProxy ANTHROPIC_* vars — fine for claude-code, possibly confusing for codex).\n\nImpact: the gpt-5.5+codex work-agent pairing — the built-in default for OpenAI models once PAN-1787 lands — cannot boot at all. This blocks PAN-1787's own implementation value and tonight's fleet rebalancing. Also fix the secondary bug: `pan start` must fail fast (bounded wait) when the spawned session dies, not hang.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent",
-      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+      "Problem": "Codex work agents died seconds after boot and pan start reported success then hung >20 min. The boot-death root causes (codex exec '-s workspace' rejection; exec-mode design) were hotfixed on main same-day (163e63c01, eb79b04cf, 5e05abc06, b0a223c72, 31760795c, 9857b1ac1). What remains: (1) pan start prints unqualified success and exits 0 even when the session died and kickoff never landed — recordKickoffDeliveryFailure (agents.ts:1707) leaves status 'running' and spawnAgent returns normally; (2) waitForReadySignal (agents.ts:783) polls the full timeout against a dead session and deliverInitialPromptWithRetry retries delivery to a session known to be dead; (3) the pan start CLI process can hang after the summary on undrained event-loop handles — no explicit exit; (4) boot deaths leave zero diagnostics because the pane dies with the session (the incident took 4 blind hotfixes to root-cause); (5) work-tui codex agents never get a codex-thread-id (spawnRun's capture explicitly skips work-tui, agents.ts:3311), so memory transcript capture and session-id resolution return null.",
+      "Proposal": "Make the spawn path fail fast and truthfully: detect dead sessions within one poll interval in every readiness wait; have spawnAgent mark state stopped and throw a typed AgentBootError on boot death (while preserving the alive-but-undelivered ghost lifecycle); capture the dead pane's tail via a bounded tmux remain-on-exit boot window into boot-failure.log; make pan start exit 1 with the diagnostic on boot death and terminate with explicit process.exit(0) on success; resolve the codex thread-id lazily from the per-agent rollout directory with write-back.",
+      "NonGoals": "- Re-implementing or modifying the codex boot fixes already on main (sandbox translation, work-tui mode, config.toml permission seeding, readiness detection, kickoff pointer file)\n- Anything in feature/pan-1803's pending diff: kickoff file relocation to the agent dir, --skip-git-repo-check removal, codexHome path via getAgentDir (PAN-1803 owns these)\n- Conversation-view rollout resolution (PAN-1805), conversation status tracking (PAN-1789), pi handoff delivery (PAN-1793), provider/role harness defaults (PAN-1787)\n- Context-preserving resume for work-tui codex agents (work-tui launcher ignores resumeSessionId — follow-up issue, recorded as hazard H5)\n- Changes to deacon orphan-patrol or auto-resume policy outside the boot window\n- Changes to the exec-mode codex specialist spawn path (spawnRun)"
     },
+    "autoDecisions": [
+      {
+        "summary": "Scoped the issue to the remaining fail-fast/diagnostics/truthfulness/thread-id gaps, treating the same-day hotfixes on origin/main as the boot-death fix.",
+        "rationale": "Verified by commit archaeology: 163e63c01, eb79b04cf, 5e05abc06, b0a223c72, 31760795c, 9857b1ac1 are all ancestors of origin/main; re-doing them would duplicate landed work and collide with PAN-1803's open branch."
+      },
+      {
+        "summary": "spawnAgent throws a typed AgentBootError on dead-session boot failure (after marking state stopped); kickoff-failed-but-alive continues to return state with kickoffDelivered=false.",
+        "rationale": "A throw propagates truthfully through both callers (pan start catch → spinner.fail + exit 1; dashboard route → non-2xx) without new plumbing, while preserving the deacon ghost-lifecycle redelivery contract locked by existing integration tests."
+      },
+      {
+        "summary": "Boot diagnostics via a bounded tmux remain-on-exit window (capture dead pane tail, then kill) instead of redirecting harness stderr to a file.",
+        "rationale": "TUIs may render on stderr; redirection risks breaking boot. remain-on-exit preserves exactly what a human attaching would have seen, and the window is closed right after readiness so post-boot death semantics are untouched."
+      },
+      {
+        "summary": "Codex thread-id resolution is lazy (on-demand scan of per-agent codex-home/sessions with write-back) rather than a background poller at spawn time.",
+        "rationale": "A post-spawn poller holds the CLI event loop open — the same class of hang this issue exists to eliminate. Per-agent CODEX_HOME isolation makes newest-rollout unambiguous."
+      },
+      {
+        "summary": "pan start ends with explicit process.exit(0) without flushing the fire-and-forget tracker transition.",
+        "rationale": "Established CLI pattern in this repo (close.ts:217, health.ts:175, dev.ts:678); the transition is best-effort, catch-logged, and has had the entire boot duration to complete."
+      }
+    ],
     "items": [
       {
-        "id": "auto-start",
-        "title": "Implement issue",
+        "id": "dead-session-detect",
+        "title": "Detect dead tmux sessions early in readiness waits and kickoff delivery",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T19:42:12.196Z",
+        "priority": "high",
+        "created": "2026-06-12T20:04:22Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1799",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
         },
         "narrative": {
-          "Action": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):\n\n1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`.\n2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn.\n3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.\n\nContrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).\n\nSuspects: the codex TUI exiting when the rollout/thread-id capture fails; the work-agent kickoff delivery path not codex-aware (related: PAN-1793 pi delivery, PAN-1789 codex status tracking); or launcher env (the work launcher exports CLIProxy ANTHROPIC_* vars — fine for claude-code, possibly confusing for codex).\n\nImpact: the gpt-5.5+codex work-agent pairing — the built-in default for OpenAI models once PAN-1787 lands — cannot boot at all. This blocks PAN-1787's own implementation value and tonight's fleet rebalancing. Also fix the secondary bug: `pan start` must fail fast (bounded wait) when the spawned session dies, not hang.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent"
+          "Action": "In src/lib/agents.ts: (1) add a sessionExists(agentId) check to each iteration of waitForReadySignal (lines 783-804) so it returns false within one poll interval when the session is gone — mirroring the existing bail in waitForCodexTuiReady at line 262; (2) in deliverInitialPromptWithRetry (lines 1614-1671), when readiness fails because the session no longer exists, set lastFailure to 'session-died' (distinct from 'ready-signal-timeout') and break out of the retry loop instead of attempting a second delivery to a dead session. waitForPromptReady (line 288) is the shared dispatch — thread a way to distinguish 'not ready' from 'session gone' (e.g. return 'ready' | 'timeout' | 'died'), updating the three other waitForPromptReady call sites (agents.ts:3337, 4290, 4885) to treat 'died' as not-ready exactly as before. Tests: extend tests/integration/agent-spawning.test.ts with fake timers (vi.useFakeTimers + advanceTimersByTimeAsync) — never real delays."
         },
         "items": [
           {
-            "id": "auto-start.ac1",
-            "title": "Observed 2026-06-12 03:45–03:55 during a fleet restart, twice on PAN-1704 (`pan start PAN-1704 --model gpt-5.5 --harness codex --fresh --force`):",
+            "id": "dead-session-detect.ac1",
+            "title": "Given a tmux session that no longer exists, waitForReadySignal returns false within one poll interval (~1s of fake time) instead of polling the full 30s timeout",
             "status": "pending",
-            "created": "2026-06-12T19:42:12.196Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac2",
-            "title": "1. Spawn reports success (`✔ Agent spawned: agent-pan-1704`, harness codex, model gpt-5.5), with a warning during boot: `Codex: rollout did not appear within 30s — thread-id not captured`. 2. Lifecycle log: `starting → running` at 07:54:44Z, then `running → stopped (orphaned: tmux session missing at boot)` at **07:54:57Z** — the tmux session vanished 13 seconds after spawn. 3. The parent `pan start` process then hung indefinitely (>20 min) and had to be killed, wedging the whole sequential fleet-restart behind it.",
+            "id": "dead-session-detect.ac2",
+            "title": "When the session is gone, deliverInitialPromptWithRetry returns a failure containing 'session-died' and performs no second delivery attempt",
             "status": "pending",
-            "created": "2026-06-12T19:42:12.196Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac3",
-            "title": "Contrast: codex-harness **conversations** worked fine the same night (three successful handoff sessions, conv 2774/2776). The failure is specific to the work-agent spawn path (launcher.sh + kickoff delivery + thread-id capture for codex TUI agents).",
+            "id": "dead-session-detect.ac3",
+            "title": "A live-but-not-ready session still produces 'ready-signal-timeout' after 2 attempts — existing kickoff-timeout tests in tests/integration/agent-spawning.test.ts pass unchanged",
             "status": "pending",
-            "created": "2026-06-12T19:42:12.196Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-boot-contract",
+        "title": "spawnAgent boot-outcome contract: throw AgentBootError on dead session, preserve ghost lifecycle when alive",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:04:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1799",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "boot-diagnostics",
+            "start-truthful-exit",
+            "ghost-boot-integration-test"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts: define an exported AgentBootError class (fields: agentId, harness, phase: 'boot-died' | 'kickoff-failed', diagnostic?: string). In spawnAgent's kickoff-failure paths (the pi catch at lines 3667-3673 and the delivery-failed branch at lines 3684-3687), after recordKickoffDeliveryFailure resolves, check sessionExists(agentId): if the session is GONE, mark the agent state stopped (markAgentStoppedState + save) and throw AgentBootError(phase 'boot-died'); if the session is ALIVE, keep the existing behavior exactly (return state with status 'running', kickoffDelivered false — the deacon ghost-lifecycle contract locked by tests/integration/agent-spawning.test.ts:357-512). Also check sessionExists immediately before the markAgentRunning(state) at line 3691 so a session that died after a seemingly-ok delivery is caught. State must be stopped BEFORE the throw so the dashboard start route (which calls spawnAgent) never leaves a phantom 'running' record. Unit/integration tests with fake timers for both branches."
+        },
+        "items": [
+          {
+            "id": "spawn-boot-contract.ac1",
+            "title": "When the tmux session is dead after kickoff delivery fails, spawnAgent persists agent state status 'stopped' and throws AgentBootError carrying agentId, harness, and phase 'boot-died'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-boot-contract.ac2",
+            "title": "When kickoff delivery fails but the session is alive, spawnAgent returns state with status 'running' and kickoffDelivered false — existing ghost-lifecycle tests (agent-spawning.test.ts:357-512) pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-boot-contract.ac3",
+            "title": "When the session dies after delivery succeeded but before markAgentRunning, spawnAgent throws AgentBootError instead of persisting a 'running' state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-boot-contract.ac4",
+            "title": "The dashboard start-agent route returns a non-2xx response with the AgentBootError message when spawnAgent throws, and the persisted agent state reads 'stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-diagnostics",
+        "title": "Capture boot-death diagnostics via a bounded tmux remain-on-exit window",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:04:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnAgent (src/lib/agents.ts:3637-3649): create the work-agent session with tmux remain-on-exit ON (use setOption from src/lib/tmux.ts right after createSession — planning sessions already use remain-on-exit, see spawn-planning-session.ts for the pattern). After readiness/delivery succeeds, set remain-on-exit OFF so post-boot deaths still vanish and the deacon orphan patrol semantics are unchanged (NFR-3, hazard H2). In the boot-death branch (spawn-boot-contract's 'boot-died' path), before killing anything: capturePane the dead pane's last ~60 lines, write them to <agentDir>/boot-failure.log, embed the last ~10 lines in the AgentBootError diagnostic, then killSession to remove the remained session. If capture fails (pane truly gone), proceed with a 'no pane output captured' diagnostic — capture is best-effort and must never block the throw. Tests with fake timers: dead-pane capture writes the log and the error contains the tail; success path flips remain-on-exit off and writes no log."
+        },
+        "items": [
+          {
+            "id": "boot-diagnostics.ac1",
+            "title": "spawnAgent creates work-agent sessions with remain-on-exit on and applies remain-on-exit off after kickoff delivery succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-diagnostics.ac2",
+            "title": "On boot death, spawnAgent persists the dead pane's captured tail to ~/.panopticon/agents/<id>/boot-failure.log, records the tail in the AgentBootError message, and closes the remained session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-diagnostics.ac3",
+            "title": "When pane capture fails, spawnAgent still throws AgentBootError with a 'no pane output captured' diagnostic and still kills the remained session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-diagnostics.ac4",
+            "title": "Given a successful boot, spawnAgent produces no boot-failure.log and the session ends up with remain-on-exit off, so later deaths surface to the deacon exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-truthful-exit",
+        "title": "pan start reports boot outcomes truthfully and terminates deterministically",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:04:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts issueCommand: (1) AgentBootError now propagates to the existing catch (line ~1170) which already does spinner.fail + process.exit(1) — ensure the boot diagnostic (pane tail) is printed in full, not just the error message's first line; (2) when spawnAgent returns a state with kickoffDelivered === false (alive-but-undelivered ghost), replace the unqualified '✔ Agent spawned' success block with spinner.warn plus an explicit note that the kickoff was not delivered and the deacon will redeliver on resume (mention pan logs <id> and pan tell <id>); (3) append explicit process.exit(0) as the final statement of the success path so undrained event-loop handles (fire-and-forget tracker HTTP, TLDR daemon exec, Effect runtime) can never hang the CLI after the summary — precedent: close.ts:217, health.ts:175, dev.ts:678. Live UAT (test role): pan start a scratch codex agent (gpt-5.5) — the agent survives at least 2 minutes with the kickoff pointer visible in the TUI and pan start exits 0 within seconds of printing the summary; a forced mid-boot session kill makes pan start exit 1 with the captured diagnostic."
+        },
+        "items": [
+          {
+            "id": "start-truthful-exit.ac1",
+            "title": "When the spawned session dies during boot, pan start prints the boot diagnostic and exits with code 1 — no '✔ Agent spawned' success line appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-truthful-exit.ac2",
+            "title": "When the session is alive but kickoff delivery failed, pan start prints an explicit kickoff-failure warning naming the deacon redelivery path instead of the unqualified success block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-truthful-exit.ac3",
+            "title": "On success, the pan start process exits with code 0 within seconds of printing the agent summary (explicit process.exit(0))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-truthful-exit.ac4",
+            "title": "Live UAT: a codex work agent spawned via pan start survives at least 2 minutes with the kickoff visible in its TUI and pan start exits promptly; killing the session mid-boot produces exit code 1 with the captured pane diagnostic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-threadid-lazy",
+        "title": "Lazy codex thread-id resolution with write-back for work-tui agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:04:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/runtimes/codex.ts: add resolveCodexThreadId(agentId): string | null — read the codex-thread-id file (threadIdPath, codex.ts:56); when absent or empty, scan the per-agent rollout directory <agentDir>/codex-home/sessions/ recursively for the newest rollout-*.jsonl by mtime (reuse the traversal pattern of collectRollouts, codex.ts:585-621), extract the id via extractThreadIdFromRollout (codex.ts:310), write it back with writeThreadId (codex.ts:76), and return it; return null when no rollout exists (agent never booted). Wire it into: (1) getLatestSessionIdSync fallback #4 in src/lib/agents.ts:2387-2396 (replace the direct file read), and (2) readCodexThreadId in src/lib/memory/transcript-source.ts:350-357 (so CodexTranscriptSource.resolveAgentTranscript stops returning null for work-tui agents whose spawn never captured a thread-id). Do NOT add any wait/poll at spawn time — resolution is strictly on-demand (decision D4). Unit tests: file present, file absent + rollout present (write-back happens), neither present (null); transcript-source test that a running codex work agent with a rollout but no thread-id file produces a TranscriptEntry."
+        },
+        "items": [
+          {
+            "id": "codex-threadid-lazy.ac1",
+            "title": "resolveCodexThreadId returns the saved codex-thread-id when the file exists, without touching the rollout directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-threadid-lazy.ac2",
+            "title": "With no codex-thread-id file but an existing rollout, resolveCodexThreadId extracts the id from the newest rollout, persists it to codex-thread-id, and returns it; with neither, it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-threadid-lazy.ac3",
+            "title": "getLatestSessionIdSync resolves a session id for a work-tui codex agent whose spawn never wrote codex-thread-id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-threadid-lazy.ac4",
+            "title": "CodexTranscriptSource.resolveAgentTranscript returns a TranscriptEntry (not null) for a running codex work agent with a rollout but no pre-existing codex-thread-id file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ghost-boot-integration-test",
+        "title": "End-to-end integration coverage for the boot-death and ghost-kickoff flows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T20:04:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend tests/integration/agent-spawning.test.ts (existing harness mocks tmux via exactPaneTarget/sessionExists mocks — follow the established pattern at lines 216-512) with the full boot-death scenario: spawn a codex work-tui agent whose mocked session disappears before readiness; assert spawnAgent throws AgentBootError, the persisted state is 'stopped', the boot-failure.log write was attempted with the mocked pane tail, and the dead-session bail consumed only ~1 poll interval of fake time (not the full 60s of two timeout rounds). Re-assert the alive-but-undelivered ghost lifecycle suite (lines 357-512) is green. ALL timing via vi.useFakeTimers()/vi.advanceTimersByTimeAsync() — repo rule, no real delays, no maxForks changes."
+        },
+        "items": [
+          {
+            "id": "ghost-boot-integration-test.ac1",
+            "title": "Integration test: when a codex work-tui spawn's session disappears before readiness, spawnAgent throws AgentBootError, persists state 'stopped', and records the mocked pane tail in the boot diagnostic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ghost-boot-integration-test.ac2",
+            "title": "Integration test: the dead-session path returns within roughly one poll interval of fake time, not the full two 30s readiness rounds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ghost-boot-integration-test.ac3",
+            "title": "The pre-existing ghost-lifecycle suite (kickoff failure with live session, resume redelivery) passes unchanged, and every new test covers its timing with fake timers exclusively",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -80,6 +383,36 @@
         ]
       }
     ],
-    "edges": []
-  }
+    "edges": [
+      {
+        "from": "dead-session-detect",
+        "to": "spawn-boot-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-boot-contract",
+        "to": "boot-diagnostics",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-boot-contract",
+        "to": "start-truthful-exit",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-boot-contract",
+        "to": "ghost-boot-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-diagnostics",
+        "to": "ghost-boot-integration-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1799-codex-harness-work-agent-spawns-die-within-seconds-of-boot-pan-start-then-hangs-indefinitely-waiting-on-the-dead-session.vbrief.json"
+    }
+  },
+  "status": "proposed"
 }
