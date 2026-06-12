@@ -17,10 +17,6 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     pool: 'forks',
-    // GitHub Actions runners have limited memory (~7GB). Use 1 worker in CI to prevent OOM.
-    // Local development can use up to 4 concurrent workers. PAN-805 root cause: multiple
-    // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
-    maxWorkers: process.env.CI ? 1 : 4,
     include: includeBenchmarks
       ? ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'tests/**/*.bench.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts', 'src/**/*.bench.ts']
       : ['tests/**/*.test.ts', 'tests/**/*.spec.ts', 'src/**/__tests__/**/*.test.ts', 'packages/**/src/__tests__/**/*.test.ts'],
