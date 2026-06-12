@@ -1,380 +1,122 @@
 {
   "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-06-12T04:04:09Z",
+    "version": "0.6",
+    "created": "2026-06-12T06:38:55Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1788: Adopt Deft Directive planning practices: codebase-map layer, finalize quality lint, trace IDs, probe pass, Q&A retention, vBRIEF v0.6",
-    "updated": "2026-06-12T04:08:10.679Z"
+    "description": "Plan for PAN-1787: Provider default harnesses, role-level harness overrides, and real brand logos",
+    "updated": "2026-06-12T06:50:41.015Z"
   },
   "plan": {
-    "id": "pan-1788",
-    "title": "Adopt Deft Directive planning practices: codebase-map layer, finalize quality lint, trace IDs, probe pass, Q&A retention, vBRIEF v0.6",
+    "id": "pan-1787",
+    "title": "Provider default harnesses, role-level harness overrides, and real brand logos",
     "status": "proposed",
-    "uid": "96422844-6a7f-4f60-a269-738e9a8b27f7",
+    "uid": "39309664-bccb-4daa-a38e-5a371cad4879",
     "author": "agent:claude-fable-5",
     "sequence": 2,
-    "created": "2026-06-12T04:04:09Z",
-    "updated": "2026-06-12T04:08:10.679Z",
+    "created": "2026-06-12T06:38:55Z",
+    "updated": "2026-06-12T06:50:41.015Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1788",
-        "label": "PAN-1788",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1787",
+        "label": "PAN-1787",
         "type": "issue"
       },
       {
-        "uri": ".pan/drafts/PAN-1788.md",
-        "label": "PRD (glossary, decisions D1-D11, before/after snippets, AC table)",
-        "type": "spec"
-      },
-      {
-        "uri": "https://github.com/deftai/directive",
-        "label": "Deft Directive (source of adopted practices; pattern lists embedded in PRD)",
-        "type": "reference"
+        "uri": ".pan/drafts/PAN-1787.md",
+        "label": "PRD rev 3 (primary execution reference — every bead cites its WI-N section)",
+        "type": "doc"
       }
     ],
     "tags": [
-      "planning",
-      "prompts",
-      "lint",
-      "vbrief",
-      "directive",
-      "drift-fix"
+      "harness",
+      "providers",
+      "settings-ui",
+      "branding",
+      "agent-lifecycle"
     ],
     "narratives": {
-      "Problem": "Panopticon enforces plan quality with prompt prose only — finalize will promote a plan whose every AC is 'works as expected'. Five drift bugs contradict role files against spawn templates, including a stale instruction telling work agents to hand-edit a spec file the verification gate stopped reading at PAN-1124. And pan plan finalize always auto-spawns the work agent while announcing 'awaiting your approval' — the message lies.",
-      "Proposal": "Per the PRD at .pan/drafts/PAN-1788.md (decisions D1-D11 are final — do not re-litigate): fix the five drift bugs against the post-WI-22 two-mode handoff behavior; add scripts/lint-prompts.sh (deterministic greps only) so drift cannot recur; gate the planning→work handoff on a deterministic autoSpawnOnFinalize stamp (human planning stops at Planned; flywheel passes --auto-start); adopt Directive's codebase-map layer (.pan/context/codebase/), story-quality lint + DAG validation at finalize, FR-N trace IDs, probe pass, Q&A retention, NonGoals narrative, anomaly-first summaries, and vBRIEF v0.6 (emit 0.6, read 0.5+0.6).",
-      "NonGoals": "- Swarm contract (files_scope, verify_commands, readiness lint, expected_outputs) — belongs to PAN-1762 (its PRD §10)\n- Harness resolution, switching semantics, settings UI, branding, --harness help strings — stays in PAN-1787\n- Directive's 'As a <role>…' UserStory regex, blocking human mid-planning gates, lifecycle folder moves, refuse-on-overlap dispatch — deliberately rejected (PRD decision D9); do not 'helpfully' add them\n- No new 'pan map' CLI verb — the human bootstrap path is the /pan-map skill only (D6)\n- pan start --auto (skip-planning fast path) is an explicit start command — unchanged by WI-22"
+      "Problem": "Every unset harness silently falls back to claude-code even for OpenAI/Google/Kimi models; harness resolution logic is duplicated inline at five spawn sites; role-level harness overrides exist in schema but only Flywheel has UI; legacy specialist_harnesses (PAN-636) is an undocumented parallel config; live model/harness switching has no fresh-session guarantee on the JSONL --resume path and only a 30s grace; only 2 of 10 providers have real brand marks and pi agents render without a brand mark.",
+      "Proposal": "Implement the PRD at .pan/drafts/PAN-1787.md (rev 3), which carries verified file/line references and before/after snippets for every change: (1) built-in provider→harness defaults on the PROVIDERS registry (anthropic→claude-code, openai→codex, all others→pi) with getBuiltInDefaultHarness(); (2) a single exported resolveHarness() (explicit > role > provider override > built-in default > claude-code, always ending at the canUseHarnessSync ToS gate, collapsing to claude-code when the winning binary is missing) migrated into all five spawn sites; (3) specialist_harnesses reconciled as a deprecated role-tier alias; (4) session-safe switching: 60s graceful grace + Escape-interrupt for tmux-TUI harnesses, plus a fresh-session invariant that drops JSONL --resume across any model/harness change; (5) conversation harness switching kept but labeled experimental; (6) Settings UI: honest Default(<built-in>) provider selects with key-deletion on clear, and a harness override select on every role card; (7) a shared branding registry (PROVIDER_BRANDS + HARNESS_BRANDS, real SVG marks for 10 providers + 3 harnesses, π for pi) rolled out across composer picker, Settings, shared ModelPicker, agent dock, and conversation feed, with the dead Settings/Provider/ directory deleted. Line-drift corrections verified 2026-06-12: plan-kickoff chain now at spawn-planning-session.ts:558-561; CLI --harness flags at cli/index.ts:376/515/533/536; convertConversationTranscript exported at session-format-converter.ts:304.",
+      "NonGoals": "- Sub-role harness overrides (RoleSubConfig keeps only model)\n- New harnesses beyond claude-code / pi / codex\n- Per-project harness configuration in projects.yaml\n- Any change to conversation model-switch tiers 1–3 (switch-strategy.ts behavior byte-for-byte unchanged)\n- Any change to the transcript converter, the tier-4 endpoint path (routes/conversations.ts:2944-2971), or their tests — label-only work\n- Modifying or weakening canUseHarnessSync (harness-policy.ts)\n- The approval-gated planning handoff and planning-flow inconsistency fixes (moved to PAN-1788 WI-22; only the stale --harness help strings stay here)\n- Transcript conversion/migration for agents (fresh session + continue.json re-onboarding is the only agent switching mechanism)"
     },
     "autoDecisions": [
       {
-        "summary": "One bead per PRD work item, except WI-7, WI-21, and WI-22 each split into a foundation bead plus a consumer bead (25 beads total).",
-        "rationale": "WI-7's lint module is consumed by WI-8/WI-14/WI-19 before its own CLI wiring matters; WI-21's read-compat must land before the emit flip; WI-22's stamp plumbing is behavior-neutral while the finalize gate flips behavior — each pair is independently reviewable and the split keeps foundation diffs small."
+        "summary": "Decomposed the PRD's 10 work items into 24 beads; PRD phases are guidance, not bead boundaries.",
+        "rationale": "Planning template requires aggressively small, independently reviewable/mergeable beads; each WI splits cleanly along file/surface lines."
       },
       {
-        "summary": "requiresInspection: true on exactly two beads — wi5-lint-prompts and wi7a-quality-lint-module.",
-        "rationale": "Both are foundations many later beads extend (10 beads add lint-prompts checks; 4 beads consume the quality-lint module's exports). A wrong check-structure or wrong exported interface would force redoing all dependents — the PAN-382 cascade criterion. All other beads are leaves or have exact before/after text in the PRD."
+        "summary": "The built-in-default activity-log notice is emitted inside resolveHarness() itself, once per provider per process; no separate release-notes work item.",
+        "rationale": "resolveHarness is the single choke point that knows which tier won; release notes are generated from git log by pan release, so the commit message carries the behavior-change callout."
       },
       {
-        "summary": "Execution order follows PRD §4: WI-2/WI-3/WI-4 → WI-22 → WI-1 → WI-5, then phases 2-9; encoded as blocks edges.",
-        "rationale": "WI-1's text must be written once against post-WI-22 behavior, and WI-5's lint asserts the final wording — the PRD states this ordering explicitly."
+        "summary": "Harness binary availability check is a new async helper inside harness-resolve.ts (promisified exec `command -v <bin>`, module-level cache); doctor's checkCommand is NOT reused.",
+        "rationale": "checkCommand in src/cli/commands/doctor.ts uses execSync, which is forbidden in dashboard-server-reachable code (PAN-70 repo rule); resolveHarness runs server-side."
       },
       {
-        "summary": "No questions asked; PRD decisions D1-D11 adopted verbatim as planning decisions.",
-        "rationale": "Auto mode; the PRD was authored against the prd-authoring rule with all decisions pre-made and references verified 2026-06-11; re-verified against the codebase 2026-06-12 during this session — all claims hold."
+        "summary": "Pi gets no pre-warning interrupt in graceful restart — 60s grace only.",
+        "rationale": "Verified 2026-06-12: pi-fifo.ts exposes no interrupt/abort/cancel op on the rpc.in FIFO; the PRD names this exact fallback. Codex/claude-code get the tmux Escape path."
       },
       {
-        "summary": "metadata.traces not used in this plan; coverage is the PRD's 1:1 AC-to-WI table instead.",
-        "rationale": "The PRD predates WI-19's numbered-requirements rule and declares no FR-N/NFR-N ids; the AC table already maps acceptance criteria to work items mechanically."
+        "summary": "Resume guard backward compat: JSONL sessions lacking persisted origin model/harness metadata keep resuming as today; the guard applies to sessions created after the change.",
+        "rationale": "Pre-change sessions cannot be distinguished safely; deacon auto-resume never changes model/harness, and restartAgent already always spawns fresh, so the residual risk window is empty."
+      },
+      {
+        "summary": "Dead-code deletion widened from ProviderCard.tsx to the entire components/Settings/Provider/ directory (ProviderCard, ProviderPanel, ThinkingLevelSlider).",
+        "rationale": "Verified 2026-06-12 that ProviderCard's only importer is ProviderPanel, and ProviderPanel/ThinkingLevelSlider have zero importers in live code (one comment mention in a test). PRD's claim that ProviderCard was unimported was stale by one hop."
+      },
+      {
+        "summary": "Dashboard start route keeps its body shape-validation and fail-fast policy check; it forwards --harness to pan start only when the user picked one, and passes nothing otherwise.",
+        "rationale": "Matches PRD WI-2 ('keep body validation; pass validated value as explicit'); avoids converting 'unset' into an explicit tier, which would double-fire the built-in-default notice and bypass role overrides applied at spawn time."
+      },
+      {
+        "summary": "PRD line-number drifts corrected in bead text rather than halting: plan-kickoff chain at spawn-planning-session.ts:558-561 (PRD said 513-516); CLI --harness at cli/index.ts:376/515/533/536 (PRD said 374/512/530/533); convertConversationTranscript export at session-format-converter.ts:304.",
+        "rationale": "PRD itself instructs 'if a line number has drifted, search for the quoted code'; quoted code verified present 2026-06-12."
+      },
+      {
+        "summary": "AgentIcon's current pi rendering is the lucide Bot fallback (providerForAgent returns null), not the Anthropic starburst the PRD describes; the fix is identical (harness→HarnessLogo with π).",
+        "rationale": "Verified AgentIcon.tsx:14-35 on 2026-06-12; the acceptance criterion 'pi never renders the Anthropic starburst' remains valid and gains 'nor the generic Bot glyph for known harnesses'."
       }
     ],
     "items": [
       {
-        "id": "wi2-bead-order",
-        "title": "WI-2: Canonicalize per-bead order in roles/work.md (close before inspect)",
+        "id": "provider-defaults",
+        "title": "Built-in defaultHarness on the provider registry",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Apply PRD WI-2's exact before/after to roles/work.md '## Per-Bead Workflow' (search 'For every bead:'): bd close becomes step 6, inspection follows at steps 7-9, and step 10 becomes the INSPECTION BLOCKED recovery (fix with a new commit, bd close again, re-run the same inspection). Decision D2: commit → continue.json → close → inspect. Currently inspect is step 7 and close is step 10 — the drifted surface is the role file, not the spawn template."
-        },
-        "subItems": [
-          {
-            "id": "wi2-bead-order.ac1",
-            "title": "In roles/work.md's per-bead numbered list, the bd close step number is lower than the pan inspect step number",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi2-bead-order.ac2",
-            "title": "The list shows an explicit INSPECTION BLOCKED step: fix with a new commit, bd close again, re-run the same inspection",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi3-ac-status-sync",
-        "title": "WI-3: Remove stale AC-status hand-edit instruction and warn on bead-title mismatch",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Per PRD WI-3: (1) in src/lib/cloister/prompts/work.md delete the block from '**CRITICAL: Update vBRIEF AC statuses…**' through the node -e fence (currently ~lines 217-225) and insert the PRD's replacement paragraph (AC statuses sync automatically from bd close via statusOverrides; never hand-edit specs — PAN-1124); (2) in src/lib/cloister/verification-runner.ts (~line 456) replace feedback step 3 'Update plan.vbrief.json subItem statuses' with the bd-close advice; (3) in src/lib/vbrief/beads.ts syncBeadStatusToVBriefPromise, the silent 'if (!matchingItem) return null;' (line 462) gains the '[vbrief-sync] No plan item matches' console.warn from the PRD snippet. Add a unit test (beads-sync.test.ts or extend existing) spying console.warn."
-        },
-        "subItems": [
-          {
-            "id": "wi3-ac-status-sync.ac1",
-            "title": "node -e no longer appears in src/lib/cloister/prompts/work.md; the replacement paragraph states AC statuses sync automatically from bd close",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi3-ac-status-sync.ac2",
-            "title": "verification-runner.ts AC-failure feedback step 3 says close beads with bd close and never hand-edit spec files; 'plan.vbrief.json subItem' is absent from the file",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi3-ac-status-sync.ac3",
-            "title": "A bead title with no matching plan item logs the [vbrief-sync] No plan item matches warning and returns null (unit test spies console.warn and passes)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi4-dedupe-workflow",
-        "title": "WI-4: Deduplicate the One Bead At A Time block in the work spawn template",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Per PRD WI-4: src/lib/cloister/prompts/work.md contains the bead workflow twice (### copy inside {{#BEADS_TASKS}} at ~line 172, unconditional ## copy at ~line 294) with different step counts. Keep the unconditional '## MANDATORY: One Bead At A Time' as the single canonical copy, renumbered cleanly 1-10 to the D2 close-then-inspect order matching WI-2's wording. Inside {{#BEADS_TASKS}}, delete the duplicated workflow and keep only the block-unique content: the {{BEADS_TASKS}} list, the -l {{ISSUE_ID_LOWER}} label-scoping warning, the hallucinated-command warnings (bd claim, bd start, --issue), and WI-3's replacement paragraph; add one pointer line 'Follow the per-bead workflow in MANDATORY: One Bead At A Time below.' Verify rendering with BEADS_TASKS set and unset."
-        },
-        "subItems": [
-          {
-            "id": "wi4-dedupe-workflow.ac1",
-            "title": "grep -c 'MANDATORY: One Bead At A Time' on the work template returns exactly 1",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi4-dedupe-workflow.ac2",
-            "title": "The {{#BEADS_TASKS}} block retains the beads list, label-scoping warning, hallucinated-command warnings, and a pointer to the canonical workflow",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi4-dedupe-workflow.ac3",
-            "title": "Rendering the template with BEADS_TASKS set and unset both produces exactly one workflow block",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi22a-autostart-stamp",
-        "title": "WI-22a: Add pan plan --auto-start flag and persist the autoSpawnOnFinalize stamp",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-22 steps 1-2 (decision D11): add --auto-start to pan plan in src/cli/commands/plan.ts ('After planning completes, automatically start the work agent — used by autonomous orchestrators; default off'), composable with --auto. spawnPlanningSession in src/lib/planning/spawn-planning-session.ts gains opts.autoSpawnOnFinalize?: boolean (default false) and persists it into the planning agent's state.json (~/.panopticon/agents/planning-<id>/). Thread from the CLI flag and from the dashboard planning route (routes/issues.ts:1045) / agent-spawner.ts:205-208 — both default false. No behavior change yet: nothing reads the stamp until wi22b. Update skills/pan-plan SKILL.md for --auto-start in the same commit (skills↔CLI convention, lint-skills enforces)."
-        },
-        "subItems": [
-          {
-            "id": "wi22a-autostart-stamp.ac1",
-            "title": "pan plan <id> --auto-start persists autoSpawnOnFinalize: true into the planning agent's state.json (unit test via spawnPlanningSession)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22a-autostart-stamp.ac2",
-            "title": "spawnPlanningSession defaults autoSpawnOnFinalize to false and the dashboard planning route spawns without the stamp (unit test)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22a-autostart-stamp.ac3",
-            "title": "skills/pan-plan SKILL.md documents --auto-start in the same commit and scripts/lint-skills.sh passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi22b-finalize-gate",
-        "title": "WI-22b: Gate finalize auto-spawn on the stamp with truthful messaging",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-22 steps 3-9: delete the hardcoded autoSpawn: true at src/cli/commands/plan-finalize.ts:226 — finalize reads autoSpawnOnFinalize from the planning agent's state.json and sends autoSpawn only when stamped (NO --auto-spawn flag on pan plan finalize itself — D11, the planning agent must not opt itself in). Server route unchanged. roles/flywheel.md: every planning launch becomes 'pan plan <id> --auto --auto-start' (lines 74, 88, 90, 95, 136, 138; rewrite the line-136 parenthetical to describe the flag). Messaging truthful (plan-finalize.ts:127-137 + console summary): no stamp → 'awaiting your approval' + 'Run pan start <id> or click Start Agent' hint; stamped → 'planned — starting implementation'. Print spawn-skipped warnings only when a spawn was attempted. Rewrite the stale 'Stop hook' comment at routes/issues.ts:1255 naming the real callers (pan plan finalize, pan plan done, PlanDialog Done, kanban action) — KEEP the pending-AskUserQuestion guard. completePlanningAutoSpawnAndKill kill-timing split stays as-is. Update auto-promote-chain.integration.test.ts (chain fires only when stamped; default promotes WITHOUT spawning); complete-planning.test.ts must stay green unmodified. Behavior change for release notes: human pan plan no longer auto-starts the work agent."
-        },
-        "subItems": [
-          {
-            "id": "wi22b-finalize-gate.ac1",
-            "title": "Finalize without a stamp posts complete-planning WITHOUT autoSpawn, prints the pan start hint, and no work agent spawns (unit test)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22b-finalize-gate.ac2",
-            "title": "Finalize with the stamp posts autoSpawn: true and emits 'starting implementation' messaging without the approval wording (unit test)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22b-finalize-gate.ac3",
-            "title": "The 'spawn was skipped' console summary prints only when a spawn was attempted on the stamped path",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22b-finalize-gate.ac4",
-            "title": "roles/flywheel.md uses pan plan --auto --auto-start at every planning launch site, and the routes/issues.ts Stop-hook comment is rewritten naming the real callers with the AskUserQuestion guard kept",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi22b-finalize-gate.ac5",
-            "title": "auto-promote-chain.integration.test.ts passes with chain-fires-only-when-stamped semantics and complete-planning.test.ts passes unmodified",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi1-handoff-rewrite",
-        "title": "WI-1: Rewrite planning-handoff prompt text for the two-mode flow",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Apply PRD WI-1's exact before/after snippets, written once against the post-wi22b behavior. File 1: src/lib/cloister/prompts/planning.md, replace the block starting 'This converts your' (~lines 53-55) with the PRD's After text (finalize is the final action, session terminates, no Done click; what happens next is decided by the --auto-start stamp or the human pan start gate; Done button remains the --no-promote manual path). File 2: roles/plan.md — replace the 'The legacy Done button still exists' sentence (line 48) with the deterministic-state sentence, and append the do-not-start-the-work-agent instruction after 'no separate \"Done\" click is required' in Process step 6 (line 75)."
-        },
-        "subItems": [
-          {
-            "id": "wi1-handoff-rewrite.ac1",
-            "title": "'click Done' is absent from src/lib/cloister/prompts/planning.md and the new text describes both modes (waits in Planned vs --auto-start)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi1-handoff-rewrite.ac2",
-            "title": "'legacy Done' is absent from roles/plan.md and the replacement names pan start / Start Agent as the human gate",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi1-handoff-rewrite.ac3",
-            "title": "roles/plan.md Process step 6 keeps the no-Done-click sentence and appends the instruction to never start or wait for the work agent",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi5-lint-prompts",
-        "title": "WI-5: Add scripts/lint-prompts.sh drift lint wired into npm run lint",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1788",
-          "requiresInspection": true,
           "inspectionDepth": "fast",
-          "foundationFor": [
-            "wi6-codebase-map",
-            "wi9-nongoals",
-            "wi10-interview-completeness",
-            "wi11-qa-retention",
-            "wi12-external-content",
-            "wi13-self-audit",
-            "wi14-ac-phrasing",
-            "wi15-anomaly-first",
-            "wi16-scope-discipline",
-            "wi17-verdict-blocker"
+          "traces": [
+            "WI-1",
+            "AC-1"
           ]
         },
         "narrative": {
-          "Action": "Per PRD WI-5 (decision D10 — deterministic greps only, no semantic checks): new executable bash script scripts/lint-prompts.sh, exits non-zero with a named failing check, modeled on scripts/lint-skills.sh. Five checks: (1) forbidden strings — 'click Done' absent from prompts/planning.md, 'legacy Done' absent from roles/plan.md, 'node -e' absent from prompts/work.md, 'plan.vbrief.json subItem' absent from verification-runner.ts; (2) bead-loop order — in roles/work.md and prompts/work.md the first numbered step containing 'bd close' has a lower number than the first containing 'pan inspect'; (3) 'MANDATORY: One Bead At A Time' occurs exactly once in prompts/work.md; (4) schema-key agreement (D5) — prompts/planning.md, sync-sources/skills/write-vbrief/SKILL.md, docs/VBRIEF.md each contain requiresInspection, inspectionDepth, issueLabel, difficulty, foundationFor, acceptance_criterion; (5) handoff consistency — roles/plan.md and prompts/planning.md both contain 'pan plan finalize' AND 'pan start', neither contains 'click Done'. Add --self-test mode running each check against a violating here-doc fixture asserting non-zero exit. Wire into package.json lint exactly like lint:skills (line 90/94). Later beads append checks to this script — structure it so adding a check is one function call."
+          "Action": "Per PRD WI-1: in src/lib/providers.ts add `defaultHarness: RuntimeName` to the ProviderConfig interface (line 29; import RuntimeName from './runtimes/types.js'), set it on all 10 PROVIDERS entries (lines 61-163: anthropic→'claude-code', openai→'codex', google/kimi/minimax/zai/mimo/openrouter/nous/dashscope→'pi'), and export `getBuiltInDefaultHarness(provider: ProviderName): RuntimeName` returning the registry value with 'claude-code' for unknown providers. Add unit coverage in tests/unit/lib/providers.test.ts (create if absent, mirroring tests/unit/lib/ layout)."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi5-lint-prompts.ac1",
-            "title": "scripts/lint-prompts.sh exists, is executable, exits non-zero naming the failing check, and npm run lint runs it like lint:skills",
+            "id": "provider-defaults.ac1",
+            "title": "Given the PROVIDERS registry, every entry stores a defaultHarness (anthropic→claude-code, openai→codex, the other eight→pi) and typecheck fails if an entry omits the now-required field",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi5-lint-prompts.ac2",
-            "title": "All five check families (forbidden strings, bead-loop order, single workflow copy, schema-key agreement, handoff consistency) pass on HEAD",
+            "id": "provider-defaults.ac2",
+            "title": "getBuiltInDefaultHarness('openai') returns 'codex', ('anthropic') returns 'claude-code', ('kimi') returns 'pi', and an unknown provider id returns 'claude-code'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi5-lint-prompts.ac3",
-            "title": "--self-test exercises every check against a violating fixture and exits non-zero when a check fails to catch its fixture",
+            "id": "provider-defaults.ac3",
+            "title": "A unit test in tests/unit/lib/providers.test.ts validates the three-way mapping for all 10 providers and the unknown-provider claude-code fallback",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -383,96 +125,68 @@
         ]
       },
       {
-        "id": "wi6-codebase-map",
-        "title": "WI-6: Codebase-map layer at .pan/context/codebase with bootstrap and finalize commit",
+        "id": "resolve-harness-core",
+        "title": "Unified resolveHarness() in new src/lib/harness-resolve.ts",
         "status": "pending",
         "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "complex",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-6 (HIGH PRIORITY operator request, decision D6): durable orientation files at <projectRoot>/.pan/context/codebase/{architecture,conventions,concerns,stack}.md, each ≤~150 lines ending with <!-- last-verified: YYYY-MM-DD -->. (1) Insert the PRD's 'Codebase Map — read first, keep fresh' section into prompts/planning.md after '### Phase 1: Understand Context' (read-first if present, bootstrap if absent, correct + re-date if stale). (2) roles/plan.md ## Outputs gains item 5 (codebase map). (3) completePlanningArtifacts() in src/dashboard/server/routes/issues.ts (line 129): extend the main-side git add pathspec for .pan/specs/ to also include .pan/context/codebase/ when changed, with a unit test. (4) New Topical skill sync-sources/skills/pan-map/SKILL.md for human pre-seeding (no CLI verb — note rationale in docs/SKILLS-CONVENTION.md's exclusion list). (5) prompts/work.md 'Read Context Files First' gains line 4: skim .pan/context/codebase/ if present. (6) lint-prompts gains check 6: prompts/planning.md contains 'Codebase Map'."
-        },
-        "subItems": [
-          {
-            "id": "wi6-codebase-map.ac1",
-            "title": "The planning template contains the Codebase Map section with read-first, bootstrap-if-absent, and correct-if-stale instructions",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi6-codebase-map.ac2",
-            "title": "The finalize promote-commit includes .pan/context/codebase/ changes when present (unit test near completePlanningArtifacts passes)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi6-codebase-map.ac3",
-            "title": "sync-sources/skills/pan-map/SKILL.md exists and docs/SKILLS-CONVENTION.md records the no-CLI-verb rationale",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi6-codebase-map.ac4",
-            "title": "The work template references the map in Read Context Files First, roles/plan.md Outputs lists it, and lint-prompts asserts 'Codebase Map' present",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi7a-quality-lint-module",
-        "title": "WI-7a: Story-quality lint module src/lib/vbrief/quality-lint.ts",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": true,
           "inspectionDepth": "fast",
           "foundationFor": [
-            "wi7b-quality-lint-wiring",
-            "wi8-dag-validation",
-            "wi14-ac-phrasing",
-            "wi19-trace-ids"
+            "migrate-agents-callsites",
+            "migrate-plan-kickoff",
+            "migrate-dashboard-route",
+            "specialist-alias"
+          ],
+          "traces": [
+            "WI-2",
+            "AC-1",
+            "AC-2",
+            "AC-3"
           ]
         },
         "narrative": {
-          "Action": "PRD WI-7, module only (wiring is wi7b): new src/lib/vbrief/quality-lint.ts exporting QualityIssue { itemId, rule, message, severity: 'error'|'warn' }, lintPlanQuality(doc: VBriefDocument): QualityIssue[], and the four exported constants PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, OBSERVABLE_TERMS — exact lists are in the PRD §WI-7 and are the source of truth. Per item (skip status 'cancelled'): ac-missing (≥1 AC subItem), ac-count (2-5 band unless non-empty metadata.acJustification), ac-banned-phrase (lowercased AC title contains any banned substring — name the matched pattern), ac-not-observable (≥1 OBSERVABLE_TERMS substring required), action-too-thin (narrative.Action ≥8 words). Tests in src/lib/vbrief/__tests__/quality-lint.test.ts with the 10 named cases from the PRD (flags missing ACs … skips cancelled items). Port of Directive's _vbrief_story_quality.py without the UserStory regex (D9)."
+          "Action": "Per PRD WI-2: create src/lib/harness-resolve.ts exporting `resolveHarness(input: { explicit?: RuntimeName; role?: Role; model: string }): Promise<RuntimeName>` with precedence (first defined wins): 1) explicit, 2) loadYamlConfig().config.roles[role]?.harness, 3) config.providerHarnesses[provider] where provider = getProviderForModelSync(model).name, 4) getBuiltInDefaultHarness(provider), 5) 'claude-code'. The winner ALWAYS passes through canUseHarnessSync(winner, model, await getProviderAuthMode(model)); blocked ⇒ 'claude-code'. If the winner is 'pi' or 'codex' and its binary is not installed, collapse to 'claude-code' with a console warning — implement an async availability helper using promisified exec `command -v <bin>` with a module-level cache (do NOT reuse doctor's execSync-based checkCommand; resolveHarness is dashboard-server-reachable and execSync is forbidden there). When tier 4 (built-in default) decides, emit a one-line notice once per provider per process: \"harness <h> chosen by provider default — override in Settings → Providers\". Write tests/unit/lib/harness-resolve.test.ts covering the full precedence matrix: explicit>role>provider-override>built-in; empty config + anthropic⇒claude-code, + openai⇒codex, + kimi/google/zai⇒pi; policy-blocked winner (explicit pi + anthropic model + subscription auth) collapses to claude-code; missing binary collapses to claude-code with warning. Mock the availability check and policy/auth lookups in tests."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi7a-quality-lint-module.ac1",
-            "title": "quality-lint.ts exports lintPlanQuality and the four pattern constants with the PRD's exact lists",
+            "id": "resolve-harness-core.ac1",
+            "title": "resolveHarness returns the explicit harness when provided, else the role override, else the provider override, else the built-in default — the full precedence-matrix unit suite passes",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi7a-quality-lint-module.ac2",
-            "title": "lintPlanQuality emits ac-missing, ac-count, ac-banned-phrase, ac-not-observable, and action-too-thin errors per rule, honors acJustification, and skips cancelled items",
+            "id": "resolve-harness-core.ac2",
+            "title": "With empty providerHarnesses and no role override, resolveHarness returns claude-code for an Anthropic model, codex for an OpenAI model, and pi for kimi/google/zai models",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi7a-quality-lint-module.ac3",
-            "title": "quality-lint.test.ts passes with the 10 named cases from the PRD",
+            "id": "resolve-harness-core.ac3",
+            "title": "Every winner passes through canUseHarnessSync: explicit pi + Anthropic model + subscription auth returns claude-code; existing harness-policy tests pass unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-harness-core.ac4",
+            "title": "When the winning pi/codex binary is absent, resolveHarness returns claude-code and logs a warning, using only async exec (no execSync anywhere in the new module)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-harness-core.ac5",
+            "title": "The first resolution that lands on a built-in default emits the one-line override-hint notice exactly once per provider per process",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -481,40 +195,53 @@
         ]
       },
       {
-        "id": "wi7b-quality-lint-wiring",
-        "title": "WI-7b: Wire the quality lint into pan plan finalize and the complete-planning endpoint",
+        "id": "migrate-agents-callsites",
+        "title": "Migrate agents.ts spawn sites to resolveHarness()",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "priority": "high",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-2",
+            "AC-1",
+            "AC-2"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-7 wiring (decision D4 — hard errors, escape hatches): (1) pan plan finalize CLI path (src/cli/commands/plan-finalize.ts) runs lintPlanQuality before calling the endpoint, prints issues grouped by item, exits non-zero on errors; new --no-quality-lint flag skips with a loud '⚠ quality lint SKIPPED' warning; update skills/pan-plan SKILL.md in the same commit. (2) completePlanningArtifacts() endpoint runs the same lint and returns 422 with the issue list on failure, mirroring the existing structural-validation error shape — defense in depth so the dashboard path is covered too."
+          "Action": "Per PRD WI-2 migration table, in src/lib/agents.ts replace the inline chains with one resolveHarness() call each: spawnRun (lines ~3011-3013: `options.harness ?? loadYamlConfig().config.roles?.[role]?.harness` then resolveEffectiveHarness) becomes `await resolveHarness({ explicit: options.harness, role, model: selectedModel })`; spawnAgent (~3339-3341) same pattern; restartAgent (~4736-4738) becomes `await resolveHarness({ explicit: newHarness ?? agentState.harness, role: agentState.role, model: effectiveModel })`. Delete resolveEffectiveHarness (lines 329-336) or reduce it to a one-line deprecated wrapper over resolveHarness if external callers exist (grep first). Keep getProviderAuthMode exported — resolveHarness uses it. Behavior assertions: with empty config, spawnAgent persists harness 'codex' for an openai model and 'pi' for a kimi model in agent state."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi7b-quality-lint-wiring.ac1",
-            "title": "pan plan finalize on a fixture plan containing AC 'works as expected' exits non-zero naming ac-banned-phrase",
+            "id": "migrate-agents-callsites.ac1",
+            "title": "spawnRun, spawnAgent, and restartAgent each call resolveHarness() exactly once; the diff deletes the inline `options.harness ?? roles[role].harness` chains from agents.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi7b-quality-lint-wiring.ac2",
-            "title": "--no-quality-lint bypasses the lint printing a loud SKIPPED warning, and skills/pan-plan SKILL.md documents the flag in the same commit",
+            "id": "migrate-agents-callsites.ac2",
+            "title": "The diff deletes resolveEffectiveHarness or reduces it to a thin wrapper that returns resolveHarness's result",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi7b-quality-lint-wiring.ac3",
-            "title": "The complete-planning endpoint returns 422 with the quality-issue list mirroring the structural-validation error shape",
+            "id": "migrate-agents-callsites.ac3",
+            "title": "With empty harness config, a work-agent spawn with an OpenAI model persists harness 'codex' and a kimi model persists 'pi' in agent state (unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-agents-callsites.ac4",
+            "title": "npm run typecheck exits 0 and the existing harness-policy suite runs green with zero modifications to its test files",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -523,40 +250,192 @@
         ]
       },
       {
-        "id": "wi8-dag-validation",
-        "title": "WI-8: DAG and reference validation in the quality lint",
+        "id": "migrate-plan-kickoff",
+        "title": "Migrate planning kickoff to resolveHarness()",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-2",
+            "AC-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/planning/spawn-planning-session.ts replace the inline chain at lines 558-561 (NOTE: PRD says 513-516 — it drifted; search for `const requestedHarness = opts.harness ?? config.roles?.plan?.harness ?? providerDefaultHarness ?? 'claude-code'`) with `const effectiveHarness = await resolveHarness({ explicit: opts.harness, role: 'plan', model: planningModel })`, deleting the local providerDefaultHarness lookup (line 558) and the manual canUseHarnessSync call (lines 560-561). Keep the log line reporting the final model+harness. Remove now-unused imports (canUseHarnessSync, getProviderAuthMode if unused elsewhere in the file)."
+        },
+        "items": [
+          {
+            "id": "migrate-plan-kickoff.ac1",
+            "title": "spawn-planning-session.ts resolves the kickoff harness through one resolveHarness() call; the diff deletes the inline precedence chain and the direct canUseHarnessSync call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-plan-kickoff.ac2",
+            "title": "Planning kickoff with empty harness config and an OpenAI planning model resolves harness 'codex'; explicit opts.harness still wins (unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-plan-kickoff.ac3",
+            "title": "npm run typecheck exits 0 and lint shows no unused-import errors in spawn-planning-session.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-dashboard-route",
+        "title": "Dashboard start route: validate, fail fast, forward explicit harness only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-2",
+            "AC-1",
+            "AC-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts (lines ~3156-3165): keep the body.harness union shape-validation exactly as-is; keep a fail-fast policy check for a user-picked harness (may call resolveHarness with the pick as explicit, or keep the existing canUseHarnessSync call — either is acceptable as long as the user gets a collapsed-to-claude-code result before spawn). The route must forward `--harness <value>` to the `pan start` invocation at ~:3435 ONLY when the user explicitly picked one; when body.harness is unset, pass no --harness flag so the spawned `pan start` resolves via the full chain (role → provider override → built-in). Do NOT resolve-and-forward an unset harness as if it were explicit — that would bypass role overrides and double-fire the built-in-default notice."
+        },
+        "items": [
+          {
+            "id": "migrate-dashboard-route.ac1",
+            "title": "POST start with body.harness='pi' on a policy-blocked combo spawns with claude-code (fail-fast collapse preserved); invalid harness strings are ignored exactly as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-dashboard-route.ac2",
+            "title": "When body.harness is unset, the spawned pan start command contains no --harness flag (assert on spawn args in a unit/route test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-dashboard-route.ac3",
+            "title": "When body.harness is set and allowed, the spawn args contain --harness with that exact value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-help-strings",
+        "title": "Fix stale --harness help strings + widen strike harness type + sync wrapper skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-2",
+            "WI-12.3",
+            "AC-12"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts update the three stale --harness help strings that still read 'claude-code (default) | pi' to 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)'. Verified locations (PRD's 374/512/530 drifted): line 376 (pan plan), line 515 (pan start), line 533 (pan strike). At line 536 widen the strike action's option type from `harness?: 'claude-code' | 'pi'` to `harness?: RuntimeName` (import type from lib/runtimes/types.js). Then update the wrapper skills that quote these flags (skills/pan-plan/SKILL.md, skills/pan-start/SKILL.md, and any other SKILL.md mentioning --harness — grep skills/ for 'harness') in the SAME commit; scripts/lint-skills.sh (runs in npm run lint) must exit 0."
+        },
+        "items": [
+          {
+            "id": "cli-help-strings.ac1",
+            "title": "Each of pan plan --help, pan start --help, and pan strike --help prints the --harness description listing claude-code | pi | codex with the role/provider-settings default wording",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-help-strings.ac2",
+            "title": "Given --harness codex, the strike action accepts it without a type error (typecheck exits 0 with the widened RuntimeName type)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-help-strings.ac3",
+            "title": "npm run lint exits 0, including scripts/lint-skills.sh cross-checking the updated SKILL.md files against the new --help output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-alias",
+        "title": "Reconcile legacy specialist_harnesses as deprecated role-tier alias",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-3",
+            "AC-6"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-8: extend lintPlanQuality in src/lib/vbrief/quality-lint.ts with five error rules: edge-unknown-id (edges[].from/to not in items[].id), edge-cycle (cycle in the blocks-edge subgraph via Kahn's algorithm — reuse from src/lib/vbrief/dag.ts), foundationFor-unknown-id, inspection-without-foundation (requiresInspection true with missing/empty foundationFor — the prompt declares this a planning error but nothing enforces it), inspection-missing (requiresInspection absent on any item). Tests in quality-lint.test.ts: flags unknown edge target, flags blocks cycle A->B->A, accepts acyclic DAG, flags foundationFor pointing nowhere, flags requiresInspection true with empty foundationFor, flags missing requiresInspection."
+          "Action": "Per PRD WI-3: model_selection.specialist_harnesses (src/lib/cloister/config.ts:157-163, defaults at :347; read by getSpecialistHarness in src/lib/cloister/router.ts:94-98) must not survive as an undocumented fourth resolution tier. Make it a deprecated alias read at the SAME precedence as roles[<role>].harness (the role tier of resolveHarness): when both roles[role].harness and the matching specialist_harnesses key are set, roles wins; when only the legacy key is set, it applies at role tier; log a one-time deprecation warning naming the legacy key and the replacement (roles.<role>.harness) when the legacy value is the one that applied. Implement by having the role-tier lookup used for specialist spawns consult roles[role].harness first, then the alias via getSpecialistHarness. Update src/lib/cloister/__tests__/specialist-harnesses-config.test.ts and specialist-harness-router.test.ts to the alias semantics (do not delete coverage — rewrite assertions)."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi8-dag-validation.ac1",
-            "title": "edge-unknown-id, foundationFor-unknown-id, inspection-without-foundation, and inspection-missing errors are emitted for the corresponding fixtures",
+            "id": "specialist-alias.ac1",
+            "title": "With only specialist_harnesses.<x> set, a specialist spawn resolves to that harness (alias applies at role tier)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi8-dag-validation.ac2",
-            "title": "edge-cycle rejects a cyclic blocks subgraph and accepts an acyclic DAG",
+            "id": "specialist-alias.ac2",
+            "title": "When both roles.<role>.harness and the matching specialist_harnesses key are set to different values, resolution returns the roles value",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi8-dag-validation.ac3",
-            "title": "The six named DAG/reference test cases pass and a cyclic-blocks fixture is rejected at finalize",
+            "id": "specialist-alias.ac3",
+            "title": "The first time the legacy alias decides a harness, the process logs a deprecation warning naming roles.<role>.harness exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-alias.ac4",
+            "title": "The updated specialist-harnesses-config suite validates alias-applies semantics and the updated specialist-harness-router suite validates roles-wins precedence; both run green",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -565,32 +444,37 @@
         ]
       },
       {
-        "id": "wi9-nongoals",
-        "title": "WI-9: NonGoals narrative in the planning schema and docs",
+        "id": "escape-helper",
+        "title": "sendEscapeKeyAsync tmux helper",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-4",
+            "AC-7"
+          ],
+          "acJustification": "Single small helper; two criteria cover behavior and repo-rule compliance."
         },
         "narrative": {
-          "Action": "PRD WI-9: discovery asks 'What's explicitly OUT of scope?' but the answer has no structured home, while roles/review-requirements.md already reviews must-not constraints — close the half-built circuit. (1) Extend the narratives JSON example in prompts/planning.md with NonGoals (the PRD's exact snippet). (2) Add the CRITICAL-rules bullet: NonGoals MUST list everything discovery established as out of scope ('none' if nothing); review enforces these as must-not constraints. (3) Mirror both edits in sync-sources/skills/write-vbrief/SKILL.md and docs/VBRIEF.md (D5). (4) Add NonGoals to lint-prompts schema-key check 4."
+          "Action": "Per PRD WI-4 step 2: add `export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promise<void>` to src/lib/tmux.ts. For each press run tmux send-keys targeting the exact pane (use the existing exactPaneTarget/exactSession helpers at tmux.ts:295-316 to avoid prefix-matching the wrong session) with the literal key name `Escape`, then wait 250ms between presses via `await new Promise(r => setTimeout(r, 250))`. Async-only (repo rule: never add sync tmux callers); use the same async exec pattern as neighbouring async helpers (e.g. isHarnessProcessAlive at :509). Unit test with vi.useFakeTimers(): assert N invocations of the tmux command with Escape and the 250ms gaps advanced via advanceTimersByTimeAsync — never real waits."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi9-nongoals.ac1",
-            "title": "NonGoals appears in the planning template JSON example and CRITICAL rules, in write-vbrief SKILL.md, and in docs/VBRIEF.md",
+            "id": "escape-helper.ac1",
+            "title": "sendEscapeKeyAsync(session, 2) sends exactly two tmux send-keys Escape commands to the exact-match pane target with a 250ms gap (fake-timer unit test)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi9-nongoals.ac2",
-            "title": "The lint-prompts schema-key check includes NonGoals and passes on HEAD",
+            "id": "escape-helper.ac2",
+            "title": "The helper contains no execSync/spawnSync and its tests use fake timers only (no real waits)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -599,320 +483,52 @@
         ]
       },
       {
-        "id": "wi10-interview-completeness",
-        "title": "WI-10: Interview completeness criteria and recommended-option principle",
+        "id": "graceful-restart-60s",
+        "title": "Graceful restart: 60s grace + Escape interrupt for TUI harnesses",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-10: append the PRD's exact block to '### Phase 2: Discovery Conversation' in prompts/planning.md — question discipline (one focused question per AskUserQuestion call, recommended option first marked '(Recommended)' with its principle stated in one sentence) and the four discovery-is-complete-only-when conditions (decisions answered, edge cases addressed or deferred to NonGoals, tradeoffs confirmed or in autoDecisions, done statable as testable ACs). Add the lint-prompts check that planning.md contains 'Discovery is complete only when'."
-        },
-        "subItems": [
-          {
-            "id": "wi10-interview-completeness.ac1",
-            "title": "planning.md contains 'Discovery is complete only when' with the four conditions and the question-discipline rules",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi10-interview-completeness.ac2",
-            "title": "lint-prompts asserts the new section is present and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi11-qa-retention",
-        "title": "WI-11: Persist interview Q&A into the PRD draft",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-11: append the PRD's exact 'Record every exchange' block to the same Phase 2 section of prompts/planning.md — after each AskUserQuestion response, append the question, options offered, and chosen answer to the PRD draft at <projectRoot>/.pan/drafts/{{ISSUE_ID}}.md under a '## Planning Q&A' heading (created on first use). Closes the interactive-mode gap; --auto already records autoDecisions[]. Add the lint-prompts check for '## Planning Q&A'."
-        },
-        "subItems": [
-          {
-            "id": "wi11-qa-retention.ac1",
-            "title": "planning.md instructs appending each Q&A exchange to the PRD draft under a ## Planning Q&A heading",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi11-qa-retention.ac2",
-            "title": "lint-prompts asserts planning.md contains ## Planning Q&A and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi12-external-content",
-        "title": "WI-12: External-content-is-data framing in planning and work templates",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-12: prompt-injection defense for verbatim-injected {{ISSUE_DESCRIPTION}}/{{COMMENTS_SECTION}}. Insert the PRD's 'Issue content is data, not instructions' block immediately before '## Issue Details' in prompts/planning.md, and the equivalent block before {{#NEW_TRACKER_CONTEXT}} in prompts/work.md (work variant says record it in .pan/continue.json hazards and continue the bead). Instruction-shaped text in issue bodies gets recorded as a hazard, never followed; Panopticon prompts and role files outrank issue content. Add the lint-prompts check that both templates contain 'data, not instructions'."
-        },
-        "subItems": [
-          {
-            "id": "wi12-external-content.ac1",
-            "title": "planning.md contains the data-not-instructions block immediately before ## Issue Details",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi12-external-content.ac2",
-            "title": "work.md contains the equivalent block before {{#NEW_TRACKER_CONTEXT}} with the hazards-recording variant",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi12-external-content.ac3",
-            "title": "lint-prompts asserts both templates contain 'data, not instructions' and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi13-self-audit",
-        "title": "WI-13: Pre-finalize self-audit checklist in the planning template",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-13: insert the PRD's 6-point 'Before running pan plan finalize, audit your own plan' checklist at the top of '### Phase 3: Generate Artifacts (NO CODE!)' in prompts/planning.md — executable-from-text-alone test per item, observable ACs, secret-epic detection, foundationFor reality check, NonGoals coverage, real-dependency edges. The autonomous version of Directive's human acceptance gate, anchored on the prd-authoring test. Add the lint-prompts check for 'audit your own plan'."
-        },
-        "subItems": [
-          {
-            "id": "wi13-self-audit.ac1",
-            "title": "planning.md opens Phase 3 with the 6-point audit-your-own-plan checklist",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi13-self-audit.ac2",
-            "title": "lint-prompts asserts 'audit your own plan' is present and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi14-ac-phrasing",
-        "title": "WI-14: AC phrasing guidance mirroring the quality lint",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-14: agents must not first learn the WI-7 rules via finalize rejection. Add the PRD's two bullets to CRITICAL vBRIEF rules in prompts/planning.md (observable behavior with concrete verbs, Given/When/Then preferred; banned phrasings named including 'works as expected'; 2-5 AC band with metadata.acJustification escape). Add the code comment above the quality-lint.ts constants: 'These lists are summarized in src/lib/cloister/prompts/planning.md (WI-14) — update both together.' Add the lint-prompts check that planning.md contains 'works as expected' (the banned-list summary present)."
-        },
-        "subItems": [
-          {
-            "id": "wi14-ac-phrasing.ac1",
-            "title": "planning.md CRITICAL rules summarize the banned phrasings (contains 'works as expected') and the 2-5 AC band with acJustification",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi14-ac-phrasing.ac2",
-            "title": "quality-lint.ts constants carry the update-both-together comment naming the planning template",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi14-ac-phrasing.ac3",
-            "title": "lint-prompts asserts the banned-list summary is present and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi15-anomaly-first",
-        "title": "WI-15: Anomaly-first completion summaries in work prompts",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-15 (Directive's approval-fatigue defense): insert the PRD's completion-summary rules block immediately before the completion command block in prompts/work.md (search 'pan done {{ISSUE_ID}} -c') — lead with anomalies in order (skipped/deferred/flaky/worked-around, deviations and why, hazards, only then deliverables); a summary reading fully successful when any anomaly occurred is a reporting failure; 'No deviations.' first when genuinely clean. Mirror one sentence in roles/work.md ## Completion. Add the lint-prompts check for 'lead with anomalies'."
-        },
-        "subItems": [
-          {
-            "id": "wi15-anomaly-first.ac1",
-            "title": "The work template contains the lead-with-anomalies rules immediately before the pan done command block",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi15-anomaly-first.ac2",
-            "title": "roles/work.md Completion mirrors the anomaly-first sentence and lint-prompts asserts 'lead with anomalies'",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi16-scope-discipline",
-        "title": "WI-16: Per-bead scope discipline in the commit step",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-16 (prose precursor to PAN-1762's files_scope): in the canonical per-bead workflow in prompts/work.md (the post-wi4 single copy), extend the commit step with the PRD's text — before committing, check git status; every staged file must be required by THIS bead's description or ACs; anything else gets unstaged, or if genuinely needed, named and justified in the commit body. Add the lint-prompts check for 'every staged file must be required'."
-        },
-        "subItems": [
-          {
-            "id": "wi16-scope-discipline.ac1",
-            "title": "The work template commit step contains 'every staged file must be required' with the unstage-or-justify rule",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi16-scope-discipline.ac2",
-            "title": "lint-prompts asserts the scope-discipline text is present and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi17-verdict-blocker",
-        "title": "WI-17: Synthesis verdict line carries the top blocker",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-17: in roles/review.md, change the synthesis verdict heading (line ~126 '## Verdict: APPROVED / CHANGES REQUESTED') to the PRD's After form appending '— <when CHANGES REQUESTED: one-line top blocker, e.g. \"auth bypass in routes/agents.ts\">'. Verify the '### 7. Signal review status' blocked example (line ~170, already '<one-line top blocker>') stays aligned. Add the lint-prompts check that roles/review.md contains 'one-line top blocker'."
-        },
-        "subItems": [
-          {
-            "id": "wi17-verdict-blocker.ac1",
-            "title": "roles/review.md verdict line carries the one-line top-blocker format for CHANGES REQUESTED and stays aligned with the signal-status example",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi17-verdict-blocker.ac2",
-            "title": "lint-prompts asserts 'one-line top blocker' is present and passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi18-nongoals-review",
-        "title": "WI-18: Requirements reviewer consumes NonGoals as must-not constraints",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-4",
+            "AC-7"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-18 (depends on wi9): in roles/review-requirements.md ## Scope, after the 'Explicit \"must not\" constraints' bullet (line ~22), add the PRD's NonGoals bullet — NonGoals entries are must-not constraints; a violation is a ⊗ finding regardless of scope bucket. Extend the review context manifest in src/lib/cloister/review-context.ts to carry plan.narratives.NonGoals: load it where acceptance criteria are extracted (extractAcceptanceCriteria area, ~lines 217-226; note the file has no narratives handling today) so the reviewer doesn't fetch the spec. Extend src/lib/cloister/__tests__/review-context.test.ts: a plan with NonGoals produces a manifest containing it."
+          "Action": "Per PRD WI-4 in src/lib/agents.ts restartAgent graceful branch (lines ~4715-4732): extract `const GRACEFUL_RESTART_GRACE_MS = 60_000;` at module level, change the warning text to say 60s, and replace both the hardcoded 30s string and the `setTimeout(r, 30_000)` wait. Keep the stale-continue.json mtime check unchanged. BEFORE sending the warning: when agentState.harness is 'claude-code' or 'codex', call `await sendEscapeKeyAsync(normalizedId, 2)` (two presses, 250ms apart) to interrupt in-flight tool calls, wait ~1s, then deliver the warning via the existing sendKeys path. For harness 'pi' skip the interrupt entirely (verified: pi-fifo.ts has no interrupt op; 60s grace still applies). Non-graceful path unchanged. IMPLEMENTATION CHECKPOINT (PRD WI-4 step 3): in a live claude-code session, Esc during streaming interrupts but a second Esc on an idle prompt can open the history-rewind dialog — verify with `tmux -L panopticon capture-pane -t <session> -p` that the warning text still lands after double-Esc; if the rewind dialog swallows it, drop to a single Esc and record the decision in the PR description and continue.json. Tests: fake timers only (vi.useFakeTimers + advanceTimersByTimeAsync(60_000)); assert warning contains '60s', escape helper called twice for claude-code and codex, zero times for pi."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi18-nongoals-review.ac1",
-            "title": "roles/review-requirements.md Scope treats NonGoals entries as must-not constraints producing ⊗ findings regardless of scope bucket",
+            "id": "graceful-restart-60s.ac1",
+            "title": "Graceful restart waits GRACEFUL_RESTART_GRACE_MS (60000) and sends a warning whose text shows '60s' (fake-timer test; no real waits)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi18-nongoals-review.ac2",
-            "title": "The review-context manifest includes plan.narratives.NonGoals and the review-context test shows it",
+            "id": "graceful-restart-60s.ac2",
+            "title": "For claude-code and codex agents the graceful flow sends Escape twice before the warning; for pi agents it sends no Escape (unit tests per harness)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "graceful-restart-60s.ac3",
+            "title": "Non-graceful restart sends no Escape and performs no grace wait (existing behavior preserved by test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "graceful-restart-60s.ac4",
+            "title": "Live checkpoint executed: capture-pane shows the 60s warning visible after the double-Esc, or the implementation drops to single Esc with the decision recorded in continue.json and the PR description",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -921,40 +537,98 @@
         ]
       },
       {
-        "id": "wi19-trace-ids",
-        "title": "WI-19: FR-N requirement trace IDs from PRD drafts into plan items",
+        "id": "session-origin-state",
+        "title": "Persist session-origin model+harness beside claudeSessionId",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-5",
+            "AC-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5 step 1: extend the agent runtime-state shape where claudeSessionId lives (src/lib/agents.ts:2037 type field, :2069 snapshot read, :2159-2167 patch write) with `sessionModel?: string` and `sessionHarness?: RuntimeName`, and populate them wherever a NEW JSONL session id is recorded (the write at ~:3127 where rawSessionId is stored, plus any other claudeSessionId-setting path found by grepping `claudeSessionId:` in agents.ts). The fields record the model and harness the session was CREATED with and are never rewritten on resume. Unit test: after a spawn, runtime state contains sessionModel/sessionHarness matching the spawn's resolved values; after a resume of the same session they are unchanged."
+        },
+        "items": [
+          {
+            "id": "session-origin-state.ac1",
+            "title": "Creating a new agent session persists sessionModel and sessionHarness alongside claudeSessionId in runtime state (unit test reads them back)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-origin-state.ac2",
+            "title": "When an existing session resumes, runtime state shows the original sessionModel/sessionHarness unchanged (test asserts no rewrite on resume)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-origin-state.ac3",
+            "title": "Loading runtime state written before this change (no origin fields) returns the snapshot without error (backward-compat test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-guard",
+        "title": "Fresh-session invariant: drop --resume across model/harness change",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-5",
+            "AC-8"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-19: (1) sync-sources/rules/prd-authoring.md gains the Numbered-requirements bullet (FR-1/NFR-1 labels in a ## Requirements section; items reference them via metadata.traces; never renumber — retire ids explicitly; run pan sync after editing). (2) Document optional metadata.traces: string[] in prompts/planning.md rules, write-vbrief SKILL, docs/VBRIEF.md Panopticon-extension table. (3) Warn-level lint (D4): lintPlanQuality gains an optional second argument { prdText?: string } to stay pure; when PRD text contains /^[-*\\s]*\\b(FR|NFR)-\\d+\\b/m ids, every declared id traced by no item produces severity 'warn' trace-uncovered, printed at finalize, never blocking. (4) Review manifest carries each item's traces (same area as wi18's change). Tests: warns on FR declared but untraced, silent with no PRD text, silent when all FRs traced."
+          "Action": "Per PRD WI-5 steps 2-3, decision rule: a model change, a harness change, or both ⇒ fresh harness session; JSONL --resume is only used when both are unchanged; no transcript conversion for agents, ever. In every path that sets spawnMode:'resume' — buildAgentLaunchConfig consumer at src/lib/agents.ts:2647-2684 and resumeAgent (~:4537, the `...(compactSeed ? {} : { spawnMode: 'resume', resumeSessionId: sessionId })` spread) — compare the agent's current state.model/state.harness against the persisted sessionModel/sessionHarness from the session-origin-state bead. On mismatch: drop resumeSessionId/spawnMode (fresh session), use the existing continue.json re-onboarding prompt (the restartAgent prompt at ~:4787 is the model), and log one line stating which field drifted. Sessions with NO persisted origin metadata (pre-change) resume as today (recorded autoDecision). restartAgent already never passes resumeSessionId — leave it; add a regression test locking that. Tests: restart with newModel only / newHarness only / both ⇒ generated launcher contains no --resume; resume with unchanged model+harness keeps --resume <id>; resume with drifted model drops it; resume with missing origin metadata keeps --resume."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi19-trace-ids.ac1",
-            "title": "The prd-authoring bundled rule contains the Numbered-requirements bullet and metadata.traces is documented in all three schema surfaces",
+            "id": "resume-guard.ac1",
+            "title": "A resume attempt whose current model or harness differs from the persisted session origin produces a launcher with no --resume and logs which field drifted",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi19-trace-ids.ac2",
-            "title": "quality-lint emits warn-level trace-uncovered for declared-but-untraced FRs and stays silent with no PRD text or full coverage (3 named tests pass)",
+            "id": "resume-guard.ac2",
+            "title": "A resume with unchanged model+harness still emits --resume <sessionId> in the launcher (status quo locked by test)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi19-trace-ids.ac3",
-            "title": "The review manifest carries each item's traces for the requirements reviewer's coverage matrix",
+            "id": "resume-guard.ac3",
+            "title": "restartAgent with newModel only, newHarness only, or both creates a launcher containing no --resume (regression tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-guard.ac4",
+            "title": "Given a session lacking origin metadata, the resume path emits --resume unchanged (backward-compat test)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -963,40 +637,52 @@
         ]
       },
       {
-        "id": "wi20-probe-pass",
-        "title": "WI-20: Probe pass via pan plan --probe and auto at high effort",
+        "id": "conv-experimental",
+        "title": "Label live-conversation harness switching experimental",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-6",
+            "AC-9"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-20 (decision D7 — in-session self-pass, no second agent spawn): (1) add --probe boolean to pan plan in src/cli/commands/plan.ts; thread through spawnPlanningSession → buildPlanningPrompt (src/lib/planning/spawn-planning-session.ts:169); set template variable PROBE_SECTION when probe === true || effort === 'high'. (2) Add PROBE_SECTION to planning.md's optional frontmatter and place {{PROBE_SECTION}} next to {{EFFORT_SECTION}}{{AUTO_SECTION}} (~line 301-302 sets those); section text is the PRD's '## Probe Pass (required before finalize)' block — attack your own plan (hidden assumptions, two-diffs-both-look-done items, unhandled failure modes, missing edges), record findings as PROBE: decisions, 'PROBE: no findings' if clean. (3) Update skills/pan-plan SKILL.md for --probe in the same commit. Tests extend the spawn-planning buildPlanningPrompt tests: --probe sets the section, effort high sets it, default does not."
+          "Action": "Per PRD WI-6 — surface-level only, NO endpoint/converter/test changes. In src/dashboard/frontend/src/components/chat/ModelPicker.tsx harness rows: when the picker operates on a LIVE conversation (thread a `liveConversation` boolean prop from ChatPanel if the component cannot already distinguish the new-conversation composer) and the row's harness differs from the current one, render a small muted 'Experimental' text tag (pan-style-guide: muted text, NO pill colors). Add tooltip/description copy for live-conversation harness rows: 'Experimental: converts the transcript to the new harness format. May lose fidelity; falls back to a fresh session on failure.' Docs: add a 'Switching harness on a live conversation (experimental)' subsection to configuration/harnesses.mdx stating unsupported/best-effort converter/fresh-session fallback/report issues but no support promise. The tier-4 path (routes/conversations.ts:2944-2971), decideSwitchStrategy, session-format-converter.ts (export now at :304), and all their tests stay byte-for-byte unchanged."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi20-probe-pass.ac1",
-            "title": "pan plan --probe and --effort high render PROBE_SECTION while the default does not (spawn-planning tests pass)",
+            "id": "conv-experimental.ac1",
+            "title": "In a live conversation, harness rows other than the current harness render a muted Experimental tag; the new-conversation composer renders no tag (component test)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi20-probe-pass.ac2",
-            "title": "planning.md declares PROBE_SECTION in optional frontmatter and renders the probe-pass block with PROBE-prefixed decision recording",
+            "id": "conv-experimental.ac2",
+            "title": "Live-conversation harness rows expose the transcript-conversion warning copy (tooltip/description renders the 'May lose fidelity' text)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi20-probe-pass.ac3",
-            "title": "skills/pan-plan SKILL.md documents --probe in the same commit and lint-skills passes",
+            "id": "conv-experimental.ac3",
+            "title": "configuration/harnesses.mdx shows the new 'Switching harness on a live conversation (experimental)' subsection stating the fresh-session fallback and best-effort status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-experimental.ac4",
+            "title": "git diff shows zero changes under routes/conversations.ts, switch-strategy.ts, session-format-converter.ts, and their test files",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1005,90 +691,543 @@
         ]
       },
       {
-        "id": "wi21a-v06-read-compat",
-        "title": "WI-21a: vBRIEF v0.6 read-compat — failed status, items alias, subItemsOf helper",
+        "id": "settings-api-builtin-defaults",
+        "title": "Settings API: expose built-in defaults + delete cleared provider harness keys",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-1788",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "PRD WI-21 steps 1-2 (decision D8): in src/lib/vbrief/types.ts add 'failed' to the item-status union and optional items?: VBriefSubItem[] alongside subItems on VBriefItem (line ~51). Add read-compat helper subItemsOf(item) returning item.items ?? item.subItems ?? [] in types.ts or io.ts. Replace EVERY direct .subItems read with the helper: src/lib/vbrief/beads.ts, io.ts (applyStatusOverrides line ~233, updateSubItemStatus), acceptance-criteria.ts, dag.ts, and the frontend viewer under src/dashboard/frontend/src/components/vbrief/ (grep subItems to enumerate; frontend changes need npm run build before any dashboard restart). Tests: a legacy 0.5 doc with subItems and a 0.6 doc with items produce identical merged views in the io tests."
-        },
-        "subItems": [
-          {
-            "id": "wi21a-v06-read-compat.ac1",
-            "title": "types.ts adds 'failed' to the item-status union and the optional items alias on VBriefItem",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi21a-v06-read-compat.ac2",
-            "title": "subItemsOf returns items ?? subItems ?? [] and every direct .subItems read in beads.ts, io.ts, acceptance-criteria.ts, dag.ts, and the vbrief viewer goes through it",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "wi21a-v06-read-compat.ac3",
-            "title": "A 0.5 doc with subItems and a 0.6 doc with items produce identical merged views in the io tests",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "wi21b-v06-emit",
-        "title": "WI-21b: vBRIEF v0.6 emit and dual-version acceptance",
-        "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-12T04:04:09Z",
+        "created": "2026-06-12T06:38:55Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-1788",
+          "issueLabel": "pan-1787",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-7",
+            "AC-4"
+          ]
         },
         "narrative": {
-          "Action": "PRD WI-21 steps 3-5: flip the emitted version to 0.6 — planning.md template JSON gains \"version\": \"0.6\" and the example's subItems key renames to items (metadata.kind acceptance_criterion unchanged); mirror in write-vbrief SKILL and docs/VBRIEF.md. Accept both 0.5 and 0.6 wherever version is checked (grep '0.5' under src/lib/vbrief and src/dashboard); update readPlanSync's 'requires exactly' error text (io.ts ~line 223) to name both versions. Add 'failed' everywhere the status enum is validated or rendered (grep 'cancelled' under src/lib/vbrief and the viewer). docs/VBRIEF.md gains a v0.6 subsection: emitted version, read-compat policy, failed, items alias rule. Tests: quality-lint operates on both shapes (one dual-shape case); beads conversion with items-shaped ACs."
+          "Action": "Per PRD WI-7 backend half: (1) extend the settings GET payload (src/lib/settings-api.ts — provider_harnesses currently surfaced at :137,595,859-861,987-998) with a read-only built-in provider→harness default map computed from getBuiltInDefaultHarness for all 10 providers, so the frontend never duplicates the mapping in TSX. (2) In providerConfigForSave (settings-api.ts:731-739), add explicit delete handling: when the incoming provider harness value is absent or empty string, REMOVE the harness key from the provider's YAML node instead of merging/keeping it. Round-trip tests in the existing settings-api suite: save with override persists the key; save with '' removes the key from YAML; GET on unset returns no override plus the built-in map."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "wi21b-v06-emit.ac1",
-            "title": "The planning template, write-vbrief SKILL, and docs/VBRIEF.md emit version 0.6 with nested items",
+            "id": "settings-api-builtin-defaults.ac1",
+            "title": "The settings GET response returns a built-in provider→harness defaults map covering all 10 providers, sourced from getBuiltInDefaultHarness",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi21b-v06-emit.ac2",
-            "title": "Version checks accept both 0.5 and 0.6 and readPlanSync's error text names both",
+            "id": "settings-api-builtin-defaults.ac2",
+            "title": "Saving a provider with an empty/absent harness value deletes the harness key from the YAML (round-trip test reads the file back)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi21b-v06-emit.ac3",
-            "title": "'failed' is accepted everywhere the status enum is validated or rendered and docs/VBRIEF.md gains the v0.6 subsection",
+            "id": "settings-api-builtin-defaults.ac3",
+            "title": "Saving an explicit override persists and survives a GET round-trip unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-select-default-ui",
+        "title": "Settings → Providers: honest Default(<built-in>) harness selects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-7",
+            "AC-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7 frontend half in src/dashboard/frontend/src/components/Settings/SettingsPage.tsx: the per-provider harness selects (value computed at :1609 as `?? 'claude-code'`; selects at :1821-1832 and the openrouter card at :1905-1907) currently lie about the effective default. Change each select: first option value '' labeled `Default (<built-in label>)` (e.g. 'Default (Codex)' for openai) computed from the built-in map in the settings GET payload (never a local TSX map); `value={provider_harnesses[p] ?? ''}`; selecting '' deletes the override key (follow the Flywheel pattern — RolesPanel.tsx:517 `<option value=\"\">` → patch with undefined). Apply identically to the openrouter select. Component tests: unset shows '', the default option label names the correct built-in harness per provider, choosing '' issues a save without the harness key."
+        },
+        "items": [
+          {
+            "id": "provider-select-default-ui.ac1",
+            "title": "With no override set, each provider's harness select renders value '' with first option labeled Default (<built-in>) — e.g. openai shows Default (Codex), kimi shows Default (Pi)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "wi21b-v06-emit.ac4",
-            "title": "The full suite passes including beads conversion with items-shaped ACs and a dual-shape quality-lint case",
+            "id": "provider-select-default-ui.ac2",
+            "title": "Selecting the Default option saves a payload without that provider's harness key (the override is deleted, not set to claude-code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-select-default-ui.ac3",
+            "title": "The openrouter card's harness select renders the same default-state behavior (Default label, '' value, key deletion on clear)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-select-default-ui.ac4",
+            "title": "An explicitly chosen harness still persists and re-renders as that value after reload (round-trip via UI test or mocked API)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-harness-select",
+        "title": "Settings → Roles: harness override select on every role card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-8",
+            "AC-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8 in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx: the Flywheel card already has the exact control (verified ~:512-525 — select with `<option value=\"\">Provider default</option>` + three explicit options, saving via `saveMutation.mutate({ role, patch: { harness: value || undefined } })`). Extract it into a local `RoleHarnessSelect` component and render it on EVERY role card (plan, work, strike, review, test, ship, flywheel) next to the existing per-role ModelPicker, with `aria-label=\"<Role> harness\"`. Empty-option label: 'Provider default'. Backend persistence already works via saveRoleConfig — no server change. Tests follow the existing RolesPanel pattern: each role card exposes its labeled select; saving patches roles.<role>.harness; clearing patches it to undefined."
+        },
+        "items": [
+          {
+            "id": "role-harness-select.ac1",
+            "title": "Every role card (plan, work, strike, review, test, ship, flywheel) renders a harness select with aria-label '<Role> harness' offering Provider default + claude-code + pi + codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-harness-select.ac2",
+            "title": "Choosing an explicit harness for a role saves a patch setting roles.<role>.harness to that value (test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-harness-select.ac3",
+            "title": "Choosing Provider default saves a patch with roles.<role>.harness undefined, clearing the override (test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brand-registry",
+        "title": "Shared branding registry: PROVIDER_BRANDS + HARNESS_BRANDS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1787",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "provider-marks",
+            "rollout-composer",
+            "rollout-settings-providers",
+            "rollout-roles-panel",
+            "rollout-shared-modelpicker",
+            "rollout-agent-dock",
+            "rollout-conv-feed"
+          ],
+          "traces": [
+            "WI-9",
+            "AC-10",
+            "AC-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: promote src/dashboard/frontend/src/components/chat/ProviderIcons.tsx into a new src/dashboard/frontend/src/components/shared/branding/ module exporting: `interface BrandDef { id: string; label: string; color: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }`, `PROVIDER_BRANDS: Record<ProviderName, BrandDef>` (all 10 providers — initially the existing Anthropic/OpenAI inline SVGs from ProviderIcons.tsx:6-18 plus letter-badge-backed Icon stubs for the other 8 until the provider-marks bead replaces them), `HARNESS_BRANDS: Record<Harness, BrandDef>` (claude-code→Anthropic mark, codex→OpenAI mark, pi→styled π glyph in a brand-colored tile — pi-ai has no formal logo), and components `<ProviderLogo provider/>`, `<HarnessLogo harness/>`, `<ProviderDot/>`. Labels in BrandDef are the single source that will replace the duplicated PROVIDER_LABELS maps (RolesPanel.tsx:148, shared/ModelPicker/ModelPicker.tsx:59) in later beads. Migrate PROVIDER_COLORS values into BrandDef.color. ProviderLetterBadge survives only as the fallback for unknown ids. Keep chat/ProviderIcons.tsx compiling as a thin re-export so existing consumers don't break until their rollout beads land. SVGs use currentColor, matching the existing AnthropicIcon/OpenAIIcon pattern."
+        },
+        "items": [
+          {
+            "id": "brand-registry.ac1",
+            "title": "Given Record-typed exports, shared/branding stores 10 PROVIDER_BRANDS entries and 3 HARNESS_BRANDS entries each carrying id, label, color, and Icon; typecheck fails on a missing provider or harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-registry.ac2",
+            "title": "<HarnessLogo harness=\"pi\"/> renders the π glyph tile; claude-code and codex render the Anthropic and OpenAI marks respectively (component test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-registry.ac3",
+            "title": "<ProviderLogo> renders the registry Icon for known providers and falls back to ProviderLetterBadge for unknown ids (component test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brand-registry.ac4",
+            "title": "Every existing consumer of chat/ProviderIcons.tsx still renders through the thin re-export (typecheck and the existing frontend tests run green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-marks",
+        "title": "Real SVG marks for the eight letter-badged providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-9",
+            "AC-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9 marks table: add inline-SVG brand marks (currentColor, same component pattern as AnthropicIcon/OpenAIIcon) to PROVIDER_BRANDS for the eight providers that currently letter-badge: google (Gemini spark), kimi (Moonshot AI), minimax (MiniMax), zai (Z.ai/Zhipu GLM), mimo (Xiaomi MI), openrouter (OpenRouter), nous (Nous Research), dashscope (Qwen/Alibaba Cloud). Source path data from official press kits or the MIT-licensed lobehub icons / simple-icons sets; note the source per mark in a module comment. After this bead no known provider id resolves to ProviderLetterBadge."
+        },
+        "items": [
+          {
+            "id": "provider-marks.ac1",
+            "title": "Each of the 10 providers' <ProviderLogo> renders an inline SVG mark — a component test asserts no known provider falls back to the letter badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-marks.ac2",
+            "title": "Every new mark uses currentColor (no hardcoded fills besides intentional brand tiles) and renders at the existing 14-15px icon sizes without clipping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-marks.ac3",
+            "title": "A module comment records the source (press kit or MIT-licensed icon set) for each imported path data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-composer",
+        "title": "Brand logos in composer ModelPicker (chat)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 rows 1-2 in src/dashboard/frontend/src/components/chat/ModelPicker.tsx: add <HarnessLogo> to the harness rows and harness indicator chips (~:354-358 and ~:410-430 — search for the harness option rendering), and re-point the provider icon imports (~:347-350, :394, :522) at shared/branding instead of chat/ProviderIcons (mechanical). Logos inherit the existing size classes (.pickerProviderIcon 14px, .pickerProviderBtnIcon 15px — command-deck.module.css:4317-4415). No layout or behavior changes."
+        },
+        "items": [
+          {
+            "id": "rollout-composer.ac1",
+            "title": "Composer harness rows and the harness indicator chip render <HarnessLogo> marks for all three harnesses (component test or UAT screenshot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-composer.ac2",
+            "title": "chat/ModelPicker.tsx resolves provider/harness branding only from shared/branding; the diff deletes the chat/ProviderIcons import from the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-composer.ac3",
+            "title": "The composer dropdown renders real SVG marks for all 10 providers (UAT: no letter badges visible for known providers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-settings-providers",
+        "title": "Brand logos in Settings → Providers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10"
+          ],
+          "acJustification": "Two-surface mechanical swap; the two criteria cover both surfaces completely."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 rows 3-4 in src/dashboard/frontend/src/components/Settings/SettingsPage.tsx: replace the generic lucide icons in the PROVIDERS list (verified :423-433 — Code/Lightbulb/Globe/Zap/Brain/Zap/Zap/Globe/Globe) with <ProviderLogo>, including the list rendering at ~:1633; add the harness mark adjacent to each provider's harness select (:1821-1832 and openrouter :1905-1907) — a small <HarnessLogo> next to the native select reflecting the currently effective harness is sufficient (no custom listbox required). Follow pan-style-guide: no decorative color, logos at existing icon sizes."
+        },
+        "items": [
+          {
+            "id": "rollout-settings-providers.ac1",
+            "title": "The Settings → Providers list renders <ProviderLogo> for every provider; no lucide Code/Lightbulb/Globe/Zap/Brain icons remain in the PROVIDERS array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-settings-providers.ac2",
+            "title": "Each provider harness select (including openrouter) renders a harness mark adjacent to the select reflecting the effective harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-roles-panel",
+        "title": "Brand logos + registry labels in Settings → Roles",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10",
+            "AC-11"
+          ],
+          "acJustification": "One-file mechanical change; two criteria cover the swap and the no-regression requirement."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 row 5 in src/dashboard/frontend/src/components/Settings/RolesPanel.tsx: give the RoleHarnessSelect (from the role-harness-select bead) the same adjacent <HarnessLogo> treatment as Settings → Providers, and delete the local PROVIDER_LABELS map (verified :148-160, consumed at :264) in favor of labels from PROVIDER_BRANDS. Provider labels shown in role model pickers must remain visually identical (the registry carries the same label strings)."
+        },
+        "items": [
+          {
+            "id": "rollout-roles-panel.ac1",
+            "title": "Each role harness select renders an adjacent harness mark; the diff deletes RolesPanel's local PROVIDER_LABELS map (labels come from shared/branding)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-roles-panel.ac2",
+            "title": "RolesPanel renders identical provider label strings sourced from the registry; the existing RolesPanel test suite runs green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-shared-modelpicker",
+        "title": "Brand logos + registry labels in shared ModelPicker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10",
+            "AC-11"
+          ],
+          "acJustification": "One-file mechanical change plus a cross-repo import re-point; two criteria cover both."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 row 6 in src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx: render logos on harness options (HARNESS_OPTIONS area ~:17-21) and provider group headers (~:152 where PROVIDER_LABELS is consumed), and delete its exported PROVIDER_LABELS map (verified :59), re-pointing ALL importers of that export at PROVIDER_BRANDS labels in the same commit (grep the frontend for `PROVIDER_LABELS` imports from shared/ModelPicker first — the export is consumed beyond this file). Typecheck must stay green."
+        },
+        "items": [
+          {
+            "id": "rollout-shared-modelpicker.ac1",
+            "title": "Shared ModelPicker harness options and provider group headers render registry marks (component test or UAT)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-shared-modelpicker.ac2",
+            "title": "The exported PROVIDER_LABELS map is deleted and no importer references it (grep returns nothing; typecheck passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-agent-dock",
+        "title": "Agent dock: harness-based marks, π for pi",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 row 7 in src/dashboard/frontend/src/components/Stage/HomePane/AgentIcon.tsx (verified :14-35): replace the string-sniffing providerForAgent() (claude/anthropic→anthropic, codex/openai/gpt→openai, else null→lucide Bot) with a harness-id mapping rendering <HarnessLogo> — claude-code ids→Anthropic mark, codex ids→OpenAI mark, pi ids→π glyph. Note current behavior drift from the PRD: pi today falls to the Bot glyph (not the Anthropic starburst) because providerForAgent returns null; either way pi must now render π. Keep the lucide Bot fallback only for genuinely unknown ids. Size classes (.agentLogo — stage.module.css:152-163) unchanged."
+        },
+        "items": [
+          {
+            "id": "rollout-agent-dock.ac1",
+            "title": "A pi agent in the dock renders the π mark — never the Anthropic starburst and never the Bot glyph (component test with a pi id)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-agent-dock.ac2",
+            "title": "claude-code and codex agents render the Anthropic and OpenAI marks via <HarnessLogo>; the string-sniffing providerForAgent function is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-agent-dock.ac3",
+            "title": "An unknown agent id still renders the lucide Bot fallback (test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollout-conv-feed",
+        "title": "Conversation feed: HarnessLogo instead of AGENT_ICON_PROVIDER map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-10"
+          ],
+          "acJustification": "One-file mechanical swap; two criteria cover the replacement and the pi-specific regression."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10 row 8 in src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx (verified: AGENT_ICON_PROVIDER map at :26, consumed at :35,45 via chat/ProviderIcons' ProviderIcon): replace the map + ProviderIcon usage with <HarnessLogo> resolved from the entry's agent/harness id. Pi entries render the π mark. Remove the chat/ProviderIcons import from this file."
+        },
+        "items": [
+          {
+            "id": "rollout-conv-feed.ac1",
+            "title": "ConversationFeedCard renders <HarnessLogo> for each entry; the AGENT_ICON_PROVIDER map is deleted and no chat/ProviderIcons import remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollout-conv-feed.ac2",
+            "title": "A pi-harness feed entry renders the π mark (component test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-dead-provider-dir",
+        "title": "Delete dead components/Settings/Provider/ directory",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-12T06:38:55Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1787",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "WI-10",
+            "AC-11"
+          ],
+          "acJustification": "Single mechanical deletion; two criteria fully cover it (directory gone + gates green)."
+        },
+        "narrative": {
+          "Action": "Delete src/dashboard/frontend/src/components/Settings/Provider/ entirely: ProviderCard.tsx (PRD WI-10 dead-code row — still references the Material Symbols font removed in a37f8c890), plus ProviderPanel.tsx and ThinkingLevelSlider.tsx, both verified unimported by live code on 2026-06-12 (ProviderCard's only importer is ProviderPanel; ProviderPanel/ThinkingLevelSlider have zero importers — the sole mention is a comment in Settings/__tests__/SettingsPage.test.ts:254, which stays valid as a historical note). Run typecheck/lint/frontend tests to prove nothing dangled."
+        },
+        "items": [
+          {
+            "id": "delete-dead-provider-dir.ac1",
+            "title": "The diff deletes components/Settings/Provider/ entirely; grep shows no source file importing ProviderCard, ProviderPanel, or ThinkingLevelSlider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-provider-dir.ac2",
+            "title": "Each of npm run typecheck, npm run lint, and the frontend test suite exits 0 after the deletion",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1099,118 +1238,123 @@
     ],
     "edges": [
       {
-        "from": "wi2-bead-order",
-        "to": "wi4-dedupe-workflow",
+        "from": "provider-defaults",
+        "to": "resolve-harness-core",
         "type": "blocks"
       },
       {
-        "from": "wi3-ac-status-sync",
-        "to": "wi4-dedupe-workflow",
+        "from": "provider-defaults",
+        "to": "settings-api-builtin-defaults",
         "type": "blocks"
       },
       {
-        "from": "wi22a-autostart-stamp",
-        "to": "wi22b-finalize-gate",
+        "from": "resolve-harness-core",
+        "to": "migrate-agents-callsites",
         "type": "blocks"
       },
       {
-        "from": "wi22b-finalize-gate",
-        "to": "wi1-handoff-rewrite",
+        "from": "resolve-harness-core",
+        "to": "migrate-plan-kickoff",
         "type": "blocks"
       },
       {
-        "from": "wi1-handoff-rewrite",
-        "to": "wi5-lint-prompts",
+        "from": "resolve-harness-core",
+        "to": "migrate-dashboard-route",
         "type": "blocks"
       },
       {
-        "from": "wi4-dedupe-workflow",
-        "to": "wi5-lint-prompts",
+        "from": "resolve-harness-core",
+        "to": "specialist-alias",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi6-codebase-map",
+        "from": "resolve-harness-core",
+        "to": "cli-help-strings",
+        "type": "informs"
+      },
+      {
+        "from": "migrate-agents-callsites",
+        "to": "graceful-restart-60s",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi9-nongoals",
+        "from": "escape-helper",
+        "to": "graceful-restart-60s",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi10-interview-completeness",
+        "from": "session-origin-state",
+        "to": "resume-guard",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi11-qa-retention",
+        "from": "migrate-agents-callsites",
+        "to": "resume-guard",
+        "type": "informs"
+      },
+      {
+        "from": "settings-api-builtin-defaults",
+        "to": "provider-select-default-ui",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi12-external-content",
+        "from": "brand-registry",
+        "to": "provider-marks",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi13-self-audit",
+        "from": "brand-registry",
+        "to": "rollout-composer",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi14-ac-phrasing",
+        "from": "brand-registry",
+        "to": "rollout-settings-providers",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi15-anomaly-first",
+        "from": "brand-registry",
+        "to": "rollout-roles-panel",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi16-scope-discipline",
+        "from": "brand-registry",
+        "to": "rollout-shared-modelpicker",
         "type": "blocks"
       },
       {
-        "from": "wi5-lint-prompts",
-        "to": "wi17-verdict-blocker",
+        "from": "brand-registry",
+        "to": "rollout-agent-dock",
         "type": "blocks"
       },
       {
-        "from": "wi7a-quality-lint-module",
-        "to": "wi7b-quality-lint-wiring",
+        "from": "brand-registry",
+        "to": "rollout-conv-feed",
         "type": "blocks"
       },
       {
-        "from": "wi7a-quality-lint-module",
-        "to": "wi8-dag-validation",
+        "from": "provider-marks",
+        "to": "rollout-composer",
         "type": "blocks"
       },
       {
-        "from": "wi7a-quality-lint-module",
-        "to": "wi14-ac-phrasing",
+        "from": "provider-marks",
+        "to": "rollout-settings-providers",
         "type": "blocks"
       },
       {
-        "from": "wi7a-quality-lint-module",
-        "to": "wi19-trace-ids",
+        "from": "provider-marks",
+        "to": "rollout-shared-modelpicker",
         "type": "blocks"
       },
       {
-        "from": "wi9-nongoals",
-        "to": "wi18-nongoals-review",
-        "type": "blocks"
-      },
-      {
-        "from": "wi21a-v06-read-compat",
-        "to": "wi21b-v06-emit",
+        "from": "role-harness-select",
+        "to": "rollout-roles-panel",
         "type": "blocks"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-12-PAN-1788-adopt-deft-directive-planning-practices-codebase-map-layer-finalize-quality-lint-trace-ids-probe-pass-q-a-retention-vbrief-v0-6.vbrief.json"
+      "canonicalFilename": "2026-06-12-PAN-1787-provider-default-harnesses-role-level-harness-overrides-and-real-brand-logos.vbrief.json"
     }
   }
 }
