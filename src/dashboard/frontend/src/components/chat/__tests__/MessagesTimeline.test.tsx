@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage } from '../chat-types';
 
@@ -52,6 +52,57 @@ function makeMessage(id: string, role: ChatMessage['role'], offsetMs: number, te
 }
 
 describe('MessagesTimeline — search', () => {
+  it('handles target-message scroll requests once per target key', async () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0, 'hello'),
+      makeMessage('a1', 'assistant', 5_000, 'target reply'),
+    ];
+    const workLog: [] = [];
+    const onTargetMessageHandled = vi.fn();
+
+    const { rerender } = render(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+        targetMessageId="a1"
+        targetMessageIndex={1}
+        targetMessageNonce={1}
+        onTargetMessageHandled={onTargetMessageHandled}
+      />,
+    );
+
+    await waitFor(() => expect(onTargetMessageHandled).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+        targetMessageId="a1"
+        targetMessageIndex={1}
+        targetMessageNonce={1}
+        onTargetMessageHandled={onTargetMessageHandled}
+      />,
+    );
+
+    expect(onTargetMessageHandled).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+        targetMessageId="a1"
+        targetMessageIndex={1}
+        targetMessageNonce={2}
+        onTargetMessageHandled={onTargetMessageHandled}
+      />,
+    );
+
+    await waitFor(() => expect(onTargetMessageHandled).toHaveBeenCalledTimes(2));
+  });
+
   it('captures Ctrl+F and searches messages beyond browser-visible text', () => {
     const messages: ChatMessage[] = [
       makeMessage('u1', 'user', 0, 'hello from the top'),

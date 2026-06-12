@@ -89,6 +89,7 @@ interface ConversationPanelProps {
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export function ConversationPanel({
   targetMessageId,
   targetMessageIndex,
   targetMessageNonce,
+  onTargetMessageHandled,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -896,6 +898,7 @@ export function ConversationPanel({
               targetMessageId={targetMessageId}
               targetMessageIndex={targetMessageIndex}
               targetMessageNonce={targetMessageNonce}
+              onTargetMessageHandled={onTargetMessageHandled}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -1061,11 +1064,12 @@ interface ConversationViewProps {
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1307,6 +1311,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           targetMessageId={targetMessageId}
           targetMessageIndex={targetMessageIndex}
           targetMessageNonce={targetMessageNonce}
+          onTargetMessageHandled={onTargetMessageHandled}
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a
