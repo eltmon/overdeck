@@ -120,4 +120,84 @@ describe('remote Claude credential proactive refresh', () => {
       'Remote credentials refreshed for PAN-1762 on vm-two',
     ]);
   });
+
+  it('retries a failed VM on the next patrol without advancing its watermark', async () => {
+    const syncClaudeCredentials = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('fly API unreachable'))
+      .mockResolvedValueOnce(true);
+    const deps = {
+      listActiveRemoteAgentStates: () => [activeRemoteState('PAN-1778', 'vm-one')],
+      credentialFingerprint: () => '100:12',
+      loadConfig: () => ({ remote: { provider: 'fly' } }),
+      createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+    };
+
+    const first = await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(first).toEqual([
+      'Remote credentials refresh failed for PAN-1778 on vm-one: fly API unreachable',
+    ]);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(1);
+
+    // Same fingerprint, well within 15 min — but prior failure left watermark
+    // intact, so the VM retries immediately.
+    const second = await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(second).toEqual(['Remote credentials refreshed for PAN-1778 on vm-one']);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(2);
+
+    // Now the watermark is advanced; same fingerprint is a no-op.
+    const third = await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(third).toEqual([]);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let one VM success block a newly started VM with the same fingerprint', async () => {
+    const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
+    let activeStates = [activeRemoteState('PAN-1778', 'vm-one')];
+    const deps = {
+      listActiveRemoteAgentStates: () => activeStates,
+      credentialFingerprint: () => '100:12',
+      loadConfig: () => ({ remote: { provider: 'fly' } }),
+      createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+    };
+
+    await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(1);
+
+    // A second VM starts before the host credentials change again.
+    activeStates = [
+      activeRemoteState('PAN-1778', 'vm-one'),
+      activeRemoteState('PAN-1762', 'vm-two'),
+    ];
+    await vi.advanceTimersByTimeAsync(60_000);
+    const actions = await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(actions).toEqual(['Remote credentials refreshed for PAN-1762 on vm-two']);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(2);
+    expect(syncClaudeCredentials).toHaveBeenLastCalledWith('vm-two');
+  });
+
+  it('drops watermark state for VMs that are no longer active', async () => {
+    const syncClaudeCredentials = vi.fn().mockResolvedValue(true);
+    let activeStates = [activeRemoteState('PAN-1778', 'vm-one')];
+    const deps = {
+      listActiveRemoteAgentStates: () => activeStates,
+      credentialFingerprint: () => '100:12',
+      loadConfig: () => ({ remote: { provider: 'fly' } }),
+      createFlyProvider: (() => ({ syncClaudeCredentials })) as any,
+    };
+
+    await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(1);
+
+    // vm-one goes away; a new machine with the same vmName appears later.
+    // The stale watermark should be discarded so the new machine refreshes.
+    activeStates = [];
+    await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+
+    activeStates = [activeRemoteState('PAN-1778', 'vm-one')];
+    await vi.advanceTimersByTimeAsync(60_000);
+    const actions = await refreshClaudeCredentialsForActiveRemoteAgents(deps);
+    expect(actions).toEqual(['Remote credentials refreshed for PAN-1778 on vm-one']);
+    expect(syncClaudeCredentials).toHaveBeenCalledTimes(2);
+  });
 });

@@ -47,8 +47,12 @@ const execAsync = promisify(exec);
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 
-let lastRemoteClaudeCredentialFingerprint: string | null = null;
-let lastRemoteClaudeCredentialRefreshAtMs = 0;
+interface PerVmCredentialRefreshState {
+  fingerprint: string | null;
+  refreshedAtMs: number;
+}
+
+const perVmCredentialRefreshState = new Map<string, PerVmCredentialRefreshState>();
 
 export interface RemoteReapResult {
   agentId: string;
@@ -77,8 +81,7 @@ function getHostClaudeCredentialFingerprint(): string | null {
 }
 
 export function resetRemoteClaudeCredentialRefreshForTests(): void {
-  lastRemoteClaudeCredentialFingerprint = null;
-  lastRemoteClaudeCredentialRefreshAtMs = 0;
+  perVmCredentialRefreshState.clear();
 }
 
 /**
@@ -89,32 +92,51 @@ export function resetRemoteClaudeCredentialRefreshForTests(): void {
  * trigger on Linux; platforms without that file fall back to a bounded 15 min
  * refresh cadence. The active-agent scan runs first so the common zero-remote
  * case never constructs a Fly provider or makes Fly API calls.
+ *
+ * Refresh state is tracked per VM (keyed by vmName), not globally. A failed
+ * or newly started VM must be retried on the next patrol regardless of whether
+ * another VM already succeeded this cycle.
  */
 export async function refreshClaudeCredentialsForActiveRemoteAgents(
   deps: RemoteClaudeCredentialRefreshDeps = {},
 ): Promise<string[]> {
   const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
+  const activeVmNames = new Set(activeStates.map((state) => state.vmName));
+
+  // Drop state for VMs that are no longer active so a future machine reusing
+  // the same vmName starts with a clean watermark. Do this before the empty
+  // short-circuit so the Map is pruned even when no agents are currently active.
+  for (const vmName of perVmCredentialRefreshState.keys()) {
+    if (!activeVmNames.has(vmName)) {
+      perVmCredentialRefreshState.delete(vmName);
+    }
+  }
+
   if (activeStates.length === 0) return [];
 
   const nowMs = (deps.nowMs ?? Date.now)();
-  const fingerprint = (deps.credentialFingerprint ?? getHostClaudeCredentialFingerprint)();
-  const credentialChanged = fingerprint !== null && fingerprint !== lastRemoteClaudeCredentialFingerprint;
-  const refreshDue = lastRemoteClaudeCredentialRefreshAtMs === 0 ||
-    nowMs - lastRemoteClaudeCredentialRefreshAtMs >= REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS;
-  if (!credentialChanged && !refreshDue) return [];
-
-  lastRemoteClaudeCredentialRefreshAtMs = nowMs;
-  if (fingerprint !== null) {
-    lastRemoteClaudeCredentialFingerprint = fingerprint;
-  }
-
+  const currentFingerprint = (deps.credentialFingerprint ?? getHostClaudeCredentialFingerprint)();
   const config = (deps.loadConfig ?? loadConfigSync)();
   const fly = (deps.createFlyProvider ?? createFlyProviderFromConfig)(config.remote);
   const actions: string[] = [];
 
   for (const state of activeStates) {
+    const last = perVmCredentialRefreshState.get(state.vmName);
+    const credentialChanged = currentFingerprint !== null && currentFingerprint !== last?.fingerprint;
+    const refreshDue = !last ||
+      nowMs - last.refreshedAtMs >= REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS;
+    if (!credentialChanged && !refreshDue) continue;
+
     try {
       const synced = await fly.syncClaudeCredentials(state.vmName);
+      if (synced) {
+        // Only advance this VM's watermark on a successful sync. A failure
+        // leaves its last watermark intact so the next patrol retries it.
+        perVmCredentialRefreshState.set(state.vmName, {
+          fingerprint: currentFingerprint,
+          refreshedAtMs: nowMs,
+        });
+      }
       actions.push(
         synced
           ? `Remote credentials refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`
