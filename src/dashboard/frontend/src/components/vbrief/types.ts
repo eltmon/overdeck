@@ -3,7 +3,7 @@
  * Used by VBriefViewer and related components.
  */
 
-export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'in_progress';
+export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed' | 'in_progress';
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type VBriefInspectionPolicy = 'auto' | 'never' | 'fast' | 'deep';
@@ -32,6 +32,7 @@ export interface VBriefItem {
   completed?: string;
   metadata?: { difficulty?: VBriefDifficulty; [key: string]: unknown };
   narrative?: { Action?: string; [key: string]: string | undefined };
+  items?: VBriefSubItem[];
   subItems?: VBriefSubItem[];
 }
 

@@ -8,7 +8,7 @@
 
 import { Effect } from 'effect';
 import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from './io.js';
-import type { VBriefDocument, VBriefItem, VBriefItemStatus, VBriefSubItem } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
 export interface AcceptanceCriterion {
@@ -61,8 +61,7 @@ export function extractACFromDocument(doc: VBriefDocument): AcceptanceCriterion[
 
   for (const item of doc.plan.items) {
     if (isDeferredOrCancelledItem(item)) continue;
-    if (!item.subItems) continue;
-    for (const sub of item.subItems) {
+    for (const sub of subItemsOf(item)) {
       if (sub.metadata?.kind === 'acceptance_criterion') {
         criteria.push({
           itemId: item.id,

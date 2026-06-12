@@ -1,4 +1,4 @@
-import type { VBriefDocument, VBriefItem, VBriefSubItem } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefSubItem } from './types.js';
 
 export interface QualityIssue {
   itemId: string | null;
@@ -39,7 +39,7 @@ function warning(itemId: string | null, rule: string, message: string): QualityI
 }
 
 function acceptanceCriteria(item: VBriefItem): VBriefSubItem[] {
-  return (item.subItems ?? []).filter(subItem => subItem.metadata?.kind === 'acceptance_criterion');
+  return subItemsOf(item).filter(subItem => subItem.metadata?.kind === 'acceptance_criterion');
 }
 
 function hasAcJustification(item: VBriefItem): boolean {

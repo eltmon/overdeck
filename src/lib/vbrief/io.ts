@@ -26,7 +26,7 @@ import type { WorkspaceContinueState } from '../pan-dir/types.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import type { VBriefDocument, VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItemStatus } from './types.js';
 
 /**
  * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.
@@ -247,7 +247,7 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const subId = key.slice(dotIndex + 1);
       const item = merged.plan.items.find(i => i.id === itemId);
       const fullSubId = `${itemId}.${subId}`;
-      const sub = item?.subItems?.find(s => s.id === subId || s.id === fullSubId || s.id === key);
+      const sub = item ? subItemsOf(item).find(s => s.id === subId || s.id === fullSubId || s.id === key) : undefined;
       if (sub) {
         sub.status = status as VBriefItemStatus;
         if (status === 'completed' && !sub.completed) {
@@ -377,11 +377,11 @@ export function updateSubItemStatus(
 
   const doc = readPlanSync(planPath);
   const item = doc.plan.items.find(i => i.id === itemId);
-  if (!item?.subItems) return;
+  if (!item) return;
 
   // Normalize subItemId before validation — spec uses "parentId.subId" format
   const fullSubId = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
-  const subItem = item.subItems.find(s => s.id === subItemId || s.id === fullSubId);
+  const subItem = subItemsOf(item).find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
   const continueState: WorkspaceContinueState = readWorkspaceContinueSync(workspacePath) ?? {

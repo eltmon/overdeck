@@ -6,7 +6,7 @@ import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Data, Effect } from 'effect';
-import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { WorkspaceContinueState } from '../pan-dir/types.js';
 
@@ -377,8 +377,8 @@ export interface ActiveSlice {
   unlocks: VBriefItem[];
   /** Nearby items connected by non-blocking context edges or shared phase. */
   nearbyContext: VBriefItem[];
-  /** Direct child acceptance criteria/subItems for prompt-size boundedness. */
-  acceptanceCriteria: NonNullable<VBriefItem['subItems']>;
+  /** Direct child acceptance criteria/items for prompt-size boundedness. */
+  acceptanceCriteria: VBriefSubItem[];
   /** Synthesis context for DAG convergence points, when available. */
   synthesisContext?: string;
   /** Minimal markdown prompt payload for work agents. */
@@ -459,7 +459,7 @@ export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptio
   const unlocks = directUnlocks(doc, item.id);
   const excludedIds = new Set([item.id, ...currentWorkSet.map(i => i.id), ...blockers.map(i => i.id), ...unlocks.map(i => i.id)]);
   const nearbyContext = nearbyItems(doc, item, excludedIds);
-  const acceptanceCriteria = item.subItems ?? [];
+  const acceptanceCriteria = subItemsOf(item);
   const synthesisContext = options.synthesisOutputs?.[item.id]?.contextUpdate;
   const globalConstraints = [doc.plan.narratives?.Constraint, doc.plan.narratives?.Risk]
     .filter((value): value is string => Boolean(value));
@@ -603,14 +603,14 @@ export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation
   }
   if (operation.subItemIds?.length) {
     const ids = new Set(operation.subItemIds);
-    for (const sub of item.subItems ?? []) {
+    for (const sub of subItemsOf(item)) {
       if (ids.has(sub.id)) {
         sub.status = item.status;
         if (operation.type === 'done') sub.completed = now;
       }
     }
   } else if (operation.type === 'done') {
-    for (const sub of item.subItems ?? []) {
+    for (const sub of subItemsOf(item)) {
       sub.status = 'completed';
       sub.completed = now;
     }
@@ -890,8 +890,8 @@ const mirrorTaskOperationToContinueFile = (
     overrides[itemId] = status;
 
     const item = doc.plan.items.find(i => i.id === itemId);
-    if (item?.subItems) {
-      const allSubIds = item.subItems.map(s => s.id);
+    if (item) {
+      const allSubIds = subItemsOf(item).map(s => s.id);
       const affectedSubIds = subItemIds?.length
         ? subItemIds.filter(id => allSubIds.includes(id))
         : (status === 'completed' ? allSubIds : []);

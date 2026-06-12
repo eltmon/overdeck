@@ -21,8 +21,8 @@
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
 
-// vBRIEF v0.5 spec status enum
-export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled';
+// vBRIEF status enum
+export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed';
 
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -77,6 +77,9 @@ export interface VBriefItem {
     Action?: string;
     [key: string]: string | undefined;
   };
+  /** vBRIEF v0.6 child items. v0.5 documents used subItems for the same structure. */
+  items?: VBriefSubItem[];
+  /** Legacy vBRIEF v0.5 child items. Kept as a read alias for compatibility. */
   subItems?: VBriefSubItem[];
 }
 
@@ -147,6 +150,10 @@ export interface VBriefDocument {
     inspectionPolicy?: VBriefInspectionPolicy;
   };
   plan: VBriefPlan;
+}
+
+export function subItemsOf(item: VBriefItem): VBriefSubItem[] {
+  return item.items ?? item.subItems ?? [];
 }
 
 /**
