@@ -77,6 +77,28 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).toContain('plan.autoDecisions[]');
     expect(prompt).toContain('Halt only for a genuine contradiction');
   });
+
+  it('renders probe pass instructions when --probe is set', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, false, true);
+
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).toContain('attack your own plan');
+    expect(prompt).toContain('PROBE: no findings');
+  });
+
+  it('renders probe pass instructions for high effort planning', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, 'high');
+
+    expect(prompt).toContain('Probe Pass (required before finalize)');
+    expect(prompt).toContain('Which edge is missing');
+  });
+
+  it('does not render probe pass instructions by default', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+
+    expect(prompt).not.toContain('Probe Pass (required before finalize)');
+    expect(prompt).not.toContain('PROBE: no findings');
+  });
 });
 
 describe('buildPlanningAgentState', () => {

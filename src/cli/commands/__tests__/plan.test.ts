@@ -53,4 +53,15 @@ describe('planCommand', () => {
       autoStart: true,
     });
   });
+
+  it('sends probe when --probe is provided', async () => {
+    const { planCommand } = await import('../plan.js');
+
+    await planCommand('PAN-123', { probe: true });
+
+    const body = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(body).toMatchObject({
+      probe: true,
+    });
+  });
 });

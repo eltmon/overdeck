@@ -123,6 +123,8 @@ export interface SpawnPlanningOptions {
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
+  /** Add the adversarial pre-finalize probe pass to the planning prompt. */
+  probe?: boolean;
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
   /** Optional callback for streaming progress events to the client. */
@@ -194,7 +196,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, memoryContext = ''): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = ''): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -312,6 +314,20 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
+  const probeSection = probe || effort === 'high' ? `
+## Probe Pass (required before finalize)
+
+After drafting the vBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
+- For each item: what hidden assumption would make this item wrong? Name it or clear it.
+- Which item could produce two very different diffs that both look "done"? Tighten its
+  ACs or set requiresInspection: true.
+- What input, state, or failure mode does no item handle? Add an item or a NonGoals line.
+- Which edge is missing (output→input you assumed implicitly)? Add it.
+
+Record every probe finding you acted on in continue.json decisions[] (prefix "PROBE:").
+If the probe pass changes nothing at all, record one decision: "PROBE: no findings".
+` : '';
+
   return await Effect.runPromise(renderPrompt({
     name: 'planning',
     vars: {
@@ -328,6 +344,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
       AUTO_SECTION: autoSection,
+      PROBE_SECTION: probeSection,
       PRD_REFERENCES: prdReferences,
       MEMORY_CONTEXT: memoryContext,
       TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv')),
@@ -408,7 +425,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, autoSpawnOnFinalize, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -564,7 +581,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
       prompt: planningPrompt,
       issueId: issue.identifier,
@@ -574,7 +591,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       harness: effectiveHarness,
     });
     if (memoryContext) {
-      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, memoryContext);
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
     }
 
     // Capture planning prompt in workspace .pan/continue.json.
