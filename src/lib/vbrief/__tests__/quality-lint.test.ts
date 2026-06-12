@@ -51,7 +51,7 @@ describe('lintPlanQuality story quality', () => {
     expect(PLACEHOLDER_AC_PATTERNS).toEqual(['acceptance criteria for', 'copy from parent', 'copy from specification', 'placeholder', 'refine from parent', 'tbd', 'to be defined', 'to refine', 'todo']);
     expect(DOCS_ONLY_AC_PATTERNS).toEqual(['docs updated', 'documentation updated', 'readme updated', 'update docs', 'update documentation', 'update readme']);
     expect(VAGUE_AC_PATTERNS).toEqual(['displays a message', 'handles errors', 'is implemented', 'is updated', 'passes tests', 'shows a message', 'updates the ui', 'works as expected', 'make it work', 'implement the feature', 'change the code', 'update the code']);
-    expect(OBSERVABLE_TERMS).toEqual(['blocks', 'creates', 'deletes', 'displays', 'emits', 'fails', 'persists', 'records', 'redirects', 'rejects', 'renders', 'returns', 'saves', 'shows', 'stores', 'updates', 'validates', 'exits', 'prints', 'logs', 'throws', 'spawns', 'opens', 'closes', 'sends', 'receives', 'resolves', 'refuses', 'marks', 'syncs', 'commits', 'pushes', 'when ', 'given ', 'then ']);
+    expect(OBSERVABLE_TERMS).toEqual(['blocks', 'creates', 'deletes', 'displays', 'emits', 'fails', 'persists', 'records', 'redirects', 'rejects', 'renders', 'returns', 'saves', 'shows', 'stores', 'updates', 'validates', 'exits', 'prints', 'logs', 'throws', 'spawns', 'opens', 'closes', 'sends', 'receives', 'resolves', 'refuses', 'marks', 'syncs', 'commits', 'pushes', 'accepts', 'applies', 'collapses', 'contains', 'covers', 'defaults to', 'falls back', 'preserves', 'produces', 'passes', 'respects', 'routes', 'survives', 'wins', 'when ', 'given ', 'then ']); // PAN-1796 expansion
   });
 
   it('flags missing ACs', () => {
@@ -246,5 +246,40 @@ describe('lintPlanQuality requirement traces', () => {
     });
 
     expect(issues.map(issue => issue.rule)).not.toContain('trace-uncovered');
+  });
+});
+
+describe('lintPlanQuality observable-term tuning (PAN-1796)', () => {
+  const planWith = (acTitle: string) => ({
+    vBRIEFInfo: { version: '0.6', created: 'x' },
+    plan: {
+      id: 'pan-1', title: 't', status: 'approved',
+      items: [{
+        id: 'a', title: 'item a', status: 'pending',
+        metadata: { requiresInspection: false },
+        narrative: { Action: 'Do a concrete focused thing across the named files now' },
+        items: [
+          { id: 'a.ac1', title: acTitle, status: 'pending', metadata: { kind: 'acceptance_criterion' } },
+          { id: 'a.ac2', title: 'The command exits 0 on the happy path', status: 'pending', metadata: { kind: 'acceptance_criterion' } },
+        ],
+      }],
+      edges: [],
+    },
+  }) as any;
+
+  it.each([
+    'The alias applies at role tier when only specialist_harnesses is set',
+    'resolveHarness falls back to claude-code when the binary is absent',
+    'The select defaults to the built-in harness when no override is set',
+    'Loading a pre-change snapshot survives without error',
+    'The full precedence-matrix unit suite passes',
+  ])('accepts natural engineering phrasing: %s', (title) => {
+    const errors = lintPlanQuality(planWith(title)).filter((i: any) => i.severity === 'error');
+    expect(errors).toEqual([]);
+  });
+
+  it('still bans "passes tests" even though "passes" is observable', () => {
+    const errors = lintPlanQuality(planWith('The feature passes tests')).filter((i: any) => i.severity === 'error');
+    expect(errors.some((i: any) => i.rule === 'ac-banned-phrase')).toBe(true);
   });
 });
