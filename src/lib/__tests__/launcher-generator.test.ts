@@ -247,56 +247,40 @@ describe('generateLauncherScript', () => {
 
     expect(script).not.toContain('exec claude');
     expect(script).toContain("pan review validate-trace '/agents/agent-pan-1-review-requirements/review-requirements.md'");
-    expect(script).toContain('elif command -v pan >/dev/null 2>&1 && pan review validate-trace');
+    expect(script).toContain('elif command -v pan >/dev/null 2>&1 && pan review validate-trace --help >/dev/null 2>&1; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY requirements /agents/agent-pan-1-review-requirements/review-requirements.md" || true');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED requirements $REASON" || true');
     expect(script).toContain('substrate trace check skipped');
-    expect(script).toContain('rm -f /tmp/pan-trace-reason.$$');
+    expect(script).toContain('REASON_FILE=$(mktemp');
+    expect(script).toContain('trap \'rm -f "$REASON_FILE"\' EXIT');
+    expect(script).not.toContain('rm -f /tmp/pan-trace-reason.$$');
   });
 
-  it('non-requirements sub-roles remain byte-identical to the pre-PAN-1498 baseline', () => {
-    const script = generateLauncherScriptSync({
-      ...DEFAULT_CONFIG,
-      role: 'review',
-      promptFile: '/agents/agent-pan-1-review-security/initial-prompt.md',
-      promptFileMode: 'stdin',
-      setPipefail: true,
-      trapHup: true,
-      baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
-      sessionId: 'sess-rev',
-      reviewSignal: {
-        synthesisAgentId: 'agent-pan-1-review',
-        subRole: 'security',
-        outputPath: '/agents/agent-pan-1-review-security/review-security.md',
-        signalMarkerPath: '/agents/agent-pan-1-review-security/reviewer-signaled',
-        launcherPidPath: '/agents/agent-pan-1-review-security/reviewer-launcher.pid',
-        timeoutSeconds: 1800,
-      },
-    });
+  it.each(['security', 'correctness', 'performance'] as const)(
+    'non-requirements sub-role %s remains byte-identical to the pre-PAN-1498 baseline',
+    (subRole) => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'review',
+        promptFile: `/agents/agent-pan-1-review-${subRole}/initial-prompt.md`,
+        promptFileMode: 'stdin',
+        setPipefail: true,
+        trapHup: true,
+        baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
+        sessionId: 'sess-rev',
+        reviewSignal: {
+          synthesisAgentId: 'agent-pan-1-review',
+          subRole,
+          outputPath: `/agents/agent-pan-1-review-${subRole}/review-${subRole}.md`,
+          signalMarkerPath: `/agents/agent-pan-1-review-${subRole}/reviewer-signaled`,
+          launcherPidPath: `/agents/agent-pan-1-review-${subRole}/reviewer-launcher.pid`,
+          timeoutSeconds: 1800,
+        },
+      });
 
-    expect(script).toMatchInlineSnapshot(`
-      "#!/bin/bash
-      unset TMUX TMUX_PANE STY
-      set -o pipefail
-      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
-      export SKIP_DOCS_INDEX=1
-      cd -- '/workspace/project'
-      trap '' HUP
-      echo $$ > '/agents/agent-pan-1-review-security/reviewer-launcher.pid'
-      timeout 1800 claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5 --session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'
-      CLAUDE_EXIT=$?
-      if [ "$CLAUDE_EXIT" = "124" ]; then
-        pan tell 'agent-pan-1-review' "REVIEWER_TIMEOUT security reviewer exceeded 1800s deadline" || true
-      elif [ -s '/agents/agent-pan-1-review-security/review-security.md' ]; then
-        pan tell 'agent-pan-1-review' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true
-      else
-        pan tell 'agent-pan-1-review' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true
-      fi
-      touch '/agents/agent-pan-1-review-security/reviewer-signaled'
-      rm -f '/agents/agent-pan-1-review-security/reviewer-launcher.pid'
-      "
-    `);
-  });
+      expect(script).toMatchSnapshot();
+    },
+  );
 
   it('work role identity prompt launch', () => {
     const script = generateLauncherScriptSync({

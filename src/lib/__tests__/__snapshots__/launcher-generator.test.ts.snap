@@ -1,0 +1,70 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generateLauncherScript > non-requirements sub-role correctness remains byte-identical to the pre-PAN-1498 baseline 1`] = `
+"#!/bin/bash
+unset TMUX TMUX_PANE STY
+set -o pipefail
+command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+export SKIP_DOCS_INDEX=1
+cd -- '/workspace/project'
+trap '' HUP
+echo $$ > '/agents/agent-pan-1-review-correctness/reviewer-launcher.pid'
+timeout 1800 claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5 --session-id 'sess-rev' < '/agents/agent-pan-1-review-correctness/initial-prompt.md'
+CLAUDE_EXIT=$?
+if [ "$CLAUDE_EXIT" = "124" ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_TIMEOUT correctness reviewer exceeded 1800s deadline" || true
+elif [ -s '/agents/agent-pan-1-review-correctness/review-correctness.md' ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_READY correctness /agents/agent-pan-1-review-correctness/review-correctness.md" || true
+else
+  pan tell 'agent-pan-1-review' "REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report" || true
+fi
+touch '/agents/agent-pan-1-review-correctness/reviewer-signaled'
+rm -f '/agents/agent-pan-1-review-correctness/reviewer-launcher.pid'
+"
+`;
+
+exports[`generateLauncherScript > non-requirements sub-role performance remains byte-identical to the pre-PAN-1498 baseline 1`] = `
+"#!/bin/bash
+unset TMUX TMUX_PANE STY
+set -o pipefail
+command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+export SKIP_DOCS_INDEX=1
+cd -- '/workspace/project'
+trap '' HUP
+echo $$ > '/agents/agent-pan-1-review-performance/reviewer-launcher.pid'
+timeout 1800 claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5 --session-id 'sess-rev' < '/agents/agent-pan-1-review-performance/initial-prompt.md'
+CLAUDE_EXIT=$?
+if [ "$CLAUDE_EXIT" = "124" ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_TIMEOUT performance reviewer exceeded 1800s deadline" || true
+elif [ -s '/agents/agent-pan-1-review-performance/review-performance.md' ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_READY performance /agents/agent-pan-1-review-performance/review-performance.md" || true
+else
+  pan tell 'agent-pan-1-review' "REVIEWER_FAILED performance reviewer exited (code $CLAUDE_EXIT) without writing report" || true
+fi
+touch '/agents/agent-pan-1-review-performance/reviewer-signaled'
+rm -f '/agents/agent-pan-1-review-performance/reviewer-launcher.pid'
+"
+`;
+
+exports[`generateLauncherScript > non-requirements sub-role security remains byte-identical to the pre-PAN-1498 baseline 1`] = `
+"#!/bin/bash
+unset TMUX TMUX_PANE STY
+set -o pipefail
+command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+export SKIP_DOCS_INDEX=1
+cd -- '/workspace/project'
+trap '' HUP
+echo $$ > '/agents/agent-pan-1-review-security/reviewer-launcher.pid'
+timeout 1800 claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5 --session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'
+CLAUDE_EXIT=$?
+if [ "$CLAUDE_EXIT" = "124" ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_TIMEOUT security reviewer exceeded 1800s deadline" || true
+elif [ -s '/agents/agent-pan-1-review-security/review-security.md' ]; then
+  pan tell 'agent-pan-1-review' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true
+else
+  pan tell 'agent-pan-1-review' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true
+fi
+touch '/agents/agent-pan-1-review-security/reviewer-signaled'
+rm -f '/agents/agent-pan-1-review-security/reviewer-launcher.pid'
+"
+`;

@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { generateLauncherScriptSync, type LauncherConfig } from '../../../src/lib/launcher-generator.js';
+import { validateRequirementsTrace } from '../../../src/lib/cloister/review-requirements-validator.js';
+
+const FIXTURE_DIR = resolve(process.cwd(), 'tests/fixtures/review-requirements');
 
 describe('requirements trace launcher e2e', () => {
   let tempHome: string;
@@ -34,17 +37,44 @@ describe('requirements trace launcher e2e', () => {
     return { binDir, promptFile, outputFile, signalMarker, pidFile, tellLog };
   }
 
-  function writeStubs(paths: ReturnType<typeof buildFixtureDirs>, fixture: 'fail' | 'pass') {
-    // claude stub: copy the requested fixture to the reviewer output path and exit 0.
-    const claudeStub = `#!/bin/bash\n# Ignore all args; just copy the fixture to the expected output path.\ncp "${process.cwd()}/tests/fixtures/review-requirements/${fixture === 'fail' ? 'missing-section' : 'happy-path'}.md" "${paths.outputFile}"\nexit 0\n`;
+  function writeClaudeStub(paths: ReturnType<typeof buildFixtureDirs>, fixture: string) {
+    const claudeStub = `#!/bin/bash\n# Ignore all args; copy the requested fixture to the expected output path.\ncp "${FIXTURE_DIR}/${fixture}.md" "${paths.outputFile}"\nexit 0\n`;
     writeFileSync(join(paths.binDir, 'claude'), claudeStub, { mode: 0o755 });
+  }
 
-    // pan stub: a tsx script that actually validates traces and records tells.
-    // The file has no extension, so Node treats it as CommonJS; use require().
-    const panStub = `#!/usr/bin/env tsx\nconst fs = require('node:fs');\nconst { validateRequirementsTrace } = require('${process.cwd()}/src/lib/cloister/review-requirements-validator.ts');\nconst args = process.argv.slice(2);\nif (args[0] === 'tell') {\n  const message = args.slice(2).join(' ');\n  fs.appendFileSync('${paths.tellLog}', message + '\\n');\n  process.exit(0);\n}\nif (args[0] === 'review' && args[1] === 'validate-trace') {\n  const content = fs.readFileSync(args[2], 'utf8');\n  const result = validateRequirementsTrace(content);\n  if (result.ok) {\n    process.exit(0);\n  }\n  process.stderr.write(result.reason);\n  process.exit(1);\n}\nprocess.exit(0);\n`;
+  function writePanStub(paths: ReturnType<typeof buildFixtureDirs>, mode: 'full' | 'fallback') {
+    // A tsx script stub. It must support `pan tell <target> <message>` and,
+    // in full mode, `pan review validate-trace <file>` plus the --help probe.
+    const shebang = '#!/usr/bin/env tsx';
+    const panStub = `${shebang}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+
+if (args[0] === 'tell') {
+  const message = args.slice(2).join(' ');
+  fs.appendFileSync('${paths.tellLog}', message + '\\n');
+  process.exit(0);
+}
+
+if (args[0] === 'review' && args[1] === 'validate-trace') {
+  if (args[2] === '--help') {
+    process.exit(${mode === 'full' ? 0 : 1});
+  }
+  ${mode === 'full' ? `
+  const content = fs.readFileSync(args[2], 'utf8');
+  const { validateRequirementsTrace } = require('${process.cwd()}/src/lib/cloister/review-requirements-validator.ts');
+  const result = validateRequirementsTrace(content);
+  if (result.ok) {
+    process.exit(0);
+  }
+  process.stderr.write(result.reason);
+  process.exit(1);
+  ` : 'process.stderr.write("unknown command"); process.exit(1);'}
+}
+
+process.exit(0);
+`;
     writeFileSync(join(paths.binDir, 'pan'), panStub, { mode: 0o755 });
-
-    writeFileSync(paths.promptFile, '# prompt\n');
   }
 
   function generateScript(outputFile: string, signalMarker: string, pidFile: string): string {
@@ -75,14 +105,18 @@ describe('requirements trace launcher e2e', () => {
   it('signals REVIEWER_FAILED with the validator reason for a missing-trace fixture', () => {
     const root = mkdtempSync(join(tmpdir(), 'pan-trace-fail-'));
     const paths = buildFixtureDirs(root);
-    writeStubs(paths, 'fail');
+    writeClaudeStub(paths, 'missing-section');
+    writePanStub(paths, 'full');
+    writeFileSync(paths.promptFile, '# prompt\n');
+
+    const expectedReason = validateRequirementsTrace(readFileSync(`${FIXTURE_DIR}/missing-section.md`, 'utf8')).reason;
 
     const script = generateScript(paths.outputFile, paths.signalMarker, paths.pidFile);
     runLauncherScript(script, root, testPath(paths));
 
     const tells = readTellLog(paths.tellLog);
     expect(tells).toHaveLength(1);
-    expect(tells[0]).toMatch(/^REVIEWER_FAILED requirements requirements review missing live code path trace for ACs:/);
+    expect(tells[0]).toBe(`REVIEWER_FAILED requirements ${expectedReason}`);
     expect(existsSync(paths.signalMarker)).toBe(true);
 
     rmSync(root, { recursive: true, force: true });
@@ -91,7 +125,9 @@ describe('requirements trace launcher e2e', () => {
   it('signals REVIEWER_READY for a valid-trace fixture', () => {
     const root = mkdtempSync(join(tmpdir(), 'pan-trace-pass-'));
     const paths = buildFixtureDirs(root);
-    writeStubs(paths, 'pass');
+    writeClaudeStub(paths, 'happy-path');
+    writePanStub(paths, 'full');
+    writeFileSync(paths.promptFile, '# prompt\n');
 
     const script = generateScript(paths.outputFile, paths.signalMarker, paths.pidFile);
     runLauncherScript(script, root, testPath(paths));
@@ -104,18 +140,19 @@ describe('requirements trace launcher e2e', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('falls back to REVIEWER_READY with a warning when pan is not on PATH', () => {
+  it('falls back to REVIEWER_READY with a warning when validate-trace is unavailable', () => {
     const root = mkdtempSync(join(tmpdir(), 'pan-trace-fallback-'));
     const paths = buildFixtureDirs(root);
-
-    // Only claude stub, no pan stub.
-    const claudeStub = `#!/bin/bash\ncp "${process.cwd()}/tests/fixtures/review-requirements/missing-section.md" "${paths.outputFile}"\nexit 0\n`;
-    writeFileSync(join(paths.binDir, 'claude'), claudeStub, { mode: 0o755 });
+    writeClaudeStub(paths, 'missing-section');
+    writePanStub(paths, 'fallback');
     writeFileSync(paths.promptFile, '# prompt\n');
 
     const script = generateScript(paths.outputFile, paths.signalMarker, paths.pidFile);
-    const output = runLauncherScript(script, root, `${paths.binDir}:/usr/bin:/bin`);
+    const output = runLauncherScript(script, root, testPath(paths));
 
+    const tells = readTellLog(paths.tellLog);
+    expect(tells).toHaveLength(1);
+    expect(tells[0]).toBe(`REVIEWER_READY requirements ${paths.outputFile}`);
     expect(output).toContain('substrate trace check skipped');
     expect(existsSync(paths.signalMarker)).toBe(true);
 

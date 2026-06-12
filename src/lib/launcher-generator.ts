@@ -525,26 +525,28 @@ function buildRequirementsReviewSubRoleCommand(config: LauncherConfig): string[]
   const out = shellQuote(sig.outputPath);
   const role = sig.subRole;
   const pidFile = shellQuote(sig.launcherPidPath);
-  const reasonFile = '/tmp/pan-trace-reason.$$';
 
   return [
     `echo $$ > ${pidFile}`,
+    `REASON_FILE=$(mktemp "${process.env.TMPDIR ?? '/tmp'}/pan-trace-reason.XXXXXX")`,
+    `trap 'rm -f "$REASON_FILE"' EXIT`,
     claudeCmd,
     'CLAUDE_EXIT=$?',
     `if [ "$CLAUDE_EXIT" = "124" ]; then`,
     `  pan tell ${synth} "REVIEWER_TIMEOUT ${role} reviewer exceeded ${sig.timeoutSeconds}s deadline" || true`,
     `elif [ ! -s ${out} ]; then`,
     `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
-    `elif command -v pan >/dev/null 2>&1 && pan review validate-trace ${out} 2>${reasonFile}; then`,
-    `  pan tell ${synth} "REVIEWER_READY ${role} ${sig.outputPath}" || true`,
-    `elif [ -f ${reasonFile} ]; then`,
-    `  REASON=$(cat ${reasonFile})`,
-    `  pan tell ${synth} "REVIEWER_FAILED ${role} $REASON" || true`,
+    `elif command -v pan >/dev/null 2>&1 && pan review validate-trace --help >/dev/null 2>&1; then`,
+    `  if pan review validate-trace ${out} 2>"$REASON_FILE"; then`,
+    `    pan tell ${synth} "REVIEWER_READY ${role} ${sig.outputPath}" || true`,
+    `  else`,
+    `    REASON=$(cat "$REASON_FILE")`,
+    `    pan tell ${synth} "REVIEWER_FAILED ${role} $REASON" || true`,
+    `  fi`,
     `else`,
     `  pan tell ${synth} "REVIEWER_READY ${role} ${sig.outputPath}" || true`,
     `  echo '[review-requirements] WARNING: pan review validate-trace unavailable on this worker — substrate trace check skipped' >&2`,
     `fi`,
-    `rm -f ${reasonFile}`,
     `touch ${shellQuote(sig.signalMarkerPath)}`,
     `rm -f ${pidFile}`,
   ];
