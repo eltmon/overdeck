@@ -45,9 +45,16 @@ describe('shared branding registry', () => {
     expect(screen.getByText('π')).toBeInTheDocument();
   });
 
-  it('renders known provider registry icons and falls back to a letter badge for unknown providers', () => {
-    const { rerender } = render(<ProviderLogo provider="openai" />);
-    expect(screen.getByLabelText('OpenAI logo')).toBeInTheDocument();
+  it('renders every known provider as an inline SVG mark and falls back to a letter badge for unknown providers', () => {
+    const { container, rerender } = render(<ProviderLogo provider="openai" />);
+
+    for (const [provider, brand] of Object.entries(PROVIDER_BRANDS)) {
+      rerender(<ProviderLogo provider={provider} />);
+      const logo = screen.getByLabelText(`${brand.label} logo`);
+
+      expect(logo.tagName.toLowerCase()).toBe('svg');
+      expect(container.querySelector('text')).not.toBeInTheDocument();
+    }
 
     rerender(<ProviderLogo provider="unknown-provider" label="Unknown Provider" />);
     expect(screen.getByText('U')).toBeInTheDocument();
