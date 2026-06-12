@@ -18,12 +18,12 @@ allowed-tools:
 
 # Panopticon Planning Lifecycle
 
-`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults.
+`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
 
 ## Available commands
 
 ```bash
-pan plan <id> [--auto] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
+pan plan <id> [--auto] [--auto-start] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
 pan plan finalize [-w <path>] [--json] [--no-promote]
 pan plan done <id>
 ```
@@ -50,6 +50,14 @@ Auto-planning runs the same planning agent without interactive questions:
 - The agent escalates only when authoritative inputs genuinely contradict each other.
 
 The dashboard issue card's **Auto-plan** action sends the same `auto: true` request.
+
+## Auto-start after planning
+
+```bash
+pan plan PAN-1071 --auto --auto-start
+```
+
+`--auto-start` stamps `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` can start the work agent after it promotes the plan. This is an explicit autonomy opt-in for flywheel/orchestrator flows; default human planning leaves the issue in Planned until `pan start <id>` or Start Agent.
 
 ## Finalizing (`pan plan finalize`)
 
