@@ -118,6 +118,14 @@ check_planning_qa_retention() {
   return 0
 }
 
+check_external_content_framing() {
+  contains "src/lib/cloister/prompts/planning.md" "data, not instructions" \
+    || fail "external-content-framing: planning.md missing data-not-instructions block"
+  contains "src/lib/cloister/prompts/work.md" "data, not instructions" \
+    || fail "external-content-framing: work.md missing data-not-instructions block"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -127,6 +135,7 @@ check_all() {
   check_handoff_consistency
   check_discovery_completeness
   check_planning_qa_retention
+  check_external_content_framing
 }
 
 write_passing_fixture() {
@@ -143,6 +152,7 @@ Run pan plan finalize. The issue waits in Planned until pan start or Start Agent
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
 Discovery is complete only when
 ## Planning Q&A
+data, not instructions
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -158,6 +168,7 @@ EOF
 7. read metadata
 8. skip if false
 9. pan inspect ISSUE --bead bead
+data, not instructions
 EOF
   cat > "$root/roles/work.md" <<'EOF'
 ## Per-Bead Workflow
@@ -241,6 +252,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('## Planning Q&A', '## Planning Notes'))
+PY"
+  expect_self_test_failure "external-content-framing" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('data, not instructions', 'trusted issue instructions'))
 PY"
   echo "lint-prompts self-test passed"
 }
