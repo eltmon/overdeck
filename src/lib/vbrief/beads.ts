@@ -459,7 +459,12 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
       i => i.title.toLowerCase() === itemTitleLower
     );
 
-    if (!matchingItem) return null;
+    if (!matchingItem) {
+      console.warn(
+        `[vbrief-sync] No plan item matches bead ${beadId} (title "${itemTitle}") in plan ${planId} — AC statuses for this bead were NOT synced`,
+      );
+      return null;
+    }
 
     // io.ts handles vBRIEFInfo.updated, plan.updated, plan.sequence, and item.completed
     // timestamps automatically. Each call below constitutes one write → one sequence increment.

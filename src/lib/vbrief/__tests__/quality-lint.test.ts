@@ -1,0 +1,109 @@
+import { describe, expect, it } from 'vitest';
+import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS } from '../quality-lint.js';
+import type { VBriefDocument, VBriefItem } from '../types.js';
+
+function ac(id: string, title: string) {
+  return {
+    id,
+    title,
+    status: 'pending' as const,
+    metadata: { kind: 'acceptance_criterion' },
+  };
+}
+
+function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
+  return {
+    id: 'item-1',
+    title: 'Implement behavior',
+    status: 'pending',
+    narrative: { Action: 'Implement the behavior with explicit files and verification steps' },
+    metadata: { requiresInspection: false },
+    subItems: [
+      ac('item-1.ac1', 'Given a valid request then it returns success'),
+      ac('item-1.ac2', 'The command rejects invalid requests with a clear error'),
+    ],
+    ...overrides,
+  };
+}
+
+function doc(items: VBriefItem[]): VBriefDocument {
+  return {
+    vBRIEFInfo: {
+      version: '0.5',
+      created: '2026-06-12T00:00:00Z',
+    },
+    plan: {
+      id: 'PAN-1788',
+      title: 'Plan',
+      status: 'proposed',
+      items,
+      edges: [],
+    },
+  };
+}
+
+function rulesFor(items: VBriefItem[]): string[] {
+  return lintPlanQuality(doc(items)).map(issue => issue.rule);
+}
+
+describe('lintPlanQuality story quality', () => {
+  it('exports the PRD pattern constants', () => {
+    expect(PLACEHOLDER_AC_PATTERNS).toEqual(['acceptance criteria for', 'copy from parent', 'copy from specification', 'placeholder', 'refine from parent', 'tbd', 'to be defined', 'to refine', 'todo']);
+    expect(DOCS_ONLY_AC_PATTERNS).toEqual(['docs updated', 'documentation updated', 'readme updated', 'update docs', 'update documentation', 'update readme']);
+    expect(VAGUE_AC_PATTERNS).toEqual(['displays a message', 'handles errors', 'is implemented', 'is updated', 'passes tests', 'shows a message', 'updates the ui', 'works as expected', 'make it work', 'implement the feature', 'change the code', 'update the code']);
+    expect(OBSERVABLE_TERMS).toEqual(['blocks', 'creates', 'deletes', 'displays', 'emits', 'fails', 'persists', 'records', 'redirects', 'rejects', 'renders', 'returns', 'saves', 'shows', 'stores', 'updates', 'validates', 'exits', 'prints', 'logs', 'throws', 'spawns', 'opens', 'closes', 'sends', 'receives', 'resolves', 'refuses', 'marks', 'syncs', 'commits', 'pushes', 'when ', 'given ', 'then ']);
+  });
+
+  it('flags missing ACs', () => {
+    expect(rulesFor([item({ subItems: [] })])).toContain('ac-missing');
+  });
+
+  it('flags 1 AC without justification', () => {
+    expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'Given input then it returns output')] })])).toContain('ac-count');
+  });
+
+  it('accepts 1 AC with acJustification', () => {
+    expect(rulesFor([item({
+      metadata: { requiresInspection: false, acJustification: 'One observable end-to-end criterion covers the full change.' },
+      subItems: [ac('item-1.ac1', 'Given input then it returns output')],
+    })])).not.toContain('ac-count');
+  });
+
+  it('flags "works as expected"', () => {
+    expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'Feature works as expected'), ac('item-1.ac2', 'Given input then it returns output')] })])).toContain('ac-banned-phrase');
+  });
+
+  it('flags docs-only AC', () => {
+    expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'Docs updated for the new behavior'), ac('item-1.ac2', 'Given input then it returns output')] })])).toContain('ac-banned-phrase');
+  });
+
+  it('flags AC with no observable term', () => {
+    expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'The new behavior follows the selected approach'), ac('item-1.ac2', 'Given input then it returns output')] })])).toContain('ac-not-observable');
+  });
+
+  it('accepts Given/When/Then AC', () => {
+    expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'Given a valid request when submitted then it returns success'), ac('item-1.ac2', 'The command rejects invalid requests with a clear error')] })])).not.toContain('ac-not-observable');
+  });
+
+  it('accepts 3 observable ACs', () => {
+    expect(lintPlanQuality(doc([item({
+      subItems: [
+        ac('item-1.ac1', 'Valid requests returns success'),
+        ac('item-1.ac2', 'The command rejects invalid requests with a clear error'),
+        ac('item-1.ac3', 'The change emits an audit record'),
+      ],
+    })]))).toEqual([]);
+  });
+
+  it('flags thin Action narrative', () => {
+    expect(rulesFor([item({ narrative: { Action: 'Do it' } })])).toContain('action-too-thin');
+  });
+
+  it('skips cancelled items', () => {
+    expect(lintPlanQuality(doc([item({
+      status: 'cancelled',
+      narrative: { Action: '' },
+      subItems: [],
+    })]))).toEqual([]);
+  });
+});

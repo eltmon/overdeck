@@ -50,9 +50,9 @@ optional:
 pan plan finalize
 ```
 
-This converts your `.pan/spec.vbrief.json` into beads tasks and marks the workspace spec as `plan.status = "proposed"`, which lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan finalize` does it deterministically from the vBRIEF.
+This converts your `.pan/spec.vbrief.json` into beads tasks, marks the spec `plan.status = "proposed"`, promotes the canonical spec to main's `.pan/specs/`, transitions the issue to Planned, and terminates this planning session. Do NOT run `bd create` yourself — `pan plan finalize` does it deterministically from the vBRIEF.
 
-After `pan plan finalize` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
+`pan plan finalize` is your final action — the pipeline terminates this session after it succeeds; no dashboard "Done" click is needed. What happens next is not your decision: if this planning run was launched with `--auto-start` (autonomous orchestrators), the work agent starts automatically; otherwise the issue waits in Planned until a human runs `pan start <id>` or clicks Start Agent. Never try to start the work agent yourself. (The dashboard Done button remains the manual handoff path for `--no-promote` runs.)
 
 ## Panopticon Agent Taxonomy
 
@@ -85,7 +85,7 @@ The review convoy sub-roles (`review.security`, `review.correctness`, `review.pe
 
 ### What happens after you finalize
 
-After `pan plan finalize` and the user clicks **Done**, the pipeline runs without you: `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
+After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ---
 {{EFFORT_SECTION}}{{AUTO_SECTION}}

@@ -169,31 +169,7 @@ Tasks created during planning (check .pan/continue.json `sessionHistory` for whi
 
 {{BEADS_TASKS}}
 
-### MANDATORY: One Bead At A Time
-
-An automated **Inspect Specialist** runs in parallel with you. It verifies each bead's
-implementation matches its specification. It needs a **scoped diff** — one bead per commit.
-If you batch multiple beads, the inspector cannot verify them individually and your work
-will be rejected.
-
-**Workflow for EVERY bead:**
-1. `bd ready -l {{ISSUE_ID_LOWER}}` — find the next unblocked bead for THIS issue
-2. `bd update <bead-id> --claim` — claim it
-3. Implement ONLY that bead's work
-4. `git add` and `git commit` — one bead = one commit
-5. **Update `.pan/continue.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
-6. `bd close <bead-id> --reason="what you did"`
-7. **Re-read this bead's plan item metadata** in `.pan/spec.vbrief.json` after the commit and before deciding inspection:
-   - If `metadata.requiresInspection === false`: skip inspection entirely and proceed straight to step 1.
-   - If `metadata.requiresInspection === true`: read `metadata.inspectionDepth` (`fast` by default when omitted), then run the matching command and **WAIT** for the verdict (delivered via `pan tell`). A terminal verdict is guaranteed within the inspection timeout because Deacon watchdog backstops stalled inspect sessions:
-     - `inspectionDepth: "fast"` or omitted → `pan inspect {{ISSUE_ID}} --bead <bead-id>`
-     - `inspectionDepth: "deep"` → `pan inspect {{ISSUE_ID}} --bead <bead-id> --deep`
-     - `INSPECTION PASSED` → proceed to step 1
-     - `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again
-     - `INSPECTION ERROR` → infrastructure failure: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop
-   - If `requiresInspection` is missing on a legacy plan item, treat it as `true` with `inspectionDepth: "fast"`.
-
-The planning agent decides per-bead whether inspection is required and how deep it should be. Most mechanical beads carry `requiresInspection: false`; foundational beads that downstream beads build on top of carry `true`, usually with fast depth unless the plan explicitly says `inspectionDepth: "deep"`. Trust the plan — do not request inspection on beads marked `false`, do not skip inspection on beads marked `true`, and do not reuse stale metadata from before you closed the bead.
+Follow the per-bead workflow in the mandatory section below.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -204,24 +180,13 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating `.pan/continue.json`
-and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
-The bead is NOT done until `bd close` succeeds.
-
-**Do NOT implement multiple beads before committing and closing.** Each bead must be
-a separate commit with a separate `bd close`. Whether inspection follows depends on
-that bead's `metadata.requiresInspection` flag — see step 7 above. The inspector
-specialist is NOT auto-spawned by `bd close`; when inspection is required you must
-invoke `pan inspect` yourself.
-
-**CRITICAL: Update vBRIEF AC statuses as you complete each bead.** The verification gate
-checks `.pan/spec.vbrief.json` subItem statuses. If you close a bead but leave its
-acceptance criteria as `pending` in the plan, verification will FAIL. After closing each
-bead, update the corresponding item and subItem statuses to `completed`:
-```bash
-node -e "const fs=require('fs'); const p='.pan/spec.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; const item=items.find(i=>i.id==='ITEM_ID'); if(item){item.status='completed';(item.subItems||[]).forEach(s=>s.status='completed')}; fs.writeFileSync(p,JSON.stringify(d,null,2))}"
-```
-Replace `ITEM_ID` with the plan item ID that corresponds to the bead you just closed.
+**AC statuses are synced automatically from closed beads.** When you run `bd close`, the
+pipeline records the matching plan item and its acceptance criteria as completed in
+`.pan/continue.json` (`statusOverrides`) — the layer the verification gate actually reads.
+Never hand-edit `.pan/spec.vbrief.json` or any file under `.pan/specs/` — specs are
+immutable after planning (PAN-1124). If verification reports incomplete acceptance
+criteria, the cause is an unclosed bead (or a bead whose title no longer matches its plan
+item): run `bd list -l {{ISSUE_ID_LOWER}}` and close everything that is done.
 {{/BEADS_TASKS}}
 
 {{#STITCH_DESIGNS}}
@@ -305,10 +270,10 @@ and your work will be rejected.
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.pan/continue.json`** — this is MANDATORY before closing the bead (see continue format below)
 6. `bd close <bead-id> --reason="what you did"`
-7. Re-read `metadata.requiresInspection` and `metadata.inspectionDepth` for this bead in `.pan/spec.vbrief.json`.
-8. If inspection is required, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for fast depth or add `--deep` for deep depth; closing a bead does NOT spawn the inspector.
-9. **WAIT** for the inspection result (delivered to your session via `pan tell`). A terminal verdict (`INSPECTION PASSED`, `INSPECTION BLOCKED`, or `INSPECTION ERROR`) is guaranteed within the inspection timeout because Deacon watchdog backstops stalled inspect sessions.
-10. `INSPECTION PASSED` → proceed to step 1; `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again; `INSPECTION ERROR` → infrastructure failure: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
+7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === false`, skip inspection and continue.
+9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+10. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the

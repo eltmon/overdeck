@@ -123,6 +123,8 @@ export interface SpawnPlanningOptions {
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
+  /** Automatically start the work agent after finalize; stamped by trusted callers only. */
+  autoSpawnOnFinalize?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -130,6 +132,32 @@ export interface SpawnPlanningOptions {
 export interface SpawnPlanningResult {
   success: boolean;
   error?: string;
+}
+
+export interface PlanningAgentStateInput {
+  sessionName: string;
+  issueId: string;
+  workspacePath: string;
+  model: string;
+  harness: 'claude-code' | 'pi' | 'codex';
+  workspaceLocation: 'local' | 'remote';
+  autoSpawnOnFinalize?: boolean;
+  startedAt?: string;
+}
+
+export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<string, unknown> {
+  return {
+    id: input.sessionName,
+    issueId: input.issueId,
+    workspace: input.workspacePath,
+    model: input.model,
+    status: 'running',
+    startedAt: input.startedAt ?? new Date().toISOString(),
+    role: 'plan',
+    harness: input.harness,
+    location: input.workspaceLocation,
+    autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -380,7 +408,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, autoSpawnOnFinalize, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -633,17 +661,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Update agent state to running ──────────────────────────────────────
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
-    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-      id: sessionName,
+    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify(buildPlanningAgentState({
+      sessionName,
       issueId: issue.identifier,
-      workspace: workspacePath,
+      workspacePath,
       model: planningModel,
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      role: 'plan',
       harness: effectiveHarness,
-      location: workspaceLocation,
-    }, null, 2));
+      workspaceLocation,
+      autoSpawnOnFinalize,
+    }), null, 2));
 
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 

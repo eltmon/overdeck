@@ -370,6 +370,7 @@ const planCmd = program
   .description('Planning lifecycle commands')
   .argument('[id]', 'Issue ID to plan')
   .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
+  .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--model <model>', 'Model to use for the planning role')
   .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
   .option('--effort <level>', 'Planning effort: low | medium | high')
@@ -383,6 +384,7 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
+  .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
   .action(planFinalizeCommand);
 
 planCmd

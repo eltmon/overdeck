@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -65,10 +65,18 @@ describe('syncBeadStatusToVBrief', () => {
     expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
-  it('returns null when no matching vBRIEF item found', async () => {
+  it('returns null and logs a warning when no matching vBRIEF item found', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Different title' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: No match here' }]);
-    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
+    try {
+      expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        '[vbrief-sync] No plan item matches bead bead-1 (title "No match here") in plan PAN-388 — AC statuses for this bead were NOT synced',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('syncs status when bead title matches with plan prefix', async () => {
