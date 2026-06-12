@@ -121,7 +121,7 @@ export class VBriefMergeConflictTaggedError extends Data.TaggedError('VBriefMerg
   readonly planPath: string;
 }> {}
 
-/** vBRIEF document on disk does not match the v0.5 spec shape. */
+/** vBRIEF document on disk does not match the supported spec shape. */
 export class VBriefInvalidFormatError extends Data.TaggedError('VBriefInvalidFormatError')<{
   readonly planPath: string;
   readonly reason: string;
@@ -212,7 +212,7 @@ export function readPlanSync(planPath: string): VBriefDocument {
   }
   const parsed = JSON.parse(raw);
 
-  // vBRIEF v0.5 requires exactly two top-level keys: vBRIEFInfo and plan
+  // vBRIEF v0.5/v0.6 requires exactly two top-level keys: vBRIEFInfo and plan
   if (parsed.vBRIEFInfo && parsed.plan) {
     return parsed as VBriefDocument;
   }
@@ -220,7 +220,7 @@ export function readPlanSync(planPath: string): VBriefDocument {
   // Non-spec format — reject with helpful error
   throw new Error(
     `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-    `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
+    `vBRIEF v0.5/v0.6 requires exactly { "vBRIEFInfo": { "version": "0.5" or "0.6" }, "plan": { ... } }. ` +
     `See docs/VBRIEF.md for the correct format.`
   );
 }

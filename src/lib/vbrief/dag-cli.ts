@@ -122,7 +122,7 @@ function mirrorTaskOperationToContinueFile(
   const overrides = { ...continueState.statusOverrides };
   overrides[itemId] = status;
 
-  // Derive affected subItems from the plan for canonical overlay
+  // Derive affected child items from the plan for canonical overlay
   const doc = readWorkspacePlanSync(workspacePath);
   if (doc) {
     const item = doc.plan.items.find(i => i.id === itemId);

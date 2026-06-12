@@ -271,13 +271,13 @@ When discovery is complete:
 
 ### vBRIEF Plan Format (REQUIRED)
 
-The plan file MUST conform to vBRIEF v0.5 spec (https://github.com/deftai/vBRIEF).
+The plan file MUST conform to vBRIEF v0.6 spec (https://github.com/deftai/vBRIEF).
 It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 ```json
 {
   "vBRIEFInfo": {
-    "version": "0.5",
+    "version": "0.6",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/{{VERSION}}",
     "description": "Plan for {{ISSUE_ID}}: <issue title>"
@@ -318,7 +318,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
           "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
-        "subItems": [
+        "items": [
           {
             "id": "<parent-id>.ac1",
             "title": "<specific testable acceptance criterion>",
@@ -340,8 +340,8 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 - `plan.id` MUST be the issue ID in lowercase (e.g., "{{ISSUE_ID_LOWER}}")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
-- `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
-- Acceptance criteria MUST be `subItems` with `metadata.kind: "acceptance_criterion"`
+- `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled, failed
+- Acceptance criteria MUST be nested `items` with `metadata.kind: "acceptance_criterion"`
 - Acceptance criteria MUST name observable behavior — prefer Given/When/Then; include a
   concrete verb like creates / returns / rejects / persists / renders / emits / exits.
   Banned phrasings (finalize lint rejects them): "works as expected", "passes tests",

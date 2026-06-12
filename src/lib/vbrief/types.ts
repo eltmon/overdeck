@@ -1,11 +1,11 @@
 /**
  * vBRIEF Type Definitions
  *
- * Conforms to vBRIEF v0.5 specification (https://github.com/deftai/vBRIEF).
+ * Conforms to vBRIEF v0.6 specification (https://github.com/deftai/vBRIEF).
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic beads creation and DAG visualization.
  *
- * New in v0.5 (PAN-453):
+ * v0.5 compatibility fields (PAN-453):
  *   - VBriefReference: external links (issues, PRDs, specs)
  *   - VBriefDocument.vBRIEFInfo: author (tool identifier), description
  *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
@@ -16,7 +16,7 @@
  * Panopticon extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.issueLabel: issue ID for beads label filtering
- *   - metadata.kind: "acceptance_criterion" on subItems
+ *   - metadata.kind: "acceptance_criterion" on child items
  */
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';

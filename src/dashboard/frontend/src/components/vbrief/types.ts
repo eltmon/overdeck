@@ -1,5 +1,5 @@
 /**
- * vBRIEF v0.5 frontend types — extended with all new fields
+ * vBRIEF frontend types — extended with all new fields
  * Used by VBriefViewer and related components.
  */
 

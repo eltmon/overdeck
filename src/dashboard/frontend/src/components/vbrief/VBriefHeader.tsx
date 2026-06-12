@@ -8,6 +8,7 @@ const STATUS_BADGE: Record<string, string> = {
   running: 'badge-bg-primary text-primary',
   completed: 'badge-bg-success text-success',
   blocked: 'badge-bg-destructive text-destructive',
+  failed: 'badge-bg-destructive text-destructive',
   cancelled: 'badge-bg-muted text-muted-foreground',
 };
 

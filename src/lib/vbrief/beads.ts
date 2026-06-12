@@ -470,8 +470,8 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
     // timestamps automatically. Each call below constitutes one write → one sequence increment.
     updateItemStatus(workspacePath, matchingItem.id, status);
 
-    // Also mark all AC subItems as completed when the parent item is completed.
-    // Each updateSubItemStatus call increments sequence separately (one write per subItem).
+    // Also mark all AC child items as completed when the parent item is completed.
+    // Each updateSubItemStatus call increments sequence separately (one write per child item).
     if (status === 'completed') {
       for (const sub of subItemsOf(matchingItem)) {
         if (sub.metadata?.kind === 'acceptance_criterion' && sub.status !== 'completed') {
