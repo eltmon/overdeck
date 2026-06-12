@@ -10,7 +10,7 @@ function makeDeps(statuses: Record<string, TestStatusGreenCiReviewStatus>): Test
   return {
     isGitHubAppConfigured: vi.fn(() => true),
     loadReviewStatuses: vi.fn(() => statuses),
-    getPullRequestState: vi.fn(() => Effect.succeed({
+    getPullRequestHeadState: vi.fn(() => Effect.succeed({
       state: 'OPEN' as const,
       merged: false,
       headSha: 'abcdef1234567890',
@@ -46,7 +46,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
 
     const actions = await reconcileTestStatusFromGreenCiWithDeps(deps);
 
-    expect(deps.getPullRequestState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 1658);
+    expect(deps.getPullRequestHeadState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 1658);
     expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 'abcdef1234567890');
     expect(deps.setReviewStatusSync).toHaveBeenCalledWith('PAN-1658', {
       testStatus: 'passed',
@@ -98,7 +98,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
     const deps = makeDeps(statuses);
 
     await expect(reconcileTestStatusFromGreenCiWithDeps(deps)).resolves.toEqual([]);
-    expect(deps.getPullRequestState).not.toHaveBeenCalled();
+    expect(deps.getPullRequestHeadState).not.toHaveBeenCalled();
     expect(deps.getCiCheckRunsState).not.toHaveBeenCalled();
     expect(deps.setReviewStatusSync).not.toHaveBeenCalled();
 
@@ -110,7 +110,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
 
   it('checks the current PR HEAD and skips closed or merged PRs', async () => {
     const deps = makeDeps({ 'PAN-1658': candidate });
-    vi.mocked(deps.getPullRequestState).mockReturnValueOnce(Effect.succeed({
+    vi.mocked(deps.getPullRequestHeadState).mockReturnValueOnce(Effect.succeed({
       state: 'OPEN' as const,
       merged: false,
       headSha: 'newhead9876543210',
@@ -121,7 +121,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
     expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 'newhead9876543210');
 
     const closedDeps = makeDeps({ 'PAN-1658': candidate });
-    vi.mocked(closedDeps.getPullRequestState).mockReturnValueOnce(Effect.succeed({
+    vi.mocked(closedDeps.getPullRequestHeadState).mockReturnValueOnce(Effect.succeed({
       state: 'CLOSED' as const,
       merged: false,
       headSha: 'abcdef1234567890',
@@ -157,10 +157,10 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
     const cooledDeps = makeDeps({ 'PAN-1658': candidate });
     cooledDeps.cooldowns.set('PAN-1658', 1_000_001);
     await expect(reconcileTestStatusFromGreenCiWithDeps(cooledDeps)).resolves.toEqual([]);
-    expect(cooledDeps.getPullRequestState).not.toHaveBeenCalled();
+    expect(cooledDeps.getPullRequestHeadState).not.toHaveBeenCalled();
 
     const errorDeps = makeDeps({ 'PAN-1658': candidate });
-    vi.mocked(errorDeps.getPullRequestState).mockReturnValueOnce(Effect.fail(new Error('rate limited')));
+    vi.mocked(errorDeps.getPullRequestHeadState).mockReturnValueOnce(Effect.fail(new Error('rate limited')));
     await expect(reconcileTestStatusFromGreenCiWithDeps(errorDeps)).resolves.toEqual([]);
     expect(errorDeps.setReviewStatusSync).not.toHaveBeenCalled();
     expect(errorDeps.cooldowns.get('PAN-1658')).toBe(1_300_000);

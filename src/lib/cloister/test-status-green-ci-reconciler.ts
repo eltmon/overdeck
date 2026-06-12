@@ -27,7 +27,7 @@ export interface TestStatusGreenCiCheckRunsState {
 export interface TestStatusGreenCiDeps {
   isGitHubAppConfigured(): boolean;
   loadReviewStatuses(): Record<string, TestStatusGreenCiReviewStatus>;
-  getPullRequestState(
+  getPullRequestHeadState(
     owner: string,
     repo: string,
     number: number,
@@ -73,7 +73,7 @@ export async function reconcileTestStatusFromGreenCiWithDeps(
       if (!Number.isFinite(prNumber)) continue;
 
       try {
-        const prState = await Effect.runPromise(deps.getPullRequestState(owner, repo, prNumber));
+        const prState = await Effect.runPromise(deps.getPullRequestHeadState(owner, repo, prNumber));
         if (prState.state !== 'OPEN' || prState.merged || !prState.headSha) continue;
 
         const ciState = await Effect.runPromise(deps.getCiCheckRunsState(owner, repo, prState.headSha));

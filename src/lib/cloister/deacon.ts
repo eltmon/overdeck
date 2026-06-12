@@ -3307,11 +3307,11 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
 }
 
 export async function reconcileTestStatusFromGreenCi(): Promise<string[]> {
-  const { getCiCheckRunsState, getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+  const { getCiCheckRunsState, getPullRequestHeadState, isGitHubAppConfigured } = await import('../github-app.js');
   return reconcileTestStatusFromGreenCiWithDeps({
     isGitHubAppConfigured,
     loadReviewStatuses,
-    getPullRequestState,
+    getPullRequestHeadState,
     getCiCheckRunsState,
     setReviewStatusSync,
     cooldowns: testStatusGreenCiReconcileCooldowns,
