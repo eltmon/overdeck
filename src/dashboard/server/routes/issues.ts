@@ -1253,12 +1253,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
       : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
-    // A planning agent waiting for an operator answer is NOT done. The plan-role
-    // Stop hook POSTs this endpoint on EVERY turn-end — including the turn where
-    // the agent calls AskUserQuestion and waits. Completing here would mark the
-    // session stopped, which trips the reducer that clears pendingAskUserQuestion
-    // (event-reducers.ts), so the dashboard question dialog would vanish the
-    // instant it was asked. If there's an unanswered AskUserQuestion, no-op.
+    // A planning agent waiting for an operator answer is NOT done. Real callers
+    // are pan plan finalize, pan plan done, the PlanDialog Done button, and the
+    // kanban Done planning action. Completing while AskUserQuestion is pending
+    // would mark the session stopped, which trips the reducer that clears
+    // pendingAskUserQuestion (event-reducers.ts), so the dashboard question
+    // dialog would vanish the instant it was asked. If there's an unanswered
+    // AskUserQuestion, no-op.
     //
     // Scan ALL of the planning session's JSONL files, not just the newest:
     // Claude Code rotates session files mid-run, so the open question can live

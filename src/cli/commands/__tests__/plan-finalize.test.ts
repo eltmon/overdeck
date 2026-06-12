@@ -50,9 +50,36 @@ afterEach(() => {
 });
 
 describe('promotePlanning', () => {
-  it('posts complete-planning with autoSpawn and no separate agents request', async () => {
+  it('posts complete-planning without autoSpawn by default', async () => {
     vi.useFakeTimers();
     const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      message: 'Planning complete and pushed to git - ready for execution',
+      workAgentSpawned: false,
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(promotePlanning('PAN-1509')).resolves.toEqual({
+      success: true,
+      message: 'Planning complete and pushed to git - ready for execution',
+      error: null,
+      workAgentSpawned: false,
+      workAgentMessage: null,
+      workAgentError: null,
+      workAgentSkipReason: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://dashboard.test/api/issues/PAN-1509/complete-planning');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({});
+    expect(String(url)).not.toContain('/api/agents');
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 90_000);
+  });
+
+  it('posts complete-planning with autoSpawn when requested and no separate agents request', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       success: true,
       message: 'Planning complete and work agent spawn requested',
@@ -61,7 +88,7 @@ describe('promotePlanning', () => {
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(promotePlanning('PAN-1509')).resolves.toEqual({
+    await expect(promotePlanning('PAN-1509', true)).resolves.toEqual({
       success: true,
       message: 'Planning complete and work agent spawn requested',
       error: null,
@@ -77,7 +104,6 @@ describe('promotePlanning', () => {
     expect(init?.method).toBe('POST');
     expect(JSON.parse(String(init?.body))).toEqual({ autoSpawn: true });
     expect(String(url)).not.toContain('/api/agents');
-    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 90_000);
   });
 
   it('surfaces autoSpawn skip reasons from complete-planning', async () => {
@@ -90,7 +116,7 @@ describe('promotePlanning', () => {
     }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(promotePlanning('PAN-1509')).resolves.toMatchObject({
+    await expect(promotePlanning('PAN-1509', true)).resolves.toMatchObject({
       success: true,
       workAgentSpawned: false,
       workAgentMessage: 'Skip reason: stack-unhealthy',
