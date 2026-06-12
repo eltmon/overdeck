@@ -1610,6 +1610,29 @@ async function deliverInitialPromptWithRetry(
   caller: string,
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<DeliveryResult> {
+  // PAN-1803: the codex TUI mangles a large pasted kickoff prompt — a multi-
+  // thousand-character paste garbles its input and trips its "Create a plan?"
+  // mode hint, so the agent never executes. Write the full brief to a file and
+  // deliver a SHORT pointer instead (robust regardless of transport — the same
+  // pattern that makes file-backed handoffs reliable). Only codex needs this;
+  // claude-code/pi line-based input handle the full prompt fine.
+  let deliveredPrompt = prompt;
+  try {
+    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
+    if (codexState?.harness === 'codex' && codexState.workspace) {
+      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
+      mkdirSync(dirname(kickoffPath), { recursive: true });
+      writeFileSync(kickoffPath, prompt, 'utf-8');
+      deliveredPrompt =
+        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
+        + 'Read that file in full now and execute it exactly — it is your full set of work '
+        + 'instructions. Begin immediately and keep working autonomously until done; do not '
+        + 'wait for further input.';
+    }
+  } catch {
+    // Non-fatal: fall back to delivering the full prompt inline.
+  }
+
   let lastFailure = 'not-attempted';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     let harness: RuntimeName | undefined;
@@ -1627,7 +1650,7 @@ async function deliverInitialPromptWithRetry(
 
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     try {
-      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
       if (result.ok) return result;
       lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
     } catch (err) {
