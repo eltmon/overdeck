@@ -79,6 +79,7 @@ import { abortReviewCommand } from './commands/abort-review.js';
 // parseReviewSynthesis (now also retired).
 import { reviewRestartCommand } from './commands/review-restart.js';
 import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
+import { reviewValidateTraceCommand } from './commands/review-validate-trace.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerTtsCommands } from './commands/tts.js';
@@ -361,6 +362,11 @@ review
   .option('--context <path>', 'Context manifest path')
   .option('--model <model>', 'Override reviewer model')
   .action(reviewSpawnReviewerCommand);
+
+review
+  .command('validate-trace <file>', { hidden: true })
+  .description('Internal: validate a requirements review output file for live code path traces')
+  .action(reviewValidateTraceCommand);
 
 // PAN-1048 R5: `pan review run` removed (see import note above).
 

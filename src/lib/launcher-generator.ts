@@ -461,8 +461,25 @@ function buildCommand(config: LauncherConfig): string[] {
  * launcher itself signals the synthesis agent deterministically — the agent
  * never has to remember to run `pan tell`, and the signal is tied to process
  * exit rather than agent good behavior or Deacon patrol timing.
+ *
+ * PAN-1498: the requirements sub-role gets an additional deterministic
+ * validator gate (`pan review validate-trace`). Other sub-roles keep the
+ * original file-present contract byte-for-byte.
  */
 function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
+  const sig = config.reviewSignal!;
+  if (sig.subRole === 'requirements') {
+    return buildRequirementsReviewSubRoleCommand(config);
+  }
+  return buildLegacyReviewSubRoleCommand(config);
+}
+
+/**
+ * Original PAN-977 signal contract for security / correctness / performance.
+ * Kept unchanged so those three reviewers are byte-for-byte identical to the
+ * pre-PAN-1498 baseline.
+ */
+function buildLegacyReviewSubRoleCommand(config: LauncherConfig): string[] {
   const sig = config.reviewSignal!;
   const inner = buildNonConversationCommand(config, false);
   if (inner.length === 0) return inner;
@@ -487,6 +504,47 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
     `else`,
     `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
     `fi`,
+    `touch ${shellQuote(sig.signalMarkerPath)}`,
+    `rm -f ${pidFile}`,
+  ];
+}
+
+/**
+ * PAN-1498 requirements sub-role launcher. After claude exits, validates the
+ * output file with `pan review validate-trace` and signals REVIEWER_FAILED
+ * with the validator's reason on failure. Falls back to the legacy file-
+ * present signal when the validator CLI is unavailable on the worker.
+ */
+function buildRequirementsReviewSubRoleCommand(config: LauncherConfig): string[] {
+  const sig = config.reviewSignal!;
+  const inner = buildNonConversationCommand(config, false);
+  if (inner.length === 0) return inner;
+
+  const claudeCmd = `timeout ${sig.timeoutSeconds} ${inner[0]}`;
+  const synth = shellQuote(sig.synthesisAgentId);
+  const out = shellQuote(sig.outputPath);
+  const role = sig.subRole;
+  const pidFile = shellQuote(sig.launcherPidPath);
+  const reasonFile = '/tmp/pan-trace-reason.$$';
+
+  return [
+    `echo $$ > ${pidFile}`,
+    claudeCmd,
+    'CLAUDE_EXIT=$?',
+    `if [ "$CLAUDE_EXIT" = "124" ]; then`,
+    `  pan tell ${synth} "REVIEWER_TIMEOUT ${role} reviewer exceeded ${sig.timeoutSeconds}s deadline" || true`,
+    `elif [ ! -s ${out} ]; then`,
+    `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
+    `elif command -v pan >/dev/null 2>&1 && pan review validate-trace ${out} 2>${reasonFile}; then`,
+    `  pan tell ${synth} "REVIEWER_READY ${role} ${sig.outputPath}" || true`,
+    `elif [ -f ${reasonFile} ]; then`,
+    `  REASON=$(cat ${reasonFile})`,
+    `  pan tell ${synth} "REVIEWER_FAILED ${role} $REASON" || true`,
+    `else`,
+    `  pan tell ${synth} "REVIEWER_READY ${role} ${sig.outputPath}" || true`,
+    `  echo '[review-requirements] WARNING: pan review validate-trace unavailable on this worker — substrate trace check skipped' >&2`,
+    `fi`,
+    `rm -f ${reasonFile}`,
     `touch ${shellQuote(sig.signalMarkerPath)}`,
     `rm -f ${pidFile}`,
   ];
