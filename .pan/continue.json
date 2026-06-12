@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T17:25:32Z",
+  "updated": "2026-06-12T17:28:07Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "dde3511fb",
+    "sha": "a7f848a3d",
     "dirty": false
   },
   "decisions": [
@@ -133,10 +133,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Inspection fix for shared branding registry bead workspace-a9852 implemented; commit it, close workspace-a9852 again, rerun pan inspect PAN-1787 --bead workspace-a9852, then continue with bd ready -l pan-1787.",
-    "beadId": "workspace-a9852",
+    "description": "Conversation feed HarnessLogo bead workspace-ua0y6 implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
+    "beadId": "workspace-ua0y6",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
+      "src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx",
+      "src/dashboard/frontend/src/components/sessionFeed/__tests__/ConversationFeedCard.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -222,6 +223,12 @@
       "timestamp": "2026-06-12T17:25:32Z",
       "reason": "inspection-fix",
       "note": "Addressed INSPECTION BLOCKED for workspace-a9852: extended the branding test so HarnessLogo claude-code must render the Anthropic SVG viewBox, codex must render the OpenAI SVG viewBox, and pi still renders the π tile. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/shared/branding/__tests__/branding.test.tsx.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:28:07Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-ua0y6: ConversationFeedCard now imports HarnessLogo from shared branding, deletes AGENT_ICON_PROVIDER and chat/ProviderIcons usage, maps feed agent ids to harness ids, and renders the Pi π mark for pi entries. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/ConversationFeedCard.test.tsx and npm run typecheck.",
       "agentModel": "gpt-5.5"
     }
   ],
