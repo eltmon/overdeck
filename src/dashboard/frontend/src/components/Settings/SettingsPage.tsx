@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -77,6 +77,16 @@ interface OpenRouterModelCatalog {
 interface OpenRouterCatalogResponse {
   models: OpenRouterModelCatalog[];
   favorites: string[];
+}
+
+const HARNESS_LABELS: Record<Harness, string> = {
+  'claude-code': 'Claude Code',
+  pi: 'Pi',
+  codex: 'Codex',
+};
+
+function harnessLabel(harness: Harness): string {
+  return HARNESS_LABELS[harness];
 }
 
 async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
@@ -1079,15 +1089,19 @@ export function SettingsPage() {
     }, { debounce: true });
   };
 
-  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+  const handleProviderHarnessChange = (provider: Provider, harness: HarnessOverride) => {
+    const nextProviderHarnesses = { ...formData.models.provider_harnesses };
+    if (harness === '') {
+      delete nextProviderHarnesses[provider];
+    } else {
+      nextProviderHarnesses[provider] = harness;
+    }
+
     applySettings({
       ...formData,
       models: {
         ...formData.models,
-        provider_harnesses: {
-          ...formData.models.provider_harnesses,
-          [provider]: harness,
-        },
+        provider_harnesses: nextProviderHarnesses,
       },
     });
   };
@@ -1606,7 +1620,8 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
-            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? '';
+            const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1822,9 +1837,10 @@ export function SettingsPage() {
                       <span className="text-xs font-medium text-foreground">Default harness</span>
                       <select
                         value={providerHarness}
-                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
+                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
                         className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
                       >
+                        <option value="">Default ({harnessLabel(builtInHarness)})</option>
                         <option value="claude-code">Claude Code</option>
                         <option value="pi">Pi</option>
                         <option value="codex">Codex</option>
@@ -1904,10 +1920,11 @@ export function SettingsPage() {
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Default harness</span>
                   <select
-                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
-                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
+                    value={formData.models.provider_harnesses?.openrouter ?? ''}
+                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
                     className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
                   >
+                    <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
                     <option value="claude-code">Claude Code</option>
                     <option value="pi">Pi</option>
                     <option value="codex">Codex</option>

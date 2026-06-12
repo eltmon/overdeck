@@ -5,6 +5,7 @@ export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'min
 
 export type ModelId = string;
 export type Harness = 'claude-code' | 'pi' | 'codex';
+export type HarnessOverride = Harness | '';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -39,7 +40,8 @@ export interface ModelsConfig {
   providers: ProvidersConfig;
   /** Legacy model-route overrides are accepted only to preserve form round-trips. */
   overrides: Partial<Record<string, ModelId>>;
-  provider_harnesses?: Partial<Record<Provider, Harness>>;
+  provider_harnesses?: Partial<Record<Provider, HarnessOverride>>;
+  provider_default_harnesses?: Record<Provider, Harness>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }

@@ -142,6 +142,20 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('Sidebar refresh interval');
   });
 
+  it('renders provider harness selects as clearable built-in defaults', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? ''");
+    expect(SETTINGS_PAGE_SOURCE).toContain('const builtInHarness = formData.models.provider_default_harnesses?.[provider.id]');
+    expect(SETTINGS_PAGE_SOURCE).toContain('<option value="">Default ({harnessLabel(builtInHarness)})</option>');
+    expect(SETTINGS_PAGE_SOURCE).toContain("value={formData.models.provider_harnesses?.openrouter ?? ''}");
+    expect(SETTINGS_PAGE_SOURCE).toContain("Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})");
+  });
+
+  it('deletes provider harness override keys when the Default option is selected', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("if (harness === '')");
+    expect(SETTINGS_PAGE_SOURCE).toContain('delete nextProviderHarnesses[provider]');
+    expect(SETTINGS_PAGE_SOURCE).toContain('provider_harnesses: nextProviderHarnesses');
+  });
+
   it('surfaces the RTK Bash compression toggle in experimental settings', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('RTK Bash compression');
     expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Enable RTK Bash compression"');
