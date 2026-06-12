@@ -280,6 +280,7 @@ const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kim
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
+type RoleConfigInput = Omit<RoleConfig, 'harness'> & { harness?: RuntimeName | null | '' };
 
 function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
   return Object.fromEntries(
@@ -356,7 +357,8 @@ function workhorseSlotFromRef(ref: string): string {
 function mergeRoles(current?: RolesConfig, updates?: RolesConfig): RolesConfig | undefined {
   if (!current && !updates) return undefined;
   const merged: RolesConfig = { ...(current ?? {}) };
-  for (const [role, roleConfig] of Object.entries(updates ?? {}) as Array<[Role, RoleConfig]>) {
+  for (const [role, rawRoleConfig] of Object.entries(updates ?? {}) as Array<[Role, RoleConfigInput]>) {
+    const roleConfig = normalizeRoleConfig(rawRoleConfig);
     merged[role] = {
       ...(merged[role] ?? {}),
       ...roleConfig,
@@ -367,8 +369,33 @@ function mergeRoles(current?: RolesConfig, updates?: RolesConfig): RolesConfig |
           }
         : merged[role]?.sub,
     };
+    if (hasHarnessClearSentinel(rawRoleConfig)) {
+      delete merged[role]?.harness;
+    }
   }
   return merged;
+}
+
+function hasHarnessClearSentinel(roleConfig: RoleConfigInput): boolean {
+  return Object.prototype.hasOwnProperty.call(roleConfig, 'harness')
+    && (roleConfig.harness === null || roleConfig.harness === '');
+}
+
+function normalizeRoleConfig(roleConfig: RoleConfigInput): RoleConfig {
+  const normalized = { ...roleConfig } as RoleConfig;
+  if (hasHarnessClearSentinel(roleConfig)) {
+    delete normalized.harness;
+  }
+  return normalized;
+}
+
+function normalizeRolesConfig(roles?: RolesConfig): RolesConfig | undefined {
+  if (!roles) return undefined;
+  const normalized: RolesConfig = {};
+  for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfigInput]>) {
+    normalized[role] = normalizeRoleConfig(roleConfig);
+  }
+  return normalized;
 }
 
 function validateModelRef(
@@ -421,8 +448,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
-    errors.push(`${fieldPath}.harness must be claude-code, pi, or codex`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -759,7 +786,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
     workhorses: settings.workhorses,
-    roles: settings.roles,
+    roles: normalizeRolesConfig(settings.roles),
     models: {
       providers: {
         anthropic: providerConfigForSave('anthropic', settings.models.providers.anthropic, settings, currentConfig),

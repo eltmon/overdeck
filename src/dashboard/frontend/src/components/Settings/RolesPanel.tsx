@@ -26,6 +26,8 @@ interface RoleConfig {
 
 type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
 type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
+type RoleConfigPatch = Omit<RoleConfig, 'harness'> & { harness?: Harness | null };
+type RolesConfigPayload = Partial<Record<RoleId, RoleConfigPatch>>;
 
 interface SettingsResponse {
   roles?: RolesConfig;
@@ -266,10 +268,10 @@ function providerWarning(
   return null;
 }
 
-async function saveRoleConfig(role: RoleId, patch: RoleConfig, subRole?: string): Promise<void> {
+async function saveRoleConfig(role: RoleId, patch: RoleConfigPatch, subRole?: string): Promise<void> {
   const settings = await fetchSettings();
   const currentRole = settings.roles?.[role] ?? {};
-  const nextRole: RoleConfig = subRole
+  const nextRole: RoleConfigPatch = subRole
     ? {
         ...currentRole,
         sub: {
@@ -285,7 +287,7 @@ async function saveRoleConfig(role: RoleId, patch: RoleConfig, subRole?: string)
         ...patch,
       };
 
-  const nextSettings = {
+  const nextSettings: Omit<SettingsResponse, 'roles'> & { roles: RolesConfigPayload } = {
     ...settings,
     roles: {
       ...(settings.roles ?? {}),
@@ -379,7 +381,7 @@ function RoleHarnessSelect({
   label: string;
   value?: Harness;
   disabled: boolean;
-  onChange: (value: Harness | undefined) => void;
+  onChange: (value: Harness | null) => void;
 }) {
   const logoHarness = value ?? 'claude-code';
   const logoLabel = value ? HARNESS_BRANDS[value].label : 'Provider default';
@@ -397,7 +399,7 @@ function RoleHarnessSelect({
         <select
           aria-label={label}
           value={value ?? ''}
-          onChange={(event) => onChange(event.target.value ? event.target.value as Harness : undefined)}
+          onChange={(event) => onChange(event.target.value ? event.target.value as Harness : null)}
           disabled={disabled}
           className="min-w-0 flex-1 px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
         >
@@ -438,7 +440,7 @@ export function RolesPanel() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: ({ role, patch, subRole }: { role: RoleId; patch: RoleConfig; subRole?: string }) => (
+    mutationFn: ({ role, patch, subRole }: { role: RoleId; patch: RoleConfigPatch; subRole?: string }) => (
       saveRoleConfig(role, patch, subRole)
     ),
     onSuccess: async () => {

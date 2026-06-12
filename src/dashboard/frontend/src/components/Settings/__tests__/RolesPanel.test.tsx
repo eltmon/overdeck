@@ -210,7 +210,7 @@ describe('RolesPanel', () => {
       url.toString() === '/api/settings' && init?.method === 'PUT'
     ));
     const body = JSON.parse(putCall?.[1]?.body as string);
-    expect(body.roles.plan).not.toHaveProperty('harness');
+    expect(body.roles.plan.harness).toBeNull();
     expect(body.roles.plan.model).toBe('workhorse:expensive');
   });
 

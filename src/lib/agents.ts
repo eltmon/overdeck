@@ -2268,21 +2268,21 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
     await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
   }
 
-  if (patch.claudeSessionId) {
+  if (patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
     // model_set requires a model — use existing snapshot's model if present.
     const snap = getAgentRuntimeStateSync(agentId);
-    if (snap || patch.claudeSessionId) {
+    if (snap || patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
       const event: {
         kind: 'model_set';
         model: string;
-        claudeSessionId: string;
+        claudeSessionId?: string;
         sessionModel?: string;
         sessionHarness?: RuntimeName;
       } = {
         kind: 'model_set',
         model: 'unknown',
-        claudeSessionId: patch.claudeSessionId,
       };
+      if (patch.claudeSessionId !== undefined) event.claudeSessionId = patch.claudeSessionId;
       if (patch.sessionModel !== undefined) event.sessionModel = patch.sessionModel;
       if (patch.sessionHarness !== undefined) event.sessionHarness = patch.sessionHarness;
       await Effect.runPromise(emitAgentEvent(agentId, {
@@ -3669,6 +3669,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   }));
+  await saveAgentRuntimeState(agentId, {
+    state: 'active',
+    lastActivity: new Date().toISOString(),
+    sessionModel: selectedModel,
+    sessionHarness: resolvedHarness,
+  });
 
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
   // the tmux session exists, but only block on completion when we are about to

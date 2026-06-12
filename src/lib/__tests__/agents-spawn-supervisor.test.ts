@@ -328,6 +328,28 @@ describe('spawnAgent PTY supervisor wiring', () => {
     }
   });
 
+  it('persists fresh work-agent session origin when the tmux session is created', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-1408',
+      workspace,
+      role: 'work',
+      model: 'gpt-5.5',
+    });
+
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1408',
+      expect.objectContaining({
+        kind: 'model_set',
+        model: 'unknown',
+        sessionModel: 'gpt-5.5',
+        sessionHarness: 'codex',
+      }),
+    );
+  });
+
   it('threads active flywheel provenance env into spawnRun work agents', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
     activeFlywheelRunId = 'RUN-777';
