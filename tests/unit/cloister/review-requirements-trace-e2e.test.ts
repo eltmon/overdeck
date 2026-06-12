@@ -158,6 +158,68 @@ process.exit(0);
 
     rmSync(root, { recursive: true, force: true });
   });
+
+  it('falls back to REVIEWER_READY with a warning when pan is not on PATH at all', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pan-trace-nopan-'));
+    const paths = buildFixtureDirs(root);
+    writeClaudeStub(paths, 'missing-section');
+    // Intentionally do NOT write a pan stub so `command -v pan` resolves false.
+    writeFileSync(paths.promptFile, '# prompt\n');
+
+    // Restrict PATH so no `pan` binary is found. `claude` is also removed from
+    // PATH, so we point baseCommand at the absolute stub path. To observe the
+    // REVIEWER_READY tell that the launcher attempts, install a
+    // command_not_found_handle that records the invocation.
+    const pathEnv = '/usr/bin:/bin';
+    const notFoundLog = join(root, 'not-found.log');
+    const bashEnv = join(root, 'bash_env.sh');
+    writeFileSync(
+      bashEnv,
+      `command_not_found_handle() {
+  echo "$*" >> ${notFoundLog}
+  return 127
+}
+export -f command_not_found_handle
+`,
+      { mode: 0o644 },
+    );
+
+    const script = generateLauncherScriptSync({
+      role: 'review',
+      workingDir: process.cwd(),
+      promptFile: '/dev/null',
+      promptFileMode: 'stdin',
+      setPipefail: true,
+      trapHup: true,
+      baseCommand: join(paths.binDir, 'claude'),
+      sessionId: 'sess-req',
+      reviewSignal: {
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'requirements',
+        outputPath: paths.outputFile,
+        signalMarkerPath: paths.signalMarker,
+        launcherPidPath: paths.pidFile,
+        timeoutSeconds: 1800,
+      },
+    });
+    const scriptPath = join(root, 'launcher.sh');
+    writeFileSync(scriptPath, script, { mode: 0o755 });
+    const result = spawnSync('bash', [scriptPath], {
+      env: { ...process.env, PATH: pathEnv, BASH_ENV: bashEnv },
+      timeout: 5000,
+    });
+    const output = (result.stdout?.toString() ?? '') + (result.stderr?.toString() ?? '');
+
+    const notFoundCalls = readTellLog(notFoundLog);
+    expect(notFoundCalls).toHaveLength(1);
+    expect(notFoundCalls[0]).toBe(
+      `pan tell agent-pan-1-review REVIEWER_READY requirements ${paths.outputFile}`,
+    );
+    expect(output).toContain('substrate trace check skipped');
+    expect(existsSync(paths.signalMarker)).toBe(true);
+
+    rmSync(root, { recursive: true, force: true });
+  });
 });
 
 function runLauncherScript(script: string, root: string, pathEnv: string): string {
