@@ -51,6 +51,7 @@ import { recordFeatureRegistryLifecycle } from './registry/feature-registry-popu
 import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
+import { sendGracefulRestartWarning } from './graceful-restart.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -4834,21 +4835,7 @@ export async function restartAgent(
   }
 
   if (graceful && await Effect.runPromise(sessionExists(normalizedId))) {
-    const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
-    try {
-      await Effect.runPromise(sendKeys(normalizedId, warning));
-    } catch { /* non-fatal — session may already be dead */ }
-
-    await new Promise(r => setTimeout(r, 30_000));
-
-    const continueFile = join(agentState.workspace, '.pan', 'continue.json');
-    if (existsSync(continueFile)) {
-      const mtime = statSync(continueFile).mtimeMs;
-      const ageMs = Date.now() - mtime;
-      if (ageMs > 5 * 60 * 1000) {
-        console.warn(`[restartAgent] continue.json is stale (${Math.round(ageMs / 1000)}s old) — proceeding anyway`);
-      }
-    }
+    await sendGracefulRestartWarning(normalizedId, agentState.harness, agentState.workspace);
   }
 
   await Effect.runPromise(stopAgent(normalizedId));

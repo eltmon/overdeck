@@ -104,6 +104,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   killSessionSync: vi.fn(() => Effect.void),
   sendKeys: vi.fn(() => Effect.void),
   sendKeysProgram: vi.fn(() => Effect.void),
+  sendEscapeKeyAsync: vi.fn(() => Promise.resolve()),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn().mockReturnValue(false),
   sessionExistsSync: vi.fn().mockReturnValue(false),
@@ -250,6 +251,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
     vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
+    vi.mocked(tmux.sendEscapeKeyAsync).mockResolvedValue(undefined);
     vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
     // PAN-1594: spawnRun/spawnAgent now wait for the session-start hook to write
     // ready.json (waitForReadySignal) instead of scraping the tmux pane. The real
@@ -271,6 +273,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await closeFeatureRegistryStorage();
     if (originalPanopticonHome) {
       process.env.PANOPTICON_HOME = originalPanopticonHome;
@@ -596,6 +599,19 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result).toEqual({ success: true });
       const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
       expect(launcher).not.toContain('--resume');
+    });
+
+    it('non-graceful restart skips Escape and grace wait', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-restart-nongraceful';
+      writeResumableWorkAgent(agentId, true);
+      vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(true));
+
+      const result = await restartAgent(agentId, { graceful: false });
+
+      expect(result).toEqual({ success: true });
+      expect(tmux.sendEscapeKeyAsync).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Restarting in 60s'));
     });
 
     it('honours an explicit options.model over the role config default', async () => {
