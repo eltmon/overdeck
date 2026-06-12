@@ -19,7 +19,7 @@ import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
 import { HARNESS_OPTIONS, canUsePickerHarness, type HarnessPolicyDecisions } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
-import { ProviderIcon, ProviderDot } from './ProviderIcons';
+import { HarnessLogo, ProviderIcon, ProviderDot } from '../shared/branding';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 /**
@@ -354,10 +354,16 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         )}
         <span className={styles.pickerLabel}>{label}</span>
         {harness === 'pi' && (
-          <span className={styles.harnessIndicator} title="Pi harness active">Pi</span>
+          <span className={styles.harnessIndicator} title="Pi harness active">
+            <HarnessLogo harness="pi" className={styles.harnessIndicatorIcon} />
+            Pi
+          </span>
         )}
         {harness === 'codex' && (
-          <span className={styles.harnessIndicator} title="Codex harness active">Codex</span>
+          <span className={styles.harnessIndicator} title="Codex harness active">
+            <HarnessLogo harness="codex" className={styles.harnessIndicatorIcon} />
+            Codex
+          </span>
         )}
         {selectedWarning && (
           <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />
@@ -457,10 +463,11 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       title={title}
                     >
                       <span className={styles.harnessOptionIcon}>
-                        {isActive ? <Check size={11} /> : null}
+                        {isActive ? <Check size={11} /> : <HarnessLogo harness={opt.id} className={styles.harnessOptionLogo} />}
                       </span>
                       <span className={styles.harnessOptionBody}>
                         <span className={styles.harnessOptionNameRow}>
+                          {isActive && <HarnessLogo harness={opt.id} className={styles.harnessOptionLogo} />}
                           <span className={styles.harnessOptionName}>{opt.label}</span>
                           {isExperimentalLiveSwitch && (
                             <span className={styles.harnessOptionExperimental}>Experimental</span>
