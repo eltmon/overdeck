@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1788",
   "created": "2026-06-12T04:00:04.296Z",
-  "updated": "2026-06-12T04:04:09Z",
+  "updated": "2026-06-12T17:58:03.717Z",
   "gitState": {
     "branch": "feature/pan-1788",
     "sha": "37d78a615",
@@ -98,5 +98,38 @@
     }
   ],
   "feedback": [],
-  "agentModel": "agent:claude-fable-5"
+  "agentModel": "agent:claude-fable-5",
+  "statusOverrides": {
+    "concurrency-regression-test": "completed",
+    "concurrency-regression-test.ac1": "completed",
+    "concurrency-regression-test.ac2": "completed",
+    "concurrency-regression-test.ac3": "completed",
+    "verify-host-yes-prompt-return": "completed",
+    "verify-host-yes-prompt-return.ac1": "completed",
+    "verify-host-yes-prompt-return.ac2": "completed",
+    "honest-transient-error-messaging": "completed",
+    "honest-transient-error-messaging.ac1": "completed",
+    "honest-transient-error-messaging.ac2": "completed",
+    "honest-transient-error-messaging.ac3": "completed",
+    "honest-transient-error-messaging.ac4": "completed",
+    "wire-start-gate-query": "completed",
+    "wire-start-gate-query.ac1": "completed",
+    "wire-start-gate-query.ac2": "completed",
+    "wire-start-gate-query.ac3": "completed",
+    "wire-create-beads-path": "completed",
+    "wire-create-beads-path.ac1": "completed",
+    "wire-create-beads-path.ac2": "completed",
+    "wire-create-beads-path.ac3": "completed",
+    "cross-process-bd-lock": "completed",
+    "cross-process-bd-lock.ac1": "completed",
+    "cross-process-bd-lock.ac2": "completed",
+    "cross-process-bd-lock.ac3": "completed",
+    "cross-process-bd-lock.ac4": "completed",
+    "cross-process-bd-lock.ac5": "completed",
+    "transient-bd-classifier": "completed",
+    "transient-bd-classifier.ac1": "completed",
+    "transient-bd-classifier.ac2": "completed",
+    "transient-bd-classifier.ac3": "completed",
+    "transient-bd-classifier.ac4": "completed"
+  }
 }
