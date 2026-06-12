@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T16:59:57.623Z",
+  "updated": "2026-06-12T17:11:24Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "5b11ac2aa",
+    "sha": "7321d85f8",
     "dirty": false
   },
   "decisions": [
@@ -133,15 +133,15 @@
     }
   ],
   "resumePoint": {
-    "description": "Settings API defaults bead workspace-bnhed implemented and committed; close the bead, then continue with the frontend Settings Providers default-select bead when ready.",
-    "beadId": "workspace-bnhed",
+    "description": "Dashboard start-route harness forwarding bead workspace-wjwqy implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
+    "beadId": "workspace-wjwqy",
     "filesToRead": [
-      "src/lib/settings-api.ts",
-      "src/lib/__tests__/settings-api.test.ts"
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/server/routes/__tests__/agents-start-args.test.ts"
     ]
   },
   "beadsMapping": {},
-  "agentModel": "agent:claude-fable-5",
+  "agentModel": "gpt-5.5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -182,6 +182,23 @@
       "timestamp": "2026-06-12T16:59:57.623Z",
       "reason": "bead-progress",
       "note": "Implemented workspace-bnhed: settings GET returns provider_default_harnesses from getBuiltInDefaultHarness for all 10 providers; provider harness empty-string/absent saves remove YAML harness keys; explicit overrides persist and round-trip. Verified with npx vitest run src/lib/__tests__/settings-api.test.ts tests/unit/lib/providers.test.ts --reporter=dot and npm run typecheck. npm test with only root filters was not useful because it forwards filters to frontend and no frontend files match.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:04:07.414Z",
+      "reason": "start",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:07:16Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-h73w7: Settings provider harness selects now use the backend provider_default_harnesses map for Default (<built-in>) labels, render unset overrides as value '', delete provider_harnesses keys when Default is selected, and apply the same behavior to OpenRouter. Verified implementation and source-level SettingsPage tests were committed in ea3f43a72.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:11:24Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-wjwqy: extracted dashboard start-route pan start argument construction into buildPanStartArgs and used it in both local spawn paths so --harness is forwarded only when an explicit harness survives validation/policy collapse; unset harnesses now remain omitted from spawn args. Added route coverage for unset, explicit, and host-override args. Verified with npx vitest run src/dashboard/server/routes/__tests__/agents-start-args.test.ts --reporter=dot and npm run typecheck.",
       "agentModel": "gpt-5.5"
     }
   ],
