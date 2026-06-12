@@ -75,6 +75,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   killSession: killSessionMock,
   createSession: createSessionMock,
   setOption: vi.fn(() => Effect.succeed(undefined)),
+  exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   listSessionNames: vi.fn(() => Effect.succeed([])),
 }));
 
