@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-1787",
+  "created": "2026-06-12T06:30:04.640Z",
+  "updated": "2026-06-12T16:59:57.623Z",
+  "gitState": {
+    "branch": "feature/pan-1787",
+    "sha": "5b11ac2aa",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "The PRD at .pan/drafts/PAN-1787.md (rev 3) is the primary execution reference — every bead cites its WI-N section. Where line numbers drifted, the bead text carries the corrected, 2026-06-12-verified location: plan-kickoff harness chain at spawn-planning-session.ts:558-561 (PRD said 513-516); CLI --harness flags at cli/index.ts:376 (plan), :515 (start), :533/:536 (strike); convertConversationTranscript export at session-format-converter.ts:304.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "resolveHarness() lives in new src/lib/harness-resolve.ts; precedence explicit > roles[role].harness > providerHarnesses[provider] > getBuiltInDefaultHarness(provider) > 'claude-code'; winner ALWAYS passes through canUseHarnessSync; pi/codex winners also require an installed binary or collapse to claude-code with a warning. The binary check is a NEW async helper (promisified exec `command -v`, module-level cache) — doctor's checkCommand is execSync-based and must not be imported into server-reachable code.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "The built-in-default activity notice ('harness <h> chosen by provider default — override in Settings → Providers') is emitted inside resolveHarness, once per provider per process. No separate release-notes artifact; the behavior-change callout goes in the commit message for the resolution-core beads.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Agent switching rule (PRD WI-5): a model change, a harness change, or both ⇒ fresh harness session re-onboarded via continue.json; JSONL --resume only when both are unchanged; agents never get transcript conversion. Sessions lacking persisted origin metadata (created before this change) keep resuming as today.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Pi gets no pre-warning interrupt in graceful restart (verified: pi-fifo.ts has no interrupt/abort op) — 60s grace only. claude-code/codex get sendEscapeKeyAsync ×2 (250ms apart) before the warning.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Dashboard start route forwards --harness to pan start ONLY when the user explicitly picked one; unset means no flag, so resolution happens once at the spawn site. Never resolve-and-forward an unset harness as explicit.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D7",
+      "summary": "specialist_harnesses (PAN-636) becomes a deprecated alias at role-tier precedence: roles[role].harness wins when both set; one-time deprecation warning when the alias is what applied; both cloister test suites rewritten to alias semantics, coverage preserved.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Dead-code scope widened: the entire src/dashboard/frontend/src/components/Settings/Provider/ directory (ProviderCard, ProviderPanel, ThinkingLevelSlider) is deleted — verified 2026-06-12 that none of the three is imported by live code (ProviderCard's only importer is the equally-dead ProviderPanel).",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Branding: shared/branding registry (PROVIDER_BRANDS + HARNESS_BRANDS + ProviderLogo/HarnessLogo/ProviderDot) is the single source for labels/colors/icons; chat/ProviderIcons.tsx stays as a thin re-export until all rollout beads land, then surfaces import the registry directly. pi harness mark = styled π glyph (pi-ai has no formal logo). AgentIcon note: pi currently falls to the lucide Bot glyph (PRD said Anthropic starburst — drifted) — fix is the same.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Conversation harness switching is kept fully functional but labeled experimental (UI tag + warning copy + harnesses.mdx subsection). The tier-4 endpoint path, decideSwitchStrategy, session-format-converter, and ALL their tests must remain byte-for-byte unchanged — review should reject any diff touching them.",
+      "recordedAt": "2026-06-12T06:55:00Z"
+    },
+    {
+      "id": "D11",
+      "summary": "getBuiltInDefaultHarness accepts ProviderName | string, not only ProviderName, so the unknown-provider fallback is reachable and type-safe for callers/tests while known providers still use the ProviderName registry.",
+      "recordedAt": "2026-06-12T16:33:48.725Z"
+    },
+    {
+      "id": "D12",
+      "summary": "resolveHarness uses a dynamic import for getProviderAuthMode so agents.ts can later import harness-resolve without creating a static agents.ts <-> harness-resolve.ts cycle; the policy gate still receives the same auth mode before any binary fallback.",
+      "recordedAt": "2026-06-12T16:41:23.834Z"
+    },
+    {
+      "id": "D13",
+      "summary": "agents.ts now imports resolveHarness and deletes resolveEffectiveHarness entirely; resumeAgent was migrated too so every relaunch/resume path uses the same resolver even though the bead only required spawnRun, spawnAgent, and restartAgent.",
+      "recordedAt": "2026-06-12T16:55:04.442Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Intentional behavior change: spawns with no explicit/role/provider override flip harness (OpenAI models claude-code→codex; other non-Anthropic providers→pi).",
+      "mitigation": "This is the feature, not a bug — do not 'fix' it by weakening built-ins. Explicit settings always win; the resolveHarness notice points users at Settings → Providers; policy-blocked combos still collapse to claude-code; conversations keep their pinned harness."
+    },
+    {
+      "id": "H2",
+      "summary": "canUseHarnessSync (harness-policy.ts) is a ToS gate.",
+      "mitigation": "Never modify, bypass, or reorder around it. Every resolution path ends by passing the winner through it. Its tests must pass unmodified."
+    },
+    {
+      "id": "H3",
+      "summary": "resolveHarness is dashboard-server-reachable; execSync would freeze the event loop (PAN-70).",
+      "mitigation": "Binary availability check uses promisified exec with a module-level cache. Do not import doctor's checkCommand."
+    },
+    {
+      "id": "H4",
+      "summary": "The 60s grace and 250ms Escape gaps are real-time delays; naive tests would burn wall-clock and OOM-parallelize.",
+      "mitigation": "Repo rule: vi.useFakeTimers() + advanceTimersByTimeAsync for ALL delay-based tests. Never real waits, never maxForks:1 masking."
+    },
+    {
+      "id": "H5",
+      "summary": "In claude-code, a second Esc on an IDLE prompt can open the history-rewind dialog and swallow the restart warning.",
+      "mitigation": "Implementation checkpoint in the graceful-restart-60s bead: verify warning visibility via tmux -L panopticon capture-pane in a live session; fallback = single Esc, decision recorded in PR description and continue.json."
+    },
+    {
+      "id": "H6",
+      "summary": "scripts/lint-skills.sh fails CI if --help text changes without updating wrapper SKILL.md files.",
+      "mitigation": "cli-help-strings bead updates skills/pan-plan, pan-start, and any SKILL.md mentioning --harness in the same commit; run npm run lint before done."
+    },
+    {
+      "id": "H7",
+      "summary": "shared/ModelPicker exports PROVIDER_LABELS consumed beyond its own file; deleting it naively breaks the build.",
+      "mitigation": "rollout-shared-modelpicker bead: grep all importers first and re-point them at PROVIDER_BRANDS labels in the same commit; typecheck must stay green."
+    },
+    {
+      "id": "H8",
+      "summary": "Workspace had a stale spec.vbrief.json belonging to PAN-1788 (overwritten by this plan).",
+      "mitigation": "Verified PAN-1788's canonical spec is promoted in .pan/specs/ on main before overwriting; nothing lost. Work agent should ignore any residual PAN-1788 references in workspace artifacts."
+    },
+    {
+      "id": "H9",
+      "summary": "Frontend changes can drift into style violations (pills, decorative color) or duplicated label maps.",
+      "mitigation": "Follow pan-style-guide; Experimental tag is muted text, no pill; all labels/colors/icons come from the branding registry only."
+    },
+    {
+      "id": "H10",
+      "summary": "Browser-based verification (Settings selects, logos, Experimental tags) is required for UAT.",
+      "mitigation": "Playwright must use an isolated browser instance/profile; never depend on another agent's browser session; any login/setup must be reproducible inside the isolated session."
+    },
+    {
+      "id": "H11",
+      "summary": "npm test with only root-side test filters also forwards those filters to the frontend workspace, where no matching files exist and Vitest exits 1.",
+      "mitigation": "For root-only targeted tests, use npx vitest run <files>; reserve npm test for full-suite or filters that include frontend test paths."
+    }
+  ],
+  "resumePoint": {
+    "description": "Settings API defaults bead workspace-bnhed implemented and committed; close the bead, then continue with the frontend Settings Providers default-select bead when ready.",
+    "beadId": "workspace-bnhed",
+    "filesToRead": [
+      "src/lib/settings-api.ts",
+      "src/lib/__tests__/settings-api.test.ts"
+    ]
+  },
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1787: Provider default harnesses, role-level harness overrides, and real brand logos",
+      "timestamp": "2026-06-12T06:30:04.640Z"
+    },
+    {
+      "timestamp": "2026-06-12T06:55:00Z",
+      "reason": "planning",
+      "note": "Auto planning completed: PRD rev 3 verified against codebase (line drifts corrected), 24-bead vBRIEF written, codebase map bootstrapped (.pan/context/codebase/), 9 autoDecisions recorded.",
+      "agentModel": "agent:claude-fable-5"
+    },
+    {
+      "timestamp": "2026-06-12T16:33:48.725Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-160xb: ProviderConfig now requires defaultHarness; all 10 providers have built-in defaults; getBuiltInDefaultHarness covers known providers plus unknown fallback; providers unit coverage added. Verified with npm run typecheck and npm test -- tests/unit/lib/providers.test.ts.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T16:41:23.834Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-jeqcg: added resolveHarness with explicit > role > provider > built-in precedence, policy/auth gate, async command -v availability cache, provider-default notice, and unit coverage. Verified with npm run typecheck and npm test -- tests/unit/lib/harness-resolve.test.ts tests/unit/lib/providers.test.ts.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T16:47:18.337Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-925df: planning kickoff now calls resolveHarness through resolvePlanningSessionHarness, removed inline provider/role/policy chain and unused imports, and added planning harness tests. Verified with npm run typecheck and npm test -- src/lib/planning/__tests__/spawn-planning-session-harness.test.ts tests/unit/lib/harness-resolve.test.ts.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T16:55:04.442Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-75853: spawnRun, spawnAgent, restartAgent, and resumeAgent now call resolveHarness; deleted resolveEffectiveHarness and old inline role/provider chains; added spawn tests for OpenAI codex and Kimi pi persisted harnesses. Verified with npm test -- src/lib/__tests__/agents-spawn-supervisor.test.ts tests/unit/lib/harness-resolve.test.ts, npm run typecheck, and npx vitest run src/lib/__tests__/harness-policy.test.ts --reporter=dot.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T16:59:57.623Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-bnhed: settings GET returns provider_default_harnesses from getBuiltInDefaultHarness for all 10 providers; provider harness empty-string/absent saves remove YAML harness keys; explicit overrides persist and round-trip. Verified with npx vitest run src/lib/__tests__/settings-api.test.ts tests/unit/lib/providers.test.ts --reporter=dot and npm run typecheck. npm test with only root filters was not useful because it forwards filters to frontend and no frontend files match.",
+      "agentModel": "gpt-5.5"
+    }
+  ],
+  "feedback": []
+}
