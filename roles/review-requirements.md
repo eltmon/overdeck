@@ -141,6 +141,24 @@ Write exactly one final report to the output file.
 
 (`!` findings MUST cite `Scope: in_pr_scope`. Any whole_feature_scope or pre_existing gap goes under Non-blocking Notes at `~`.)
 
+## Live Code Path Traces
+
+For every AC you marked **Implemented** or **Partial** AND classified as **Scope: in_pr_scope**, you MUST emit a trace block. ACs classified as `whole_feature_scope`, `pre_existing`, `Missing`, or `Not-applicable` do NOT require a trace.
+
+Use one `### AC: <ac title>` block per required AC, in the same order as the Coverage Matrix, containing exactly these bolded-field lines:
+
+### AC: <ac title>
+**Scope:** in_pr_scope
+**File:** `path/to/file.ts:42`
+**Function:** `functionName`
+**Path:** <one-paragraph description of how user input reaches this function>
+
+If there are zero in-PR-scope ACs claimed Implemented or Partial, the body of this section MUST be exactly:
+
+None — no in_pr_scope ACs claimed Implemented or Partial.
+
+If this section is missing or any required AC trace omits a `**File:** \`path:line\`` line, the launcher will signal REVIEWER_FAILED — the synthesis agent will not see your report as passing.
+
 ## Non-blocking Notes
 <`~`, `≉`, and `?` items, or "None". Group whole_feature_scope and pre_existing gaps here. Tag each with its scope bucket so synthesis can render the scope note.>
 
@@ -148,7 +166,7 @@ Write exactly one final report to the output file.
 <brief list of in_pr_scope requirements verified with evidence>
 ```
 
-If every in-PR-scope requirement is covered, still write the report with `## Findings` set to `None`.
+If every in-PR-scope requirement is covered, write `## Findings` as `None`. The `## Live Code Path Traces` section must still appear, even if its body is the sentinel `None — no in_pr_scope ACs claimed Implemented or Partial.`
 
 ## Write contract
 
