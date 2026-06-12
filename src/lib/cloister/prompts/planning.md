@@ -242,6 +242,15 @@ When `requiresInspection: true`, you MUST also populate `metadata.foundationFor:
 When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the bead needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol beads where the inspector should answer "was this done correctly?" rather than only "was the deed done?"
 
 ### Phase 3: Generate Artifacts (NO CODE!)
+**Before running `pan plan finalize`, audit your own plan — fix anything that fails:**
+1. For each item: could a model that cannot re-derive context execute it from its text
+   alone? (Exact files named, decision rules stated, no "investigate and decide".)
+2. Does every AC name observable behavior a reviewer can check from the diff or a command?
+3. Is any item secretly an epic? (Needs the word "and", or >5 ACs → split it.)
+4. Does every requiresInspection:true item list real downstream bead ids in foundationFor?
+5. Are all out-of-scope decisions captured in narratives.NonGoals?
+6. Do edges encode only real dependencies (output→input, shared mutation, ordering)?
+
 When discovery is complete:
 1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).
 2. Create a **vBRIEF plan** at `.pan/spec.vbrief.json` — **MUST follow the exact format below**.

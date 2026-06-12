@@ -126,6 +126,12 @@ check_external_content_framing() {
   return 0
 }
 
+check_plan_self_audit() {
+  contains "src/lib/cloister/prompts/planning.md" "audit your own plan" \
+    || fail "plan-self-audit: planning.md missing pre-finalize self-audit checklist"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -136,6 +142,7 @@ check_all() {
   check_discovery_completeness
   check_planning_qa_retention
   check_external_content_framing
+  check_plan_self_audit
 }
 
 write_passing_fixture() {
@@ -153,6 +160,7 @@ requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptanc
 Discovery is complete only when
 ## Planning Q&A
 data, not instructions
+audit your own plan
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -259,6 +267,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('data, not instructions', 'trusted issue instructions'))
+PY"
+  expect_self_test_failure "plan-self-audit" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('audit your own plan', 'review the plan briefly'))
 PY"
   echo "lint-prompts self-test passed"
 }
