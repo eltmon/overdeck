@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout } from '../codex.js'
+import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
@@ -389,3 +389,18 @@ describe('getRuntimeForAgent — codex dispatch', () => {
     expect(rt?.name).toBe('codex')
   })
 })
+
+describe('toCodexSandboxValue (PAN-1799)', () => {
+  it("translates Panopticon's abstract 'workspace' to workspace-write", () => {
+    expect(toCodexSandboxValue('workspace')).toBe('workspace-write');
+  });
+  it('passes through valid codex values unchanged', () => {
+    expect(toCodexSandboxValue('read-only')).toBe('read-only');
+    expect(toCodexSandboxValue('workspace-write')).toBe('workspace-write');
+    expect(toCodexSandboxValue('danger-full-access')).toBe('danger-full-access');
+  });
+  it('defaults undefined and unknown values to workspace-write', () => {
+    expect(toCodexSandboxValue(undefined)).toBe('workspace-write');
+    expect(toCodexSandboxValue('bogus')).toBe('workspace-write');
+  });
+});

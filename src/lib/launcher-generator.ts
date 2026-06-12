@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
+import { toCodexSandboxValue } from './runtimes/codex.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
@@ -621,9 +622,11 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // Disable approval prompts (codex exec rejects --ask-for-approval; use -c instead)
   tokens.push('-c', 'approval_policy=never');
 
-  // Sandbox mode: 'workspace' allows file reads/writes in the working directory.
-  // Resume path uses -c (not -s) because `codex exec resume` rejects -s.
-  const sandbox = config.codexSandboxMode ?? 'workspace';
+  // Sandbox mode: translate Panopticon's abstract 'workspace' token to the
+  // codex CLI's 'workspace-write' (PAN-1799 — raw 'workspace' is rejected and
+  // the agent dies at boot). Resume path uses -c (not -s) because
+  // `codex exec resume` rejects -s.
+  const sandbox = toCodexSandboxValue(config.codexSandboxMode);
   if (isResume) {
     tokens.push('-c', `sandbox_mode=${sandbox}`);
   } else {

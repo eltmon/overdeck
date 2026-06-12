@@ -243,6 +243,22 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
 }
 
 /**
+ * Translate Panopticon's abstract sandbox mode token into a value the codex
+ * CLI actually accepts. Panopticon config uses 'workspace' as its mode name
+ * (see config-yaml.ts permission modes); codex only accepts read-only,
+ * workspace-write, danger-full-access. Passing the abstract token raw made
+ * `codex exec -s workspace` exit instantly with an invalid-value error, which
+ * killed every codex work agent ~13s after spawn (PAN-1799).
+ */
+export function toCodexSandboxValue(mode: string | undefined): string {
+  const valid = new Set(['read-only', 'workspace-write', 'danger-full-access'])
+  if (mode && valid.has(mode)) return mode
+  if (mode === 'read_only') return 'read-only'
+  // 'workspace', undefined, and anything unrecognized → the safe writable default.
+  return 'workspace-write'
+}
+
+/**
  * Poll $CODEX_HOME/sessions/**\/*.jsonl for a new rollout file.
  * Returns the rollout path once one appears, or null on timeout.
  */
@@ -504,7 +520,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     initCodexHome(codexHomeDir)
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
-    const sandbox = config.codexSandboxMode ?? 'workspace'
+    const sandbox = toCodexSandboxValue(config.codexSandboxMode)
     const tokens: string[] = ['codex', 'exec']
     if (config.model) tokens.push('-m', shellQuote(config.model))
     tokens.push('-c', 'approval_policy=never')

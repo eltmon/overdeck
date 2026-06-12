@@ -211,6 +211,11 @@ function getCodexLauncherFields(agentId: string, model: string): {
   model: string;
 } {
   const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+  // PAN-1799: the launcher exports CODEX_HOME but nothing created it for work
+  // agents — codex booted into a nonexistent home with no config.toml and no
+  // seeded auth.json. initCodexHome is idempotent (always rewrites config.toml,
+  // seeds auth only when missing) and is the same call conversations make.
+  initCodexHome(codexHome);
   return {
     harness: 'codex',
     codexMode: 'exec',
@@ -2023,6 +2028,7 @@ import {
   emitAgentEvent,
 } from './agent-runtime.js';
 import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
+import { initCodexHome } from './runtimes/codex.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
