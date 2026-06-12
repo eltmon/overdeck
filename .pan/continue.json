@@ -1,0 +1,45 @@
+{
+  "version": "1",
+  "issueId": "PAN-1696",
+  "created": "2026-06-12T20:30:48.443Z",
+  "updated": "2026-06-12T20:55:00.000Z",
+  "gitState": { "branch": "feature/pan-1696", "sha": "bff3036ec", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Flag rename is a fallback read: isMergeTrainEnabled() reads merge_train.enabled, falls back to legacy flywheel.merge_train_enabled when unset; setMergeTrainEnabled() writes only the new key. No data migration — the flag is ON in production and must survive deploy.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D2", "summary": "Per-project override merge_train?: 'enabled'|'disabled' on ProjectConfig (absent = follow global), mirroring auto_merge_default. Resolution helper isMergeTrainEnabledForProject(projectKey) lives in src/lib/cloister/auto-merge-policy.ts and gates BOTH the UAT train reconciler and the post-merge sibling reconciler (runMergeTrainReconcile).", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D3", "summary": "Ready set sources from getAllReviewStatusesFromDb() filtered by mergeGateEligibility().eligible && deaconIgnored !== true (the readyForMerge boolean can be stale; the predicate is authoritative per PAN-1759), grouped via resolveProjectFromIssueSync. The MERGE_GATE_VERBS verb filter is dropped; the verb-based computeMergeQueue wrapper and MERGE_GATE_VERBS are deleted in remove-legacy-routes IF grep -rn MERGE_GATE_VERBS src/ shows only test references remaining.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D4", "summary": "No module file renames — src/lib/flywheel-merge-order.ts keeps its path (surgical-changes rule; the issue's coupling list is flag/data-source/UI, not file names).", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D5", "summary": "New API is the aggregate /api/merge-train/* namespace (queues/generations return all projects; mutations take project or generation-name params). Legacy /api/flywheel merge-train routes are removed in the final remove-legacy-routes bead AFTER the frontend beads migrate — no aliases (dashboard frontend is the only consumer), and every intermediate bead leaves a working tree.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D6", "summary": "Multi-project view hosts on the Awaiting Merge page; the Flywheel page stays one viewer; no new top-level page. Project cockpit gets the per-project segmented control plus a compact summary (ready count + current generation name/status) linking to Awaiting Merge.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D7", "summary": "Generation label stays the project issue prefix (codenameLabel) — uat_generations.name is a global PRIMARY KEY and prefix-distinct labels make cross-project name collisions structurally impossible. Keep an invariant comment at codenameLabel.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D8", "summary": "UAT stack frontend host resolves from the project's dns domain config (dns lives on WorkspaceConfig, src/lib/projects.ts:32-52) with pan.localhost fallback; non-PAN stack support beyond URL resolution is best-effort.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D9", "summary": "Scope is baked into the flywheel run prompt at start/resume (flywheel-actions.ts:223,294). Persist effective scope on the run record; all UI copy states scope changes apply at the next run start or resume; configured-vs-run mismatch is made visible.", "recordedAt": "2026-06-12T20:55:00.000Z" },
+    { "id": "D10", "summary": "The pure reconciler (reconcileUatGenerations) keeps its existing per-projectRoot interface; multi-project iteration happens only in the service wiring (uat-train.ts). Everything below the service layer is already multi-project-capable.", "recordedAt": "2026-06-12T20:55:00.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Production currently runs with the merge-train flag ON under the legacy key; the rename must not flip it off.", "mitigation": "Fallback read in isMergeTrainEnabled() (flag-rename.ac1 tests an ON value stored only under the old key). Verify live after merge." },
+    { "id": "H2", "summary": "Blast radius: after decoupling, the global flag reaches every tracked project with ready work — git fetch/worktree/branch-push in THEIR repos every 60s tick.", "mitigation": "Per-project 'disabled' override is the safety valve; the idle-skip rule (zero git calls when ready set empty AND no live generations) is the noise guard — but a project with live generations and an empty ready set MUST still proceed so invalidation runs (reconciler-decouple.ac3)." },
+    { "id": "H3", "summary": "The post-merge path must stay idempotent (PAN-328 infinite-loop history, 24k tracker calls).", "mitigation": "tests/unit/lib/cloister/in-flight-guard.test.ts must stay green; promote keeps firing post-merge through the in-flight guard exactly once per member." },
+    { "id": "H4", "summary": "Stale/cancelled tracker issues can linger in review-status records looking eligible.", "mitigation": "deaconIgnored exclusion + the branch-existence check inside computeMergeQueueFromCandidates are the backstops. Do NOT add tracker API calls to the ready-set hot path (it runs every 60s)." },
+    { "id": "H5", "summary": "uat_generations.name is a global PK; two projects could theoretically collide on a generation name.", "mitigation": "Label = issue prefix makes names prefix-distinct per project (uat/pan-* vs uat/min-*). Invariant comment required at codenameLabel (D7)." },
+    { "id": "H6", "summary": "Browser-based verification is required for the dashboard beads (Awaiting Merge view, cockpit control, Flywheel viewer, settings scope select).", "mitigation": "Playwright must use an isolated browser instance/profile; never depend on another agent's session or shared browser state; any login/setup must be reproducible inside the isolated session." },
+    { "id": "H7", "summary": "A prior planning session (2026-06-11) left a sequence-2 workspace spec that was never promoted (no main-side spec existed).", "mitigation": "This session superseded it with sequence 3, incorporating its route-removal-as-final-bead ordering and empty-ready-set invalidation AC. No beads existed from the prior session." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1696: feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view",
+      "timestamp": "2026-06-12T20:30:48.443Z"
+    },
+    {
+      "timestamp": "2026-06-12T20:55:00.000Z",
+      "reason": "planning",
+      "note": "Auto planning complete: PRD at .pan/drafts/PAN-1696.md (FR-1..15, NFR-1..4, D1-D10), vBRIEF sequence 3 with 17 beads (2 inspection gates: ready-set-source deep, merge-train-routes fast). Key discovery: everything below the service layer is already multi-project-capable; coupling concentrates in uat-train.ts wiring, flywheel routes, the flag key, and UI placement.",
+      "agentModel": "agent:claude-fable-5"
+    }
+  ],
+  "feedback": []
+}
