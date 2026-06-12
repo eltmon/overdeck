@@ -18,7 +18,7 @@ describe('summarizeToolInputForWorkLog', () => {
   it('falls back to first line of Bash command when no description', () => {
     expect(
       summarizeToolInputForWorkLog('Bash', {
-        command: 'node -e "\nconst Database = require(\'better-sqlite3\');\n..."',
+        command: 'node -e "\nconst db = openDatabase(\':memory:\');\n..."',
       }),
     ).toBe('node -e "');
   });

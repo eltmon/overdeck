@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
-import Database from 'better-sqlite3';
+import { openNodeSqliteDatabase } from './sqlite.mjs';
 
 const CLAUDE_PROJECTS = join(homedir(), '.claude', 'projects');
 const DB_PATH = join(homedir(), '.panopticon', 'panopticon.db');
@@ -72,8 +72,8 @@ function findTranscripts(projectDir) {
 }
 
 // Main
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+const db = openNodeSqliteDatabase(DB_PATH);
+db.exec('PRAGMA journal_mode = WAL');
 
 const insert = db.prepare(`
   INSERT OR IGNORE INTO cost_events (

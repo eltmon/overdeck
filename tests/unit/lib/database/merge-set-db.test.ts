@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../src/lib/database/schema.js';
 import type { MergeSet } from '../../../../src/lib/merge-set.js';
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
 });

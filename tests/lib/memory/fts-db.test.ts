@@ -46,7 +46,7 @@ describe('memory FTS database', () => {
   });
 
   it('creates memory_fts with the documented columns and porter unicode61 tokenizer', async () => {
-    const columns = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare('PRAGMA table_info(memory_fts)').all() as Array<{ name: string }>);
+    const columns = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare('PRAGMA table_info(memory_fts)').all<{ name: string }>());
 
     expect(columns.map((column) => column.name)).toEqual([
       'content',
@@ -69,8 +69,8 @@ describe('memory FTS database', () => {
       'agent_harness',
     ]);
 
-    const matches = await withMemoryFtsDatabase('panopticon-cli', (db) => {
-      db.prepare(`
+    const matches = await withMemoryFtsDatabase('panopticon-cli', async (db) => {
+      await db.prepare(`
         INSERT INTO memory_fts (
           content,
           display_content,
@@ -133,7 +133,7 @@ describe('memory FTS database', () => {
           'idx_observation_index_path_offset'
         )
       ORDER BY name
-    `).all() as Array<{ name: string; sql: string }>);
+    `).all<{ name: string; sql: string }>());
 
     expect(tables.map((row) => row.name)).toEqual([
       'idx_observation_index_path_offset',
@@ -155,7 +155,7 @@ describe('memory FTS database', () => {
       SELECT COUNT(*) AS count
       FROM sqlite_master
       WHERE name IN ('memory_fts', 'reset_markers', 'observation_index')
-    `).get() as { count: number });
+    `).get<{ count: number }>());
 
     expect(tableCount.count).toBe(3);
   });
