@@ -123,7 +123,7 @@ Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling 
 ```markdown
 # Review Synthesis — <issueId> — <timestamp>
 
-## Verdict: APPROVED / CHANGES REQUESTED
+## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker, e.g. "auth bypass in routes/agents.ts">
 
 ## Context
 - Manifest: <path>

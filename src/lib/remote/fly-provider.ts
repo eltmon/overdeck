@@ -163,6 +163,27 @@ export class FlyProvider implements RemoteProvider {
       // Ensure app exists
       await api.ensureApp(this.config.app, this.config.org);
 
+      // Get-or-create: machine names are unique per app, so a leftover
+      // machine from a crashed/interrupted run makes a plain create 422.
+      // Adopt it instead — rootfs resets from the image on start, so a
+      // restarted leftover is indistinguishable from a fresh machine for
+      // the provisioning steps that follow.
+      const existing = (await api.listMachines(this.config.app)).find((m) => m.name === name && m.state !== 'destroyed');
+      if (existing) {
+        if (existing.state !== 'started') {
+          await api.startMachine(this.config.app, existing.id);
+        }
+        await api.waitForState(this.config.app, existing.id, 'started', 300);
+        const fresh = await api.getMachine(this.config.app, existing.id);
+        return {
+          name,
+          status: mapFlyStateToVmStatus(fresh.state),
+          machineId: fresh.id,
+          ipAddress: fresh.private_ip,
+          created: fresh.created_at ? new Date(fresh.created_at) : undefined,
+        };
+      }
+
       // Create machine
       const machine = await api.createMachine(this.config.app, name, {
         image: this.config.image,
@@ -483,9 +504,21 @@ export class FlyProvider implements RemoteProvider {
 
   /** Initialize beads in a workspace on a remote VM */
   async initBeads(vmName: string, workspacePath: string = '/workspace'): Promise<boolean> {
+    // The cloned .beads/config.yaml carries the repo's sync.remote (an SSH
+    // git URL). VMs are keyless — bd init tries to clone that remote and
+    // fails before creating the local DB. Disable it: the host owns beads
+    // sync; the VM's DB is a local working copy seeded from issues.jsonl.
+    await this.sshImpl(
+      vmName,
+      `cd ${workspacePath} && [ -f .beads/config.yaml ] && sed -i 's|^sync.remote:|# vm-local (keyless): sync.remote:|' .beads/config.yaml || true`
+    );
+    // --from-jsonl seeds the DB from the synced issues.jsonl; the default
+    // init imports from git history, which fetches the beads remote and
+    // fails on keyless VMs (and its failed clone destroys .beads working
+    // files, including the just-synced issues.jsonl).
     const result = await this.sshImpl(
       vmName,
-      `cd ${workspacePath} && bd init --prefix PAN 2>&1 || bd init 2>&1`
+      `cd ${workspacePath} && (bd init --prefix PAN --from-jsonl --non-interactive 2>&1 || bd init --from-jsonl --non-interactive 2>&1)`
     );
     return result.exitCode === 0;
   }

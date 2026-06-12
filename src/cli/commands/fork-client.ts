@@ -44,6 +44,7 @@ export interface ForkResultConv {
   harness?: string | null;
   forkStatus?: string | null;
   forkError?: string | null;
+  timedOut?: boolean;
   forkFallbackReason?: string | null;
   handoffDocPath?: string | null;
   sessionAlive?: boolean;
@@ -51,6 +52,10 @@ export interface ForkResultConv {
 }
 
 export class ForkServerError extends Error {}
+
+export function isForkResultInProgress(conv: ForkResultConv): boolean {
+  return conv.timedOut === true || (conv.forkStatus !== null && conv.forkStatus !== undefined && conv.forkStatus !== 'failed');
+}
 
 /**
  * Loopback base URL for the dashboard API. Mirrors the resolution used by other
@@ -132,5 +137,9 @@ export async function forkConversationViaServer(
     const fs = latest.forkStatus;
     if (fs === null || fs === undefined || fs === 'failed') break;
   }
-  return latest;
+  const fs = latest.forkStatus;
+  return {
+    ...latest,
+    timedOut: fs !== null && fs !== undefined && fs !== 'failed',
+  };
 }

@@ -65,6 +65,7 @@ function mockSpawnDependencies(): void {
     listPaneValues: vi.fn(() => Effect.succeed([])),
     waitForClaudePrompt: vi.fn(async () => true),
     setOption: vi.fn(() => Effect.void),
+    exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   }));
 
   vi.doMock('../workspace/stack-health.js', () => ({

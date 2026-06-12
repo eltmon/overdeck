@@ -1,0 +1,135 @@
+---
+title: Context Layers
+description: How Panopticon distributes rules and guidance to every harness — CLAUDE.md, AGENTS.md, and the layered context system
+---
+
+# Context Layers
+
+Panopticon distributes context — engineering rules, project guidance, machine
+quirks — to the coding-agent harnesses it drives through a layered system.
+You author small canonical markdown files; `pan sync` renders them into the
+files each harness actually reads.
+
+## Canonical terminology
+
+Use these names when adding or moving context; they are the vocabulary the
+agents themselves are taught:
+
+| Term | Source file | Use for |
+| --- | --- | --- |
+| **Bundled rule** | `sync-sources/rules/<name>.md` (ships inside the panopticon-cli package) | Engineering rules for **every machine** |
+| **Global layer** (machine context) | `~/.panopticon/context/global.md` | Genuinely **machine-specific** quirks |
+| **Project layer** | `<projectRoot>/.pan/context/project.md` | Guidance for **one project**; committed to that repo |
+| **Workspace layer** | `<workspace>/.pan/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
+
+The rendered outputs are **harness context files** — never edit those directly.
+Edit the source layer or rule, then run `pan sync`.
+
+<Info>
+There is no "global context template". A request phrased that way means either
+a **bundled rule** (every machine) or the **global layer** (one machine).
+</Info>
+
+### The shorthand: "add a `<scope>` rule"
+
+In practice you (and your agents) only need four phrases — the scope word
+alone routes the content:
+
+| You say | Applies to | Destination |
+| --- | --- | --- |
+| "add a **universal rule**: …" | every machine, every project | `sync-sources/rules/<name>.md`, `scope: universal` |
+| "add a **dev rule**: …" | Panopticon development only | `sync-sources/rules/<name>.md`, `scope: dev` |
+| "add a **project rule**: …" | one project | `<root>/.pan/context/project.md` |
+| "add a **machine rule**: …" | one machine | `~/.panopticon/context/global.md` |
+
+After any of them: `pan sync`, and the change reaches new sessions.
+
+## Bundled rules
+
+Panopticon ships engineering rules inside the package under
+`sync-sources/rules/`. Each rule carries a `scope:` frontmatter key:
+
+- `scope: universal` — folded into every machine's rendered global context;
+- `scope: dev` — folded in only on a panopticon-cli source checkout, for rules
+  about developing Panopticon itself.
+
+Rules ship with `pan install` and refresh on every `pan sync`.
+
+## What each harness actually reads
+
+Each harness consumes context through its own native mechanism. `pan sync`
+renders the global layer (your `global.md` + the bundled rules) once per
+harness; spawn-time plumbing delivers it:
+
+| Harness | Rendered artifact | How the harness receives it |
+| --- | --- | --- |
+| **Claude Code** | managed region of `~/.claude/CLAUDE.md` | Claude Code natively reads `~/.claude/CLAUDE.md` at session start |
+| **Codex** | `~/.panopticon/context/codex-global.md` | At spawn, Panopticon seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
+| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Panopticon deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
+
+The `pi-global.md` / `codex-global.md` files are **Panopticon-owned render
+artifacts** — the harnesses do not know about them. They exist so the global
+layer has a stable, inspectable rendered form per harness.
+
+**Project layer** rendering follows each harness's native convention directly:
+it is written into a managed region of the project's `CLAUDE.md` (for Claude
+Code) **and** the project's `AGENTS.md` (for Pi and Codex, which both follow
+the `AGENTS.md` convention).
+
+## Managed regions — your files are never clobbered
+
+`pan sync` only ever owns the span between these markers:
+
+```
+<!-- BEGIN PANOPTICON CONTEXT — managed by `pan sync`; edit the layer source, not this region -->
+…rendered content…
+<!-- END PANOPTICON CONTEXT -->
+```
+
+Everything outside the markers — in `~/.claude/CLAUDE.md`, a project's
+`CLAUDE.md`, or a project's `AGENTS.md` — is preserved verbatim across every
+sync. The first sync that touches a file with pre-existing hand-authored
+content snapshots it into `~/.panopticon/backups/<timestamp>/context/` before
+writing. A project's files are touched only if its `.pan/context/project.md`
+exists.
+
+## Harness-specific blocks
+
+A layer file targets a single harness with Mustache-style blocks; text outside
+any block renders for every harness:
+
+```markdown
+All agents follow the engineering philosophy: fix root causes, no bandaids.
+
+{{#harness:claude}}
+Prefer the beads CLI (`bd`) for task tracking.
+{{/harness:claude}}
+
+{{#harness:pi}}
+Write completion markers via `/pan-done` when ready for review.
+{{/harness:pi}}
+```
+
+Blocks may be stacked to target several harnesses; `{{#harness:codex}}` is
+also recognized.
+
+## CLI
+
+```bash
+pan context list                  # show all three layers and their files
+pan context edit                  # open global.md in $EDITOR
+pan context edit --layer project  # open this project's project.md
+pan context sync                  # render the layers into harness context files
+pan context diff --harness pi     # preview what one harness would receive
+pan context validate              # lint templates for malformed blocks
+```
+
+`pan sync` runs the context render as part of its broader sync (skills,
+agents, rules). The dashboard's **Context** page edits the same files with
+per-harness previews.
+
+## Changes apply to new sessions only
+
+Harnesses read their context files at session startup. After editing a layer
+and running `pan sync`, running sessions keep their old context — only newly
+spawned agents and conversations pick up the change.

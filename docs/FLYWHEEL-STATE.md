@@ -70,7 +70,14 @@ workspaces (which is all of them). Candidate substrate fix: resolve the real git
 
 ## Parked items
 
-(none recorded yet — `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
+- **PAN-1762 (Swarm v2) — OPERATOR-HELD at proposed (directive 2026-06-11, RUN-22).**
+  The operator wants to review the plan before any work starts. Do NOT
+  `pan start PAN-1762` when its spec reaches proposed — the stop-at-proposed
+  contract is explicitly overridden for this issue. It starts only on the
+  operator's explicit instruction. Do not re-surface it as a start suggestion;
+  list it as held.
+
+(otherwise: `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
 
 ## RUN-9 observations (tick 1, 2026-05-24)
 
@@ -2075,6 +2082,27 @@ reconciliation rather than a vestigial ship agent."
   PAN-1720 alive as the root fix.
 - work-1765 at ctx 89% + gpt-5.5 5h window 100% — double wedge-watch, brake is
   the net. Inspections passing (bead flow working).
+
+## RUN-22 ticks 5-6 (2026-06-11 ~09:00-09:20Z) — full tilt: 1744 ready, drain cluster fully revived
+
+- **PAN-1744 reached ready_for_merge=1** (09:05Z) — 5th issue to the gate this
+  run. The earlier partial convoys on it self-recycled; no permanent stall.
+- **PAN-1675 compact brake: 3rd production save** — work-1765 hit ctx 100%
+  mid-implementation and was recovered with diff preserved (+1035/-67), then
+  continued. gpt-5.5's 5h usage window also reset mid-task. WATCH: tick 6 shows
+  cost +$10 with a STATIC diff — if that repeats, it's compact-thrash
+  (PAN-1672 shape) and the salvage is pan handoff, not resume.
+- **Operator revived the entire drain cluster** (~08:47-09:01): 1242/1491/1641
+  unpaused, then 1642 and 1579 too. All five re-cycling through review convoys.
+  A new session type appeared: agent-pan-1641-e2e-prompt (e2e prompt runner).
+- **Zero vestigial ship spawns since PAN-1747's removal merged+deployed** — the
+  ship-role retirement is holding in production.
+- **Shared-worktree race lesson:** when a conv session is live-iterating a
+  source file on the primary worktree, the chore-commit+rebase reconcile loses
+  the race repeatedly (3 attempts, file re-dirtied within seconds each time).
+  Stop racing: land flywheel docs via the detached-worktree cherry-pick, leave
+  divergence for the conv session's own completion push, keep `pan reload`
+  off-limits meanwhile (deploys build pristine origin so production is safe).
 
 ## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
 

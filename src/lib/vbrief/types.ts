@@ -1,11 +1,11 @@
 /**
  * vBRIEF Type Definitions
  *
- * Conforms to vBRIEF v0.5 specification (https://github.com/deftai/vBRIEF).
+ * Conforms to vBRIEF v0.6 specification (https://github.com/deftai/vBRIEF).
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic beads creation and DAG visualization.
  *
- * New in v0.5 (PAN-453):
+ * v0.5 compatibility fields (PAN-453):
  *   - VBriefReference: external links (issues, PRDs, specs)
  *   - VBriefDocument.vBRIEFInfo: author (tool identifier), description
  *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
@@ -16,13 +16,13 @@
  * Panopticon extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.issueLabel: issue ID for beads label filtering
- *   - metadata.kind: "acceptance_criterion" on subItems
+ *   - metadata.kind: "acceptance_criterion" on child items
  */
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
 
-// vBRIEF v0.5 spec status enum
-export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled';
+// vBRIEF status enum
+export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed';
 
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
@@ -77,6 +77,9 @@ export interface VBriefItem {
     Action?: string;
     [key: string]: string | undefined;
   };
+  /** vBRIEF v0.6 child items. v0.5 documents used subItems for the same structure. */
+  items?: VBriefSubItem[];
+  /** Legacy vBRIEF v0.5 child items. Kept as a read alias for compatibility. */
   subItems?: VBriefSubItem[];
 }
 
@@ -147,6 +150,10 @@ export interface VBriefDocument {
     inspectionPolicy?: VBriefInspectionPolicy;
   };
   plan: VBriefPlan;
+}
+
+export function subItemsOf(item: VBriefItem): VBriefSubItem[] {
+  return item.items ?? item.subItems ?? [];
 }
 
 /**

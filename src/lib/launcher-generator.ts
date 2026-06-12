@@ -199,7 +199,7 @@ function buildChannelsArgs(config: LauncherConfig): string {
 
 function wrapWithSupervisor(config: LauncherConfig, cmd: string): string {
   if (!config.useSupervisor) return cmd;
-  if (config.harness === 'pi' || config.harness === 'codex' || config.reviewSignal) return cmd;
+  if (config.harness === 'pi' || config.reviewSignal) return cmd;
   if (!config.supervisorScriptPath) {
     throw new Error('LauncherConfig.supervisorScriptPath is required when useSupervisor=true');
   }
@@ -594,9 +594,13 @@ function systemPromptFiles(config: LauncherConfig): string[] {
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   const codexMode = config.codexMode ?? 'exec';
 
-  // TUI / conversation mode: bare `codex` (interactive terminal, no args)
+  // TUI / conversation mode: interactive terminal, optionally under the PTY
+  // supervisor for conversation delivery. Keep CODEX_HOME/AGENTS.md, but do
+  // not let repo AGENTS.md turn a normal dashboard conversation into a work
+  // agent with project-level task-tracker rules.
   if (codexMode === 'tui') {
-    return ['codex'];
+    const cmd = wrapWithSupervisor(config, 'codex -c project_doc_max_bytes=0');
+    return [useExec ? `exec ${cmd}` : cmd];
   }
 
   const isResume = Boolean(config.resumeSessionId);

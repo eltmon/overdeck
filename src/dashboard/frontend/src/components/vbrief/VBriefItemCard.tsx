@@ -7,6 +7,7 @@ const STATUS_COLORS: Record<string, string> = {
   running: 'text-primary border-primary/50',
   in_progress: 'text-primary border-primary/50',
   blocked: 'text-destructive border-destructive/50',
+  failed: 'text-destructive border-destructive/50',
   cancelled: 'text-muted-foreground border-border',
   pending: 'text-muted-foreground border-border',
   draft: 'text-muted-foreground border-border',
@@ -29,7 +30,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 function ACIcon({ sub }: { sub: VBriefSubItem }) {
   if (sub.status === 'completed') return <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />;
-  if (sub.status === 'blocked') return <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />;
+  if (sub.status === 'blocked' || sub.status === 'failed') return <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />;
   if (sub.status === 'running' || sub.status === 'in_progress') return <Clock className="w-3.5 h-3.5 text-primary shrink-0" />;
   return <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />;
 }
@@ -43,7 +44,7 @@ export function VBriefItemCard({ item }: VBriefItemCardProps) {
 
   const statusCls = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
   const difficulty = item.metadata?.difficulty as string | undefined;
-  const acItems = item.subItems?.filter(s => s.metadata?.kind === 'acceptance_criterion') ?? [];
+  const acItems = (item.items ?? item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
 
   return (
     <div className={`border rounded-lg overflow-hidden ${statusCls}`}>

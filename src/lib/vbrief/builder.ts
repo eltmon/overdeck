@@ -102,6 +102,8 @@ export class PlanBuilder {
     difficulty?: VBriefDifficulty;
     phase?: number;
     priority?: VBriefPriority;
+    items?: VBriefSubItem[];
+    /** Legacy input alias retained for call sites that still pass v0.5-style children. */
     subItems?: VBriefSubItem[];
     created?: string;
   }): this {
@@ -116,7 +118,7 @@ export class PlanBuilder {
         phase: opts?.phase,
       },
       narrative: opts?.narrative ? { Action: opts.narrative } : undefined,
-      subItems: opts?.subItems,
+      items: opts?.items ?? opts?.subItems,
     });
     return this;
   }
@@ -136,7 +138,7 @@ export class PlanBuilder {
     const version = getPackageVersion();
     return {
       vBRIEFInfo: {
-        version: '0.5',
+        version: '0.6',
         created: now,
         author: `panopticon-cli/${version}`,
         description: this._description,

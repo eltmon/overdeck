@@ -167,14 +167,15 @@ describe('initCodexHome', () => {
     expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
   })
 
-  it('is idempotent — does not overwrite existing config', () => {
+  it('always rewrites config.toml so permission-mode changes apply on resume', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-03')
     initCodexHome(codexDir)
     const { writeFileSync: writeNode, readFileSync: readNode } = require('node:fs')
     writeNode(join(codexDir, 'config.toml'), 'custom-content')
-    initCodexHome(codexDir) // second call — should not overwrite
+    initCodexHome(codexDir, { approvalPolicy: 'explicit' }) // second call — should overwrite with new policy
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
-    expect(config).toBe('custom-content')
+    expect(config).not.toBe('custom-content')
+    expect(config).toContain('approval_policy = "explicit"')
   })
 })
 

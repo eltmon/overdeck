@@ -4622,7 +4622,9 @@ function initSchema(db) {
       handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
       handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
       fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
-      cleared_to_conv_id INTEGER                           -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
+      fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
+      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -4827,7 +4829,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 52`);
+	db.pragma(`user_version = 53`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4835,7 +4837,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 52) return;
+	if (currentVersion === 53) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5460,7 +5462,15 @@ function runMigrations(db) {
 	if (currentVersion < 52) try {
 		db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
 	} catch {}
-	db.pragma(`user_version = 52`);
+	if (currentVersion < 53) {
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
+		} catch {}
+	}
+	db.pragma(`user_version = 53`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

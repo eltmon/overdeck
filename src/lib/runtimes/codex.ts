@@ -162,6 +162,7 @@ export interface InitCodexHomeOpts {
   trustedDir?: string
   approvalPolicy?: string
   sandboxMode?: string
+  approvalsReviewer?: string
 }
 
 /**
@@ -176,8 +177,10 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
 
   const configPath = join(codexHomeDir, 'config.toml')
-  if (!existsSync(configPath)) {
-    // The notify shim writes heartbeat.json on agent-turn-complete (D-5).
+  // Always (re)write config.toml so permission-mode changes take effect on
+  // resume. The file is Panopticon-managed ("do not edit manually") and
+  // contains no user state — only launch-time settings.
+  {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
     // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a
     // single argv array. model/provider is set at launch via the -m flag, so it
@@ -192,6 +195,9 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     ]
     if (opts.sandboxMode) {
       lines.push(`sandbox_mode = "${opts.sandboxMode}"`)
+    }
+    if (opts.approvalsReviewer) {
+      lines.push(`approvals_reviewer = "${opts.approvalsReviewer}"`)
     }
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)

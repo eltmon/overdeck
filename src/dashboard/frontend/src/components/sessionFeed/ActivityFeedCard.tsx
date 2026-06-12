@@ -8,6 +8,8 @@ interface ActivityFeedCardProps {
 }
 
 export function ActivityFeedCard({ entry, onSelect, now = new Date() }: ActivityFeedCardProps) {
+  const metaParts = [entry.workspaceId, entry.issueId].filter(Boolean);
+  const meta = metaParts.length > 0 ? metaParts.join(' · ') : entry.summary;
   return (
     <button
       type="button"
@@ -18,9 +20,9 @@ export function ActivityFeedCard({ entry, onSelect, now = new Date() }: Activity
       <div className="flex items-start gap-2">
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-foreground">{entry.headline}</p>
+          <p className="break-words font-medium text-foreground">{entry.headline}</p>
           <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
-            <span className="truncate">{entry.workspaceId} · {entry.issueId}</span>
+            <span className="truncate">{meta}</span>
             <span aria-hidden="true">·</span>
             <time dateTime={entry.timestamp} className="shrink-0">
               {formatRelativeTime(entry.timestamp, now)}
