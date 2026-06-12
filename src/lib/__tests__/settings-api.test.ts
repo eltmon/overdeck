@@ -99,6 +99,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       apiKeys: {},
       providerAuth: {},
       providerPlan: {},
+      providerHarnesses: {},
       openrouterFavorites: [],
       trackerKeys: {},
       tmux: { configMode: 'managed' },
@@ -236,6 +237,27 @@ describe('loadSettingsApi', () => {
       flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
+  });
+
+  it('exposes built-in provider harness defaults separately from overrides', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
+
+    const { loadSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.models.provider_harnesses).toEqual({ openai: 'pi' });
+    expect(settings.models.provider_default_harnesses).toEqual({
+      anthropic: 'claude-code',
+      openai: 'codex',
+      google: 'pi',
+      minimax: 'pi',
+      zai: 'pi',
+      kimi: 'pi',
+      mimo: 'pi',
+      openrouter: 'pi',
+      nous: 'pi',
+      dashscope: 'pi',
+    });
   });
 
   it('overlays configured workhorses and roles on seeded defaults', async () => {
@@ -404,6 +426,56 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('observations: false');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
+  });
+
+  it('persists explicit provider harness overrides', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        provider_harnesses: { openai: 'pi' },
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('openai:');
+    expect(written).toContain('harness: pi');
+
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
+    expect(loadSettingsApi().models.provider_harnesses?.openai).toBe('pi');
+  });
+
+  it('removes provider harness overrides when saved as empty or absent', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ providerHarnesses: { openai: 'pi' } }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        provider_harnesses: { openai: '' },
+      },
+    }));
+
+    let written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).not.toContain('harness: pi');
+    expect(written).not.toContain('harness: ""');
+
+    mockWriteFile.mockClear();
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        provider_harnesses: {},
+      },
+    }));
+
+    written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).not.toContain('harness: pi');
   });
 
   it('round-trips parent sub-role model refs through saved and loaded settings', async () => {
