@@ -39,6 +39,7 @@ function makeDeps(options: {
   psCount?: number;
   failUp?: boolean;
   failRender?: boolean;
+  projectDomain?: string | null;
 } = {}): UatStackDeps & {
   ups: string[]; downs: string[]; stackWrites: Array<[string, string | null]>;
 } {
@@ -58,6 +59,7 @@ function makeDeps(options: {
     findComposeFile: (workspacePath) =>
       (options.composeFileExists ?? true) ? `${workspacePath}/.devcontainer/docker-compose.devcontainer.yml` : null,
     readComposeFile: async () => options.composeContent ?? '',
+    projectDomainFor: () => options.projectDomain ?? null,
     store: {
       setStack: (name, startedAt) => { stackWrites.push([name, startedAt]); },
       listWithStacks: () => withStacks,
@@ -206,6 +208,16 @@ describe('uatFrontendUrl', () => {
     });
     const url = await uatFrontendUrl(gen('uat/pan-host-0610'), deps);
     expect(url).toBe('https://uat-pan-host-0610.custom.localhost');
+  });
+
+  it('uses the generation project DNS domain when no Host() label is rendered', async () => {
+    const url = await uatFrontendUrl(gen('uat/pan-domain-0610'), makeDeps({ projectDomain: 'uat.example.test' }));
+    expect(url).toBe('https://uat-pan-domain-0610.uat.example.test');
+  });
+
+  it('falls back to pan.localhost when no project DNS domain is configured', async () => {
+    const url = await uatFrontendUrl(gen('uat/pan-fallback-0610'), makeDeps({ projectDomain: null }));
+    expect(url).toBe('https://uat-pan-fallback-0610.pan.localhost');
   });
 
   it('falls back to the FEATURE_FOLDER convention without a rendered compose', async () => {

@@ -20,6 +20,7 @@ import { readFile } from 'node:fs/promises';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { ensureDevcontainerSync } from '../workspace/ensure-devcontainer.js';
+import { findProjectByPathSync } from '../projects.js';
 import {
   listUatGenerationsWithStacksSync,
   setUatGenerationStackStartedAtSync,
@@ -64,6 +65,7 @@ export interface UatStackDeps {
   composePsCount(composeFile: string, projectName: string): Promise<number>;
   findComposeFile(workspacePath: string): string | null;
   readComposeFile(composeFile: string): Promise<string>;
+  projectDomainFor(projectRoot: string): string | null;
   store: {
     setStack(name: string, startedAt: string | null): void;
     listWithStacks(): UatGeneration[];
@@ -105,6 +107,7 @@ function defaultDeps(): UatStackDeps {
       }
       return null;
     },
+    projectDomainFor: (projectRoot) => findProjectByPathSync(projectRoot)?.workspace?.dns?.domain ?? null,
     readComposeFile: (composeFile) => readFile(composeFile, 'utf-8'),
     store: {
       setStack: (name, startedAt) => setUatGenerationStackStartedAtSync(name, startedAt),
@@ -137,7 +140,7 @@ export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackD
       if (hostMatch?.[1]) return `https://${hostMatch[1]}`;
     } catch { /* fall through to convention */ }
   }
-  return `https://${folder}.pan.localhost`;
+  return `https://${folder}.${d.projectDomainFor(gen.projectRoot) ?? 'pan.localhost'}`;
 }
 
 export type UatStackStatus = 'running' | 'absent';
