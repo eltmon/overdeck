@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
@@ -16,6 +16,48 @@ function render(ui: Parameters<typeof rtlRender>[0]) {
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
+
+const fetchMock = vi.fn();
+let mergeTrainSetting: { value: 'enabled' | 'disabled' | null; effective: boolean };
+
+function jsonResponse(body: unknown, ok = true): Response {
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    json: async () => body,
+  } as Response;
+}
+
+function installDefaultFetchMock() {
+  mergeTrainSetting = { value: null, effective: true };
+  fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith('/api/costs/summary')) {
+      return jsonResponse({ week: {} });
+    }
+    if (url.endsWith('/auto-merge-default')) {
+      return jsonResponse({ value: null });
+    }
+    if (url.endsWith('/merge-train')) {
+      if (init?.method === 'POST') {
+        const body = JSON.parse(String(init.body ?? '{}')) as { value: 'enabled' | 'disabled' | null };
+        mergeTrainSetting = {
+          value: body.value,
+          effective: body.value === null ? true : body.value === 'enabled',
+        };
+      }
+      return jsonResponse(mergeTrainSetting);
+    }
+    if (url === '/api/merge-train/queues') {
+      return jsonResponse([]);
+    }
+    if (url === '/api/merge-train/generations') {
+      return jsonResponse([]);
+    }
+    return jsonResponse({}, false);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+}
 
 function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
   return {
@@ -57,7 +99,13 @@ function expectPhase(
 
 describe('bucketFeaturePhase', () => {
   beforeEach(() => {
+    fetchMock.mockReset();
+    installDefaultFetchMock();
     useDashboardStore.setState({ reviewStatusByIssueId: {} });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('buckets stuck issues by the stuck flag', () => {
@@ -271,5 +319,84 @@ describe('bucketFeaturePhase', () => {
     fireEvent.mouseEnter(screen.getAllByText('$1.23')[1]!);
 
     expect(screen.getAllByText('No cost data')).toHaveLength(2);
+  });
+
+  it('renders and persists the project merge-train setting', async () => {
+    const { unmount } = render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        projectKey="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    await screen.findByText('Effective: enabled');
+    expect(screen.getAllByRole('button', { name: 'Global default' })[1]).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enabled' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/projects/panopticon-cli/merge-train',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ value: 'enabled' }),
+        }),
+      );
+      expect(screen.getByRole('button', { name: 'Enabled' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    unmount();
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        projectKey="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Enabled' })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  it('links to Awaiting Merge with the project merge-train summary', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/costs/summary')) return jsonResponse({ week: {} });
+      if (url.endsWith('/auto-merge-default')) return jsonResponse({ value: null });
+      if (url.endsWith('/merge-train')) return jsonResponse(mergeTrainSetting);
+      if (url === '/api/merge-train/queues') {
+        return jsonResponse([
+          { projectKey: 'panopticon-cli', queue: [{ issueId: 'PAN-1' }, { issueId: 'PAN-2' }] },
+          { projectKey: 'krux', queue: [{ issueId: 'KRUX-1' }] },
+        ]);
+      }
+      if (url === '/api/merge-train/generations') {
+        return jsonResponse([
+          { projectKey: 'panopticon-cli', name: 'uat/pan-otter-0612', status: 'ready' },
+          { projectKey: 'krux', name: 'uat/krux-fox-0612', status: 'ready' },
+        ]);
+      }
+      return jsonResponse({}, false);
+    });
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        projectKey="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const link = await screen.findByRole('link', { name: /Merge train: 2 ready features .*pan-otter-0612 ready.*Awaiting Merge/ });
+    expect(link).toHaveAttribute('href', '/awaiting-merge');
   });
 });

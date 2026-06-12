@@ -9,6 +9,8 @@ import VerbBadge, { type VerbBadgeVariant } from '../primitives/VerbBadge';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import type { Agent, Issue, CanonicalState } from '../../types';
 
+type MergeTrainOverride = 'enabled' | 'disabled' | null;
+
 export interface IssueCostBreakdown {
   byModel: Record<string, { cost: number; tokens: number }>;
   byStage: Record<string, { cost: number; tokens: number }>;
@@ -148,10 +150,88 @@ export function projectTotalCost(
   return sum;
 }
 
-/** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
+interface ProjectMergeTrainSetting {
+  value: MergeTrainOverride;
+  effective: boolean;
+}
+
+interface MergeTrainQueueItem {
+  projectKey?: string;
+  issueId?: string;
+}
+
+interface MergeTrainQueueGroup {
+  projectKey?: string;
+  queue?: MergeTrainQueueItem[];
+  items?: MergeTrainQueueItem[];
+}
+
+interface MergeTrainGeneration {
+  projectKey?: string;
+  name: string;
+  status: string;
+}
+
+interface MergeTrainGenerationGroup {
+  projectKey?: string;
+  generations?: MergeTrainGeneration[];
+}
+
+async function fetchJsonOrEmpty<T>(url: string, fallback: T): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) return fallback;
+  return res.json() as Promise<T>;
+}
+
+function mergeTrainQueueCount(payload: unknown, projectKey: string): number {
+  if (!Array.isArray(payload)) return 0;
+  let total = 0;
+  for (const entry of payload) {
+    const group = entry as MergeTrainQueueGroup;
+    if (group.projectKey === projectKey) {
+      if (Array.isArray(group.queue)) total += group.queue.length;
+      else if (Array.isArray(group.items)) total += group.items.length;
+      else if ('issueId' in group) total += 1;
+      continue;
+    }
+    const item = entry as MergeTrainQueueItem;
+    if (item.projectKey === projectKey) total += 1;
+  }
+  return total;
+}
+
+function mergeTrainGenerationsForProject(payload: unknown, projectKey: string): MergeTrainGeneration[] {
+  if (!Array.isArray(payload)) return [];
+  const generations: MergeTrainGeneration[] = [];
+  for (const entry of payload) {
+    const group = entry as MergeTrainGenerationGroup;
+    if (group.projectKey === projectKey && Array.isArray(group.generations)) {
+      generations.push(...group.generations.filter((gen) => gen.projectKey === undefined || gen.projectKey === projectKey));
+      continue;
+    }
+    const generation = entry as MergeTrainGeneration;
+    if (generation.projectKey === projectKey && typeof generation.name === 'string') {
+      generations.push(generation);
+    }
+  }
+  return generations;
+}
+
+function currentGeneration(generations: MergeTrainGeneration[]): MergeTrainGeneration | null {
+  return generations.find((g) => g.status === 'ready') ??
+    generations.find((g) => g.status === 'assembling') ??
+    generations.find((g) => g.status === 'superseded') ??
+    null;
+}
+
+function shortGenerationName(name: string): string {
+  return name.replace(/^uat\//, '');
+}
+
+/** PAN-1693/1695/1696: per-project settings in the cockpit. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
-  const { data } = useQuery({
+  const { data: autoMergeData } = useQuery({
     queryKey: ['project-auto-merge-default', projectKey],
     queryFn: async (): Promise<{ value: 'auto' | 'hold' | null }> => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`);
@@ -160,8 +240,35 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
     },
     enabled: !!projectKey,
   });
-  const value = data?.value ?? null;
-  const mutation = useMutation({
+  const { data: mergeTrainData } = useQuery({
+    queryKey: ['project-merge-train', projectKey],
+    queryFn: async (): Promise<ProjectMergeTrainSetting> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`);
+      if (!res.ok) return { value: null, effective: false };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const { data: mergeTrainQueues } = useQuery({
+    queryKey: ['merge-train-queues'],
+    queryFn: () => fetchJsonOrEmpty<unknown[]>('/api/merge-train/queues', []),
+    enabled: !!projectKey,
+    refetchInterval: 30_000,
+  });
+  const { data: mergeTrainGenerations } = useQuery({
+    queryKey: ['merge-train-generations'],
+    queryFn: () => fetchJsonOrEmpty<unknown[]>('/api/merge-train/generations', []),
+    enabled: !!projectKey,
+    refetchInterval: 30_000,
+  });
+
+  const autoMergeValue = autoMergeData?.value ?? null;
+  const mergeTrainValue = mergeTrainData?.value ?? null;
+  const mergeTrainEffective = mergeTrainData?.effective ?? false;
+  const readyFeatureCount = mergeTrainQueueCount(mergeTrainQueues, projectKey);
+  const generation = currentGeneration(mergeTrainGenerationsForProject(mergeTrainGenerations, projectKey));
+
+  const autoMergeMutation = useMutation({
     mutationFn: async (next: 'auto' | 'hold' | null) => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`, {
         method: 'POST',
@@ -173,9 +280,30 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-auto-merge-default', projectKey] }),
   });
-  const options: Array<{ v: 'auto' | 'hold' | null; label: string; color: string }> = [
+  const mergeTrainMutation = useMutation({
+    mutationFn: async (next: MergeTrainOverride) => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: next }),
+      });
+      if (!res.ok) throw new Error('Failed to save project setting');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-merge-train', projectKey] });
+      queryClient.invalidateQueries({ queryKey: ['merge-train-queues'] });
+      queryClient.invalidateQueries({ queryKey: ['merge-train-generations'] });
+    },
+  });
+  const autoMergeOptions: Array<{ v: 'auto' | 'hold' | null; label: string; color: string }> = [
     { v: 'auto', label: '⚡ Auto', color: 'var(--success)' },
     { v: 'hold', label: '🔒 Hold for UAT', color: 'var(--warning)' },
+    { v: null, label: 'Global default', color: 'var(--muted-foreground)' },
+  ];
+  const mergeTrainOptions: Array<{ v: MergeTrainOverride; label: string; color: string }> = [
+    { v: 'enabled', label: 'Enabled', color: 'var(--success)' },
+    { v: 'disabled', label: 'Disabled', color: 'var(--destructive)' },
     { v: null, label: 'Global default', color: 'var(--muted-foreground)' },
   ];
   return (
@@ -184,14 +312,15 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, color: 'var(--foreground)' }}>Auto-merge default</span>
         <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          {options.map((o, i) => {
-            const active = value === o.v;
+          {autoMergeOptions.map((o, i) => {
+            const active = autoMergeValue === o.v;
             return (
               <button
                 key={String(o.v)}
                 type="button"
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate(o.v)}
+                aria-pressed={active}
+                disabled={autoMergeMutation.isPending}
+                onClick={() => autoMergeMutation.mutate(o.v)}
                 style={{
                   appearance: 'none',
                   border: 0,
@@ -210,6 +339,47 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
           })}
         </div>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, color: 'var(--foreground)' }}>Merge train</span>
+        <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          {mergeTrainOptions.map((o, i) => {
+            const active = mergeTrainValue === o.v;
+            return (
+              <button
+                key={String(o.v)}
+                type="button"
+                aria-pressed={active}
+                disabled={mergeTrainMutation.isPending}
+                onClick={() => mergeTrainMutation.mutate(o.v)}
+                style={{
+                  appearance: 'none',
+                  border: 0,
+                  borderLeft: i === 0 ? 0 : '1px solid var(--border)',
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: active ? `color-mix(in srgb, ${o.color} 16%, transparent)` : 'transparent',
+                  color: active ? o.color : 'var(--muted-foreground)',
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        {mergeTrainValue === null && (
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
+            Effective: {mergeTrainEffective ? 'enabled' : 'disabled'}
+          </span>
+        )}
+      </div>
+      <a
+        href="/awaiting-merge"
+        style={{ fontSize: 11, color: 'var(--muted-foreground)', textDecoration: 'none' }}
+      >
+        Merge train: {readyFeatureCount} ready feature{readyFeatureCount === 1 ? '' : 's'} · {generation ? `${shortGenerationName(generation.name)} ${generation.status}` : 'no active generation'} · Awaiting Merge
+      </a>
       <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
         Applies to this project's issues that have no explicit per-issue auto-merge setting.
       </div>
@@ -673,4 +843,3 @@ function subStatus(entry: BucketedFeature): string | undefined {
 
   return undefined;
 }
-
