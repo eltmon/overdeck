@@ -36,7 +36,13 @@ import {
   dashboardCsrfToken,
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
-import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
+import {
+  getSetting,
+  LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
+  MERGE_TRAIN_ENABLED_KEY,
+  setFlywheelAutoPickupBacklog,
+  setSetting,
+} from '../../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
 import { markBlocked, markFailed, scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
 
@@ -337,6 +343,8 @@ describe('flywheel config routes', () => {
   });
 
   it('toggles the merge-train flag (default off) without touching the others', async () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'false');
+
     await expect(requestFlywheelRoute('/api/flywheel/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
@@ -345,6 +353,8 @@ describe('flywheel config routes', () => {
       status: 200,
       body: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true },
     });
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('true');
+    expect(getSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY)).toBe('false');
   });
 
   it('rejects non-boolean flywheel config values', async () => {

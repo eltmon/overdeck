@@ -4,7 +4,7 @@
  * flywheel routes expose.
  *
  * The reconciler interval is the heartbeat of "always one batch ready":
- * every 60s (gated per-tick on flywheel.merge_train_enabled, no-op without an
+ * every 60s (gated per-tick on the global merge-train flag, no-op without an
  * active flywheel run) it compares the ready set against the generation chain
  * and assembles/invalidates as needed. Assemblies run minutes — the reconciler
  * is single-flight per project, so ticks never pile up.

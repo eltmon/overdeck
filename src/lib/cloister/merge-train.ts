@@ -2,7 +2,7 @@
  * Merge-train entry point (PAN-1691).
  *
  * Called from the post-merge path after a feature lands on main. Gated by the
- * default-off `flywheel.merge_train_enabled` flag — when off this is a no-op, so
+ * default-off global merge-train flag — when off this is a no-op, so
  * nothing git-mutating runs until an operator deliberately enables it.
  *
  * The real git/spawn deps are lazy-loaded only when the flag is on, so importing

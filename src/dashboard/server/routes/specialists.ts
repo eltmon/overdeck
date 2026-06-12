@@ -204,7 +204,7 @@ export function firePostMergeLifecycle(issueId: string): boolean {
 
       // PAN-1691: roll the merge train — rebase ready siblings onto the new main,
       // re-verify the clean ones, agent-resolve conflicts. No-op unless the
-      // flywheel.merge_train_enabled flag is on. Runs inside the in-flight guard,
+      // global merge-train flag is on. Runs inside the in-flight guard,
       // so it cannot re-enter postMergeLifecycle for this issue.
       const { runMergeTrainReconcile } = await import('../../../lib/cloister/merge-train.js');
       const outcomes = await runMergeTrainReconcile(issueId);

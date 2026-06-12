@@ -5,11 +5,16 @@ import { tmpdir } from 'os';
 import {
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
+  LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
+  MERGE_TRAIN_ENABLED_KEY,
   getSetting,
   isFlywheelAutoPickupBacklog,
   isFlywheelRequireUatBeforeMerge,
+  isMergeTrainEnabled,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
+  setMergeTrainEnabled,
+  setSetting,
 } from '../app-settings.js';
 import { resetDatabase } from '../index.js';
 
@@ -73,5 +78,29 @@ describe('flywheel app settings', () => {
     expect(isFlywheelAutoPickupBacklog()).toBe(false);
     expect(isFlywheelRequireUatBeforeMerge()).toBe(false);
     expect(getSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY)).toBe('false');
+  });
+
+  it('reads the merge-train value from the new key when present', () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'true');
+    setSetting(MERGE_TRAIN_ENABLED_KEY, 'false');
+
+    expect(isMergeTrainEnabled()).toBe(false);
+  });
+
+  it('falls back to the legacy merge-train key when the new key is absent', () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'true');
+
+    expect(isMergeTrainEnabled()).toBe(true);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBeNull();
+  });
+
+  it('writes the merge-train value only to the new key', () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'false');
+
+    setMergeTrainEnabled(true);
+
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('true');
+    expect(getSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY)).toBe('false');
+    expect(isMergeTrainEnabled()).toBe(true);
   });
 });

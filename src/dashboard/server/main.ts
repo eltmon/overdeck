@@ -380,8 +380,8 @@ console.log('[panopticon] ConversationLifecycleService started');
 startSubstrateBugPoller();
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
-// times (gated per-tick on flywheel.merge_train_enabled; no-op without an
-// active flywheel run).
+// times (gated per-tick on the global merge-train flag; no-op without an active
+// flywheel run).
 startUatTrainReconciler();
 console.log('[panopticon] UAT batch-train reconciler started');
 

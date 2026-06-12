@@ -37,7 +37,7 @@ export const STUCK_ASSEMBLING_MS = 60 * 60 * 1000;
 export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
 
 export interface UatReconcilerDeps {
-  /** Gate: flywheel.merge_train_enabled. */
+  /** Gate: global merge-train flag. */
   isEnabled(): boolean;
   /**
    * Current ready set in merge order, or null when it cannot be computed

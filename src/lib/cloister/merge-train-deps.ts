@@ -1,6 +1,6 @@
 /**
  * Real wiring for the merge-train reconciler (PAN-1691). Lazy-loaded from
- * merge-train.ts only when the `flywheel.merge_train_enabled` flag is on, so it
+ * merge-train.ts only when the global merge-train flag is on, so it
  * is never imported during normal operation or the gating unit tests.
  *
  * This is pure I/O — git rebase/force-push and agent spawn — and is exercised
