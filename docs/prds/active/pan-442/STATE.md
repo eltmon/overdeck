@@ -5,7 +5,7 @@
 ## Decision Summary
 
 ### Framework: Electron
-- Electron bundles Node.js natively, so `node-pty` and `better-sqlite3` work without modification
+- Electron bundles Node.js natively, so `node-pty` works after rebuild and SQLite uses Node's built-in driver
 - Electrobun rejected: Bun main process can't run native Node addons (node-pty exits with code 0)
 - Electron 40.x (latest stable, matches T3Code reference)
 
@@ -85,7 +85,7 @@
 - Detachable terminal as native BrowserWindow (PAN-486 follow-up)
 
 ## Technical Risks
-1. **Native addon rebuilds**: node-pty and better-sqlite3 need `electron-rebuild` for Electron's Node version
+1. **Native addon rebuilds**: node-pty needs `electron-rebuild` for Electron's Node version
 2. **Custom protocol + WebSocket**: `panopticon://` protocol needs to handle WS connections to the embedded server correctly
 3. **macOS code signing**: Unsigned apps trigger Gatekeeper warnings — acceptable for alpha, needs signing for distribution
 4. **Bundle size**: Electron adds ~150MB — acceptable tradeoff for native experience

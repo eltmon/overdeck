@@ -33,7 +33,7 @@
     "dist:linux": "electron-builder --linux AppImage --publish never",
     "dist:mac": "electron-builder --mac dmg --universal --publish never",
     "dist:win": "electron-builder --win nsis --publish never",
-    "postinstall": "electron-rebuild -f -w node-pty,better-sqlite3 2>/dev/null; exit 0"
+    "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
   "dependencies": {
     "conf": "^13.0.0",

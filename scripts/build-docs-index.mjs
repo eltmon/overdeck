@@ -6,6 +6,11 @@ import { pathToFileURL } from 'node:url';
 const projectRoot = resolve(import.meta.dirname, '..');
 const libraryEntry = join(projectRoot, 'dist', 'index.js');
 
+if (process.env.SKIP_DOCS_INDEX === '1') {
+  console.log('Skipping docs index build because SKIP_DOCS_INDEX=1');
+  process.exit(0);
+}
+
 if (!existsSync(libraryEntry)) {
   console.error('dist/index.js is missing; run npm run build:cli before build:docs-index');
   process.exit(1);

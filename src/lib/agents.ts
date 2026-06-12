@@ -775,9 +775,7 @@ export function clearReadySignal(agentId: string): void {
 export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
-  for (let i = 0; i < timeoutSeconds; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-
+  for (let i = 0; i <= timeoutSeconds; i++) {
     if (existsSync(readyPath)) {
       try {
         const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
@@ -789,6 +787,10 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
       } catch {
         // File exists but mid-write / invalid — keep waiting.
       }
+    }
+
+    if (i < timeoutSeconds) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
     }
   }
 
@@ -1361,21 +1363,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const clearClientTimeout = () => {
       if (timeout) clearTimeout(timeout);
-      timeout = null;
+      timeout = undefined;
     };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       reject(err);
     };
 

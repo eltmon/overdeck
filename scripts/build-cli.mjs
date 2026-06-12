@@ -11,14 +11,15 @@ const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(tmpdir(), `panopticon-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
 
-const moveDirSync = (src, dest) => {
+const moveDirSync = (src, dst) => {
   try {
-    renameSync(src, dest);
+    renameSync(src, dst);
   } catch (error) {
     if (error?.code !== 'EXDEV') {
       throw error;
     }
-    cpSync(src, dest, { recursive: true });
+
+    cpSync(src, dst, { recursive: true });
     rmSync(src, { recursive: true, force: true });
   }
 };

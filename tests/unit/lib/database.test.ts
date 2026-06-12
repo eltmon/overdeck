@@ -9,15 +9,15 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
 import { initSchema } from '../../../src/lib/database/schema.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
 
 // ============== In-memory DB helper ==============
 // We test the logic directly using in-memory DBs to avoid singleton issues
 
-function createTestDb(): Database.Database {
-  const db = new Database(':memory:');
+function createTestDb(): SqliteDatabase {
+  const db = openDatabase(':memory:');
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   initSchema(db);
@@ -79,7 +79,7 @@ describe('Database schema', () => {
 // ============== Review Status Logic Tests ==============
 
 describe('review_status table', () => {
-  let db: Database.Database;
+  let db: SqliteDatabase;
   beforeAll(() => { db = createTestDb(); });
   afterAll(() => db.close());
 
@@ -142,7 +142,7 @@ describe('review_status table', () => {
 // ============== Cost Events Logic Tests ==============
 
 describe('cost_events table', () => {
-  let db: Database.Database;
+  let db: SqliteDatabase;
   beforeAll(() => { db = createTestDb(); });
   afterAll(() => db.close());
 
@@ -251,7 +251,7 @@ describe('cost_events table', () => {
 // ============== Health Events Logic Tests ==============
 
 describe('health_events table', () => {
-  let db: Database.Database;
+  let db: SqliteDatabase;
   beforeAll(() => { db = createTestDb(); });
   afterAll(() => db.close());
 
