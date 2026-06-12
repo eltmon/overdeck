@@ -2122,6 +2122,8 @@ export interface AgentRuntimeState {
   lastActivity: string;
   currentTool?: string;
   claudeSessionId?: string;
+  sessionModel?: string;
+  sessionHarness?: RuntimeName;
   /**
    * For specialists: the issue currently being processed. Tracked per-agent in
    * the AgentStateService snapshot (see agent.current_issue_set event).
@@ -2154,6 +2156,10 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     lastActivity: snap.lastActivity,
     currentTool: snap.currentTool,
     claudeSessionId: snap.claudeSessionId,
+    sessionModel: snap.sessionModel,
+    sessionHarness: (snap.sessionHarness === 'claude-code' || snap.sessionHarness === 'pi' || snap.sessionHarness === 'codex')
+      ? snap.sessionHarness
+      : undefined,
     currentIssue: snap.currentIssue,
     resolution: snap.resolution as AgentResolution | undefined,
     resolutionCount: snap.resolutionCount,
@@ -2247,10 +2253,21 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
     // model_set requires a model — use existing snapshot's model if present.
     const snap = getAgentRuntimeStateSync(agentId);
     if (snap || patch.claudeSessionId) {
-      await Effect.runPromise(emitAgentEvent(agentId, {
+      const event: {
+        kind: 'model_set';
+        model: string;
+        claudeSessionId: string;
+        sessionModel?: string;
+        sessionHarness?: RuntimeName;
+      } = {
         kind: 'model_set',
         model: 'unknown',
         claudeSessionId: patch.claudeSessionId,
+      };
+      if (patch.sessionModel !== undefined) event.sessionModel = patch.sessionModel;
+      if (patch.sessionHarness !== undefined) event.sessionHarness = patch.sessionHarness;
+      await Effect.runPromise(emitAgentEvent(agentId, {
+        ...event,
       }));
     }
   }
@@ -3179,10 +3196,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
   let sessionId: string | undefined;
+  let rawSessionId: string | undefined;
   if (shouldRegisterConversation) {
     // When resuming, reuse the prior JSONL session so `claude --resume` reloads conversation history.
     // When starting fresh, generate a new UUID and use `claude --session-id`.
-    const rawSessionId = options.resumeSessionId ?? randomUUID();
+    rawSessionId = options.resumeSessionId ?? randomUUID();
 
     // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
     // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
@@ -3277,6 +3295,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   }));
+  if (shouldRegisterConversation) {
+    await saveAgentRuntimeState(agentId, {
+      claudeSessionId: rawSessionId,
+      ...(options.resumeSessionId ? {} : {
+        sessionModel: selectedModel,
+        sessionHarness: resolvedHarness,
+      }),
+    });
+  }
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 

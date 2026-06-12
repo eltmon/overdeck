@@ -291,6 +291,8 @@ export const AgentModelSetEvent = Schema.Struct({
     agentId: AgentId,
     model: Schema.String,
     claudeSessionId: Schema.optional(Schema.String),
+    sessionModel: Schema.optional(Schema.String),
+    sessionHarness: Schema.optional(Schema.String),
   }),
 })
 export type AgentModelSetEvent = typeof AgentModelSetEvent.Type
