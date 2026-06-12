@@ -28,10 +28,10 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, preflightProviderForModel, resolveEffectiveHarness, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getCodexLauncherFields, getPiLauncherFields, getProviderExportsForModel, preflightProviderForModel, resolveEffectiveHarness, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { getProviderForModelSync } from '../providers.js';
-import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { generateLauncherScriptSync, type LauncherConfig } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
@@ -392,6 +392,66 @@ function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
+interface PlanningLauncherConfigInput {
+  effectiveHarness: 'claude-code' | 'pi' | 'codex';
+  sessionName: string;
+  issueIdentifier: string;
+  issueTitle: string;
+  workspacePath: string;
+  planningModel: string;
+  cmdWithArgs: string;
+  providerExports: string;
+  promptFile: string;
+  continueFilePath: string;
+}
+
+/**
+ * Build the LauncherConfig for a planning session.
+ *
+ * PAN-636 / PAN-1641: planning can resolve to Pi (e.g. an `ollama:` model with
+ * `roles.plan.harness: pi`) or Codex. Both harnesses need their launcher-specific
+ * fields threaded into the config or the generator falls back to a Claude-shaped
+ * command and the session boots malformed.
+ */
+export async function buildPlanningLauncherConfig(
+  input: PlanningLauncherConfigInput,
+): Promise<LauncherConfig> {
+  const {
+    effectiveHarness,
+    sessionName,
+    issueIdentifier,
+    issueTitle,
+    workspacePath,
+    planningModel,
+    cmdWithArgs,
+    providerExports,
+    promptFile,
+    continueFilePath,
+  } = input;
+
+  let launcherSpecificFields: Partial<LauncherConfig> = {};
+  if (effectiveHarness === 'pi') {
+    launcherSpecificFields = await getPiLauncherFields(sessionName, planningModel);
+  } else if (effectiveHarness === 'codex') {
+    launcherSpecificFields = getCodexLauncherFields(sessionName, planningModel, workspacePath);
+  }
+
+  return {
+    role: 'plan',
+    workingDir: workspacePath,
+    setTerminalEnv: true,
+    panopticonEnv: { agentId: sessionName, issueId: issueIdentifier, sessionType: 'plan' },
+    providerExports,
+    promptFile,
+    baseCommand: cmdWithArgs,
+    appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
+    trapHup: true,
+    debugLog: '/tmp/pan-launcher-debug.log',
+    keepAlive: true,
+    ...launcherSpecificFields,
+  };
+}
+
 export async function writeFeatureContext(workspacePath: string, issue: PlanningIssue): Promise<void> {
   if (!issue.artifactType?.includes('PortfolioItem')) return;
   const childStoriesSection = issue.childStories && issue.childStories.length > 0
@@ -631,21 +691,23 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);
+
+    const launcherConfig = await buildPlanningLauncherConfig({
+      effectiveHarness,
+      sessionName,
+      issueIdentifier: issue.identifier,
+      issueTitle: issue.title,
+      workspacePath,
+      planningModel,
+      cmdWithArgs,
+      providerExports,
+      promptFile,
+      continueFilePath,
+    });
+
     await writeFile(
       launcherScript,
-      generateLauncherScriptSync({
-        role: 'plan',
-        workingDir: workspacePath,
-        setTerminalEnv: true,
-        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
-        providerExports,
-        promptFile,
-        baseCommand: cmdWithArgs,
-        appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
-        trapHup: true,
-        debugLog: '/tmp/pan-launcher-debug.log',
-        keepAlive: true,
-      }),
+      generateLauncherScriptSync(launcherConfig),
       { mode: 0o755 },
     );
 

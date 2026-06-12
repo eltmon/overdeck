@@ -14,6 +14,9 @@ export const DEFAULT_OLLAMA_MODEL = 'gemma4:12b';
 export const OLLAMA_MODEL_PREFIX = 'ollama:';
 export const SAFE_OLLAMA_HOST_RE = /^https?:\/\/(localhost|127(?:\.\d+){3}|\[::1\]|::1)(:\d+)?\/?$/;
 
+/** In-flight `ollama serve` startups keyed by normalized base URL. */
+const inFlightStarts = new Map<string, Promise<void>>();
+
 export class OllamaError extends Data.TaggedError('OllamaError')<{
   readonly operation: string;
   readonly message: string;
@@ -133,29 +136,54 @@ export async function ensureOllamaServeRunning(
   baseUrl: string = OLLAMA_BASE_URL,
   options: { startupTimeoutMs?: number } = {},
 ): Promise<void> {
-  if (await checkOllamaEndpointReachable(baseUrl)) return;
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
 
-  if (!await isOllamaInstalled()) {
-    throw new OllamaError({
-      operation: 'ensureOllamaServeRunning',
-      message: 'Ollama is not installed. Install Ollama, then run `ollama serve` or let Panopticon start it.',
+  const existing = inFlightStarts.get(normalizedBaseUrl);
+  if (existing) return existing;
+
+  const startPromise = (async (): Promise<void> => {
+    if (await checkOllamaEndpointReachable(normalizedBaseUrl)) return;
+
+    if (!await isOllamaInstalled()) {
+      throw new OllamaError({
+        operation: 'ensureOllamaServeRunning',
+        message: 'Ollama is not installed. Install Ollama, then run `ollama serve` or let Panopticon start it.',
+      });
+    }
+
+    // Force the auto-started daemon to bind to loopback only. A polluted
+    // OLLAMA_HOST env var (e.g. 0.0.0.0:11434) would otherwise expose the
+    // local model endpoint beyond the machine.
+    let ollamaHost: string;
+    try {
+      const url = new URL(normalizedBaseUrl);
+      const port = url.port || '11434';
+      ollamaHost = `127.0.0.1:${port}`;
+    } catch {
+      ollamaHost = '127.0.0.1:11434';
+    }
+
+    const child = spawn('ollama', ['serve'], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, OLLAMA_HOST: ollamaHost },
     });
-  }
 
-  const child = spawn('ollama', ['serve'], {
-    detached: true,
-    stdio: 'ignore',
+    if (!child.pid) {
+      throw new OllamaError({
+        operation: 'ensureOllamaServeRunning',
+        message: 'Failed to spawn `ollama serve`.',
+      });
+    }
+
+    child.unref();
+    await waitForOllamaEndpoint(normalizedBaseUrl, options.startupTimeoutMs ?? 30_000);
+  })().finally(() => {
+    inFlightStarts.delete(normalizedBaseUrl);
   });
 
-  if (!child.pid) {
-    throw new OllamaError({
-      operation: 'ensureOllamaServeRunning',
-      message: 'Failed to spawn `ollama serve`.',
-    });
-  }
-
-  child.unref();
-  await waitForOllamaEndpoint(baseUrl, options.startupTimeoutMs ?? 30_000);
+  inFlightStarts.set(normalizedBaseUrl, startPromise);
+  return startPromise;
 }
 
 export async function checkOllamaModelHealth(

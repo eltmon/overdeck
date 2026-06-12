@@ -220,6 +220,7 @@ export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
   if (modelId.startsWith('mimo-')) return 'mimo';
+  if (modelId.startsWith('ollama:')) return 'ollama';
   return 'anthropic';
 }
 

@@ -47,6 +47,11 @@ describe('model-fallback', () => {
     it('should return nous for Nous Portal models', () => {
       expect(getModelProviderSync('qwen/qwen3.6-plus')).toBe('nous');
     });
+
+    it('should return ollama for Ollama local models', () => {
+      expect(getModelProviderSync('ollama:gemma4:12b')).toBe('ollama');
+      expect(getModelProviderSync('ollama:anything')).toBe('ollama');
+    });
   });
 
   describe('requiresExternalKey', () => {

@@ -33,6 +33,7 @@ function okResponse(body: unknown): Response {
 
 describe('ollama lifecycle', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
     mocks.exec.mockImplementation((_command: string, _options: unknown, callback: ExecCallback) => {
@@ -87,15 +88,37 @@ describe('ollama lifecycle', () => {
   it('spawns ollama serve when the endpoint is initially unreachable', async () => {
     vi.mocked(globalThis.fetch)
       .mockRejectedValueOnce(new Error('connection refused'))
+      .mockRejectedValueOnce(new Error('connection refused'))
       .mockResolvedValueOnce(okResponse({ models: [] }));
 
-    await ensureOllamaServeRunning();
+    const promise = ensureOllamaServeRunning();
+    await vi.advanceTimersByTimeAsync(250);
+    await promise;
 
-    expect(mocks.spawn).toHaveBeenCalledWith('ollama', ['serve'], {
-      detached: true,
-      stdio: 'ignore',
-    });
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      'ollama',
+      ['serve'],
+      expect.objectContaining({
+        detached: true,
+        stdio: 'ignore',
+        env: expect.objectContaining({ OLLAMA_HOST: '127.0.0.1:11434' }),
+      }),
+    );
     expect(mocks.unref).toHaveBeenCalledOnce();
+  });
+
+  it('deduplicates concurrent ollama serve startups', async () => {
+    vi.mocked(globalThis.fetch)
+      .mockRejectedValueOnce(new Error('connection refused'))
+      .mockRejectedValueOnce(new Error('connection refused'))
+      .mockResolvedValueOnce(okResponse({ models: [] }));
+
+    const p1 = ensureOllamaServeRunning();
+    const p2 = ensureOllamaServeRunning();
+    await vi.advanceTimersByTimeAsync(250);
+    await Promise.all([p1, p2]);
+
+    expect(mocks.spawn).toHaveBeenCalledOnce();
   });
 
   it('reports endpoint unreachable separately from missing models', async () => {

@@ -174,7 +174,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 
   return false;
 }
 
-async function getPiLauncherFields(agentId: string, model: string): Promise<{
+export async function getPiLauncherFields(agentId: string, model: string): Promise<{
   harness: 'pi';
   piExtensionPath: string;
   piFifoPath: string;
@@ -204,7 +204,7 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
   };
 }
 
-function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
   codexMode: 'work-tui';
   codexHome: string;
