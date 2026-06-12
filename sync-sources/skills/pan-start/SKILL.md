@@ -28,6 +28,7 @@ pan start MIN-456          # Works with any tracker prefix
 pan start PAN-123 --force  # Clear a paused agent gate and start anyway
 pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
 pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. switch model)
+pan start PAN-123 --harness codex  # Explicitly use the Codex harness
 ```
 
 ## What It Does
