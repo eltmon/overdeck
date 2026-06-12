@@ -40,6 +40,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
+import { assertPlanQuality, PlanQualityLintError } from '../../../lib/vbrief/quality-lint.js';
 import { appendContinueSessionEntryForIssue, promoteContinueToProject } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
@@ -147,6 +148,7 @@ export async function completePlanningArtifacts(options: {
   if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
+  assertPlanQuality(workspaceDoc);
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
@@ -1335,16 +1337,34 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       projectPath = projectConfig?.path || '';
     }
 
+    const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
+    if (workspacePath) {
+      const workspacePlanPath = yield* Effect.promise(async () =>
+        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath))) ?? (await Effect.runPromise(findPlan(workspacePath)))
+      );
+      if (workspacePlanPath) {
+        const workspaceDoc = yield* readPlan(workspacePlanPath);
+        try {
+          assertPlanQuality(workspaceDoc);
+        } catch (error) {
+          if (error instanceof PlanQualityLintError) {
+            return jsonResponse({ error: 'vBRIEF quality lint failed', qualityIssues: error.issues }, { status: 422 });
+          }
+          throw error;
+        }
+      }
+    }
+
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
     const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
 
-      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
       const gitRoot = workspacePath;
       const upperIssueId = id.toUpperCase();
-      const { proposed, beadCount, beadsWarning } = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
+      const artifacts = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
+      const { proposed, beadCount, beadsWarning } = artifacts;
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
       console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 

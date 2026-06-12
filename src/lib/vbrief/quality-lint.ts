@@ -7,6 +7,13 @@ export interface QualityIssue {
   severity: 'error' | 'warn';
 }
 
+export class PlanQualityLintError extends Error {
+  constructor(public readonly issues: QualityIssue[]) {
+    super(`vBRIEF quality lint failed with ${issues.length} issue${issues.length === 1 ? '' : 's'}`);
+    this.name = 'PlanQualityLintError';
+  }
+}
+
 export const PLACEHOLDER_AC_PATTERNS = ['acceptance criteria for', 'copy from parent', 'copy from specification', 'placeholder', 'refine from parent', 'tbd', 'to be defined', 'to refine', 'todo'];
 export const DOCS_ONLY_AC_PATTERNS = ['docs updated', 'documentation updated', 'readme updated', 'update docs', 'update documentation', 'update readme'];
 export const VAGUE_AC_PATTERNS = ['displays a message', 'handles errors', 'is implemented', 'is updated', 'passes tests', 'shows a message', 'updates the ui', 'works as expected', 'make it work', 'implement the feature', 'change the code', 'update the code'];
@@ -66,4 +73,34 @@ function lintItem(item: VBriefItem): QualityIssue[] {
 
 export function lintPlanQuality(doc: VBriefDocument): QualityIssue[] {
   return doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item));
+}
+
+export function qualityLintErrors(doc: VBriefDocument): QualityIssue[] {
+  return lintPlanQuality(doc).filter(issue => issue.severity === 'error');
+}
+
+export function formatQualityIssues(issues: QualityIssue[]): string[] {
+  const grouped = new Map<string, QualityIssue[]>();
+  for (const issue of issues) {
+    const key = issue.itemId ?? '<plan>';
+    grouped.set(key, [...(grouped.get(key) ?? []), issue]);
+  }
+
+  const lines: string[] = [];
+  for (const [itemId, itemIssues] of grouped) {
+    lines.push(`${itemId}:`);
+    for (const issue of itemIssues) {
+      lines.push(`  [${issue.severity}] ${issue.rule}: ${issue.message}`);
+    }
+  }
+  return lines;
+}
+
+export function assertPlanQuality(doc: VBriefDocument): QualityIssue[] {
+  const issues = lintPlanQuality(doc);
+  const errors = issues.filter(issue => issue.severity === 'error');
+  if (errors.length > 0) {
+    throw new PlanQualityLintError(issues);
+  }
+  return issues;
 }

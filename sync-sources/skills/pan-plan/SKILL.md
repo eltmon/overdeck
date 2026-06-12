@@ -24,7 +24,7 @@ allowed-tools:
 
 ```bash
 pan plan <id> [--auto] [--auto-start] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
-pan plan finalize [-w <path>] [--json] [--no-promote]
+pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint]
 pan plan done <id>
 ```
 
@@ -75,7 +75,7 @@ What it does:
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
 5. Returns a summary of beads created and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done).
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs vBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
 
 ## Completing planning (`pan plan done`)
 

@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill } from '../issues.js';
+import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
 let projectRoot: string | null = null;
@@ -25,8 +26,48 @@ function makeDoc(issueId: string): VBriefDocument {
         canonicalFilename: '../../outside.vbrief.json',
       } as Record<string, unknown>,
       items: [
-        { id: 'item-1', title: 'Promote spec', status: 'pending' },
-        { id: 'item-2', title: 'Create beads', status: 'pending' },
+        {
+          id: 'item-1',
+          title: 'Promote spec',
+          status: 'pending',
+          narrative: { Action: 'Promote the finalized spec into the project planning directory' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-1.ac1',
+              title: 'The project spec directory stores the promoted vBRIEF',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-1.ac2',
+              title: 'The promoted vBRIEF persists proposed status',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
+        {
+          id: 'item-2',
+          title: 'Create beads',
+          status: 'pending',
+          narrative: { Action: 'Materialize one bead task for each finalized plan item' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-2.ac1',
+              title: 'The bead materializer creates one task per item',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-2.ac2',
+              title: 'Materialization errors blocks the planning promotion',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
       ],
       edges: [],
     },
@@ -111,6 +152,44 @@ describe('completePlanningArtifacts', () => {
         beadIds: new Map(),
       }),
     })).rejects.toThrow('bd daemon unavailable');
+
+    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
+  });
+
+  it('rejects quality lint failures before writing a proposed spec', async () => {
+    const issueId = 'PAN-1149';
+    const { projectPath, workspacePath } = makeProject(issueId);
+    await mkdir(join(workspacePath, '.pan'), { recursive: true });
+    const badDoc = makeDoc(issueId);
+    badDoc.plan.items[0]!.subItems = [
+      {
+        id: 'task-1.ac1',
+        title: 'Feature works as expected',
+        status: 'pending',
+        metadata: { kind: 'acceptance_criterion' },
+      },
+      {
+        id: 'task-1.ac2',
+        title: 'Given valid input then it returns success',
+        status: 'pending',
+        metadata: { kind: 'acceptance_criterion' },
+      },
+    ];
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(badDoc, null, 2));
+
+    await expect(completePlanningArtifacts({
+      projectPath,
+      workspacePath,
+      issueId,
+      createBeads: async () => {
+        throw new Error('createBeads should not run');
+      },
+    })).rejects.toMatchObject({
+      name: 'PlanQualityLintError',
+      issues: expect.arrayContaining([
+        expect.objectContaining({ rule: 'ac-banned-phrase' }),
+      ]),
+    } satisfies Partial<PlanQualityLintError>);
 
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });

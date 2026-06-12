@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
+import { evaluatePlanFinalizeQualityGate, promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 
 let TEST_DIR: string;
@@ -18,7 +18,27 @@ function makePlanDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDoc
       status: 'draft',
       sequence: 3,
       created: '2026-05-03T00:00:00Z',
-      items: [],
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'Implement the change with exact files and verification steps' },
+        metadata: { requiresInspection: false },
+        subItems: [
+          {
+            id: 'task-1.ac1',
+            title: 'Given valid input then it returns success',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+          {
+            id: 'task-1.ac2',
+            title: 'The command rejects invalid input with a clear error',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+        ],
+      }],
       edges: [],
       ...overrides,
     },
@@ -124,6 +144,60 @@ describe('promotePlanning', () => {
       workAgentSkipReason: 'stack-unhealthy',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('evaluatePlanFinalizeQualityGate', () => {
+  it('rejects plans with banned AC phrasing', () => {
+    const doc = makePlanDoc({
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'Implement the change with exact files and verification steps' },
+        metadata: { requiresInspection: false },
+        subItems: [
+          {
+            id: 'task-1.ac1',
+            title: 'Feature works as expected',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+          {
+            id: 'task-1.ac2',
+            title: 'Given valid input then it returns success',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+        ],
+      }],
+    });
+
+    const result = evaluatePlanFinalizeQualityGate(doc);
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'ac-banned-phrase', message: expect.stringContaining('works as expected') }),
+    ]));
+  });
+
+  it('skips quality lint when --no-quality-lint is set', () => {
+    const doc = makePlanDoc({
+      items: [{
+        id: 'task-1',
+        title: 'Task one',
+        status: 'pending',
+        narrative: { Action: 'thin' },
+        metadata: { requiresInspection: false },
+        subItems: [],
+      }],
+    });
+
+    expect(evaluatePlanFinalizeQualityGate(doc, { qualityLint: false })).toEqual({
+      ok: true,
+      skipped: true,
+      issues: [],
+    });
   });
 });
 

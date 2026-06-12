@@ -10,12 +10,33 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-l
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
   json?: boolean;
   /** Commander negation: `--no-promote` arrives as `promote: false` (default true). */
   promote?: boolean;
+  /** Commander negation: `--no-quality-lint` arrives as `qualityLint: false` (default true). */
+  qualityLint?: boolean;
+}
+
+export type PlanFinalizeQualityGateResult =
+  | { ok: true; skipped: boolean; issues: QualityIssue[] }
+  | { ok: false; skipped: false; issues: QualityIssue[] };
+
+export function evaluatePlanFinalizeQualityGate(
+  doc: VBriefDocument,
+  options: Pick<PlanFinalizeOptions, 'qualityLint'> = {},
+): PlanFinalizeQualityGateResult {
+  if (options.qualityLint === false) {
+    return { ok: true, skipped: true, issues: [] };
+  }
+  const issues = lintPlanQuality(doc);
+  const errors = issues.filter(issue => issue.severity === 'error');
+  return errors.length > 0
+    ? { ok: false, skipped: false, issues }
+    : { ok: true, skipped: false, issues };
 }
 
 interface PromotePlanningResult {
@@ -97,6 +118,27 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   if (!options.json) {
     console.log(chalk.dim(`workspace: ${workspacePath}`));
     console.log(chalk.dim('finalizing vBRIEF and creating beads…'));
+  }
+
+  const planDoc = readPlanSync(planPath);
+  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, options);
+  if (qualityGate.skipped) {
+    if (!options.json) {
+      console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
+    }
+  } else {
+    if (!qualityGate.ok) {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: 'vBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
+      } else {
+        console.error(chalk.red('✗ vBRIEF quality lint failed:'));
+        for (const line of formatQualityIssues(qualityGate.issues)) {
+          console.error(chalk.red('  ' + line));
+        }
+        console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
+      }
+      process.exit(3);
+    }
   }
 
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the

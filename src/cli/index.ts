@@ -384,6 +384,7 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
+  .option('--no-quality-lint', 'Emergency bypass for vBRIEF quality lint during finalize')
   .action(planFinalizeCommand);
 
 planCmd
