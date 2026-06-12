@@ -1,0 +1,348 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T19:57:12Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1805: Codex work-agent conversation view is blank — resolveJsonlPath is claude-code-only, never resolves the codex rollout",
+    "updated": "2026-06-12T20:01:42.881Z"
+  },
+  "plan": {
+    "id": "pan-1805",
+    "title": "Codex work-agent conversation view is blank — resolveJsonlPath is claude-code-only, never resolves the codex rollout",
+    "status": "proposed",
+    "uid": "ddd7e321-93b0-4b05-beed-3302384927c7",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-06-12T19:57:12Z",
+    "updated": "2026-06-12T20:01:42.881Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1805",
+        "label": "PAN-1805",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1803",
+        "label": "PAN-1803",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1690",
+        "label": "PAN-1690",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "codex",
+      "command-deck",
+      "transcripts"
+    ],
+    "narratives": {
+      "Problem": "Codex work agents (real since PAN-1803) show 'No conversation data available' in the Command Deck conversation view because the work-agent transcript resolver resolveJsonlPath (src/dashboard/server/routes/jsonl-resolver.ts) is hardcoded to claude-code: it calls resolveClaudeSessionId, gets null for codex agents, and returns null — even though the codex rollout JSONL exists at ~/.panopticon/agents/<id>/codex-home/sessions/.../rollout-*.jsonl. The conversation panel already solved this for conversations (PAN-1690) but the work-agent path never got that treatment.",
+      "Proposal": "Fix at the resolver level so all resolveJsonlPath callers (command-deck, projects, reviewer-tree) inherit codex support: dispatch on the harness recorded in state.json; codex agents resolve via a shared resolveCodexRolloutPath (persisted codex-thread-id fast path + findLatestRollout lazy fallback). Make findLatestRollout/waitForCodexRollout skip subagent (guardian) rollouts via session_meta.thread_source so the fallback picks the user thread. Replace the conversations route's local claude-only agent-name fallback with the shared resolver. Add a non-blocking post-kickoff codex thread-id capture to spawnAgent. NOTE FOR THE WORK ROLE: this is already implemented on feature/pan-1805 in commit 5a0ce548d (live-verified against agent-pan-1803) and has survived two main syncs with targeted tests (51) and typecheck green — verify each bead against its acceptance criteria in the current tree, repair any drift, complete the branch-hygiene bead, and ship. Do NOT re-implement from scratch.",
+      "NonGoals": "- No fix for the review-convoy gpt-5.5-over-claude-code stall (separate concern; reviews read the PR diff, not the codex transcript)\n- No CLIProxy context-deadlock work\n- No codex conversation status changes (PAN-1789)\n- No changes to spawnRun's existing exec-only thread-id capture gating at src/lib/agents.ts:3304\n- No frontend SessionPanel changes — the existing jsonl-backed rendering path is reused unchanged\n- No pi harness resolution changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat existing commit 5a0ce548d on feature/pan-1805 as the implementation of record; beads verify it post-main-sync rather than prescribing a rewrite.",
+        "rationale": "The full fix already exists on the branch, was live-verified against the running codex agent agent-pan-1803 (222 messages rendered), and targeted tests (51) plus typecheck pass after two main syncs. Re-implementation would be pure churn."
+      },
+      {
+        "summary": "Fix lives at the resolver level (jsonl-resolver harness dispatch), not as a command-deck-only special case.",
+        "rationale": "All resolveJsonlPath callers (command-deck.ts, projects.ts, reviewer-tree.ts) inherit codex support from one dispatch point, and it mirrors the conversation panel's PAN-1690 precedent."
+      },
+      {
+        "summary": "The issue's 'bonus' item 3 (spawnAgent codex thread-id capture) is in scope.",
+        "rationale": "Already implemented, low-risk (non-blocking background task), and it enables the fast path and resume; the lazy fallback alone leaves a per-request directory scan."
+      },
+      {
+        "summary": "Subagent (guardian) rollout exclusion in findLatestRollout/waitForCodexRollout is in scope although not named in the issue text.",
+        "rationale": "The approval supervisor writes its own rollout into the same codex-home concurrently with the main thread, so a raw mtime pick returns the wrong transcript — a correctness prerequisite for the fallback path the fix depends on."
+      },
+      {
+        "summary": "Remove .pan/handoff-1805.md from the branch before pan done.",
+        "rationale": "It is session-scoped orchestration context committed by the prior session, not product code; main should not accumulate per-issue handoff docs."
+      },
+      {
+        "summary": "No frontend changes.",
+        "rationale": "SessionPanel already renders jsonl-backed transcripts; live verification confirmed codex messages flow through the existing rendering path."
+      }
+    ],
+    "items": [
+      {
+        "id": "codex-rollout-subagent-skip",
+        "title": "findLatestRollout/waitForCodexRollout skip subagent (guardian) rollouts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T19:57:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/runtimes/codex.ts, findLatestRollout must prefer user-thread rollouts over codex-internal subagent rollouts (e.g. the guardian approval supervisor), discriminated by the session_meta first-line record's payload.thread_source === 'subagent'. waitForCodexRollout reuses the same preference so spawn-time thread-id capture also picks the user thread. Already implemented (codex.ts ~lines 264-370, tests in src/lib/runtimes/__tests__/codex.test.ts) — verify against the current tree and repair any drift from main syncs."
+        },
+        "items": [
+          {
+            "id": "codex-rollout-subagent-skip.ac1",
+            "title": "Given a codex-home containing a user-thread rollout and a NEWER subagent rollout, findLatestRollout returns the user-thread rollout (covered by a test in src/lib/runtimes/__tests__/codex.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-rollout-subagent-skip.ac2",
+            "title": "When ALL rollouts are subagent threads, findLatestRollout falls back to returning the newest rollout rather than null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-rollout-subagent-skip.ac3",
+            "title": "Given a rollout whose session_meta lacks thread_source (older codex versions), findLatestRollout returns it as a user-thread candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-codex-dispatch",
+        "title": "resolveJsonlPath dispatches on agent harness and resolves codex rollouts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T19:57:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/jsonl-resolver.ts, resolveJsonlPath must dispatch on the harness recorded in the agent's state.json (resolveAgentHarness) BEFORE attempting claude-code resolution. Codex agents resolve via resolveCodexRolloutPath: fast path through the persisted ~/.panopticon/agents/<id>/codex-thread-id (findRolloutPath), lazy fallback through findLatestRollout over codex-home/sessions (the PAN-1690 shape). Export resolveCodexRolloutPath for reuse by the conversations route. Already implemented (jsonl-resolver.ts ~lines 170-211, tests in src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts) — verify against the current tree and repair any drift."
+        },
+        "items": [
+          {
+            "id": "resolver-codex-dispatch.ac1",
+            "title": "Given a codex-harness agent with a persisted codex-thread-id matching a rollout, resolveJsonlPath returns that rollout's path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-codex-dispatch.ac2",
+            "title": "Given a codex-harness agent with no codex-thread-id, resolveJsonlPath falls back to the latest user-thread rollout under codex-home/sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-codex-dispatch.ac3",
+            "title": "Given a codex-harness agent whose agent dir has no codex-home, resolveJsonlPath returns null without attempting claude-code resolution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-codex-dispatch.ac4",
+            "title": "resolveJsonlPath preserves claude-code resolution (pre-existing jsonl-resolver tests pass unchanged) and returns the codex rollout — never a stale claude session file — for a codex-harness agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-codex-fallback",
+        "title": "Conversations /:name/messages agent-name fallback resolves codex rollouts via the shared resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T19:57:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts, the agent-name fallback used by GET /api/conversations/:name/messages was claude-only; codex-harness agents must resolve their rollout there too. The route's previously local resolveCodexSessionFile duplicate is replaced by importing the shared resolveCodexRolloutPath from ./jsonl-resolver.js, and codex rollouts are parsed with the existing parseCodexConversationMessages from ../services/codex-conversation-parser.js. Already implemented (conversations.ts lines 27, 144, 744-746, 781-789) — verify against the current tree and repair any drift."
+        },
+        "items": [
+          {
+            "id": "conversations-codex-fallback.ac1",
+            "title": "GET /api/conversations/:name/messages for a codex-harness agent name resolves the rollout and returns messages parsed by parseCodexConversationMessages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-codex-fallback.ac2",
+            "title": "conversations.ts contains no local duplicate codex session-file resolver — it imports resolveCodexRolloutPath from ./jsonl-resolver.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-codex-fallback.ac3",
+            "title": "claude-code conversation message resolution returns the same results as before the change (existing conversation tests stay green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawnagent-threadid-capture",
+        "title": "spawnAgent captures the codex thread-id post-kickoff without blocking spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T19:57:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts spawnAgent, after kickoff delivery for a codex-harness work agent, run a non-blocking background task (void async IIFE) that calls waitForCodexRollout on the agent's codex-home (120s budget), extracts the thread-id via extractThreadIdFromRollout, and persists it with writeThreadId. Codex work-tui writes its rollout only after the first prompt, which is why this polls post-kickoff instead of at spawn. spawnRun's pre-existing exec-only capture (agents.ts ~3304) stays untouched. Already implemented (agents.ts ~3699) — verify against the current tree and repair any drift."
+        },
+        "items": [
+          {
+            "id": "spawnagent-threadid-capture.ac1",
+            "title": "After codex work-agent kickoff, spawnAgent persists the captured thread-id to ~/.panopticon/agents/<id>/codex-thread-id via writeThreadId once the rollout appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawnagent-threadid-capture.ac2",
+            "title": "The capture runs as a non-blocking background task: spawnAgent returns without waiting for it, and a rollout that never appears (timeout) produces no spawn failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawnagent-threadid-capture.ac3",
+            "title": "spawnRun preserves its existing exec-specialist thread-id capture behavior unchanged (gating at agents.ts ~3304 untouched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-verify-and-branch-hygiene",
+        "title": "End-to-end verification of the codex conversation view plus branch hygiene",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T19:57:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "acJustification": "Verification-and-hygiene bead: each AC is an independent observable gate (API payload, full quality gates, branch content); merging them would hide which gate failed."
+        },
+        "narrative": {
+          "Action": "Prove the fix end-to-end and clean the branch for review. (1) With the dashboard rebuilt (npm run build; Node 22 dist only) and a codex work agent available (agent-pan-1803 if still running, else any codex agent with a rollout on disk), confirm the command-deck session payload carries hasJsonl: true / a jsonlPath pointing at the rollout, and the conversation view renders the transcript instead of 'No conversation data available'. If no live codex agent exists, verify via the route tests plus a manual API call against an agent dir fixture. (2) Run the full quality gates. (3) Remove the session-scoped .pan/handoff-1805.md from the branch (git rm) so it does not ship to main — it is prior-session orchestration context, not product code."
+        },
+        "items": [
+          {
+            "id": "e2e-verify-and-branch-hygiene.ac1",
+            "title": "The command-deck session payload for a codex work agent returns hasJsonl: true with a jsonlPath under codex-home/sessions, and the conversation view renders transcript messages (no 'No conversation data available')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verify-and-branch-hygiene.ac2",
+            "title": "Each of npm run typecheck, npm run lint, and npm test exits 0 with no new failures relative to main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verify-and-branch-hygiene.ac3",
+            "title": "git diff main...HEAD no longer contains .pan/handoff-1805.md — the branch removes it before pan done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "codex-rollout-subagent-skip",
+        "to": "resolver-codex-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-codex-dispatch",
+        "to": "conversations-codex-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-codex-dispatch",
+        "to": "e2e-verify-and-branch-hygiene",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-codex-fallback",
+        "to": "e2e-verify-and-branch-hygiene",
+        "type": "blocks"
+      },
+      {
+        "from": "spawnagent-threadid-capture",
+        "to": "e2e-verify-and-branch-hygiene",
+        "type": "blocks"
+      },
+      {
+        "from": "spawnagent-threadid-capture",
+        "to": "resolver-codex-dispatch",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1805-codex-work-agent-conversation-view-is-blank-resolvejsonlpath-is-claude-code-only-never-resolves-the-codex-rollout.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
