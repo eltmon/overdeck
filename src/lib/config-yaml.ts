@@ -37,6 +37,8 @@ export interface ProviderConfig {
   enabled: boolean;
   /** API key (optional, can use env var) */
   api_key?: string;
+  /** Default harness for this provider's models. Role/request harnesses override this. */
+  harness?: RuntimeName;
   /** Authentication mode: api-key (default) or subscription (OAuth) */
   auth?: AuthMode;
   /** Subscription plan tier (only used when auth is 'subscription') */
@@ -407,7 +409,6 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   // slot because strike skips the normal review pipeline and lands directly.
   strike: { model: 'workhorse:expensive' },
   flywheel: {
-    harness: 'claude-code',
     model: 'claude-opus-4-8',
     effort: 'high',
     minAgents: 20,
@@ -571,6 +572,22 @@ export interface YamlConfig {
   claude?: {
     permissionMode?: 'auto' | 'bypass';
   };
+
+  /**
+   * Codex spawn behavior for conversation sessions (TUI mode).
+   *
+   * 'read-only'   — approval_policy=on-request + sandbox_mode=read-only:
+   *                 Codex can browse files but asks before any write or command.
+   * 'workspace'   — approval_policy=on-request + sandbox_mode=workspace-write (default):
+   *                 Codex works freely inside the cwd, asks before going outside or using the network.
+   * 'auto-review' — approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write:
+   *                 A sub-agent reviews and auto-answers approval requests instead of prompting the user.
+   * 'full-access' — approval_policy=never + sandbox_mode=danger-full-access:
+   *                 No approval prompts; full filesystem and network access.
+   */
+  codex?: {
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+  };
 }
 
 /**
@@ -700,6 +717,9 @@ export interface NormalizedConfig {
   /** Provider subscription plan by provider */
   providerPlan: Partial<Record<ModelProvider, SubscriptionPlan>>;
 
+  /** Default harness by provider. Role/request harnesses override these defaults. */
+  providerHarnesses: Partial<Record<ModelProvider, RuntimeName>>;
+
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
 
@@ -817,6 +837,11 @@ export interface NormalizedConfig {
   /** Permission-mode for spawned Claude Code agents. Always defined; defaults to 'auto'. */
   claude: {
     permissionMode: 'auto' | 'bypass';
+  };
+
+  /** Permission-mode for Codex TUI conversation sessions. Always defined; defaults to 'workspace'. */
+  codex: {
+    permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
 }
 
@@ -943,6 +968,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   apiKeys: {},
   providerAuth: {},
   providerPlan: {},
+  providerHarnesses: {},
   openrouterFavorites: [],
   workhorses: { ...DEFAULT_WORKHORSES },
   roles: cloneRoles(DEFAULT_ROLES),
@@ -1100,6 +1126,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   claude: {
     permissionMode: 'auto',
   },
+  codex: {
+    permissionMode: 'auto-review',
+  },
 };
 
 /**
@@ -1113,7 +1142,7 @@ const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
 function normalizeProviderConfig(
   providerConfig: ProviderConfig | boolean | undefined,
   fallbackKey?: string
-): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan } {
+): { enabled: boolean; api_key?: string; auth?: AuthMode; plan?: SubscriptionPlan; harness?: RuntimeName } {
   if (providerConfig === undefined) {
     return { enabled: false };
   }
@@ -1125,9 +1154,23 @@ function normalizeProviderConfig(
   return {
     enabled: providerConfig.enabled,
     api_key: providerConfig.api_key || fallbackKey,
+    harness: providerConfig.harness,
     auth: providerConfig.auth,
     plan: providerConfig.plan,
   };
+}
+
+function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+  }
+}
+
+function applyProviderHarness(result: NormalizedConfig, provider: ModelProvider, harness: RuntimeName | undefined): void {
+  validateProviderHarness(provider, harness);
+  if (harness !== undefined) {
+    result.providerHarnesses[provider] = harness;
+  }
 }
 
 /**
@@ -1668,6 +1711,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.tmux,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
     roles: cloneRoles(DEFAULT_ROLES),
     memory: {
@@ -1740,6 +1784,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
     },
+    codex: {
+      permissionMode: DEFAULT_CONFIG.codex.permissionMode,
+    },
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -1758,6 +1805,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Anthropic
       const anthropic = normalizeProviderConfig(providers.anthropic, undefined);
+      applyProviderHarness(result, 'anthropic', anthropic.harness);
       if (anthropic.enabled) {
         result.enabledProviders.add('anthropic');
       } else if (providers.anthropic !== undefined) {
@@ -1767,6 +1815,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // OpenAI
       const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
+      applyProviderHarness(result, 'openai', openai.harness);
       if (openai.enabled) {
         result.enabledProviders.add('openai');
         if (openai.api_key) {
@@ -1780,6 +1829,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Google
       const google = normalizeProviderConfig(providers.google, legacyKeys.google);
+      applyProviderHarness(result, 'google', google.harness);
       if (google.enabled) {
         result.enabledProviders.add('google');
         if (google.api_key) {
@@ -1793,6 +1843,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // MiniMax
       const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+      applyProviderHarness(result, 'minimax', minimax.harness);
       if (minimax.enabled) {
         result.enabledProviders.add('minimax');
         if (minimax.api_key) {
@@ -1804,6 +1855,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Z.AI
       const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+      applyProviderHarness(result, 'zai', zai.harness);
       if (zai.enabled) {
         result.enabledProviders.add('zai');
         if (zai.api_key) {
@@ -1815,6 +1867,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Kimi
       const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+      applyProviderHarness(result, 'kimi', kimi.harness);
       if (kimi.enabled) {
         result.enabledProviders.add('kimi');
         if (kimi.api_key) {
@@ -1826,6 +1879,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // OpenRouter
       const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
+      applyProviderHarness(result, 'openrouter', openrouter.harness);
       if (openrouter.enabled) {
         result.enabledProviders.add('openrouter');
         if (openrouter.api_key) {
@@ -1837,6 +1891,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // MiMo
       const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+      applyProviderHarness(result, 'mimo', mimo.harness);
       if (mimo.enabled) {
         result.enabledProviders.add('mimo');
         if (mimo.api_key) {
@@ -1848,6 +1903,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Nous Portal
       const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+      applyProviderHarness(result, 'nous', nous.harness);
       if (nous.enabled) {
         result.enabledProviders.add('nous');
         if (nous.api_key) {
@@ -1859,6 +1915,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
       // Alibaba DashScope
       const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+      applyProviderHarness(result, 'dashscope', dashscope.harness);
       if (dashscope.enabled) {
         result.enabledProviders.add('dashscope');
         if (dashscope.api_key) {
@@ -2153,6 +2210,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
       result.claude.permissionMode = config.claude.permissionMode;
+    }
+
+    if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {
+      result.codex.permissionMode = config.codex.permissionMode;
     }
 
     // Merge conversationSearch configuration

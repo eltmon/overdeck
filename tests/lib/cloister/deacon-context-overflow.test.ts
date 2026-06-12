@@ -2,17 +2,18 @@
  * Tests for checkApiErrorAgents — context-window overflow recovery branch.
  *
  * A 400 "input exceeds the context window" cannot be retried by continuing
- * (it re-sends the same oversized context). Work agents recover through a
- * Panopticon-side compact respawn; specialist/planning sessions still use the
- * harness `/compact` tier and receive a continue nudge once it settles.
- * A loop guard escalates to `stuck` if compaction never clears the overflow.
+ * (it re-sends the same oversized context). The deacon recovers by sending
+ * Panopticon-side compact respawn; once the respawn settles and the overflow
+ * clears, the recovery state is cleared. Non-agent harness compactions still get
+ * a resume nudge. A loop guard escalates to `stuck` if compact respawns never
+ * clear the overflow.
  *
  * Covers:
- *  - overflow detected → compact respawn records attempt 1
- *  - compaction in flight (within settle window) → does nothing
- *  - harness compact settled + overflow cleared → nudges continue, clears state
- *  - compact respawn settled + overflow persists → respawns once more
- *  - loop guard: after MAX compactAttempts still overflowing → marks stuck, no compact
+ *  - overflow detected → compact-respawns the agent, records attempt 1
+ *  - recovery in flight (within settle window) → does nothing
+ *  - settled harness /compact + overflow cleared → nudges continue, clears state
+ *  - settled compact respawn + overflow persists → compact-respawns again
+ *  - loop guard: after MAX compactAttempts still overflowing → marks stuck, no recovery
  *  - non-overflow output → falls through (overflow branch is a no-op)
  */
 
@@ -89,7 +90,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
-  getAgentDir: vi.fn().mockReturnValue('/tmp/pan-test-agent-pan-9001'),
+  getAgentDir: (agentId: string) => `/tmp/${agentId}`,
   getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
   getAgentStateSync: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
@@ -143,7 +144,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     stuckOverflowNativeRecoveryState.clear();
   });
 
-  it('(a) detects overflow at an idle prompt → compact-respawns via resumeAgent (never /compact) and records attempt 1', async () => {
+  it('(a) detects overflow at an idle prompt → Panopticon-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {
     mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
 
     const actions = await checkApiErrorAgents();
@@ -171,7 +172,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     );
   });
 
-  it('(a2) resumeAgent compaction failure → records the failed respawn and waits for settle', async () => {
+  it('(a2) resumeAgent compaction failure records an attempt and never falls back to /clear', async () => {
     mockResumeAgent.mockResolvedValue({ success: false, error: 'compaction boom' });
     mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
 
@@ -180,8 +181,8 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
     expect(mockSendKeys).not.toHaveBeenCalled();
     expect(contextOverflowRecoveryState.get(SESSION)).toMatchObject({
-      mechanism: 'respawn',
       compactAttempts: 1,
+      mechanism: 'respawn',
     });
     expect(actions.some(a => /compact respawn failed/.test(a))).toBe(true);
   });
@@ -215,7 +216,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(mockSendKeys).not.toHaveBeenCalled();
   });
 
-  it('(b) does nothing while a /compact is still in flight (within settle window)', async () => {
+  it('(b) does nothing while compact recovery is still in flight (within settle window)', async () => {
     contextOverflowRecoveryState.set(SESSION, { lastAttempt: Date.now() - 1_000, compactAttempts: 1, mechanism: 'respawn' });
     mockCapturePane.mockResolvedValue(pane('still compacting', OVERFLOW_LINE));
 
@@ -227,9 +228,9 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(contextOverflowRecoveryState.get(SESSION)?.compactAttempts).toBe(1);
   });
 
-  it('(c) settled + overflow cleared → nudges continue and clears state', async () => {
+  it('(c) settled harness /compact + overflow cleared → nudges continue and clears state', async () => {
     contextOverflowRecoveryState.set(SESSION, { lastAttempt: Date.now() - (SETTLE_MS + 1_000), compactAttempts: 1, mechanism: 'harness-compact' });
-    // Harness compaction succeeded: the recent tail no longer shows the overflow error.
+    // Compaction succeeded: the recent tail no longer shows the overflow error.
     mockCapturePane.mockResolvedValue(pane('Conversation compacted', 'continuing work'));
 
     const actions = await checkApiErrorAgents();
@@ -242,7 +243,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(actions.some(a => /resumed/.test(a))).toBe(true);
   });
 
-  it('(d) settled but overflow persists → attempts one more compact respawn', async () => {
+  it('(d) settled compact respawn but overflow persists → compact-respawns again without /clear', async () => {
     contextOverflowRecoveryState.set(SESSION, { lastAttempt: Date.now() - (SETTLE_MS + 1_000), compactAttempts: 1, mechanism: 'respawn' });
     mockCapturePane.mockResolvedValue(pane('compaction failed', OVERFLOW_LINE));
 
@@ -257,13 +258,14 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(actions.some(a => /compact-respawned/.test(a))).toBe(true);
   });
 
-  it('(e) loop guard: after compact-respawn budget is exhausted → marks stuck, no further recovery', async () => {
+  it('(e) loop guard: after max compact respawns still overflowing → marks stuck, no further recovery', async () => {
     contextOverflowRecoveryState.set(SESSION, { lastAttempt: Date.now() - (SETTLE_MS + 1_000), compactAttempts: 2, mechanism: 'respawn' });
     mockCapturePane.mockResolvedValue(pane('compaction failed', OVERFLOW_LINE));
 
     const actions = await checkApiErrorAgents();
 
     expect(mockSendKeys).not.toHaveBeenCalled();
+    expect(mockResumeAgent).not.toHaveBeenCalled();
     expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
       ISSUE,
       'context_overflow',

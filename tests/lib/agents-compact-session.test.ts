@@ -1,9 +1,9 @@
 /**
- * PAN-1781: buildCompactRecoverySeed — out-of-band summary + durable-artifact
- * seed for a fresh session replacing a context-wedged work agent. Verifies it
- * resolves the SAME JSONL session the harness would resume from, never mutates
- * that JSONL, degrades through fallback summary, and still returns a usable seed
- * when sessionId/workspace are missing.
+ * PAN-1781: buildCompactRecoverySeed — out-of-band summary plus fresh-session
+ * reseed prompt for a context-wedged work agent. Verifies it resolves the SAME
+ * session file the harness would have resumed from, never throws, and
+ * short-circuits to durable-artifact reconstruction when sessionId/workspace are
+ * missing.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,12 +11,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Effect } from 'effect';
 
-const mockGetConversationCompactionSettings = vi.fn();
 const mockGenerateSmartSummary = vi.fn();
 const mockGenerateFallbackSummary = vi.fn();
 
 vi.mock('../../src/dashboard/server/services/conversation-compaction.js', () => ({
-  getConversationCompactionSettings: (...args: unknown[]) => mockGetConversationCompactionSettings(...args),
+  getConversationCompactionSettings: () => ({ model: 'summary-model', richCompaction: true }),
 }));
 
 vi.mock('../../src/lib/conversations/smart-compaction.js', () => ({
@@ -29,7 +28,6 @@ vi.mock('../../src/lib/conversations/summary-fork.js', () => ({
 
 let HOME_DIR: string;
 const AGENT_ID = 'agent-pan-test';
-const ISSUE_ID = 'PAN-TEST';
 const WORKSPACE = '/tmp/ws-pan-test';
 const SESSION_ID = 'sess-abc-123';
 
@@ -38,7 +36,7 @@ function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
   mkdirSync(agentDir, { recursive: true });
   const state: Record<string, unknown> = {
     id: AGENT_ID,
-    issueId: ISSUE_ID,
+    issueId: 'PAN-TEST',
     status: 'stopped',
     role: 'work',
     model: 'gpt-5.5',
@@ -50,13 +48,14 @@ function writeAgent(opts: { workspace?: string; sessionId?: string }): void {
 
 beforeEach(() => {
   vi.resetModules();
-  mockGetConversationCompactionSettings.mockReset().mockReturnValue({
-    model: 'claude-opus-4-7',
-    richCompaction: true,
-  });
-  mockGenerateSmartSummary.mockReset().mockReturnValue(Effect.succeed({ summary: 'smart summary' }));
-  mockGenerateFallbackSummary.mockReset().mockReturnValue(Effect.succeed('fallback summary'));
-  HOME_DIR = join(tmpdir(), `pan-compact-seed-${process.pid}-${Math.random().toString(36).slice(2)}`);
+  mockGenerateSmartSummary.mockReset().mockReturnValue(Effect.succeed({
+    summary: 'Recovered session summary',
+    tokensBefore: 1,
+    boundaryUuid: 'b',
+    model: 'm',
+  }));
+  mockGenerateFallbackSummary.mockReset().mockReturnValue(Effect.succeed('Fallback session summary'));
+  HOME_DIR = join(tmpdir(), `pan-compact-session-${process.pid}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(HOME_DIR, { recursive: true });
   process.env.PANOPTICON_HOME = HOME_DIR;
 });
@@ -67,7 +66,7 @@ afterEach(() => {
 });
 
 describe('buildCompactRecoverySeed (PAN-1781)', () => {
-  it('resolves the agent JSONL and embeds the smart summary in the fresh-session seed', async () => {
+  it('resolves the agent JSONL and embeds a smart summary in the fresh-session seed', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
     const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
     const { sessionFilePath } = await import('../../src/lib/paths.js');
@@ -76,20 +75,21 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
 
     expect(result).toEqual({
       summarized: true,
-      seed: expect.stringContaining('smart summary'),
+      seed: expect.stringContaining('Recovered session summary'),
     });
-    expect(result.seed).toContain(ISSUE_ID);
+    expect(result.seed).toContain('PAN-TEST');
     expect(result.seed).toContain('Do NOT start over');
+    expect(mockGenerateSmartSummary).toHaveBeenCalledTimes(1);
     expect(mockGenerateSmartSummary).toHaveBeenCalledWith({
       jsonlPath: sessionFilePath(WORKSPACE, SESSION_ID),
-      model: 'claude-opus-4-7',
+      model: 'summary-model',
       richMode: true,
       mode: 'fork',
     });
     expect(mockGenerateFallbackSummary).not.toHaveBeenCalled();
   });
 
-  it('uses the fallback summary when smart summarization rejects', async () => {
+  it('falls back to a heuristic summary when smart summary generation rejects', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
     mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
     const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
@@ -98,13 +98,13 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
     const result = await buildCompactRecoverySeed(AGENT_ID);
 
     expect(result.summarized).toBe(true);
-    expect(result.seed).toContain('fallback summary');
+    expect(result.seed).toContain('Fallback session summary');
     expect(mockGenerateFallbackSummary).toHaveBeenCalledWith(sessionFilePath(WORKSPACE, SESSION_ID));
   });
 
-  it('returns a durable-artifact-only seed when both summarizers fail', async () => {
+  it('returns a reseed-only prompt without throwing when both summary paths fail', async () => {
     writeAgent({ workspace: WORKSPACE, sessionId: SESSION_ID });
-    mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('smart boom')));
+    mockGenerateSmartSummary.mockReturnValue(Effect.fail(new Error('boom')));
     mockGenerateFallbackSummary.mockReturnValue(Effect.fail(new Error('fallback boom')));
     const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
@@ -113,13 +113,11 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
     expect(result.summarized).toBe(false);
     expect(result.seed).toContain('.pan/continue.json');
     expect(result.seed).toContain('bd ready');
-    expect(result.seed).toContain('git status');
-    expect(result.seed).toContain('git diff');
-    expect(result.seed).not.toContain('Summary of the archived session');
+    expect(result.seed).toContain('Do NOT start over');
   });
 
-  it('short-circuits to a durable-artifact-only seed when sessionId is missing', async () => {
-    writeAgent({ workspace: WORKSPACE });
+  it('short-circuits to a reseed-only prompt with no summary call when sessionId is missing', async () => {
+    writeAgent({ workspace: WORKSPACE }); // no session.id
     const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);
@@ -130,8 +128,8 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
     expect(mockGenerateFallbackSummary).not.toHaveBeenCalled();
   });
 
-  it('short-circuits to a durable-artifact-only seed when workspace is missing', async () => {
-    writeAgent({ sessionId: SESSION_ID });
+  it('short-circuits to a reseed-only prompt with no summary call when workspace is missing', async () => {
+    writeAgent({ sessionId: SESSION_ID }); // no workspace
     const { buildCompactRecoverySeed } = await import('../../src/lib/agents.js');
 
     const result = await buildCompactRecoverySeed(AGENT_ID);

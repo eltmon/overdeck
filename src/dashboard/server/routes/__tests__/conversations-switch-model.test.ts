@@ -60,6 +60,8 @@ vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
 
 vi.mock('../../../../lib/providers.js', () => ({
   getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  piProviderForModel: vi.fn(() => 'anthropic'),
+  qualifyPiModel: vi.fn((m: string) => m),
 }));
 
 vi.mock('../../../../lib/workspace-manager.js', () => ({
@@ -75,6 +77,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   killSession: killSessionMock,
   createSession: createSessionMock,
   setOption: vi.fn(() => Effect.succeed(undefined)),
+  exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   listSessionNames: vi.fn(() => Effect.succeed([])),
 }));
 

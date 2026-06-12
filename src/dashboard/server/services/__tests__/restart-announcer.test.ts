@@ -184,6 +184,21 @@ describe('announceNewRestart', () => {
     expect(t.emitted).toHaveLength(0);
     expect(t.lastAnnounced()).toBe(RESTART_TS);
   });
+
+  it('does not persist the announced ts when emitting fails', async () => {
+    const t = makeDeps();
+
+    await expect(announceNewRestart({
+      ...t.deps,
+      emit: () => { throw new Error('event store not ready'); },
+    })).rejects.toThrow('event store not ready');
+
+    expect(t.lastAnnounced()).toBeNull();
+
+    expect(await announceNewRestart(t.deps)).toBe(true);
+    expect(t.emitted).toHaveLength(1);
+    expect(t.lastAnnounced()).toBe(RESTART_TS);
+  });
 });
 
 describe('startRestartAnnouncer', () => {

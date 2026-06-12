@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { existsSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
@@ -9,12 +10,33 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-l
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
   json?: boolean;
   /** Commander negation: `--no-promote` arrives as `promote: false` (default true). */
   promote?: boolean;
+  /** Commander negation: `--no-quality-lint` arrives as `qualityLint: false` (default true). */
+  qualityLint?: boolean;
+}
+
+export type PlanFinalizeQualityGateResult =
+  | { ok: true; skipped: boolean; issues: QualityIssue[] }
+  | { ok: false; skipped: false; issues: QualityIssue[] };
+
+export function evaluatePlanFinalizeQualityGate(
+  doc: VBriefDocument,
+  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string } = {},
+): PlanFinalizeQualityGateResult {
+  if (options.qualityLint === false) {
+    return { ok: true, skipped: true, issues: [] };
+  }
+  const issues = lintPlanQuality(doc, { prdText: options.prdText });
+  const errors = issues.filter(issue => issue.severity === 'error');
+  return errors.length > 0
+    ? { ok: false, skipped: false, issues }
+    : { ok: true, skipped: false, issues };
 }
 
 interface PromotePlanningResult {
@@ -57,6 +79,27 @@ function findWorkspaceRoot(start: string): string | null {
   }
 }
 
+function readAutoSpawnOnFinalize(issueId: string): boolean {
+  const panopticonHome = process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+  const stateFile = join(panopticonHome, 'agents', `planning-${issueId.toLowerCase()}`, 'state.json');
+  try {
+    if (!existsSync(stateFile)) return false;
+    const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
+    return state.autoSpawnOnFinalize === true;
+  } catch {
+    return false;
+  }
+}
+
+function readPrdDraftText(workspacePath: string, issueId: string): string | undefined {
+  const path = join(workspacePath, PAN_DIRNAME, 'drafts', `${issueId}.md`);
+  try {
+    return existsSync(path) ? readFileSync(path, 'utf-8') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Promise<void> {
   const startDir = options.workspace ? resolve(options.workspace) : process.cwd();
   const workspacePath = findWorkspaceRoot(startDir);
@@ -86,6 +129,39 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     console.log(chalk.dim('finalizing vBRIEF and creating beads…'));
   }
 
+  const planDoc = readPlanSync(planPath);
+  const prdText = readPrdDraftText(workspacePath, issueId);
+  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
+  if (qualityGate.skipped) {
+    if (!options.json) {
+      console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
+    }
+  } else {
+    if (!qualityGate.ok) {
+      if (options.json) {
+        console.log(JSON.stringify({ success: false, error: 'vBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
+      } else {
+        console.error(chalk.red('✗ vBRIEF quality lint failed:'));
+        for (const line of formatQualityIssues(qualityGate.issues)) {
+          console.error(chalk.red('  ' + line));
+        }
+        console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
+      }
+      process.exit(3);
+    }
+    const warnings = qualityGate.issues.filter(issue => issue.severity === 'warn');
+    if (warnings.length > 0) {
+      if (options.json) {
+        console.error(JSON.stringify({ qualityWarnings: warnings }));
+      } else {
+        console.error(chalk.yellow('⚠ vBRIEF quality warnings:'));
+        for (const line of formatQualityIssues(warnings)) {
+          console.error(chalk.yellow('  ' + line));
+        }
+      }
+    }
+  }
+
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
   // vBRIEF before beads creation. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
@@ -95,6 +171,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // spec still has the OLD content until promotion, so resolving main-first
   // here would materialize beads from the superseded plan.
   const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath, { planPath }));
+  const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
 
   if (!result.success || result.created.length === 0) {
     const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
@@ -119,11 +196,15 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   emitActivityEntrySync({
     source: 'plan',
     level: 'info',
-    message: `${issueId} planning finalized — awaiting your approval`,
+    message: autoSpawnOnFinalize
+      ? `${issueId} planned — starting implementation`
+      : `${issueId} planning finalized — awaiting your approval`,
     issueId,
   });
   emitActivityTtsSync({
-    utterance: `${issueId} planning is done, awaiting your approval`,
+    utterance: autoSpawnOnFinalize
+      ? `${issueId} planned, starting implementation`
+      : `${issueId} planning is done, awaiting your approval`,
     priority: 1,
     issueId,
     source: 'planning-agent',
@@ -140,8 +221,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const noPromote = options.promote === false;
   if (!noPromote) {
-    emitAutoPromotePhase(issueId, 'completePlanning', 'start', 'posting complete-planning autoSpawn request');
-    const promotion = await promotePlanning(issueId);
+    emitAutoPromotePhase(issueId, 'completePlanning', 'start', autoSpawnOnFinalize ? 'posting complete-planning autoSpawn request' : 'posting complete-planning request');
+    const promotion = await promotePlanning(issueId, autoSpawnOnFinalize);
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
@@ -192,11 +273,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (workAgentSpawned) {
         console.log(chalk.green('✓ Work agent spawned — implementation in progress.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
-      } else {
+      } else if (autoSpawnOnFinalize) {
         console.log(chalk.yellow('⚠ Auto-promoted but work agent spawn was skipped.'));
         if (workAgentMessage) console.log(chalk.dim('  ' + workAgentMessage));
         if (workAgentError) console.log(chalk.dim('  ' + workAgentError));
         console.log(chalk.dim('Run `pan start ' + issueId + '` to retry the work agent spawn.'));
+      } else {
+        console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
     } else {
       console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
@@ -213,7 +296,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  * until after the response is flushed so callers running inside the planning
  * tmux session still see this response.
  */
-export async function promotePlanning(issueId: string): Promise<PromotePlanningResult> {
+export async function promotePlanning(issueId: string, autoSpawn = false): Promise<PromotePlanningResult> {
   try {
     const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
     const controller = new AbortController();
@@ -223,7 +306,7 @@ export async function promotePlanning(issueId: string): Promise<PromotePlanningR
       response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
-        body: JSON.stringify({ autoSpawn: true }),
+        body: JSON.stringify(autoSpawn ? { autoSpawn: true } : {}),
         signal: controller.signal,
       });
     } finally {

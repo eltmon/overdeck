@@ -114,15 +114,15 @@ describe('ChatMarkdown file links', () => {
     expect(screen.getByText('link').closest('a')).not.toHaveAttribute('href');
   });
 
-  it('keeps Streamdown-rendered external links safe and blocks scriptable hrefs', () => {
+  it('keeps Streamdown-rendered external links safe and blocks scriptable hrefs', async () => {
     const { rerender } = renderMarkdown(<ChatMarkdown text="Visit [site](https://example.com)." cwd="/tmp/project" />, true);
 
-    const external = screen.getByRole('link', { name: 'site' });
-    expect(external).toHaveAttribute('href', 'https://example.com/');
+    const external = await screen.findByRole('link', { name: 'site' });
+    await waitFor(() => expect(external).toHaveAttribute('href', 'https://example.com/'));
     expect(external).toHaveAttribute('target', '_blank');
     expect(external).toHaveAttribute('rel', 'noopener noreferrer');
 
     rerender(<ChatMarkdown text="Bad [link](javascript:alert(1))." cwd="/tmp/project" />);
-    expect(screen.getByText(/link \[blocked\]/).closest('a')).toBeNull();
+    await waitFor(() => expect(screen.getByText(/link \[blocked\]/).closest('a')).toBeNull());
   });
 });

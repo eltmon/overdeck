@@ -21,6 +21,37 @@ Panopticon at workspace creation — never hand-authored — and is gitignored.
 The global layer may also carry the user's own skills and agents under
 `~/.panopticon/context/global/{skills,agents}/`.
 
+### Canonical terminology
+
+Use these names — in docs, in chat, in code comments — so placement requests
+are unambiguous:
+
+| Term | Meaning |
+|---|---|
+| **Context layers** | This whole distribution system |
+| **Global layer** (machine context) | `~/.panopticon/context/global.md` — per-machine quirks only |
+| **Project layer** | `<root>/.pan/context/project.md` |
+| **Workspace layer** | auto-assembled per issue; never hand-authored |
+| **Bundled rule** | `sync-sources/rules/<name>.md` (`scope: universal` or `dev`) — every-machine engineering rules |
+| **Harness context files** | the rendered outputs (`~/.claude/CLAUDE.md` managed region, project `CLAUDE.md`/`AGENTS.md`, `pi-global.md`, `codex-global.md`) — never edited directly |
+
+There is no "global context template": a request phrased that way means either
+a **bundled rule** (every machine) or the **global layer** (this machine). The
+`context-nomenclature` bundled rule ships this table to every agent session.
+
+**Shorthand:** placement requests use "add a `<scope>` rule" — the scope word
+alone routes the content:
+
+| You say | Destination |
+|---|---|
+| "add a **universal rule**" | `sync-sources/rules/<name>.md`, `scope: universal` |
+| "add a **dev rule**" | `sync-sources/rules/<name>.md`, `scope: dev` |
+| "add a **project rule**" | `<root>/.pan/context/project.md` |
+| "add a **machine rule**" | `~/.panopticon/context/global.md` |
+
+The `rule-authoring` bundled rule (`scope: dev`) carries the authoring
+procedure for the first two.
+
 Register projects with `pan projects add <path>`. The older singular
 `pan project add <path>` command remains available as a compatibility alias,
 but new docs and examples should use the plural command group.

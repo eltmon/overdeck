@@ -32,10 +32,23 @@ vi.mock('../../../../lib/agents.js', () => {
 
 vi.mock('../../../../lib/config-yaml.js', () => ({
   isClaudeCodeChannelsEnabled: vi.fn(() => channelsEnabled),
+  loadConfigSync: vi.fn(() => ({
+    config: {
+      conversations: {
+        titleModel: 'claude-haiku-4-5',
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'panopticon-native',
+        richCompaction: false,
+      },
+      codex: { permissionMode: 'workspace' },
+    },
+  })),
 }));
 
 vi.mock('../../../../lib/providers.js', () => ({
   getProviderForModelSync: vi.fn(() => ({ name: 'anthropic' })),
+  piProviderForModel: vi.fn(() => 'anthropic'),
+  qualifyPiModel: vi.fn((m: string) => m),
 }));
 
 vi.mock('../../../../lib/workspace-manager.js', () => ({
@@ -59,6 +72,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
     }
   })),
   setOption: vi.fn(() => Effect.succeed(undefined)),
+  exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
   listSessionNames: vi.fn(() => Effect.succeed([])),
 }));

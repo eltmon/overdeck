@@ -4,7 +4,7 @@
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'pi';
+export type Harness = 'claude-code' | 'pi' | 'codex';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -39,6 +39,7 @@ export interface ModelsConfig {
   providers: ProvidersConfig;
   /** Legacy model-route overrides are accepted only to preserve form round-trips. */
   overrides: Partial<Record<string, ModelId>>;
+  provider_harnesses?: Partial<Record<Provider, Harness>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }
@@ -200,5 +201,15 @@ export interface SettingsConfig {
   claude?: {
     permissionMode?: 'auto' | 'bypass';
   };
+  /**
+   * Permission mode for Codex TUI conversation sessions.
+   *
+   * 'read-only'   — asks before any write or command (approval_policy=on-request + sandbox=read-only)
+   * 'workspace'   — works freely inside cwd, asks before going outside (default)
+   * 'auto-review' — a sub-agent auto-reviews approval requests (approval_policy=on-request + approvals_reviewer=auto_review)
+   * 'full-access' — no prompts, full filesystem + network access
+   */
+  codex?: {
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+  };
 }
-

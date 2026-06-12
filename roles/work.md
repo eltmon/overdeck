@@ -57,11 +57,11 @@ For every bead:
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
 5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory).
-6. Re-read this bead's metadata in `.pan/spec.vbrief.json` after the commit.
-7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. Fix any blocked finding with a new commit before closing the bead.
-10. `bd close <bead-id> --reason="…"`.
+6. `bd close <bead-id> --reason="…"`.
+7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+9. If `metadata.requiresInspection === false`, skip inspection and continue.
+10. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection.
 11. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
@@ -146,6 +146,8 @@ Beads tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth:
 The work role does not choose models for these gates. The selected `pan inspect` command controls the sub-role: `pan inspect` resolves through `resolveModel('work', 'inspect')`, and `pan inspect --deep` resolves through `resolveModel('work', 'inspect-deep')`.
 
 ## Completion
+
+Summaries lead with anomalies and deviations — never bury them after the wins.
 
 When all beads are closed and the tree is clean:
 

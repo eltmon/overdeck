@@ -241,6 +241,7 @@ describe('AgentSpawner Effect service', () => {
           workspacePath: WORKSPACE,
           projectPath: '/projects/myapp',
           workspaceLocation: 'local',
+          autoSpawnOnFinalize: false,
         }),
       );
     });

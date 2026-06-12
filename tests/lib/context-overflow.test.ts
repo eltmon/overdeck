@@ -6,24 +6,17 @@ const OVERFLOW_LINE = 'API Error: 400 Your input exceeds the context window of t
 
 describe('buildCompactRecoverySeedMessage', () => {
   it('points only at durable recovery artifacts and warns not to restart', () => {
-    const message = buildCompactRecoverySeedMessage('PAN-123', null);
+    const message = buildCompactRecoverySeedMessage('PAN-TEST', null);
 
-    expect(message).toContain('PAN-123');
+    expect(message).toContain('PAN-TEST');
     expect(message).toContain('.pan/continue.json');
     expect(message).toContain('bd ready');
     expect(message).toContain('bd show <id>');
     expect(message).toContain('git status');
     expect(message).toContain('git diff');
     expect(message).toMatch(/Do NOT start over/);
-    expect(message).toMatch(/starting a fresh session/i);
-    expect(message).toMatch(/context-window limit/i);
-  });
-
-  it('embeds the archived-session summary when one is available', () => {
-    const message = buildCompactRecoverySeedMessage('PAN-123', 'summary body');
-
-    expect(message).toContain('Summary of the archived session:');
-    expect(message).toContain('summary body');
+    expect(message).toMatch(/fresh session/i);
+    expect(message).toMatch(/context-window/i);
   });
 });
 

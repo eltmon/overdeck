@@ -1,5 +1,7 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
+import { toCodexSandboxValue } from './runtimes/codex.js';
+import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
@@ -43,11 +45,12 @@ export interface LauncherConfig {
   piSessionDir?: string;
 
   /**
-   * Codex agent mode. Defaults to 'exec' (headless) for work agents.
-   *   - 'exec': non-interactive `codex exec` with approval_policy=never (work agents)
+   * Codex agent mode. Defaults to 'exec' (headless legacy mode).
+   *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
+   *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
    */
-  codexMode?: 'exec' | 'tui';
+  codexMode?: 'exec' | 'tui' | 'work-tui';
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.panopticon/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -594,10 +597,28 @@ function systemPromptFiles(config: LauncherConfig): string[] {
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   const codexMode = config.codexMode ?? 'exec';
 
-  // TUI / conversation mode: bare `codex` (interactive terminal, no args),
-  // optionally under the PTY supervisor for conversation delivery.
+  // TUI / conversation mode: interactive terminal, optionally under the PTY
+  // supervisor for conversation delivery. Keep CODEX_HOME/AGENTS.md, but do
+  // not let repo AGENTS.md turn a normal dashboard conversation into a work
+  // agent with project-level task-tracker rules.
   if (codexMode === 'tui') {
-    const cmd = wrapWithSupervisor(config, 'codex');
+    const cmd = wrapWithSupervisor(config, 'codex -c project_doc_max_bytes=0');
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
+  if (codexMode === 'work-tui') {
+    // PAN-1803: approval_policy and sandbox_mode come from the per-agent
+    // config.toml that initCodexHome seeds from the user's Settings →
+    // Permissions → Codex level (getCodexLauncherFields). Do NOT pass `-s` or
+    // `-c approval_policy=` on the CLI — those override config.toml and would
+    // ignore the Settings choice. Mirror the conversation path (codexMode
+    // 'tui'), which relies entirely on the seeded config.toml. Only `-m`
+    // (per-agent model) is passed here.
+    const tokens: string[] = ['codex'];
+    if (config.model) {
+      tokens.push('-m', shellQuoteModelIdSync(config.model));
+    }
+    const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }
 
@@ -619,9 +640,11 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // Disable approval prompts (codex exec rejects --ask-for-approval; use -c instead)
   tokens.push('-c', 'approval_policy=never');
 
-  // Sandbox mode: 'workspace' allows file reads/writes in the working directory.
-  // Resume path uses -c (not -s) because `codex exec resume` rejects -s.
-  const sandbox = config.codexSandboxMode ?? 'workspace';
+  // Sandbox mode: translate Panopticon's abstract 'workspace' token to the
+  // codex CLI's 'workspace-write' (PAN-1799 — raw 'workspace' is rejected and
+  // the agent dies at boot). Resume path uses -c (not -s) because
+  // `codex exec resume` rejects -s.
+  const sandbox = toCodexSandboxValue(config.codexSandboxMode);
   if (isResume) {
     tokens.push('-c', `sandbox_mode=${sandbox}`);
   } else {
@@ -663,7 +686,10 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    // Provider-qualify so Pi binds the model to the intended provider
+    // (bare 'kimi-k2.6' resolves to keyless moonshotai instead of
+    // kimi-coding — agent boots but every prompt fails; PAN-1799).
+    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {

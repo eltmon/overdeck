@@ -220,6 +220,8 @@ export interface MessagesTimelineProps {
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
+  /** Called after a requested target message has been scrolled into view. */
+  onTargetMessageHandled?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -246,6 +248,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageId,
   targetMessageIndex,
   targetMessageNonce,
+  onTargetMessageHandled,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -267,6 +270,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [searchRenderTick, setSearchRenderTick] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previousSearchQueryRef = useRef('');
+  const handledTargetKeyRef = useRef<string | null>(null);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
@@ -495,6 +499,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     }
     return null;
   }, [rows, targetMessageId, targetMessageIndex]);
+  const targetMessageKey = targetMessageId || targetMessageIndex !== undefined
+    ? `${targetMessageNonce ?? 'no-nonce'}:${targetMessageId ?? ''}:${targetMessageIndex ?? ''}`
+    : null;
   const searchHighlightTerms = useMemo(() => extractSearchHighlightTerms(searchQuery), [searchQuery]);
 
   const scrollToRow = useCallback((rowIndex: number, rowId: string) => {
@@ -527,9 +534,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, [scrollToRow, searchMatches]);
 
   useEffect(() => {
-    if (!targetMessageRow) return;
+    if (!targetMessageRow || !targetMessageKey) return;
+    if (handledTargetKeyRef.current === targetMessageKey) return;
+    handledTargetKeyRef.current = targetMessageKey;
     scrollToRow(targetMessageRow.index, targetMessageRow.row.id);
-  }, [targetMessageRow, targetMessageNonce, scrollToRow]);
+    onTargetMessageHandled?.();
+  }, [targetMessageRow, targetMessageKey, scrollToRow, onTargetMessageHandled]);
 
   useEffect(() => {
     if (!searchOpen) return;
