@@ -214,14 +214,13 @@ that bead's `metadata.requiresInspection` flag — see step 7 above. The inspect
 specialist is NOT auto-spawned by `bd close`; when inspection is required you must
 invoke `pan inspect` yourself.
 
-**CRITICAL: Update vBRIEF AC statuses as you complete each bead.** The verification gate
-checks `.pan/spec.vbrief.json` subItem statuses. If you close a bead but leave its
-acceptance criteria as `pending` in the plan, verification will FAIL. After closing each
-bead, update the corresponding item and subItem statuses to `completed`:
-```bash
-node -e "const fs=require('fs'); const p='.pan/spec.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; const item=items.find(i=>i.id==='ITEM_ID'); if(item){item.status='completed';(item.subItems||[]).forEach(s=>s.status='completed')}; fs.writeFileSync(p,JSON.stringify(d,null,2))}"
-```
-Replace `ITEM_ID` with the plan item ID that corresponds to the bead you just closed.
+**AC statuses are synced automatically from closed beads.** When you run `bd close`, the
+pipeline records the matching plan item and its acceptance criteria as completed in
+`.pan/continue.json` (`statusOverrides`) — the layer the verification gate actually reads.
+Never hand-edit `.pan/spec.vbrief.json` or any file under `.pan/specs/` — specs are
+immutable after planning (PAN-1124). If verification reports incomplete acceptance
+criteria, the cause is an unclosed bead (or a bead whose title no longer matches its plan
+item): run `bd list -l {{ISSUE_ID_LOWER}}` and close everything that is done.
 {{/BEADS_TASKS}}
 
 {{#STITCH_DESIGNS}}
