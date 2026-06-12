@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1642",
   "created": "2026-06-12T18:35:00.000Z",
-  "updated": "2026-06-12T18:53:07.264Z",
+  "updated": "2026-06-12T18:53:22.470Z",
   "gitState": {
     "branch": "feature/pan-1642",
     "sha": "97be8cb6e",
@@ -93,6 +93,12 @@
       "reason": "resume",
       "note": "Implemented the review fix in ConversationPanel.tsx. pan done then required a merge from origin/main; resolved conflicts in ConversationPanel.tsx, MessagesTimeline.test.tsx, and took origin/main for three unrelated context-overflow test files. Post-merge, fixed a flaky Streamdown assertion in ChatMarkdown.test.tsx by awaiting/waitFor the lazy-loaded renderer. Final gate: typecheck pass, lint pass, root tests pass (6003), frontend tests pass (1537).",
       "agentModel": "claude-opus-4"
+    },
+    {
+      "timestamp": "2026-06-12T18:53:22.468Z",
+      "reason": "end",
+      "note": "Fixed review blocker: guarded ConversationPanel HTTP messages query so in-flight fetches cannot overwrite newer WS-streamed state. Merged origin/main to resolve rebase; fixed post-merge Streamdown test flakiness in ChatMarkdown.test.tsx. Typecheck, lint, root tests (6003), and frontend tests (1537) all pass."
     }
-  ]
+  ],
+  "feedback": []
 }
