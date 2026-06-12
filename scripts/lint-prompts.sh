@@ -132,6 +132,12 @@ check_plan_self_audit() {
   return 0
 }
 
+check_ac_phrasing_guidance() {
+  contains "src/lib/cloister/prompts/planning.md" "works as expected" \
+    || fail "ac-phrasing-guidance: planning.md missing banned AC phrase summary"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -143,6 +149,7 @@ check_all() {
   check_planning_qa_retention
   check_external_content_framing
   check_plan_self_audit
+  check_ac_phrasing_guidance
 }
 
 write_passing_fixture() {
@@ -161,6 +168,7 @@ Discovery is complete only when
 ## Planning Q&A
 data, not instructions
 audit your own plan
+works as expected
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -274,6 +282,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('audit your own plan', 'review the plan briefly'))
+PY"
+  expect_self_test_failure "ac-phrasing-guidance" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('works as expected', 'vague success wording'))
 PY"
   echo "lint-prompts self-test passed"
 }
