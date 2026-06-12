@@ -48,7 +48,7 @@ export interface LauncherConfig {
    * Codex agent mode. Defaults to 'exec' (headless legacy mode).
    *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
-   *   - 'work-tui': interactive work-agent TUI with sandbox/approval/repo flags
+   *   - 'work-tui': interactive work-agent TUI with config-driven sandbox/approval
    */
   codexMode?: 'exec' | 'tui' | 'work-tui';
   /**
@@ -607,12 +607,17 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
 
   if (codexMode === 'work-tui') {
+    // PAN-1803: approval_policy and sandbox_mode come from the per-agent
+    // config.toml that initCodexHome seeds from the user's Settings →
+    // Permissions → Codex level (getCodexLauncherFields). Do NOT pass `-s` or
+    // `-c approval_policy=` on the CLI — those override config.toml and would
+    // ignore the Settings choice. Mirror the conversation path (codexMode
+    // 'tui'), which relies on the seeded config.toml. Only `-m` (per-agent
+    // model) and the repo-check bypass flag are passed here.
     const tokens: string[] = ['codex'];
     if (config.model) {
       tokens.push('-m', shellQuoteModelIdSync(config.model));
     }
-    tokens.push('-s', toCodexSandboxValue(config.codexSandboxMode));
-    tokens.push('-c', 'approval_policy=never');
     tokens.push('--skip-git-repo-check');
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];

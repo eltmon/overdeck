@@ -203,7 +203,7 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
   };
 }
 
-function getCodexLauncherFields(agentId: string, model: string): {
+function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
   codexMode: 'work-tui';
   codexHome: string;
@@ -211,11 +211,26 @@ function getCodexLauncherFields(agentId: string, model: string): {
   model: string;
 } {
   const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
-  // PAN-1799: the launcher exports CODEX_HOME but nothing created it for work
-  // agents — codex booted into a nonexistent home with no config.toml and no
-  // seeded auth.json. initCodexHome is idempotent (always rewrites config.toml,
-  // seeds auth only when missing) and is the same call conversations make.
-  initCodexHome(codexHome);
+  // PAN-1803: codex work agents must inherit the user's configured codex
+  // permission level (Settings → Permissions → Codex) and pre-trust the
+  // workspace, EXACTLY like the conversation path
+  // (routes/conversations.ts). Without trustedDir, codex shows its first-run
+  // folder-trust / "load project-local config?" wizard and blocks the pane.
+  // Without the permission mapping, work agents ignore the Settings choice
+  // and run hardcoded never+workspace-write.
+  const codexPermMode = loadYamlConfig().config.codex?.permissionMode ?? 'workspace';
+  const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
+  const sandboxMode =
+    codexPermMode === 'full-access' ? 'danger-full-access'
+    : codexPermMode === 'read-only' ? 'read-only'
+    : 'workspace-write';
+  const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
+  initCodexHome(codexHome, {
+    trustedDir: workspacePath,
+    approvalPolicy,
+    sandboxMode,
+    approvalsReviewer,
+  });
   return {
     harness: 'codex',
     codexMode: 'work-tui',
@@ -246,15 +261,20 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
     try {
       if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
       const pane = await Effect.runPromise(capturePane(agentId, 80));
-      if (
-        /\bcodex\b/i.test(pane)
-        && (
-          /press enter to continue/i.test(pane)
-          || /ctrl[+-][cj]/i.test(pane)
-          || /enter to send/i.test(pane)
-          || /›\s*$/.test(pane.trim())
-        )
-      ) {
+      // The codex TUI is ready when its input prompt (a line starting with the
+      // `›` glyph) AND its status line (`<model> ... · <cwd>`) are both on
+      // screen. PAN-1803: the previous check keyed off the first-run
+      // trust-wizard markers ("press enter to continue") — but pre-trusting the
+      // workspace (correctly) skips that wizard, so those markers never appear
+      // and the kickoff never fired. Detect the actual ready prompt instead.
+      const hasInputPrompt = /^\s*[›>]\s/m.test(pane);
+      const hasStatusLine = /·\s+[~/]/.test(pane);
+      if (hasInputPrompt && hasStatusLine) {
+        return true;
+      }
+      // Fallback: if pre-trust ever fails and the wizard does appear, treat its
+      // markers as ready (the kickoff paste will dismiss + drive it).
+      if (/press enter to continue/i.test(pane) || /ctrl[+-][cj]/i.test(pane)) {
         return true;
       }
     } catch {
@@ -1590,6 +1610,29 @@ async function deliverInitialPromptWithRetry(
   caller: string,
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<DeliveryResult> {
+  // PAN-1803: the codex TUI mangles a large pasted kickoff prompt — a multi-
+  // thousand-character paste garbles its input and trips its "Create a plan?"
+  // mode hint, so the agent never executes. Write the full brief to a file and
+  // deliver a SHORT pointer instead (robust regardless of transport — the same
+  // pattern that makes file-backed handoffs reliable). Only codex needs this;
+  // claude-code/pi line-based input handle the full prompt fine.
+  let deliveredPrompt = prompt;
+  try {
+    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
+    if (codexState?.harness === 'codex' && codexState.workspace) {
+      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
+      mkdirSync(dirname(kickoffPath), { recursive: true });
+      writeFileSync(kickoffPath, prompt, 'utf-8');
+      deliveredPrompt =
+        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
+        + 'Read that file in full now and execute it exactly — it is your full set of work '
+        + 'instructions. Begin immediately and keep working autonomously until done; do not '
+        + 'wait for further input.';
+    }
+  } catch {
+    // Non-fatal: fall back to delivering the full prompt inline.
+  }
+
   let lastFailure = 'not-attempted';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     let harness: RuntimeName | undefined;
@@ -1607,7 +1650,7 @@ async function deliverInitialPromptWithRetry(
 
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     try {
-      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
       if (result.ok) return result;
       lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
     } catch (err) {
@@ -2686,7 +2729,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getPiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = opts.harness === 'codex'
-    ? getCodexLauncherFields(opts.agentId, model)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -3135,7 +3178,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -4199,7 +4242,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     saveAgentStateSync(agentState);
@@ -5025,7 +5068,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
     : {};
   if (recoveryHarness === 'codex') {
     state.codexMode = 'work-tui';
