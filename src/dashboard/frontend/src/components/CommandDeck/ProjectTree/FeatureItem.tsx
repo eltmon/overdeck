@@ -857,20 +857,20 @@ interface ProjectUatTrainGenerations {
   generations: UatTrainGeneration[];
 }
 
-type UatTrainGenerationsResponse = UatTrainGeneration[] | ProjectUatTrainGenerations[];
+type UatTrainGenerationsResponse = ProjectUatTrainGenerations[];
 
 function flattenUatTrainGenerations(data: UatTrainGenerationsResponse | undefined): UatTrainGeneration[] {
   if (!Array.isArray(data)) return [];
-  return data.flatMap((item) => 'generations' in item ? item.generations : [item]);
+  return data.flatMap((item) => item.generations);
 }
 
 /** Merge-train membership for the train chip (PAN-1779). One shared query —
  *  react-query dedupes across all FeatureItem instances. */
 function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
   const { data } = useQuery({
-    queryKey: ['uat-generations'],
+    queryKey: ['merge-train-generations'],
     queryFn: async () => {
-      const res = await fetch('/api/flywheel/uat-generations');
+      const res = await fetch('/api/merge-train/generations');
       if (!res.ok) return [];
       return res.json() as Promise<UatTrainGenerationsResponse>;
     },

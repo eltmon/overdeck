@@ -1,6 +1,5 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
-import type { FlywheelPipelineItem } from '@panctl/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { getAllReviewStatusesFromDb } from './database/review-status-db.js';
 import { resolveProjectFromIssueSync } from './projects.js';
@@ -120,15 +119,6 @@ const changedFilesVsMain = (branch: string, cwd: string) =>
     );
   });
 
-/**
- * Verbs that mean "at the merge gate" (PAN-1736). Orchestrators have
- * legitimately emitted both 'shipping' and 'merging' for merge-ready issues;
- * filtering on one alone silently rendered an empty queue with five ready
- * items in RUN-18. Contract documented next to FlywheelPipelineVerb in
- * packages/contracts/src/flywheel.ts — extend BOTH places together.
- */
-export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
-
 export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
@@ -167,19 +157,6 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
   if (!githubIssue.isGitHub) return undefined;
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
 }
-
-export const computeMergeQueue = (
-  items: ReadonlyArray<FlywheelPipelineItem>,
-  projectRoot: string,
-  options: ComputeMergeQueueOptions = {},
-) =>
-  computeMergeQueueFromCandidates(
-    items
-      .filter((item) => MERGE_GATE_VERBS.has(item.verb))
-      .map((item) => ({ issueId: item.issueId, title: item.title, ...(item.pr !== undefined ? { pr: item.pr } : {}) })),
-    projectRoot,
-    options,
-  );
 
 export const computeMergeQueueFromCandidates = (
   candidates: ReadonlyArray<MergeCandidate>,

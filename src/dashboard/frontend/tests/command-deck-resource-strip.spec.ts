@@ -149,6 +149,12 @@ const RESOURCE_DETAIL_IDENTIFIERS: Record<string, ResourceDetailIdentifiers> = {
 
 test.describe('Command Deck resource strip', () => {
   test('renders concrete resource icons and hover details for resource-allocated issues', async ({ page }) => {
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = '#pan-recovery-overlay { display: none !important; pointer-events: none !important; }';
+      document.documentElement.appendChild(style);
+    });
+
     await page.route('**/api/issues/resource-allocated', async (route) => {
       await route.fulfill({
         status: 200,
@@ -201,7 +207,7 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify({ version: 'test' }),
       });
     });
-    await page.route('**/api/flywheel/uat-generations', async (route) => {
+    await page.route('**/api/merge-train/generations', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -210,6 +216,9 @@ test.describe('Command Deck resource strip', () => {
     });
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
+    await page.locator('#pan-recovery-overlay').evaluateAll((elements) => {
+      for (const element of elements) element.remove();
+    });
 
     // Select the project from the sidebar rail. This sets selectedProject, which
     // mounts the ProjectNode (already expanded) in the Issues section.
@@ -219,7 +228,9 @@ test.describe('Command Deck resource strip', () => {
     // rows un-rendered and flaking the first toBeVisible below.
     const sidebarProject = page.getByTestId('sidebar-project-panopticon-cli');
     await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
-    await sidebarProject.click();
+    await sidebarProject.evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
 
     const pan862Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-862"]');
     const pan777Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-777"]');

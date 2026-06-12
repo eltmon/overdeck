@@ -95,21 +95,6 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
   });
 });
 
-describe('MERGE_GATE_VERBS (PAN-1736 verb contract)', () => {
-  it("treats both 'shipping' and 'merging' as at-the-merge-gate", async () => {
-    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
-    expect(MERGE_GATE_VERBS.has('shipping')).toBe(true);
-    expect(MERGE_GATE_VERBS.has('merging')).toBe(true);
-  });
-
-  it('excludes verbs that do not mean merge-ready', async () => {
-    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
-    for (const verb of ['planning', 'working', 'reviewing', 'testing', 'blocked', 'parked'] as const) {
-      expect(MERGE_GATE_VERBS.has(verb)).toBe(false);
-    }
-  });
-});
-
 describe('mergeGateEligibility (PAN-1759 verb vs authoritative state)', () => {
   it('passes only when review passed and test passed/skipped', async () => {
     const { mergeGateEligibility } = await import('../../../src/lib/review-status.js');
@@ -128,35 +113,6 @@ describe('mergeGateEligibility (PAN-1759 verb vs authoritative state)', () => {
     expect(mergeGateEligibility(null)).toEqual({ eligible: false, reason: 'no review record' });
     expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', mergeStatus: 'merged' }))
       .toEqual({ eligible: false, reason: 'already merged' });
-  });
-});
-
-describe('computeMergeQueue eligibility gate (PAN-1759)', () => {
-  it('excludes verb-tagged items the review pipeline has not cleared, reporting each rejection', async () => {
-    const { Effect } = await import('effect');
-    const { layer: nodeServicesLayer } = await import('@effect/platform-node/NodeServices');
-    const { computeMergeQueue } = await import('../../../src/lib/flywheel-merge-order.js');
-    const items = [
-      { issueId: 'PAN-1', title: 'Mid-review rider', verb: 'merging' },
-      { issueId: 'PAN-2', title: 'Still testing', verb: 'shipping' },
-      { issueId: 'PAN-3', title: 'Not at the gate', verb: 'working' },
-    ] as never[];
-    const rejected: Array<[string, string]> = [];
-    const queue = await Effect.runPromise(
-      computeMergeQueue(items, '/nonexistent', {
-        eligibility: (issueId) =>
-          issueId === 'PAN-1'
-            ? { eligible: false, reason: 'review is reviewing' }
-            : { eligible: false, reason: 'test is testing' },
-        onIneligible: (issueId, reason) => rejected.push([issueId, reason]),
-      }).pipe(Effect.provide(nodeServicesLayer)),
-    );
-    expect(queue).toEqual([]);
-    // PAN-3 never reaches the eligibility gate — wrong verb.
-    expect(rejected).toEqual([
-      ['PAN-1', 'review is reviewing'],
-      ['PAN-2', 'test is testing'],
-    ]);
   });
 });
 

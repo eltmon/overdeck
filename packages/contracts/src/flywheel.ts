@@ -39,17 +39,9 @@ export const FlywheelHeadline = Schema.Struct({
 })
 
 /**
- * Pipeline verbs and the merge-queue contract (PAN-1736):
- *
- * `computeMergeQueue` treats an item as AT THE MERGE GATE when its verb is
- * "shipping" OR "merging" — both are natural emissions for a merge-ready
- * issue, and orchestrators have used each. Emitting any OTHER verb for an
- * issue that is ready_for_merge in the review DB silently drops it from the
- * merge queue and from UAT batch assembly (PAN-1737). RUN-18 shipped an
- * empty queue with five ready issues exactly this way.
- *
- * If you add a verb that can describe a merge-ready issue, extend
- * MERGE_GATE_VERBS in src/lib/flywheel-merge-order.ts in the same change.
+ * Pipeline verbs describe the live Flywheel conversation only. Merge-train
+ * queues are sourced from review-status records, not from activePipeline verbs,
+ * so changing these literals must not affect merge eligibility.
  */
 export const FlywheelPipelineVerb = Schema.Literals([
   "planning",
