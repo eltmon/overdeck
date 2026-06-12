@@ -1,5 +1,6 @@
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
 let warningFilterInstalled = false;
 
 function installSqliteWarningFilter() {
@@ -21,5 +22,6 @@ function installSqliteWarningFilter() {
 
 export function openNodeSqliteDatabase(path) {
   installSqliteWarningFilter();
+  const { DatabaseSync } = require('node:sqlite');
   return new DatabaseSync(path);
 }

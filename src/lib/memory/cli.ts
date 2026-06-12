@@ -3,7 +3,7 @@ import { readdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { MemoryObservation, MemoryStatus, ResetMarker } from '@panctl/contracts';
 import { getPanopticonHome } from '../paths.js';
-import { withMemoryFtsDatabase } from './fts-db.js';
+import { runMemoryFtsTransaction, withMemoryFtsDatabase } from './fts-db.js';
 import { resolveExtractionProviderSelection } from './providers/index.js';
 import { getMemoryRollupPendingThreshold, loadMemorySettings } from './settings.js';
 import {
@@ -199,14 +199,14 @@ async function readResetMarkers(projectId: string): Promise<ResetMarker[]> {
   const dbMarkers = await withMemoryFtsDatabase(projectId, (db) => db.prepare(`
     SELECT id, scope, scope_id, from_timestamp, reason, created_at
     FROM reset_markers
-  `).all() as Array<{
+  `).all<{
     id: number;
     scope: ResetMarker['scope'];
     scope_id: string;
     from_timestamp: string;
     reason: string | null;
     created_at: string;
-  }>).catch((error: unknown) => {
+  }>()).catch((error: unknown) => {
     if (isNoSuchTable(error)) return [];
     throw error;
   });
@@ -311,56 +311,64 @@ async function indexDailySummary(projectId: string, issueId: string, date: strin
   const files = [...new Set(observations.flatMap((observation) => observation.files))].join(',');
   const tags = [...new Set(['memory', 'summary', ...observations.flatMap((observation) => observation.tags)])].join(',');
   const entryTime = latest?.timestamp.slice(11) ?? '00:00:00.000Z';
-  await withMemoryFtsDatabase(projectId, (db) => {
-    db.prepare(`
-      DELETE FROM memory_fts
-      WHERE project_id = ?
-        AND issue_id = ?
-        AND doc_type = 'summary'
-        AND entry_date = ?
-    `).run(projectId, issueId, date);
-    db.prepare(`
-      INSERT INTO memory_fts (
-        content,
-        display_content,
-        source,
-        branch,
-        entry_date,
-        entry_time,
-        entry_type,
+  await runMemoryFtsTransaction(projectId, [
+    {
+      method: 'run',
+      sql: `
+        DELETE FROM memory_fts
+        WHERE project_id = ?
+          AND issue_id = ?
+          AND doc_type = 'summary'
+          AND entry_date = ?
+      `,
+      params: [projectId, issueId, date],
+    },
+    {
+      method: 'run',
+      sql: `
+        INSERT INTO memory_fts (
+          content,
+          display_content,
+          source,
+          branch,
+          entry_date,
+          entry_time,
+          entry_type,
+          files,
+          tags,
+          doc_type,
+          scope,
+          project_id,
+          workspace_id,
+          issue_id,
+          run_id,
+          session_id,
+          agent_role,
+          agent_harness
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        markdown,
+        markdown,
+        'summary',
+        latest?.gitBranch ?? '',
+        date,
+        entryTime,
+        'memory-summary',
         files,
         tags,
-        doc_type,
-        scope,
-        project_id,
-        workspace_id,
-        issue_id,
-        run_id,
-        session_id,
-        agent_role,
-        agent_harness
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      markdown,
-      markdown,
-      'summary',
-      latest?.gitBranch ?? '',
-      date,
-      entryTime,
-      'memory-summary',
-      files,
-      tags,
-      'summary',
-      'issue',
-      projectId,
-      latest?.workspaceId ?? '',
-      issueId,
-      latest?.runId ?? '',
-      latest?.sessionId ?? '',
-      latest?.agentRole ?? '',
-      latest?.agentHarness ?? '',
-    );
-  });
+        'summary',
+        'issue',
+        projectId,
+        latest?.workspaceId ?? '',
+        issueId,
+        latest?.runId ?? '',
+        latest?.sessionId ?? '',
+        latest?.agentRole ?? '',
+        latest?.agentHarness ?? '',
+      ],
+    },
+  ]);
 }
 
 async function listIssueIds(projectId: string): Promise<string[]> {
@@ -451,8 +459,8 @@ async function writeJsonAtomically(path: string, value: unknown): Promise<void> 
 }
 
 async function writeResetMarkerToFtsDb(projectId: string, marker: ResetMarker): Promise<void> {
-  await withMemoryFtsDatabase(projectId, (db) => {
-    db.prepare(`
+  await withMemoryFtsDatabase(projectId, async (db) => {
+    await db.prepare(`
       INSERT INTO reset_markers (scope, scope_id, from_timestamp, reason, created_at)
       VALUES (?, ?, ?, ?, ?)
     `).run(marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt);

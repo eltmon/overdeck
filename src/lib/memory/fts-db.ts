@@ -1,177 +1,182 @@
-import { openDatabase, type SqliteDatabase, type SqliteBindValue } from '../database/driver.js';
-import { ensureParentDir, resolveFtsDbPath } from './paths.js';
+import { Worker } from 'node:worker_threads';
+import type { SqliteBindParams, SqliteRunResult } from '../database/driver.js';
+import {
+  closeMemoryFtsDatabasesInProcess,
+  getMemoryFtsDatabaseSync,
+  runMemoryFtsStatementSync,
+  runMemoryFtsTransactionSync,
+  type MemoryFtsStatement,
+} from './fts-operations.js';
 
-const databases = new Map<string, SqliteDatabase>();
-const openingDatabases = new Map<string, Promise<SqliteDatabase>>();
+export type { MemoryFtsStatement };
 
-export interface MemoryFtsStatement {
-  sql: string;
-  params?: unknown[];
-  method: 'all' | 'get' | 'run' | 'exec';
+export interface MemoryFtsPreparedStatement {
+  run(...params: SqliteBindParams[]): Promise<SqliteRunResult>;
+  get<TRow = unknown>(...params: SqliteBindParams[]): Promise<TRow | undefined>;
+  all<TRow = unknown>(...params: SqliteBindParams[]): Promise<TRow[]>;
 }
 
-export async function getMemoryFtsDatabase(projectId: string): Promise<SqliteDatabase> {
-  const cached = databases.get(projectId);
+export interface MemoryFtsDatabaseClient {
+  exec(sql: string): Promise<void>;
+  prepare(sql: string): MemoryFtsPreparedStatement;
+}
+
+interface MemoryFtsWorkerResponse {
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
+type MemoryFtsWorkerOperation = 'initialize' | 'statement' | 'transaction' | 'close';
+
+let worker: Worker | null = null;
+let nextRequestId = 1;
+const pendingRequests = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const clients = new Map<string, MemoryFtsDatabaseClient>();
+
+export async function getMemoryFtsDatabase(projectId: string): Promise<MemoryFtsDatabaseClient> {
+  const cached = clients.get(projectId);
   if (cached) return cached;
 
-  const opening = openingDatabases.get(projectId);
-  if (opening) return opening;
-
-  const promise = openMemoryFtsDatabase(projectId).finally(() => {
-    openingDatabases.delete(projectId);
-  });
-  openingDatabases.set(projectId, promise);
-  return promise;
+  await postMemoryFtsRequest('initialize', projectId);
+  const client = createClient(projectId);
+  clients.set(projectId, client);
+  return client;
 }
 
-export async function withMemoryFtsDatabase<T>(projectId: string, operation: (db: SqliteDatabase) => T): Promise<T> {
+export async function withMemoryFtsDatabase<T>(
+  projectId: string,
+  operation: (db: MemoryFtsDatabaseClient) => T | Promise<T>,
+): Promise<T> {
   const db = await getMemoryFtsDatabase(projectId);
-  return deferSqliteWork(() => operation(db));
+  return operation(db);
 }
 
-export async function runMemoryFtsStatement<T = unknown>(projectId: string, statement: MemoryFtsStatement): Promise<T> {
-  const db = await getMemoryFtsDatabase(projectId);
-  return deferSqliteWork(() => runStatement(db, statement) as T);
+export function runMemoryFtsStatement<T = unknown>(projectId: string, statement: MemoryFtsStatement): Promise<T> {
+  return postMemoryFtsRequest<T>('statement', projectId, { statement });
 }
 
-export async function runMemoryFtsTransaction(projectId: string, statements: MemoryFtsStatement[]): Promise<unknown[]> {
-  const db = await getMemoryFtsDatabase(projectId);
-  return deferSqliteWork(() => db.transaction(() => statements.map((statement) => runStatement(db, statement)))());
+export function runMemoryFtsTransaction(projectId: string, statements: MemoryFtsStatement[]): Promise<unknown[]> {
+  return postMemoryFtsRequest<unknown[]>('transaction', projectId, { statements });
 }
 
 export function closeMemoryFtsDatabases(): void {
-  for (const db of databases.values()) {
-    db.close();
-  }
-  databases.clear();
-  openingDatabases.clear();
+  clients.clear();
+  closeMemoryFtsDatabasesInProcess();
+  if (!worker) return;
+
+  const closing = worker;
+  worker = null;
+  pendingRequests.forEach((request) => request.reject(new Error('Memory FTS worker closed')));
+  pendingRequests.clear();
+  closing.postMessage({ id: nextRequestId++, operation: 'close' });
+  void closing.terminate();
 }
 
-async function openMemoryFtsDatabase(projectId: string): Promise<SqliteDatabase> {
-  const dbPath = resolveFtsDbPath(projectId);
-  await ensureParentDir(dbPath);
+function createClient(projectId: string): MemoryFtsDatabaseClient {
+  return {
+    exec: async (sql: string) => {
+      await runMemoryFtsStatement(projectId, { sql, method: 'exec' });
+    },
+    prepare: (sql: string) => ({
+      run: (...params: SqliteBindParams[]) => runMemoryFtsStatement<SqliteRunResult>(projectId, { sql, params, method: 'run' }),
+      get: <TRow = unknown>(...params: SqliteBindParams[]) => runMemoryFtsStatement<TRow | undefined>(projectId, { sql, params, method: 'get' }),
+      all: <TRow = unknown>(...params: SqliteBindParams[]) => runMemoryFtsStatement<TRow[]>(projectId, { sql, params, method: 'all' }),
+    }),
+  };
+}
 
-  return deferSqliteWork(() => {
-    const cached = databases.get(projectId);
-    if (cached) return cached;
+function postMemoryFtsRequest<T = unknown>(operation: MemoryFtsWorkerOperation, projectId?: string, payload: Record<string, unknown> = {}): Promise<T> {
+  if (shouldRunInline()) {
+    return Promise.resolve().then(() => runInline<T>(operation, projectId, payload));
+  }
 
-    const db = openDatabase(dbPath);
-    configureDatabase(db);
-    initializeMemoryFtsSchema(db);
-    databases.set(projectId, db);
-    return db;
+  const id = nextRequestId++;
+  return new Promise<T>((resolve, reject) => {
+    pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject });
+    const currentWorker = getMemoryFtsWorker();
+    currentWorker.ref();
+    currentWorker.postMessage({ id, operation, projectId, ...payload });
   });
 }
 
-function configureDatabase(db: SqliteDatabase): void {
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('journal_size_limit = 67108864');
-}
-
-function initializeMemoryFtsSchema(db: SqliteDatabase): void {
-  migrateMemoryFtsBranchColumn(db);
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-
-    CREATE TABLE IF NOT EXISTS reset_markers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scope TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      from_timestamp TEXT NOT NULL,
-      reason TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_scope
-      ON reset_markers(scope, scope_id, from_timestamp);
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_created_at
-      ON reset_markers(created_at);
-
-    CREATE TABLE IF NOT EXISTS observation_index (
-      id TEXT PRIMARY KEY,
-      observation_path_jsonl TEXT NOT NULL,
-      byte_offset INTEGER NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_observation_index_path_offset
-      ON observation_index(observation_path_jsonl, byte_offset);
-  `);
-}
-
-function migrateMemoryFtsBranchColumn(db: SqliteDatabase): void {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes('branch UNINDEXED')) return;
-
-  db.exec(`
-    CREATE VIRTUAL TABLE memory_fts_rebuild USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-    INSERT INTO memory_fts_rebuild(rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness)
-    SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness
-    FROM memory_fts;
-    DROP TABLE memory_fts;
-    ALTER TABLE memory_fts_rebuild RENAME TO memory_fts;
-  `);
-}
-
-function runStatement(db: SqliteDatabase, statement: MemoryFtsStatement): unknown {
-  if (statement.method === 'exec') {
-    db.exec(statement.sql);
-    return null;
+function runInline<T>(operation: MemoryFtsWorkerOperation, projectId?: string, payload: Record<string, unknown> = {}): T {
+  switch (operation) {
+    case 'initialize':
+      getMemoryFtsDatabaseSync(requireProjectId(projectId));
+      return null as T;
+    case 'statement':
+      return runMemoryFtsStatementSync<T>(requireProjectId(projectId), payload.statement as MemoryFtsStatement);
+    case 'transaction':
+      return runMemoryFtsTransactionSync(requireProjectId(projectId), payload.statements as MemoryFtsStatement[]) as T;
+    case 'close':
+      closeMemoryFtsDatabasesInProcess();
+      return null as T;
   }
-  const prepared = db.prepare(statement.sql);
-  const params = (statement.params ?? []) as SqliteBindValue[];
-  return prepared[statement.method](...params);
 }
 
-function deferSqliteWork<T>(operation: () => T): Promise<T> {
-  return new Promise((resolve, reject) => {
-    setImmediate(() => {
-      try {
-        resolve(operation());
-      } catch (err) {
-        reject(err);
-      }
-    });
+function shouldRunInline(): boolean {
+  // Source-mode workers cannot reliably resolve this repo's .js TypeScript import specifiers.
+  // The supported dashboard runtime is the built Node bundle, which always takes the worker path.
+  return import.meta.url.endsWith('.ts');
+}
+
+function requireProjectId(projectId: string | undefined): string {
+  if (!projectId) throw new Error('Memory FTS request missing projectId');
+  return projectId;
+}
+
+function getMemoryFtsWorker(): Worker {
+  if (worker) return worker;
+
+  const nextWorker = new Worker(memoryFtsWorkerUrl(), {
+    type: 'module',
+    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
+  } as ConstructorParameters<typeof Worker>[1]);
+
+  nextWorker.on('message', (message: MemoryFtsWorkerResponse) => {
+    const request = pendingRequests.get(message.id);
+    if (!request) return;
+    pendingRequests.delete(message.id);
+    if (message.ok) {
+      request.resolve(message.result);
+    } else {
+      request.reject(new Error(message.error ?? 'Memory FTS worker failed'));
+    }
+    if (pendingRequests.size === 0) nextWorker.unref();
   });
+
+  nextWorker.on('error', (err) => {
+    failPendingRequests(err);
+    if (worker === nextWorker) worker = null;
+  });
+
+  nextWorker.on('exit', (code) => {
+    if (worker === nextWorker) worker = null;
+    if (code !== 0) failPendingRequests(new Error(`Memory FTS worker exited with code ${code}`));
+  });
+
+  worker = nextWorker;
+  return worker;
+}
+
+function failPendingRequests(error: Error): void {
+  pendingRequests.forEach((request) => request.reject(error));
+  pendingRequests.clear();
+}
+
+function memoryFtsWorkerUrl(): URL {
+  if (import.meta.url.endsWith('/dist/cli/index.js')) {
+    return new URL('../lib/memory/fts-worker.js', import.meta.url);
+  }
+  if (import.meta.url.endsWith('/dist/index.js') || /\/dist\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
+    return new URL('./lib/memory/fts-worker.js', import.meta.url);
+  }
+  if (import.meta.url.endsWith('/dist/dashboard/server.js') || /\/dist\/dashboard\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
+    return new URL('./memory-fts-worker.js', import.meta.url);
+  }
+  return import.meta.url.endsWith('.ts')
+    ? new URL('./fts-worker.ts', import.meta.url)
+    : new URL('./fts-worker.js', import.meta.url);
 }

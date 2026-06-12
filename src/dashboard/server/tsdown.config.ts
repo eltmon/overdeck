@@ -6,6 +6,7 @@ export default defineConfig({
     server: 'main.ts',
     'dashboard-db-worker': 'services/dashboard-db-worker.ts',
     'checkpoint-worker': '../../lib/memory/checkpoint-worker.ts',
+    'memory-fts-worker': '../../lib/memory/fts-worker.ts',
   },
   outDir: '../../../dist/dashboard',
   format: 'esm',

@@ -22,7 +22,12 @@ export interface SqliteDatabase {
   prepare(sql: string): SqliteStatement;
   pragma(sql: string, options?: { simple?: boolean }): unknown;
   transaction<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult): (...args: TArgs) => TResult;
+  loadExtension(path: string): void;
   close(): void;
+}
+
+export interface OpenDatabaseOptions {
+  allowExtension?: boolean;
 }
 
 declare const Bun: unknown;
@@ -38,6 +43,8 @@ type RawDatabase = {
   exec: (sql: string) => void;
   prepare?: (sql: string) => RawStatement;
   query?: (sql: string) => RawStatement;
+  enableLoadExtension?: (enabled: boolean) => void;
+  loadExtension?: (path: string) => void;
   close: () => void;
 };
 
@@ -206,34 +213,47 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
       return (...args: TArgs): TResult => {
         if (transactionDepth === 0) {
           raw.exec('BEGIN');
-          transactionDepth++;
+          transactionDepth = 1;
+          let committed = false;
           try {
             const result = fn(...args);
-            transactionDepth--;
             raw.exec('COMMIT');
+            committed = true;
             return result;
           } catch (error) {
-            transactionDepth--;
-            raw.exec('ROLLBACK');
+            if (!committed) raw.exec('ROLLBACK');
             throw error;
+          } finally {
+            transactionDepth = 0;
           }
         }
 
         const savepoint = `panopticon_tx_${++savepointId}`;
         raw.exec(`SAVEPOINT ${savepoint}`);
         transactionDepth++;
+        let released = false;
         try {
           const result = fn(...args);
-          transactionDepth--;
           raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+          released = true;
           return result;
         } catch (error) {
-          transactionDepth--;
-          raw.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-          raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+          if (!released) {
+            raw.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+            raw.exec(`RELEASE SAVEPOINT ${savepoint}`);
+          }
           throw error;
+        } finally {
+          transactionDepth--;
         }
       };
+    },
+    loadExtension: (path: string) => {
+      if (!raw.loadExtension) {
+        throw new Error('SQLite driver does not support loadable extensions.');
+      }
+      raw.enableLoadExtension?.(true);
+      raw.loadExtension(path);
     },
     close: () => {
       raw.close();
@@ -243,9 +263,9 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
   return db;
 }
 
-function loadNodeSqlite(): { DatabaseSync: new (path: string) => RawDatabase } {
+function loadNodeSqlite(): { DatabaseSync: new (path: string, options?: OpenDatabaseOptions) => RawDatabase } {
   try {
-    return _require('node:sqlite') as { DatabaseSync: new (path: string) => RawDatabase };
+    return _require('node:sqlite') as { DatabaseSync: new (path: string, options?: OpenDatabaseOptions) => RawDatabase };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -255,12 +275,12 @@ function loadNodeSqlite(): { DatabaseSync: new (path: string) => RawDatabase } {
   }
 }
 
-export function openDatabase(path: string): SqliteDatabase {
+export function openDatabase(path: string, options: OpenDatabaseOptions = {}): SqliteDatabase {
   if (isBunRuntime()) {
     const { Database } = _require('bun:sqlite') as { Database: new (path: string) => RawDatabase };
     return wrapDatabase(new Database(path));
   }
 
   const { DatabaseSync } = loadNodeSqlite();
-  return wrapDatabase(new DatabaseSync(path));
+  return wrapDatabase(new DatabaseSync(path, options));
 }
