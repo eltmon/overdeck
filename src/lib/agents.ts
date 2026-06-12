@@ -203,7 +203,7 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
   };
 }
 
-function getCodexLauncherFields(agentId: string, model: string): {
+function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
   codexMode: 'work-tui';
   codexHome: string;
@@ -211,11 +211,26 @@ function getCodexLauncherFields(agentId: string, model: string): {
   model: string;
 } {
   const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
-  // PAN-1799: the launcher exports CODEX_HOME but nothing created it for work
-  // agents — codex booted into a nonexistent home with no config.toml and no
-  // seeded auth.json. initCodexHome is idempotent (always rewrites config.toml,
-  // seeds auth only when missing) and is the same call conversations make.
-  initCodexHome(codexHome);
+  // PAN-1803: codex work agents must inherit the user's configured codex
+  // permission level (Settings → Permissions → Codex) and pre-trust the
+  // workspace, EXACTLY like the conversation path
+  // (routes/conversations.ts). Without trustedDir, codex shows its first-run
+  // folder-trust / "load project-local config?" wizard and blocks the pane.
+  // Without the permission mapping, work agents ignore the Settings choice
+  // and run hardcoded never+workspace-write.
+  const codexPermMode = loadYamlConfig().config.codex?.permissionMode ?? 'workspace';
+  const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
+  const sandboxMode =
+    codexPermMode === 'full-access' ? 'danger-full-access'
+    : codexPermMode === 'read-only' ? 'read-only'
+    : 'workspace-write';
+  const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
+  initCodexHome(codexHome, {
+    trustedDir: workspacePath,
+    approvalPolicy,
+    sandboxMode,
+    approvalsReviewer,
+  });
   return {
     harness: 'codex',
     codexMode: 'work-tui',
@@ -2686,7 +2701,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getPiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = opts.harness === 'codex'
-    ? getCodexLauncherFields(opts.agentId, model)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -3135,7 +3150,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -4199,7 +4214,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     saveAgentStateSync(agentState);
@@ -5025,7 +5040,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
     : {};
   if (recoveryHarness === 'codex') {
     state.codexMode = 'work-tui';
