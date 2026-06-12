@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { SCHEMA_VERSION, initSchema, runMigrations } from '../../../../src/lib/database/schema.js';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 
 describe('schema migrations', () => {
-  let db: Database.Database;
+  let db: SqliteDatabase;
   let tempRoot: string;
 
   beforeEach(() => {
-    db = new Database(':memory:');
+    db = openDatabase(':memory:');
     tempRoot = mkdtempSync('/tmp/pan-schema-');
   });
 
@@ -120,13 +120,13 @@ describe('schema migrations', () => {
     `);
 
     // Verify the column is absent before migration
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('reviewed_at_commit');
 
     runMigrations(db);
 
     // After migration the column must exist
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('reviewed_at_commit');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
@@ -165,7 +165,7 @@ describe('schema migrations', () => {
 
   it('fresh initSchema includes reviewed_at_commit and merge_retry_count in review_status', () => {
     initSchema(db);
-    const cols = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const cols = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     const names = cols.map(c => c.name);
     expect(names).toContain('reviewed_at_commit');
     expect(names).toContain('merge_retry_count');
@@ -192,12 +192,12 @@ describe('schema migrations', () => {
       ALTER TABLE review_status_v22 RENAME TO review_status;
     `);
 
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('merge_retry_count');
 
     runMigrations(db);
 
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('merge_retry_count');
   });
 
@@ -245,13 +245,13 @@ describe('schema migrations', () => {
       ALTER TABLE review_status_v23 RENAME TO review_status;
     `);
 
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('review_spawned_at');
     expect(colsBefore.map(c => c.name)).not.toContain('test_retry_count');
 
     runMigrations(db);
 
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('review_spawned_at');
     expect(colsAfter.map(c => c.name)).toContain('test_retry_count');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);

@@ -10,12 +10,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
 import { initSchema } from '../../src/lib/database/schema.js';
 
 // ── In-memory DB injection ────────────────────────────────────────────────────
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 let projectStub: { projectPath: string } | null = null;
 const mockClearIssueClosedCache = vi.fn();
 
@@ -98,7 +98,7 @@ function createWorkspace(): string {
 // ── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
   projectStub = null;

@@ -20,12 +20,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../../src/lib/database/schema.js';
 
 // ─── In-memory DB injection ───────────────────────────────────────────────────
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -145,7 +145,7 @@ vi.mock('node:fs', async (importActual) => {
 import { existsSync } from 'node:fs';
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
   vi.clearAllMocks();

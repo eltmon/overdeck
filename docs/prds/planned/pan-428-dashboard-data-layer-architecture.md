@@ -91,7 +91,7 @@ Following T3Code's pattern (`persistence/Layers/Sqlite.ts`):
 | Runtime | SQLite Provider |
 |---------|----------------|
 | Bun | `@effect/sql-sqlite-bun` (Bun's native sqlite) |
-| Node | `node:sqlite` (Node 22.16+ built-in) or `better-sqlite3` fallback |
+| Node | `node:sqlite` (Node 22.16+ built-in) |
 
 Both are fast, both avoid native compilation headaches.
 
@@ -442,7 +442,7 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 
 **Design:**
 - SQLite-backed append-only event store
-- Dual-runtime SQLite: Bun native sqlite or `better-sqlite3`/`node:sqlite` (detect at startup, following T3Code `persistence/Layers/Sqlite.ts`)
+- Dual-runtime SQLite: Bun native sqlite or `node:sqlite` (detect at startup, following T3Code `persistence/Layers/Sqlite.ts`)
 - In-memory `PubSub<DomainEvent>` for live streaming
 - Monotonic sequence counter (loaded from DB max on startup)
 - Methods: `append()`, `readFrom(sequence)`, `liveStream`, `getLatestSequence()`
