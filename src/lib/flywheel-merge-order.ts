@@ -2,7 +2,15 @@ import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@panctl/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
+import { getAllReviewStatusesFromDb } from './database/review-status-db.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
+
+export interface MergeCandidate {
+  issueId: string;
+  title: string;
+  pr?: number;
+}
 
 export interface MergeQueueItem {
   issueId: string;
@@ -124,7 +132,7 @@ export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new S
 export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
-  getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+  getPrUrl?: (item: MergeCandidate) => string | undefined;
   gitConcurrency?: number;
   /**
    * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
@@ -165,10 +173,22 @@ export const computeMergeQueue = (
   projectRoot: string,
   options: ComputeMergeQueueOptions = {},
 ) =>
+  computeMergeQueueFromCandidates(
+    items
+      .filter((item) => MERGE_GATE_VERBS.has(item.verb))
+      .map((item) => ({ issueId: item.issueId, title: item.title, ...(item.pr !== undefined ? { pr: item.pr } : {}) })),
+    projectRoot,
+    options,
+  );
+
+export const computeMergeQueueFromCandidates = (
+  candidates: ReadonlyArray<MergeCandidate>,
+  projectRoot: string,
+  options: ComputeMergeQueueOptions = {},
+) =>
   Effect.gen(function*() {
     const eligibility = options.eligibility ?? reviewRecordEligibility;
-    const candidates = items.filter((item) => {
-      if (!MERGE_GATE_VERBS.has(item.verb)) return false;
+    const eligibleCandidates = candidates.filter((item) => {
       const gate = eligibility(item.issueId);
       if (!gate.eligible) {
         options.onIneligible?.(item.issueId, gate.reason ?? 'not eligible');
@@ -176,17 +196,17 @@ export const computeMergeQueue = (
       }
       return true;
     });
-    if (candidates.length === 0) return [] as MergeQueueItem[];
+    if (eligibleCandidates.length === 0) return [] as MergeQueueItem[];
     const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 
-    const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
+    const branches = eligibleCandidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
 
     const existsFlags = yield* Effect.all(
       branches.map((branch) => branchExists(branch, projectRoot)),
       { concurrency: gitConcurrency },
     );
 
-    const existing = candidates
+    const existing = eligibleCandidates
       .map((item, i) => ({ item, branch: branches[i]!, exists: existsFlags[i]! }))
       .filter(({ exists }) => exists);
 
@@ -236,3 +256,36 @@ export const computeMergeQueue = (
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
     }));
   });
+
+export interface EligibleCandidatesByProject {
+  projectKey: string;
+  projectRoot: string;
+  candidates: MergeCandidate[];
+}
+
+export function listEligibleCandidatesByProject(opts: { titleFor?: (issueId: string) => string | undefined } = {}): Map<string, EligibleCandidatesByProject> {
+  const statuses = getAllReviewStatusesFromDb();
+  const groups = new Map<string, EligibleCandidatesByProject>();
+
+  for (const [recordIssueId, status] of Object.entries(statuses)) {
+    const gate = mergeGateEligibility(status);
+    if (!gate.eligible || status.deaconIgnored === true) continue;
+    const issueId = status.issueId || recordIssueId;
+    const project = resolveProjectFromIssueSync(issueId);
+    if (!project) continue;
+
+    const group = groups.get(project.projectKey) ?? {
+      projectKey: project.projectKey,
+      projectRoot: project.projectPath,
+      candidates: [],
+    };
+    group.candidates.push({
+      issueId,
+      title: opts.titleFor?.(issueId) ?? issueId,
+      ...(status.prNumber !== undefined ? { pr: status.prNumber } : {}),
+    });
+    groups.set(project.projectKey, group);
+  }
+
+  return groups;
+}
