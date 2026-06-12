@@ -75,7 +75,8 @@ Before starting any work, you MUST read these files to understand the full conte
 1. **Read `./.pan/continue.json`** - Structured planning context: decisions, hazards, and approach from the planning agent. Replaces the old STATE.md.
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
-4. **Check `feedback[]` in the continue file** — If the continue file has a non-empty `feedback` array, each entry contains inline specialist feedback (review issues, test failures, merge blocks) requiring action. This is the primary feedback source (Layer 1+). The `SPECIALIST FEEDBACK` section below injects these entries for you.
+4. **Skim `.pan/context/codebase/` (if present)** — project-wide orientation: architecture, conventions, known traps.
+5. **Check `feedback[]` in the continue file** — If the continue file has a non-empty `feedback` array, each entry contains inline specialist feedback (review issues, test failures, merge blocks) requiring action. This is the primary feedback source (Layer 1+). The `SPECIALIST FEEDBACK` section below injects these entries for you.
    Also check `.pan/feedback/` for filesystem feedback entries when present.
 
 These files contain critical context that may have been updated since the last session.

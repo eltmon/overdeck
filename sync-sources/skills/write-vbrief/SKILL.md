@@ -93,7 +93,8 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
           "difficulty": "trivial|simple|medium|complex|expert",
           "issueLabel": "<issue-id-lowercase>",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -124,6 +125,7 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
 | `plan.narratives.NonGoals` | Required narrative. List everything discovery established as out of scope (`"none"` if genuinely nothing); review enforces these as must-not constraints. |
 | `items[].metadata.requiresInspection` | **Required on every item.** See inspection rules below. |
 | `items[].metadata.inspectionDepth` | `"fast"` (default) or `"deep"`. Only matters when `requiresInspection: true`. |
+| `items[].metadata.traces` | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) this item satisfies. |
 | `subItems` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one AC sub-item. |
 
 ---

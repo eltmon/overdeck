@@ -44,6 +44,7 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
+5. **Codebase map** under `<projectRoot>/.pan/context/codebase/` — bootstrapped if missing, corrected if stale.
 
 `pan plan finalize` does the full handoff in one shot: it materializes beads, marks the workspace vBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`, commit it on main, push, transition the issue to Planned, and terminate this planning session. You do not write to `.pan/specs/` directly. Whether a work agent starts afterward is decided by deterministic state, not by you: human-initiated planning waits in Planned for `pan start` / Start Agent; flywheel-initiated planning (launched with `--auto-start`) auto-spawns. The dashboard Done button is the manual handoff path for `--no-promote` runs. See docs/VBRIEF.md for the four-artifact model.
 

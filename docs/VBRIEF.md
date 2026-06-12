@@ -213,7 +213,8 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
         "created": "2026-04-04T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-436"
+          "issueLabel": "pan-436",
+          "traces": ["FR-1"]
         },
         "narrative": {
           "Action": "Component that checks selectIsBootstrapped and renders fallback or children"
@@ -335,6 +336,7 @@ The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon 
 | `metadata.requiresInspection` | items | Boolean decision for whether a bead must pass the work.inspect gate before downstream work proceeds |
 | `metadata.inspectionDepth` | items | `"fast"` or `"deep"` review depth when `requiresInspection` is true |
 | `metadata.foundationFor` | items | Downstream bead IDs that depend on this inspection-gated item |
+| `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
 | `metadata.kind` | subItems | `"acceptance_criterion"` — marks subItem as an AC for verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 

@@ -114,6 +114,7 @@ describe('buildReviewContext', () => {
     expect(manifest.headSha).toBe('abc12345def67890');
     expect(manifest.changedFiles).toHaveLength(2);
     expect(manifest.nonGoals).toEqual([]);
+    expect(manifest.traces).toEqual([]);
     expect(manifest.manifestPath).toBe(join(workspace, '.pan', 'review', runId, 'context.json'));
   });
 
@@ -149,6 +150,43 @@ describe('buildReviewContext', () => {
     ]);
     const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
     expect(written.nonGoals).toEqual(manifest.nonGoals);
+  });
+
+  it("includes plan item traces in the manifest", async () => {
+    vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
+    mockReadPlan.mockReturnValue(Effect.succeed({
+      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      plan: {
+        id: issueId.toLowerCase(),
+        title: 'Plan',
+        status: 'proposed',
+        items: [
+          {
+            id: 'wire-command',
+            title: 'Wire command',
+            status: 'pending',
+            metadata: { traces: ['FR-1', 'NFR-2'] },
+          },
+        ],
+        edges: [],
+      },
+    }));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1059\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.traces).toEqual([
+      { itemId: 'wire-command', title: 'Wire command', traces: ['FR-1', 'NFR-2'] },
+    ]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.traces).toEqual(manifest.traces);
   });
 
   it('sorts changed files by risk score descending', async () => {

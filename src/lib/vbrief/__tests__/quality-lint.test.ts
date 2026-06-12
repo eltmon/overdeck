@@ -195,3 +195,38 @@ describe('lintPlanQuality DAG and references', () => {
     ]));
   });
 });
+
+describe('lintPlanQuality requirement traces', () => {
+  it('warns on FR declared in PRD but traced by no item', () => {
+    const issues = lintPlanQuality(doc([item()]), {
+      prdText: [
+        '## Requirements',
+        '- FR-1 The command returns success',
+        '- NFR-2 The command exits quickly',
+      ].join('\n'),
+    });
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'trace-uncovered', severity: 'warn', message: expect.stringContaining('FR-1') }),
+      expect.objectContaining({ rule: 'trace-uncovered', severity: 'warn', message: expect.stringContaining('NFR-2') }),
+    ]));
+  });
+
+  it('silent when no PRD text provided', () => {
+    expect(rulesFor([item()])).not.toContain('trace-uncovered');
+  });
+
+  it('silent when all FRs traced', () => {
+    const issues = lintPlanQuality(doc([
+      item({ metadata: { requiresInspection: false, traces: ['FR-1', 'NFR-2'] } }),
+    ]), {
+      prdText: [
+        '## Requirements',
+        '- FR-1 The command returns success',
+        '- NFR-2 The command exits quickly',
+      ].join('\n'),
+    });
+
+    expect(issues.map(issue => issue.rule)).not.toContain('trace-uncovered');
+  });
+});

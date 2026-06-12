@@ -18,12 +18,12 @@ allowed-tools:
 
 # Panopticon Planning Lifecycle
 
-`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
+`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
 
 ## Available commands
 
 ```bash
-pan plan <id> [--auto] [--auto-start] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
+pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
 pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint]
 pan plan done <id>
 ```
@@ -50,6 +50,14 @@ Auto-planning runs the same planning agent without interactive questions:
 - The agent escalates only when authoritative inputs genuinely contradict each other.
 
 The dashboard issue card's **Auto-plan** action sends the same `auto: true` request.
+
+## Probe pass
+
+```bash
+pan plan PAN-1071 --probe
+```
+
+`--probe` adds an adversarial self-review section to the planning prompt before finalize. The planner attacks hidden assumptions, ambiguous "done" criteria, unhandled failure modes, and missing dependency edges, then records acted-on findings in `continue.json` decisions with a `PROBE:` prefix. `--effort high` includes this section automatically.
 
 ## Auto-start after planning
 

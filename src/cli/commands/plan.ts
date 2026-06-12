@@ -5,6 +5,7 @@ import { getDashboardApiUrlSync } from '../../lib/config.js';
 interface PlanOptions {
   auto?: boolean;
   autoStart?: boolean;
+  probe?: boolean;
   model?: string;
   harness?: 'claude-code' | 'pi' | 'codex';
   effort?: 'low' | 'medium' | 'high';
@@ -28,6 +29,7 @@ export async function planCommand(id: string | undefined, options: PlanOptions):
       body: JSON.stringify({
         auto: options.auto === true,
         autoStart: options.autoStart === true,
+        probe: options.probe === true,
         model: options.model || undefined,
         harness: options.harness || undefined,
         effort: options.effort || undefined,
