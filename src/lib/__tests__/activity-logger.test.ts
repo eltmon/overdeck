@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   emitActivityEntrySync,
   emitActivityTtsSync,
+  emitDashboardLifecycleSync,
   setActivityEventStoreProvider,
 } from '../activity-logger.js';
 
@@ -29,5 +30,33 @@ describe('activity logger', () => {
     expect(store.appendAsync).toHaveBeenCalledTimes(2);
     expect(store.appendAsync.mock.calls[0][0]).toMatchObject({ type: 'activity.entry' });
     expect(store.appendAsync.mock.calls[1][0]).toMatchObject({ type: 'activity.tts' });
+  });
+
+  it('mirrors dashboard lifecycle events into the ActivityPanel feed', () => {
+    emitDashboardLifecycleSync('started', {
+      reason: 'post-merge',
+      issueId: 'PAN-1744',
+      trigger: 'deploy-script',
+    });
+
+    expect(store.appendAsync).not.toHaveBeenCalled();
+    expect(store.append).toHaveBeenCalledTimes(2);
+    expect(store.append.mock.calls[0][0]).toMatchObject({
+      type: 'dashboard.lifecycle_started',
+      payload: {
+        reason: 'post-merge',
+        issueId: 'PAN-1744',
+        trigger: 'deploy-script',
+      },
+    });
+    expect(store.append.mock.calls[1][0]).toMatchObject({
+      type: 'activity.entry',
+      payload: {
+        source: 'deploy-script',
+        level: 'info',
+        message: 'Dashboard restart started via deploy-script for PAN-1744 (post-merge)',
+        issueId: 'PAN-1744',
+      },
+    });
   });
 });

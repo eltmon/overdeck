@@ -70,7 +70,14 @@ workspaces (which is all of them). Candidate substrate fix: resolve the real git
 
 ## Parked items
 
-(none recorded yet — `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
+- **PAN-1762 (Swarm v2) — OPERATOR-HELD at proposed (directive 2026-06-11, RUN-22).**
+  The operator wants to review the plan before any work starts. Do NOT
+  `pan start PAN-1762` when its spec reaches proposed — the stop-at-proposed
+  contract is explicitly overridden for this issue. It starts only on the
+  operator's explicit instruction. Do not re-surface it as a start suggestion;
+  list it as held.
+
+(otherwise: `needs-discussion` / `needs-design` labels are the canonical park signal; do not duplicate that state here unless there is something additional to remember about the rationale)
 
 ## RUN-9 observations (tick 1, 2026-05-24)
 
@@ -1403,3 +1410,707 @@ completion bookkeeping, not just parking signals. Note: strike-1717 ALSO
 handled the shared-worktree case correctly — it pushed its fast-forward
 directly to origin/main rather than checking out main in the primary worktree
 (live .pan/continues writes), an explicitly good pattern to repeat.
+
+## RUN-18 ticks 6-7 (2026-06-10) — first merge of the run, and the "deployed ≠ merged" discovery
+
+### PAN-1455 merged (attempt 2) — the full operator-merge loop worked
+
+Operator re-clicked MERGE after PAN-1717 made main green: rebase → verify →
+squash-merge → post-merge deploy, all monitored live (DB-poll monitor on
+merge_step gives step-level events: rebasing → verifying → squash-merging →
+post-merge-cleanup). First PR merge of RUN-18.
+
+### THE BIG ONE — post-merge-deploy builds the primary worktree WITHOUT syncing origin (PAN-1723)
+
+The deploy fired 1 second after the squash landed on origin and built the
+primary worktree as-is — which was BEHIND origin by exactly that squash (a
+conv agent's unpushed commits had diverged local main). Result: the deploy
+reported success, server restarted healthy, lifecycle completed — and the
+running server does NOT contain the merged fix (`refresh_token_reused`
+marker: 0 hits in dist). Silent. Post-merge verification-on-main then
+exercises the OLD build.
+
+**Detection recipe:** `git -C <root> status -sb` (behind>0 at deploy time) +
+grep dist for a marker string from the merged diff. **Fix direction (in
+PAN-1723):** deploy from a pristine `git worktree add --detach` of
+origin/main; log the built sha. Under multi-channel operation (conv agents
+committing on local main), divergence at merge time is ROUTINE — every merge
+deploy is suspect until PAN-1723 lands.
+
+### PAN-1716 reaper went live with the merge restart and immediately worked
+
+`[deacon] Reaped terminal advancing session agent-pan-1455-ship (PAN-1716)`
+then PAN-1641's review convoy re-dispatched (02:10) after 60+ min stuck —
+confirming the stall hypothesis (advancing slots exhausted by zombie
+sessions). 1242/1491 queue behind 1641's convoy on the 3 advancing slots —
+expected self-resolving; the advancing-slot ceiling serializes convoy
+dispatch one issue at a time.
+
+### PAN-1658 cascade experiment result (posted on the issue)
+
+The merge cascade did NOT touch the stuck test=pending siblings, consistent
+with getReadySiblings' ready=1 filter (confounder: the deploy restart may
+have preempted the cascade — but the filter argument is structural). What
+unstuck dispatch was the reaper (capacity), not status reconciliation. The
+green-CI→testStatus gap is unowned after #1707's closure; operator to choose
+among the issue's three options.
+
+### Workspace devcontainers look like dueling dashboards in ps — they aren't
+
+Multiple `node dist/dashboard/server.js` processes with containerd-shim
+parents are workspace-container UI peers (deacon-disabled), not host
+dashboards. Check ppid before declaring a restart storm. Also: `ps -o etime`
+is MM:SS under an hour — 02:28 is 2.5 MINUTES, not hours (misread once).
+
+## RUN-18 ticks 8-9 (2026-06-10) — ceiling backpressure quantified; fix verified live after double-reload
+
+### The deacon's deferred-dispatch log line is the definitive stall/queue distinguisher
+
+`checkPendingTestDispatch: deferred test for PAN-X — advancing ceiling reached
+(PAN-1665) — counts: work=7 advancing=6 total=13/9 | advancing=[...] work=[...]`
+— grep deacon.log for `deferred` before classifying review/test non-dispatch
+as a bug. The queue drains serially: one review convoy (5 sessions) at a time,
+then tests. Idle work sessions on merged/done issues count against `work=` and
+slow the drain — extending the PAN-1716 reaper to merged-issue work agents is
+the obvious next substrate improvement.
+
+### Verifying a merged fix is live takes THREE checks, in order
+
+1. Squash is ancestor of local HEAD (`git merge-base --is-ancestor <sha> HEAD`)
+2. Marker string present in src (`grep src/...`)
+3. Marker present in **ANY dist chunk** (`grep -rl dist/` — NOT just
+   server.js; rolldown splits chunks, codex-auth lands in `workspaces-*.js`)
+
+RUN-18 hit a triple-stale sequence: deploy built behind-origin tree
+(PAN-1723), then the first manual reload built mid-sync (squash landed
+between build and check), then the marker grep targeted the wrong file. Only
+the third reload + full-dist grep confirmed live. A sync can land BETWEEN a
+build and its health check — sha logging in the deploy (PAN-1723 fix) is the
+real cure.
+
+### `pan unpause` → deacon resume → session can still silently not appear
+
+agent-pan-1579's resume logged 'resuming' at 02:38 but produced no tmux
+session 20+ min later — second gate (work-slot ceiling or unhealthy docker
+stack from its pause reason) swallowed the spawn after the resume decision.
+Resume-decision ≠ session-up; verify has-session after a resume claim.
+
+## RUN-18 ticks 20-26 (2026-06-10, overnight) — the livelock arc: diagnose → jam-break → strike×2 → drain
+
+The defining arc of RUN-18. After PAN-1455 merged (02:06Z), NOTHING else landed
+for 5+ hours. Operator escalated ("nothing is landing"). Root cause was a
+three-layer livelock, broken in stages:
+
+1. **Frozen sessions masquerading as running** (eaten kickoffs, PAN-1700 class):
+   1491 work + 1686/1704 review convoys sat inert with instructions pasted but
+   never executed. Counter-move: `pan review restart <id>` (official surface)
+   recycled the frozen convoys → both passed within ~10-25 min.
+2. **Idle sessions counted against the governor** until `total=9/9` deferred
+   every test dispatch. Counter-moves: `pan pause PAN-1455` (merged, never
+   paused — PAN-1726), `pan pause PAN-1658` (reconciler misfire spawn on a
+   superseded issue — PAN-1709 materialized). Each freed slot produced an
+   immediate dispatch.
+3. **Structural fixes via strike×2, both landed same night:** fb9524bb8
+   (PAN-1726: verify post-merge pause + reap merged work sessions) and
+   04669ad0a (PAN-1730: reap idle awaiting-test work sessions). Both required
+   `pan reload` to go live (landed ≠ live, always).
+
+**Outcome:** test dispatches resumed (first: agent-pan-1242-test, seconds after
+the slot freed), and by 08:13Z BOTH PAN-1704 and PAN-1700 (the keystone
+delivery-ack fix) reached ready_for_merge=1.
+
+**The orchestrator playbook that worked (in order):**
+- `grep deacon.log for 'deferred'` → quantifies the ceiling (work=N advancing=M total/9)
+- byte-identical pane across 2 ticks → frozen, not working
+- `pan review restart` for frozen convoys; `pan pause <id> --reason` for
+  misfire/orphaned work agents (both official surfaces, NOT hand-fixes)
+- strike the structural gap the moment it's precisely characterized; reload after landing
+- every freed slot dispatches within one patrol (~60s) — instant feedback loop
+
+**Open residue for next runs:** agent-pan-1491-ship zombie (refused-and-parked,
+unreapable — PAN-1699 class); 1242/1491 fast test FAILURES (suspect broken
+workspace docker stacks, not code); PAN-1658 issue still open drawing
+reconciler attention (operator close/re-scope pending); strike-1682 parked 20+
+ticks (code long since on main).
+
+## RUN-18 ticks 33-41 (2026-06-10 morning) — 3rd red main, test starvation named, FIVE at the gate
+
+- **3rd red main** (69fb3239f doc line tripping beads-scoping) filed PAN-1732,
+  struck, fixed (+1/-1, 48a6ffd3b), closed with evidence — diagnosis-to-green
+  ~25 min. Recurring class: any line matching `` `bd ready `` in
+  src/lib/cloister/prompts/work.md MUST carry `-l {{ISSUE_ID_LOWER}}`.
+  NOTE: roles/work.md ≠ src/lib/cloister/prompts/work.md (the test reads the
+  latter; a pan-tell corrected an early mis-pointer).
+- **Test-dispatch STARVATION is a design gap** (documented on PAN-1730): freed
+  slots are instantly out-competed by eager review-convoy dispatch; tests
+  waited 6-10h across multiple ceiling configurations. Fix direction: reserved
+  test slot or queue priority. The pause-gambit (pan pause the idle
+  review-passed work agent so its OWN test can dispatch) works as manual relief
+  — unpause if the test then fails.
+- **Morning state: FIVE merge-ready** (1700 keystone, 1704, 1719 first-fly.io,
+  1629, 1712 remote) — from a pipeline that was fully frozen at 02:00. PAN-1712
+  = first full remote (fly.io) execution through plan→work→review→test, adopted
+  into the pipeline via pan-tell from its wrangler.
+- 1641 test=failed (suspect its PAN-1710 boot-surface regression vs new main,
+  or broken workspace docker stack) — feedback cycle owns it.
+
+## RUN-20 tick 1 (2026-06-11) — post-reboot re-baseline; strikes on PAN-1723 + PAN-1699
+
+**RUN-19 was a zero-tick casualty** — started 00:10Z, killed by a host reboot
+(~00:16Z), no snapshot content. RUN-20 replaced it at 00:24Z. When a run's
+report shows a zero-second window, look for a reboot/restart before reading
+anything into it.
+
+### Post-reboot state (the deacon re-drove everything itself)
+
+Host up 10 min at tick 1; the deacon re-dispatched the whole advancing fleet
+at 00:18–00:24Z: ship on 1629/1686/1704/1712/1719 (clearing the 13:11Z
+merge-conflict blockers), review convoys on 1642/1712. Main GREEN at
+1a508f015. RAM 21/64GB, swap 0. merge_queue + pending_auto_merges both EMPTY.
+Pipeline truth confirmed in SQLite `review_status` (no `settings` table —
+autonomy toggles are not in the DB; defaults apply, require_uat=true).
+
+- **PAN-1700 ready_for_merge=1** — the ONLY issue at the gate, and it's the
+  keystone eaten-kickoff fix. Surfaced as the urgent operator action: a
+  reboot-respawn burst is exactly the situation PAN-1700's bug bites.
+- Watch items: agent-pan-1712-ship + agent-pan-1629-ship panes captured BLANK
+  twice ~10 min post-spawn (1686-ship/1642-review idle-at-prompt with low
+  tokens). Byte-compare next tick before calling them frozen; if frozen, the
+  official surface is `pan review restart` (convoys) — ship has no equivalent,
+  file the gap.
+- PAN-1739 has a stale strike branch + workspace, no session — PAN-1681-class
+  residue; surfaced `investigate`, did not relaunch on top.
+
+### Tick-1 launches (active work was 0 vs minAgents=2)
+
+Zero work/plan/strike agents at run start → launched `pan strike PAN-1723
+PAN-1699 --effort high` (both Opus 4.8, spawned clean, kickoffs visible):
+
+- **PAN-1723** (deploy builds stale primary worktree): every merge deploy is
+  suspect until it lands — highest-leverage deploy-correctness fix.
+- **PAN-1699** (signal-before-parking): its absence cost 20+ silently-parked
+  strike ticks across RUN-17/18; prompt-only edits, low strike risk.
+
+New unstarted candidates queued (post-RUN-18 filings): PAN-1744 (fork/handoff
+dies on dashboard restart — next start when a slot frees), PAN-1743
+(--no-resume doesn't gate boot orphan recovery), PAN-1745 (conversation-search
+tests failing on main — but main CI is green; verify it's the PAN-1702/1720
+host-only isolation class before launching), PAN-1740, PAN-1739.
+
+## RUN-20 tick 2 (2026-06-11) — THREE at the gate; PAN-1746 filed (ship-on-merged + $HOME spawn)
+
+### The post-reboot ship burst COMPLETED — 3 ready_for_merge in ~30 min
+
+The tick-1 ship agents finished and were reaped: **PAN-1700 + PAN-1686 +
+PAN-1719 all ready_for_merge=1** — from zero-at-the-gate to three in one
+inter-tick window. The pipeline self-drove the whole way (rebase → verify →
+ship complete). Merge order surfaced: 1700 FIRST (eaten-kickoff keystone),
+then 1686, 1719. PAN-1704-ship still finishing; PAN-1712 review passed →
+test queued; 1629 re-reviewing.
+
+### PAN-1746 filed — boot reconciliation dispatches ship on MERGED issues
+
+Caught live: `onIssueStateChangePromise → spawnRun(ship)` fired for PAN-1190
+(merged WEEKS ago, verifying-on-main) at 00:27:34Z — seconds after the deacon
+itself logged "merge_status=merged is terminal". Same path attempted PAN-1487;
+only the docker-stack gate stopped it. Worse: PAN-1190's workspace is deleted,
+and `assertWorkspaceStackHealthyForSpawn` PASSES on a missing workspace (it
+only fails on a broken one), so the launcher started Claude in **$HOME at the
+folder-trust prompt** — a wedged session holding an advancing slot against the
+PAN-1665 governor (live `total=13/9` deferrals). Filed PAN-1746; paused the
+instance via `pan pause agent-pan-1190-ship --reason ...` (official surface,
+RUN-18 misfire precedent). Note `pan pause` accepts full agent-session ids,
+not just issue ids — useful for role-session misfires.
+
+### Live PAN-1700 evidence: agent-pan-1704 is a ghost
+
+Work agent on PAN-1704 (review/test/verify all passed — shouldn't even have a
+work spawn; PAN-1709 shape) resumed at 00:25 with kickoff eaten: out 0, cost
+frozen at $1.3505, garbled "resuming from a summary" banner, byte-identical
+across two checks 18 min apart. Work slots uncontended (1/6) so left it —
+surfaced as the demonstration of why PAN-1700 merges first.
+
+### Tick-2 lesson: the dispatcher of a mystery session may not be the deacon
+
+The deacon log had NO line for the 1190-ship spawn. The dispatcher was the
+dashboard server (`dashboard.log`: `purpose=role-run source=agents.ts:spawnRun`
+via `onIssueStateChangePromise`). When hunting a mystery dispatch, grep
+`dashboard.log` for `claude-invoke.*<session>` — the deacon log only covers
+patrol-driven actions.
+
+### BOTH tick-1 strikes LANDED within ~40 min — and the bookkeeping pattern held
+
+- **PAN-1699 → 8101a3c76** (signal-before-stalling roles contract). Closed with
+  evidence (prompt-only change; content IS the deliverable). The strike also
+  flagged that **roles/ship.md does not exist** while every ship spawn passes
+  `--agent roles/ship.md` (agents.ts:460 returns it unconditionally; spawn then
+  takes the has-definition branch for permission flags on a lie) → filed
+  **PAN-1747**. Failing-soft is why it went unnoticed — ship sessions run fine.
+- **PAN-1723 → 2d0e4f5c8** (pristine-worktree deploy). Left OPEN: real
+  verification is the next live merge logging the built sha. Check the deploy
+  log on the next merge, then close with evidence.
+- Both strikes parked at the prompt WITHOUT `pan done` citing the strike
+  contract (4-for-4 now). Both pushed `strike/<id>:main` directly — the good
+  shared-worktree pattern from strike-1717.
+- **Landed ≠ live, again:** roles/*.md prompts and the deploy script execute
+  from the PRIMARY worktree, which had diverged behind origin. The orchestrator
+  must fast-forward local main after strikes land or the fixes stay inert.
+  Reconcile recipe when the tree has live .pan writes: path-scoped chore-commit
+  of .pan/continues+specs (repo convention), then `git pull --rebase`, then
+  push. NEVER autostash (it's a stash).
+
+## RUN-20 tick 3 (2026-06-11) — PAN-1746 landed+reloaded+closed; strike-1747 surfaced a PAN-1531 architecture contradiction
+
+Run scoreboard after ~75 min: **3 substrate fixes on main** (PAN-1699 closed,
+PAN-1746 closed, PAN-1723 open-pending-live-verify), 2 new bugs filed
+(PAN-1747, PAN-1749), 3 issues at the merge gate (1700/1712/1719).
+
+- **strike-1746 landed in ~18 min** (72f09e9e0: terminal-merge dispatch gate +
+  hard-fail on missing workspace). Orchestrator ran the reconcile recipe + `pan
+  reload` → fix live in the running server; closed with evidence.
+- **PAN-1686 fell back from ready** — merge conflict the moment the strike
+  commits hit main (00:59:52Z). Expected rolling-rebase cost; the deacon
+  self-drove a full re-cycle (work + ship + 4-session review convoy). Do NOT
+  treat a ready→blocked flip right after a main landing as a regression.
+- **`pan plan --auto` (PAN-1744) COMPLETED the full planning flow in ~25 min**
+  (proposed spec + planned label + workspace + beads) and its session
+  self-cleaned. Followed the stop-at-proposed contract: `pan start PAN-1744`
+  → the PAN-1618 auto-rebuild gate fired (docker stack rebuilt) → work agent
+  up. The plan→start chain works; just drive the start yourself.
+- **strike-1747 declined with the run's best finding:** roles/ship.md missing
+  was the tip of a PAN-1531 contradiction — docs/MERGE-WORKFLOW.md said the
+  interactive ship role was RETIRED (server-side rebase, no ship actor), but
+  live code still spawned load-bearing ship runs from the reactive scheduler
+  and the old deacon undispatched-ship patrol — ship was treated as what flipped
+  readyForMerge. Fix needed an architecture decision + taxonomy reconciliation.
+  Strike→plan reflex applied: `pan plan PAN-1747 --auto` launched same tick.
+- **PAN-1749 filed:** strike-1747 obeyed the brand-new PAN-1699 contract and
+  `pan tell flywheel-orchestrator` returned "not running" DURING AN ACTIVE RUN
+  — the orchestrator has no agent state dir, so the tell no-ops. The contract
+  silently degrades to issue-comment fallback (which the strike correctly
+  used). Until fixed, expect signals as issue comments, not tells.
+- **1704 pair paused** (official surface): ghost work agent (kickoff eaten at
+  boot, out 0 for 80 min, PAN-1709 misfire shape) + ship stalled idle 70 min
+  pre-contract. Freed slots; the then-existing deacon ship-dispatch patrol was
+  expected to re-dispatch ship fresh. Verify next tick.
+
+## RUN-20 tick 4 (2026-06-11) — 4 at the gate; 4th red main of the week (PAN-1746 fixture fallout)
+
+- **FOUR ready_for_merge=1: PAN-1700/1704/1712/1719.** The 1704 pause-gambit
+  worked: pausing the ghost work agent + stalled ship let the pipeline flip it
+  ready within one patrol cycle. PAN-1686 re-passed review+test after its
+  conflict kickback — fully autonomous recovery.
+- **Main went RED at 01:17Z (PAN-1752, filed + struck same tick).** The
+  spawnAgent/spawnRun unit suite fails wholesale — fallout from 72f09e9e0
+  (PAN-1746 gate) changing spawn preconditions the fixtures don't satisfy.
+  Same class as PAN-1698/1717/1732: behavior change lands, fixtures stale,
+  main red. **Production spawns are fine under the live gate** (pan start
+  PAN-1744 and PAN-1747 both succeeded) — it's a test-fixture problem, but a
+  red main still blocks every verify/ship/merge, so it gates the 4 ready
+  merges. Surfaced "hold merges until green."
+- **Strike-fallout lesson (now twice this run):** every strike that changes
+  pipeline behavior should grep the unit suites asserting that behavior
+  (tests/unit/**/agents*, spawn*) BEFORE pushing. Consider adding to
+  roles/strike.md: "run the tests that exercise your changed module, not just
+  the full suite at HEAD~" — the full suite passed for strike-1746 because it
+  ran BEFORE the commit was applied? No — more likely it ran vitest filtered
+  or the suite's spawn tests were green pre-change and the strike never
+  re-ran them post-change. Either way: post-change full-suite verification is
+  the strike contract; flag this in the PAN-1752 fix.
+- **stop-at-proposed contract held for PAN-1747** (4th consecutive):
+  `pan plan --auto` → proposed spec ("finish the PAN-1531 ship-role removal —
+  stop spawning the vestigial ship agent, reconcile docs") → orchestrator
+  `pan start PAN-1747` → work agent up. The planner made the architecture
+  call itself (remove, not define) — correct under decide-don't-delegate;
+  review will scrutinize.
+- work-1744 at ctx 93% (gpt-5.5) with +538/-48 banked and inspection passing —
+  PAN-1675 compact brake is the safety net if it wedges.
+
+## RUN-20 tick 5 (2026-06-11) — main green in ~35 min; rolling-rebase churn quantified
+
+- **PAN-1752 fixed + closed**: 6611efa9d (fixture workspace dir) — diagnosis
+  was exact (fixtures, not the gate; production spawns were never broken).
+  4th red main of the week, all the same class, all fixed by file→strike
+  within ~25-35 min. The class fix is becoming obvious: a CI-side
+  fixture-contract lint, or strike.md requiring module-scoped test runs
+  post-change.
+- **Rolling-rebase churn is the new tax:** each strike landing pulled the
+  ready PRs back into re-review — PAN-1704 lost ready_for_merge TWICE, 1686
+  is on its 3rd review cycle. With merge_train on, the cure is the operator
+  merging the ready set promptly (or auto-merge when the toggle flips).
+  Surfaced explicitly in the snapshot.
+- **Operator active in parallel:** filed PAN-1748/1750/1751/1753/1754/1755
+  tonight (UAT-assembly + settings families) and landed the 1755 interim fix
+  064a97963 directly. PAN-1752 was already closed when I went to close it.
+  Multi-channel awareness rule held: checked git log before launching on
+  anything new.
+- **Launched strikes on PAN-1753** (ROLE_NAMES omits strike — settings save
+  broken) **and PAN-1749** (orchestrator tell delivery). At cap 4: work-1744,
+  work-1747, strike-1753, strike-1749.
+- **work-1744 at ctx 100% with +662/-62 UNSUBMITTED** (blocking wedge).
+  PAN-1675 compact brake expected to fire; verify next tick, file brake gap
+  if it didn't. work-1747 at 89% (net-deletion diff, consistent with
+  ship-role removal).
+- Watch: `agent-pan-resume-redeliver` tmux session appeared at 21:59 — a
+  test-fixture-named session going live on the HOST (PAN-1702/1720 isolation
+  class, likely from a host test run touching real tmux). Cosmetic so far.
+
+## RUN-20 tick 6 (2026-06-11) — compact brake saved 1744; tell-fix LIVE-verified; 6 bugs down
+
+- **PAN-1675 compact brake: 2nd production save, new variant.** work-1744
+  (ctx 100%, +662/-62 UNSUBMITTED — the blocking pre-PR wedge) was auto
+  recovered: fresh 26% ctx, kickoff re-delivered, diff preserved, work
+  continued into a review convoy. The brake covers the pre-PR variant, not
+  just post-PR (RUN-18's case).
+- **PAN-1749 closed with the strongest evidence type yet:** the strike fixed
+  `pan tell` singleton resolution (a7cc9f23c, tellCommand blindly prefixed
+  'agent-'; now routes normalizeAgentId) and then SIGNALED THE RUNNING
+  ORCHESTRATOR through the repaired path — the message arrived mid-run.
+  Signal contract now works end-to-end. roles/*.md gained the tell-fails→
+  issue-comment fallback.
+- **PAN-1753 landed WITH its test mocks in the same push** (8e98ae2f9 +
+  7bab68059) — no fixture-staleness red. The PAN-1752 lesson propagated to
+  the next strike immediately.
+- **Host-test isolation got expensive (PAN-1720 comment):** a host suite run
+  spawned a REAL fixture agent (agent-pan-resume-redeliver, issueId=
+  PAN-RESUME) with a live TUI at the project picker; the governor counted it
+  (total=10/9) and deferred real review re-dispatches. Paused it. Watch for
+  more fixture-named sessions after any host suite run.
+- Run scoreboard: **6 substrate bugs fixed** (1699/1746/1752/1749/1753 closed,
+  1723 landed-pending-merge-verify), 3 merges READY ~1.5h (1700/1712/1719),
+  main green. Strikes launched on PAN-1743 + PAN-1721 (cap 4 reached).
+
+## RUN-20 tick 7 (2026-06-11) — 8 bugs down; the 1747 bootstrap paradox and its resolution
+
+- **Strikes 1743 + 1721 landed within ~25 min** (aa903c5bf: --no-resume flag
+  never actually reached the dashboard server; 8a1eeb4d7: close-out teardown +
+  deacon reaper cover strike-* resources). Both closed. Reloaded the server
+  after a proper sync — **caught myself mid-mistake: the first reload was
+  building a local tree that did NOT yet contain the fixes** (pull had failed
+  on dirty .pan files). Killed it, synced, rebuilt. Always verify local HEAD
+  contains the commit you're reloading FOR, before the build starts.
+- **The PAN-1747 bootstrap paradox** (signaled via the fixed tell path — 2nd
+  live delivery): the ship agent refused to ship the branch that REMOVES the
+  ship role, citing the branch's own docs. Resolution: orchestrator decision
+  recorded IN THE ISSUE BODY (next dispatch reads it) — the removal branch
+  merges under the LEGACY contract; post-merge semantics don't apply to their
+  own delivery vehicle. Used pause→unpause to recycle the dead ship session
+  (pause alone blocks re-dispatch; the unpause clears the gate so the legacy
+  ship-dispatch patrol can fire). Escalation if the next ship still aborts:
+  strike a transitional roles/ship.md onto main.
+- **PAN-1744 review BLOCKED** — feedback loop owns it; the compact-recovered
+  work agent is addressing it.
+- Gate: 1700/1712/1719 ready ~2h, operator idle. Churn continues on 1686/1704
+  (re-review convoys) every time main moves — the standing cost of an
+  unmerged ready set.
+
+## RUN-20 tick 8 (2026-06-11) — churn-aware posture: hold strikes, drain the gate
+
+- 1747 got pulled into re-review before its ship could re-dispatch (main moved
+  again) — the bootstrap-paradox resolution rides the next pass. 1744
+  re-reviewing after addressing its blocked verdict. The re-review churn now
+  visibly costs: 1686/1704/1747 at 2-3 cycles each tonight.
+- **Posture decision: hold NEW main-landing strikes while 3 PRs sit ready at
+  the gate** — each landing re-triggers convoys on every in-flight branch.
+  Launched planning on PAN-1709 instead (root cause of the ghost-misfire
+  class; planning's main footprint is one spec commit). When the gate drains,
+  resume strike velocity. The churn-vs-velocity tradeoff is real and should
+  be priced into every strike decision while ready PRs wait.
+- Zombie strike sessions 1723/1747 correctly NOT reaped — the PAN-1721 reaper
+  keys on close-out and those issues are open. Expectation corrected.
+- Swap appeared: 4.7GB/8GB under convoy churn (was 0 at run start). RAM
+  31.8/64. Watch each tick; the RUN-14 pathology starts at swap-full.
+
+## RUN-20 tick 9 (2026-06-11) — pan pause addressing gap (PAN-1760); swap-full ≠ pressure
+
+- **PAN-1760 filed:** pan pause blind-prefixes 'agent-' — NO working form
+  pauses strike-*/inspect-* sessions (tried strike-pan-1723, pan-1723). Same
+  class as PAN-1749's tell fix; audit pause/kill/unpause/untroubled for
+  normalizeAgentId routing. Hit exactly when the orchestrator reached for the
+  pause-for-RAM lever.
+- **Swap-full panic corrected:** swap 95% with RAM at 50% (36GB available) is
+  cold-page eviction from idle sessions, harmless. The RUN-14 pathology was
+  swap-full + RAM near ceiling. Watch AVAILABLE RAM, not the swap gauge.
+- PAN-1709 planned (4th consecutive stop-at-proposed) → work agent started.
+  Churn-hold posture maintained: no new main-landing strikes while
+  1700/1712/1719 sit ready (~3h now).
+
+## RUN-20 tick 10 (2026-06-11) — 1709 docker init exit-1; --host fallback
+
+- PAN-1709 start: auto-rebuild ran (PAN-1618 gate) but the stack's `init`
+  service exit-1'd → spawn refused. Restarted `--host --yes` (deacon-code
+  task; the PAN-1579 precedent). WATCH: if fresh-workspace init failures
+  recur, file a workspace-template regression — one data point so far.
+- Gate at ~3.5h (1700/1712/1719). Reviews cycling normally; main CI
+  in_progress; avail RAM 34.6GB.
+
+## RUN-20 tick 11 (2026-06-11) — BATCH TRAIN MERGED 3; PAN-1723 live-verified and closed
+
+- **The PAN-1737 UAT batch train delivered**: uat/pan-reef-0611 assembled and
+  merged PAN-1700 + PAN-1712 + PAN-1719 in one batch (36dca7693). First PR
+  merges of RUN-20; the eaten-kickoff keystone is merged AND live (deploy
+  restarted the server at 23:51 with the batch content).
+- **PAN-1723 closed with first-merge live evidence**: deploy log shows
+  pristine worktree at origin/main, built sha == the batch merge commit,
+  health check pass, and correct lock-coalescing of the 3 deploy firings.
+  The deployed-≠-merged class is structurally dead.
+- Deploy-log hygiene note: /tmp/panopticon-deploy.log gets polluted by the
+  restarted server's stdout (fd inheritance) — grep '[post-merge-deploy]' to
+  read deploys. Minor; not filed (cosmetic).
+- Run scoreboard: **9 substrate bugs fixed, 3 PRs merged.** Churn-hold
+  lifted; strike queue resumes with PAN-1760 (pause addressing).
+
+## RUN-20 tick 12 (2026-06-11) — PAN-1760 landed + live-verified; 10 bugs fixed
+
+- strike-1760 landed 5dcfccee9 (normalizeAgentId routing for agent-targeting
+  commands) ~15 min after launch; live-verified by re-running the exact
+  failed invocation (pan pause strike-pan-1723 → success). Zombie strikes
+  reclaimed. inspect-* sessions remain unaddressable (no agent state dir —
+  registration scope, owned by close-out/reaper, not filed).
+- Scoreboard: 10 substrate bugs fixed, 3 PRs merged, deploy live-verified.
+  Gate drained; 4 branches cycling review against post-batch main; 1709
+  implementing on host.
+
+## RUN-20 tick 14 (2026-06-11) — convoy circular-wait jam-break
+
+**New deadlock shape:** the governor over-committed (total 13/9 — ceiling only
+gates NEW dispatches), leaving 1686's convoy PARTIAL: synthesis + 2/4
+sub-reviewers live, the other 2 forever deferred, synthesis waiting on their
+files while holding 3 slots. Detection: review_status frozen "reviewing"
+across 3 ticks + synthesis pane at out≈17 tokens after 1h45m + convoy session
+count < 5. Fix (RUN-18 playbook): pause idle in-review work agents (freed 2
+slots) → pan review restart → fresh convoy spawned 4/4. If this recurs, the
+substrate fix is making convoy dispatch atomic (all-or-nothing slot
+reservation) — file it with this evidence if seen twice.
+
+## Spawn-guardrail substrate fixes (2026-06-11, handoff session — PAN-1763/PAN-1764 closed)
+
+A parallel handoff session root-fixed the two spawn-guardrail failures RUN-20 was
+working around. Do not re-investigate or strike these classes:
+
+- **"services exited 130/255" stack-health failures (PAN-1763, f6a5bbb51):** every
+  post-merge deploy (`scripts/post-merge-deploy.sh` step 5) and `pan dev` restart ran a
+  bare `pkill -f 'dist/dashboard/server'`, which matched every workspace/UAT stack's
+  in-container server (same cmdline, host-visible PIDs). The 23:50:22Z deploy sweep
+  killed PAN-1629's and PAN-1704's servers 16 ms apart. Both kill sites now skip PIDs in
+  container cgroups. Live-verified: a full `pan reload` with 6 container servers running
+  left all 6 untouched. The tick-10 "1709 docker init exit-1" and the recurring
+  exited-130 stacks were NOT a workspace-template regression in the old sense — see next.
+- **Fresh-workspace init exit-1 (PAN-1764, f6a5bbb51 + 51f488ae8):** init needed
+  github.com for better-sqlite3's prebuilt binary on every run (the bun-store volume was
+  mounted at /root/.bun while services run as user node — dead — and `down -v` wiped it
+  anyway); a transient DNS EAI_AGAIN hard-failed init with no fallback (alpine image has
+  no python3). Now: shared host bind caches `~/.cache/panopticon-devcontainer/{bun,npm}`
+  (survive rebuilds, shared across stacks, _prebuilds cached), one bun-install retry,
+  renderer pre-creates the dirs. **Bonus:** `sanitizeComposeFileSync` was rewriting
+  container-side `/home/node/` mount targets to `${HOME}` — this had silently broken the
+  PAN-1619 `.codex` bridge in every rendered workspace; fixed + locked by a renderer test.
+  Live-verified on PAN-1709's stack: init exit 0, caches warm (1.6G bun;
+  better-sqlite3-v12.10.0-linuxmusl in _prebuilds).
+- **Beads-422 "no beads tasks":** confirmed all six active workspaces have
+  `.beads/issues.jsonl`; the 422s are the PAN-1629 bd-list lock race (misleading error),
+  whose fix is PAN-1629's own in-review PR. No separate action.
+- **Repairs applied:** pan-1629 + pan-1704 server containers restarted (`docker start`);
+  both stacks healthy again. PAN-1709's stack rebuilt and fully up (its work agent
+  continues on --host, unaffected). The flywheel's deliberate slot-release pauses on
+  agent-pan-1629 / agent-pan-1704 were left in place.
+
+## RUN-22 tick 1 (2026-06-11, post-reboot) — full fleet self-recovery observed; PAN-1765 churn live again
+
+**RUN-21 was a zero-tick reboot casualty** (same as RUN-19) — host rebooted
+~06:36Z, RUN-22 replaced it at 06:50Z. Re-baseline notes:
+
+- **Post-reboot self-recovery now works END-TO-END.** Startup recovery reset 9
+  orphans (06:37:18), then the next patrol (06:53:18) resumed work-1709 and the
+  deacon re-dispatched the PAN-1704 + PAN-1747 review convoys and PAN-1744 ship
+  within 90 seconds — 13 sessions live, zero hand-holding. Contrast RUN-20
+  tick 1 where the orchestrator had to drive part of it. The resume-decision
+  logic read correctly: 1686 skipped (completed marker + review/test passed),
+  1747 skipped (pipeline mid-flight), paused agents respected.
+- **WATCH: 16-minute patrol gap** between the startup patrol (06:37:18) and the
+  next (06:53:18) — contract is every 60s. Recovered alone; if it recurs, file
+  with both timestamps.
+- **PAN-1746's closed-issue gate confirmed live post-reboot:** repeated
+  `[deacon] PAN-1190: skipping review/test re-dispatch — issue is closed`
+  where the old code would have spawned a $HOME-wedged ship.
+- **awaitingUat = 0 for the first time across all runs** — the RUN-11-era
+  20-deep verifying-on-main backlog is fully drained (label count zero).
+  PAN-1686 is the lone gate item (ready_for_merge=1).
+- **PAN-1765 churn reproduced live:** PAN-1747 carries an unresolved
+  merge_conflict blocker (02:33Z) yet a full 5-session review convoy
+  re-dispatched on it post-reboot — doomed verdict. Launched
+  `pan plan PAN-1765 --auto` (the conflict-gates-review fix). Held
+  main-landing strikes while PAN-1686 sits at the gate (churn-hold rule);
+  plan→work pipeline is churn-safe (feature branches don't move main).
+- **Multi-channel:** operator conv sessions are landing PAN-1768 fixes
+  directly (63c7f0eba, d6077ea34) — do not launch on PAN-1768. PAN-1488's
+  spec flipped to active (0664f1337) with no agent session — likely the conv
+  session exercising the fixed transitionVBriefOnMain; flagged as
+  investigate-if-it-persists.
+- **Drain-cluster question surfaced:** PAN-1642/1641/1242/1491 still paused
+  under "Operator drain 2026-06-10 (PAN-1737 session)" with review=passed
+  test=failed. The drain context (UAT batch) is over; needs operator
+  unpause-or-close. PAN-1658 likewise awaits close-as-superseded.
+- Minor noise: stale completion marker for PAN-714 retries review trigger on a
+  nonexistent workspace (bounded, 3 attempts); host-test fixture agents
+  (agent-pan-resume-*, agent-pan-kickoff-fail) still get orphan-recovered every
+  patrol pre-reboot (PAN-1702/1720 class).
+
+## RUN-22 operator interlude (2026-06-11 ~07:00-07:30Z) — PAN-1771 stale-blocker sweep: filed→fixed→live in ~30 min
+
+Operator merged UAT batch `uat/pan-flint-0611` (PAN-1686, a8f76b7a4) and asked
+(1) did it merge OK, (2) does merge auto-reload the dashboard, (3) implement if
+not. Then relayed an agent-pan-1704-ship signal (PAN-1699 contract working):
+ship can't run (roles/ship.md absent), PR #1713 green+mergeable, but
+`pan review pending --ready` omits PAN-1704 — "pipeline state needs
+reconciliation rather than a vestigial ship agent."
+
+**Answers established:**
+- Merge-auto-deploy EXISTS and works (PAN-1723, closed): every merge fires
+  `scripts/post-merge-deploy.sh` → pristine origin/main worktree build → dist
+  swap → restart → health check. Verified twice tonight (built sha == merge sha
+  both times). It is postMergeLifecycle, NOT the ship agent, that triggers it.
+- **readyForMerge is EVENT-DRIVEN since PAN-1650** (review-status.ts:268):
+  derived on every status write from review+test+verification+blockers. No ship
+  actor flips it. Ship really is vestigial for the flip (PAN-1747 removes it).
+- **Root cause of 1704's invisibility (PAN-1771, fixed+closed):** GitHub-native
+  blockers (failing_checks/merge_conflict/draft_pr/not_mergeable) were refreshed
+  ONLY by webhooks (refreshMergeStateFromGitHub via PAN-1620). Webhooks missed
+  during server downtime (reboot/deploy) leave stale blockers that pin
+  readyForMerge=false forever under the PAN-1650 derivation. Fix: boot sweep
+  `reconcileStaleGitHubBlockers()` next to fixStuckReadyForMerge(). Live result:
+  8 issues reconciled at boot; PAN-1704 AND PAN-1747 both flipped ready_for_merge=1
+  (1747's 02:33 conflict blocker was also stale); PAN-1491's blocker was
+  re-derived FRESH from live PR state (kept, correctly — it's real).
+
+**Operational learnings:**
+- The deploy lock (/tmp/panopticon-deploy.lock) can read "held" transiently
+  right after a completed deploy — a skipped manual deploy may just need a
+  re-run a few minutes later. No fd leak found (checked /proc/*/fd).
+- Landing a fix when the primary worktree has ANOTHER session's uncommitted
+  source edits: chore-commit .pan state (convention), then
+  `git worktree add --detach /tmp/x origin/main` + cherry-pick + push — never
+  touch the other session's files, never stash. Local main stays diverged until
+  that session commits; **do not `pan reload` while local main is behind origin**
+  (it would build a stale tree) — use the deploy script (pristine origin build)
+  for liveness instead.
+- `pan pause` accepts role-session ids (agent-pan-1704-ship) — used to park the
+  vestigial ship session after its signal (slot release, blocks re-dispatch).
+- commitlint here rejects subjects starting with an uppercase token (RUN-22 →
+  use lowercase); scope enum is [cloister, dashboard, workspace, cli, review,
+  beads, db, specialists, terminal, infra, deps].
+
+## RUN-22 tick 2 (2026-06-11 ~07:50Z) — two at the gate; partial convoys do NOT retro-fill
+
+- **PAN-1709 completed a fully-autonomous pipeline pass within one run**: resumed
+  post-reboot by the deacon at 06:53, review+test+verification all passed,
+  ready_for_merge=1 by 07:44. Joins PAN-1704 at the operator gate. PAN-1686
+  merged (uat/pan-flint-0611) and is verifying-on-main.
+- **Partial convoys do NOT retro-fill.** PAN-1747's re-review convoy dispatched
+  3/5 (governor ceiling bit mid-dispatch, total 10/9); after the jam-break
+  freed 2 slots, the patrol used them for other dispatches (agent-pan-1744
+  resume) — the missing performance/security reviewers were never spawned.
+  Confirms RUN-20 tick 14 ("the other 2 forever deferred"). The atomic
+  all-or-nothing convoy-slot reservation is now a twice-observed gap — file it
+  if seen a third time (or fold into PAN-1765's fix, which gates dispatch).
+- **Sequencing rule: never `pan review restart` while the branch carries a real
+  merge_conflict blocker** — that manufactures the doomed-convoy churn PAN-1765
+  exists to fix. Let the work agent resolve+push first; new-commit detection
+  recycles the convoy (restart only if it doesn't).
+- Jam-break round 2 (official surfaces): paused idle work-1709 (issue at gate)
+  + the agent-pan-resume-redeliver-second FIXTURE session (PAN-1720 pollution,
+  counted as work=1 by the governor — second occurrence of a fixture session
+  eating a real slot). Unpaused work-1744 (its pause condition "while convoy
+  runs" expired — review came back BLOCKED, so the work agent is needed).
+- agent-pan-1491-ship spawned despite the vestigial-ship problem and is
+  actively attempting work (rebase?) rather than refusing — ship behavior
+  varies by agent. PAN-1491 is otherwise fully passed with a GENUINE
+  failing_checks blocker (PAN-1710 boot-surface smoke hang class).
+- PAN-1762 (Swarm v2) spec reached proposed via operator-side planning;
+  surfaced start-permission as an openQuestion rather than auto-starting an
+  operator-owned plan for a major feature.
+
+## RUN-22 tick 3 (2026-06-11 ~08:20Z) — planner stalled pre-finalize; finalize is a host-side surface; webhooks are DOWN
+
+- **`pan plan --auto` has a SECOND stall shape: complete-but-unfinalized.** The
+  PAN-1765 planner (Fable 5) wrote the full design + workspace artifacts
+  (+331/-6, autoDecisions, hazards) then sat at the prompt without running
+  `pan plan finalize` — frozen byte-identical for 25+ min. Distinct from
+  stop-at-proposed (which is post-finalize). **Recovery: `pan plan finalize -w
+  <workspace>` runs host-side** and does the whole chain (beads, spec→proposed,
+  promote to main, work-spawn attempt). Then `pan start <id> --host --yes` if
+  the spawn skips on stack-unhealthy (deacon-code tasks don't need the stack).
+  agent-pan-1765 implementing as of 08:18Z.
+- **Webhook ingress is DOWN since the reboot** — zero webhook lines in
+  dashboard.log since the 03:29 restart, no forwarder process (smee/gh-webhook)
+  running. Consequence observed live: PAN-1747 resolved its conflict, PR #1757
+  went MERGEABLE/CLEAN 6/6, but the merge_conflict blocker stayed stale →
+  ready=0 (the PAN-1771 sweep is boot-only by design). PAN-1765's plan
+  independently includes the fix: a ~10-min reconcile cadence re-verifying
+  blocker-flagged rows. Until that lands, expect in-flight blocker staleness
+  after every webhook gap; each server restart's boot sweep is the interim
+  clearer. Surfaced ingress restoration as an operator question (how is
+  delivery even supposed to arrive on this host?).
+- PAN-1747 is therefore EFFECTIVELY at the gate (passed everything, PR clean,
+  stale blocker only) — suggested merging it in the same batch as 1704/1709;
+  the post-merge deploy boot-sweep clears it automatically.
+- 1744 convoy dispatched 4/5 (security missing) — third partial-convoy
+  sighting, but session-absence isn't dispatch-log proof (a fast reviewer may
+  exit early); held off filing until a convoy provably stalls on a missing
+  reviewer file.
+- Paused agent-pan-1491-ship (idle ctx-0 on a review-blocked, genuinely
+  failing-checks issue).
+
+## RUN-22 tick 4 (2026-06-11 ~08:40Z) — gate drained: 3 merges in one batch; convoy self-recycled
+
+- **PAN-1704 + PAN-1709 + PAN-1747 all merged 08:26Z** (run total: 4 PRs incl.
+  1686). Notably the batch took PAN-1747 DESPITE its stale merge_conflict
+  blocker — the train/operator path is not gated on blockerReasons, only the
+  flywheel's ready surface is. The ship-role removal (1747) is now live: expect
+  no more vestigial ship spawns after the next reload; if ship sessions still
+  appear, that's a regression to flag.
+- **The 4/5 partial convoy did NOT permanently stall this time** — PAN-1744's
+  convoy was recycled to a full 5/5 by the pipeline itself (~04:34, after its
+  work agent pushed feedback fixes). So partial-convoy is self-healing WHEN new
+  commits arrive (checkPostReviewCommits recycles); it only deadlocks when the
+  branch is quiescent (RUN-20 tick 14 case). Refines the file-on-third-sighting
+  rule: only file if a partial convoy stalls on a QUIESCENT branch.
+- **Host work agents leak fixture sessions**: agent-pan-1765 (--host) running
+  the test suite spawned agent-pan-resume-confirmed on the real tmux socket
+  (PAN-1720 class, 2nd leak tonight). Pattern: every --host work agent that
+  runs `npm test` will do this; pause the fixtures as they appear and keep
+  PAN-1720 alive as the root fix.
+- work-1765 at ctx 89% + gpt-5.5 5h window 100% — double wedge-watch, brake is
+  the net. Inspections passing (bead flow working).
+
+## RUN-22 ticks 5-6 (2026-06-11 ~09:00-09:20Z) — full tilt: 1744 ready, drain cluster fully revived
+
+- **PAN-1744 reached ready_for_merge=1** (09:05Z) — 5th issue to the gate this
+  run. The earlier partial convoys on it self-recycled; no permanent stall.
+- **PAN-1675 compact brake: 3rd production save** — work-1765 hit ctx 100%
+  mid-implementation and was recovered with diff preserved (+1035/-67), then
+  continued. gpt-5.5's 5h usage window also reset mid-task. WATCH: tick 6 shows
+  cost +$10 with a STATIC diff — if that repeats, it's compact-thrash
+  (PAN-1672 shape) and the salvage is pan handoff, not resume.
+- **Operator revived the entire drain cluster** (~08:47-09:01): 1242/1491/1641
+  unpaused, then 1642 and 1579 too. All five re-cycling through review convoys.
+  A new session type appeared: agent-pan-1641-e2e-prompt (e2e prompt runner).
+- **Zero vestigial ship spawns since PAN-1747's removal merged+deployed** — the
+  ship-role retirement is holding in production.
+- **Shared-worktree race lesson:** when a conv session is live-iterating a
+  source file on the primary worktree, the chore-commit+rebase reconcile loses
+  the race repeatedly (3 attempts, file re-dirtied within seconds each time).
+  Stop racing: land flywheel docs via the detached-worktree cherry-pick, leave
+  divergence for the conv session's own completion push, keep `pan reload`
+  off-limits meanwhile (deploys build pristine origin so production is safe).
+
+## RUN-20 tick 17 (2026-06-11) — PAN-1765: the bulk-reset mystery solved
+
+PAN-1747 status_history gave the smoking gun: review+test PASSED 05:29, both
+reset to pending 05:31:56, with a merge_conflict blocker from 02:33 never
+resolved in between. The pipeline reviews conflict-flagged branches (doomed
+verdicts), instead of gating review on conflict resolution. RUN-18's
+"bulk reset at 01:08, unexplained" = this signature. Filed PAN-1765 with the
+timeline. Tonight's cost: 1686/1704/1747 × ~3 convoy cycles each. The faster
+main moves (good night for fixes!), the worse this burns — it's the next
+keystone after the gate drained.

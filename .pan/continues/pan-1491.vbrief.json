@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-06T08:48:30.045Z",
-  "updated": "2026-06-09T23:11:55.029Z",
+  "updated": "2026-06-11T13:25:42.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -129,15 +129,62 @@
       "reason": "feedback",
       "note": "[2026-06-09T23:11Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-06-09T23:11:55.028Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-09T23:25Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-09T23:25:56.473Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T19:11:48.901Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T07:59:57.693Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T08:47:25.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:53Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T08:53:41.730Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:00Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:00:53.829Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T09:17:20.125Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:00:32.865Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:13Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T13:13:22.458Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:19Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-11T13:19:50.672Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:25:42.269Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-06-09T23:11:55Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1491 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - roles/flywheel.md\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1491 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ]
+  "feedback": []
 }

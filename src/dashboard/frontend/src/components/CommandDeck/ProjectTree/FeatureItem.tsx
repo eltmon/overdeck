@@ -9,7 +9,7 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';
-import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
 import {
   ContextMenuRoot,
@@ -22,6 +22,8 @@ import {
 } from '../../shared/ContextMenu';
 import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
+import { useQuery } from '@tanstack/react-query';
+import { MergeButton } from '../../MergeButton';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -39,6 +41,7 @@ interface FeatureItemProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -50,14 +53,11 @@ interface FeatureItemProps {
 
 // ContextMenuState removed — migrated to Radix UI ContextMenu
 
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
 
-function resourceColor(feature: ProjectFeature): string {
-  const state = feature.stateLabel.toLowerCase();
-  if (state.includes('closed') || state.includes('done')) return 'var(--muted-foreground)';
-  if (state.includes('review')) return 'var(--primary)';
-  if (state.includes('progress')) return 'var(--success)';
-  if (state.includes('suspend')) return 'var(--warning)';
+function resourceColor(_feature: ProjectFeature): string {
+  // v1.2 color restraint: resources are infrastructure facts, not status —
+  // always neutral. Exceptional states (CI failing) color individual chips.
   return 'var(--muted-foreground)';
 }
 
@@ -93,6 +93,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
         : null;
     case 'docker':
       return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
+    case 'remote-agent':
+      return details.remoteAgent ? { label: 'fly.io', detail: `${details.remoteAgent.vmName} (${details.remoteAgent.status})` } : null;
     default:
       return null;
   }
@@ -117,8 +119,9 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
             : source === 'pr' ? <Workflow {...props} />
               : <Container {...props} />;
   return (
-    <span className={styles.featureResourceIcon} title={`${summary.label}: ${summary.detail}`}>
+    <span className={styles.featureResourceChip} title={`${summary.label}: ${summary.detail}`}>
       {icon}
+      <span>{source === 'pr' ? summary.detail.split(' ')[0] : source === 'branch' ? `branch ${summary.detail}` : source === 'docker' ? `stack ${summary.detail.split(' ')[0]}` : summary.label}</span>
     </span>
   );
 }
@@ -196,6 +199,10 @@ function ResourceStrip({
       rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
     }
 
+    if (details.remoteAgent) {
+      rows.push({ key: 'remote-agent', label: `fly.io: ${details.remoteAgent.vmName} · ${details.remoteAgent.status} · ${details.remoteAgent.model}` });
+    }
+
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
     if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
     for (const pr of identifiers?.prs ?? details.prs) {
@@ -217,7 +224,7 @@ function ResourceStrip({
 
   return (
     <span
-      className={styles.featureResourceStrip}
+      className={`${styles.featureResourceStrip} ${styles.featureResourceLine}`}
       onMouseEnter={() => setPopoverOpen(true)}
       onMouseLeave={() => setPopoverOpen(false)}
       onFocus={() => setPopoverOpen(true)}
@@ -297,6 +304,17 @@ type AggregateBadge =
   | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
   | { key: 'review-error'; label: string; tone: 'error' };
 
+/** Compact age label for the paused badge (PAN-1779): 99h / 3d. */
+function formatPausedAge(pausedAt?: string): string | null {
+  if (!pausedAt) return null;
+  const ms = Date.now() - new Date(pausedAt).getTime();
+  if (Number.isNaN(ms) || ms < 0) return null;
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))}m`;
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 function formatRoleList(roles: readonly string[]): string {
   if (roles.length === 0) return '';
   if (roles.length === 1) return roles[0]!;
@@ -342,11 +360,6 @@ function getAggregateActivityState(sessions: readonly SessionNodeType[]): Aggreg
   return 'stopped';
 }
 
-function getActivityDotStatus(state: AggregateActivityState): StatusDotStatus {
-  if (state === 'running') return 'active';
-  if (state === 'queued') return 'waiting';
-  return 'ended';
-}
 
 function buildActivitySummary(sessions: readonly SessionNodeType[]): string {
   if (sessions.length === 0) return 'No sessions';
@@ -750,6 +763,7 @@ function ReviewGroup({
   onViewTerminal,
   onPauseSession,
   onResumeSession,
+  onUnpauseSession,
   onRestartSession,
   onDeepWipe,
   onOpenStateDir,
@@ -764,17 +778,29 @@ function ReviewGroup({
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  // Collapsed by default (PAN-1779): the convoy reads as one summary line —
+  // expand only when you need per-reviewer detail.
+  const [expanded, setExpanded] = useState(false);
+
+  const errorCount = children.filter((s) => s.status === 'error').length;
+  const liveCount = children.filter((s) => s.status === 'running' || s.status === 'starting').length;
+  const summary = children.length === 0
+    ? undefined
+    : `${children.length} reviewer${children.length === 1 ? '' : 's'}${
+        errorCount > 0 ? ` · ${errorCount} error` : liveCount > 0 ? ` · ${liveCount} running` : ' · clean'
+      }`;
 
   return (
     <div>
       <SessionNode
         session={parent}
+        subtitle={summary}
         issueId={issueId}
         isSelected={selectedSessionId === parent.sessionId}
         onClick={() => onSelectSession?.(issueId, parent.sessionId)}
@@ -782,6 +808,7 @@ function ReviewGroup({
         onViewTerminal={onViewTerminal}
         onPauseSession={onPauseSession}
         onResumeSession={onResumeSession}
+        onUnpauseSession={onUnpauseSession}
         onRestartSession={onRestartSession}
         onDeepWipe={onDeepWipe}
         onOpenStateDir={onOpenStateDir}
@@ -803,6 +830,7 @@ function ReviewGroup({
               onViewTerminal={onViewTerminal}
               onPauseSession={onPauseSession}
               onResumeSession={onResumeSession}
+              onUnpauseSession={onUnpauseSession}
               onRestartSession={onRestartSession}
               onDeepWipe={onDeepWipe}
               onOpenStateDir={onOpenStateDir}
@@ -815,7 +843,80 @@ function ReviewGroup({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
+interface UatTrainBadgeInfo { name: string; status: string; order: number; total: number }
+
+/** Merge-train membership for the train chip (PAN-1779). One shared query —
+ *  react-query dedupes across all FeatureItem instances. */
+function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
+  const { data } = useQuery({
+    queryKey: ['uat-generations'],
+    queryFn: async () => {
+      const res = await fetch('/api/flywheel/uat-generations');
+      if (!res.ok) return [];
+      return res.json() as Promise<Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }>>;
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  return useMemo(() => {
+    const map = new Map<string, UatTrainBadgeInfo>();
+    const generations = Array.isArray(data) ? data : [];
+    for (const gen of generations) {
+      const members = gen.members ?? [];
+      for (const member of members) {
+        const key = member.issueId.toUpperCase();
+        if (!map.has(key)) map.set(key, { name: gen.name, status: gen.status, order: member.mergeOrder, total: members.length });
+      }
+    }
+    return map;
+  }, [data]);
+}
+
+type PipeSegState = 'none' | 'done' | 'working' | 'paused' | 'error' | 'merged';
+const PIPE_ORDER = ['planning', 'work', 'review', 'test', 'ship'] as const;
+
+/** Per-issue plan→work→review→test→ship strip. Earlier phases read done;
+ *  only the live phase carries a signal color (v1.2 color restraint). */
+export function derivePipeline(feature: ProjectFeature, sessions: readonly SessionNodeType[]): PipeSegState[] {
+  const isDone = feature.stateLabel.toLowerCase().includes('done');
+  if (isDone) return ['done', 'done', 'done', 'done', 'merged'];
+
+  const byPhase = PIPE_ORDER.map((phase) =>
+    sessions.filter((s) => s.type === phase || (phase === 'planning' && s.type === 'legacy') || (phase === 'review' && s.type === 'reviewer')),
+  );
+  if (feature.hasPlanning && byPhase[0].length === 0) {
+    byPhase[0] = [{ status: 'stopped' } as SessionNodeType];
+  }
+  let lastIdx = -1;
+  for (let i = 0; i < byPhase.length; i++) {
+    if (byPhase[i].length > 0) lastIdx = i;
+  }
+  if (feature.readyForMerge) lastIdx = 4;
+
+  return PIPE_ORDER.map((_, i) => {
+    if (lastIdx === -1) return 'none';
+    if (i < lastIdx) return 'done';
+    if (i > lastIdx) return 'none';
+    if (feature.readyForMerge && i === 4) return 'done';
+    const phaseSessions = byPhase[i];
+    if (phaseSessions.length === 0) return 'done';
+    if (phaseSessions.some((s) => s.paused === true)) return 'paused';
+    if (phaseSessions.some((s) => s.status === 'error')) return 'error';
+    if (phaseSessions.some((s) => s.status === 'running' || s.status === 'starting')) return 'working';
+    return 'done';
+  });
+}
+
+const PIPE_CLASS: Record<PipeSegState, string> = {
+  none: '',
+  done: 'pipeDone',
+  working: 'pipeWorking',
+  paused: 'pipePaused',
+  error: 'pipeError',
+  merged: 'pipeMerged',
+};
+
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -857,7 +958,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     feature.resourceDetails.dockerContainerCount > 0 ||
     feature.resourceDetails.prs.length > 0 ||
     feature.resourceDetails.localBranchCount > 0 ||
-    feature.resourceDetails.remoteBranchCount > 0
+    feature.resourceDetails.remoteBranchCount > 0 ||
+    Boolean(feature.resourceDetails.remoteAgent)
   );
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
@@ -880,6 +982,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
+  // PAN-1779: surface the pause gate at the issue level — paused agents are
+  // deliberately parked and must never read as generic "stopped".
+  const pausedSession = feature.sessions?.find((s) => s.paused === true);
+  const pausedAge = formatPausedAge(pausedSession?.pausedAt);
+
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
   const activitySummary = buildActivitySummary(aggregateSessions);
@@ -890,6 +997,30 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const dominantStatus = feature.sessions && feature.sessions.length > 0
     ? computeDominantStatus(feature.sessions)
     : null;
+
+  // PAN-1779 redesign: the wrapper edge bar is the row's one colored signal.
+  // Priority: error (red) > paused/ready (amber human gates) > done (emerald)
+  // > working (blue machine activity).
+  const isDoneState = feature.stateLabel.toLowerCase().includes('done');
+  const hasErrorSession = aggregateSessions.some(isErrorSession);
+  const hasRunningSession = aggregateSessions.some(isRunningSession);
+  const edgeClass = (hasErrorSession
+    ? styles.featureItemWrapperError
+    : pausedSession
+      ? styles.featureItemWrapperPaused
+      : feature.readyForMerge
+        ? styles.featureItemWrapperReady
+        : isDoneState
+          ? styles.featureItemWrapperMerged
+          : hasRunningSession
+            ? styles.featureItemWrapperWorking
+            : '') ?? '';
+
+  const pipeline = useMemo(
+    () => derivePipeline(feature, feature.sessions ?? []),
+    [feature],
+  );
+  const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
 
   // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
@@ -917,7 +1048,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   return (
     <ContextMenuRoot>
       <div
-        className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
@@ -939,23 +1070,23 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
               onClick={handleRowClick}
             >
-          <span className={styles.featureStatus}>
+          <span className={styles.featureTitleLine}>
             {feature.isShadow ? (
-              <Eye size={14} style={{ color: 'var(--primary)' }} />
+              <span className={styles.featureStatus}><Eye size={14} style={{ color: 'var(--primary)' }} /></span>
             ) : feature.isRally ? (
-              <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
-            ) : aggregateSessions.length > 0 ? (
-              <StatusDot status={getActivityDotStatus(activityState)} title={activitySummary} className={activityState === 'error' ? styles.featureActivityError : undefined} />
-            ) : dominantStatus ? (
-              <StatusDot status={dominantStatus} title={activitySummary} />
-            ) : (
-              <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} readyForMerge={feature.readyForMerge} />
+              <span className={styles.featureStatus}>
+                <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
+              </span>
+            ) : null}
+            <span className={styles.featureId_sidebar} title={activitySummary}>{feature.issueId}</span>
+            <span className={titleClassName} title={displayTitle}>
+              {displayTitle}
+            </span>
+            {cost !== undefined && cost > 0 && (
+              <span className={styles.featureCost}>{formatCost(cost)}</span>
             )}
           </span>
-          <span className={styles.featureId_sidebar}>{feature.issueId}</span>
-          <span className={titleClassName} title={displayTitle}>
-            {displayTitle}
-          </span>
+          <span className={styles.featureMetaLine}>
           {!feature.isRally && aggregateBadges.length > 0 && (
             <span className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
@@ -967,6 +1098,29 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   {badge.label}
                 </span>
               ))}
+            </span>
+          )}
+          {pausedSession && (
+            <span className={styles.featureBadgeGroup} data-testid="feature-paused">
+              <span
+                className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
+                title={pausedSession.pausedReason ? `Paused: ${pausedSession.pausedReason}` : 'Agent is paused'}
+              >
+                ⏸ Paused{pausedAge ? ` ${pausedAge}` : ''}
+              </span>
+              {onUnpauseSession && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  data-testid="feature-unpause"
+                  className={styles.unpauseBtn}
+                  title={pausedSession.pausedReason ? `Unpause — paused: ${pausedSession.pausedReason}` : 'Unpause this agent'}
+                  onClick={(e) => { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); } }}
+                >
+                  ▶ Unpause
+                </span>
+              )}
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
@@ -1001,13 +1155,42 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               {feature.stateLabel}
             </span>
           )}
-          {cost !== undefined && cost > 0 && (
-            <span className={styles.featureCost}>{formatCost(cost)}</span>
+          {feature.readyForMerge && !pausedSession && (
+            <span
+              className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
+              data-testid="feature-ready"
+              title="All gates passed — awaiting your merge"
+            >
+              Ready · awaiting merge
+            </span>
           )}
+          {feature.readyForMerge && (
+            <MergeButton
+              issueId={feature.issueId}
+              variant="card"
+              reviewStatus={{ readyForMerge: true }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+          {trainInfo && (
+            <span
+              className={`${styles.featureBadge} ${styles.featureBadge_stopped}`}
+              data-testid="feature-train"
+              title={`Merge train ${trainInfo.name} (${trainInfo.status}) — position ${trainInfo.order} of ${trainInfo.total}`}
+            >
+              🚆 {trainInfo.name} · {trainInfo.order}/{trainInfo.total}
+            </span>
+          )}
+          <span className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+            {pipeline.map((seg, i) => (
+              <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
+            ))}
+          </span>
+          </span>
         </button>
       </ContextMenuTrigger>
-      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
       </div>
+      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
@@ -1034,6 +1217,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                         onViewTerminal={onViewTerminal}
                         onPauseSession={onPauseSession}
                         onResumeSession={onResumeSession}
+                        onUnpauseSession={onUnpauseSession}
                         onRestartSession={onRestartSession}
                         onDeepWipe={onDeepWipe}
                         onOpenStateDir={onOpenStateDir}
@@ -1052,6 +1236,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                       onViewTerminal={onViewTerminal}
                       onPauseSession={onPauseSession}
                       onResumeSession={onResumeSession}
+                      onUnpauseSession={onUnpauseSession}
                       onRestartSession={onRestartSession}
                       onDeepWipe={onDeepWipe}
                       onOpenStateDir={onOpenStateDir}

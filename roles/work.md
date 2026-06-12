@@ -57,11 +57,11 @@ For every bead:
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
 5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory).
-6. Re-read this bead's metadata in `.pan/spec.vbrief.json` after the commit.
-7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. Fix any blocked finding with a new commit before closing the bead.
-10. `bd close <bead-id> --reason="…"`.
+6. `bd close <bead-id> --reason="…"`.
+7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+9. If `metadata.requiresInspection === false`, skip inspection and continue.
+10. On `INSPECTION BLOCKED`: fix with a new commit, `bd close` again, then re-run the same inspection.
 11. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
@@ -147,6 +147,8 @@ The work role does not choose models for these gates. The selected `pan inspect`
 
 ## Completion
 
+Summaries lead with anomalies and deviations — never bury them after the wins.
+
 When all beads are closed and the tree is clean:
 
 ```bash
@@ -156,6 +158,18 @@ pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
 `pan done` opens the PR and triggers the review pipeline. Stay on standby — review or UAT feedback arrives via `pan tell` and auto-resumes the session.
+
+## Signal the flywheel before you stall
+
+If you are about to **stop short of your deliverable** — self-abort, refuse to fix-forward an orthogonal failure, decide the work needs a different path, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park:
+
+```bash
+pan tell flywheel-orchestrator "work <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
+```
+
+Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+
+The four push-back shapes that require this signal: **self-abort** (the work can't or shouldn't proceed as scoped), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing).
 
 ## Boundaries
 

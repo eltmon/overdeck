@@ -32,7 +32,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -210,10 +210,6 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
-export function buildTtsAutosavePayload(latest: SettingsConfig, tts: TtsConfig): SettingsConfig {
-  return { ...latest, tts };
-}
-
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
   // workhorses + roles via their own PUTs. SettingsPage's parent formData is
@@ -245,6 +241,24 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
         : {}),
       ...(settings.conversations?.title_model !== undefined
         ? { title_model: settings.conversations.title_model }
+        : {}),
+      // Background AI section edits these through the parent too; the embedding
+      // card syncs its own saves back into parent formData, so the parent's
+      // values are never stale for them (PAN-1589).
+      ...(settings.conversations?.enrichment !== undefined
+        ? { enrichment: settings.conversations.enrichment }
+        : {}),
+      ...(settings.conversations?.embeddings !== undefined
+        ? { embeddings: settings.conversations.embeddings }
+        : {}),
+      ...(settings.conversations?.embedding_provider !== undefined
+        ? { embedding_provider: settings.conversations.embedding_provider }
+        : {}),
+      ...(settings.conversations?.embedding_model !== undefined
+        ? { embedding_model: settings.conversations.embedding_model }
+        : {}),
+      ...(settings.conversations?.embedding_auto_on_deep !== undefined
+        ? { embedding_auto_on_deep: settings.conversations.embedding_auto_on_deep }
         : {}),
     };
     merged = {
@@ -438,7 +452,17 @@ const TTS_EVENT_KEYS = [
   'readyForMerge',
 ] as const;
 
-const TTS_AUTOSAVE_DEBOUNCE_MS = 400;
+/**
+ * Debounce window for autosaves driven by high-frequency inputs (text fields,
+ * sliders). Click-style controls (toggles, selects, radios) save immediately.
+ */
+const AUTOSAVE_DEBOUNCE_MS = 600;
+
+/** One pending autosave: the full settings + voice payload, latest-wins. */
+interface AutosavePayload {
+  settings: SettingsConfig;
+  voiceSettings: VoiceSettings;
+}
 
 const ACTIVITY_SOURCE_OPTIONS = [
   'merge-agent',
@@ -582,9 +606,16 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('model-routing');
   const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-  const pendingTtsSaveRef = useRef<TtsConfig | null>(null);
-  const ttsSaveInFlightRef = useRef(false);
-  const ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Autosave pipeline ───────────────────────────────────────────────────────
+  // Every control persists on change through one serialized latest-wins queue:
+  // rapid edits collapse into the newest snapshot, saves never overlap, and
+  // text inputs debounce so half-typed values don't hit the server.
+  const pendingSaveRef = useRef<AutosavePayload | null>(null);
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaveOkRef = useRef(true);
+  const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -771,7 +802,7 @@ export function SettingsPage() {
       if (settings.deprecation_warnings && settings.deprecation_warnings.length > 0) {
         const count = settings.deprecation_warnings.length;
         toast.warning(
-          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Save" to migrate automatically.`,
+          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Migrate now" in the Settings banner to update them.`,
           { duration: 10000 }
         );
       }
@@ -788,42 +819,80 @@ export function SettingsPage() {
     window.localStorage.setItem(VOICE_HARDWARE_STORAGE_KEY, JSON.stringify(voiceHardwareSettings));
   }, [voiceHardwareSettings]);
 
-  const saveMutation = useMutation({
-    mutationFn: async ({
-      settings: nextSettings,
-      voiceSettings: nextVoiceSettings,
-    }: {
-      settings: SettingsConfig;
-      voiceSettings: VoiceSettings;
-    }) => {
-      const [response, savedVoiceSettings] = await Promise.all([
-        saveSettings(nextSettings),
-        saveVoiceSettings(nextVoiceSettings),
-      ]);
-      return { response, savedVoiceSettings };
-    },
-    onSuccess: ({ response, savedVoiceSettings }) => {
-      invalidateAvailableModelsCache();
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
-      queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
-      queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
-      setVoiceFormData(savedVoiceSettings);
-
-      // Show success toast
-      toast.success('Settings saved successfully');
-
-      // Show warnings if present
-      if (response.warnings && response.warnings.length > 0) {
-        response.warnings.forEach((warning) => {
-          toast.warning(warning, { duration: 8000 });
-        });
+  // Drain the autosave queue: one save in flight at a time, always taking the
+  // newest pending snapshot. Returns the in-flight drain so callers can await
+  // a flush (e.g. before triggering a paid reindex).
+  const drainSaveQueue = useCallback((): Promise<void> => {
+    if (saveInFlightRef.current) return saveInFlightRef.current;
+    const run = (async () => {
+      while (pendingSaveRef.current) {
+        const snapshot = pendingSaveRef.current;
+        pendingSaveRef.current = null;
+        setSaveStatus('saving');
+        try {
+          const [response, savedVoiceSettings] = await Promise.all([
+            saveSettings(snapshot.settings),
+            saveVoiceSettings(snapshot.voiceSettings),
+          ]);
+          lastSaveOkRef.current = true;
+          invalidateAvailableModelsCache();
+          queryClient.invalidateQueries({ queryKey: ['settings'] });
+          queryClient.invalidateQueries({ queryKey: ['conversation-search-status'] });
+          queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
+          queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
+          if (response.warnings && response.warnings.length > 0) {
+            response.warnings.forEach((warning) => {
+              toast.warning(warning, { duration: 8000 });
+            });
+          }
+          setSaveStatus('saved');
+          if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+          savedStatusResetRef.current = setTimeout(() => {
+            savedStatusResetRef.current = null;
+            setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
+          }, 2500);
+        } catch (error) {
+          lastSaveOkRef.current = false;
+          setSaveStatus('error');
+          toast.error(`Failed to save settings: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to save settings: ${error.message}`);
-    },
-  });
+    })();
+    saveInFlightRef.current = run.finally(() => {
+      saveInFlightRef.current = null;
+    });
+    return saveInFlightRef.current;
+  }, [queryClient]);
+
+  // Schedule an autosave of the given snapshot. Click-style controls save
+  // immediately; text inputs and sliders pass debounce to wait for typing to
+  // pause. A newer schedule always supersedes the pending snapshot.
+  const scheduleAutosave = useCallback((payload: AutosavePayload, opts: { debounce?: boolean } = {}) => {
+    pendingSaveRef.current = payload;
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+    if (opts.debounce) {
+      saveDebounceRef.current = setTimeout(() => {
+        saveDebounceRef.current = null;
+        void drainSaveQueue();
+      }, AUTOSAVE_DEBOUNCE_MS);
+    } else {
+      void drainSaveQueue();
+    }
+  }, [drainSaveQueue]);
+
+  // Force any pending (possibly debounced) save through and report whether the
+  // final save succeeded. Used by flows that must persist before acting.
+  const flushAutosave = useCallback(async (): Promise<boolean> => {
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+    }
+    await drainSaveQueue();
+    return lastSaveOkRef.current;
+  }, [drainSaveQueue]);
 
   const conversationSearchReindexMutation = useMutation({
     mutationFn: reindexConversationSearch,
@@ -893,19 +962,19 @@ export function SettingsPage() {
     if (kind === 'model' && newModel) {
       if (!formData || !voiceFormData) return;
       setReindexConfirmBusy(true);
-      try {
-        const next: SettingsConfig = {
-          ...formData,
-          conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
-        };
-        setFormData(next);
-        await saveMutation.mutateAsync({ settings: next, voiceSettings: voiceFormData });
-        conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
-      } catch {
-        // saveMutation surfaces its own error toast; leave the modal open to retry.
+      const next: SettingsConfig = {
+        ...formData,
+        conversationSearch: { ...(formData.conversationSearch ?? {}), model: newModel },
+      };
+      setFormData(next);
+      scheduleAutosave({ settings: next, voiceSettings: voiceFormData });
+      const saved = await flushAutosave();
+      if (!saved) {
+        // The autosave pipeline surfaces its own error toast; leave the modal open to retry.
         setReindexConfirmBusy(false);
         return;
       }
+      conversationSearchReindexMutation.mutate(estimate.confirmationNonce);
       setReindexConfirmBusy(false);
       setReindexConfirm(null);
       return;
@@ -926,52 +995,16 @@ export function SettingsPage() {
     },
   });
 
-  const queueTtsSave = useCallback((next: TtsConfig) => {
-    pendingTtsSaveRef.current = next;
-    if (ttsSaveInFlightRef.current) return;
-
-    ttsSaveInFlightRef.current = true;
-    void (async () => {
-      while (true) {
-        const snapshot = pendingTtsSaveRef.current;
-        if (!snapshot) {
-          ttsSaveInFlightRef.current = false;
-          return;
-        }
-
-        pendingTtsSaveRef.current = null;
-        try {
-          const latest = await fetchSettings();
-          await saveSettings(buildTtsAutosavePayload(latest, snapshot));
-        } catch {
-          void 0;
-        }
-      }
-    })();
-  }, []);
-
-  const scheduleTtsSave = useCallback((next: TtsConfig, debounce = false) => {
-    if (ttsSaveDebounceRef.current) {
-      clearTimeout(ttsSaveDebounceRef.current);
-      ttsSaveDebounceRef.current = null;
-    }
-
-    if (!debounce) {
-      queueTtsSave(next);
-      return;
-    }
-
-    pendingTtsSaveRef.current = next;
-    ttsSaveDebounceRef.current = setTimeout(() => {
-      ttsSaveDebounceRef.current = null;
-      const snapshot = pendingTtsSaveRef.current;
-      if (snapshot) queueTtsSave(snapshot);
-    }, TTS_AUTOSAVE_DEBOUNCE_MS);
-  }, [queueTtsSave]);
-
+  // On unmount, flush any debounced edit immediately so navigating away
+  // doesn't drop the last change (the fetch survives SPA navigation).
   useEffect(() => () => {
-    if (ttsSaveDebounceRef.current) clearTimeout(ttsSaveDebounceRef.current);
-  }, []);
+    if (saveDebounceRef.current) {
+      clearTimeout(saveDebounceRef.current);
+      saveDebounceRef.current = null;
+      void drainSaveQueue();
+    }
+    if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+  }, [drainSaveQueue]);
 
   // Shared chat-model <option> list (same catalog as the Conversations selects).
   // MUST be declared before the early returns below — it's a hook (PAN-1597 fix:
@@ -1006,15 +1039,24 @@ export function SettingsPage() {
     );
   }
 
-  const hasSettingsChanges = JSON.stringify(formData) !== JSON.stringify(settings);
-  const hasVoiceSettingsChanges = JSON.stringify(voiceFormData) !== JSON.stringify(voiceSettings);
-  const hasChanges = hasSettingsChanges || hasVoiceSettingsChanges;
   const conversationSearch = formData.conversationSearch ?? {};
   const conversationSearchEnabled = conversationSearch.enabled ?? false;
   const conversationSearchModel = conversationSearch.model ?? 'text-embedding-3-small';
 
+  // Apply a settings patch and autosave it. Pass debounce for text inputs and
+  // sliders; click-style controls save immediately.
+  const applySettings = (next: SettingsConfig, opts: { debounce?: boolean } = {}) => {
+    setFormData(next);
+    scheduleAutosave({ settings: next, voiceSettings: voiceFormData }, opts);
+  };
+
+  const applyVoiceSettings = (next: VoiceSettings, opts: { debounce?: boolean } = {}) => {
+    setVoiceFormData(next);
+    scheduleAutosave({ settings: formData, voiceSettings: next }, opts);
+  };
+
   const handleProviderToggle = (provider: Provider) => {
-    setFormData({
+    applySettings({
       ...formData,
       models: {
         ...formData.models,
@@ -1028,27 +1070,40 @@ export function SettingsPage() {
 
   const handleApiKeyChange = (provider: Provider, key: string) => {
     if (provider === 'anthropic') return;
-    setFormData({
+    applySettings({
       ...formData,
       api_keys: {
         ...formData.api_keys,
         [provider]: key || undefined,
       },
+    }, { debounce: true });
+  };
+
+  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+    applySettings({
+      ...formData,
+      models: {
+        ...formData.models,
+        provider_harnesses: {
+          ...formData.models.provider_harnesses,
+          [provider]: harness,
+        },
+      },
     });
   };
 
   const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
-    setFormData({
+    applySettings({
       ...formData,
       tracker_keys: {
         ...formData.tracker_keys,
         [tracker]: key || undefined,
       },
-    });
+    }, { debounce: true });
   };
 
   const handleTmuxConfigModeChange = (configMode: 'managed' | 'inherit-user') => {
-    setFormData({
+    applySettings({
       ...formData,
       tmux: {
         ...formData.tmux,
@@ -1062,12 +1117,10 @@ export function SettingsPage() {
       ...formData.tts,
       ...patch,
     };
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       tts: nextTts,
-    };
-    setFormData(next);
-    scheduleTtsSave(nextTts, options.debounce === true);
+    }, { debounce: options.debounce === true });
   };
 
   const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {
@@ -1121,7 +1174,7 @@ export function SettingsPage() {
   };
 
   const handleVoiceProviderChange = (provider: VoiceSettings['stt']['provider']) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -1131,7 +1184,7 @@ export function SettingsPage() {
   };
 
   const handleMoonshineModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -1141,7 +1194,7 @@ export function SettingsPage() {
   };
 
   const handleGoogleCloudApiKeyChange = (apiKey: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -1150,11 +1203,11 @@ export function SettingsPage() {
           apiKey,
         },
       },
-    });
+    }, { debounce: true });
   };
 
   const handleGoogleCloudModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       stt: {
         ...voiceFormData.stt,
@@ -1167,7 +1220,7 @@ export function SettingsPage() {
   };
 
   const handleAutoPresoProviderChange = (provider: VoiceSettings['autopreso']['provider']) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       autopreso: {
         ...voiceFormData.autopreso,
@@ -1177,13 +1230,13 @@ export function SettingsPage() {
   };
 
   const handleAutoPresoModelChange = (model: string) => {
-    setVoiceFormData({
+    applyVoiceSettings({
       ...voiceFormData,
       autopreso: {
         ...voiceFormData.autopreso,
         model,
       },
-    });
+    }, { debounce: true });
   };
 
   const handleVoiceHardwareChange = <K extends keyof VoiceHardwareSettings>(
@@ -1196,7 +1249,7 @@ export function SettingsPage() {
     });
   };
   const handleCompactionModelChange = (modelId: ModelId) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1206,7 +1259,7 @@ export function SettingsPage() {
   };
 
   const handleTitleModelChange = (modelId: ModelId) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1216,7 +1269,7 @@ export function SettingsPage() {
   };
 
   const handleManualCompactModeChange = (mode: 'claude-code' | 'panopticon-native') => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1226,7 +1279,7 @@ export function SettingsPage() {
   };
 
   const handleRichCompactionChange = (enabled: boolean) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversations: {
         ...formData.conversations,
@@ -1236,7 +1289,7 @@ export function SettingsPage() {
   };
 
   const handleConversationSearchChange = (patch: Partial<ConversationSearchConfig>) => {
-    setFormData({
+    applySettings({
       ...formData,
       conversationSearch: {
         ...(formData.conversationSearch ?? {}),
@@ -1245,27 +1298,27 @@ export function SettingsPage() {
     });
   };
 
-  const updateMemorySettings = (memory: NonNullable<SettingsConfig['memory']>) => {
-    setFormData({
+  const updateMemorySettings = (memory: NonNullable<SettingsConfig['memory']>, opts: { debounce?: boolean } = {}) => {
+    applySettings({
       ...formData,
       memory: {
         ...formData.memory,
         ...memory,
       },
-    });
+    }, opts);
   };
 
   const handleMemoryNumberChange = (
     key: 'per_day_cost_cap_usd' | 'rollup_pending_threshold' | 'sidebar_refresh_interval_ms' | 'worker_concurrency',
     value: string,
   ) => {
-    updateMemorySettings({ [key]: value === '' ? undefined : Number(value) });
+    updateMemorySettings({ [key]: value === '' ? undefined : Number(value) }, { debounce: true });
   };
 
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
     if (!formData) return;
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       background_ai: {
         cheap_mode: patch.cheap_mode ?? formData.background_ai?.cheap_mode ?? false,
@@ -1274,16 +1327,13 @@ export function SettingsPage() {
           ...patch.features,
         },
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+    });
   };
 
-  // Apply an arbitrary settings patch and persist immediately (used by the
-  // per-feature model pickers in the Background AI section — PAN-1589).
-  const applyBackgroundModelPatch = (next: SettingsConfig) => {
-    setFormData(next);
-    saveMutation.mutate({ settings: next, voiceSettings: voiceFormData });
+  // Apply an arbitrary settings patch and persist (used by the per-feature
+  // model pickers in the Background AI section — PAN-1589).
+  const applyBackgroundModelPatch = (next: SettingsConfig, opts: { debounce?: boolean } = {}) => {
+    applySettings(next, opts);
   };
 
   const bgSelectClass = 'bg-background border border-border rounded-md px-2 py-1 text-[11px] text-foreground focus:ring-1 focus:ring-primary';
@@ -1322,8 +1372,8 @@ export function SettingsPage() {
       case 'memoryExtraction':
       case 'memoryQueryExpansion': {
         const provider = formData?.memory?.provider || 'anthropic';
-        const setMem = (patch: NonNullable<SettingsConfig['memory']>) =>
-          applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } });
+        const setMem = (patch: NonNullable<SettingsConfig['memory']>, opts: { debounce?: boolean } = {}) =>
+          applyBackgroundModelPatch({ ...formData!, memory: { ...formData!.memory, ...patch } }, opts);
         return (
           <div className="flex items-center gap-1">
             <select value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
@@ -1331,7 +1381,7 @@ export function SettingsPage() {
               <option value="cliproxy">cliproxy</option>
             </select>
             <input type="text" value={formData?.memory?.model || ''}
-              onChange={(e) => setMem({ model: e.target.value || undefined })}
+              onChange={(e) => setMem({ model: e.target.value || undefined }, { debounce: true })}
               placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
               className="w-36 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary" />
           </div>
@@ -1370,22 +1420,17 @@ export function SettingsPage() {
   };
 
   const handleClaudeCodeChannelsToggle = (enabled: boolean) => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
   const handleRtkToggle = (enabled: boolean) => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       agents: {
         ...formData.agents,
@@ -1394,16 +1439,11 @@ export function SettingsPage() {
           enabled,
         },
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
   const handleTldrToggle = (enabled: boolean) => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       agents: {
         ...formData.agents,
@@ -1412,37 +1452,27 @@ export function SettingsPage() {
           enabled,
         },
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
   const handlePermissionModeChange = (mode: 'auto' | 'bypass') => {
-    const next: SettingsConfig = {
+    applySettings({
       ...formData,
       claude: {
         ...formData.claude,
         permissionMode: mode,
       },
-    };
-    setFormData(next);
-    saveMutation.mutate({
-      settings: next,
-      voiceSettings: voiceFormData,
     });
   };
 
-
-  const handleSave = () => saveMutation.mutate({
-    settings: formData,
-    voiceSettings: voiceFormData,
-  });
-  const handleReset = () => {
-    setFormData(settings || null);
-    setVoiceFormData(voiceSettings || DEFAULT_VOICE_SETTINGS);
+  const handleCodexPermissionModeChange = (mode: 'read-only' | 'workspace' | 'auto-review' | 'full-access') => {
+    applySettings({
+      ...formData,
+      codex: {
+        ...formData.codex,
+        permissionMode: mode,
+      },
+    });
   };
 
 
@@ -1512,12 +1542,7 @@ export function SettingsPage() {
       header={
         <SettingsHeader
           title="Settings"
-          hasChanges={hasChanges}
-          saving={saveMutation.isPending}
-          saveSuccess={saveMutation.isSuccess}
-          saveError={saveMutation.isError}
-          onSave={handleSave}
-          onReset={handleReset}
+          status={saveStatus}
         />
       }
       sidebar={
@@ -1548,9 +1573,13 @@ export function SettingsPage() {
                   </p>
                 ))}
               </div>
-              <p className="text-muted-foreground text-xs mt-2">
-                Save to migrate automatically.
-              </p>
+              <button
+                type="button"
+                onClick={() => scheduleAutosave({ settings: formData, voiceSettings: voiceFormData })}
+                className="mt-2 px-3 py-1 text-xs font-medium rounded-md bg-warning/20 text-warning hover:bg-warning/30 transition-colors"
+              >
+                Migrate now
+              </button>
             </div>
           </div>
         </div>
@@ -1577,6 +1606,7 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1788,6 +1818,18 @@ export function SettingsPage() {
                         )}
                       </div>
                     )}
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-foreground">Default harness</span>
+                      <select
+                        value={providerHarness}
+                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
+                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                      >
+                        <option value="claude-code">Claude Code</option>
+                        <option value="pi">Pi</option>
+                        <option value="codex">Codex</option>
+                      </select>
+                    </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
                       <div className="flex items-center gap-2">
@@ -1858,7 +1900,19 @@ export function SettingsPage() {
               </div>
             </div>
             {expandedProviders.openrouter && (
-              <div className="px-3 pb-3 pt-0 ml-7">
+              <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">Default harness</span>
+                  <select
+                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
+                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="claude-code">Claude Code</option>
+                    <option value="pi">Pi</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
                   enabled={!!formData.models.providers.openrouter}
@@ -1877,79 +1931,156 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* Permissions — controls what flags get passed to spawned `claude` processes */}
+      {/* Permissions — controls what flags get passed to spawned agents */}
       <section id="permissions" className="py-6 scroll-mt-4">
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-muted-foreground" />
           Permissions
         </h2>
-        <p className="text-xs text-muted-foreground mb-4">
-          How spawned Claude Code and Codex agents are gated. Applies to work agents, specialists,
-          conversations, and remote agents. Override per-invocation with{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
-          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+        <p className="text-xs text-muted-foreground mb-6">
+          How spawned agents are gated, configured per harness. Applies to work agents, specialists,
+          conversations, and remote agents.
         </p>
 
-        <div className="space-y-2">
-          {([
-            {
-              value: 'auto',
-              title: 'Auto (recommended)',
-              flag: '--permission-mode auto',
-              codex: 'Codex: Auto (on-request + workspace-write)',
-              description:
-                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Codex runs in its Auto preset: it works freely inside the workspace but asks before escaping it (e.g. network access). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
-            },
-            {
-              value: 'bypass',
-              title: 'Bypass (yolo)',
-              flag: '--permission-mode bypassPermissions',
-              codex: 'Codex: Full Access (danger-full-access)',
-              description:
-                'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Codex runs in Full Access: no approval prompts, full system + network. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
-            },
-          ] as const).map((opt) => {
-            const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                data-testid={`permission-mode-${opt.value}`}
-                onClick={() => handlePermissionModeChange(opt.value)}
-                disabled={saveMutation.isPending}
-                className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
-                  selected
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-transparent hover:bg-muted/30'
-                }`}
-              >
-                <span
-                  className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    selected ? 'border-primary' : 'border-muted-foreground/40'
+        {/* Claude Code */}
+        <div className="mb-6">
+          <p className="text-xs font-medium text-foreground mb-1">Claude Code</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Override per-invocation with{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
+            <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'auto' as const,
+                title: 'Auto (recommended)',
+                flag: '--permission-mode auto',
+                description:
+                  "Claude Code's built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.",
+              },
+              {
+                value: 'bypass' as const,
+                title: 'Bypass (yolo)',
+                flag: '--permission-mode bypassPermissions',
+                description:
+                  'Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when the classifier interferes with intentionally destructive automation.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`permission-mode-${opt.value}`}
+                  onClick={() => handlePermissionModeChange(opt.value)}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
                   }`}
                 >
-                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-foreground">{opt.title}</span>
-                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      {opt.flag}
-                    </code>
-                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      {opt.codex}
-                    </code>
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                    {opt.description}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Codex */}
+        <div>
+          <p className="text-xs font-medium text-foreground mb-1">Codex</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Applies to Codex TUI conversation sessions. Takes effect on the next resume or new conversation.
+          </p>
+          <div className="space-y-2">
+            {([
+              {
+                value: 'read-only' as const,
+                title: 'Read-only',
+                flag: 'approval_policy=on-request + sandbox=read-only',
+                description:
+                  'Codex can browse files but asks before making any changes or running commands.',
+              },
+              {
+                value: 'workspace' as const,
+                title: 'Workspace',
+                flag: 'approval_policy=on-request + sandbox=workspace-write',
+                description:
+                  'Codex works freely inside the working directory, but asks before going outside it or using the network.',
+              },
+              {
+                value: 'auto-review' as const,
+                title: 'Auto-review (recommended)',
+                flag: 'approvals_reviewer=auto_review + sandbox=workspace-write',
+                description:
+                  'A sub-agent automatically reviews and answers approval requests instead of prompting you. Codex still runs inside the workspace sandbox — the reviewer decides whether to allow escapes.',
+              },
+              {
+                value: 'full-access' as const,
+                title: 'Full access (yolo)',
+                flag: 'approval_policy=never + sandbox=danger-full-access',
+                description:
+                  'No approval prompts — Codex has full filesystem and network access. Use with care.',
+              },
+            ]).map((opt) => {
+              const selected = (formData.codex?.permissionMode ?? 'auto-review') === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  data-testid={`codex-permission-mode-${opt.value}`}
+                  onClick={() => handleCodexPermissionModeChange(opt.value)}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-transparent hover:bg-muted/30'
+                  }`}
+                >
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                      selected ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {opt.flag}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {opt.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -2559,7 +2690,7 @@ export function SettingsPage() {
             <input
               type="text"
               value={formData.memory?.model || ''}
-              onChange={(e) => updateMemorySettings({ model: e.target.value || undefined })}
+              onChange={(e) => updateMemorySettings({ model: e.target.value || undefined }, { debounce: true })}
               placeholder={formData.memory?.provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
               className="w-64 bg-background border border-border rounded-md px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
             />
@@ -2583,7 +2714,7 @@ export function SettingsPage() {
               <input
                 type="text"
                 value={formData.memory?.fallback_model || ''}
-                onChange={(e) => updateMemorySettings({ fallback_model: e.target.value || undefined })}
+                onChange={(e) => updateMemorySettings({ fallback_model: e.target.value || undefined }, { debounce: true })}
                 placeholder="fallback model"
                 className="w-44 bg-background border border-border rounded-md px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
               />
@@ -2849,7 +2980,6 @@ export function SettingsPage() {
             aria-checked={!!ttsConfig.enabled}
             aria-label="Toggle TTS"
             onClick={() => handleTtsConfigChange({ enabled: !ttsConfig.enabled })}
-            disabled={saveMutation.isPending}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
               ttsConfig.enabled ? 'bg-primary' : 'bg-muted'
             }`}
@@ -2895,7 +3025,6 @@ export function SettingsPage() {
             step={0.05}
             value={ttsVolume}
             onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
             className="w-40 accent-primary disabled:opacity-50"
           />
           <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
@@ -2913,7 +3042,6 @@ export function SettingsPage() {
             step={0.1}
             value={ttsRate}
             onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
             className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
           />
         </SettingsRow>
@@ -2928,7 +3056,6 @@ export function SettingsPage() {
             step={1}
             value={ttsMaxChars}
             onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })}
-            disabled={saveMutation.isPending}
             className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
           />
         </SettingsRow>
@@ -2943,7 +3070,6 @@ export function SettingsPage() {
             aria-checked={ttsConfig.dropInfoWhenFull ?? true}
             aria-label="Toggle dropping low-priority TTS when queue is full"
             onClick={() => handleTtsConfigChange({ dropInfoWhenFull: !(ttsConfig.dropInfoWhenFull ?? true) })}
-            disabled={saveMutation.isPending}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
               (ttsConfig.dropInfoWhenFull ?? true) ? 'bg-primary' : 'bg-muted'
             }`}
@@ -2959,7 +3085,6 @@ export function SettingsPage() {
           isLoading={ttsVoicesQuery.isLoading}
           systemVoiceId={ttsConfig.voice}
           statusVoiceId={ttsConfig.statusVoice}
-          disabled={saveMutation.isPending}
           onSetSystemVoice={(voiceId) => handleTtsConfigChange({ voice: voiceId })}
           onSetStatusVoice={(voiceId) => handleTtsConfigChange({ statusVoice: voiceId })}
         />
@@ -3021,7 +3146,6 @@ export function SettingsPage() {
                     <select
                       value={ttsConfig.voiceMap?.[eventKey] ?? ''}
                       onChange={(e) => handleTtsVoiceMapChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
                       aria-label={`Voice for ${eventKey}`}
                       className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
                     >
@@ -3044,7 +3168,6 @@ export function SettingsPage() {
                       type="checkbox"
                       checked={ttsConfig.mutedSources?.includes(source) ?? false}
                       onChange={(e) => handleTtsMutedSourceChange(source, e.target.checked)}
-                      disabled={saveMutation.isPending}
                       className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
                     />
                     <span>{source}</span>
@@ -3062,7 +3185,7 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={handleAddTtsTemplate}
-                  disabled={!canAddTtsTemplate || saveMutation.isPending}
+                  disabled={!canAddTtsTemplate}
                   className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-popover disabled:opacity-50"
                 >
                   Add template
@@ -3079,7 +3202,6 @@ export function SettingsPage() {
                     <select
                       value={eventKey}
                       onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
                       aria-label="Template event key"
                       className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
                     >
@@ -3091,7 +3213,6 @@ export function SettingsPage() {
                       type="text"
                       value={template}
                       onChange={(e) => handleTtsTemplateChange(eventKey, e.target.value)}
-                      disabled={saveMutation.isPending}
                       placeholder="e.g. {issueId} passed review"
                       aria-label={`Template text for ${eventKey}`}
                       className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
@@ -3099,7 +3220,6 @@ export function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveTtsTemplate(eventKey)}
-                      disabled={saveMutation.isPending}
                       className="inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       aria-label={`Remove template for ${eventKey}`}
                     >
@@ -3607,7 +3727,6 @@ export function SettingsPage() {
               aria-label="Enable RTK Bash compression"
               data-testid="experimental-rtk-toggle"
               onClick={() => handleRtkToggle(!formData.agents?.rtk?.enabled)}
-              disabled={saveMutation.isPending}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
                 formData.agents?.rtk?.enabled ? 'bg-primary' : 'bg-muted'
               }`}
@@ -3658,7 +3777,6 @@ export function SettingsPage() {
                 aria-label="Enable TLDR code-aware reads"
                 data-testid="experimental-tldr-toggle"
                 onClick={() => handleTldrToggle(!(formData.agents?.tldr?.enabled ?? true))}
-                disabled={saveMutation.isPending}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
                   (formData.agents?.tldr?.enabled ?? true) ? 'bg-primary' : 'bg-muted'
                 }`}
@@ -3683,7 +3801,6 @@ export function SettingsPage() {
               aria-label="Use Claude Code Channels for prompt delivery (work agents only)"
               data-testid="experimental-claude-code-channels-toggle"
               onClick={() => handleClaudeCodeChannelsToggle(!formData.experimental?.claudeCodeChannels)}
-              disabled={saveMutation.isPending}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
                 formData.experimental?.claudeCodeChannels ? 'bg-primary' : 'bg-muted'
               }`}

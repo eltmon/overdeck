@@ -47,6 +47,12 @@ vi.mock('../../components/flywheel/FlywheelStatsPanel', () => ({
   },
 }));
 
+// Isolate FlywheelPage from the UAT batches card (which has its own queries +
+// useConfirm/DialogProvider dependency) — same pattern as the other rail panes.
+vi.mock('../../components/flywheel/MergeQueueCard', () => ({
+  MergeQueueCard: () => <div data-testid="uat-batches-card">uat batches</div>,
+}));
+
 function renderFlywheelPage(element: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
@@ -144,6 +150,30 @@ describe('FlywheelPage', () => {
     expect(await screen.findByText(/Run paused/)).toBeInTheDocument();
     expect(screen.getByText('pan flywheel resume')).toBeInTheDocument();
     expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
+  });
+
+  it('does not render a stale snapshot when the latest run is paused (no flash-then-vanish)', async () => {
+    // A paused run: /api/flywheel/current is null, but the RPC stream may still
+    // replay the frozen snapshot. The page must NOT treat that as a live run —
+    // otherwise the header + suggestions flash in and then vanish on the next
+    // null. The paused message stays put.
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/flywheel/runs')) return Response.json([{ status: 'paused' }]);
+      return Response.json(null);
+    }));
+
+    renderFlywheelPage(<FlywheelPage />);
+    expect(await screen.findByText(/Run paused/)).toBeInTheDocument();
+
+    // Stale snapshot replays through the subscription — must be ignored.
+    act(() => {
+      mocks.listener?.(status);
+    });
+
+    expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
+    expect(screen.getByText(/Run paused/)).toBeInTheDocument();
+    expect(screen.queryByText(/running · /)).not.toBeInTheDocument();
   });
 
   it('loads Flywheel config, posts partial updates, and updates optimistically', async () => {

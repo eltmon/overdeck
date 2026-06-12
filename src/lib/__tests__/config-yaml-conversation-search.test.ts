@@ -51,6 +51,8 @@ describe('conversationSearch configuration', () => {
     expect(result).toHaveProperty('provider');
     expect(result).toHaveProperty('model');
     expect(result).toHaveProperty('dbPath');
+    // This helper reads the operator's real config, so only assert normalization
+    // invariants here; default values are covered by mergeConfigs({}) above.
     expect(typeof result.enabled).toBe('boolean');
     expect(typeof result.provider).toBe('string');
     expect(typeof result.model).toBe('string');

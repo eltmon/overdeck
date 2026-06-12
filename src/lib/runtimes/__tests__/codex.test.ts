@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout } from '../codex.js'
+import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
@@ -167,14 +167,15 @@ describe('initCodexHome', () => {
     expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
   })
 
-  it('is idempotent — does not overwrite existing config', () => {
+  it('always rewrites config.toml so permission-mode changes apply on resume', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-03')
     initCodexHome(codexDir)
     const { writeFileSync: writeNode, readFileSync: readNode } = require('node:fs')
     writeNode(join(codexDir, 'config.toml'), 'custom-content')
-    initCodexHome(codexDir) // second call — should not overwrite
+    initCodexHome(codexDir, { approvalPolicy: 'explicit' }) // second call — should overwrite with new policy
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
-    expect(config).toBe('custom-content')
+    expect(config).not.toBe('custom-content')
+    expect(config).toContain('approval_policy = "explicit"')
   })
 })
 
@@ -388,3 +389,18 @@ describe('getRuntimeForAgent — codex dispatch', () => {
     expect(rt?.name).toBe('codex')
   })
 })
+
+describe('toCodexSandboxValue (PAN-1799)', () => {
+  it("translates Panopticon's abstract 'workspace' to workspace-write", () => {
+    expect(toCodexSandboxValue('workspace')).toBe('workspace-write');
+  });
+  it('passes through valid codex values unchanged', () => {
+    expect(toCodexSandboxValue('read-only')).toBe('read-only');
+    expect(toCodexSandboxValue('workspace-write')).toBe('workspace-write');
+    expect(toCodexSandboxValue('danger-full-access')).toBe('danger-full-access');
+  });
+  it('defaults undefined and unknown values to workspace-write', () => {
+    expect(toCodexSandboxValue(undefined)).toBe('workspace-write');
+    expect(toCodexSandboxValue('bogus')).toBe('workspace-write');
+  });
+});

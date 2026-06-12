@@ -87,3 +87,80 @@ export function selectTerminalAdvancingSessions(
   }
   return [...kill];
 }
+
+/**
+ * Whether an issue's WORK session is safe to reap (PAN-1726).
+ *
+ * Once the issue has merged, its work agent (`agent-<id>`) has no remaining
+ * work — it sits idle at the prompt yet `countRunningAgents()` still counts it
+ * against the PAN-1665 work ceiling, throttling dispatch for every live issue.
+ * `postMergeLifecycle` pauses + kills it at merge time, but a server restart
+ * mid-lifecycle (PAN-1723) or a deacon read-modify-write race on state.json can
+ * resurrect it. This is the work-role sibling of the advancing reaper above.
+ */
+export function isWorkReapable(status: ReapableStatus): boolean {
+  return status.mergeStatus === 'merged';
+}
+
+/**
+ * Across every issue, the alive WORK sessions whose issue has merged — the
+ * deacon janitor's work-role kill list. Matches only the canonical work session
+ * `agent-<id>` (never the `agent-<id>-<role>` advancing sub-sessions, which the
+ * advancing reaper owns). Exact-name matching against the alive set.
+ */
+export function selectMergedWorkSessions(
+  statuses: Record<string, ReapableStatus>,
+  aliveSessions: readonly string[],
+): string[] {
+  const alive = new Set(aliveSessions);
+  const kill: string[] = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (!isWorkReapable(status)) continue;
+    const session = `agent-${issueId.toLowerCase()}`;
+    if (alive.has(session)) kill.push(session);
+  }
+  return kill;
+}
+
+/**
+ * Whether an issue's WORK session is reapable because it's idle awaiting its
+ * test verdict (PAN-1730).
+ *
+ * Review has passed and test is still pending, so the work agent has already
+ * handed off via `pan done` and now sits idle at its prompt — yet
+ * `countRunningAgents()` keeps counting it against the PAN-1665 work ceiling.
+ * When the work pool alone meets the total ceiling (work=7 advancing=4
+ * total=11/9 observed) `tryReserveAdvancingSlot()` can never admit the test
+ * that would release these agents: a livelock. Reaping returns the work slot
+ * (and RAM).
+ *
+ * This is the status half of the predicate. The idle-duration gate (pane idle
+ * ≥10 min) lives in the deacon caller, which has the runtime state — a pure
+ * status predicate cannot see it. Unlike `isWorkReapable` (merged), the caller
+ * must NOT pause the agent: if the test later FAILS the deacon's auto-resume
+ * `needsFix` gate has to be free to bring it back to address the feedback.
+ */
+export function isAwaitingTestReapable(status: ReapableStatus): boolean {
+  return status.reviewStatus === 'passed' && status.testStatus === 'pending';
+}
+
+/**
+ * Across every issue, the alive WORK sessions whose review passed but whose
+ * test verdict is still pending — candidates for the idle-awaiting-test reaper
+ * (PAN-1730). Matches only the canonical work session `agent-<id>` (never the
+ * `agent-<id>-<role>` advancing sub-sessions). The deacon applies the idle-≥10
+ * min gate per returned session before killing.
+ */
+export function selectAwaitingTestWorkSessions(
+  statuses: Record<string, ReapableStatus>,
+  aliveSessions: readonly string[],
+): string[] {
+  const alive = new Set(aliveSessions);
+  const candidates: string[] = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (!isAwaitingTestReapable(status)) continue;
+    const session = `agent-${issueId.toLowerCase()}`;
+    if (alive.has(session)) candidates.push(session);
+  }
+  return candidates;
+}

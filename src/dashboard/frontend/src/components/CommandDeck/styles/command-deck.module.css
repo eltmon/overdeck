@@ -254,9 +254,10 @@
 /* Feature Item */
 .featureItem {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 3px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 5px 6px 5px 3px;
   cursor: pointer;
   transition: background 0.1s;
   font-size: 12px;
@@ -266,6 +267,44 @@
   text-align: left;
   color: var(--foreground);
 }
+
+.featureTitleLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.featureMetaLine {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* pipeline mini-strip: neutral fills, only the live segment is colored */
+.featurePipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.featurePipe i {
+  display: block;
+  width: 11px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.featurePipe i.pipeDone { background: color-mix(in srgb, var(--foreground) 22%, transparent); }
+.featurePipe i.pipeWorking { background: var(--info); }
+.featurePipe i.pipePaused { background: var(--warning); }
+.featurePipe i.pipeError { background: var(--destructive); }
+.featurePipe i.pipeMerged { background: var(--success); }
 
 .featureItem:hover {
   background: var(--accent);
@@ -287,10 +326,14 @@
 .featureLabel {
   flex: 1;
   min-width: 0;
+  /* titles wrap to two lines — never clipped mid-word (style guide v1.2) */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .featureLabelUntitled {
@@ -318,9 +361,16 @@
 }
 
 .featureBadge_running {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  /* v1.2 signal law: machine activity = blue (emerald is outcome only) */
+  background: color-mix(in srgb, var(--info) 16%, transparent);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+}
+
+.featureBadge_paused {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  color: var(--warning-foreground, var(--warning));
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
 .featureBadge_stopped {
@@ -346,6 +396,29 @@
   background: var(--destructive) !important;
   opacity: 1 !important;
   box-shadow: 0 0 8px color-mix(in srgb, var(--destructive) 45%, transparent);
+}
+
+.featureResourceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+  border: 1px solid var(--border);
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  white-space: nowrap;
+}
+
+.featureResourceLine {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 0 6px 5px 27px;
 }
 
 .featureResourceStrip {
@@ -475,6 +548,69 @@
 .featureItemWrapper {
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* PAN-1779: paused issues carry an unmissable amber edge bar (the row's one
+ * colored signal — amber = a human must act). */
+.featureItemWrapperWorking::before,
+.featureItemWrapperError::before,
+.featureItemWrapperMerged::before,
+.featureItemWrapperReady::before,
+.featureItemWrapperPaused::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--warning);
+}
+
+.featureItemWrapperWorking::before { background: var(--info); }
+.featureItemWrapperError::before { background: var(--destructive); }
+.featureItemWrapperMerged::before { background: var(--success); }
+/* ready-for-merge is a human gate — amber, same as paused */
+.featureItemWrapperReady::before { background: var(--warning); }
+
+.unpauseBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+}
+
+.unpauseBtn:hover {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.sessionSubtitle {
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.sessionPausedReason {
+  padding: 0 8px 4px 56px;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--warning) 60%, var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .featureItemWrapperSelected {
@@ -914,12 +1050,54 @@
 }
 
 .sessionToggleSlot,
-.sessionDotSlot,
-.sessionIconSlot {
+.sessionDotSlot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
+}
+
+/* Redesign (PAN-1779): role icons live in a state-tinted tile — the icon IS
+ * the status indicator (blue machine, purple specialist, amber paused,
+ * red error, neutral idle). */
+.sessionIconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+.sessionIconRunning {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+}
+
+.sessionIconReview {
+  color: var(--signal-review-foreground, var(--signal-review));
+  background: color-mix(in srgb, var(--signal-review) 10%, transparent);
+}
+
+.sessionIconPaused {
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.sessionIconError {
+  color: var(--destructive-foreground, var(--destructive));
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+}
+
+.sessionModel {
+  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10.5px;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sessionToggleButton {
@@ -962,8 +1140,14 @@
 }
 
 .sessionStatus_running {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  /* v1.2 signal law: machine activity = blue */
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+}
+
+.sessionStatus_paused {
+  color: var(--warning-foreground, var(--warning));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
 }
 
 .sessionStatus_error {
@@ -984,13 +1168,13 @@
 }
 
 .sessionStatus_working {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .sessionStatus_thinking {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
 }
 
 .sessionStatus_waiting {
@@ -2847,6 +3031,33 @@
   color: var(--muted-foreground);
   opacity: 0.4;
   user-select: none;
+}
+
+.conversationAboutToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.conversationAboutToggle:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.conversationAboutToggleActive {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--background));
+  color: var(--primary);
 }
 
 /* ⋮ overflow menu */

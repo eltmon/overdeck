@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -65,10 +65,18 @@ describe('syncBeadStatusToVBrief', () => {
     expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
   });
 
-  it('returns null when no matching vBRIEF item found', async () => {
+  it('returns null and logs a warning when no matching vBRIEF item found', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     writePlan(makePlanDoc([{ id: 'item-1', title: 'Different title' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-1', title: 'PAN-388: No match here' }]);
-    expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
+    try {
+      expect(await Effect.runPromise(syncBeadStatusToVBrief('bead-1', WORKSPACE_PATH))).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        '[vbrief-sync] No plan item matches bead bead-1 (title "No match here") in plan PAN-388 — AC statuses for this bead were NOT synced',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('syncs status when bead title matches with plan prefix', async () => {
@@ -136,6 +144,7 @@ describe('getVBriefACStatus', () => {
     id: string;
     title: string;
     subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
+    items?: Array<{ id: string; title: string; status?: string; kind?: string }>;
   }>): VBriefDocument {
     return {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -147,6 +156,12 @@ describe('getVBriefACStatus', () => {
           id: i.id,
           title: i.title,
           status: 'pending' as const,
+          items: i.items?.map(s => ({
+            id: s.id,
+            title: s.title,
+            status: (s.status ?? 'pending') as any,
+            metadata: { kind: s.kind ?? 'acceptance_criterion' },
+          })),
           subItems: i.subItems?.map(s => ({
             id: s.id,
             title: s.title,
@@ -212,6 +227,25 @@ describe('getVBriefACStatus', () => {
     expect(result.items[0].itemId).toBe('item-1');
     expect(result.items[0].completed).toBe(1);
     expect(result.items[0].pending).toBe(1);
+  });
+
+  it('extracts AC status from v0.6 items children', () => {
+    const doc = makePlanWithAC([{
+      id: 'item-1',
+      title: 'Build module',
+      items: [
+        { id: 'item-1.ac1', title: 'Function exists', status: 'completed' },
+        { id: 'item-1.ac2', title: 'Tests pass', status: 'pending' },
+      ],
+    }]);
+    doc.vBRIEFInfo.version = '0.6';
+    writeACPlan(doc);
+
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
+    expect(result).not.toBeNull();
+    expect(result.totalCompleted).toBe(1);
+    expect(result.totalPending).toBe(1);
+    expect(result.items[0].criteria.map(ac => ac.subItemId)).toEqual(['item-1.ac1', 'item-1.ac2']);
   });
 
   it('returns allCompleted=true when all AC are completed', () => {

@@ -4,7 +4,7 @@
  * Every rail section (Merge queue, Merge policy, Pending auto-merges, Run status)
  * is one of these: an uppercase header with icon + count + chevron, and a body
  * that collapses. Matches `.card`/`.chead`/`.cbody` in the approved v3 mockup
- * (.tmp/flywheel-redesign-mockup-v3.html).
+ * (docs/design/flywheel-redesign-mockup-v3.html).
  */
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';

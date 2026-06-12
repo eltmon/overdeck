@@ -4,17 +4,17 @@
     "created": "2026-06-09T22:44:41.149Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1647: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "updated": "2026-06-09T22:55:13.979Z"
+    "updated": "2026-06-11T05:55:49.540Z"
   },
   "plan": {
     "id": "pan-1647",
     "title": "Substrate: pan start --auto rolls back — synthesized vBRIEF written to projectRoot/.pan/specs but createBeadsFromVBrief reads it back empty (0 beads)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b7e0c4a2-3f6d-4c81-9a2e-5d4f8e1a6c93",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 98,
     "created": "2026-06-09T22:44:41.149Z",
-    "updated": "2026-06-09T22:55:13.979Z",
+    "updated": "2026-06-11T05:55:49.540Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1647",
@@ -51,7 +51,7 @@
       {
         "id": "fix-resolver",
         "title": "Correct projectRootFromWorkspace to resolve a workspace to its true project root (+ round-trip regression test)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T22:44:41.149Z",
         "metadata": {
@@ -70,41 +70,46 @@
           {
             "id": "fix-resolver.ac1",
             "title": "projectRootFromWorkspace(workspace) returns resolve(workspacePath,'..','..') (the main project root) for a feature-<id> worktree that has a .git file and a checked-out .pan/specs/ directory — it no longer returns the workspace itself.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           },
           {
             "id": "fix-resolver.ac2",
             "title": "A regression test reproduces the worktree shape (<root>/workspaces/feature-pan-<n>/ with a .git file and a .pan/specs/ dir) and asserts that after writeAutoStartVBrief(root, workspace, issue), readWorkspacePlanSync(workspace) and findPlanSync(workspace) resolve the synthesized plan (non-null). The test fails on the pre-fix code and passes on the post-fix code.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           },
           {
             "id": "fix-resolver.ac3",
             "title": "With execFile/bd mocked (per create-beads.test.ts), the round-trip writeAutoStartVBrief → createBeadsFromVBrief(workspace) returns success with created.length >= 1 — proving the 0-beads rollback no longer occurs.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           },
           {
             "id": "fix-resolver.ac4",
             "title": "Any import (existsSync/join) left unused in io.ts solely by removing the short-circuit branch is cleaned up; typecheck and lint pass.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           }
-        ]
+        ],
+        "completed": "2026-06-09T23:59:30.734Z"
       },
       {
         "id": "guard-tests",
         "title": "Guard tests: normal-flow spec reads still resolve correctly after the resolver change",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-09T22:44:41.149Z",
         "metadata": {
@@ -120,28 +125,32 @@
           {
             "id": "guard-tests.ac1",
             "title": "Pre-promotion test: with only <workspace>/.pan/spec.vbrief.json present (no <root>/.pan/specs/ entry for the issue), findPlanSync(workspace) and readWorkspacePlanSync(workspace) resolve the workspace draft via the fallback — confirming the planning-in-progress window is unaffected by the resolver change.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           },
           {
             "id": "guard-tests.ac2",
             "title": "Post-promotion test: with a canonical spec for the issue present in <root>/.pan/specs/, findPlanSync(workspace) resolves the main-side spec (returned path is under <root>/.pan/specs/, not <workspace>/.pan/specs/) — confirming the intended single-spec-on-main resolution.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           },
           {
             "id": "guard-tests.ac3",
             "title": "The full vbrief unit suite and the dashboard complete-planning + auto-promote-chain integration tests pass (npm test green), demonstrating no regression in normal planned-work spec resolution.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-09T23:59:30.734Z"
           }
-        ]
+        ],
+        "completed": "2026-06-09T23:59:30.734Z"
       }
     ],
     "edges": [
@@ -152,8 +161,69 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json"
+      "canonicalFilename": "2026-06-09-PAN-1647-substrate-pan-start-auto-rolls-back-synthesized-vbrief-written-to-projectroot-pan-specs-but-createbeadsfromvbrief-reads-it-back-empty-0-beads.vbrief.json",
+      "pipeline": {
+        "phase": "test",
+        "issueId": "PAN-1647",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-10T12:40:46.998Z",
+        "work": {
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T12:40:46.998Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "notes": "Approved: all four convoy reviewers reported zero blockers.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T12:40:46.998Z",
+              "notes": "Approved: all four convoy reviewers reported zero blockers."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-10T12:40:46.998Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-06-10T12:40:46.998Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-06-10T12:40:46.998Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1703"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

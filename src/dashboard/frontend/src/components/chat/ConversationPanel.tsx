@@ -89,6 +89,7 @@ interface ConversationPanelProps {
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export function ConversationPanel({
   targetMessageId,
   targetMessageIndex,
   targetMessageNonce,
+  onTargetMessageHandled,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -153,6 +155,10 @@ export function ConversationPanel({
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+
+  useEffect(() => {
+    setAboutOpen(false);
+  }, [conversation.name]);
 
   // Sync the picker when the backing conversation's model changes (e.g. after a
   // resume/switch-model that persisted a new model). useState's lazy initializer
@@ -520,12 +526,14 @@ export function ConversationPanel({
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  // v1.2 signal law: blue = machine activity (forking/starting/alive),
+  // red = failed, neutral = ended. Amber is reserved for human-action states.
   const statusColor = isForkingHeader || isSpawningHeader
-    ? 'var(--warning)'
+    ? 'var(--info)'
     : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
-    ? 'var(--success)'
+    ? 'var(--info)'
     : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
   return (
@@ -605,6 +613,17 @@ export function ConversationPanel({
                 </div>
               )}
 
+              <button
+                className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
+                onClick={() => setAboutOpen(v => !v)}
+                title={aboutOpen ? 'Hide conversation summary' : 'Show conversation summary'}
+                aria-label={aboutOpen ? 'Hide about this conversation' : 'Show about this conversation'}
+                aria-pressed={aboutOpen}
+              >
+                <Info size={14} />
+                <span>About</span>
+              </button>
+
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -660,17 +679,6 @@ export function ConversationPanel({
                         <Wrench size={14} />
                         Hide tool calls
                         {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
-                      </button>
-
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${aboutOpen ? styles.headerMenuItemActive : ''}`}
-                        onClick={() => { setAboutOpen(v => !v); setMenuOpen(false); }}
-                        aria-expanded={aboutOpen}
-                      >
-                        <Info size={14} />
-                        About this conversation
-                        {aboutOpen && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
                       </button>
 
                       {conversation.harness === 'claude-code' && (
@@ -890,6 +898,7 @@ export function ConversationPanel({
               targetMessageId={targetMessageId}
               targetMessageIndex={targetMessageIndex}
               targetMessageNonce={targetMessageNonce}
+              onTargetMessageHandled={onTargetMessageHandled}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -1055,11 +1064,12 @@ interface ConversationViewProps {
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
+  onTargetMessageHandled?: () => void;
 }
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1301,6 +1311,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           targetMessageId={targetMessageId}
           targetMessageIndex={targetMessageIndex}
           targetMessageNonce={targetMessageNonce}
+          onTargetMessageHandled={onTargetMessageHandled}
         />
       )}
       {/* PAN-1458: when this conversation was cleared via Claude Code's /clear, show a

@@ -18,13 +18,13 @@ allowed-tools:
 
 # Panopticon Planning Lifecycle
 
-`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults.
+`pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
 
 ## Available commands
 
 ```bash
-pan plan <id> [--auto] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
-pan plan finalize [-w <path>] [--json] [--no-promote]
+pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
+pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint]
 pan plan done <id>
 ```
 
@@ -51,6 +51,22 @@ Auto-planning runs the same planning agent without interactive questions:
 
 The dashboard issue card's **Auto-plan** action sends the same `auto: true` request.
 
+## Probe pass
+
+```bash
+pan plan PAN-1071 --probe
+```
+
+`--probe` adds an adversarial self-review section to the planning prompt before finalize. The planner attacks hidden assumptions, ambiguous "done" criteria, unhandled failure modes, and missing dependency edges, then records acted-on findings in `continue.json` decisions with a `PROBE:` prefix. `--effort high` includes this section automatically.
+
+## Auto-start after planning
+
+```bash
+pan plan PAN-1071 --auto --auto-start
+```
+
+`--auto-start` stamps `autoSpawnOnFinalize: true` into the planning agent state so `pan plan finalize` can start the work agent after it promotes the plan. This is an explicit autonomy opt-in for flywheel/orchestrator flows; default human planning leaves the issue in Planned until `pan start <id>` or Start Agent.
+
 ## Finalizing (`pan plan finalize`)
 
 Run this from inside the planning workspace after the planning agent has produced a complete `.pan/spec.vbrief.json`.
@@ -67,7 +83,7 @@ What it does:
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
 5. Returns a summary of beads created and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done).
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs vBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
 
 ## Completing planning (`pan plan done`)
 

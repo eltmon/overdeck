@@ -25,6 +25,8 @@ vi.mock('util', async (importOriginal) => {
 
 // Import after mocks are registered
 import { clearBeadsForIssue, createBeadsFromVBrief } from '../beads.js';
+import { writeAutoStartVBrief } from '../auto-synthesize.js';
+import { findPlanSync, readWorkspacePlanSync } from '../io.js';
 
 const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
@@ -81,6 +83,11 @@ function createWorkspace(issueId: string): { projectRoot: string; workspacePath:
   const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
   mkdirSync(workspacePath, { recursive: true });
   return { projectRoot, workspacePath };
+}
+
+function createWorktreeShape(workspacePath: string): void {
+  writeFileSync(join(workspacePath, '.git'), 'gitdir: ../../.git/worktrees/test-worktree');
+  mkdirSync(join(workspacePath, '.pan', 'specs'), { recursive: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +165,38 @@ describe('createBeadsFromVBrief', () => {
 
     expect(result.success).toBe(true);
     expect(result.created).toEqual(['PAN-500: First task', 'PAN-500: Second task']);
+  });
+
+  it('creates beads from an auto-start vBRIEF written to the project spec directory for a git worktree', async () => {
+    createWorktreeShape(WORKSPACE_DIR);
+    setupRedirect(WORKSPACE_DIR);
+
+    const written = await Effect.runPromise(writeAutoStartVBrief(projectRoot, WORKSPACE_DIR, {
+      issueId: 'PAN-500',
+      title: 'Auto-start round trip',
+      body: '- [ ] Create the auto-start bead',
+      url: 'https://github.com/eltmon/panopticon-cli/issues/500',
+    }));
+
+    expect(findPlanSync(WORKSPACE_DIR)).toBe(written.projectSpecPath);
+    const resolvedPlan = readWorkspacePlanSync(WORKSPACE_DIR);
+    expect(resolvedPlan).not.toBeNull();
+    expect(resolvedPlan!.plan.items[0].id).toBe('auto-start');
+
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-auto-start\n', stderr: '' });
+
+    const result = await Effect.runPromise(createBeadsFromVBrief(WORKSPACE_DIR));
+
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.created.length).toBeGreaterThanOrEqual(1);
+    expect(result.created).toContain('pan-500: Implement issue');
+    expect(result.beadIds.get('auto-start')).toBe('bead-auto-start');
   });
 
   it('creates .beads/redirect when main repo has .beads/ but workspace does not', async () => {

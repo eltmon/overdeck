@@ -4,17 +4,17 @@
     "created": "2026-06-10T01:00:53.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1712: pan conv jsonl <conv-id> — first-class transcript path resolution for agents",
-    "updated": "2026-06-10T01:07:00.052Z"
+    "updated": "2026-06-11T04:36:10.102Z"
   },
   "plan": {
     "id": "pan-1712",
     "title": "pan conv jsonl <conv-id> — first-class transcript path resolution for agents",
-    "status": "proposed",
+    "status": "completed",
     "uid": "240d64bb-fe05-4f2d-8130-63f9812b23b6",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 21,
     "created": "2026-06-10T01:00:53.000Z",
-    "updated": "2026-06-10T01:07:00.052Z",
+    "updated": "2026-06-11T04:36:10.102Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1712",
@@ -252,8 +252,71 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-10-PAN-1712-pan-conv-jsonl-conv-id-first-class-transcript-path-resolution-for-agents.vbrief.json"
+      "canonicalFilename": "2026-06-10-PAN-1712-pan-conv-jsonl-conv-id-first-class-transcript-path-resolution-for-agents.vbrief.json",
+      "pipeline": {
+        "phase": "done",
+        "issueId": "PAN-1712",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-06-11T03:49:55.744Z",
+        "work": {
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T03:49:55.744Z",
+              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "notes": "Approved: all four reviewers ready; no blocking findings after synthesis.",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T03:49:55.744Z",
+              "notes": "Approved: all four reviewers ready; no blocking findings after synthesis."
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "notes": "All quality gates pass: npm run test (5693 tests passed), npm run typecheck (TypeScript strict), npm run lint (ESLint). Tests include regression coverage for projectRootFromWorkspace fix: (1) auto-start round-trip test reproducing worktree shape with .git file and .pan/specs/ directory, verifying that writeAutoStartVBrief → createBeadsFromVBrief no longer returns 0 beads; (2) io.test.ts guard tests confirming pre-promotion draft fallback still works for git worktrees and post-promotion specs resolve from main project root (.pan/specs/), not workspace (.pan/specs/). Two completed beads: fix-resolver (io.ts short-circuit branch removed, regression test added) + guard-tests (pre/post-promotion guards + full suite green).",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-06-11T03:49:55.744Z",
+              "notes": "All quality gates pass: npm run test (5693 tests passed), npm run typecheck (TypeScript strict), npm run lint (ESLint). Tests include regression coverage for projectRootFromWorkspace fix: (1) auto-start round-trip test reproducing worktree shape with .git file and .pan/specs/ directory, verifying that writeAutoStartVBrief → createBeadsFromVBrief no longer returns 0 beads; (2) io.test.ts guard tests confirming pre-promotion draft fallback still works for git worktrees and post-promotion specs resolve from main project root (.pan/specs/), not workspace (.pan/specs/). Two completed beads: fix-resolver (io.ts short-circuit branch removed, regression test added) + guard-tests (pre/post-promotion guards + full suite green)."
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "history": []
+        },
+        "merge": {
+          "status": "merged",
+          "updatedAt": "2026-06-11T03:49:55.744Z",
+          "history": [
+            {
+              "status": "merged",
+              "at": "2026-06-11T03:49:55.744Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1733"
+        }
+      }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

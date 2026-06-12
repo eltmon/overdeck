@@ -101,7 +101,7 @@ See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation,
 
 ## Panopticon Agent Taxonomy
 
-Panopticon's pipeline is expressed as five issue-scoped **roles**:
+Panopticon's issue pipeline is expressed as four spawned **roles** plus a server-side merge handoff:
 
 | Role | Purpose | Instruction source |
 | --- | --- | --- |
@@ -109,7 +109,8 @@ Panopticon's pipeline is expressed as five issue-scoped **roles**:
 | `work` | Implement one bead at a time in the workspace | `roles/work.md` |
 | `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
-| `ship` | Rebase/verify/push approved branches for human merge | `roles/ship.md` |
+
+Shipping is server-side: `rebaseFeatureBranch()` prepares branches and PAN-1650's review-status gate derives `readyForMerge`; no `roles/ship.md` file exists and no ship agent is spawned. The `ship` token survives only as the merge-specialist identity for model routing, historical activity attribution, and old session records.
 
 Sub-roles are configuration slots under a role, not standalone pipeline stages. All sub-roles today are delivered as **harness-agnostic prompt templates** that the orchestrator inlines into spawn messages:
 

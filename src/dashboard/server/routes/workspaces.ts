@@ -11,6 +11,7 @@ import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
+ *   GET    /api/workspaces/:issueId/uat-context
  *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
  *   GET    /api/workspaces/:issueId/clean/preview
  *   POST   /api/workspaces/:issueId/clean
@@ -102,13 +103,15 @@ import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
+import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { queryBeadsForIssue, type BeadEntry } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
-import { loadWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { loadWorkspaceMetadataSync, listWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';
+import { loadConfigSync } from '../../../lib/config.js';
 import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
@@ -981,7 +984,12 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
   const lines: string[] = [];
 
-  lines.push(`Closes #${extractNumberSync(issueId) ?? issueId}`);
+  // Non-closing reference on purpose: a closing keyword ("Closes #N") hands
+  // close authority to GitHub, which fires the moment the PR's head becomes
+  // reachable from main and races the pipeline's verifying_on_main → close-out
+  // lifecycle (the first UAT batch promote closed 2 of 3 member issues
+  // mid-handoff, 2026-06-11). Panopticon's close-out owns issue closing.
+  lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
   // Acceptance criteria checklist from vBRIEF plan items
@@ -1073,8 +1081,17 @@ async function ensurePRExists(
 }
 
 function getFlyAppName(vmName: string): string {
-  const match = vmName.match(/^([^-]+-[^-]+)/);
-  return match ? match[1] : vmName;
+  // Resolve via workspace metadata — deriving from the vmName prefix is wrong
+  // ('pan-pan-1712-ws' → 'pan-pan'). Fall back to the configured app.
+  try {
+    const meta = listWorkspaceMetadataSync().find((m) => m.vmName === vmName);
+    if (meta?.appName) return meta.appName;
+  } catch { /* fall through */ }
+  try {
+    return loadConfigSync().remote?.fly?.app ?? 'pan-workspaces';
+  } catch {
+    return 'pan-workspaces';
+  }
 }
 
 function shellQuote(value: string): string {
@@ -1840,6 +1857,147 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
   });
 }
 
+export interface UatContextAcceptanceCriterion {
+  id: string;
+  title: string;
+  status: string;
+  itemId: string;
+  itemTitle: string;
+}
+
+export interface UatContextDeliverable {
+  id: string;
+  title: string;
+  status: string;
+  action?: string;
+}
+
+export interface UatContextChangedFile {
+  path: string;
+  status: 'M' | 'A' | 'D' | 'R' | 'C' | 'U';
+  additions: number;
+  deletions: number;
+}
+
+interface UatContextPlanFields {
+  acceptanceCriteria: UatContextAcceptanceCriterion[];
+  deliverables: UatContextDeliverable[];
+  proposal: string | null;
+}
+
+interface UatContextGitFields {
+  changedFiles: UatContextChangedFile[];
+  changedFilesTotal: number;
+  changedFilesOmitted: number;
+  diffStat: { stat: string; truncated: boolean } | null;
+  source: { files: 'git' | 'none' };
+}
+
+const MAX_UAT_CONTEXT_CHANGED_FILES = 12;
+const MAX_UAT_CONTEXT_DIFF_STAT_LENGTH = 4_000;
+
+export function assembleUatContextPlanFields(doc: VBriefDocument | null): UatContextPlanFields {
+  if (!doc) {
+    return { acceptanceCriteria: [], deliverables: [], proposal: null };
+  }
+
+  const acceptanceCriteria: UatContextAcceptanceCriterion[] = [];
+  const deliverables: UatContextDeliverable[] = [];
+
+  for (const item of doc.plan.items ?? []) {
+    deliverables.push({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      ...(item.narrative?.Action ? { action: item.narrative.Action } : {}),
+    });
+
+    const subItems = item.subItems ?? [];
+    if (subItems.length === 0) continue;
+
+    const taggedAcceptanceCriteria = subItems.filter(
+      (subItem) => subItem.metadata?.kind === 'acceptance_criterion',
+    );
+    const selectedSubItems = taggedAcceptanceCriteria.length > 0
+      ? taggedAcceptanceCriteria
+      : subItems;
+
+    for (const subItem of selectedSubItems) {
+      acceptanceCriteria.push({
+        id: subItem.id,
+        title: subItem.title,
+        status: subItem.status,
+        itemId: item.id,
+        itemTitle: item.title,
+      });
+    }
+  }
+
+  return {
+    acceptanceCriteria,
+    deliverables,
+    proposal: doc.plan.narratives?.Proposal ?? null,
+  };
+}
+
+export function emptyUatContextGitFields(): UatContextGitFields {
+  return {
+    changedFiles: [],
+    changedFilesTotal: 0,
+    changedFilesOmitted: 0,
+    diffStat: null,
+    source: { files: 'none' },
+  };
+}
+
+export function assembleUatContextGitFields(
+  changedFiles: ChangedFile[],
+  diffStat: { stat: string; truncated: boolean },
+): UatContextGitFields {
+  if (diffStat.stat === 'Unable to compute diff stat') {
+    return emptyUatContextGitFields();
+  }
+
+  const limitedChangedFiles = changedFiles
+    .slice(0, MAX_UAT_CONTEXT_CHANGED_FILES)
+    .map((file) => ({
+      path: file.path,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+    }));
+
+  const isDiffStatTruncated = diffStat.truncated || diffStat.stat.length > MAX_UAT_CONTEXT_DIFF_STAT_LENGTH;
+  const limitedDiffStat = {
+    stat: diffStat.stat.slice(0, MAX_UAT_CONTEXT_DIFF_STAT_LENGTH),
+    truncated: isDiffStatTruncated,
+  };
+
+  return {
+    changedFiles: limitedChangedFiles,
+    changedFilesTotal: changedFiles.length,
+    changedFilesOmitted: Math.max(0, changedFiles.length - limitedChangedFiles.length),
+    diffStat: limitedDiffStat,
+    source: { files: 'git' },
+  };
+}
+
+async function readWorkspaceUatChangedFiles(workspacePath: string): Promise<UatContextGitFields> {
+  if (!existsSync(workspacePath)) return emptyUatContextGitFields();
+
+  try {
+    const base = await getDiffBase(workspacePath);
+    const [changedFiles, diffStat] = await Promise.all([
+      getChangedFiles(workspacePath, base),
+      getDiffStat(workspacePath, base),
+    ]);
+
+    return assembleUatContextGitFields(changedFiles, diffStat);
+  } catch {
+    return emptyUatContextGitFields();
+  }
+}
+
 const getWorkspacePlanRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/plan',
@@ -1862,6 +2020,42 @@ const getWorkspacePlanRoute = HttpRouter.add(
 
     const cp = criticalPath(actionableDoc(location.doc));
     return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+  }))
+);
+
+const getWorkspaceUatContextRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/uat-context',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const parsed = parseIssueIdSync(issueId);
+    if (!parsed) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const issuePrefix = parsed.prefix ?? extractPrefixSync(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
+
+    const location = yield* Effect.promise(() =>
+      Effect.runPromise(resolvePlanLocation(projectPath, parsedIssueId)).catch(() => null)
+    );
+    const planFields = assembleUatContextPlanFields(location?.doc ?? null);
+    const gitFields = yield* Effect.promise(() => readWorkspaceUatChangedFiles(workspacePath));
+
+    return jsonResponse({
+      issueId: parsedIssueId,
+      ...planFields,
+      changedFiles: gitFields.changedFiles,
+      changedFilesTotal: gitFields.changedFilesTotal,
+      changedFilesOmitted: gitFields.changedFilesOmitted,
+      diffStat: gitFields.diffStat,
+      source: {
+        plan: location ? 'vbrief' : 'none',
+        files: gitFields.source.files,
+      },
+    });
   }))
 );
 
@@ -3417,9 +3611,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const branchName = `feature/${numericSuffix}`;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    const workspacePath = workspaceInfo.isRemote
-      ? workspaceInfo.remotePath!
-      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
+    // Review runs against the local worktree only. Remote (fly.io) workspaces
+    // exist for the work phase; the reap flow retires them and materializes
+    // the local worktree before review (PAN-1676).
+    if (workspaceInfo.isRemote) {
+      return jsonResponse({
+        error: `${issueId} is executing remotely on ${workspaceInfo.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${issueId}' after the agent finishes, then review.`,
+      }, { status: 409 });
+    }
+    const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
     const existingStatus = getReviewStatusSync(issueId);
 
@@ -3504,20 +3704,10 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             });
 
             try {
-              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-                await execAsync(
-                  flyExecCmd(
-                    workspaceInfo.vmName,
-                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
-                  ),
-                  { encoding: 'utf-8', timeout: 30000 }
-                );
-              } else {
-                await execAsync(`git push origin ${branchName}`, {
-                  cwd: workspacePath,
-                  encoding: 'utf-8',
-                });
-              }
+              await execAsync(`git push origin ${branchName}`, {
+                cwd: workspacePath,
+                encoding: 'utf-8',
+              });
             } catch (pushErr: any) {
               console.log(`Feature branch push note: ${pushErr.message}`);
             }
@@ -3729,20 +3919,21 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
       const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
       const wsInfoRerun = getWorkspaceInfoForIssue(canonicalIssueId);
-      const workspacePathRerun = wsInfoRerun.isRemote
-        ? wsInfoRerun.remotePath!
-        : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+      // Review runs against the local worktree only (PAN-1676) — see the
+      // matching guard in /api/review/:issueId/trigger.
+      if (wsInfoRerun.isRemote) {
+        return jsonResponse({
+          success: false,
+          message: `${canonicalIssueId} is executing remotely on ${wsInfoRerun.vmName ?? 'a fly machine'} — run 'pan admin remote reap --issue ${canonicalIssueId}' after the agent finishes, then review.`,
+        }, { status: 409 });
+      }
+      const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
       if (existingStatus.reviewedAtCommit && !forceReview) {
         let currentHeadSha: string | undefined;
         const headResult = yield* Effect.promise(async () => {
           try {
-            const result = wsInfoRerun.isRemote && wsInfoRerun.vmName
-              ? await execAsync(
-                  flyExecCmd(wsInfoRerun.vmName!, `cd ${shellQuote(workspacePathRerun)} && git rev-parse HEAD`),
-                  { encoding: 'utf-8', timeout: 30000 },
-                )
-              : await execAsync('git rev-parse HEAD', {
+            const result = await execAsync('git rev-parse HEAD', {
                   cwd: workspacePathRerun,
                   encoding: 'utf-8',
                 });
@@ -3806,20 +3997,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             });
 
             try {
-              if (wsInfoRerun.isRemote && wsInfoRerun.vmName) {
-                await execAsync(
-                  flyExecCmd(
-                    wsInfoRerun.vmName,
-                    `cd ${shellQuote(workspacePathRerun)} && git push origin ${branchNameRerun} 2>&1 || true`
-                  ),
-                  { encoding: 'utf-8', timeout: 30000 }
-                );
-              } else {
-                await execAsync(`git push origin ${branchNameRerun}`, {
-                  cwd: workspacePathRerun,
-                  encoding: 'utf-8',
-                });
-              }
+              await execAsync(`git push origin ${branchNameRerun}`, {
+                cwd: workspacePathRerun,
+                encoding: 'utf-8',
+              });
             } catch (pushErr: any) {
               console.log(`[request-review] Feature branch push note: ${pushErr.message}`);
             }
@@ -6219,6 +6400,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
+  getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
   getWorkspaceStashesRoute,
   postWorkspaceRecoverStashRoute,

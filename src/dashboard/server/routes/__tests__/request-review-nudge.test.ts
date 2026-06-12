@@ -217,7 +217,7 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     expect(result.appendedEvents).toEqual([]);
   });
 
-  it('uses fly ssh with a timeout when checking remote workspace HEAD', async () => {
+  it('rejects remote workspaces without checking remote HEAD', async () => {
     loadWorkspaceMetadataMock.mockReturnValue({
       location: 'remote',
       vmName: 'pan-workspace-123',
@@ -225,12 +225,14 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     });
     getReviewStatusMock.mockReturnValue(passedStatus());
 
-    await postRequestReview('PAN-1417');
+    const result = await postRequestReview('PAN-1417');
 
-    const headCall = execBehaviorMock.mock.calls.find(([command]) => String(command).includes('git rev-parse HEAD'));
-    expect(headCall?.[0]).toContain('fly ssh console -a pan-workspace');
-    expect(headCall?.[0]).toContain("cd '/remote/workspace' && git rev-parse HEAD");
-    expect(headCall?.[1]).toMatchObject({ timeout: 30000 });
+    expect(result.status).toBe(409);
+    expect(result.body).toMatchObject({
+      success: false,
+      message: expect.stringContaining('PAN-1417 is executing remotely on pan-workspace-123'),
+    });
+    expect(execBehaviorMock.mock.calls.some(([command]) => String(command).includes('git rev-parse HEAD'))).toBe(false);
     expect(setReviewStatusMock).not.toHaveBeenCalled();
   });
 

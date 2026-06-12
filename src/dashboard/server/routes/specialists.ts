@@ -186,7 +186,13 @@ const postMergeGuard = createInFlightGuard();
 // Exported so the workspaces route can register/unregister server-managed merges.
 export const _serverManagedMerges = new Set<string>();
 
-function firePostMergeLifecycle(issueId: string): void {
+/**
+ * Exported for the UAT batch-promote route (PAN-1737): batch promotion fans
+ * out the per-member post-merge through THIS guard instance so an issue's
+ * lifecycle still runs at most once regardless of which path merged it.
+ * Returns false when a run for the issue is already in flight.
+ */
+export function firePostMergeLifecycle(issueId: string): boolean {
   const started = postMergeGuard.run(
     issueId,
     async () => {
@@ -214,6 +220,7 @@ function firePostMergeLifecycle(issueId: string): void {
   if (!started) {
     console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
   }
+  return started;
 }
 
 function getProjectPathForIssue(issuePrefix: string): string {
@@ -555,9 +562,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // When test specialist reports success, emit test.passed so reactive Cloister
-    // dispatches the ship role (which sets readyForMerge: true).  PAN-1048 invariant:
-    // ONLY the ship role sets readyForMerge: true — no direct assignment here.
+    // When the test specialist reports success, persist testStatus and emit
+    // test.passed so reactive Cloister records the shipping lifecycle phase.
+    // PAN-1650 derives readyForMerge from review/test gate state server-side;
+    // no ship role is spawned.
     if (specialist === 'test' && status === 'passed') {
       yield* Effect.promise(async () => {
         try {
@@ -577,7 +585,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
                 timestamp: new Date().toISOString(),
                 payload: { issueId: normalizedIssueId },
               } as any);
-              console.log(`[specialists/done] ${normalizedIssueId} emitted test.passed; ship role dispatched`);
+              console.log(`[specialists/done] ${normalizedIssueId} emitted test.passed; shipping lifecycle recorded`);
             }
           }
         } catch (err) {
@@ -967,8 +975,8 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           testNotes: `Auto-detected: ${status}`,
         });
         if (testPassed) {
-          // Emit test.passed so reactive Cloister dispatches the ship role
-          // (ship sets readyForMerge: true per the PAN-1048 invariant).
+          // Emit test.passed so reactive Cloister records the shipping
+          // lifecycle phase; readyForMerge is derived server-side.
           yield* eventStore.append({
             type: 'test.passed',
             timestamp: new Date().toISOString(),
@@ -1072,11 +1080,12 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 //
 // PAN-1048 R1: removed. The legacy /spawn endpoint dispatched arbitrary
 // "specialist types" (review-agent, test-agent, merge-agent) by issuing a
-// generic spawnEphemeralSpecialist call. Under the role primitive this is
-// expressed as spawnRun(issueId, role, opts) — review/test/ship are first-
-// class roles, not opaque specialist names. The endpoint had no remaining
-// in-tree caller and is replaced by reactive Cloister scheduling on issue
-// state transitions plus the role spawn primitive.
+// generic spawnEphemeralSpecialist call. Under the role primitive, review/test
+// dispatch through lifecycle-aware role paths. Shipping is now server-side;
+// `ship` remains only as the merge-specialist identity for model routing and
+// historical activity attribution. The endpoint had no remaining in-tree caller
+// and is replaced by reactive Cloister scheduling on issue state transitions
+// plus the role spawn primitive.
 //
 // Old shape (removed):
 //   POST /api/specialists/:project/:type/spawn { issueId, branch, ... }

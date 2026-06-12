@@ -339,6 +339,48 @@ describe('applyEventReducer — resources and activity', () => {
   })
 })
 
+describe('seedRecentActivity', () => {
+  beforeEach(() => {
+    useDashboardStore.setState({ recentActivity: [] })
+  })
+
+  it('backfills persisted activity entries fetched over HTTP', () => {
+    useDashboardStore.getState().seedRecentActivity([
+      { id: 'restart-1', timestamp: '2026-06-11T23:24:05.000Z', source: 'dashboard', message: 'Dashboard restarted via pan reload', link: '/conv/2762' },
+    ])
+    const activity = useDashboardStore.getState().recentActivity as Array<Record<string, unknown>>
+    expect(activity).toHaveLength(1)
+    expect(activity[0]?.['id']).toBe('restart-1')
+    expect(activity[0]?.['link']).toBe('/conv/2762')
+  })
+
+  it('keeps live entries on id collisions and sorts newest-first', () => {
+    useDashboardStore.setState({
+      recentActivity: [
+        { id: 'dup', timestamp: '2026-06-11T23:30:00.000Z', source: 'work', message: 'live version' },
+      ],
+    })
+    useDashboardStore.getState().seedRecentActivity([
+      { id: 'dup', timestamp: '2026-06-11T23:30:00.000Z', source: 'work', message: 'fetched version' },
+      { id: 'older', timestamp: '2026-06-11T22:00:00.000Z', source: 'dashboard', message: 'older entry' },
+    ])
+    const activity = useDashboardStore.getState().recentActivity as Array<Record<string, unknown>>
+    expect(activity.map((e) => e['id'])).toEqual(['dup', 'older'])
+    expect(activity[0]?.['message']).toBe('live version')
+  })
+
+  it('caps the merged list at 50 entries', () => {
+    const fetched = Array.from({ length: 80 }, (_, i) => ({
+      id: `entry-${i}`,
+      timestamp: `2026-06-11T20:00:${String(i % 60).padStart(2, '0')}.000Z`,
+      source: 'dashboard',
+      message: `entry ${i}`,
+    }))
+    useDashboardStore.getState().seedRecentActivity(fetched)
+    expect((useDashboardStore.getState().recentActivity as unknown[]).length).toBe(50)
+  })
+})
+
 // ─── Memory reducers ──────────────────────────────────────────────────────────
 
 describe('applyEventReducer — memory events', () => {

@@ -40,6 +40,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlanSync, readPlan } from '../../../lib/vbrief/io.js';
+import { assertPlanQuality, PlanQualityLintError } from '../../../lib/vbrief/quality-lint.js';
 import { appendContinueSessionEntryForIssue, promoteContinueToProject } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
@@ -147,6 +148,7 @@ export async function completePlanningArtifacts(options: {
   if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
     throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
+  assertPlanQuality(workspaceDoc);
 
   const createBeads = options.createBeads ?? (async (path: string) => {
     const mod = await import('../../../lib/vbrief/beads.js');
@@ -222,6 +224,14 @@ export async function completePlanningArtifacts(options: {
   }
 
   return { proposed, beadCount: created.length, beadsWarning: null };
+}
+
+export function completePlanningFilesToStage(projectPath: string, proposedFilename: string): string[] {
+  const filesToStage = [`.pan/specs/${proposedFilename}`];
+  if (existsSync(join(projectPath, '.pan', 'context', 'codebase'))) {
+    filesToStage.push('.pan/context/codebase/');
+  }
+  return filesToStage;
 }
 
 function getInternalDashboardOrigin(): string {
@@ -832,6 +842,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       model: modelOverride,
       effort,
       auto = false,
+      autoStart = false,
+      probe = false,
       harness = 'claude-code',
     } = body as any;
     const requestedHarness = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
@@ -1054,6 +1066,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             harness: effectiveHarness,
             effort: effort || undefined,
             auto: auto === true,
+            probe: probe === true,
+            autoSpawnOnFinalize: autoStart === true,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });
@@ -1251,12 +1265,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       ? `[complete-planning] CALLED for ${id} (skipKill=${skipKill}, autoSpawn=true)`
       : `[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
 
-    // A planning agent waiting for an operator answer is NOT done. The plan-role
-    // Stop hook POSTs this endpoint on EVERY turn-end — including the turn where
-    // the agent calls AskUserQuestion and waits. Completing here would mark the
-    // session stopped, which trips the reducer that clears pendingAskUserQuestion
-    // (event-reducers.ts), so the dashboard question dialog would vanish the
-    // instant it was asked. If there's an unanswered AskUserQuestion, no-op.
+    // A planning agent waiting for an operator answer is NOT done. Real callers
+    // are pan plan finalize, pan plan done, the PlanDialog Done button, and the
+    // kanban Done planning action. Completing while AskUserQuestion is pending
+    // would mark the session stopped, which trips the reducer that clears
+    // pendingAskUserQuestion (event-reducers.ts), so the dashboard question
+    // dialog would vanish the instant it was asked. If there's an unanswered
+    // AskUserQuestion, no-op.
     //
     // Scan ALL of the planning session's JSONL files, not just the newest:
     // Claude Code rotates session files mid-run, so the open question can live
@@ -1332,47 +1347,73 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       projectPath = projectConfig?.path || '';
     }
 
+    const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
+    if (workspacePath) {
+      const workspacePlanPath = yield* Effect.promise(async () =>
+        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath))) ?? (await Effect.runPromise(findPlan(workspacePath)))
+      );
+      if (workspacePlanPath) {
+        const workspaceDoc = yield* readPlan(workspacePlanPath);
+        try {
+          assertPlanQuality(workspaceDoc);
+        } catch (error) {
+          if (error instanceof PlanQualityLintError) {
+            return jsonResponse({ error: 'vBRIEF quality lint failed', qualityIssues: error.issues }, { status: 422 });
+          }
+          throw error;
+        }
+      }
+    }
+
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
     const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
 
-      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
       const gitRoot = workspacePath;
       const upperIssueId = id.toUpperCase();
-      const { proposed, beadCount, beadsWarning } = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
+      const artifacts = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
+      const { proposed, beadCount, beadsWarning } = artifacts;
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
       console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 
-      const filesToStage = [`.pan/specs/${proposed.filename}`];
-      const { stdout: branchStdout } = await execFileAsync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      const currentBranch = branchStdout.trim();
-      if (currentBranch === 'main') {
-        await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-        try {
-          await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
-        } catch {
-          await execFileAsync(
-            'git',
-            ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
-            { cwd: projectPath, encoding: 'utf-8' },
-          );
-          console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
-          try {
-            const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
-            if (remotes.trim()) {
-              const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
-              pushChild.unref();
-            }
-          } catch { /* push failed — no remote or auth — non-fatal */ }
-        }
+      const filesToStage = completePlanningFilesToStage(projectPath, proposed.filename);
+      // Polyrepo project roots (e.g. myn) have no .git at projectPath — the
+      // sub-worktrees are the repos. Spec promotion still lands on disk; only
+      // the convenience commit on main is skipped.
+      const projectIsGitRepo = existsSync(join(projectPath, '.git'));
+      if (!projectIsGitRepo) {
+        console.log(`[complete-planning] Project root ${projectPath} is not a git repository (polyrepo) — pan spec updated on disk but not committed`);
       } else {
-        console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
+        const { stdout: branchStdout } = await execFileAsync(
+          'git',
+          ['rev-parse', '--abbrev-ref', 'HEAD'],
+          { cwd: projectPath, encoding: 'utf-8' },
+        );
+        const currentBranch = branchStdout.trim();
+        if (currentBranch === 'main') {
+          await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
+          try {
+            await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
+          } catch {
+            await execFileAsync(
+              'git',
+              ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
+            try {
+              const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
+              if (remotes.trim()) {
+                const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+                pushChild.unref();
+              }
+            } catch { /* push failed — no remote or auth — non-fatal */ }
+          }
+        } else {
+          console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
+        }
       }
 
       const isGitRepo = existsSync(join(gitRoot, '.git'));

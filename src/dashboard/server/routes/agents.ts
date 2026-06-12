@@ -1988,9 +1988,10 @@ const postAgentResumeRoute = HttpRouter.add(
     const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
     // PAN-1675: a compact-resume targets a context-wedged agent that is usually
     // still 'running' (a live but stuck session), which the normal gate rejects.
-    // Allow it through for compact === true — resumeAgent compacts the JSONL and
-    // kills the wedged session before relaunch (its own canResume handles the
-    // running case). Non-compact resumes keep the strict gate.
+    // Allow it through for compact === true — resumeAgent summarizes the wedged
+    // session out-of-band, kills it, and respawns a fresh session seeded with
+    // the summary (PAN-1781; its own canResume handles the running case).
+    // Non-compact resumes keep the strict gate.
     if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck && compact !== true) {
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
@@ -2618,12 +2619,13 @@ const postAgentsRoute = HttpRouter.add(
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
-      yield* Effect.promise(() => writeAutoStartVBrief(projectPath, workspacePath, {
+      // writeAutoStartVBrief is Effect-returning — yield it directly (PAN-1768).
+      yield* writeAutoStartVBrief(projectPath, workspacePath, {
         issueId,
         title: issueTitle,
         body: issueBody,
         url: cachedIssue?.url,
-      }));
+      });
       planPath = yield* findPlan(workspacePath);
     }
     if (!planPath) {
@@ -2793,29 +2795,34 @@ const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    try {
-      yield* Effect.promise(() => validateProviderHealth(spawnModel));
-    } catch (err) {
-      if (err instanceof ProviderHealthError) {
-        return jsonResponse({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: err.message,
-          hint: err.probeResult.kind === 'quota'
-            ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
-            : err.probeResult.kind === 'auth'
-              ? 'Check your API key in Settings → Providers.'
-              : 'The provider may be temporarily unavailable. Try again later or switch models.',
-          providerHealth: {
-            provider: err.provider.name,
-            model: err.model,
-            kind: err.probeResult.kind,
-            status: err.probeResult.status,
-          },
-        }, { status: 429 });
-      }
-      throw err;
+    // validateProviderHealth returns an Effect (typed ProviderHealthError
+    // channel) — wrapping it in Effect.promise handed a non-thenable to the
+    // runtime and crashed the whole request (PAN-1768).
+    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+      Effect.match({
+        onFailure: (err) => ({ _tag: 'failure' as const, err }),
+        onSuccess: () => ({ _tag: 'success' as const, err: null }),
+      }),
+    );
+    if (providerHealthCheck._tag === 'failure' && providerHealthCheck.err) {
+      const err = providerHealthCheck.err;
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: err.message,
+        hint: err.probeResult.kind === 'quota'
+          ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
+          : err.probeResult.kind === 'auth'
+            ? 'Check your API key in Settings → Providers.'
+            : 'The provider may be temporarily unavailable. Try again later or switch models.',
+        providerHealth: {
+          provider: err.provider.name,
+          model: err.model,
+          kind: err.probeResult.kind,
+          status: err.probeResult.status,
+        },
+      }, { status: 429 });
     }
 
     if (!isRemote) {
@@ -2896,25 +2903,27 @@ const postAgentsRoute = HttpRouter.add(
     // commit only happens when projectPath is on main; otherwise the on-disk
     // move still applies and a later sync will pick it up. Failure is non-fatal
     // — agent spawn proceeds even if the lifecycle move fails.
-    yield* Effect.promise(() =>
-      transitionVBriefOnMain(
-        projectPath,
-        issueId,
-        'active',
-        'approved',
-        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
-      )
-        .then((result) => {
+    // transitionVBriefOnMain is Effect-returning — match on it directly (PAN-1768).
+    yield* transitionVBriefOnMain(
+      projectPath,
+      issueId,
+      'active',
+      'approved',
+      `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+    ).pipe(
+      Effect.match({
+        onSuccess: (result) => {
           if (result.moved) {
             console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
           }
           if (result.committed) {
             console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
           }
-        })
-        .catch((err) => {
+        },
+        onFailure: (err) => {
           console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
-        }),
+        },
+      }),
     );
 
     // Running transition (PAN-946): set workspace plan.status to 'running'.

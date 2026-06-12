@@ -83,7 +83,8 @@
               "features/skills",
               "features/workspaces",
               "features/convoys",
-              "features/swarm"
+              "features/swarm",
+              "features/merge-batches"
             ]
           }
         ]
@@ -96,6 +97,7 @@
             "pages": [
               "configuration/projects",
               "configuration/harnesses",
+              "configuration/context-layers",
               "configuration/issue-trackers",
               "configuration/polyrepo",
               "configuration/auto-merge"

@@ -7,9 +7,11 @@ import type { NetworkInterfaceInfo } from 'node:os';
 import {
   DASHBOARD_SESSION_COOKIE,
   _resetDashboardSessionTokenForTests,
+  dashboardCsrfToken,
   dashboardSessionCookieHeader,
   hasDashboardAuthHeaders,
   peerIsHostLocalDockerBridge,
+  peerIsLocalContainerNetwork,
   rejectUnauthorizedDashboardSessionMintRequest,
 } from '../dashboard-auth.js';
 
@@ -82,6 +84,48 @@ describe('dashboard session token persistence', () => {
   });
 });
 
+describe('dashboard CSRF token persistence', () => {
+  beforeEach(() => {
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  it('keeps the CSRF token stable across a restart (token regen)', () => {
+    // The frontend caches the CSRF token once per page load; a random
+    // per-process value 403'd every mutation from open tabs after each
+    // dashboard restart (flywheel post-merge deploys restart the dashboard).
+    const before = dashboardCsrfToken();
+    _resetDashboardSessionTokenForTests();
+    expect(dashboardCsrfToken()).toBe(before);
+  });
+
+  it('honors PANOPTICON_DASHBOARD_CSRF_TOKEN override over internal-token derivation', () => {
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'explicit-csrf-override';
+    _resetDashboardSessionTokenForTests();
+    expect(dashboardCsrfToken()).toBe('explicit-csrf-override');
+  });
+
+  it('rotates the CSRF token when the internal token rotates, independently of the session token', () => {
+    const before = dashboardCsrfToken();
+    expect(before).not.toBe(requestCookie(dashboardSessionCookieHeader()).split('=')[1]);
+
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'rotated-internal-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+
+    expect(dashboardCsrfToken()).not.toBe(before);
+  });
+});
+
 describe('dashboard session mint auth gate', () => {
   beforeEach(() => {
     process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
@@ -144,5 +188,40 @@ describe('peerIsHostLocalDockerBridge — host-local Traefik trust', () => {
       'br-rogue': [ipv4('8.8.0.1', '255.255.0.0')],
     };
     expect(peerIsHostLocalDockerBridge('8.8.0.2', publicBridge)).toBe(false);
+  });
+});
+
+describe('peerIsLocalContainerNetwork — in-container Traefik trust', () => {
+  // Mirrors a workspace/UAT stack server container: veth endpoints on the
+  // project-private devnet and the shared panopticon network. No docker0/br-*
+  // names exist inside a container — that's exactly why the host check missed.
+  const interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = {
+    lo: [{ ...ipv4('127.0.0.1', '255.0.0.0'), internal: true }],
+    eth0: [ipv4('172.21.0.3', '255.255.0.0')],
+    eth1: [ipv4('172.18.0.7', '255.255.0.0')],
+  };
+
+  it('trusts a peer on one of the container\'s own Docker network subnets (the Traefik case)', () => {
+    expect(peerIsLocalContainerNetwork('172.18.0.2', interfaces)).toBe(true);
+    expect(peerIsLocalContainerNetwork('172.21.0.9', interfaces)).toBe(true);
+  });
+
+  it('rejects peers outside every attached subnet', () => {
+    expect(peerIsLocalContainerNetwork('172.30.0.5', interfaces)).toBe(false);
+    expect(peerIsLocalContainerNetwork('10.1.2.3', interfaces)).toBe(false);
+  });
+
+  it('rejects public IPs, malformed input, and internal interfaces', () => {
+    expect(peerIsLocalContainerNetwork('8.8.8.8', interfaces)).toBe(false);
+    expect(peerIsLocalContainerNetwork('not-an-ip', interfaces)).toBe(false);
+    // lo is internal:true — a 127.x peer must not be trusted via the subnet path.
+    expect(peerIsLocalContainerNetwork('127.0.0.2', interfaces)).toBe(false);
+  });
+
+  it('refuses to trust a non-RFC1918 interface subnet (misconfig guard)', () => {
+    const publicIface: NodeJS.Dict<NetworkInterfaceInfo[]> = {
+      eth0: [ipv4('8.8.0.1', '255.255.0.0')],
+    };
+    expect(peerIsLocalContainerNetwork('8.8.0.2', publicIface)).toBe(false);
   });
 });

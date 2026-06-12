@@ -23,6 +23,7 @@ vi.mock('../config-yaml.js', () => ({
     test: 'workhorse:mid',
     ship: 'workhorse:mid',
     flywheel: 'claude-opus-4-7',
+    strike: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -35,7 +36,8 @@ vi.mock('../config-yaml.js', () => ({
     review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
-    flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+    strike: { model: 'workhorse:expensive' },
+    flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],
   loadConfig: () => mockLoadConfig(),
@@ -231,7 +233,7 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
-      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
+      flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
   });
@@ -255,7 +257,6 @@ describe('loadSettingsApi', () => {
     const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
 
     expect(getRoleConfig('flywheel')).toEqual({
-      harness: 'claude-code',
       model: 'claude-opus-4-7',
       effort: 'high',
       maxAgents: 8,

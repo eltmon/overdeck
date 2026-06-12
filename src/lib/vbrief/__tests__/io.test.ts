@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../io.js';
-import type { VBriefDocument } from '../types.js';
+import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
@@ -49,6 +49,11 @@ function writeWorkspaceSpec(doc: VBriefDocument): string {
   const specPath = join(specsDir, SPEC_FILENAME);
   writeFileSync(specPath, JSON.stringify({ ...doc, status: 'active' }, null, 2));
   return specPath;
+}
+
+function createWorktreeShape(): void {
+  writeFileSync(join(WORKSPACE_PATH, '.git'), 'gitdir: ../../.git/worktrees/feature-pan-100');
+  mkdirSync(join(WORKSPACE_PATH, '.pan', 'specs'), { recursive: true });
 }
 
 function writeWorkspaceDraft(doc: VBriefDocument): string {
@@ -97,13 +102,13 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
-  it('resolves the workspace-local spec when the workspace is itself a git worktree', () => {
-    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
-    writeFileSync(join(WORKSPACE_PATH, '.git'), 'gitdir: ../../.git/worktrees/feature-pan-100');
+  it('resolves the parent project spec when the workspace is itself a git worktree', () => {
+    createWorktreeShape();
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -112,6 +117,29 @@ describe('findPlan', () => {
     const draftPath = writeWorkspaceDraft(doc);
 
     expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
+  });
+
+  it('keeps the workspace draft fallback for a git worktree before promotion', () => {
+    createWorktreeShape();
+    const doc = makePlanDoc([{ id: 'draft-worktree-item' }]);
+    doc.plan.id = ISSUE_ID.toLowerCase();
+    const draftPath = writeWorkspaceDraft(doc);
+
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('draft-worktree-item');
+  });
+
+  it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
+    createWorktreeShape();
+    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'canonical-item' }]));
+    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+
+    const result = findPlanSync(WORKSPACE_PATH);
+
+    expect(result).toBe(projectSpec);
+    expect(result?.startsWith(join(PROJECT_ROOT, '.pan', 'specs'))).toBe(true);
+    expect(result?.startsWith(join(WORKSPACE_PATH, '.pan', 'specs'))).toBe(false);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-item');
   });
 
   it('ignores workspace drafts for a different issue', () => {
@@ -171,6 +199,29 @@ describe('readWorkspacePlan', () => {
     const result = readWorkspacePlanSync(WORKSPACE_PATH);
     expect(result).not.toBeNull();
     expect(result!.plan.items[0].id).toBe('draft-x');
+  });
+
+  it('returns equivalent child item views for v0.5 subItems and v0.6 items', () => {
+    const childItems: VBriefSubItem[] = [
+      { id: 'item-1.ac1', title: 'First AC', status: 'pending', metadata: { kind: 'acceptance_criterion' } },
+      { id: 'item-1.ac2', title: 'Second AC', status: 'completed', metadata: { kind: 'acceptance_criterion' } },
+    ];
+    const legacyDoc = makePlanDoc([{ id: 'item-1' }]);
+    legacyDoc.vBRIEFInfo.version = '0.5';
+    legacyDoc.plan.items[0].subItems = childItems;
+    writePlanDoc(legacyDoc);
+    const legacyView = readWorkspacePlanSync(WORKSPACE_PATH)!;
+
+    rmSync(PROJECT_ROOT, { recursive: true, force: true });
+    mkdirSync(WORKSPACE_PATH, { recursive: true });
+
+    const currentDoc = makePlanDoc([{ id: 'item-1' }]);
+    currentDoc.vBRIEFInfo.version = '0.6';
+    currentDoc.plan.items[0].items = childItems;
+    writePlanDoc(currentDoc);
+    const currentView = readWorkspacePlanSync(WORKSPACE_PATH)!;
+
+    expect(subItemsOf(currentView.plan.items[0])).toEqual(subItemsOf(legacyView.plan.items[0]));
   });
 });
 
@@ -244,6 +295,14 @@ describe('updateSubItemStatus', () => {
     };
   }
 
+  function makePlanWithItems(): VBriefDocument {
+    const doc = makePlanWithSubItems();
+    doc.vBRIEFInfo.version = '0.6';
+    doc.plan.items[0].items = doc.plan.items[0].subItems;
+    delete doc.plan.items[0].subItems;
+    return doc;
+  }
+
   it('no-ops when no plan exists', () => {
     expect(() => updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'item-1.ac1', 'completed')).not.toThrow();
   });
@@ -291,6 +350,30 @@ describe('updateSubItemStatus', () => {
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
+    expect(sub?.status).toBe('completed');
+  });
+
+  it('applies compact status overrides to v0.6 items children', () => {
+    const doc = makePlanWithItems();
+    writePlanDoc(doc);
+    const panDir = join(WORKSPACE_PATH, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(join(panDir, 'continue.json'), JSON.stringify({
+      version: '1',
+      issueId: ISSUE_ID,
+      created: '2026-01-01T00:00:00Z',
+      updated: '2026-01-01T00:00:00Z',
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+      statusOverrides: { 'item-1.ac1': 'completed' },
+    }));
+
+    const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
+    const sub = subItemsOf(updated.plan.items[0]).find(s => s.id === 'item-1.ac1');
     expect(sub?.status).toBe('completed');
   });
 

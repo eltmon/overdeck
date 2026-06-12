@@ -5,7 +5,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
@@ -27,6 +27,8 @@ export interface ProjectFeatureResourceDetails {
   branchDrifted?: boolean;
   /** PAN-1523: true when workspace path is configured but missing on disk. */
   workspaceMissing?: boolean;
+  /** PAN-1676: remote (fly.io) work agent for this issue, when one is active. */
+  remoteAgent?: { vmName: string; status: string; model: string; startedAt: string } | null;
 }
 
 export interface ProjectFeatureResourceIdentifiers {
@@ -83,6 +85,7 @@ interface ProjectNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
+  onUnpauseSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
@@ -173,7 +176,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -265,6 +268,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               onViewTerminal={onViewTerminal}
               onPauseSession={onPauseSession}
               onResumeSession={onResumeSession}
+              onUnpauseSession={onUnpauseSession}
               onRestartSession={onRestartSession}
               onDeepWipe={onDeepWipe}
               onOpenStateDir={onOpenStateDir}

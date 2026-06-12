@@ -49,6 +49,8 @@ export function findAllWorkspacePaths(projectPath: string, issueLower: string): 
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
   const candidates = [
     join(projectPath, 'workspaces', `feature-${issueLower}`),
+    // Strike worktrees (`pan strike`) use the `-strike` suffix (PAN-1721)
+    join(projectPath, 'workspaces', `feature-${issueLower}-strike`),
     join(projectPath, 'workspaces', `feature-${numericSuffix}`),
     join(projectPath, 'workspaces', issueLower),
     join(projectPath, '.worktrees', issueLower),

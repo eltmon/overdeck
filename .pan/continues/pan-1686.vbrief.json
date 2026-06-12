@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1686",
   "created": "2026-06-09T00:33:55.138Z",
-  "updated": "2026-06-09T22:32:08.913Z",
+  "updated": "2026-06-11T07:26:38.490Z",
   "gitState": {
     "branch": "feature/pan-1686",
     "sha": "9a2b57507",
@@ -47,8 +47,8 @@
     },
     {
       "id": "D8",
-      "summary": "Frontend fetches the new endpoint with a second parallel useQueries keyed ['uat-context', issueId], mirroring the existing workspace useQueries (staleTime ~30s). No fetch waterfall; the section shows a lightweight loading state and degrades gracefully on error.",
-      "recordedAt": "2026-06-09T00:40:00.000Z"
+      "summary": "Frontend lazy-loads the UAT context from GET /api/workspaces/:issueId/uat-context inside AwaitingMergeRow only when the operator expands the collapsed section; the query is cached and disables polling/window-focus refetch.",
+      "recordedAt": "2026-06-11T01:17:20.211Z"
     }
   ],
   "hazards": [
@@ -121,15 +121,67 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-09T22:32:08.913Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-10T01:17:52.580Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-10T01:30Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-10T01:30:12.674Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T08:04:33.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T01:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T01:13:41.989Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T01:13:42.921Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T01:15Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T01:15:36.505Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T01:18Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T01:18:17.512Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T01:22Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T01:22:07.255Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T01:26Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-11T01:26:24.161Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T05:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T05:18:54.281Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T05:31:40.549Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T05:38Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T05:38:33.181Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-09T22:32:07Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1686\n\n# Review Synthesis — PAN-1686 — 2026-06-09T22:31:05Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/context.json\n- Branch: feature/pan-1686\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686\n- HEAD reviewed: 8050ba0f491df8c898d7ae4b134b4d0ce42cbc51\n- PR diff base: a84369005f3f886acae0751cb8efb2b6177a00f8\n- Cycle number: 5\n- Prior cycle SHA: 531ca7ee8b6b6e50ecf493b788e95a61cc3fde3d\n- PR commits: 6\n- Cycle diff since prior synthesis: includes `src/dashboard/server/routes/workspaces.ts`, `src/dashboard/frontend/src/components/AwaitingMergePage.tsx`, `src/dashboard/frontend/src/components/AwaitingMergePage.test.tsx`, `docs/FLYWHEEL.md`, `.panopticon/projects.yaml`, and other files changed between the prior reviewed SHA and this reviewed SHA.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/requirements.md | 3 |\n\n## Blocking Findings\n\n### [performance] Synchronous workspace existence check blocks the dashboard HTTP event loop — `src/dashboard/server/routes/workspaces.ts:1963`\nThe performance reviewer found that `readWorkspaceUatChangedFiles()` performs `existsSync(workspacePath)` in the `GET /api/workspaces/:issueId/uat-context` request path before the otherwise-async git probes. This is PR-scoped to the new UAT-context route and survives the convergence gate because `src/dashboard/server/routes/workspaces.ts` is in the cycle diff since the prior synthesis. Replace the synchronous check with an async `access()` check or rely on the existing async git failure path.\n\n### [requirements] Awaiting Merge cards do not implement the required UAT-context UI — AC #10 through AC #16\n**Scope:** in_pr_scope. The requirements reviewer found the reviewed head lacks the frontend `UatContext` type/fetch helper, per-row UAT-context query wiring, optional row props, default-collapsed “What to test / Expected changes” section, acceptance-criteria checklist/fallback behavior, `uatNotes` rendering, deliverables rendering, changed-file summary, truncation affordance, and empty states. This blocks because the issue’s visible feature is not present on Awaiting Merge cards at the reviewed head.\n\n### [requirements] Promised frontend tests for the card UI are absent — AC #18 and AC #19\n**Scope:** in_pr_scope. The reviewed manifest contains backend helper tests only; it does not add frontend tests for checklist rendering from acceptance criteria, description/title fallback, changed-files summary rendering, or the collapse/expand toggle. Add the promised Awaiting Merge row/page tests for these UI behaviors.\n\n### [requirements] Flywheel/Awaiting-Merge documentation was not updated — AC #20\n**Scope:** in_pr_scope. The reviewed diff does not include documentation for the collapsible UAT-context section or its `/api/workspaces/:issueId/uat-context` data source. Update the flywheel/Awaiting-Merge docs to describe the section, vBRIEF acceptance-criteria source, deliverables/changed-files summary, and endpoint.\n\n## Non-blocking Findings\n\n### [correctness] ≉ Changed files are always empty for polyrepo workspaces — `src/dashboard/server/routes/workspaces.ts:1963`\nThe correctness reviewer noted that `readWorkspaceUatChangedFiles()` runs the exported review-context git helpers against the workspace root only. Polyrepo workspaces use child repo worktrees, so MIN/AUR-style polyrepo workspaces can fall back to `source.files: \"none\"` and `changedFiles: []` even when child repos have changes. The reviewer classified this as non-blocking; keep it as an advisory unless the issue scope is expanded to aggregate child repo diffs.\n\n## Clean Sub-roles\n- security — no security findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1686/.pan/review/agent-pan-1686-review-8050ba0f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1686 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

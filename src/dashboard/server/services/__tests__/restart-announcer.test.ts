@@ -94,15 +94,30 @@ describe('describeRestart', () => {
     expect(entry.link).toBeUndefined();
   });
 
-  it('attributes a conversation-initiated reload and links to its conversation page', () => {
+  it('attributes a conversation-initiated reload and links to its conversation ID page', () => {
+    // The initiator is a tmux session NAME; /conv/:key resolves only numeric
+    // conversation ids, so the announcer resolves through the conversations DB.
+    const resolve = (tmux: string) =>
+      tmux === 'conv-20260610-8858' ? { id: 2671, title: 'Live UAT merge train validation run' } : null;
     const entry = describeRestart({
       ...watchdogSuccess,
       trigger: 'pan reload',
       reason: undefined,
       initiator: 'conv-20260610-8858',
-    });
-    expect(entry.message).toBe('Dashboard restarted via pan reload by conversation 20260610-8858 (13.5s)');
-    expect(entry.link).toBe('/conv/20260610-8858');
+    }, resolve);
+    expect(entry.message).toBe('Dashboard restarted via pan reload by conversation 2671 ("Live UAT merge train validation run") (13.5s)');
+    expect(entry.link).toBe('/conv/2671');
+  });
+
+  it('falls back to the session name with no link when the conversation cannot be resolved', () => {
+    const entry = describeRestart({
+      ...watchdogSuccess,
+      trigger: 'pan reload',
+      reason: undefined,
+      initiator: 'conv-20260610-9999',
+    }, () => null);
+    expect(entry.message).toBe('Dashboard restarted via pan reload by conversation 20260610-9999 (13.5s)');
+    expect(entry.link).toBeUndefined();
   });
 
   it('links flywheel-orchestrator reloads to the flywheel page', () => {
@@ -131,13 +146,15 @@ describe('describeRestart', () => {
 });
 
 describe('initiatorLink', () => {
+  const resolve = (tmux: string) => (tmux === 'conv-20260610-8858' ? { id: 42 } : null);
   it.each([
     [undefined, undefined],
     ['conv-flywheel-orchestrator', '/flywheel'],
-    ['conv-20260610-8858', '/conv/20260610-8858'],
+    ['conv-20260610-8858', '/conv/42'],
+    ['conv-20260610-0000', undefined],
     ['agent-pan-1647', undefined],
   ])('%s -> %s', (initiator, expected) => {
-    expect(initiatorLink(initiator)).toBe(expected);
+    expect(initiatorLink(initiator, resolve)).toBe(expected);
   });
 });
 
@@ -167,6 +184,21 @@ describe('announceNewRestart', () => {
     expect(t.emitted).toHaveLength(0);
     expect(t.lastAnnounced()).toBe(RESTART_TS);
   });
+
+  it('does not persist the announced ts when emitting fails', async () => {
+    const t = makeDeps();
+
+    await expect(announceNewRestart({
+      ...t.deps,
+      emit: () => { throw new Error('event store not ready'); },
+    })).rejects.toThrow('event store not ready');
+
+    expect(t.lastAnnounced()).toBeNull();
+
+    expect(await announceNewRestart(t.deps)).toBe(true);
+    expect(t.emitted).toHaveLength(1);
+    expect(t.lastAnnounced()).toBe(RESTART_TS);
+  });
 });
 
 describe('startRestartAnnouncer', () => {
@@ -176,7 +208,7 @@ describe('startRestartAnnouncer', () => {
     vi.useRealTimers();
   });
 
-  it('announces a restart status that appears after boot, exactly once', async () => {
+  it('announces a restart status that appears after boot on the fast bootstrap poll, exactly once', async () => {
     const t = makeDeps(null);
     startRestartAnnouncer(t.deps);
 
@@ -184,7 +216,10 @@ describe('startRestartAnnouncer', () => {
     expect(t.emitted).toHaveLength(0);
 
     t.setStatus(watchdogSuccess);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(t.emitted).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
     expect(t.emitted).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(45_000);

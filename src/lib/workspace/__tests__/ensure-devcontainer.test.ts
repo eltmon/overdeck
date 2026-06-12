@@ -98,6 +98,25 @@ describe('renderDevcontainer', () => {
     expect(compose).not.toContain('{{FEATURE_FOLDER}}');
   });
 
+  it('lets UAT batch rendering align host folders with the UAT workspace leaf', () => {
+    renderDevcontainerSync({
+      workspacePath,
+      projectConfig: buildProjectConfig(projectPath),
+      featureName: 'pan-otter-0610',
+      placeholderOverrides: {
+        FEATURE_FOLDER: 'uat-pan-otter-0610',
+        BRANCH_NAME: 'uat/pan-otter-0610',
+        COMPOSE_PROJECT: 'project-uat-pan-otter-0610',
+      },
+    });
+    const compose = readFileSync(
+      join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
+      'utf-8',
+    );
+    expect(compose).toContain('uat-pan-otter-0610');
+    expect(compose).not.toContain('feature-uat-pan-otter-0610');
+  });
+
   it('is idempotent — second render produces identical files', () => {
     renderDevcontainerSync({
       workspacePath,
@@ -125,5 +144,30 @@ describe('renderDevcontainer', () => {
     expect(() =>
       renderDevcontainerSync({ workspacePath, projectConfig: cfg, featureName: 'min-1' }),
     ).toThrow(/compose_template/);
+  });
+
+  it('sanitizes host home paths but preserves the container user home /home/node/', () => {
+    // PAN-1764: the sanitizer rewrote container-side mount targets like
+    // /home/node/.bun/install/cache to ${HOME}/..., which compose interpolates
+    // with the HOST home — silently moving the mount where the container's
+    // `node` user never reads (same mechanism broke the PAN-1619 .codex bridge).
+    const templateDir = join(projectPath, 'infra', '.devcontainer-template');
+    writeFileSync(
+      join(templateDir, 'docker-compose.devcontainer.yml.template'),
+      'services:\n  api:\n    volumes:\n' +
+        '      - /home/somehostuser/.cache/thing:/home/node/.cache/thing\n' +
+        '      - {{PROJECTS_DIR}}:{{PROJECTS_DIR}}:ro\n',
+    );
+    renderDevcontainerSync({
+      workspacePath,
+      projectConfig: buildProjectConfig(projectPath),
+      featureName: 'min-1',
+    });
+    const rendered = readFileSync(
+      join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
+      'utf-8',
+    );
+    expect(rendered).toContain('${HOME}/.cache/thing:/home/node/.cache/thing');
+    expect(rendered).not.toMatch(/\$\{HOME\}\/\.cache\/thing:\$\{HOME\}/);
   });
 });

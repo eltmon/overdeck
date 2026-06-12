@@ -75,6 +75,12 @@ export interface RemoteConfig {
   provider?: 'fly';
   /** Default location for new workspaces */
   default_location?: 'local' | 'remote';
+  /**
+   * Overflow scale-out (PAN-1676): when starting a FRESH issue and the local
+   * work pool is at max_work_agents, route the spawn to a remote (fly.io)
+   * machine instead. Explicit --local/--remote flags always win.
+   */
+  overflow_to_remote?: boolean;
   /** Auto-hibernate idle workspaces after N minutes (0 = disabled) */
   auto_hibernate_minutes?: number;
   /** Fly.io specific configuration */

@@ -21,30 +21,66 @@ import {
 } from '../../../lib/activity-logger.js';
 import { readRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
 import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
+import { getConversationByTmuxSession } from '../../../lib/database/conversations-db.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;
+const BOOTSTRAP_POLL_MS = 1_000;
+const BOOTSTRAP_FAST_POLL_COUNT = 30;
 const ANNOUNCE_MAX_AGE_MS = 60 * 60_000;
+
+/** Minimal conversation shape the announcer needs from the initiator's tmux session. */
+export type InitiatorConversationResolver = (tmuxSession: string) => { id: number; title?: string | null } | null;
+
+/** Default resolver: the conversations DB, keyed by the initiator's tmux session name. */
+function resolveInitiatorConversation(tmuxSession: string): { id: number; title?: string | null } | null {
+  try {
+    return getConversationByTmuxSession(tmuxSession);
+  } catch {
+    return null;
+  }
+}
 
 /** Dashboard route for the restart's initiator: flywheel orchestrator → the
  *  flywheel page, conversations → their conversation page. Issue agents route
- *  via the entry's issueId instead (same destination as the issue tree). */
-export function initiatorLink(initiator: string | undefined): string | undefined {
+ *  via the entry's issueId instead (same destination as the issue tree).
+ *  The initiator string is a TMUX SESSION NAME (`conv-20260610-4123`), not a
+ *  conversation id — `/conv/:key` only resolves numeric ids, so the link must
+ *  go through the conversations DB (a name-based link landed on an empty
+ *  Command Deck). */
+export function initiatorLink(
+  initiator: string | undefined,
+  resolveConversation: InitiatorConversationResolver = resolveInitiatorConversation,
+): string | undefined {
   if (!initiator) return undefined;
   if (initiator === 'conv-flywheel-orchestrator') return '/flywheel';
-  if (initiator.startsWith('conv-')) return `/conv/${encodeURIComponent(initiator.slice('conv-'.length))}`;
+  if (initiator.startsWith('conv-')) {
+    const conv = resolveConversation(initiator);
+    return conv ? `/conv/${conv.id}` : undefined;
+  }
   return undefined;
 }
 
-function describeInitiator(initiator: string | undefined): string {
+function describeInitiator(
+  initiator: string | undefined,
+  resolveConversation: InitiatorConversationResolver,
+): string {
   if (!initiator) return '';
   if (initiator === 'conv-flywheel-orchestrator') return ' by the flywheel orchestrator';
-  if (initiator.startsWith('conv-')) return ` by conversation ${initiator.slice('conv-'.length)}`;
+  if (initiator.startsWith('conv-')) {
+    const conv = resolveConversation(initiator);
+    if (conv?.title) return ` by conversation ${conv.id} ("${conv.title}")`;
+    if (conv) return ` by conversation ${conv.id}`;
+    return ` by conversation ${initiator.slice('conv-'.length)}`;
+  }
   return ` by ${initiator}`;
 }
 
 /** Map a restart-status entry to an activity-feed entry. Pure; exported for tests. */
-export function describeRestart(status: RestartStatus): EmitActivityOptions {
+export function describeRestart(
+  status: RestartStatus,
+  resolveConversation: InitiatorConversationResolver = resolveInitiatorConversation,
+): EmitActivityOptions {
   const seconds = (status.durationMs / 1000).toFixed(1);
   if (status.trigger === 'watchdog') {
     if (status.gaveUp) {
@@ -69,7 +105,7 @@ export function describeRestart(status: RestartStatus): EmitActivityOptions {
       message: `Supervisor watchdog restarted the dashboard (attempt ${status.attempts}, ${seconds}s)${status.reason ? ` — ${status.reason}` : ''}`,
     };
   }
-  const actor = describeInitiator(status.initiator);
+  const actor = describeInitiator(status.initiator, resolveConversation);
   return {
     source: 'dashboard',
     level: status.success ? 'info' : 'error',
@@ -78,7 +114,7 @@ export function describeRestart(status: RestartStatus): EmitActivityOptions {
       : `Dashboard restart via ${status.trigger}${actor} failed`,
     details: status.error,
     issueId: status.issueId,
-    link: initiatorLink(status.initiator),
+    link: initiatorLink(status.initiator, resolveConversation),
   };
 }
 
@@ -105,27 +141,57 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
   if (!status) return false;
   if (getLastAnnounced() === status.ts) return false;
 
-  setLastAnnounced(status.ts);
   const ageMs = now() - Date.parse(status.ts);
-  if (!Number.isFinite(ageMs) || ageMs > ANNOUNCE_MAX_AGE_MS) return false;
+  if (!Number.isFinite(ageMs) || ageMs > ANNOUNCE_MAX_AGE_MS) {
+    // Too old to announce, but mark as seen so we never retry this one.
+    setLastAnnounced(status.ts);
+    return false;
+  }
 
+  // Emit first — only mark as announced if the emit wasn't silently dropped
+  // (e.g. event store not ready yet on boot). Next bootstrap poll will retry.
   emit(describeRestart(status));
+  setLastAnnounced(status.ts);
   return true;
 }
 
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let running = false;
+let runToken = 0;
 
 export function startRestartAnnouncer(deps: RestartAnnouncerDeps = {}): void {
-  if (timer) return;
-  const pass = () => {
-    void announceNewRestart(deps).catch(() => undefined);
+  if (running) return;
+  running = true;
+  const token = ++runToken;
+  let remainingBootstrapPolls = BOOTSTRAP_FAST_POLL_COUNT;
+
+  const schedule = (delayMs: number) => {
+    if (!running || token !== runToken) return;
+    timer = setTimeout(pass, delayMs);
+    timer.unref?.();
   };
+
+  const nextDelay = (emitted: boolean): number => {
+    if (emitted) return POLL_MS;
+    if (remainingBootstrapPolls > 0) {
+      remainingBootstrapPolls -= 1;
+      return BOOTSTRAP_POLL_MS;
+    }
+    return POLL_MS;
+  };
+
+  const pass = () => {
+    void announceNewRestart(deps)
+      .then((emitted) => schedule(nextDelay(emitted)))
+      .catch(() => schedule(nextDelay(false)));
+  };
+
   pass();
-  timer = setInterval(pass, POLL_MS);
-  timer.unref?.();
 }
 
 export function stopRestartAnnouncer(): void {
-  if (timer) clearInterval(timer);
+  running = false;
+  runToken += 1;
+  if (timer) clearTimeout(timer);
   timer = null;
 }

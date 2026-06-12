@@ -16,7 +16,7 @@ import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_P
  */
 
 import { randomUUID } from 'node:crypto';
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync, createReadStream, readFileSync } from 'node:fs';
 import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -29,7 +29,11 @@ import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
-import { modelSupportsImagesSync } from '../../../lib/model-capabilities.js';
+import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
+import {
+  decideSwitchStrategy,
+  getEffectiveTargetWindow,
+} from '../../../lib/conversations/switch-strategy.js';
 import {
   findCommitAtTime,
   diffSinceCommit,
@@ -46,6 +50,8 @@ import * as Multipart from 'effect/unstable/http/Multipart';
 import {
   listConversations,
   listArchivedConversationsWithEnrichment,
+  getStuckForks,
+  incrementForkRetryCount,
   getConversationByName,
   getConversationByClaudeSessionId,
   getConversationById,
@@ -60,6 +66,7 @@ import {
   setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
   updateConversationForkFallbackReason,
+  setForkRequest,
   recordConversationHandoff,
   backfillConversationModel,
   archiveConversation,
@@ -74,6 +81,7 @@ import {
   type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
   type Conversation,
+  type ForkRequest,
 } from '../../../lib/database/conversations-db.js';
 import {
   sendRawKeystroke,
@@ -84,6 +92,7 @@ import {
   killSession,
   createSession,
   setOption,
+  exactPaneTarget,
   listSessionNames,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
@@ -110,7 +119,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { getProviderForModelSync } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -129,6 +138,8 @@ import {
 } from '../services/conversation-service.js';
 import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
+import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
+import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
 import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
@@ -174,11 +185,133 @@ import {
 } from '../services/conversation-attachments.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_LENGTH = 50_000;
 const MAX_FILENAME_LENGTH = 255;
 const PTY_SUPERVISOR_SOCKET_WAIT_MS = 30_000;
 const CONVERSATION_LIST_ENRICHMENT_CONCURRENCY = 8;
+const PROCESS_CLEANUP_GRACE_MS = 750;
+
+type ProcessTableRow = {
+  pid: number;
+  ppid: number;
+  args: string;
+};
+
+function parseProcessTable(output: string): ProcessTableRow[] {
+  return output
+    .split('\n')
+    .map((line) => {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (!match) return null;
+      return {
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        args: match[3] ?? '',
+      };
+    })
+    .filter((row): row is ProcessTableRow => row !== null && Number.isFinite(row.pid) && Number.isFinite(row.ppid));
+}
+
+async function readProcessTable(): Promise<ProcessTableRow[]> {
+  const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=,args='], {
+    encoding: 'utf-8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return parseProcessTable(stdout);
+}
+
+function collectProcessTree(rootPids: number[], rows: ProcessTableRow[]): number[] {
+  const childrenByParent = new Map<number, number[]>();
+  for (const row of rows) {
+    const children = childrenByParent.get(row.ppid) ?? [];
+    children.push(row.pid);
+    childrenByParent.set(row.ppid, children);
+  }
+
+  const seen = new Set<number>();
+  const ordered: number[] = [];
+  const visit = (pid: number) => {
+    if (seen.has(pid) || pid === process.pid) return;
+    seen.add(pid);
+    for (const child of childrenByParent.get(pid) ?? []) visit(child);
+    ordered.push(pid);
+  };
+
+  for (const pid of rootPids) visit(pid);
+  return ordered;
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function terminatePids(pids: number[]): Promise<void> {
+  if (pids.length === 0) return;
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // Already gone.
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, PROCESS_CLEANUP_GRACE_MS));
+
+  for (const pid of pids) {
+    if (!isProcessAlive(pid)) continue;
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Already gone or permission denied; callers log the cleanup attempt.
+    }
+  }
+}
+
+function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+  const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
+  const sessionId = conv.claudeSessionId?.trim();
+  const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+
+  return rows
+    .filter((row) => {
+      if (row.pid === process.pid) return false;
+      if (row.args.includes(launcherScript)) return true;
+      return sessionNeedles.some((needle) => row.args.includes(needle));
+    })
+    .map((row) => row.pid);
+}
+
+async function killConversationRuntimeProcesses(conv: Conversation): Promise<void> {
+  const rows = await readProcessTable();
+  const rootPids = conversationRuntimeRootPids(conv, rows);
+  const pids = collectProcessTree(rootPids, rows);
+  await terminatePids(pids);
+}
+
+async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
+  // PAN-1458: post-/clear sibling rows share one tmux pane. If another active
+  // conversation still owns that pane, only end this DB row.
+  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
+    return;
+  }
+
+  await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+
+  try {
+    await killConversationRuntimeProcesses(conv);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
+  }
+}
 
 /** Quote a string for safe use in a bash script using single-quote wrapping. */
 function shellQuote(str: string): string {
@@ -186,7 +319,92 @@ function shellQuote(str: string): string {
 }
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW = 200_000;
+const SWITCH_MODEL_STATUSLINE_TIMEOUT_MS = 5_000;
+const SWITCH_MODEL_STATUSLINE_POLL_MS = 250;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
+
+function modelCapabilityForModel(model: string | null | undefined) {
+  if (!model) return undefined;
+  const resolvedModel = resolveModelIdSync(model);
+  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+    ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
+    : undefined;
+}
+
+function registryContextWindowForModel(model: string | null | undefined): number {
+  return modelCapabilityForModel(model)?.contextWindow ?? DEFAULT_SWITCH_MODEL_CONTEXT_WINDOW;
+}
+
+function displayNameForModel(model: string): string {
+  return modelCapabilityForModel(model)?.displayName ?? model;
+}
+
+async function isCliproxyRoutedModel(model: string | null | undefined): Promise<boolean> {
+  if (!model) return false;
+  return getProviderForModelSync(model).name === 'openai'
+    && (await getProviderAuthMode(model)) === 'subscription';
+}
+
+function providerRoutingSignature(exports: string): string {
+  return exports
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('unset '))
+    .join('\n');
+}
+
+async function hasProviderRoutingChanged(currentModel: string | null | undefined, targetModel: string | null | undefined): Promise<boolean> {
+  if (!targetModel || currentModel === targetModel) return false;
+
+  const targetSignature = providerRoutingSignature(await getProviderExportsForModel(targetModel));
+  if (!currentModel) return targetSignature !== '';
+
+  const currentSignature = providerRoutingSignature(await getProviderExportsForModel(currentModel));
+  return currentSignature !== targetSignature;
+}
+
+const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
+
+function normalizePaneLine(line: string): string {
+  return line.replace(ANSI_ESCAPE_PATTERN, '').trim().toLowerCase();
+}
+
+function modelStatuslinePrefix(line: string): string {
+  return line.startsWith('statusline:') ? line.slice('statusline:'.length).trimStart() : line;
+}
+
+function hasStatuslineModelConfirmation(pane: string, targetModel: string): boolean {
+  const targetDisplayName = displayNameForModel(targetModel).toLowerCase();
+  const targetModelId = targetModel.toLowerCase();
+  const expectedWithId = `${targetDisplayName} (${targetModelId})`;
+
+  for (const rawLine of pane.split(/\r?\n/)) {
+    const line = normalizePaneLine(rawLine);
+    if (!line || line.includes('/model')) continue;
+
+    const modelLine = modelStatuslinePrefix(line);
+    if (modelLine === targetModelId || modelLine.startsWith(`${targetModelId} `)) return true;
+    if (modelLine === expectedWithId || modelLine.startsWith(`${expectedWithId} `)) return true;
+  }
+
+  return false;
+}
+
+async function waitForModelStatusline(tmuxSession: string, targetModel: string): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < SWITCH_MODEL_STATUSLINE_TIMEOUT_MS) {
+    const pane = await Effect.runPromise(
+      capturePane(tmuxSession, 10).pipe(Effect.catch(() => Effect.succeed(''))),
+    );
+    if (hasStatuslineModelConfirmation(pane, targetModel)) {
+      return true;
+    }
+    await new Promise(r => setTimeout(r, SWITCH_MODEL_STATUSLINE_POLL_MS));
+  }
+  return false;
+}
+
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
@@ -495,36 +713,9 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
  * indicates Pi has drawn at least its title/prompt line. This is the same
  * shape of readiness check we use for Claude Code's interactive prompt.
  */
-/**
- * Map a Panopticon model id to the matching Pi-side provider name. Pi has
- * its own provider taxonomy (`pi --list-models`); the IDs differ from our
- * internal {@link getProviderForModelSync}. Returning `undefined` lets Pi fall
- * back to its registry order.
- *
- * Pi conversations rely on the user's own Pi auth (`~/.pi/agent/auth.json`).
- * We only constrain *which* Pi provider Pi uses; we never inject keys.
- */
-function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModelSync(modelId).name;
-  switch (provider) {
-    case 'openai':
-      return 'openai-codex';
-    case 'anthropic':
-      return 'anthropic';
-    case 'google':
-      return 'google';
-    case 'minimax':
-      return 'minimax';
-    case 'zai':
-      return 'zai';
-    case 'kimi':
-      return 'kimi-coding';
-    case 'mimo':
-      return 'xiaomi';
-    default:
-      return undefined;
-  }
-}
+// piProviderForModel moved to src/lib/providers.ts so the work-agent launcher
+// (launcher-generator.ts buildPiCommand) and conversations share one source of
+// truth for the Pi provider taxonomy (PAN-1799 follow-up).
 
 async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -647,6 +838,22 @@ export function parseSummaryForkFocus(value: unknown): { ok: true; focus: string
   if (focus.length > 500) return { ok: false, error: 'focus must be 500 characters or fewer' };
   if (/[\x00-\x1f\x7f]/u.test(focus)) return { ok: false, error: 'focus must not contain control characters' };
   return { ok: true, focus };
+}
+
+export function buildForkRequest(params: ForkRequest): ForkRequest {
+  return {
+    parentConversationName: params.parentConversationName,
+    sessionId: params.sessionId,
+    forkMode: params.forkMode,
+    ...(params.summaryModel !== undefined ? { summaryModel: params.summaryModel } : {}),
+    localSummaryOnly: params.localSummaryOnly,
+    ...(params.includeThinkingInSummary !== undefined ? { includeThinkingInSummary: params.includeThinkingInSummary } : {}),
+    ...(params.summaryHarness !== undefined ? { summaryHarness: params.summaryHarness } : {}),
+    ...(params.handoffFocus !== undefined ? { handoffFocus: params.handoffFocus } : {}),
+    handoffAuthor: params.handoffAuthor,
+    ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
+    ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
+  };
 }
 
 function safeUploadExtension(filename: string, mimeType: string): string {
@@ -855,6 +1062,15 @@ export async function handleConversationMessage(
     );
   }
 
+  // PAN-1635/PAN-1769: capture the transcript offset BEFORE delivery so the
+  // eaten-by-compaction watcher below can tell whether this message ever
+  // landed. Claude-only — the probe parses Claude-format JSONL.
+  let watchFromByteOffset: number | null = null;
+  if (harness === 'claude-code' && conv.claudeSessionId) {
+    const snapshot = await captureTranscriptUserRecordSnapshot(conv.cwd, conv.claudeSessionId);
+    watchFromByteOffset = snapshot.readOffset ?? snapshot.fileSize ?? 0;
+  }
+
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
@@ -868,6 +1084,28 @@ export async function handleConversationMessage(
       return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
     }
     throw deliveryErr;
+  }
+
+  // Watch in the background for Claude Code's submit-time compaction eating
+  // the just-delivered prompt (compact boundary lands, message doesn't) and
+  // redeliver once. The POST already returned ok by the time this matters.
+  if (watchFromByteOffset !== null && conv.claudeSessionId) {
+    void watchForEatenConversationMessage({
+      conversationName: conv.name,
+      tmuxSession: conv.tmuxSession,
+      cwd: conv.cwd,
+      sessionId: conv.claudeSessionId,
+      message: deliveredMessage,
+      deliveryMethod: resolveConversationDeliveryMethod(conv),
+      fromByteOffset: watchFromByteOffset,
+    }).then((outcome) => {
+      if (outcome === 'redelivered') {
+        console.log(`[conversations] ${conv.name}: redelivered message eaten by submit-time compaction (PAN-1635)`);
+      }
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[conversations] eaten-message watcher failed for ${conv.name}: ${msg}`);
+    });
   }
 
   // Generate AI title for conversations created via instant-start (no message at creation)
@@ -907,13 +1145,14 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promi
 }
 
 function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
-  return harness === 'claude-code'
+  return (harness === 'claude-code' || harness === 'codex')
     && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
     && process.env.PAN_DOCKER !== '1';
 }
 
 function resolveConversationDeliveryMethod(conv: Conversation): 'auto' | 'channels' | 'tmux' {
-  return conv.deliveryMethod ?? ((conv.harness ?? 'claude-code') === 'claude-code' ? 'auto' : 'tmux');
+  const harness = conv.harness ?? 'claude-code';
+  return conv.deliveryMethod ?? (harness === 'pi' ? 'tmux' : 'auto');
 }
 
 /** Synthetic toolUseId prefix marking a Codex pane-detected approval (PAN-1690). */
@@ -1277,21 +1516,32 @@ export async function spawnConversationSession(
 
     } else if (harness === 'codex') {
       // Codex conversations run in TUI mode — bare `codex` interactive terminal.
-      // Users type directly in the pane; dashboard messages arrive via tmux paste-buffer.
+      // Users type directly in the pane; dashboard messages arrive via the PTY
+      // supervisor when available, with tmux as the delivery fallback.
       //
       // Pre-seed the per-agent config so Codex never shows its first-run
       // "Decide how much autonomy" / folder-trust wizard (which otherwise fires
       // on every fresh CODEX_HOME and blocks the pane). Autonomy follows the
-      // global Panopticon yolo setting: bypass → never + danger-full-access,
-      // auto → on-request + workspace-write. This is the Codex analog of
-      // preTrustDirectory(cwd) below, which only pre-accepts Claude Code trust.
+      // codex.permissionMode setting (separate from Claude's permission mode):
+      //   read-only   → approval_policy=on-request + sandbox_mode=read-only
+      //   workspace   → approval_policy=on-request + sandbox_mode=workspace-write (default)
+      //   full-access → approval_policy=never + sandbox_mode=danger-full-access
+      // This is the Codex analog of preTrustDirectory(cwd) below, which only
+      // pre-accepts Claude Code trust.
       const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
-      const codexYolo = resolvePermissionModeSync() === 'bypass';
+      const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
+      const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
+      const codexSandboxMode =
+        codexPermMode === 'full-access' ? 'danger-full-access'
+        : codexPermMode === 'read-only' ? 'read-only'
+        : 'workspace-write';
+      const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
       const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
-        approvalPolicy: codexYolo ? 'never' : 'on-request',
-        sandboxMode: codexYolo ? 'danger-full-access' : 'workspace-write',
+        approvalPolicy: codexApprovalPolicy,
+        sandboxMode: codexSandboxMode,
+        approvalsReviewer: codexApprovalsReviewer,
       });
       codexFields = {
         harness: 'codex',
@@ -1503,7 +1753,7 @@ export async function spawnConversationSession(
 
   // Keep session alive when clients disconnect
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(tmuxSession, 'remain-on-exit', 'on'));
+  await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
 
 /**
@@ -1669,6 +1919,7 @@ function scheduleTitleRefinement(conversationName: string): void {
 
 /** Conversations with a retitle currently running — guards against double-clicks. */
 const retitleInFlight = new Set<string>();
+const EXPLICIT_RETITLE_TIMEOUT_MS = 90_000;
 
 interface ConversationAboutSummary {
   summary: string;
@@ -1823,6 +2074,13 @@ interface ListEnrichmentEntry {
 }
 const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
 
+export function conversationSessionAliveFromState(
+  conv: Pick<Conversation, 'status' | 'forkStatus'>,
+  tmuxSessionAlive: boolean,
+): boolean {
+  return conv.status === 'active' && !conv.forkStatus && tmuxSessionAlive;
+}
+
 function getEnrichedConversationList(limit: number, offset: number): Promise<unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();
@@ -1862,7 +2120,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
   const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
   return Effect.runPromise(withConcurrencyLimit(
           conversations.map((conv) => Effect.promise(async () => {
-            const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
+            const sessionAlive = conversationSessionAliveFromState(conv, liveSessionNames.has(conv.tmuxSession));
             let isWorking = false;
             let currentTool: string | null = null;
             const convSf = await resolveSessionFile(conv);
@@ -2111,7 +2369,7 @@ const getConversationRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-        const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+        const sessionAlive = conversationSessionAliveFromState(conv, await tmuxSessionExists(conv.tmuxSession));
         const convSf = await resolveSessionFile(conv);
         let contextUsage = null;
         if (convSf && existsSync(convSf)) {
@@ -2377,12 +2635,7 @@ const postConversationStopRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        // Post-/clear sibling rows share the tmux pane with their parent — killing
-        // from one would tear down the live thread.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
         markConversationEnded(name);
         // Fire-and-forget cleanup after a brief pause for in-flight JSONL writes.
         // Do NOT await — attachment pruning can read the entire JSONL and must
@@ -2574,37 +2827,79 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         }
         const harnessChanged = harness !== currentHarness;
 
+        if (!(await validateCwdContainment(conv.cwd))) {
+          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+        }
+
+        // Validate model before persisting so invalid values never reach the DB.
+        if (model && !SAFE_MODEL_PATTERN.test(model)) {
+          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+        }
+
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.claudeSessionId;
+
+        // Resolve the transcript before the kill→spawn gap so the route can decide
+        // whether compaction is actually needed for the target window.
+        const sessionFile = await resolveSessionFile(conv);
+        const cwd = conv.cwd;
+        const tmuxSession = conv.tmuxSession;
+        const effort = conv.effort ?? undefined;
+        const issueId = conv.issueId ?? undefined;
+        const targetModel = model ?? conv.model ?? undefined;
+        const providerRoutingChanged = await hasProviderRoutingChanged(conv.model, targetModel);
+        const contextUsage = sessionFile && existsSync(sessionFile)
+          ? await computeContextUsage(sessionFile, conv.model ?? targetModel ?? null)
+          : null;
+        const contextTokens = contextUsage?.estimatedTokens ?? 0;
+        const currentObservedCeiling = Math.max(contextUsage?.maxObservedInputTokens ?? 0, contextTokens);
+        const effectiveTargetWindow = getEffectiveTargetWindow({
+          registryWindow: registryContextWindowForModel(targetModel),
+          currentObservedCeiling,
+          cliproxyRouted: await isCliproxyRoutedModel(targetModel),
+          providerRoutingChanged,
+        });
+        const switchStrategy = decideSwitchStrategy({
+          harnessChanged,
+          providerRoutingChanged,
+          contextTokens,
+          effectiveTargetWindow,
+        });
+
+        if (harness === 'claude-code' && switchStrategy.useModelCommand && targetModel) {
+          if (model) setConversationModel(name, model);
+          try {
+            await deliverAgentMessage(
+              tmuxSession,
+              `/model ${targetModel}`,
+              'conversation-switch-model',
+              resolveConversationDeliveryMethod(conv),
+            );
+            if (await waitForModelStatusline(tmuxSession, targetModel)) {
+              markConversationActive(name);
+              return jsonResponse({ ...conv, status: 'active', model: targetModel, harness, reattached: false, sessionAlive: true });
+            }
+            console.warn(`[conversations] switch-model Tier 1 statusline verification timed out for ${name}; falling back to respawn`);
+          } catch (deliveryErr: unknown) {
+            const msg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+            console.warn(`[conversations] switch-model Tier 1 delivery failed for ${name}; falling back to respawn: ${msg}`);
+          }
+        }
+
         // Mark the session as mid-respawn BEFORE killing it so terminal
         // WS reconnects landing in the kill→spawn gap don't get a fatal
         // 4404. The marker is cleared in the `finally` below regardless
         // of which branch returns or throws.
-        const respawn = markRespawnPending(conv.tmuxSession);
+        const respawn = markRespawnPending(tmuxSession);
         try {
-          // Always kill the existing session first (if alive) so the model change takes effect
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-
-          if (!(await validateCwdContainment(conv.cwd))) {
-            return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-          }
-
-          // Validate model before persisting so invalid values never reach the DB.
-          if (model && !SAFE_MODEL_PATTERN.test(model)) {
-            return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-          }
+          // Tier 1 (/model in-session) is wired by the follow-up bead. Until then,
+          // every switch still respawns; the tier decision already owns whether
+          // this respawn compacts.
+          await Effect.runPromise(killSession(tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
 
           // Persist the new model and harness
           if (model) setConversationModel(name, model);
           if (harnessChanged) setConversationHarness(name, harness);
-
-          // Extract the session UUID from the existing session file path
-          const oldSessionId = conv.claudeSessionId;
-
-          // Compact (if needed) then respawn with the new model before reporting success.
-          const sessionFile = await resolveSessionFile(conv);
-          const cwd = conv.cwd;
-          const tmuxSession = conv.tmuxSession;
-          const effort = conv.effort ?? undefined;
-          const issueId = conv.issueId ?? undefined;
 
           // Only resume if the session JSONL actually exists — Claude Code's --resume
           // fails with "No conversation found" if the file is missing (e.g., first
@@ -2648,8 +2943,9 @@ const postConversationSwitchModelRoute = HttpRouter.add(
               canResume = false;
             }
           } else if (harness === 'claude-code') {
-            // Same harness, Claude Code: native (Claude-format) compaction is correct.
-            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+            // Same harness, Claude Code: native (Claude-format) compaction is correct
+            // only when the tier decision says the active context will not fit.
+            await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
           }
           // Pi staying on Pi: skip native compaction — it is Claude-format only and
           // would corrupt the Pi JSONL. Pi manages its own context.
@@ -3166,10 +3462,7 @@ const deleteConversationRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
@@ -3209,10 +3502,7 @@ const postConversationArchiveRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation is already archived' }, { status: 400 });
         }
 
-        // PAN-1458: only kill the tmux if no other active conversation shares it.
-        if (!hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-          await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
-        }
+        await stopConversationRuntime(conv, name);
 
         // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
@@ -3410,6 +3700,50 @@ function handoffTitleFromFocus(focus: string | undefined, fallback: string): str
   return `Handoff: ${trimmed}`;
 }
 
+type ForkPipelineRuntimeOverrides = Partial<{
+  sessionExists: (sessionName: string) => Promise<boolean>;
+  isHarnessProcessAlive: (sessionName: string) => Promise<boolean>;
+  spawnConversationSession: typeof spawnConversationSession;
+  waitForTmuxSession: typeof waitForTmuxSession;
+  getAgentRuntimeStateSync: typeof getAgentRuntimeStateSync;
+}>;
+
+let forkPipelineRuntimeOverrides: ForkPipelineRuntimeOverrides = {};
+
+export function __setForkPipelineRuntimeOverridesForTest(overrides: ForkPipelineRuntimeOverrides): void {
+  forkPipelineRuntimeOverrides = overrides;
+}
+
+export function __resetForkPipelineRuntimeOverridesForTest(): void {
+  forkPipelineRuntimeOverrides = {};
+}
+
+async function forkSessionExists(sessionName: string): Promise<boolean> {
+  return forkPipelineRuntimeOverrides.sessionExists
+    ? forkPipelineRuntimeOverrides.sessionExists(sessionName)
+    : Effect.runPromise(sessionExists(sessionName));
+}
+
+async function forkHarnessProcessAlive(sessionName: string): Promise<boolean> {
+  return forkPipelineRuntimeOverrides.isHarnessProcessAlive
+    ? forkPipelineRuntimeOverrides.isHarnessProcessAlive(sessionName)
+    : isHarnessProcessAlive(sessionName);
+}
+
+function forkRuntimeState(sessionName: string): ReturnType<typeof getAgentRuntimeStateSync> {
+  return forkPipelineRuntimeOverrides.getAgentRuntimeStateSync
+    ? forkPipelineRuntimeOverrides.getAgentRuntimeStateSync(sessionName)
+    : getAgentRuntimeStateSync(sessionName);
+}
+
+async function forkSpawnConversationSession(...args: Parameters<typeof spawnConversationSession>): Promise<void> {
+  return (forkPipelineRuntimeOverrides.spawnConversationSession ?? spawnConversationSession)(...args);
+}
+
+async function forkWaitForTmuxSession(...args: Parameters<typeof waitForTmuxSession>): Promise<void> {
+  return (forkPipelineRuntimeOverrides.waitForTmuxSession ?? waitForTmuxSession)(...args);
+}
+
 /**
  * Watch the hook-driven runtime mirror to confirm a delivered fork brief was
  * actually accepted as a prompt. Once a prompt is submitted the agent leaves
@@ -3429,7 +3763,7 @@ export async function confirmForkPromptAccepted(
   const deadline = Date.now() + timeoutMs;
   let sawIdle = false;
   do {
-    const state = getAgentRuntimeStateSync(tmuxSession)?.state;
+    const state = forkRuntimeState(tmuxSession)?.state;
     if (state === 'active' || state === 'waiting-on-human') return 'accepted';
     if (state === 'idle') sawIdle = true;
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -3452,6 +3786,41 @@ export async function confirmForkPromptAccepted(
  * never double-submitted; when the mirror can't tell us, we fall back to a
  * single delivery (the pre-PAN-1624 behavior).
  */
+export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDocPath'>): Promise<string | null> {
+  if (!conv.handoffDocPath || !existsSync(conv.handoffDocPath)) return null;
+  return readFile(conv.handoffDocPath, 'utf-8');
+}
+
+async function ensureForkSessionReady(
+  conv: Conversation,
+  sessionId: string,
+  resume: boolean,
+  plainFork = false,
+): Promise<void> {
+  const tmuxAlive = await forkSessionExists(conv.tmuxSession);
+  if (tmuxAlive) {
+    const harnessAlive = await forkHarnessProcessAlive(conv.tmuxSession);
+    if (harnessAlive) {
+      console.info(`[fork-pipeline] Reusing existing live tmux session ${conv.tmuxSession} for ${conv.name}`);
+      return;
+    }
+    console.warn(`[fork-pipeline] Existing tmux session ${conv.tmuxSession} for ${conv.name} is a keep-alive corpse — recreating`);
+  }
+
+  await forkSpawnConversationSession(
+    conv.tmuxSession,
+    conv.cwd,
+    sessionId,
+    conv.model ?? undefined,
+    conv.effort ?? undefined,
+    conv.issueId ?? undefined,
+    resume,
+    conv.harness ?? 'claude-code',
+    plainFork,
+  );
+  await forkWaitForTmuxSession(conv.tmuxSession);
+}
+
 async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
@@ -3489,7 +3858,7 @@ async function injectForkSummary(conv: Conversation, summary: string, caller: st
   }
 }
 
-async function runForkPipeline(
+export async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
   sessionId: string,
@@ -3517,27 +3886,26 @@ async function runForkPipeline(
       // rejects launchHarness='pi'/'codex'; this guard is defense in depth.
       throw new Error(`Plain forks cannot launch under the ${conv.harness} harness — it cannot consume Claude session history.`);
     }
-    // Plain Claude Code fork: copy JSONL from last compact boundary into the new
-    // session file, then spawn with --resume so Claude Code loads the history
-    // directly.
-    const forkSessionFile = await resolveSessionFile(conv);
-    if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-    await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+    const tmuxAlive = await forkSessionExists(conv.tmuxSession);
+    const reusableSession = tmuxAlive && await forkHarnessProcessAlive(conv.tmuxSession);
+    if (!reusableSession) {
+      // Plain Claude Code fork: copy JSONL from last compact boundary into the new
+      // session file, then spawn with --resume so Claude Code loads the history
+      // directly. A tmux keep-alive corpse is not reusable; ensureForkSessionReady()
+      // will recreate it, so refresh the session file before respawning.
+      const forkSessionFile = await resolveSessionFile(conv);
+      if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
+      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+    }
 
     updateForkStatus(convName, 'spawning');
-    await spawnConversationSession(
-      conv.tmuxSession,
-      conv.cwd,
+    await ensureForkSessionReady(
+      conv,
       sessionId,
-      conv.model ?? undefined,
-      conv.effort ?? undefined,
-      conv.issueId ?? undefined,
       true, // resume — load the copied JSONL history
-      conv.harness ?? 'claude-code',
       true, // plainFork — skip channels MCP wiring so it doesn't inflate the
             // resumed context past Claude Code's auto-compact threshold
     );
-    await waitForTmuxSession(conv.tmuxSession);
 
     // No summary injection needed for plain Claude Code forks.
     markConversationActive(convName);
@@ -3559,7 +3927,11 @@ async function runForkPipeline(
   };
 
   if (forkMode === 'handoff') {
-    if (handoffAuthor === 'external') {
+    const existingHandoffDoc = await readExistingHandoffDoc(conv);
+    if (existingHandoffDoc !== null) {
+      summary = existingHandoffDoc;
+      handoffDocPath = conv.handoffDocPath;
+    } else if (handoffAuthor === 'external') {
       // External authoring: separate session reads the source JSONL and
       // writes the doc; source conversation is never touched.
       try {
@@ -3616,22 +3988,122 @@ async function runForkPipeline(
   }
 
   updateForkStatus(convName, 'spawning');
-  await spawnConversationSession(
-    conv.tmuxSession,
-    conv.cwd,
-    sessionId,
-    conv.model ?? undefined,
-    conv.effort ?? undefined,
-    conv.issueId ?? undefined,
-    false,
-    conv.harness ?? 'claude-code',
-  );
-  await waitForTmuxSession(conv.tmuxSession);
+  await ensureForkSessionReady(conv, sessionId, false);
 
   await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
+}
+
+function parsePersistedForkRequest(raw: string): ForkRequest | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<ForkRequest>;
+    if (typeof parsed.parentConversationName !== 'string') return null;
+    if (typeof parsed.sessionId !== 'string') return null;
+    if (parsed.forkMode !== 'summary' && parsed.forkMode !== 'plain' && parsed.forkMode !== 'handoff') return null;
+    if (typeof parsed.localSummaryOnly !== 'boolean') return null;
+    if (parsed.handoffAuthor !== 'source' && parsed.handoffAuthor !== 'external') return null;
+    return parsed as ForkRequest;
+  } catch {
+    return null;
+  }
+}
+
+const inFlightForkPipelines = new Set<Promise<void>>();
+
+export function registerInFlightForkPipeline(pipeline: Promise<void>): Promise<void> {
+  const tracked = pipeline.finally(() => {
+    inFlightForkPipelines.delete(tracked);
+  });
+  inFlightForkPipelines.add(tracked);
+  return tracked;
+}
+
+export function getInFlightForkPipelineCount(): number {
+  return inFlightForkPipelines.size;
+}
+
+export async function waitForInFlightForkPipelines(timeoutMs = 10_000): Promise<{ completed: boolean; count: number }> {
+  const pipelines = [...inFlightForkPipelines];
+  const count = pipelines.length;
+  if (count === 0) return { completed: true, count: 0 };
+
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.allSettled(pipelines).then(() => ({ completed: true, count })),
+      new Promise<{ completed: boolean; count: number }>((resolve) => {
+        timeout = setTimeout(() => resolve({ completed: false, count }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+export async function recoverStuckForks(): Promise<number> {
+  const forks = getStuckForks();
+  let recovered = 0;
+
+  for (const fork of forks) {
+    try {
+      if (!fork.forkRequest) {
+        updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
+        continue;
+      }
+
+      const request = parsePersistedForkRequest(fork.forkRequest);
+      if (!request) {
+        updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
+        continue;
+      }
+
+      const tmuxAlive = await forkSessionExists(fork.tmuxSession);
+      const harnessAlive = tmuxAlive && await forkHarnessProcessAlive(fork.tmuxSession);
+      const runtimeState = harnessAlive ? forkRuntimeState(fork.tmuxSession)?.state : undefined;
+      if (harnessAlive && (runtimeState === 'active' || runtimeState === 'waiting-on-human')) {
+        markConversationActive(fork.name);
+        updateForkStatus(fork.name, null);
+        recovered += 1;
+        continue;
+      }
+
+      if (fork.forkRetryCount >= 2) {
+        updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
+        continue;
+      }
+
+      incrementForkRetryCount(fork.name);
+      const parentConv = getConversationByName(request.parentConversationName);
+      if (!parentConv) {
+        updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
+        continue;
+      }
+
+      await registerInFlightForkPipeline(runForkPipeline(
+        fork.name,
+        parentConv,
+        request.sessionId,
+        request.summaryModel,
+        request.forkMode,
+        request.localSummaryOnly,
+        request.includeThinkingInSummary,
+        request.summaryHarness,
+        request.handoffFocus,
+        request.handoffAuthor,
+        request.handoffAuthorModel,
+        request.handoffAuthorHarness,
+      ));
+      recovered += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[fork-recovery] Failed to recover ${fork.name}:`, error);
+      updateForkStatus(fork.name, 'failed', message);
+    }
+  }
+
+  return recovered;
 }
 
 const postConversationSummaryForkRoute = HttpRouter.add(
@@ -3794,9 +4266,25 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           harness: launchHarness,
           forkStatus: forkMode === 'plain' ? 'spawning' : forkMode === 'handoff' ? 'handoff' : 'summarizing',
         });
+        const forkRequest = buildForkRequest({
+          parentConversationName: conv.name,
+          sessionId,
+          forkMode,
+          ...(summaryModel !== undefined ? { summaryModel } : {}),
+          localSummaryOnly,
+          includeThinkingInSummary,
+          ...(summaryHarness !== undefined ? { summaryHarness } : {}),
+          ...(handoffFocus !== undefined ? { handoffFocus } : {}),
+          handoffAuthor,
+          ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
+          ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
+        });
+        setForkRequest(newConv.name, JSON.stringify(forkRequest));
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness).catch((err) => {
+        registerInFlightForkPipeline(
+          runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
+        ).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });
@@ -4249,8 +4737,9 @@ const postConversationRetitleRoute = HttpRouter.add(
 
         retitleInFlight.add(name);
         try {
-          console.log(`[claude-invoke] purpose=conversation-retitle | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-          const title = await summarizeTranscriptTitle(transcript, configuredTitleModel());
+          const model = configuredTitleModel();
+          console.log(`[claude-invoke] purpose=conversation-retitle | model=${model} | conversation=${name} | transcriptChars=${transcript.length}`);
+          const title = await summarizeTranscriptTitle(transcript, model, EXPLICIT_RETITLE_TIMEOUT_MS);
           if (!title) {
             return jsonResponse({ error: 'Title model returned an empty result' }, { status: 502 });
           }
@@ -4264,7 +4753,7 @@ const postConversationRetitleRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[conversations] retitle failed for "${name}":`, msg);
-        return jsonResponse({ error: 'Failed to regenerate title' }, { status: 500 });
+        return jsonResponse({ error: `Failed to regenerate title: ${msg}` }, { status: 500 });
       }
     });
   }),
@@ -4315,8 +4804,9 @@ const getConversationAboutRoute = HttpRouter.add(
         }
 
         const transcript = serializeConversationTranscript(messages);
-        console.log(`[claude-invoke] purpose=conversation-about | model=${CONVERSATION_TITLE_MODEL} | conversation=${name} | transcriptChars=${transcript.length}`);
-        const summary = await summarizeTranscriptAbout(transcript, configuredTitleModel());
+        const aboutModel = configuredTitleModel();
+        console.log(`[claude-invoke] purpose=conversation-about | model=${aboutModel} | conversation=${name} | transcriptChars=${transcript.length}`);
+        const summary = await summarizeTranscriptAbout(transcript, aboutModel);
         if (!summary) {
           return jsonResponse({ error: 'Summary model returned an empty result' }, { status: 502 });
         }

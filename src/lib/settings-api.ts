@@ -25,6 +25,7 @@ import {
   type TtsDaemonConfig,
   type ConversationSearchConfig,
   type RoleEffort,
+  type ProviderConfig,
   ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
@@ -133,6 +134,7 @@ export interface ApiSettingsConfig {
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
+    provider_harnesses?: ProviderHarnessesConfig;
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
@@ -229,6 +231,19 @@ export interface ApiSettingsConfig {
   claude?: {
     permissionMode?: 'auto' | 'bypass';
   };
+  /**
+   * Permission mode for Codex TUI conversation sessions.
+   *
+   * 'read-only'   → approval_policy=on-request + sandbox_mode=read-only
+   * 'workspace'   → approval_policy=on-request + sandbox_mode=workspace-write (default)
+   * 'auto-review' → approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write
+   * 'full-access' → approval_policy=never + sandbox_mode=danger-full-access
+   *
+   * Persisted under `codex.permissionMode` in `~/.panopticon/config.yaml`.
+   */
+  codex?: {
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+  };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -257,8 +272,11 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelIdSync('claude-sonnet-4-6');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
+type ApiModelProvider = typeof MODEL_PROVIDERS[number];
+type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName>>;
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
   review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
@@ -574,6 +592,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
       },
+      provider_harnesses: config.providerHarnesses,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
@@ -628,6 +647,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       // production loader always populates it via DEFAULT_CONFIG.
       permissionMode: config.claude?.permissionMode ?? 'auto',
     },
+    codex: {
+      permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
+    },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -678,6 +700,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['tracker_keys', config.tracker_keys],
     ['experimental', config.experimental],
     ['claude', config.claude],
+    ['codex', config.codex],
   ];
 
   for (const [key, value] of topLevelSections) {
@@ -705,10 +728,21 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
 
+function providerConfigForSave(
+  provider: ApiModelProvider,
+  enabled: boolean,
+  settings: ApiSettingsConfig,
+  currentConfig: ReturnType<typeof loadConfigSync>['config'],
+): boolean | ProviderConfig {
+  const auth = currentConfig.providerAuth?.[provider];
+  const plan = currentConfig.providerPlan?.[provider];
+  const harness = settings.models.provider_harnesses?.[provider];
+  if (!auth && !plan && !harness) return enabled;
+  return pruneUndefined({ enabled, auth, plan, harness });
+}
+
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
-  const providerAuth = currentConfig.providerAuth ?? {};
-  const providerPlan = currentConfig.providerPlan ?? {};
 
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
@@ -716,28 +750,16 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     roles: settings.roles,
     models: {
       providers: {
-        anthropic: settings.models.providers.anthropic,
-        openai: providerAuth.openai || providerPlan.openai
-          ? {
-              enabled: settings.models.providers.openai,
-              auth: providerAuth.openai,
-              plan: providerPlan.openai,
-            }
-          : settings.models.providers.openai,
-        google: providerAuth.google || providerPlan.google
-          ? {
-              enabled: settings.models.providers.google,
-              auth: providerAuth.google,
-              plan: providerPlan.google,
-            }
-          : settings.models.providers.google,
-        minimax: settings.models.providers.minimax,
-        zai: settings.models.providers.zai,
-        kimi: settings.models.providers.kimi,
-        mimo: settings.models.providers.mimo,
-        openrouter: settings.models.providers.openrouter,
-        nous: settings.models.providers.nous,
-        dashscope: settings.models.providers.dashscope,
+        anthropic: providerConfigForSave('anthropic', settings.models.providers.anthropic, settings, currentConfig),
+        openai: providerConfigForSave('openai', settings.models.providers.openai, settings, currentConfig),
+        google: providerConfigForSave('google', settings.models.providers.google, settings, currentConfig),
+        minimax: providerConfigForSave('minimax', settings.models.providers.minimax, settings, currentConfig),
+        zai: providerConfigForSave('zai', settings.models.providers.zai, settings, currentConfig),
+        kimi: providerConfigForSave('kimi', settings.models.providers.kimi, settings, currentConfig),
+        mimo: providerConfigForSave('mimo', settings.models.providers.mimo, settings, currentConfig),
+        openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
+        nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
+        dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -805,6 +827,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     claude: settings.claude?.permissionMode
       ? { permissionMode: settings.claude.permissionMode }
       : undefined,
+    codex: settings.codex?.permissionMode
+      ? { permissionMode: settings.codex.permissionMode }
+      : undefined,
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -830,6 +855,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
       providers: {
         ...current.models.providers,
         ...updates.models?.providers,
+      },
+      provider_harnesses: {
+        ...current.models.provider_harnesses,
+        ...updates.models?.provider_harnesses,
       },
       overrides: undefined,
     },
@@ -896,6 +925,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
       ...current.claude,
       ...updates.claude,
     },
+    codex: {
+      ...current.codex,
+      ...updates.codex,
+    },
   };
 
   // Save and return
@@ -948,6 +981,22 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     const enabledCount = Object.values(settings.models.providers).filter(Boolean).length;
     if (enabledCount === 0) {
       errors.push('At least one provider must be enabled');
+    }
+  }
+
+  if (settings.models?.provider_harnesses !== undefined) {
+    if (!isRecord(settings.models.provider_harnesses)) {
+      errors.push('models.provider_harnesses must be an object');
+    } else {
+      for (const [provider, harness] of Object.entries(settings.models.provider_harnesses)) {
+        if (!MODEL_PROVIDERS.includes(provider as ApiModelProvider)) {
+          errors.push(`Unknown provider harness entry "${provider}"`);
+          continue;
+        }
+        if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, or codex`);
+        }
+      }
     }
   }
 

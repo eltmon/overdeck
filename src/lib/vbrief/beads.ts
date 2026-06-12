@@ -14,10 +14,10 @@ import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
 import { runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
-import { readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
+import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
-import type { VBriefDocument, VBriefInspectionPolicy, VBriefItem, VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -155,7 +155,21 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   return { requiresInspection, inspectionDepth };
 }
 
-async function createBeadsFromVBriefPromise(workspacePath: string): Promise<CreateBeadsResult> {
+export interface CreateBeadsOptions extends BdRetryOptions {
+  /**
+   * Exact plan file to materialize beads from. Used by `pan plan finalize` so
+   * a re-plan creates beads from the workspace draft being finalized rather
+   * than the (still-stale) canonical spec on main — readWorkspacePlanSync
+   * resolves main-first, which is correct everywhere EXCEPT mid-finalize.
+   */
+  planPath?: string;
+}
+
+async function createBeadsFromVBriefPromise(
+  workspacePath: string,
+  options: CreateBeadsOptions = {},
+): Promise<CreateBeadsResult> {
+  const { planPath, ...retryOptions } = options;
   return withBdMutexPromise(() => withBdProcessLock(
     `createBeadsFromVBrief ${workspacePath}`,
     async () => {
@@ -203,7 +217,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
   }
 
   // Read the vBRIEF plan — must be spec-compliant format
-  const doc = readWorkspacePlanSync(workspacePath);
+  const doc = planPath ? readPlanSync(planPath) : readWorkspacePlanSync(workspacePath);
   if (!doc) {
     return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
   }
@@ -272,7 +286,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, { lockAlreadyHeld: true });
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, { ...retryOptions, lockAlreadyHeld: true });
   if (clearResult.errors.length > 0) {
     return {
       success: false,
@@ -368,7 +382,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
     const labelStr = labels.join(',');
 
     const actionText = item.narrative?.Action ?? '';
-    const acLines = (item.subItems ?? [])
+    const acLines = subItemsOf(item)
       .filter(s => s.metadata?.kind === 'acceptance_criterion')
       .map(s => `- AC: ${s.title}`)
       .join('\n');
@@ -416,7 +430,7 @@ async function createBeadsFromVBriefPromise(workspacePath: string): Promise<Crea
 
   return { success: errors.length === 0, created, errors, beadIds };
     },
-    { workspacePath },
+    { ...retryOptions, workspacePath },
   ));
 }
 
@@ -474,16 +488,21 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
       i => i.title.toLowerCase() === itemTitleLower
     );
 
-    if (!matchingItem) return null;
+    if (!matchingItem) {
+      console.warn(
+        `[vbrief-sync] No plan item matches bead ${beadId} (title "${itemTitle}") in plan ${planId} — AC statuses for this bead were NOT synced`,
+      );
+      return null;
+    }
 
     // io.ts handles vBRIEFInfo.updated, plan.updated, plan.sequence, and item.completed
     // timestamps automatically. Each call below constitutes one write → one sequence increment.
     updateItemStatus(workspacePath, matchingItem.id, status);
 
-    // Also mark all AC subItems as completed when the parent item is completed.
-    // Each updateSubItemStatus call increments sequence separately (one write per subItem).
-    if (status === 'completed' && matchingItem.subItems) {
-      for (const sub of matchingItem.subItems) {
+    // Also mark all AC child items as completed when the parent item is completed.
+    // Each updateSubItemStatus call increments sequence separately (one write per child item).
+    if (status === 'completed') {
+      for (const sub of subItemsOf(matchingItem)) {
         if (sub.metadata?.kind === 'acceptance_criterion' && sub.status !== 'completed') {
           updateSubItemStatus(workspacePath, matchingItem.id, sub.id, 'completed');
         }
@@ -587,9 +606,10 @@ export class BeadsOperationError extends Data.TaggedError('BeadsOperationError')
  */
 export const createBeadsFromVBrief = (
   workspacePath: string,
+  options: CreateBeadsOptions = {},
 ): Effect.Effect<CreateBeadsResult, BeadsOperationError> =>
   Effect.tryPromise({
-    try: () => createBeadsFromVBriefPromise(workspacePath),
+    try: () => createBeadsFromVBriefPromise(workspacePath, options),
     catch: (cause) =>
       new BeadsOperationError({
         operation: 'createBeadsFromVBrief',

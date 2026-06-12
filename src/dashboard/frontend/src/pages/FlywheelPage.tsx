@@ -320,6 +320,13 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
   });
   const isPaused = latestRun?.status === 'paused';
 
+  // When the run is paused, the last-emitted snapshot is stale (often hours old)
+  // and `/api/flywheel/current` returns null, while the RPC stream may still
+  // replay the frozen snapshot — so `status` flickers between the two and the
+  // header/suggestions flash-then-vanish. A paused run is not a live run: don't
+  // render its stale status anywhere. The paused/idle empty states take over.
+  const effectiveStatus = isPaused ? null : status;
+
   const setLeftWidthClamped = useCallback((next: number) => {
     const container = containerRef.current;
     const containerWidth = container?.getBoundingClientRect().width ?? window.innerWidth;
@@ -387,7 +394,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
     };
   }, []);
 
-  const freshness = status ? getLastTickFreshness(status.lastTickAt, nowMs) : null;
+  const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;
 
   return (
     <div
@@ -399,8 +406,8 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-card/60 px-5 py-2.5">
         <h1 className="font-display text-base font-semibold tracking-tight text-foreground">Fix-All Flywheel</h1>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-          <span className={status ? 'h-1.5 w-1.5 rounded-full bg-success' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground'} />
-          {status ? `running · ${status.runId}` : isPaused ? 'paused' : 'idle'}
+          <span className={effectiveStatus ? 'h-1.5 w-1.5 rounded-full bg-success' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground'} />
+          {effectiveStatus ? `running · ${effectiveStatus.runId}` : isPaused ? 'paused' : 'idle'}
         </span>
         <a
           href="https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md"
@@ -417,11 +424,11 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
             <ToggleSwitch label="Require UAT" checked={requireUatBeforeMerge} disabled={configBusy} title={REQUIRE_UAT_BEFORE_MERGE_TITLE} onChange={(next) => flywheelConfigMutation.mutate({ require_uat_before_merge: next })} />
             <ToggleSwitch label="Merge train" checked={mergeTrainEnabled} disabled={configBusy} title={MERGE_TRAIN_TITLE} onChange={(next) => flywheelConfigMutation.mutate({ merge_train_enabled: next })} />
           </div>
-          {status && (
+          {effectiveStatus && (
             <div className="flex items-center gap-4 border-l border-border pl-4">
-              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{status.system.agentsActive}/{status.system.agentsCap}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">agents</span></span>
-              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{status.activePipeline.length}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">in flight</span></span>
-              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{formatElapsed(status.elapsedMs)}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">{status.ticks} ticks</span></span>
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{effectiveStatus.system.agentsActive}/{effectiveStatus.system.agentsCap}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">agents</span></span>
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{effectiveStatus.activePipeline.length}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">in flight</span></span>
+              <span className="flex flex-col items-end leading-tight"><b className="text-[13px] text-foreground">{formatElapsed(effectiveStatus.elapsedMs)}</b><span className="text-[9px] uppercase tracking-wide text-muted-foreground/70">{effectiveStatus.ticks} ticks</span></span>
               <span className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${freshness?.className ?? ''}`}>{freshness?.label ?? '—'}</span>
             </div>
           )}
@@ -435,7 +442,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           style={{ width: `${leftWidth}px`, minWidth: `${SPLIT_MIN_LEFT}px` }}
           aria-label="Flywheel control rail"
         >
-          <MergeQueueCard active={!!status || isPaused} onNavigateIssue={onNavigateIssue} />
+          <MergeQueueCard active={!!effectiveStatus || isPaused} onNavigateIssue={onNavigateIssue} />
           <MergePolicySection onNavigateIssue={onNavigateIssue} />
           <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
 
@@ -463,8 +470,8 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
 
             <div role="tabpanel" aria-label={getTabPanelLabel(activeTab)}>
               {activeTab === 'status' ? (
-                status ? (
-                  <FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
+                effectiveStatus ? (
+                  <FlywheelStatusDetails status={effectiveStatus} onNavigateAgent={onNavigateAgent} onNavigateIssue={onNavigateIssue} />
                 ) : isPaused ? (
                   <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
                     <div>

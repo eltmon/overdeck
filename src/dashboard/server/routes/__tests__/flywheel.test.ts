@@ -17,7 +17,6 @@ import {
   getPendingAutoMergePayload,
   postAutoMergeSchedulePayload,
   postFlywheelMergeNextPayload,
-  postFlywheelAssembleUatPayload,
   postFlywheelPausePayload,
   postFlywheelReportOpenPayload,
   postFlywheelResumePayload,
@@ -29,9 +28,26 @@ import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
 import { resetDatabase } from '../../../../lib/database/index.js';
+import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
+import {
+  DASHBOARD_CSRF_HEADER,
+  DASHBOARD_SESSION_COOKIE,
+  _resetDashboardSessionTokenForTests,
+  dashboardCsrfToken,
+  dashboardSessionCookieHeader,
+} from '../dashboard-auth.js';
 import { setFlywheelAutoPickupBacklog } from '../../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-config.js';
 import { markBlocked, markFailed, scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
+
+const uatTrainMocks = vi.hoisted(() => ({
+  postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] })),
+  postUatGenerationPromotePayload: vi.fn(async () => ({ success: true as const, generation: 'uat/pan-otter-0610', mergeSha: 'merge-sha', members: ['PAN-1'], postMergeStarted: ['PAN-1'], invalidated: [] })),
+  runUatTrainReconcile: vi.fn(async () => ({ action: 'assembled' as const, invalidated: [] })),
+}));
+
+vi.mock('../../services/uat-train.js', () => uatTrainMocks);
+vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
 
 interface RouteResult {
   status: number;
@@ -810,23 +826,72 @@ describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', ()
   });
 });
 
-describe('postFlywheelAssembleUatPayload (PAN-1691 UAT assembly)', () => {
-  it('returns an empty result when there is no candidate', async () => {
-    await expect(postFlywheelAssembleUatPayload({ getCandidate: async () => null }))
-      .resolves.toEqual({ status: 200, body: { branch: null, merged: [], conflicts: [] } });
+describe('UAT mutation route auth', () => {
+  beforeEach(() => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-session-token';
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    vi.clearAllMocks();
   });
 
-  it('assembles the bundle onto the candidate branch (feature/<id> per bundled issue)', async () => {
-    const assemble = vi.fn(async (branch: string, fbs: string[]) => ({ branch, merged: fbs, conflicts: [] }));
-    const result = await postFlywheelAssembleUatPayload({
-      getCandidate: async () => ({ label: 'pan', bundled: ['PAN-1', 'PAN-2'] }),
-      branchName: () => 'uat/pan-otter-0609',
-      assemble,
-    });
-    expect(assemble).toHaveBeenCalledWith('uat/pan-otter-0609', ['feature/pan-1', 'feature/pan-2']);
-    expect(result).toEqual({
-      status: 200,
-      body: { branch: 'uat/pan-otter-0609', merged: ['feature/pan-1', 'feature/pan-2'], conflicts: [] },
-    });
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+  });
+
+  it('rejects trusted Origin alone for stack, promote, and forced assembly mutations', async () => {
+    const init = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: 'http://localhost:3011' },
+      body: '{}',
+    } satisfies RequestInit;
+
+    await expect(requestFlywheelRoute('/api/flywheel/uat-generations/pan-otter-0610/stack', init))
+      .resolves.toEqual({ status: 401, body: { error: 'unauthorized' } });
+    await expect(requestFlywheelRoute('/api/flywheel/uat-generations/pan-otter-0610/promote', init))
+      .resolves.toEqual({ status: 401, body: { error: 'unauthorized' } });
+    await expect(requestFlywheelRoute('/api/flywheel/assemble-uat', init))
+      .resolves.toEqual({ status: 401, body: { error: 'unauthorized' } });
+
+    expect(uatTrainMocks.postUatGenerationStackPayload).not.toHaveBeenCalled();
+    expect(uatTrainMocks.postUatGenerationPromotePayload).not.toHaveBeenCalled();
+    expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
+  });
+
+  it('allows internal-token callers through the unsafe mutation gate', async () => {
+    await expect(requestFlywheelRoute('/api/flywheel/uat-generations/pan-otter-0610/stack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token' },
+      body: '{}',
+    })).resolves.toEqual({ status: 200, body: { frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] } });
+
+    expect(uatTrainMocks.postUatGenerationStackPayload).toHaveBeenCalledWith('uat/pan-otter-0610');
+  });
+
+  it('allows dashboard session plus CSRF callers through the unsafe mutation gate', async () => {
+    const cookie = dashboardSessionCookieHeader().split(';')[0]!;
+
+    await expect(requestFlywheelRoute('/api/flywheel/assemble-uat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `${DASHBOARD_SESSION_COOKIE}=${cookie.split('=')[1]}`,
+        [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+        origin: 'http://localhost:3011',
+      },
+      body: '{}',
+    })).resolves.toEqual({ status: 200, body: { action: 'assembled', invalidated: [] } });
+
+    expect(uatTrainMocks.runUatTrainReconcile).toHaveBeenCalledWith({ force: true });
   });
 });
+
+// PAN-1737: the one-shot postFlywheelAssembleUatPayload was removed — POST
+// /api/flywheel/assemble-uat now forces a generation reconcile. The
+// reconciler/engine behavior is covered by tests/unit/lib/cloister/
+// uat-reconciler.test.ts and uat-generation-engine.test.ts.

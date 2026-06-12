@@ -6,6 +6,7 @@ import {
   startWorkSync,
   completeWorkSync,
 } from '../../lib/cv.js';
+import { normalizeAgentId } from '../../lib/agents.js';
 
 interface CVOptions {
   json?: boolean;
@@ -55,7 +56,7 @@ export async function cvCommand(agentId?: string, options: CVOptions = {}): Prom
   }
 
   // Show specific agent CV
-  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+  const normalizedId = normalizeAgentId(agentId);
   const cv = getAgentCVSync(normalizedId);
 
   if (options.json) {

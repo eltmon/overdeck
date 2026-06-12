@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Provider } from '../types';
+import type { Harness } from '../types';
 import { Toggle } from '../Shared/Toggle';
 import { StatusDot } from '../Shared/StatusDot';
 import { ThinkingLevelSlider } from './ThinkingLevelSlider';
@@ -18,8 +19,10 @@ export interface ProviderCardProps {
   showThinkingLevel?: boolean;
   thinkingLevel?: number;
   compatibility?: 'direct' | 'router'; // NEW: Provider compatibility type
+  harness?: Harness;
   onToggle: () => void;
   onApiKeyChange: (key: string) => void;
+  onHarnessChange: (harness: Harness) => void;
   onThinkingLevelChange?: (level: number) => void;
   onTestConnection?: () => Promise<void>;
 }
@@ -36,8 +39,10 @@ export function ProviderCard({
   showThinkingLevel = false,
   thinkingLevel = 3,
   compatibility = 'direct', // Default to direct
+  harness = 'claude-code',
   onToggle,
   onApiKeyChange,
+  onHarnessChange,
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderCardProps) {
@@ -163,6 +168,25 @@ export function ProviderCard({
                 <ThinkingLevelSlider value={thinkingLevel} onChange={onThinkingLevelChange!} />
               </div>
             )}
+
+            <label className="block space-y-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Default Harness
+              </span>
+              <select
+                value={harness}
+                onChange={(event) => onHarnessChange(event.target.value as Harness)}
+                disabled={locked}
+                className={cn(
+                  'w-full bg-background border border-border rounded-lg text-sm text-foreground px-3 py-2 focus:ring-[#a078f7] focus:border-[#a078f7]',
+                  locked && 'bg-popover text-muted-foreground cursor-not-allowed'
+                )}
+              >
+                <option value="claude-code">Claude Code</option>
+                <option value="pi">Pi</option>
+                <option value="codex">Codex</option>
+              </select>
+            </label>
           </div>
         </div>
       </div>

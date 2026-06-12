@@ -177,12 +177,21 @@ describe('CommandPalette conversation results', () => {
       await vi.advanceTimersByTimeAsync(120);
     });
 
-    expect(screen.getByText('Conversations')).toBeInTheDocument();
+    // 'Conversations'/'Memory' also appear as filter pill buttons — scope the
+    // assertions to the cmdk group headings.
+    const groupHeading = (label: string) => {
+      const heading = screen
+        .getAllByText(label)
+        .find((el) => el.hasAttribute('cmdk-group-heading'));
+      expect(heading).toBeTruthy();
+      return heading!;
+    };
+
+    const conversationsHeading = groupHeading('Conversations');
     expect(screen.getByText('semantic transcript hit')).toBeInTheDocument();
     expect(screen.getByText('needle')).toBeInTheDocument();
 
-    const conversationsHeading = screen.getByText('Conversations');
-    const memoryHeading = screen.getByText('Memory');
+    const memoryHeading = groupHeading('Memory');
     expect(conversationsHeading.compareDocumentPosition(memoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

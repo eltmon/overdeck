@@ -42,7 +42,7 @@ Ignore this bullet:
 });
 
 describe('synthesizeMinimalVBrief', () => {
-  it('creates a proposed no-inspection vBRIEF with acceptance-criterion subitems', () => {
+  it('creates a proposed no-inspection v0.6 vBRIEF with acceptance-criterion items', () => {
     const doc = synthesizeMinimalVBrief({
       issueId: 'pan-1071',
       title: 'Auto start work agents',
@@ -50,6 +50,7 @@ describe('synthesizeMinimalVBrief', () => {
       url: 'https://example.test/PAN-1071',
     });
 
+    expect(doc.vBRIEFInfo.version).toBe('0.6');
     expect(doc.vBRIEFInfo.inspectionPolicy).toBe('never');
     expect(doc.plan.id).toBe('pan-1071');
     expect(doc.plan.status).toBe('proposed');
@@ -60,10 +61,11 @@ describe('synthesizeMinimalVBrief', () => {
       inspectionDepth: 'fast',
       issueLabel: 'pan-1071',
     });
-    expect(doc.plan.items[0].subItems?.map((item) => item.title)).toEqual([
+    expect(doc.plan.items[0].items?.map((item) => item.title)).toEqual([
       'Synthesizes a minimal vBRIEF',
       'Starts the normal flow',
     ]);
+    expect(doc.plan.items[0].subItems).toBeUndefined();
   });
 });
 

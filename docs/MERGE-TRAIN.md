@@ -1,5 +1,16 @@
 # Merge Train — design, status & remaining-work PRD
 
+> **⚠️ SUPERSEDED (2026-06-10).** The merge-model described here — the disjoint-only
+> "UAT candidate" with a manual *Assemble* / *Ship batch* control — was replaced by
+> **UAT batch trains** ([PAN-1737](https://github.com/eltmon/panopticon-cli/issues/1737)):
+> auto-assembled rolling generations that resolve cross-feature conflicts *inside*
+> the batch, with "promote the batch" as the merge and on-demand live UAT stacks.
+> **For the current model see [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md).**
+> This document is retained as the historical PAN-1691 decision record (the engine,
+> the tri-state auto-merge policy, and the reconciler it describes still underpin
+> the batch trains). The verb-contract gap noted in §7 was fixed in
+> [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736).
+
 > Mind-dump / handoff for PAN-1691 and friends, written 2026-06-09 because the
 > implementing session is near compaction. This is the single source of truth
 > for what's done, what's left, every decision made, and the file map. Read this

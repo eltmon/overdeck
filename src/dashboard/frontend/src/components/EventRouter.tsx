@@ -36,6 +36,7 @@ function isSequencedDomainEvent(event: DomainEvent): event is SequencedDomainEve
 export function EventRouter() {
   const syncSnapshot = useDashboardStore((s) => s.syncSnapshot)
   const applyEvents = useDashboardStore((s) => s.applyEvents)
+  const seedRecentActivity = useDashboardStore((s) => s.seedRecentActivity)
   const recovery = useRef<RecoveryCoordinator | null>(null)
   const pendingBatch = useRef<SequencedDomainEvent[]>([])
   const flushScheduled = useRef(false)
@@ -104,6 +105,18 @@ export function EventRouter() {
       syncSnapshot(cached)
     }
 
+    // ── Activity backfill: HTTP fetch of persisted activity entries ──────────
+    async function seedRecentActivityFromApi() {
+      try {
+        const res = await fetch('/api/activity')
+        if (!res.ok) return
+        const entries = await res.json()
+        if (Array.isArray(entries)) seedRecentActivity(entries)
+      } catch {
+        // Non-fatal — live events still stream in over the WS.
+      }
+    }
+
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
     async function bootstrap() {
       if (bootstrapInFlight) return
@@ -114,6 +127,10 @@ export function EventRouter() {
           (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
         ) as DashboardSnapshot
         syncSnapshot(snapshot)
+        // The WS snapshot carries no activity history — backfill from the
+        // persisted event store so entries emitted while this page was
+        // disconnected (e.g. restart announcements at boot) still show.
+        void seedRecentActivityFromApi()
         bootstrapComplete = true
         stopFallbackPoller()
         const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
@@ -250,7 +267,7 @@ export function EventRouter() {
       stopStalenessWatchdog()
       unsubscribe?.()
     }
-  }, [syncSnapshot, applyEvents])
+  }, [syncSnapshot, applyEvents, seedRecentActivity])
 
   return null
 }

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1642",
   "created": "2026-06-07T02:10:48.815Z",
-  "updated": "2026-06-09T22:21:33.731Z",
+  "updated": "2026-06-11T13:16:59.160Z",
   "gitState": {
     "branch": "feature/pan-1642",
     "sha": "ab4ba668c",
@@ -162,7 +162,45 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-09T22:21:33.731Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-10T19:11:53.215Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T09:01:17.357Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:09Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:09:59.341Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:20Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:20:12.809Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T13:16:56.428Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:16:59.160Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-11T13:16:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1642\n\n# Review Synthesis — PAN-1642 — 2026-06-11T13:16:05Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/context.json\n- Branch: feature/pan-1642\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642\n- HEAD reviewed: 4b50618a4e085ef0fb44e4cd18f8b55ed8e73796\n- Cycle number: 9\n- Prior cycle SHA: 71aa8dbdd7f5f91a9de5e7f3e1c10914842c363f\n- PR base: 8958380924e1da424bdc590e816b023c2d116154\n- Proportionality: 2 reviewer blockers across 38 PR commits, below the 3× threshold.\n- Scope/convergence checks:\n  - The correctness finding is PR-scoped and remains promotable in cycle 9: the cited `ConversationPanel` shared query/cache-writer block at /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx:186-189 was touched since the prior synthesis (`queryFn` changed at line 188), but the change kept the HTTP query enabled while the WebSocket stream writes the same cache key.\n  - The performance finding cites /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1195. It is PR-scoped through the live stream call pattern, but no `conversation-service.ts` or `ws-rpc.ts` hunks relevant to that path changed from `71aa8dbdd7f5f91a9de5e7f3e1c10914842c363f..4b50618a4e085ef0fb44e4cd18f8b55ed8e73796`; per the convergence gate, it is demoted as previously reviewed.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/performance.md | 0 (1 demoted by convergence gate) |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Live streamed messages can be overwritten by a stale HTTP fetch — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx:186\n`ConversationPanel` still mounts the HTTP `useQuery` for `conversationMessagesQueryKey(conversation.name)` while `useConversationMessagesStream()` writes WebSocket snapshot/delta events into the same React Query cache key. The current cycle changed this shared query block to pass React Query's abort signal into `fetchMessages()`, but did not make the live WebSocket stream the only authoritative cache writer for live Claude conversations and did not guard stale HTTP responses.\n\nA stale HTTP response can therefore replace newer WebSocket-delivered assistant messages, tool calls, or tool results. Because polling is disabled when streaming is enabled, that stale cache state can remain until a later WebSocket event, remount, conversation switch, or manual refresh. This violates the live streaming acceptance criteria and the explicit no-duplicate-fetch cache requirement.\n\nRequired fix: for live Claude conversations, disable or cancel/ignore the HTTP messages query once the WebSocket stream is active and let the subscription's initial snapshot populate the cache, or add a source/version guard so older HTTP results cannot overwrite newer streamed state.\n\n## Non-blocking Findings\n\n### [correctness] Async watcher callbacks are fire-and-forget and can offer deltas out of order — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1261\n`watchConversation()` still treats callbacks as synchronous, while the subscription callback awaits `readContextUsage()` before offering a stream event. The ignored promise can let a later parse/event offer before an earlier one finishes. This is advisory because the reviewer did not justify blocker severity after the convergence gate; it should still be addressed if ordering-sensitive header or optimistic-message state proves unstable.\n\n### [performance] [demoted: previously reviewed] Live conversation updates rescan and allocate the full active JSONL window — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/server/services/conversation-service.ts:1195\nThe performance reviewer found that `subscribeConversationMessages` can call `readContextUsage()` before emitting the initial snapshot and again for usage-bearing watcher results. That path reaches `readLatestAssistantUsage()`, which allocates and parses the whole active transcript window. Large active JSONL sessions can therefore cause repeated disk reads, large allocations, and WebSocket update latency per connected viewer.\n\nThis is PR-scoped through the live stream call pattern, but it is not promotable in cycle 9: the cited scanner and relevant server stream call sites were already present before the prior synthesis, and the current cycle diff contains no relevant `conversation-service.ts` or `ws-rpc.ts` hunks. Per the convergence gate, it remains non-blocking for this cycle.\n\n### [performance] Client-side delta merge is O(history) for normal appends — /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts:20\n`mergeById()` builds duplicate-detection structures over the full prior transcript/work-log arrays on each delta. This is much smaller than the server-side scan, but can still create frontend jank for very long live conversations. Consider adding a true append fast path or carrying an id index with cached state.\n\n## Clean Sub-roles\n- security — no findings.\n- requirements — all 24 in-PR acceptance criteria were reported implemented with no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1642/.pan/review/agent-pan-1642-review-4b50618a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1642 -m \"Fixed review issues\"`"
+    }
+  ]
 }

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { getAgentRuntimeBaseCommand } from '../agents.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getAgentRuntimeBaseCommand, getRoleRuntimeBaseCommand } from '../agents.js'
 
 // CRITICAL trust property: when the user has set permissionMode=auto in Settings
 // (or via --no-yolo / PAN_YOLO=false), NO spawn path may emit
@@ -46,6 +46,30 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/--agent pan-planning-agent/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  it('role runtime command uses --agent when the role definition file exists', async () => {
+    const cmd = await getRoleRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
+    expect(cmd).toMatch(/--agent roles\/work\.md/)
+    expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
+    expect(cmd).not.toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+  })
+
+  it('role runtime command falls back to global permission flags when the role definition file is missing', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const cmd = await getRoleRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1-ship', 'ship')
+
+      expect(cmd).not.toMatch(/--agent roles\/ship\.md/)
+      expect(cmd).toMatch(/--permission-mode auto/)
+      expect(cmd).toMatch(/--model 'claude-sonnet-4-6'/)
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('roles/ship.md'))
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 
   it('Kimi direct + Auto: no DSP, --permission-mode auto', async () => {

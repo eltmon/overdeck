@@ -27,7 +27,7 @@ export function VoiceWidget({
       if (directModeRef.current === 'direct') onSendDirect(text);
     },
   });
-  const previewText = partialText || committedText;
+  const previewText = [committedText, partialText].filter(Boolean).join(' ');
 
   useEffect(() => {
     directModeRef.current = mode;
