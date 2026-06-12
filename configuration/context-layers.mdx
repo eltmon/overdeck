@@ -51,7 +51,7 @@ harness; spawn-time plumbing delivers it:
 | --- | --- | --- |
 | **Claude Code** | managed region of `~/.claude/CLAUDE.md` | Claude Code natively reads `~/.claude/CLAUDE.md` at session start |
 | **Codex** | `~/.panopticon/context/codex-global.md` | At spawn, Panopticon seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
-| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn — Pi has no global context file convention of its own |
+| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Panopticon deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
 
 The `pi-global.md` / `codex-global.md` files are **Panopticon-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
