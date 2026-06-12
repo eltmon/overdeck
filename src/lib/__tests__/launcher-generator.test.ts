@@ -922,7 +922,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       model: 'codex-4o',
       codexMode: 'work-tui',
     });
-    expect(script).toMatch(/^exec codex -m 'codex-4o' -s workspace-write -c approval_policy=never --skip-git-repo-check$/m);
+    expect(script).toMatch(/^exec codex -m 'codex-4o' -s workspace-write -c approval_policy=never$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
@@ -936,7 +936,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o' -s workspace-write -c approval_policy=never --skip-git-repo-check$/m);
+    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o' -s workspace-write -c approval_policy=never$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 

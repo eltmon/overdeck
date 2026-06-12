@@ -613,7 +613,6 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
     }
     tokens.push('-s', toCodexSandboxValue(config.codexSandboxMode));
     tokens.push('-c', 'approval_policy=never');
-    tokens.push('--skip-git-repo-check');
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }
