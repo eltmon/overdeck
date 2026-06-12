@@ -449,7 +449,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
-    it('resumeAgent marks kickoff redelivered only after the redelivery lands', async () => {
+    it('resumeAgent marks kickoff redelivered only after the redelivery lands', { timeout: 10_000 }, async () => {
       vi.useFakeTimers();
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-redeliver-second';

@@ -1,21 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildContextOverflowReseedMessage, isContextOverflowTail } from '../../src/lib/context-overflow.js';
+import { buildCompactRecoverySeedMessage, isContextOverflowTail } from '../../src/lib/context-overflow.js';
 
 const OVERFLOW_LINE = 'API Error: 400 Your input exceeds the context window of this model.';
 
-describe('buildContextOverflowReseedMessage', () => {
-  it('points only at durable recovery artifacts and warns not to restart', () => {
-    const message = buildContextOverflowReseedMessage();
+describe('buildCompactRecoverySeedMessage', () => {
+  it('embeds a compact recovery summary while pointing at durable artifacts', () => {
+    const message = buildCompactRecoverySeedMessage('PAN-1781', 'Recovered the deacon compact-respawn path.');
 
+    expect(message).toContain('Your previous session for PAN-1781 hit the model');
+    expect(message).toContain('Summary of the archived session:');
+    expect(message).toContain('Recovered the deacon compact-respawn path.');
     expect(message).toContain('.pan/continue.json');
     expect(message).toContain('bd ready');
     expect(message).toContain('bd show <id>');
     expect(message).toContain('git status');
     expect(message).toContain('git diff');
     expect(message).toMatch(/Do NOT start over/);
-    expect(message).toMatch(/prior conversation was cleared/i);
-    expect(message).toMatch(/context-window overflow/i);
+    expect(message).toMatch(/context-window/i);
+  });
+
+  it('falls back to durable artifacts when no summary is available', () => {
+    const message = buildCompactRecoverySeedMessage('PAN-1781', null);
+
+    expect(message).not.toContain('Summary of the archived session:');
+    expect(message).toContain('Read .pan/continue.json');
+    expect(message).toContain('Inspect `git status` and `git diff`');
+    expect(message).toContain('do not wait for further instructions');
   });
 });
 
