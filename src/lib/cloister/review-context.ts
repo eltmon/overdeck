@@ -57,6 +57,12 @@ export interface ChangedFile {
   riskScore: number;
 }
 
+export interface ReviewItemTrace {
+  itemId: string;
+  title: string;
+  traces: string[];
+}
+
 export interface ReviewContextManifest {
   runId: string;
   issueId: string;
@@ -69,6 +75,8 @@ export interface ReviewContextManifest {
   };
   changedFiles: ChangedFile[];
   acceptanceCriteria: string[];
+  nonGoals: string[];
+  traces: ReviewItemTrace[];
   policyNotes: string[];
   manifestPath: string;
 }
@@ -186,13 +194,23 @@ export async function getDiffStat(cwd: string, base: string): Promise<{ stat: st
   return { stat, truncated: true };
 }
 
-async function extractAcceptanceCriteria(workspace: string, issueId: string): Promise<string[]> {
+interface PlanReviewRequirements {
+  acceptanceCriteria: string[];
+  nonGoals: string[];
+  traces: ReviewItemTrace[];
+}
+
+async function extractPlanReviewRequirements(workspace: string, issueId: string): Promise<PlanReviewRequirements> {
   // Try workspace-local spec first
   const planPath = findPlanSync(workspace);
   if (planPath) {
     try {
       const doc = await Effect.runPromise(readPlan(planPath));
-      return flattenAC(doc);
+      return {
+        acceptanceCriteria: flattenAC(doc),
+        nonGoals: flattenNonGoals(doc),
+        traces: flattenTraces(doc),
+      };
     } catch {
       // Fall through to lifecycle lookup
     }
@@ -201,21 +219,28 @@ async function extractAcceptanceCriteria(workspace: string, issueId: string): Pr
   // Try project-root lifecycle directories
   try {
     const projectRoot = getDevrootPathSync();
-    if (!projectRoot) return [];
+    if (!projectRoot) return { acceptanceCriteria: [], nonGoals: [], traces: [] };
     const found = findVBriefByIssueSync(projectRoot, issueId);
     if (found) {
-      return flattenAC(found.document);
+      return {
+        acceptanceCriteria: flattenAC(found.document),
+        nonGoals: flattenNonGoals(found.document),
+        traces: flattenTraces(found.document),
+      };
     }
   } catch {
     // Non-fatal
   }
 
-  return [];
+  return { acceptanceCriteria: [], nonGoals: [], traces: [] };
 }
 
 interface PanItem {
+  id?: string;
+  title?: string;
   acceptanceCriteria?: string[];
   subItems?: Array<{ title?: string; description?: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
@@ -232,6 +257,31 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
     }
   }
   return acs;
+}
+
+function flattenNonGoals(doc: { plan?: { narratives?: Record<string, string | undefined> } }): string[] {
+  const raw = doc.plan?.narratives?.NonGoals?.trim();
+  if (!raw || raw.toLowerCase() === 'none') return [];
+  return raw
+    .split('\n')
+    .map(line => line.trim().replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function flattenTraces(doc: { plan?: { items?: PanItem[] } }): ReviewItemTrace[] {
+  const traces: ReviewItemTrace[] = [];
+  for (const item of doc.plan?.items ?? []) {
+    const raw = item.metadata?.traces;
+    if (!Array.isArray(raw)) continue;
+    const itemTraces = raw.filter((trace): trace is string => typeof trace === 'string' && trace.trim().length > 0);
+    if (itemTraces.length === 0) continue;
+    traces.push({
+      itemId: item.id ?? '<unknown>',
+      title: item.title ?? '',
+      traces: itemTraces,
+    });
+  }
+  return traces;
 }
 
 async function readPolicyNotes(workspace: string): Promise<string[]> {
@@ -279,7 +329,7 @@ export interface BuildReviewContextOpts {
 export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
-    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'policyNotes' | 'diff'
+    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'diff'
   >,
 ): string {
   const lines: string[] = [];
@@ -318,6 +368,28 @@ export function formatTier1Summary(
     }
   }
 
+  if (manifest.nonGoals.length > 0) {
+    lines.push('');
+    lines.push('NonGoals / must-not constraints:');
+    for (const [i, nonGoal] of manifest.nonGoals.slice(0, 7).entries()) {
+      lines.push(`  ${i + 1}. ${nonGoal}`);
+    }
+    if (manifest.nonGoals.length > 7) {
+      lines.push(`  ... and ${manifest.nonGoals.length - 7} more (see manifest)`);
+    }
+  }
+
+  if (manifest.traces.length > 0) {
+    lines.push('');
+    lines.push('Requirement traces:');
+    for (const trace of manifest.traces.slice(0, 7)) {
+      lines.push(`  ${trace.itemId}: ${trace.traces.join(', ')}`);
+    }
+    if (manifest.traces.length > 7) {
+      lines.push(`  ... and ${manifest.traces.length - 7} more (see manifest)`);
+    }
+  }
+
   if (manifest.policyNotes.length > 0) {
     lines.push('');
     lines.push('Policy notes:');
@@ -351,8 +423,8 @@ export function formatTier1Summary(
     getDiffStat(workspace, diffBase),
   ]);
 
-  const [acceptanceCriteria, policyNotes] = await Promise.all([
-    extractAcceptanceCriteria(workspace, issueId),
+  const [planRequirements, policyNotes] = await Promise.all([
+    extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
   ]);
 
@@ -368,7 +440,9 @@ export function formatTier1Summary(
     headSha,
     diff,
     changedFiles,
-    acceptanceCriteria,
+    acceptanceCriteria: planRequirements.acceptanceCriteria,
+    nonGoals: planRequirements.nonGoals,
+    traces: planRequirements.traces,
     policyNotes,
     manifestPath,
   };

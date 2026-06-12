@@ -857,7 +857,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       resumeSessionId: 'sess-pi-123',
     });
     expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model 'gpt-5.4-mini'/);
+    expect(script).toMatch(/exec pi --mode rpc --model 'openai-codex\/gpt-5.4-mini'/);
   });
 
   it('throws when pi launcher is missing required path config', () => {
@@ -917,7 +917,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
 
   // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
 
-  it('codex work agent (exec mode) emits approval_policy=never and workspace sandbox', () => {
+  it('codex exec mode emits approval_policy=never and workspace sandbox', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -932,17 +932,37 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--skip-git-repo-check/);
   });
 
-  it('codex work agent uses exec prefix when useExec=true (non-conversation non-plan)', () => {
+  it('codex work-tui mode emits interactive codex with only -m (approval/sandbox from config.toml)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
       harness: 'codex',
       model: 'codex-4o',
+      codexMode: 'work-tui',
     });
-    expect(script).toMatch(/^exec codex exec/m);
+    // PAN-1803: approval_policy/sandbox_mode come from the seeded config.toml
+    // (Settings-driven), NOT CLI flags that would override the user's choice.
+    expect(script).toMatch(/^exec codex -m 'codex-4o'$/m);
+    expect(script).not.toMatch(/codex exec/);
+    expect(script).not.toMatch(/approval_policy=never/);
+    expect(script).not.toMatch(/-s workspace-write/);
   });
 
-  it('codex conversation (tui) mode emits bare `codex`', () => {
+  it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'work-tui',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o'$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -950,11 +970,25 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       codexMode: 'tui',
       spawnMode: 'conversation',
     });
-    expect(script).toMatch(/^codex$/m);
+    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
     expect(script).not.toMatch(/codex exec/);
   });
 
-  it('codex is excluded from PTY supervisor wrapping', () => {
+  it('codex conversation (tui) mode can be wrapped by the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex exec mode stays off the PTY supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -963,7 +997,6 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
-    // Supervisor should NOT be applied to Codex
     expect(script).not.toMatch(/pty-supervisor/);
     expect(script).toMatch(/codex exec/);
   });
@@ -992,5 +1025,19 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     expect(a).toBe(b);
+  });
+});
+
+describe('pi model provider qualification (PAN-1799)', () => {
+  it('qualifies kimi models with the kimi-coding pi provider', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
+  });
+  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
+    // getProviderForModelSync falls back to anthropic for unknown ids — the
+    // same behavior conversations.ts has always had for pi model resolution.
+    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
   });
 });

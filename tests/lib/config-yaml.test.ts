@@ -141,6 +141,29 @@ api_keys:
       expect(config.apiKeys.dashscope).toBe('dashscope-test-key');
     });
 
+    it('normalizes provider default harnesses from object provider config', () => {
+      const { config } = mergeConfigs({
+        models: {
+          providers: {
+            openai: { enabled: true, harness: 'codex' },
+          },
+        },
+      });
+
+      expect(config.enabledProviders.has('openai')).toBe(true);
+      expect(config.providerHarnesses.openai).toBe('codex');
+    });
+
+    it('rejects invalid provider default harnesses', () => {
+      expect(() => mergeConfigs({
+        models: {
+          providers: {
+            openai: { enabled: true, harness: 'bad' as never },
+          },
+        },
+      })).toThrow('models.providers.openai.harness must be claude-code, pi, or codex');
+    });
+
     it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {
       const { config } = mergeConfigs({
         models: { providers: { anthropic: false, dashscope: false } },

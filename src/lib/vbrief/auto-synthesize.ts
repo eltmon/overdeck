@@ -63,7 +63,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
   const issueLabel = issueId.toLowerCase();
   const now = new Date().toISOString();
   const criteria = extractAcceptanceCriteriaFromIssue(issue.title, issue.body);
-  const subItems: VBriefSubItem[] = criteria.map((criterion, index) => ({
+  const items: VBriefSubItem[] = criteria.map((criterion, index) => ({
     id: `auto-start.ac${index + 1}`,
     title: criterion,
     status: 'pending',
@@ -75,7 +75,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
 
   return {
     vBRIEFInfo: {
-      version: '0.5',
+      version: '0.6',
       created: now,
       updated: now,
       author: 'panopticon-cli/auto-start',
@@ -112,7 +112,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
             inspectionDepth: 'fast',
           },
           narrative: { Action: issue.body?.trim() || issue.title },
-          subItems,
+          items,
         },
       ],
       edges: [],

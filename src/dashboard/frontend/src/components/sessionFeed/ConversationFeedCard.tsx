@@ -12,7 +12,7 @@ interface ConversationFeedCardProps {
 type AgentState = 'active' | 'waiting' | 'idle';
 
 const STATUS_DOT_COLORS: Record<AgentState, string> = {
-  active: 'bg-success',
+  active: 'bg-info', // v1.2: blue = machine working
   waiting: 'bg-warning',
   idle: 'bg-muted-foreground/60',
 };

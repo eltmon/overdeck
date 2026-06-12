@@ -9,6 +9,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockReadFile = vi.hoisted(() => vi.fn<(path: string, enc: string) => Promise<string>>());
 const mockUnlink = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>());
 const mockExistsSync = vi.hoisted(() => vi.fn<(path: string) => boolean>());
+const mockEmitDashboardLifecycleSync = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/lib/activity-logger.js', () => ({
+  emitDashboardLifecycleSync: mockEmitDashboardLifecycleSync,
+}));
 
 vi.mock('fs/promises', () => ({
   readFile: mockReadFile,
@@ -36,6 +41,7 @@ vi.mock('os', async (importOriginal) => {
 import {
   processPendingLifecycle,
   PENDING_FILE,
+  RESTART_MARKER,
   STALE_THRESHOLD_MS,
   type PendingLifecycleData,
 } from '../../../src/dashboard/server/pending-lifecycle.js';
@@ -66,6 +72,32 @@ describe('processPendingLifecycle', () => {
     await processPendingLifecycle({ pendingFile: PENDING_FILE });
     expect(mockReadFile).not.toHaveBeenCalled();
     expect(mockUnlink).not.toHaveBeenCalled();
+  });
+
+  it('emits lifecycle start from a restart marker even when no pending lifecycle file exists yet', async () => {
+    const now = Date.now();
+    mockExistsSync.mockImplementation((path) => path === RESTART_MARKER);
+    mockReadFile.mockResolvedValue(JSON.stringify({
+      reason: 'post-merge',
+      issueId: 'PAN-1744',
+      trigger: 'deploy-script',
+      timestamp: now - 1000,
+    }));
+    mockUnlink.mockResolvedValue(undefined);
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      restartMarker: RESTART_MARKER,
+      now,
+    });
+
+    expect(mockReadFile).toHaveBeenCalledWith(RESTART_MARKER, 'utf-8');
+    expect(mockUnlink).toHaveBeenCalledWith(RESTART_MARKER);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('started', {
+      reason: 'post-merge',
+      issueId: 'PAN-1744',
+      trigger: 'deploy-script',
+    });
   });
 
   it('reads and deletes the pending file', async () => {

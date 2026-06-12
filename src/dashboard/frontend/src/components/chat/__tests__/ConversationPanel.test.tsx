@@ -62,6 +62,12 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
     conversationTitleInput: 'conversationTitleInput',
     conversationTitleEditBtn: 'conversationTitleEditBtn',
     copyLinkButton: 'copyLinkButton',
+    conversationAboutToggle: 'conversationAboutToggle',
+    conversationAboutToggleActive: 'conversationAboutToggleActive',
+    conversationAboutDrawer: 'conversationAboutDrawer',
+    conversationAboutText: 'conversationAboutText',
+    conversationAboutMeta: 'conversationAboutMeta',
+    conversationAboutMuted: 'conversationAboutMuted',
     viewToggle: 'viewToggle',
     viewToggleBtn: 'viewToggleBtn',
     viewToggleBtnActive: 'viewToggleBtnActive',
@@ -110,7 +116,7 @@ function renderPanel(
   messagesData?: Parameters<typeof makeClient>[0],
 ) {
   const client = makeClient(messagesData);
-  render(
+  const view = render(
     <DialogProvider>
       <QueryClientProvider client={client}>
         <ConversationPanel
@@ -122,7 +128,7 @@ function renderPanel(
       </QueryClientProvider>
     </DialogProvider>,
   );
-  return client;
+  return { client, ...view };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -137,12 +143,65 @@ describe('ConversationPanel rename flow', () => {
 
   afterEach(() => {
     window.history.replaceState(null, '', '/');
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
   it('renders the conversation title in the header', () => {
     renderPanel();
     expect(screen.getByText('My Panel Title')).toBeInTheDocument();
+  });
+
+  it('shows About as a visible pressed-state toggle', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        summary: 'This conversation is about tightening dashboard behavior.',
+        messageCount: 2,
+        generatedAt: '2026-06-11T00:00:00.000Z',
+      }),
+    }));
+
+    renderPanel();
+    const toggle = screen.getByRole('button', { name: 'Show about this conversation' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('This conversation is about tightening dashboard behavior.')).toBeInTheDocument();
+  });
+
+  it('closes the About drawer when switching conversations', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ summary: null, messageCount: 0, generatedAt: null }),
+    }));
+
+    const { rerender, client } = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Show about this conversation' }));
+    expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
+
+    const nextConversation = {
+      ...mockConversation,
+      id: 2,
+      name: 'next-conv',
+      title: 'Next Conversation',
+    };
+    client.setQueryData(['conversation-messages', 'next-conv'], { messages: [], workLog: [], streaming: false });
+    rerender(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel
+            conversation={nextConversation}
+            viewMode="conversation"
+            onArchived={() => {}}
+          />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Show about this conversation' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('does not mount the terminal when a diff deep-link opens a live terminal-mode conversation', () => {

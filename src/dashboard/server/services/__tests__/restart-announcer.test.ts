@@ -184,6 +184,21 @@ describe('announceNewRestart', () => {
     expect(t.emitted).toHaveLength(0);
     expect(t.lastAnnounced()).toBe(RESTART_TS);
   });
+
+  it('does not persist the announced ts when emitting fails', async () => {
+    const t = makeDeps();
+
+    await expect(announceNewRestart({
+      ...t.deps,
+      emit: () => { throw new Error('event store not ready'); },
+    })).rejects.toThrow('event store not ready');
+
+    expect(t.lastAnnounced()).toBeNull();
+
+    expect(await announceNewRestart(t.deps)).toBe(true);
+    expect(t.emitted).toHaveLength(1);
+    expect(t.lastAnnounced()).toBe(RESTART_TS);
+  });
 });
 
 describe('startRestartAnnouncer', () => {
@@ -193,7 +208,7 @@ describe('startRestartAnnouncer', () => {
     vi.useRealTimers();
   });
 
-  it('announces a restart status that appears after boot, exactly once', async () => {
+  it('announces a restart status that appears after boot on the fast bootstrap poll, exactly once', async () => {
     const t = makeDeps(null);
     startRestartAnnouncer(t.deps);
 
@@ -201,7 +216,10 @@ describe('startRestartAnnouncer', () => {
     expect(t.emitted).toHaveLength(0);
 
     t.setStatus(watchdogSuccess);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(t.emitted).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
     expect(t.emitted).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(45_000);

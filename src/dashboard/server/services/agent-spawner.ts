@@ -219,6 +219,7 @@ export const AgentSpawnerLive = Layer.effect(
             sessionName,
             workspaceLocation: 'local',
             shadowMode: opts.shadowMode ?? false,
+            autoSpawnOnFinalize: false,
           });
 
           if (!result.success) {

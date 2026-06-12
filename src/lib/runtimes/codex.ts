@@ -162,6 +162,7 @@ export interface InitCodexHomeOpts {
   trustedDir?: string
   approvalPolicy?: string
   sandboxMode?: string
+  approvalsReviewer?: string
 }
 
 /**
@@ -176,8 +177,10 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   mkdirSync(join(codexHomeDir, 'sessions'), { recursive: true, mode: 0o700 })
 
   const configPath = join(codexHomeDir, 'config.toml')
-  if (!existsSync(configPath)) {
-    // The notify shim writes heartbeat.json on agent-turn-complete (D-5).
+  // Always (re)write config.toml so permission-mode changes take effect on
+  // resume. The file is Panopticon-managed ("do not edit manually") and
+  // contains no user state — only launch-time settings.
+  {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
     // `model`/`approval_policy`/`sandbox_mode` are strings and `notify` is a
     // single argv array. model/provider is set at launch via the -m flag, so it
@@ -192,6 +195,9 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     ]
     if (opts.sandboxMode) {
       lines.push(`sandbox_mode = "${opts.sandboxMode}"`)
+    }
+    if (opts.approvalsReviewer) {
+      lines.push(`approvals_reviewer = "${opts.approvalsReviewer}"`)
     }
     if (existsSync(notifyHookPath)) {
       lines.push(`notify = ["node", "${notifyHookPath}"]`)
@@ -234,6 +240,22 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       writeFileSync(agentsMdPath, '# Panopticon Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
     }
   }
+}
+
+/**
+ * Translate Panopticon's abstract sandbox mode token into a value the codex
+ * CLI actually accepts. Panopticon config uses 'workspace' as its mode name
+ * (see config-yaml.ts permission modes); codex only accepts read-only,
+ * workspace-write, danger-full-access. Passing the abstract token raw made
+ * `codex exec -s workspace` exit instantly with an invalid-value error, which
+ * killed every codex work agent ~13s after spawn (PAN-1799).
+ */
+export function toCodexSandboxValue(mode: string | undefined): string {
+  const valid = new Set(['read-only', 'workspace-write', 'danger-full-access'])
+  if (mode && valid.has(mode)) return mode
+  if (mode === 'read_only') return 'read-only'
+  // 'workspace', undefined, and anything unrecognized → the safe writable default.
+  return 'workspace-write'
 }
 
 /**
@@ -498,7 +520,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     initCodexHome(codexHomeDir)
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
-    const sandbox = config.codexSandboxMode ?? 'workspace'
+    const sandbox = toCodexSandboxValue(config.codexSandboxMode)
     const tokens: string[] = ['codex', 'exec']
     if (config.model) tokens.push('-m', shellQuote(config.model))
     tokens.push('-c', 'approval_policy=never')

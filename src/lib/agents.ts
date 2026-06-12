@@ -6,10 +6,10 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, getPanopticonHome, packageRoot, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
-import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption } from './tmux.js';
+import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -35,6 +35,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
+import { buildCompactRecoverySeedMessage } from './context-overflow.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
@@ -203,17 +204,37 @@ async function getPiLauncherFields(agentId: string, model: string): Promise<{
   };
 }
 
-function getCodexLauncherFields(agentId: string, model: string): {
+function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
-  codexMode: 'exec';
+  codexMode: 'work-tui';
   codexHome: string;
   codexSessionDir: string;
   model: string;
 } {
   const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+  // PAN-1803: codex work agents must inherit the user's configured codex
+  // permission level (Settings → Permissions → Codex) and pre-trust the
+  // workspace, EXACTLY like the conversation path
+  // (routes/conversations.ts). Without trustedDir, codex shows its first-run
+  // folder-trust / "load project-local config?" wizard and blocks the pane.
+  // Without the permission mapping, work agents ignore the Settings choice
+  // and run hardcoded never+workspace-write.
+  const codexPermMode = loadYamlConfig().config.codex?.permissionMode ?? 'workspace';
+  const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
+  const sandboxMode =
+    codexPermMode === 'full-access' ? 'danger-full-access'
+    : codexPermMode === 'read-only' ? 'read-only'
+    : 'workspace-write';
+  const approvalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
+  initCodexHome(codexHome, {
+    trustedDir: workspacePath,
+    approvalPolicy,
+    sandboxMode,
+    approvalsReviewer,
+  });
   return {
     harness: 'codex',
-    codexMode: 'exec',
+    codexMode: 'work-tui',
     codexHome,
     codexSessionDir: join(codexHome, 'sessions'),
     model,
@@ -233,6 +254,41 @@ async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<bo
     await new Promise((r) => setTimeout(r, 500));
   }
   return false;
+}
+
+async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    try {
+      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
+      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      // The codex TUI is ready when its input prompt (a line starting with the
+      // `›` glyph) AND its status line (`<model> ... · <cwd>`) are both on
+      // screen. PAN-1803: the previous check keyed off the first-run
+      // trust-wizard markers ("press enter to continue") — but pre-trusting the
+      // workspace (correctly) skips that wizard, so those markers never appear
+      // and the kickoff never fired. Detect the actual ready prompt instead.
+      const hasInputPrompt = /^\s*[›>]\s/m.test(pane);
+      const hasStatusLine = /·\s+[~/]/.test(pane);
+      if (hasInputPrompt && hasStatusLine) {
+        return true;
+      }
+      // Fallback: if pre-trust ever fails and the wizard does appear, treat its
+      // markers as ready (the kickoff paste will dismiss + drive it).
+      if (/press enter to continue/i.test(pane) || /ctrl[+-][cj]/i.test(pane)) {
+        return true;
+      }
+    } catch {
+      // The pane may not exist yet immediately after tmux session creation.
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
+  if (harness === 'codex') return waitForCodexTuiReady(agentId, timeoutSec);
+  return waitForReadySignal(agentId, timeoutSec);
 }
 
 /**
@@ -327,7 +383,10 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
 }
 
 export async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
-  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex' ? harness : 'claude-code';
+  const providerDefault = loadYamlConfig().config.providerHarnesses?.[getProviderForModelSync(model).name];
+  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex'
+    ? harness
+    : providerDefault ?? 'claude-code';
   const authMode = await getProviderAuthMode(model);
   const decision = canUseHarnessSync(requested, model, authMode);
   if (decision.allowed) return requested;
@@ -395,7 +454,7 @@ export async function getAgentRuntimeBaseCommand(
     return `pi --mode rpc --model ${shellQuoteModelIdSync(toPiOllamaModelSelector(validatedModel))}`;
   }
   if (harness === 'codex') {
-    // buildCodexCommand in launcher-generator builds the full `codex exec` line;
+    // buildCodexCommand in launcher-generator builds the full Codex command;
     // return a stub base command so the launcher generator can short-circuit.
     return `codex`;
   }
@@ -779,6 +838,13 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
   return false;
 }
 
+function promptReadyTimeoutSeconds(): number {
+  const raw = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  if (!raw) return 30;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+}
+
 /**
  * Wait until a hook-instrumented agent reports it is idle at the prompt, via the
  * runtime mirror (Stop / SessionStart hook → activity 'idle'), or the timeout
@@ -816,6 +882,8 @@ export interface AgentState {
   workspace: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
   harness?: RuntimeName;
+  /** Codex launch mode for compatibility with legacy one-shot agents. */
+  codexMode?: 'exec' | 'tui' | 'work-tui';
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
@@ -894,7 +962,7 @@ export interface AgentState {
 }
 
 export function getAgentDir(agentId: string): string {
-  return join(AGENTS_DIR, agentId);
+  return join(getPanopticonHome(), 'agents', agentId);
 }
 
 function isRole(value: unknown): value is Role {
@@ -907,6 +975,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     issueId: raw.issueId,
     workspace: raw.workspace,
     harness: raw.harness,
+    codexMode: raw.codexMode,
     role: raw.role,
     model: raw.model,
     status: raw.status,
@@ -1335,18 +1404,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const clearTimer = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+    };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      req.setTimeout(0); // cancel the idle timer
-      req.removeAllListeners('timeout');
+      clearTimer();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      req.setTimeout(0);
-      req.removeAllListeners('timeout');
+      clearTimer();
       reject(err);
     };
 
@@ -1379,9 +1451,10 @@ async function postUnixSocketJson(
       },
     );
 
-    req.setTimeout(timeoutMs, () => {
+    timeout = setTimeout(() => {
       req.destroy(new Error('socket POST timeout'));
-    });
+    }, timeoutMs);
+    timeout.unref?.();
     req.on('error', (err: Error) => {
       finishErr(err);
     });
@@ -1407,10 +1480,10 @@ export async function deliverAgentMessage(
   let resolvedMethod = deliveryMethod;
   try {
     const state = await Effect.runPromise(getAgentState(normalizedId));
-    // Codex agents are headless one-shot processes; the supervisor/channels/tmux
-    // delivery ladder does not apply — route through CodexRuntimeSync.sendMessage
-    // (codex exec resume <threadId> <message>).
-    if (state?.harness === 'codex') {
+    // Legacy Codex exec agents were headless one-shot processes; route those
+    // through `codex exec resume`. Persistent work-tui agents use the normal
+    // supervisor/channels/tmux delivery ladder below.
+    if (state?.harness === 'codex' && state.codexMode !== 'work-tui') {
       const { CodexRuntimeSync } = await import('./runtimes/codex.js');
       const rt = new CodexRuntimeSync();
       await rt.sendMessage(normalizedId, message);
@@ -1437,10 +1510,15 @@ export async function deliverAgentMessage(
       supervisorFailure = 'pty-token-missing';
     } else {
       try {
+        // Must exceed the supervisor's worst-case echo-confirmation path
+        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
+        // A shorter client timeout abandons the POST mid-retry and fires the
+        // tmux fallback while the supervisor is still writing — re-creating
+        // the duplicate-submit race PAN-1769 fixed.
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          4_000,
+          8_000,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
@@ -1574,18 +1652,48 @@ async function deliverInitialPromptWithRetry(
   caller: string,
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
 ): Promise<DeliveryResult> {
+  // PAN-1803: the codex TUI mangles a large pasted kickoff prompt — a multi-
+  // thousand-character paste garbles its input and trips its "Create a plan?"
+  // mode hint, so the agent never executes. Write the full brief to a file and
+  // deliver a SHORT pointer instead (robust regardless of transport — the same
+  // pattern that makes file-backed handoffs reliable). Only codex needs this;
+  // claude-code/pi line-based input handle the full prompt fine.
+  let deliveredPrompt = prompt;
+  try {
+    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
+    if (codexState?.harness === 'codex' && codexState.workspace) {
+      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
+      mkdirSync(dirname(kickoffPath), { recursive: true });
+      writeFileSync(kickoffPath, prompt, 'utf-8');
+      deliveredPrompt =
+        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
+        + 'Read that file in full now and execute it exactly — it is your full set of work '
+        + 'instructions. Begin immediately and keep working autonomously until done; do not '
+        + 'wait for further input.';
+    }
+  } catch {
+    // Non-fatal: fall back to delivering the full prompt inline.
+  }
+
   let lastFailure = 'not-attempted';
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const ready = await waitForReadySignal(agentId, 30);
+    let harness: RuntimeName | undefined;
+    try {
+      harness = (await Effect.runPromise(getAgentState(normalizeAgentId(agentId))))?.harness;
+    } catch {
+      harness = undefined;
+    }
+    const readyTimeoutSeconds = promptReadyTimeoutSeconds();
+    const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
       lastFailure = 'ready-signal-timeout';
-      console.error(`[${agentId}] Claude did not become ready within 30s (kickoff attempt ${attempt}/2)`);
+      console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
       continue;
     }
 
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     try {
-      const result = await deliverAgentMessage(agentId, prompt, caller, deliveryMethod);
+      const result = await deliverAgentMessage(agentId, deliveredPrompt, caller, deliveryMethod);
       if (result.ok) return result;
       lastFailure = result.failure ?? `delivery returned ok=false via ${result.path}`;
     } catch (err) {
@@ -1730,7 +1838,7 @@ export function decideSupervisorForWorkAgent(
     return { eligible: false, reason: 'docker-not-supported-yet' };
   }
 
-  if (state.harness !== 'claude-code') {
+  if (state.harness !== 'claude-code' && state.harness !== 'codex') {
     const reason = `harness-${state.harness ?? 'unknown'}`;
     log(false, reason);
     return { eligible: false, reason };
@@ -2045,6 +2153,7 @@ import {
   emitAgentEvent,
 } from './agent-runtime.js';
 import { getRuntimeSnapshot, isAgentStateServiceInProcess } from './agent-runtime-mirror.js';
+import { initCodexHome } from './runtimes/codex.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
@@ -2622,7 +2731,7 @@ export async function buildAgentLaunchConfig(opts: {
   extraEnvExports?: string[];
   /** Claude Code `--effort` level threaded into the launcher command. */
   effort?: RoleEffort;
-  /** Inline prompt to embed in the launch command (used for codex exec resume). */
+  /** Inline prompt to embed in launch commands that still support prompt arguments. */
   promptInline?: string;
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
@@ -2664,7 +2773,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getPiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = opts.harness === 'codex'
-    ? getCodexLauncherFields(opts.agentId, model)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -2744,7 +2853,6 @@ export async function buildAgentLaunchConfig(opts: {
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
     supervisorScriptPath: opts.supervisorScriptPath,
-    // PAN-1574: codex work agents embed the initial prompt inline in `codex exec`.
     promptInline: opts.promptInline,
     ...piLauncherFields,
     ...codexLauncherFields,
@@ -3031,9 +3139,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // subscription auth, a ToS violation) blocks it, so a config-level
   // `roles.work.harness: pi` cannot silently bypass the gate just because the
   // model+auth combination is illegal.
-  const requestedHarness: RuntimeName = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness
-    ?? 'claude-code';
+  const requestedHarness: RuntimeName | undefined = options.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness;
   const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   if (
@@ -3055,6 +3162,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     issueId,
     workspace,
     harness: resolvedHarness,
+    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
@@ -3074,7 +3182,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
-  // For Codex, the initial prompt is passed inline to `codex exec` via promptFile.
+  const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
         prompt: options.prompt,
@@ -3087,7 +3195,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     : '';
 
   let promptFile: string | undefined;
-  if (prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
+  if (prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
   }
@@ -3116,7 +3224,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -3228,14 +3336,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     },
   }));
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(agentId, 'remain-on-exit', 'on'));
+  await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
-  // PAN-1574: codex specialists are headless one-shot processes. After the session
-  // starts, poll for the rollout JSONL to capture the real thread-id, then write it
-  // to both codex-thread-id and session.id so getLatestSessionIdSync returns the
-  // correct value for later resumes (spawnRun wrote a placeholder UUID to session.id
-  // at conversation-register time; we overwrite it here with the real thread-id).
-  if (resolvedHarness === 'codex') {
+  // Legacy codex exec specialists wrote a rollout before exiting; capture that
+  // thread-id for old exec launches only. Codex work-tui sessions write their
+  // rollout after the first delivered prompt, so this pre-prompt poll would
+  // only delay kickoff.
+  if (resolvedHarness === 'codex' && state.codexMode !== 'work-tui') {
     const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
       await import('./runtimes/codex.js');
     const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
@@ -3262,15 +3369,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       } catch (err) {
         console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
-    } else if (shouldDeliverPromptViaTmux) {
+    } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
       // PAN-1594: wait for the hook-written ready.json (session-start hook),
       // not a tmux pane-scrape. No dependency on permission-mode footer text.
-      const ready = await waitForReadySignal(agentId, 30);
+      const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
       if (ready) {
         await new Promise<void>((resolve) => setTimeout(resolve, 500));
         await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
       } else {
-        console.error(`[${agentId}] Claude did not become ready within 30s`);
+        console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
       }
     }
   }
@@ -3362,9 +3469,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
   // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
   // runs before we persist the resolved harness or hand it to the launcher.
-  const requestedHarness: RuntimeName = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness
-    ?? 'claude-code';
+  const requestedHarness: RuntimeName | undefined = options.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness;
   const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   // Create state
@@ -3374,6 +3480,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     issueId: options.issueId,
     workspace: options.workspace,
     harness: resolvedHarness,
+    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
@@ -3531,10 +3638,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     harness: state.harness ?? 'claude-code',
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     effort: options.effort,
-    // PAN-1574: codex work agents are headless one-shot processes; embed the
-    // initial prompt inline in `codex exec <prompt>` via the launcher generator.
-    // Claude-code and Pi receive their prompts via tmux/FIFO after session start.
-    ...(state.harness === 'codex' && prompt ? { promptInline: prompt } : {}),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -3583,29 +3686,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }));
 
-  // PAN-1574: codex agents are headless one-shot processes — the initial prompt
-  // is already embedded inline in the launcher's `codex exec <prompt>` command.
-  // After the session starts, poll for the rollout JSONL to capture the thread-id
-  // so getLatestSessionIdSync / getSessionPath / sendMessage can find the session.
-  if (resolvedHarness === 'codex') {
-    const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
-      await import('./runtimes/codex.js');
-    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
-    const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
-    if (rolloutPath) {
-      const threadId = extractThreadIdFromRollout(rolloutPath);
-      if (threadId) {
-        writeCodexThreadId(agentId, threadId);
-      }
-    } else {
-      console.warn(`[${agentId}] Codex: rollout did not appear within 30s — thread-id not captured`);
-    }
-    if (prompt && role === 'work') {
-      state.kickoffDelivered = true;
-      saveAgentStateSync(state);
-    }
-  }
-
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
   // the tmux session exists, but only block on completion when we are about to
   // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
@@ -3614,9 +3694,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     ? dismissDevChannelsDialog(agentId).catch(() => undefined)
     : null;
 
-  // Send the initial prompt after Claude's interactive prompt is ready.
-  // Codex agents skip this — the prompt is embedded inline in the launch command.
-  // Wait for the session to be ready by polling tmux output for Claude's prompt.
+  // Send the initial prompt after the interactive prompt is ready.
   if (prompt && resolvedHarness === 'pi') {
     try {
       await writePiAgentPrompt(agentId, prompt);
@@ -3631,7 +3709,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         return state;
       }
     }
-  } else if (prompt && resolvedHarness !== 'codex') {
+  } else if (prompt) {
     if (dismissChannelsDialogPromise) {
       await dismissChannelsDialogPromise;
     }
@@ -3885,6 +3963,20 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
  * sync-by-nature already and is only called from CLI contexts and existing
  * sync internals.
  */
+/**
+ * True when the PID is a tmux process (client or server). Used to keep the
+ * per-agent launcher kill sweep from ever signalling the shared tmux server
+ * (PAN-1798). Reads /proc/<pid>/comm; on non-Linux or read failure returns
+ * false (fail-open matches pre-fix behavior for non-tmux processes).
+ */
+function isTmuxProcessSync(pid: number): boolean {
+  try {
+    return readFileSync(`/proc/${pid}/comm`, 'utf-8').trim() === 'tmux';
+  } catch {
+    return false;
+  }
+}
+
 function killLauncherProcessSync(agentId: string): void {
   const launcherPath = join(AGENTS_DIR, agentId, 'launcher.sh');
   let pidsOut: string;
@@ -3900,7 +3992,13 @@ function killLauncherProcessSync(agentId: string): void {
   const pids = pidsOut
     .split('\n')
     .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
+    // PAN-1798: when this agent's spawn FOUNDED the shared tmux server, the
+    // server's cmdline embeds this launcher path (`tmux ... new-session ...
+    // bash .../launcher.sh`), so pgrep -f matches the server itself. Killing
+    // it destroys every session on the socket — agents, reviews, and all
+    // conversations. Never signal a tmux process from the per-agent sweep.
+    .filter(pid => !isTmuxProcessSync(pid));
   if (pids.length === 0) return;
 
   for (const pid of pids) {
@@ -3941,7 +4039,10 @@ async function killLauncherProcessAsync(agentId: string): Promise<void> {
   const pids = pidsOut
     .split('\n')
     .map(s => Number.parseInt(s, 10))
-    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid);
+    .filter(n => Number.isFinite(n) && n > 0 && n !== process.pid)
+    // PAN-1798: see killLauncherProcessSync — the founding tmux server's
+    // cmdline embeds this launcher path; never signal tmux from this sweep.
+    .filter(pid => !isTmuxProcessSync(pid));
   if (pids.length === 0) return;
 
   for (const pid of pids) {
@@ -4174,6 +4275,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
+    if (fallbackHarness === 'codex') {
+      agentState.codexMode = 'work-tui';
+    }
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       resumeRole,
@@ -4184,7 +4288,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     saveAgentStateSync(agentState);
@@ -4221,7 +4325,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     markAgentRunning(agentState);
     saveAgentStateSync(agentState);
 
-    const ready = await waitForReadySignal(normalizedId, 30);
+    const ready = await waitForPromptReady(normalizedId, fallbackHarness, 30);
     const fallbackResumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     const resumeMessage = await buildResumeMessageForAgent(agentState, fallbackResumePrompt, message);
     if (resumeMessage.error) {
@@ -4333,39 +4437,58 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
  * - Work agents: When message is sent via /work-tell
  */
 /**
- * PAN-1675: Out-of-band Panopticon-side compaction of a work agent's JSONL
- * session — recovers a context-wedged agent without the harness `/compact`
- * deadlock (which needs a live, responsive Claude process to run). Resolves the
- * SAME session file the harness resumes from and rewrites it in place via
- * native compaction.
+ * PAN-1781: Build the opening prompt for a compact-recovery respawn — an
+ * out-of-band summary of the wedged session plus durable-artifact reseed
+ * instructions. Replaces PAN-1675's in-place JSONL compaction
+ * (compactAgentSession), which appended a compact_boundary the harness's
+ * resume leaf selection bypassed ~half the time, silently rebuilding the full
+ * pre-compact context. The old JSONL is read-only here — never mutated.
  *
- * Never throws: every failure path returns `{ compacted:false, error }` so
- * callers (resumeAgent's `--compact` path, the deacon's fresh-overflow tier)
- * can fail safely and fall through to the `/clear` fallback. A missing
- * sessionId or workspace short-circuits to `{ compacted:false }` with no
- * compaction call.
+ * Never throws and never returns an unusable seed: smart summary → fallback
+ * heuristic summary → reseed-instructions-only, in that order. A missing
+ * sessionId or workspace skips straight to the reseed-only seed.
  */
-export async function compactAgentSession(agentId: string): Promise<{ compacted: boolean; error?: string }> {
+export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed: string; summarized: boolean }> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
   const sessionId = getLatestSessionIdSync(normalizedId);
-  if (!agentState?.workspace || !sessionId) {
-    return { compacted: false };
-  }
-  try {
+  const issueId = agentState?.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+
+  let summary: string | null = null;
+  if (agentState?.workspace && sessionId) {
     const sessionFile = sessionFilePath(agentState.workspace, sessionId);
-    // Dynamic import: keep conversation-compaction out of agents.ts's top-level
-    // import graph (it pulls in dashboard server services).
-    const { compactConversationNative } = await import(
-      '../dashboard/server/services/conversation-compaction.js'
-    );
-    await compactConversationNative(sessionFile);
-    return { compacted: true };
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    logAgentLifecycleSync(normalizedId, `compactAgentSession failed: ${error}`);
-    return { compacted: false, error };
+    try {
+      // Dynamic imports: keep conversation-compaction out of agents.ts's
+      // top-level import graph (it pulls in dashboard server services).
+      const [{ getConversationCompactionSettings }, { generateSmartSummary }] = await Promise.all([
+        import('../dashboard/server/services/conversation-compaction.js'),
+        import('./conversations/smart-compaction.js'),
+      ]);
+      const settings = getConversationCompactionSettings();
+      const result = await Effect.runPromise(generateSmartSummary({
+        jsonlPath: sessionFile,
+        model: settings.model,
+        richMode: settings.richCompaction,
+        mode: 'fork',
+      }));
+      summary = result.summary;
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      logAgentLifecycleSync(normalizedId, `compact-recovery smart summary failed (${error}); trying heuristic fallback`);
+      try {
+        const { generateFallbackSummary } = await import('./conversations/summary-fork.js');
+        summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
+      } catch (fallbackErr) {
+        const fallbackError = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        logAgentLifecycleSync(normalizedId, `compact-recovery fallback summary failed (${fallbackError}); seeding with reseed instructions only`);
+      }
+    }
   }
+
+  return {
+    seed: buildCompactRecoverySeedMessage(issueId, summary),
+    summarized: summary !== null,
+  };
 }
 
 export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
@@ -4450,18 +4573,21 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     return { success: false, error: reason };
   }
 
-  // PAN-1675: Optionally compact the wedged session's JSONL out-of-band BEFORE
-  // killing the live tmux session, so the fresh resume reads a compacted history
-  // instead of immediately re-overflowing. Fail-safe: if compaction fails, do
-  // NOT kill the session or build a launcher — leave the wedged session live so
-  // the caller (e.g. the deacon) can fall through to the /clear tier against it.
+  // PAN-1781: compact recovery = summarize the wedged session out-of-band and
+  // respawn a FRESH session seeded with that summary. The previous approach
+  // (PAN-1675: append a compact_boundary to the JSONL and relaunch with
+  // --resume) was silently bypassed by the harness's resume leaf selection
+  // ~half the time in the field — the relaunched session rebuilt the full
+  // pre-compact context, re-overflowed, and escalated to /clear. A fresh
+  // seeded session has nothing stale to rewind to, so its starting context is
+  // bounded by construction. The old JSONL stays untouched on disk.
+  // buildCompactRecoverySeed never throws: it degrades smart summary →
+  // heuristic summary → reseed-instructions-only.
+  let compactSeed: string | null = null;
   if (opts?.compact) {
-    const compactResult = await compactAgentSession(normalizedId);
-    if (!compactResult.compacted) {
-      const reason = `Pre-resume compaction failed: ${compactResult.error ?? 'unknown error'}`;
-      logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
-      return { success: false, error: reason };
-    }
+    const seedResult = await buildCompactRecoverySeed(normalizedId);
+    compactSeed = seedResult.seed;
+    logAgentLifecycleSync(normalizedId, `compact recovery: respawning fresh session (seed=${seedResult.summarized ? 'summary' : 'reseed-only'})`);
   }
 
   // Kill any zombie tmux session (crashed agent left behind)
@@ -4505,14 +4631,24 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     const effectiveHarness = await resolveEffectiveHarness(opts?.harness ?? agentState.harness, model);
     agentState.harness = effectiveHarness;
+    if (effectiveHarness === 'codex') {
+      agentState.codexMode = 'work-tui';
+    } else {
+      delete agentState.codexMode;
+    }
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
 
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
+    // PAN-1781: a compact recovery skips the kickoff-redelivery machinery — its
+    // seed (summary + reseed instructions) IS the opening prompt of the fresh
+    // session; a caller-supplied message rides along after it.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
     const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
-    const resumeMessage = await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
+    const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
+      ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
+      : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
       emitActivityEntrySync({
@@ -4531,14 +4667,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       workspace: agentState.workspace,
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
-      spawnMode: 'resume',
-      resumeSessionId: sessionId,
+      // PAN-1781: compact recovery launches a FRESH session (no --resume) so the
+      // harness cannot rewind to the overflowed history. Normal resumes keep
+      // re-attaching to the saved session.
+      ...(compactSeed ? {} : { spawnMode: 'resume' as const, resumeSessionId: sessionId }),
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
-      // PAN-1574: codex resume embeds the message inline so `codex exec resume
-      // <threadId> <message>` delivers it in one shot without a separate send.
-      ...(effectiveHarness === 'codex' ? { promptInline: effectiveMessage } : {}),
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -4575,10 +4710,23 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
       }
     } else if (effectiveHarness === 'codex') {
-      // Codex is one-shot: message is already embedded in `codex exec resume
-      // <threadId> <message>` via buildCodexCommand. No SessionStart hook fires.
-      messageDelivered = true;
-      if (resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:codex-continue', agentState.deliveryMethod);
+      messageDelivered = delivery.ok;
+      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+      if (!delivery.ok) {
+        console.error(`[resumeAgent] Codex continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+      }
+    } else if (compactSeed) {
+      // PAN-1781: fresh seeded session — deliver like a kickoff. Transcript
+      // confirmation is impossible here: the new session's id is unknown until
+      // its SessionStart hook fires, and the saved sessionId points at the
+      // archived (overflowed) session. deliverInitialPromptWithRetry waits for
+      // the ready signal internally.
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', agentState.deliveryMethod);
+      messageDelivered = delivery.ok;
+      if (!delivery.ok) {
+        console.error(`[resumeAgent] Compact-recovery seed did not land: ${delivery.failure ?? 'unknown failure'}`);
+      }
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
@@ -4602,8 +4750,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
 
     const resumedAt = new Date().toISOString();
-    console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
-    logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
+    if (compactSeed) {
+      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+    } else {
+      console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
+    }
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',
       lastActivity: resumedAt,
@@ -4767,12 +4920,16 @@ export async function restartAgent(
         console.error(`[restartAgent] Pi prompt delivery failed for ${normalizedId}: ${msg}`);
       }
     } else {
-      const ready = await waitForReadySignal(normalizedId, 30);
+      const ready = await waitForPromptReady(normalizedId, effectiveHarness, 30);
       if (ready) {
         await new Promise(r => setTimeout(r, 500));
-        await Effect.runPromise(sendKeys(normalizedId, prompt));
+        if (effectiveHarness === 'codex') {
+          await deliverAgentMessage(normalizedId, prompt, 'restartAgent:continue-prompt', agentState.deliveryMethod);
+        } else {
+          await Effect.runPromise(sendKeys(normalizedId, prompt));
+        }
       } else {
-        console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+        console.error(`[restartAgent] ${effectiveHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s for ${normalizedId}`);
       }
     }
 
@@ -4957,8 +5114,13 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
     : {};
+  if (recoveryHarness === 'codex') {
+    state.codexMode = 'work-tui';
+  } else {
+    delete state.codexMode;
+  }
   const recoveryLauncherContent = generateLauncherScriptSync({
     role: recoveryRole,
     workingDir: state.workspace,
@@ -4967,7 +5129,7 @@ export async function recoverAgent(
     providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
-    promptInline: recoveryPrompt,
+    ...(recoveryHarness === 'codex' ? {} : { promptInline: recoveryPrompt }),
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
     ...recoveryCodexFields,
@@ -4985,6 +5147,13 @@ export async function recoverAgent(
     }
   });
 
+  saveAgentStateSync(state);
+  if (recoveryHarness === 'codex') {
+    const delivery = await deliverInitialPromptWithRetry(normalizedId, recoveryPrompt, 'recoverAgent:recovery-prompt', state.deliveryMethod);
+    if (!delivery.ok) {
+      console.error(`[recoverAgent] Codex recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`);
+    }
+  }
   // Update state
   markAgentRunning(state);
   saveAgentStateSync(state);
@@ -5120,4 +5289,3 @@ function writeTaskCache(agentId: string, issueId: string): void {
     }, null, 2)
   );
 }
-

@@ -1,0 +1,35 @@
+{
+  "version": "1",
+  "issueId": "PAN-1775",
+  "created": "2026-06-11T10:39:48.392Z",
+  "updated": "2026-06-11T13:03:10.007Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "gpt-5.5",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T10:39:48.392Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:01:25.422Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:03:03.033Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:03:10.007Z"
+    }
+  ],
+  "feedback": []
+}

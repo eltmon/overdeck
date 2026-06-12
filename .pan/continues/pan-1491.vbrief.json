@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-06T08:48:30.045Z",
-  "updated": "2026-06-11T07:18:00.585Z",
+  "updated": "2026-06-11T13:25:42.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -139,6 +139,51 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T19:11:48.901Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T07:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T07:59:57.693Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T08:47:25.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T08:53Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T08:53:41.730Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:00Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T09:00:53.829Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T09:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-11T09:17:20.125Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:00:32.865Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:13Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T13:13:22.458Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:19Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-11T13:19:50.672Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T13:25:42.269Z"
     }
   ],
   "feedback": []

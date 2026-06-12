@@ -315,4 +315,47 @@ describe('schema migrations', () => {
     expect(row.session_file).toBe(stalePath);
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
+
+  it('fresh initSchema includes fork recovery columns on conversations', () => {
+    initSchema(db);
+
+    const cols = db.pragma('table_info(conversations)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forkRequest = cols.find((col) => col.name === 'fork_request');
+    const forkRetryCount = cols.find((col) => col.name === 'fork_retry_count');
+
+    expect(forkRequest).toBeDefined();
+    expect(forkRetryCount).toMatchObject({ notnull: 1, dflt_value: '0' });
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v52 → v53: adds fork recovery columns idempotently', () => {
+    initSchema(db);
+    db.pragma('user_version = 52');
+    db.exec(`
+      CREATE TABLE conversations_v52 AS SELECT
+        id, name, tmux_session, status, cwd, issue_id, created_at, ended_at,
+        last_attached_at, session_file, claude_session_id, title, title_source,
+        title_seed, total_cost, total_tokens, archived_at, model, effort,
+        fork_status, fork_error, harness, delivery_method, spawn_error,
+        handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+      FROM conversations;
+      DROP TABLE conversations;
+      ALTER TABLE conversations_v52 RENAME TO conversations;
+    `);
+
+    const before = db.pragma('table_info(conversations)') as Array<{ name: string }>;
+    expect(before.map((col) => col.name)).not.toContain('fork_request');
+    expect(before.map((col) => col.name)).not.toContain('fork_retry_count');
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const after = db.pragma('table_info(conversations)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forkRequest = after.find((col) => col.name === 'fork_request');
+    const forkRetryCount = after.find((col) => col.name === 'fork_retry_count');
+
+    expect(forkRequest).toBeDefined();
+    expect(forkRetryCount).toMatchObject({ notnull: 1, dflt_value: '0' });
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
 });

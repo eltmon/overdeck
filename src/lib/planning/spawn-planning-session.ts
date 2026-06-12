@@ -23,12 +23,14 @@ import {
   createSession,
   killSession,
   setOption,
+  exactPaneTarget,
   buildTmuxCommandString,
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel, preflightProviderForModel, resolveEffectiveHarness, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
+import { getProviderForModelSync } from '../providers.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -120,6 +122,10 @@ export interface SpawnPlanningOptions {
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
+  /** Add the adversarial pre-finalize probe pass to the planning prompt. */
+  probe?: boolean;
+  /** Automatically start the work agent after finalize; stamped by trusted callers only. */
+  autoSpawnOnFinalize?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -127,6 +133,32 @@ export interface SpawnPlanningOptions {
 export interface SpawnPlanningResult {
   success: boolean;
   error?: string;
+}
+
+export interface PlanningAgentStateInput {
+  sessionName: string;
+  issueId: string;
+  workspacePath: string;
+  model: string;
+  harness: 'claude-code' | 'pi' | 'codex';
+  workspaceLocation: 'local' | 'remote';
+  autoSpawnOnFinalize?: boolean;
+  startedAt?: string;
+}
+
+export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<string, unknown> {
+  return {
+    id: input.sessionName,
+    issueId: input.issueId,
+    workspace: input.workspacePath,
+    model: input.model,
+    status: 'running',
+    startedAt: input.startedAt ?? new Date().toISOString(),
+    role: 'plan',
+    harness: input.harness,
+    location: input.workspaceLocation,
+    autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -163,7 +195,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, memoryContext = ''): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = ''): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -281,6 +313,20 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
+  const probeSection = probe || effort === 'high' ? `
+## Probe Pass (required before finalize)
+
+After drafting the vBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
+- For each item: what hidden assumption would make this item wrong? Name it or clear it.
+- Which item could produce two very different diffs that both look "done"? Tighten its
+  ACs or set requiresInspection: true.
+- What input, state, or failure mode does no item handle? Add an item or a NonGoals line.
+- Which edge is missing (output→input you assumed implicitly)? Add it.
+
+Record every probe finding you acted on in continue.json decisions[] (prefix "PROBE:").
+If the probe pass changes nothing at all, record one decision: "PROBE: no findings".
+` : '';
+
   return await Effect.runPromise(renderPrompt({
     name: 'planning',
     vars: {
@@ -297,6 +343,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
       AUTO_SECTION: autoSection,
+      PROBE_SECTION: probeSection,
       PRD_REFERENCES: prdReferences,
       MEMORY_CONTEXT: memoryContext,
       TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv')),
@@ -377,7 +424,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -505,8 +552,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
+    const config = loadConfigSync().config;
     const planningModel = modelOverride || settingsModel;
-    const requestedHarness = opts.harness ?? 'claude-code';
+    const providerDefaultHarness = config.providerHarnesses?.[getProviderForModelSync(planningModel).name];
+    const requestedHarness = opts.harness ?? config.roles?.plan?.harness ?? providerDefaultHarness ?? 'claude-code';
     const effectiveHarness = await resolveEffectiveHarness(requestedHarness, planningModel);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
@@ -530,7 +579,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
       prompt: planningPrompt,
       issueId: issue.identifier,
@@ -540,7 +589,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       harness: effectiveHarness,
     });
     if (memoryContext) {
-      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, memoryContext);
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
     }
 
     // Capture planning prompt in workspace .pan/continue.json.
@@ -618,7 +667,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
     await Effect.runPromise(setOption(sessionName, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOption(sessionName, 'remain-on-exit', 'on'));
+    await Effect.runPromise(setOption(exactPaneTarget(sessionName), 'remain-on-exit', 'on'));
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the
@@ -628,17 +677,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Update agent state to running ──────────────────────────────────────
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
-    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-      id: sessionName,
+    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify(buildPlanningAgentState({
+      sessionName,
       issueId: issue.identifier,
-      workspace: workspacePath,
+      workspacePath,
       model: planningModel,
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      role: 'plan',
       harness: effectiveHarness,
-      location: workspaceLocation,
-    }, null, 2));
+      workspaceLocation,
+      autoSpawnOnFinalize,
+    }), null, 2));
 
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 

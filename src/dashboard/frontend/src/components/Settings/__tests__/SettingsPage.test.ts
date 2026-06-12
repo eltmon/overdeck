@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildMiniMaxFormData, buildTtsAutosavePayload } from '../SettingsPage';
+import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { SettingsConfig } from '../types';
 
@@ -83,17 +83,31 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
 
-  it('serializes TTS settings autosaves through a TTS-only latest-snapshot queue', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef = useRef<TtsConfig | null>(null)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
-    expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveSettings(buildTtsAutosavePayload(latest, snapshot))');
-    expect(SETTINGS_PAGE_SOURCE).toContain('scheduleTtsSave(nextTts, options.debounce === true)');
+  it('serializes all settings autosaves through one latest-snapshot queue', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('pendingSaveRef = useRef<AutosavePayload | null>(null)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveInFlightRef');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const drainSaveQueue = useCallback');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const scheduleAutosave = useCallback');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const flushAutosave = useCallback');
   });
 
-  it('debounces high-frequency TTS autosaves', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('const TTS_AUTOSAVE_DEBOUNCE_MS = 400');
-    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+  it('autosaves every control — no global Save/Reset buttons', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('status={saveStatus}');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('onSave={');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('onReset={');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('hasChanges');
+    // Draft-style handlers now persist through the autosave pipeline.
+    expect(SETTINGS_PAGE_SOURCE).toContain('const applySettings = (next: SettingsConfig');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const applyVoiceSettings = (next: VoiceSettings');
+    // Text-input handlers debounce; click handlers save immediately.
+    expect(SETTINGS_PAGE_SOURCE).toContain("}, { debounce: true });");
+    // Deprecated-model migration kept its own explicit action.
+    expect(SETTINGS_PAGE_SOURCE).toContain('Migrate now');
+  });
+
+  it('debounces high-frequency autosaves', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('const AUTOSAVE_DEBOUNCE_MS = 600');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
     expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
@@ -141,25 +155,6 @@ describe('MODELS_BY_PROVIDER', () => {
     const allModelIds = Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models.map(m => m.id));
     const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
     expect(found).toEqual([]);
-  });
-});
-
-
-describe('buildTtsAutosavePayload', () => {
-  it('overlays only TTS settings onto the latest server snapshot', () => {
-    const latest: SettingsConfig = {
-      ...MINIMAX_DEFAULTS,
-      api_keys: { openai: 'server-key' },
-      tracker_keys: { github: 'server-token' },
-      tmux: { config_mode: 'managed' },
-      tts: { enabled: false, volume: 0.4 },
-    };
-    const result = buildTtsAutosavePayload(latest, { enabled: true, volume: 0.8 });
-
-    expect(result).toEqual({
-      ...latest,
-      tts: { enabled: true, volume: 0.8 },
-    });
   });
 });
 
