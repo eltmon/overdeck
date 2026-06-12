@@ -17,18 +17,12 @@ const readyGeneration = {
 };
 
 test.describe('multi-project merge train view', () => {
-  test('renders live generations without an active flywheel run and persists project filter', async ({ page }) => {
-    await page.addInitScript(() => {
-      const style = document.createElement('style');
-      style.textContent = '#pan-recovery-overlay { display: none !important; pointer-events: none !important; }';
-      document.documentElement.appendChild(style);
-    });
-
+  async function mockMergeTrainApis(page: import('@playwright/test').Page, config: { mergeTrainEnabled: boolean }) {
     await page.route('**/api/version', (route) => route.fulfill({ json: { version: 'test', supervisorUrl: null } }));
     await page.route('**/api/flywheel/current', (route) => route.fulfill({ json: null }));
     await page.route('**/api/flywheel/runs?limit=1', (route) => route.fulfill({ json: [] }));
     await page.route('**/api/flywheel/runs?limit=10', (route) => route.fulfill({ json: [] }));
-    await page.route('**/api/flywheel/config', (route) => route.fulfill({ json: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true } }));
+    await page.route('**/api/flywheel/config', (route) => route.fulfill({ json: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: config.mergeTrainEnabled } }));
     await page.route('**/api/flywheel/auto-merge/pending', (route) => route.fulfill({ json: { pending: [] } }));
     await page.route('**/api/merge-train/generations', (route) => route.fulfill({
       json: [
@@ -52,6 +46,16 @@ test.describe('multi-project merge train view', () => {
         },
       ],
     }));
+  }
+
+  test('renders live generations without an active flywheel run and persists project filter', async ({ page }) => {
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = '#pan-recovery-overlay { display: none !important; pointer-events: none !important; }';
+      document.documentElement.appendChild(style);
+    });
+
+    await mockMergeTrainApis(page, { mergeTrainEnabled: true });
 
     await page.goto(`${DASHBOARD_URL}/flywheel`);
 
@@ -69,5 +73,35 @@ test.describe('multi-project merge train view', () => {
     await page.reload();
     await expect(page.getByText('MIN-1', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('pan-otter-0612', { exact: true })).toHaveCount(0);
+  });
+
+  test('renders on awaiting merge and persists the global merge-train toggle', async ({ page }) => {
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = '#pan-recovery-overlay { display: none !important; pointer-events: none !important; }';
+      document.documentElement.appendChild(style);
+    });
+
+    let postedBody: unknown = null;
+    await mockMergeTrainApis(page, { mergeTrainEnabled: false });
+    await page.route('**/api/flywheel/config', async (route) => {
+      if (route.request().method() === 'POST') {
+        postedBody = route.request().postDataJSON();
+        await route.fulfill({ json: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true } });
+        return;
+      }
+      await route.fulfill({ json: { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false } });
+    });
+
+    await page.goto(`${DASHBOARD_URL}/awaiting-merge`);
+
+    await expect(page.getByRole('heading', { name: 'Merge train' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('pan-otter-0612', { exact: true }).first()).toBeVisible();
+
+    const toggle = page.getByRole('switch');
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(postedBody).toEqual({ merge_train_enabled: true });
   });
 });

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 import { AutoMergeToggle } from './AutoMergeToggle';
+import { MergeQueueCard } from './flywheel/MergeQueueCard';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
@@ -34,6 +35,33 @@ interface UatContext {
   changedFilesOmitted?: number;
   diffStat?: { stat: string; truncated: boolean } | null;
   source?: { plan?: 'vbrief' | 'none'; files?: 'git' | 'none' };
+}
+
+interface MergeTrainConfig {
+  merge_train_enabled: boolean;
+}
+
+const MERGE_TRAIN_CONFIG_QUERY_KEY = ['flywheel', 'config'] as const;
+
+async function fetchMergeTrainConfig(): Promise<MergeTrainConfig> {
+  const res = await fetch('/api/flywheel/config');
+  if (!res.ok) throw new Error(`GET /api/flywheel/config -> ${res.status}`);
+  const json = (await res.json()) as { merge_train_enabled?: unknown };
+  return { merge_train_enabled: Boolean(json.merge_train_enabled) };
+}
+
+async function postMergeTrainConfig(enabled: boolean): Promise<MergeTrainConfig> {
+  const res = await fetch('/api/flywheel/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ merge_train_enabled: enabled }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(body || `POST /api/flywheel/config -> ${res.status}`);
+  }
+  const json = (await res.json()) as { merge_train_enabled?: unknown };
+  return { merge_train_enabled: Boolean(json.merge_train_enabled) };
 }
 
 async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
@@ -183,6 +211,8 @@ export function AwaitingMergePage() {
           </p>
         </header>
 
+        <MergeTrainOverview />
+
         {sortedAwaiting.length === 0 ? (
           <EmptyState />
         ) : (
@@ -265,13 +295,63 @@ export function AwaitingMergePage() {
   );
 }
 
+function MergeTrainOverview() {
+  const queryClient = useQueryClient();
+  const configQuery = useQuery({
+    queryKey: MERGE_TRAIN_CONFIG_QUERY_KEY,
+    queryFn: fetchMergeTrainConfig,
+    staleTime: 5_000,
+  });
+  const configMutation = useMutation({
+    mutationFn: postMergeTrainConfig,
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: MERGE_TRAIN_CONFIG_QUERY_KEY });
+      const previous = queryClient.getQueryData<MergeTrainConfig>(MERGE_TRAIN_CONFIG_QUERY_KEY);
+      queryClient.setQueryData<MergeTrainConfig>(MERGE_TRAIN_CONFIG_QUERY_KEY, { merge_train_enabled: next });
+      return { previous };
+    },
+    onError: (error: Error, _next, context) => {
+      queryClient.setQueryData(MERGE_TRAIN_CONFIG_QUERY_KEY, context?.previous);
+      toast.error(`Failed to update merge train: ${error.message}`);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(MERGE_TRAIN_CONFIG_QUERY_KEY, data);
+    },
+  });
+  const enabled = configQuery.data?.merge_train_enabled ?? false;
+  const busy = configQuery.isLoading || configMutation.isPending;
+
+  return (
+    <section className="mb-8" aria-label="Merge train">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Merge train</h2>
+          <p className="text-xs text-muted-foreground">Assemble and batch-test ready features per project.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={busy}
+          onClick={() => configMutation.mutate(!enabled)}
+          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-success' : 'bg-muted-foreground'}`} />
+          {enabled ? 'Enabled' : 'Disabled'}
+        </button>
+      </div>
+      <MergeQueueCard />
+    </section>
+  );
+}
+
 function EmptyState() {
   return (
     <div className="border border-dashed border-border rounded-lg p-10 text-center">
       <CheckCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
       <p className="text-sm text-foreground mb-1">Nothing awaiting merge.</p>
       <p className="text-xs text-muted-foreground">
-        The flywheel is idling — kick off more work or run <code>/all-up</code>.
+        No reviewed work is waiting for a merge click.
       </p>
     </div>
   );
