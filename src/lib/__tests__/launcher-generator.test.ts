@@ -839,7 +839,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       resumeSessionId: 'sess-pi-123',
     });
     expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model 'gpt-5.4-mini'/);
+    expect(script).toMatch(/exec pi --mode rpc --model 'openai-codex\/gpt-5.4-mini'/);
   });
 
   it('throws when pi launcher is missing required path config', () => {
@@ -987,5 +987,19 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     expect(a).toBe(b);
+  });
+});
+
+describe('pi model provider qualification (PAN-1799)', () => {
+  it('qualifies kimi models with the kimi-coding pi provider', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
+  });
+  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
+    // getProviderForModelSync falls back to anthropic for unknown ids — the
+    // same behavior conversations.ts has always had for pi model resolution.
+    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
   });
 });

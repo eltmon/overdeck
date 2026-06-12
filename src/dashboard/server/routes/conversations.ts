@@ -119,7 +119,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { getProviderForModelSync } from '../../../lib/providers.js';
+import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -713,36 +713,9 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
  * indicates Pi has drawn at least its title/prompt line. This is the same
  * shape of readiness check we use for Claude Code's interactive prompt.
  */
-/**
- * Map a Panopticon model id to the matching Pi-side provider name. Pi has
- * its own provider taxonomy (`pi --list-models`); the IDs differ from our
- * internal {@link getProviderForModelSync}. Returning `undefined` lets Pi fall
- * back to its registry order.
- *
- * Pi conversations rely on the user's own Pi auth (`~/.pi/agent/auth.json`).
- * We only constrain *which* Pi provider Pi uses; we never inject keys.
- */
-function piProviderForModel(modelId: string): string | undefined {
-  const provider = getProviderForModelSync(modelId).name;
-  switch (provider) {
-    case 'openai':
-      return 'openai-codex';
-    case 'anthropic':
-      return 'anthropic';
-    case 'google':
-      return 'google';
-    case 'minimax':
-      return 'minimax';
-    case 'zai':
-      return 'zai';
-    case 'kimi':
-      return 'kimi-coding';
-    case 'mimo':
-      return 'xiaomi';
-    default:
-      return undefined;
-  }
-}
+// piProviderForModel moved to src/lib/providers.ts so the work-agent launcher
+// (launcher-generator.ts buildPiCommand) and conversations share one source of
+// truth for the Pi provider taxonomy (PAN-1799 follow-up).
 
 async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;

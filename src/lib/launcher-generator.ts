@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import type { Role } from './agents.js';
 import { toCodexSandboxValue } from './runtimes/codex.js';
+import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 
@@ -668,7 +669,10 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--mode', 'rpc');
   }
   if (config.model) {
-    tokens.push('--model', shellQuoteModelIdSync(config.model));
+    // Provider-qualify so Pi binds the model to the intended provider
+    // (bare 'kimi-k2.6' resolves to keyless moonshotai instead of
+    // kimi-coding — agent boots but every prompt fails; PAN-1799).
+    tokens.push('--model', shellQuoteModelIdSync(qualifyPiModel(config.model)));
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
   if (config.piExtensionPath) {

@@ -433,3 +433,46 @@ export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<vo
       await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
     } catch { /* non-fatal */ }
   });
+
+/**
+ * Map a Panopticon provider to the Pi harness's provider name for that
+ * vendor. Pi resolves bare model ids against its own registry order, which
+ * can pick the wrong provider entirely — e.g. bare `kimi-k2.6` resolves to
+ * `moonshotai` (no API key configured) instead of `kimi-coding`, leaving the
+ * agent alive but unable to complete any prompt (PAN-1799 follow-up). Pi
+ * sessions rely on the user's own Pi auth (`~/.pi/agent/auth.json`); we only
+ * constrain WHICH Pi provider is used — we never inject keys.
+ */
+export function piProviderForModel(modelId: string): string | undefined {
+  const provider = getProviderForModelSync(modelId).name;
+  switch (provider) {
+    case 'openai':
+      return 'openai-codex';
+    case 'anthropic':
+      return 'anthropic';
+    case 'google':
+      return 'google';
+    case 'minimax':
+      return 'minimax';
+    case 'zai':
+      return 'zai';
+    case 'kimi':
+      return 'kimi-coding';
+    case 'mimo':
+      return 'xiaomi';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Provider-qualify a model id for Pi (`kimi-coding/kimi-k2.6`). Returns the
+ * bare id unchanged when no Pi provider mapping exists.
+ */
+export function qualifyPiModel(modelId: string): string {
+  // Idempotent: conversations pre-qualify (`anthropic/claude-...`) before the
+  // launcher sees the model — never double-prefix an already-qualified id.
+  if (modelId.includes('/')) return modelId;
+  const piProvider = piProviderForModel(modelId);
+  return piProvider ? `${piProvider}/${modelId}` : modelId;
+}
