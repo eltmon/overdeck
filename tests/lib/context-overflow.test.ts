@@ -1,21 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildContextOverflowReseedMessage, isContextOverflowTail } from '../../src/lib/context-overflow.js';
+import { buildCompactRecoverySeedMessage, isContextOverflowTail } from '../../src/lib/context-overflow.js';
 
 const OVERFLOW_LINE = 'API Error: 400 Your input exceeds the context window of this model.';
 
-describe('buildContextOverflowReseedMessage', () => {
+describe('buildCompactRecoverySeedMessage', () => {
   it('points only at durable recovery artifacts and warns not to restart', () => {
-    const message = buildContextOverflowReseedMessage();
+    const message = buildCompactRecoverySeedMessage('PAN-TEST', null);
 
+    expect(message).toContain('PAN-TEST');
     expect(message).toContain('.pan/continue.json');
     expect(message).toContain('bd ready');
     expect(message).toContain('bd show <id>');
     expect(message).toContain('git status');
     expect(message).toContain('git diff');
     expect(message).toMatch(/Do NOT start over/);
-    expect(message).toMatch(/prior conversation was cleared/i);
-    expect(message).toMatch(/context-window overflow/i);
+    expect(message).toMatch(/fresh session/i);
+    expect(message).toMatch(/context-window/i);
   });
 });
 
