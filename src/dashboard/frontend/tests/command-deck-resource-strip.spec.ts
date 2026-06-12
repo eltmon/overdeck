@@ -201,6 +201,13 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify({ version: 'test' }),
       });
     });
+    await page.route('**/api/flywheel/uat-generations', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
 
     await page.goto(`${DASHBOARD_URL}/command-deck`);
 
@@ -214,8 +221,10 @@ test.describe('Command Deck resource strip', () => {
     await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
     await sidebarProject.click();
 
-    const pan862Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-862' }).first();
-    const pan777Row = page.locator('[class*="featureItemRow"]').filter({ hasText: 'PAN-777' }).first();
+    const pan862Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-862"]');
+    const pan777Item = page.locator('[data-component="feature-item"][data-issue-id="PAN-777"]');
+    const pan862Row = pan862Item.locator('[class*="featureItemRow"]').first();
+    const pan777Row = pan777Item.locator('[class*="featureItemRow"]').first();
     // First assertion after project selection gates on the data load + render —
     // give it generous headroom (the remaining assertions render together once
     // the row is present and keep the default timeout).
@@ -223,29 +232,38 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan777Row).toBeVisible();
     await expect(pan777Row.locator('[class*="featureState"]').getByText('Closed', { exact: true })).toBeVisible();
 
-    const workspaceIcon = pan862Row.getByTitle('workspace: allocated');
-    await expect(workspaceIcon).toBeVisible();
-    await expect(pan862Row.getByTitle('branch: local 1 · remote 1')).toBeVisible();
-    await expect(pan862Row.getByTitle('tmux: 2 sessions')).toBeVisible();
-    await expect(pan862Row.getByTitle('vBRIEF: present')).toBeVisible();
-    await expect(pan862Row.getByTitle('beads: present')).toBeVisible();
-    await expect(pan862Row.getByTitle('PR: #862 (open) · #863 (open, draft)')).toBeVisible();
-    await expect(pan862Row.getByTitle('docker: 1 container')).toBeVisible();
+    const expectResourceChip = async (title: string, label: string) => {
+      const chip = pan862Item.getByTitle(title);
+      await expect(chip).toBeVisible();
+      await expect(chip.locator('svg')).toBeVisible();
+      await expect(chip.getByText(label, { exact: true })).toBeVisible();
+      return chip;
+    };
+
+    const workspaceIcon = await expectResourceChip('workspace: allocated', 'workspace');
+    await expectResourceChip('branch: local 1 · remote 1', 'branch local 1 · remote 1');
+    await expectResourceChip('tmux: 2 sessions', 'tmux');
+    await expectResourceChip('vBRIEF: present', 'vBRIEF');
+    await expectResourceChip('beads: present', 'beads');
+    await expectResourceChip('PR: #862 (open) · #863 (open, draft)', '#862');
+    await expectResourceChip('docker: 1 container', 'stack 1');
     await workspaceIcon.hover();
 
-    await expect(pan862Row.getByText('workspace: /tmp/workspaces/feature-pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('branch (local): feature/pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('branch (remote): origin/feature/pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('vBRIEF present', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('beads present', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('workspace: /tmp/workspaces/feature-pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('branch (local): feature/pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('branch (remote): origin/feature/pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('vBRIEF present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('beads present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
 
-    const closedWorkspaceIcon = pan777Row.getByTitle('workspace: allocated');
+    const closedWorkspaceIcon = pan777Item.getByTitle('workspace: allocated');
+    await expect(closedWorkspaceIcon.locator('svg')).toBeVisible();
+    await expect(closedWorkspaceIcon.getByText('workspace', { exact: true })).toBeVisible();
     await closedWorkspaceIcon.hover();
-    await expect(pan777Row.getByRole('button', { name: 'Cleanup' }).first()).toBeVisible();
+    await expect(pan777Item.getByRole('button', { name: 'Cleanup' }).first()).toBeVisible();
   });
 });
