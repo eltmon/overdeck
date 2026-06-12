@@ -144,6 +144,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
 
 const MODEL_STORAGE_KEY = 'conv-composer-model';
 const HARNESS_STORAGE_KEY = 'conv-composer-harness';
+const LIVE_HARNESS_SWITCH_WARNING = 'Experimental: converts the transcript to the new harness format. May lose fidelity; falls back to a fresh session on failure.';
 export const FALLBACK_DEFAULT_MODEL = FALLBACK_DEFAULT_CONVERSATION_MODEL;
 
 let knownModelIds = new Set(FALLBACK_GROUPS.flatMap((g) => g.models.map((m) => m.id)));
@@ -204,9 +205,10 @@ interface ModelPickerProps {
    * on the tmux session lifecycle. (PAN-1067)
    */
   onComboChange?: (modelId: string, effortLevels: readonly string[], harness: Harness) => void;
+  liveConversation?: boolean;
 }
 
-export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange, liveConversation = false }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
@@ -414,6 +416,10 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                   const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
                   const isActive = harness === opt.id;
                   const willAutoFlip = !decision.allowed;
+                  const isExperimentalLiveSwitch = liveConversation && !isActive;
+                  const title = isExperimentalLiveSwitch
+                    ? LIVE_HARNESS_SWITCH_WARNING
+                    : willAutoFlip ? `Will auto-switch model: ${decision.reason}` : opt.description;
                   const handleClick = () => {
                     if (isActive) return;
                     // Keep the dropdown OPEN after a harness switch so the user
@@ -448,14 +454,22 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                       type="button"
                       className={`${styles.harnessOption} ${isActive ? styles.harnessOptionActive : ''}`}
                       onClick={handleClick}
-                      title={willAutoFlip ? `Will auto-switch model: ${decision.reason}` : opt.description}
+                      title={title}
                     >
                       <span className={styles.harnessOptionIcon}>
                         {isActive ? <Check size={11} /> : null}
                       </span>
                       <span className={styles.harnessOptionBody}>
-                        <span className={styles.harnessOptionName}>{opt.label}</span>
+                        <span className={styles.harnessOptionNameRow}>
+                          <span className={styles.harnessOptionName}>{opt.label}</span>
+                          {isExperimentalLiveSwitch && (
+                            <span className={styles.harnessOptionExperimental}>Experimental</span>
+                          )}
+                        </span>
                         {opt.description && <span className={styles.harnessOptionDesc}>{opt.description}</span>}
+                        {isExperimentalLiveSwitch && (
+                          <span className={styles.harnessOptionDesc}>{LIVE_HARNESS_SWITCH_WARNING}</span>
+                        )}
                         {willAutoFlip && decision.reason && (
                           <span className={styles.harnessOptionNote}>{decision.reason}</span>
                         )}

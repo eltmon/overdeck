@@ -4688,6 +4688,21 @@
   line-height: 1.3;
 }
 
+.harnessOptionNameRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.harnessOptionExperimental {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  line-height: 1.3;
+}
+
 .harnessOptionActive .harnessOptionName {
   font-weight: 600;
   color: var(--primary);
