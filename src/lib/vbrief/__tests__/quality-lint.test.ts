@@ -107,3 +107,91 @@ describe('lintPlanQuality story quality', () => {
     })]))).toEqual([]);
   });
 });
+
+describe('lintPlanQuality DAG and references', () => {
+  function validItem(id: string, overrides: Partial<VBriefItem> = {}): VBriefItem {
+    return item({
+      id,
+      title: id,
+      metadata: { requiresInspection: false },
+      subItems: [
+        ac(`${id}.ac1`, 'Given input then it returns output'),
+        ac(`${id}.ac2`, 'The command rejects invalid input'),
+      ],
+      ...overrides,
+    });
+  }
+
+  it('flags unknown edge target', () => {
+    const issues = lintPlanQuality({
+      ...doc([validItem('a')]),
+      plan: {
+        ...doc([validItem('a')]).plan,
+        edges: [{ from: 'a', to: 'missing', type: 'blocks' }],
+      },
+    });
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'edge-unknown-id', message: expect.stringContaining('missing') }),
+    ]));
+  });
+
+  it('flags blocks cycle A->B->A', () => {
+    const issues = lintPlanQuality({
+      ...doc([validItem('a'), validItem('b')]),
+      plan: {
+        ...doc([validItem('a'), validItem('b')]).plan,
+        edges: [
+          { from: 'a', to: 'b', type: 'blocks' },
+          { from: 'b', to: 'a', type: 'blocks' },
+        ],
+      },
+    });
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'edge-cycle' }),
+    ]));
+  });
+
+  it('accepts acyclic DAG', () => {
+    const plan = doc([validItem('a'), validItem('b'), validItem('c')]);
+    plan.plan.edges = [
+      { from: 'a', to: 'b', type: 'blocks' },
+      { from: 'b', to: 'c', type: 'blocks' },
+    ];
+
+    expect(lintPlanQuality(plan)).toEqual([]);
+  });
+
+  it('flags foundationFor pointing nowhere', () => {
+    const issues = lintPlanQuality(doc([
+      validItem('a', { metadata: { requiresInspection: true, foundationFor: ['missing'] } }),
+      validItem('b'),
+    ]));
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'a', rule: 'foundationFor-unknown-id' }),
+    ]));
+  });
+
+  it('flags requiresInspection true with empty foundationFor', () => {
+    const issues = lintPlanQuality(doc([
+      validItem('a', { metadata: { requiresInspection: true, foundationFor: [] } }),
+      validItem('b'),
+    ]));
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'a', rule: 'inspection-without-foundation' }),
+    ]));
+  });
+
+  it('flags missing requiresInspection', () => {
+    const issues = lintPlanQuality(doc([
+      validItem('a', { metadata: {} }),
+    ]));
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'a', rule: 'inspection-missing' }),
+    ]));
+  });
+});
