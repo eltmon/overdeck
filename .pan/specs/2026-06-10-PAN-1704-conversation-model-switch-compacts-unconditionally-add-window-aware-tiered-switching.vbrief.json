@@ -4,17 +4,17 @@
     "created": "2026-06-10T00:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1704: Conversation model switch compacts unconditionally — add window-aware tiered switching (lossless /model or --resume when context fits)",
-    "updated": "2026-06-11T03:18:13.978Z"
+    "updated": "2026-06-12T20:20:58.724Z"
   },
   "plan": {
     "id": "pan-1704",
     "title": "Conversation model switch compacts unconditionally — add window-aware tiered switching",
-    "status": "proposed",
+    "status": "completed",
     "uid": "cfbef208-8840-448b-b105-acec6ecba538",
     "author": "agent:claude-opus-4-8",
-    "sequence": 33,
+    "sequence": 34,
     "created": "2026-06-10T00:12:00.000Z",
-    "updated": "2026-06-11T03:18:13.978Z",
+    "updated": "2026-06-12T20:20:58.724Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1704",
@@ -428,5 +428,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
