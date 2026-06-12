@@ -330,6 +330,9 @@ The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon 
 |-------|----------|-------------|
 | `metadata.difficulty` | items | `trivial`, `simple`, `medium`, `complex`, `expert` — used for model routing |
 | `metadata.issueLabel` | items | Issue ID for beads label filtering (e.g., `"pan-436"`) |
+| `metadata.requiresInspection` | items | Boolean decision for whether a bead must pass the work.inspect gate before downstream work proceeds |
+| `metadata.inspectionDepth` | items | `"fast"` or `"deep"` review depth when `requiresInspection` is true |
+| `metadata.foundationFor` | items | Downstream bead IDs that depend on this inspection-gated item |
 | `metadata.kind` | subItems | `"acceptance_criterion"` — marks subItem as an AC for verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
