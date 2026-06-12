@@ -378,6 +378,36 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, clau
   );
 }
 
+function RoleHarnessSelect({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value?: Harness;
+  disabled: boolean;
+  onChange: (value: Harness | undefined) => void;
+}) {
+  return (
+    <label className="space-y-1.5">
+      <span className="text-xs font-medium text-foreground">{label}</span>
+      <select
+        aria-label={label}
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value ? event.target.value as Harness : undefined)}
+        disabled={disabled}
+        className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+      >
+        <option value="">Provider default</option>
+        <option value="claude-code">Claude Code</option>
+        <option value="pi">Pi</option>
+        <option value="codex">Codex</option>
+      </select>
+    </label>
+  );
+}
+
 function getFlywheelConfig(settings: SettingsResponse | undefined): Pick<RoleConfig, 'harness'> & Required<Pick<RoleConfig, 'effort' | 'maxAgents' | 'scope'>> {
   return {
     ...DEFAULT_FLYWHEEL_CONFIG,
@@ -492,37 +522,30 @@ export function RolesPanel() {
                     </div>
                   </div>
                   <div className="md:w-80">
-                    <ModelPicker
-                      label={`${role.name} model`}
-                      value={roleModel}
-                      workhorses={workhorses}
-                      providerGroups={providerGroups}
-                      providers={settings?.models?.providers}
-                      claudeAuth={claudeAuthQuery.data}
-                      disabled={saveMutation.isPending}
-                      onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
-                    />
+                    <div className="space-y-3">
+                      <ModelPicker
+                        label={`${role.name} model`}
+                        value={roleModel}
+                        workhorses={workhorses}
+                        providerGroups={providerGroups}
+                        providers={settings?.models?.providers}
+                        claudeAuth={claudeAuthQuery.data}
+                        disabled={saveMutation.isPending}
+                        onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
+                      />
+                      <RoleHarnessSelect
+                        label={`${role.name} harness`}
+                        value={settings?.roles?.[role.id]?.harness}
+                        disabled={saveMutation.isPending}
+                        onChange={(harness) => saveMutation.mutate({ role: role.id, patch: { harness } })}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {flywheelConfig && (
                   <div className="mt-4 border-t border-border pt-3">
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <label className="space-y-1.5">
-                        <span className="text-xs font-medium text-foreground">Flywheel harness</span>
-                        <select
-                          aria-label="Flywheel harness"
-                          value={flywheelConfig.harness ?? ''}
-                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { harness: event.target.value ? event.target.value as Harness : undefined } })}
-                          disabled={saveMutation.isPending}
-                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-                        >
-                          <option value="">Provider default</option>
-                          <option value="claude-code">Claude Code</option>
-                          <option value="pi">Pi</option>
-                          <option value="codex">Codex</option>
-                        </select>
-                      </label>
+                    <div className="grid gap-3 md:grid-cols-3">
                       <label className="space-y-1.5">
                         <span className="text-xs font-medium text-foreground">Flywheel effort</span>
                         <select

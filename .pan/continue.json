@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1787",
   "created": "2026-06-12T06:30:04.640Z",
-  "updated": "2026-06-12T17:20:46Z",
+  "updated": "2026-06-12T17:24:01Z",
   "gitState": {
     "branch": "feature/pan-1787",
-    "sha": "d58860365",
+    "sha": "09fb08db7",
     "dirty": false
   },
   "decisions": [
@@ -133,12 +133,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Shared branding registry bead workspace-a9852 implemented and ready to commit/close; run required inspection after close, then claim workspace-bzy4x.",
-    "beadId": "workspace-a9852",
+    "description": "Settings Roles harness-select bead workspace-bzy4x implemented and ready to commit/close; then run bd ready -l pan-1787 and continue with the next unblocked bead.",
+    "beadId": "workspace-bzy4x",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/shared/branding/index.tsx",
-      "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx",
-      "src/dashboard/frontend/src/components/chat/ProviderIcons.tsx"
+      "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+      "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -212,6 +211,12 @@
       "timestamp": "2026-06-12T17:20:46Z",
       "reason": "bead-progress",
       "note": "Implemented workspace-a9852: added shared/branding with typed PROVIDER_BRANDS for all 10 providers, HARNESS_BRANDS for claude-code/codex/pi, ProviderLogo, HarnessLogo, ProviderDot, and ProviderLetterBadge; Pi renders a π glyph tile; chat/ProviderIcons.tsx is now a compatibility re-export. Added branding component tests. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/shared/branding/__tests__/branding.test.tsx, full frontend tests, and npm run typecheck.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-06-12T17:24:01Z",
+      "reason": "bead-progress",
+      "note": "Implemented workspace-bzy4x: extracted RoleHarnessSelect and rendered Provider default/Claude Code/Pi/Codex harness controls for plan, work, strike, review, test, ship, and flywheel role cards. Explicit selections save roles.<role>.harness; Provider default saves undefined and clears the key. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/RolesPanel.test.tsx and npm run typecheck.",
       "agentModel": "gpt-5.5"
     }
   ],
