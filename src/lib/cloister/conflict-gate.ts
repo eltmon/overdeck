@@ -1,7 +1,7 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { spawnRun } from '../agents.js';
+import { messageAgent, spawnRun } from '../agents.js';
 import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus } from '../review-status.js';
 
 const execAsync = promisify(exec);
@@ -24,10 +24,13 @@ export interface CheckBranchMergeabilityDeps {
   exec?: ExecRunner;
 }
 
+export type ResolverDispatchState = 'dispatched' | 'already_running' | 'throttled';
+
 export interface ConflictGateResult {
   gated: boolean;
   reason?: string;
   clearedStaleBlocker?: boolean;
+  resolverDispatchState?: ResolverDispatchState;
 }
 
 export interface DispatchResolverInput {
@@ -46,13 +49,14 @@ export interface ResolveConflictGateDeps {
     existing?: ReviewStatus,
   ) => ReviewStatus | Promise<ReviewStatus>;
   probeMergeability?: (workspacePath: string, targetBranch: string) => BranchMergeability | Promise<BranchMergeability>;
-  dispatchResolver: (input: DispatchResolverInput) => void | Promise<void>;
+  dispatchResolver: (input: DispatchResolverInput) => ResolverDispatchState | void | Promise<ResolverDispatchState | void>;
   now?: () => Date;
   log?: (message: string) => void;
 }
 
 interface RealConflictGateDepsOverrides {
   spawnRun?: typeof spawnRun;
+  messageAgent?: typeof messageAgent;
   getReviewStatus?: typeof getReviewStatusSync;
   setReviewStatus?: typeof setReviewStatusSync;
   emitActivityEntry?: typeof emitActivityEntrySync;
@@ -99,6 +103,7 @@ export async function checkBranchMergeability(
 
 export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
   const runSpawn = overrides.spawnRun ?? spawnRun;
+  const deliverMessage = overrides.messageAgent ?? messageAgent;
   const readStatus = overrides.getReviewStatus ?? getReviewStatusSync;
   const writeStatus = overrides.setReviewStatus ?? setReviewStatusSync;
   const emitActivity = overrides.emitActivityEntry ?? emitActivityEntrySync;
@@ -111,14 +116,18 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
     now,
     log: overrides.log,
     dispatchResolver: async (input) => {
+      const prompt = buildConflictResolverPrompt(input);
+      let dispatchState: ResolverDispatchState = 'dispatched';
       try {
-        await runSpawn(input.issueId, 'work', { prompt: buildConflictResolverPrompt(input) });
+        await runSpawn(input.issueId, 'work', { prompt });
       } catch (err) {
         if (isAlreadyRunningError(err)) {
-          overrides.log?.(`[conflict-gate] ${input.issueId}: conflict resolver already running`);
-          return;
+          await deliverMessage(`agent-${input.issueId.toLowerCase()}`, prompt, 'conflict-gate');
+          dispatchState = 'already_running';
+          overrides.log?.(`[conflict-gate] ${input.issueId}: conflict resolver already running; delivered resolver prompt`);
+        } else {
+          throw err;
         }
-        throw err;
       }
 
       const dispatchedAt = now().toISOString();
@@ -128,9 +137,12 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
         source: 'review',
         level: 'info',
         issueId: input.issueId,
-        message: `Review deferred — conflict resolver dispatched for ${input.issueId}`,
+        message: dispatchState === 'already_running'
+          ? `Review deferred — conflict resolver already running for ${input.issueId}; delivered resolver prompt`
+          : `Review deferred — conflict resolver dispatched for ${input.issueId}`,
         details: input.reason,
       });
+      return dispatchState;
     },
   };
 }
@@ -164,13 +176,25 @@ export async function resolveConflictGate(
     ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
     : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
 
-  if (!isResolverDispatchThrottled(status, checkedAtMs)) {
-    await deps.dispatchResolver({ issueId, workspacePath, targetBranch, blockerReasons: mergeBlockers, reason });
+  let resolverDispatchState: ResolverDispatchState;
+  if (!isResolverDispatchThrottled(status, mergeBlockers, checkedAtMs)) {
+    resolverDispatchState = await deps.dispatchResolver({
+      issueId,
+      workspacePath,
+      targetBranch,
+      blockerReasons: mergeBlockers,
+      reason,
+    }) ?? 'dispatched';
   } else {
+    resolverDispatchState = 'throttled';
     deps.log?.(`[conflict-gate] ${issueId}: conflict resolver dispatch is throttled`);
   }
 
-  return { gated: true, reason };
+  return {
+    gated: true,
+    reason: `${reason}; ${formatResolverDispatchState(resolverDispatchState)}`,
+    resolverDispatchState,
+  };
 }
 
 export function __resetConflictGateProbeCacheForTests(): void {
@@ -185,6 +209,7 @@ async function getCachedMergeability(
   deps: ResolveConflictGateDeps,
 ): Promise<BranchMergeability> {
   const key = issueId.toUpperCase();
+  sweepExpiredProbeCache(nowMs);
   const cached = probeCache.get(key);
   if (cached && nowMs - cached.checkedAtMs < PROBE_CACHE_MS) return cached.result;
 
@@ -193,10 +218,40 @@ async function getCachedMergeability(
   return result;
 }
 
-function isResolverDispatchThrottled(status: ReviewStatus, nowMs: number): boolean {
+function isResolverDispatchThrottled(
+  status: ReviewStatus,
+  mergeBlockers: BlockerReason[],
+  nowMs: number,
+): boolean {
   if (!status.conflictResolutionDispatchedAt) return false;
   const dispatchedAtMs = Date.parse(status.conflictResolutionDispatchedAt);
-  return Number.isFinite(dispatchedAtMs) && nowMs - dispatchedAtMs < DISPATCH_THROTTLE_MS;
+  if (!Number.isFinite(dispatchedAtMs)) return false;
+
+  const newestBlockerMs = Math.max(
+    ...mergeBlockers
+      .map((blocker) => Date.parse(blocker.detectedAt))
+      .filter((detectedAtMs) => Number.isFinite(detectedAtMs)),
+  );
+  if (Number.isFinite(newestBlockerMs) && dispatchedAtMs < newestBlockerMs) return false;
+
+  return nowMs - dispatchedAtMs < DISPATCH_THROTTLE_MS;
+}
+
+function formatResolverDispatchState(state: ResolverDispatchState): string {
+  switch (state) {
+    case 'already_running':
+      return 'conflict resolver already running; resolver prompt delivered';
+    case 'throttled':
+      return 'conflict resolver dispatch throttled';
+    case 'dispatched':
+      return 'conflict resolver dispatched';
+  }
+}
+
+function sweepExpiredProbeCache(nowMs: number): void {
+  for (const [key, cached] of probeCache.entries()) {
+    if (nowMs - cached.checkedAtMs >= PROBE_CACHE_MS) probeCache.delete(key);
+  }
 }
 
 function isMergeBlocker(blocker: BlockerReason): boolean {
@@ -214,7 +269,7 @@ function buildConflictResolverPrompt(input: DispatchResolverInput): string {
     'Resolve the conflict WITHOUT degrading either side of the change:',
     `1. Read what origin/${input.targetBranch} changed and what ${input.issueId} intended before editing.`,
     `2. Rebase this branch onto origin/${input.targetBranch} and resolve every conflict so BOTH intents are preserved.`,
-    '3. Build, run the relevant tests, commit the resolved state, and push with --force-with-lease.',
+    '3. Build, run the relevant tests, and commit the resolved state.',
     '4. Re-request review when the branch is clean (use pan done or pan review request as appropriate for this workspace).',
     '',
     'Do not blindly accept one side of a conflict — understand both changesets first.',

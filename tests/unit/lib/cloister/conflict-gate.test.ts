@@ -59,6 +59,7 @@ function makeGateDeps(status: ReviewStatus | null, mergeability: 'clean' | 'conf
     probeMergeability: vi.fn(() => mergeability),
     dispatchResolver: vi.fn(() => {
       if (status) status.conflictResolutionDispatchedAt = new Date().toISOString();
+      return 'dispatched';
     }),
     now: () => new Date(),
   };
@@ -167,11 +168,34 @@ describe('resolveConflictGate', () => {
     const status = makeStatus({ blockerReasons: [mergeBlocker] });
     const deps = makeGateDeps(status, 'conflicts');
 
-    await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({ gated: true });
-    await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({ gated: true });
+    await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
+      gated: true,
+      reason: expect.stringContaining('conflict resolver dispatched'),
+      resolverDispatchState: 'dispatched',
+    });
+    await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
+      gated: true,
+      reason: expect.stringContaining('dispatch throttled'),
+      resolverDispatchState: 'throttled',
+    });
 
     expect(deps.dispatchResolver).toHaveBeenCalledTimes(1);
   });
+  it('does not let an old dispatch timestamp throttle a newer blocker instance', async () => {
+    const status = makeStatus({
+      blockerReasons: [{ ...mergeBlocker, detectedAt: '2026-06-11T08:20:00.000Z' }],
+      conflictResolutionDispatchedAt: '2026-06-11T08:10:00.000Z',
+    });
+    const deps = makeGateDeps(status, 'conflicts');
+
+    await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
+      gated: true,
+      resolverDispatchState: 'dispatched',
+    });
+
+    expect(deps.dispatchResolver).toHaveBeenCalledTimes(1);
+  });
+
 
   it('gates unknown probe results without throwing and still dispatches', async () => {
     const status = makeStatus({ blockerReasons: [mergeBlocker] });
@@ -180,6 +204,7 @@ describe('resolveConflictGate', () => {
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
       gated: true,
       reason: expect.stringContaining('could not be verified'),
+      resolverDispatchState: 'dispatched',
     });
 
     expect(deps.dispatchResolver).toHaveBeenCalledTimes(1);
@@ -235,6 +260,7 @@ describe('buildRealConflictGateDeps', () => {
     expect(prompt).toContain('BOTH intents are preserved');
     expect(prompt).toContain('Re-request review');
     expect(prompt).toContain('pan done or pan review request');
+    expect(prompt).not.toContain('--force-with-lease');
     expect(setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
       { conflictResolutionDispatchedAt: '2026-06-11T08:45:00.000Z' },
@@ -246,11 +272,20 @@ describe('buildRealConflictGateDeps', () => {
     }));
   });
 
-  it('swallows already-running spawn errors without stamping status or activity', async () => {
-    const spawnRun = vi.fn(async () => { throw new Error("Role run agent already running. Use 'pan tell' to message it."); });
+  it('delivers the resolver prompt and stamps status when the work agent is already running', async () => {
+    const spawnRun = vi.fn(async () => {
+      throw new Error("Role run agent already running. Use 'pan tell' to message it.");
+    });
+    const messageAgent = vi.fn().mockResolvedValue(undefined);
     const setReviewStatus = vi.fn();
     const emitActivityEntry = vi.fn();
-    const deps = buildRealConflictGateDeps({ spawnRun, setReviewStatus, emitActivityEntry });
+    const deps = buildRealConflictGateDeps({
+      spawnRun,
+      messageAgent,
+      setReviewStatus,
+      emitActivityEntry,
+      getReviewStatus: () => makeStatus({ blockerReasons: [mergeBlocker] }),
+    });
 
     await expect(deps.dispatchResolver({
       issueId: 'PAN-1765',
@@ -258,9 +293,21 @@ describe('buildRealConflictGateDeps', () => {
       targetBranch: 'main',
       blockerReasons: [mergeBlocker],
       reason: 'merge conflict with main must be resolved before review dispatch',
-    })).resolves.toBeUndefined();
+    })).resolves.toBe('already_running');
 
-    expect(setReviewStatus).not.toHaveBeenCalled();
-    expect(emitActivityEntry).not.toHaveBeenCalled();
+    expect(messageAgent).toHaveBeenCalledWith(
+      'agent-pan-1765',
+      expect.stringContaining('Rebase this branch onto origin/main'),
+      'conflict-gate',
+    );
+    expect(setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1765',
+      { conflictResolutionDispatchedAt: '2026-06-11T08:45:00.000Z' },
+      expect.objectContaining({ issueId: 'PAN-1765' }),
+    );
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'review',
+      message: expect.stringContaining('already running'),
+    }));
   });
 });

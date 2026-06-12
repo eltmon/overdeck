@@ -285,7 +285,7 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
   it('defers review without spawning or archiving feedback when conflict-gated', async () => {
     mockResolveConflictGate.mockResolvedValue({
       gated: true,
-      reason: 'merge conflict with main must be resolved before review dispatch',
+      reason: 'merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
     });
 
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -298,7 +298,7 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
     expect(result).toEqual({
       success: false,
       gated: true,
-      message: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch',
+      message: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
     });
     expect(mockResolveConflictGate).toHaveBeenCalledWith(
       'PAN-1765',
@@ -308,7 +308,7 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
     );
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1765', {
       reviewStatus: 'pending',
-      reviewNotes: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch',
+      reviewNotes: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
     });
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(mockArchiveFeedbackFiles).not.toHaveBeenCalled();
@@ -800,6 +800,7 @@ describe('dispatch failure reviewStatus regression', () => {
 
     expect(restartBlock).toContain('if (result.gated)');
     expect(restartBlock).toContain('gated: true');
+    expect(restartBlock).toContain('message: result.message');
     expect(restartBlock).toContain('{ status: 409 }');
   });
 
@@ -822,6 +823,30 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).toContain('gated: true');
     expect(requestReviewBlock).toContain('{ status: 409 }');
     expect(requestReviewBlock).toContain('reviewNotes: result.message');
+  });
+
+  it('workspaces.ts approve route treats gated dispatches as deferrals', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const approveMatch = routeSrc.match(
+      /POST \/api\/issues\/:issueId\/approve[\s\S]*?Fallback \(PAN-1531\): direct server-side rebase/,
+    );
+    expect(approveMatch).not.toBeNull();
+    const approveBlock = approveMatch![0];
+
+    expect(approveBlock).toContain('gated?: boolean');
+    expect(approveBlock).toContain('if (reviewResult.gated)');
+    expect(approveBlock).toContain('review dispatch deferred for');
+    expect(approveBlock).toContain('gated: true');
+    expect(approveBlock).toContain("pipeline: 'deferred'");
+    expect(approveBlock).toContain('{ status: 409 }');
+    expect(approveBlock).toContain('return jsonResponse');
+    expect(approveBlock).toContain('setReviewStatusBase(issueId, {');
   });
 
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {

@@ -6036,7 +6036,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         // posts the verdict via /api/review/:id/status. Test dispatch is NOT
         // part of the review prompt — reactive Cloister picks up the
         // review.approved lifecycle event and spawns the test role.
-        let reviewResult: { success: boolean; message: string; error?: string };
+        let reviewResult: { success: boolean; message: string; error?: string; gated?: boolean };
         try {
           const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
           reviewResult = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -6054,6 +6054,23 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         }
 
         if (!reviewResult.success) {
+          if (reviewResult.gated) {
+            console.log(`[approve] review dispatch deferred for ${issueId}: ${reviewResult.message}`);
+            completePendingOperation(issueId, reviewResult.message);
+            setReviewStatusBase(issueId, {
+              reviewStatus: 'pending',
+              reviewNotes: reviewResult.message,
+            });
+            return jsonResponse({
+              success: false,
+              gated: true,
+              message: reviewResult.message,
+              pipeline: 'deferred',
+              ...(recentPushWarning && { recentPushWarning }),
+              ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
+            }, { status: 409 });
+          }
+
           console.warn(`[approve] review role failed to start: ${reviewResult.message}`);
           console.log(`[approve] Falling back to direct merge...`);
         } else {

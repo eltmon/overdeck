@@ -30,12 +30,18 @@ function status(overrides: Partial<ReviewStatus>): ReviewStatus {
   };
 }
 
+async function flushRefreshQueue(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('merge-blocker reconcile service', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-11T09:00:00.000Z'));
     mockGetAllReviewStatusesFromDb.mockReset();
-    mockRefreshMergeStateFromGitHub.mockClear();
+    mockRefreshMergeStateFromGitHub.mockReset();
+    mockRefreshMergeStateFromGitHub.mockResolvedValue(undefined);
     stopMergeBlockerReconcileService();
   });
 
@@ -66,6 +72,43 @@ describe('merge-blocker reconcile service', () => {
     expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-1', 'eltmon/panopticon-cli', 1);
   });
 
+  it('bounds mergeability-blocker refresh fan-out', async () => {
+    const releases: Array<() => void> = [];
+    mockRefreshMergeStateFromGitHub.mockImplementation(() => new Promise<void>((resolve) => {
+      releases.push(resolve);
+    }));
+    mockGetAllReviewStatusesFromDb.mockReturnValue(Object.fromEntries(
+      Array.from({ length: 6 }, (_, index) => {
+        const number = index + 1;
+        return [`PAN-${number}`, status({
+          issueId: `PAN-${number}`,
+          prUrl: `https://github.com/eltmon/panopticon-cli/pull/${number}`,
+          blockerReasons: [
+            { type: 'merge_conflict', summary: 'conflicts', detectedAt: '2026-06-11T08:00:00.000Z' },
+          ],
+        })];
+      }),
+    ));
+
+    await __reconcileOnceForTests();
+
+    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledTimes(4);
+
+    while (mockRefreshMergeStateFromGitHub.mock.calls.length < 6) {
+      const release = releases.shift();
+      expect(release).toBeDefined();
+      release!();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    while (releases.length > 0) {
+      releases.shift()!();
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
   it('skips rows with only non-mergeability blockers', async () => {
     mockGetAllReviewStatusesFromDb.mockReturnValue({
       'PAN-2': status({
@@ -93,6 +136,7 @@ describe('merge-blocker reconcile service', () => {
     });
 
     await __reconcileOnceForTests();
+    await flushRefreshQueue();
     await __reconcileOnceForTests();
     vi.advanceTimersByTime(181_000);
     await __reconcileOnceForTests();
