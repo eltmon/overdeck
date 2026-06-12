@@ -41,17 +41,21 @@ vi.mock('child_process', () => ({
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),
+  readPlan: (...args: unknown[]) => mockReadPlan(...args),
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),
+  findVBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
+  getDevrootPathSync: vi.fn(() => null),
 }));
 
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext } from '../review-context.js';
+import { findPlanSync } from '../../vbrief/io.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function mockGitOutput(map: Record<string, { stdout: string; stderr?: string }>) {
@@ -109,7 +113,42 @@ describe('buildReviewContext', () => {
     expect(manifest.issueId).toBe(issueId);
     expect(manifest.headSha).toBe('abc12345def67890');
     expect(manifest.changedFiles).toHaveLength(2);
+    expect(manifest.nonGoals).toEqual([]);
     expect(manifest.manifestPath).toBe(join(workspace, '.pan', 'review', runId, 'context.json'));
+  });
+
+  it('includes plan NonGoals in the manifest', async () => {
+    vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
+    mockReadPlan.mockReturnValue(Effect.succeed({
+      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      plan: {
+        id: issueId.toLowerCase(),
+        title: 'Plan',
+        status: 'proposed',
+        narratives: {
+          NonGoals: '- Do not add a new dashboard route\n- Do not change issue lifecycle statuses',
+        },
+        items: [],
+        edges: [],
+      },
+    }));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1059\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.nonGoals).toEqual([
+      'Do not add a new dashboard route',
+      'Do not change issue lifecycle statuses',
+    ]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.nonGoals).toEqual(manifest.nonGoals);
   });
 
   it('sorts changed files by risk score descending', async () => {

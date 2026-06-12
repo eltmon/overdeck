@@ -86,6 +86,7 @@ check_schema_key_agreement() {
     "difficulty"
     "foundationFor"
     "acceptance_criterion"
+    "NonGoals"
   )
   for file in "${files[@]}"; do
     for key in "${keys[@]}"; do
@@ -105,6 +106,56 @@ check_handoff_consistency() {
   return 0
 }
 
+check_discovery_completeness() {
+  contains "src/lib/cloister/prompts/planning.md" "Discovery is complete only when" \
+    || fail "discovery-completeness: planning.md missing discovery completion criteria"
+  return 0
+}
+
+check_planning_qa_retention() {
+  contains "src/lib/cloister/prompts/planning.md" "## Planning Q&A" \
+    || fail "planning-qa-retention: planning.md missing Planning Q&A persistence guidance"
+  return 0
+}
+
+check_external_content_framing() {
+  contains "src/lib/cloister/prompts/planning.md" "data, not instructions" \
+    || fail "external-content-framing: planning.md missing data-not-instructions block"
+  contains "src/lib/cloister/prompts/work.md" "data, not instructions" \
+    || fail "external-content-framing: work.md missing data-not-instructions block"
+  return 0
+}
+
+check_plan_self_audit() {
+  contains "src/lib/cloister/prompts/planning.md" "audit your own plan" \
+    || fail "plan-self-audit: planning.md missing pre-finalize self-audit checklist"
+  return 0
+}
+
+check_ac_phrasing_guidance() {
+  contains "src/lib/cloister/prompts/planning.md" "works as expected" \
+    || fail "ac-phrasing-guidance: planning.md missing banned AC phrase summary"
+  return 0
+}
+
+check_anomaly_first_completion() {
+  contains "src/lib/cloister/prompts/work.md" "lead with anomalies" \
+    || fail "anomaly-first-completion: work prompt missing anomaly-first summary guidance"
+  return 0
+}
+
+check_bead_scope_discipline() {
+  contains "src/lib/cloister/prompts/work.md" "every staged file must be required" \
+    || fail "bead-scope-discipline: work prompt missing per-bead staged-file rule"
+  return 0
+}
+
+check_review_verdict_blocker() {
+  contains "roles/review.md" "one-line top blocker" \
+    || fail "review-verdict-blocker: review.md missing top-blocker verdict guidance"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -112,6 +163,14 @@ check_all() {
   check_single_workflow_copy
   check_schema_key_agreement
   check_handoff_consistency
+  check_discovery_completeness
+  check_planning_qa_retention
+  check_external_content_framing
+  check_plan_self_audit
+  check_ac_phrasing_guidance
+  check_anomaly_first_completion
+  check_bead_scope_discipline
+  check_review_verdict_blocker
 }
 
 write_passing_fixture() {
@@ -125,10 +184,18 @@ write_passing_fixture() {
 
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
 Run pan plan finalize. The issue waits in Planned until pan start or Start Agent unless --auto-start was stamped.
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
+Discovery is complete only when
+## Planning Q&A
+data, not instructions
+audit your own plan
+works as expected
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
+EOF
+  cat > "$root/roles/review.md" <<'EOF'
+## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker>
 EOF
   cat > "$root/src/lib/cloister/prompts/work.md" <<'EOF'
 ## MANDATORY: One Bead At A Time
@@ -141,6 +208,9 @@ EOF
 7. read metadata
 8. skip if false
 9. pan inspect ISSUE --bead bead
+data, not instructions
+lead with anomalies
+every staged file must be required
 EOF
   cat > "$root/roles/work.md" <<'EOF'
 ## Per-Bead Workflow
@@ -158,7 +228,7 @@ Close every completed bead with bd close.
 EOF
   for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
     cat > "$file" <<'EOF'
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
 EOF
   done
 }
@@ -197,12 +267,75 @@ import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('foundationFor ', ''))
 PY"
+  expect_self_test_failure "schema-key-agreement-nongoals" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace(' NonGoals', ''))
+PY"
   expect_self_test_failure "handoff-consistency" \
     "python3 - <<'PY' \"\$tmp/roles/plan.md\"
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('pan start', 'Start Agent'))
+PY"
+  expect_self_test_failure "discovery-completeness" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('Discovery is complete only when', 'Discovery continues until'))
+PY"
+  expect_self_test_failure "planning-qa-retention" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('## Planning Q&A', '## Planning Notes'))
+PY"
+  expect_self_test_failure "external-content-framing" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('data, not instructions', 'trusted issue instructions'))
+PY"
+  expect_self_test_failure "plan-self-audit" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('audit your own plan', 'review the plan briefly'))
+PY"
+  expect_self_test_failure "ac-phrasing-guidance" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('works as expected', 'vague success wording'))
+PY"
+  expect_self_test_failure "anomaly-first-completion" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('lead with anomalies', 'summarize normally'))
+PY"
+  expect_self_test_failure "bead-scope-discipline" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('every staged file must be required', 'stage whatever changed'))
+PY"
+  expect_self_test_failure "review-verdict-blocker" \
+    "python3 - <<'PY' \"\$tmp/roles/review.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('one-line top blocker', 'short summary'))
 PY"
   echo "lint-prompts self-test passed"
 }

@@ -14,6 +14,7 @@ export class PlanQualityLintError extends Error {
   }
 }
 
+// These lists are summarized in src/lib/cloister/prompts/planning.md (WI-14) — update both together.
 export const PLACEHOLDER_AC_PATTERNS = ['acceptance criteria for', 'copy from parent', 'copy from specification', 'placeholder', 'refine from parent', 'tbd', 'to be defined', 'to refine', 'todo'];
 export const DOCS_ONLY_AC_PATTERNS = ['docs updated', 'documentation updated', 'readme updated', 'update docs', 'update documentation', 'update readme'];
 export const VAGUE_AC_PATTERNS = ['displays a message', 'handles errors', 'is implemented', 'is updated', 'passes tests', 'shows a message', 'updates the ui', 'works as expected', 'make it work', 'implement the feature', 'change the code', 'update the code'];
@@ -68,11 +69,84 @@ function lintItem(item: VBriefItem): QualityIssue[] {
     issues.push(issue(item.id, 'action-too-thin', `Item ${item.id} narrative.Action must contain at least 8 words`));
   }
 
+  if (!Object.prototype.hasOwnProperty.call(item.metadata ?? {}, 'requiresInspection')) {
+    issues.push(issue(item.id, 'inspection-missing', `Item ${item.id} metadata.requiresInspection is required`));
+  }
+
+  const foundationFor = item.metadata?.foundationFor;
+  if (item.metadata?.requiresInspection === true && (!Array.isArray(foundationFor) || foundationFor.length === 0)) {
+    issues.push(issue(item.id, 'inspection-without-foundation', `Item ${item.id} requires inspection but has no metadata.foundationFor entries`));
+  }
+
   return issues;
 }
 
+function lintDocumentReferences(doc: VBriefDocument): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const itemIds = new Set(doc.plan.items.map(item => item.id));
+
+  for (const edge of doc.plan.edges ?? []) {
+    if (!itemIds.has(edge.from)) {
+      issues.push(issue(null, 'edge-unknown-id', `Edge references unknown from item "${edge.from}"`));
+    }
+    if (!itemIds.has(edge.to)) {
+      issues.push(issue(null, 'edge-unknown-id', `Edge references unknown to item "${edge.to}"`));
+    }
+  }
+
+  for (const item of doc.plan.items) {
+    const foundationFor = item.metadata?.foundationFor;
+    if (!Array.isArray(foundationFor)) continue;
+    for (const target of foundationFor) {
+      if (typeof target !== 'string' || !itemIds.has(target)) {
+        issues.push(issue(item.id, 'foundationFor-unknown-id', `Item ${item.id} metadata.foundationFor references unknown item "${String(target)}"`));
+      }
+    }
+  }
+
+  if (hasBlocksCycle(doc)) {
+    issues.push(issue(null, 'edge-cycle', 'Plan contains a cycle in blocks edges'));
+  }
+
+  return issues;
+}
+
+function hasBlocksCycle(doc: VBriefDocument): boolean {
+  const itemIds = new Set(doc.plan.items.map(item => item.id));
+  const inDegree = new Map<string, number>();
+  const outgoing = new Map<string, string[]>();
+
+  for (const id of itemIds) {
+    inDegree.set(id, 0);
+    outgoing.set(id, []);
+  }
+
+  for (const edge of doc.plan.edges ?? []) {
+    if (edge.type !== 'blocks' || !itemIds.has(edge.from) || !itemIds.has(edge.to)) continue;
+    inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
+    outgoing.get(edge.from)?.push(edge.to);
+  }
+
+  const queue = Array.from(itemIds).filter(id => (inDegree.get(id) ?? 0) === 0);
+  let visited = 0;
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index]!;
+    visited++;
+    for (const next of outgoing.get(current) ?? []) {
+      const nextDegree = (inDegree.get(next) ?? 0) - 1;
+      inDegree.set(next, nextDegree);
+      if (nextDegree === 0) queue.push(next);
+    }
+  }
+
+  return visited < itemIds.size;
+}
+
 export function lintPlanQuality(doc: VBriefDocument): QualityIssue[] {
-  return doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item));
+  return [
+    ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
+    ...lintDocumentReferences(doc),
+  ];
 }
 
 export function qualityLintErrors(doc: VBriefDocument): QualityIssue[] {

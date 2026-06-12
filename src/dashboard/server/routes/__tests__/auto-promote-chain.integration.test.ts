@@ -36,8 +36,48 @@ function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'dr
       title: `${issueId} auto promote regression`,
       status,
       items: [
-        { id: 'item-1', title: 'Promote the spec', status: 'pending' },
-        { id: 'item-2', title: 'Start the work agent', status: 'pending' },
+        {
+          id: 'item-1',
+          title: 'Promote the spec',
+          status: 'pending',
+          narrative: { Action: 'Promote the finalized workspace spec into the project specs directory' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-1.ac1',
+              title: 'The project specs directory stores the proposed vBRIEF',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-1.ac2',
+              title: 'The promoted vBRIEF persists proposed status',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
+        {
+          id: 'item-2',
+          title: 'Start the work agent',
+          status: 'pending',
+          narrative: { Action: 'Start the work agent only when auto-start policy allows it' },
+          metadata: { requiresInspection: false },
+          subItems: [
+            {
+              id: 'item-2.ac1',
+              title: 'Default planning returns without spawning a work agent',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+            {
+              id: 'item-2.ac2',
+              title: 'Stamped planning spawns the work agent after promotion',
+              status: 'pending',
+              metadata: { kind: 'acceptance_criterion' },
+            },
+          ],
+        },
       ],
       edges: [],
     },
