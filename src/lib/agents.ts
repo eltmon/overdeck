@@ -3715,6 +3715,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
+  // For codex work agents, poll for the first rollout JSONL in the background
+  // and persist the thread-id so transcript/cost lookups hit the fast path
+  // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
+  // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
+  // fallback covers sessions whose first turn lands after this window.
+  if (resolvedHarness === 'codex') {
+    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    void (async () => {
+      try {
+        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+          await import('./runtimes/codex.js');
+        const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
+        if (rollout) {
+          const threadId = extractThreadIdFromRollout(rollout);
+          if (threadId) writeThreadId(agentId, threadId);
+        }
+      } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
+    })();
+  }
+
   // Update status
   markAgentRunning(state);
   saveAgentStateSync(state);
