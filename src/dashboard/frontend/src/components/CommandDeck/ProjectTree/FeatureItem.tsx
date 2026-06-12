@@ -845,6 +845,25 @@ function ReviewGroup({
 
 interface UatTrainBadgeInfo { name: string; status: string; order: number; total: number }
 
+interface UatTrainGeneration {
+  name: string;
+  status: string;
+  members?: Array<{ issueId: string; mergeOrder: number }>;
+}
+
+interface ProjectUatTrainGenerations {
+  projectKey: string;
+  projectName: string;
+  generations: UatTrainGeneration[];
+}
+
+type UatTrainGenerationsResponse = UatTrainGeneration[] | ProjectUatTrainGenerations[];
+
+function flattenUatTrainGenerations(data: UatTrainGenerationsResponse | undefined): UatTrainGeneration[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((item) => 'generations' in item ? item.generations : [item]);
+}
+
 /** Merge-train membership for the train chip (PAN-1779). One shared query —
  *  react-query dedupes across all FeatureItem instances. */
 function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
@@ -853,14 +872,14 @@ function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
     queryFn: async () => {
       const res = await fetch('/api/flywheel/uat-generations');
       if (!res.ok) return [];
-      return res.json() as Promise<Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }>>;
+      return res.json() as Promise<UatTrainGenerationsResponse>;
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
   return useMemo(() => {
     const map = new Map<string, UatTrainBadgeInfo>();
-    const generations = Array.isArray(data) ? data : [];
+    const generations = flattenUatTrainGenerations(data);
     for (const gen of generations) {
       const members = gen.members ?? [];
       for (const member of members) {

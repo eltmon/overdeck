@@ -5,6 +5,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { toast } from 'sonner';
 import { MergeQueueCard } from '../MergeQueueCard';
 
 const mocks = vi.hoisted(() => ({
@@ -131,6 +132,17 @@ describe('steady state', () => {
     const legacyBatchLabel = new RegExp(['Ship', 'batch'].join(' '));
     expect(screen.queryByText(legacyBatchLabel)).toBeNull();
   });
+
+  it('renders grouped per-project generation payloads', async () => {
+    mockFetch({
+      'uat-generations': [{ projectKey: 'panopticon', projectName: 'Panopticon', generations: [READY_GEN] }],
+      'merge-queue': QUEUE,
+    });
+    renderCard();
+
+    expect(await screen.findByText('pan-otter-0610')).toBeTruthy();
+    expect(screen.getByText('Merge batch (2) to main')).toBeTruthy();
+  });
 });
 
 describe('assembling state', () => {
@@ -191,5 +203,18 @@ describe('confirm gating', () => {
     const options = mocks.confirm.mock.calls[0]![0] as { title: string; message: string };
     expect(options.title).toContain('PAN-1');
     expect(options.message).toContain('bypasses batch testing');
+  });
+
+  it('handles grouped force-reconcile results from rebuild', async () => {
+    mockFetch({
+      'uat-generations': [READY_GEN],
+      'merge-queue': QUEUE,
+      'POST assemble-uat': { panopticon: { action: 'assembled', invalidated: [] }, krux: { action: 'idle', invalidated: [] } },
+    });
+    renderCard();
+
+    fireEvent.click(await screen.findByTitle(/Re-merge the ready features/));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rebuilt the UAT batch'));
   });
 });

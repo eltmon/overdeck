@@ -25,7 +25,6 @@ import { isMergeTrainEnabledForProject } from '../../../lib/cloister/auto-merge-
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
-import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
@@ -38,13 +37,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
-
-// ─── Shared IssueDataService (via singleton) ────────────────────────────────
-
-async function getIssueDataService(): Promise<IssueDataService> {
-  const { getSharedIssueService } = await import('../services/issue-service-singleton.js');
-  return getSharedIssueService();
-}
+import { buildIssueTitleMap, sanitizeDisplayTitle } from '../services/issue-title-map.js';
 
 // ─── Async FS helpers ─────────────────────────────────────────────────────────
 
@@ -65,13 +58,6 @@ function mapSessionType(type: string): SessionNodeType {
     'planning', 'work', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
-}
-
-function sanitizeDisplayTitle(title: string): string {
-  return title
-    .replace(/<!--\s*panopticon:[\s\S]*?-->/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 interface ActivityContext {
@@ -424,33 +410,6 @@ const getProjectSessionTreeRoute = HttpRouter.add(
     return jsonResponse(result);
   })),
 );
-
-const ISSUE_TITLE_MAP_TTL_MS = 30_000;
-let issueTitleMapCache: { timestamp: number; data: ReadonlyMap<string, string> } | null = null;
-
-async function buildIssueTitleMap(): Promise<ReadonlyMap<string, string>> {
-  if (issueTitleMapCache && issueTitleMapCache.timestamp > Date.now() - ISSUE_TITLE_MAP_TTL_MS) {
-    return issueTitleMapCache.data;
-  }
-
-  const issueTitles = new Map<string, string>();
-  try {
-    const issueDataService = await getIssueDataService();
-    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
-    for (const issue of allIssues) {
-      const identifier = typeof issue['identifier'] === 'string' ? issue['identifier'] : null;
-      const title = typeof issue['title'] === 'string' ? sanitizeDisplayTitle(issue['title']) : '';
-      if (!identifier || !title) continue;
-      issueTitles.set(identifier, title);
-      issueTitles.set(identifier.toLowerCase(), title);
-    }
-  } catch {
-    // non-fatal: callers fall back to planning prompt or issue id
-  }
-
-  issueTitleMapCache = { timestamp: Date.now(), data: issueTitles };
-  return issueTitles;
-}
 
 export async function fetchProjectSessionTree(
   projectKey: string,

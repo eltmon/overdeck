@@ -54,6 +54,16 @@ interface UatGenerationPayload {
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
+interface ProjectUatGenerationsPayload {
+  projectKey: string;
+  projectName: string;
+  generations: UatGenerationPayload[];
+}
+
+type UatGenerationsResponse = UatGenerationPayload[] | ProjectUatGenerationsPayload[];
+
+type RebuildResponse = { action: string } | Record<string, { action: string }>;
+
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
@@ -80,6 +90,16 @@ function shortName(name: string): string {
   return name.replace(/^uat\//, '');
 }
 
+function flattenGenerations(data: UatGenerationsResponse | undefined): UatGenerationPayload[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((item) => 'generations' in item ? item.generations : [item]);
+}
+
+function rebuildActions(data: RebuildResponse): string[] {
+  if ('action' in data) return [data.action];
+  return Object.values(data).map((result) => result.action);
+}
+
 export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; onNavigateIssue?: (issueId: string) => void }) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -87,7 +107,7 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
 
   const generationsQuery = useQuery({
     queryKey: ['flywheel-uat-generations'],
-    queryFn: () => fetchJson<UatGenerationPayload[]>('/api/flywheel/uat-generations'),
+    queryFn: () => fetchJson<UatGenerationsResponse>('/api/flywheel/uat-generations'),
     refetchInterval: active ? 15000 : false,
   });
   const mergeQueueQuery = useQuery({
@@ -96,7 +116,7 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
     refetchInterval: active ? 15000 : false,
   });
 
-  const generations = Array.isArray(generationsQuery.data) ? generationsQuery.data : [];
+  const generations = flattenGenerations(generationsQuery.data);
   const mergeQueue = Array.isArray(mergeQueueQuery.data) ? mergeQueueQuery.data : [];
 
   const invalidate = () => {
@@ -133,10 +153,11 @@ export function MergeQueueCard({ active, onNavigateIssue }: { active: boolean; o
   });
 
   const rebuildMutation = useMutation({
-    mutationFn: () => postJson<{ action: string }>('/api/flywheel/assemble-uat'),
+    mutationFn: () => postJson<RebuildResponse>('/api/flywheel/assemble-uat'),
     onSuccess: (data) => {
-      if (data.action === 'assembled') toast.success('Rebuilt the UAT batch');
-      else toast.info(`Rebuild: ${data.action}`);
+      const actions = rebuildActions(data);
+      if (actions.includes('assembled')) toast.success('Rebuilt the UAT batch');
+      else toast.info(`Rebuild: ${[...new Set(actions)].join(', ') || 'idle'}`);
       invalidate();
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Rebuild failed'),

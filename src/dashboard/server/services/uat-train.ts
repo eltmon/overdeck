@@ -4,10 +4,10 @@
  * flywheel routes expose.
  *
  * The reconciler interval is the heartbeat of "always one batch ready":
- * every 60s (gated per-tick on the global merge-train flag, no-op without an
- * active flywheel run) it compares the ready set against the generation chain
- * and assembles/invalidates as needed. Assemblies run minutes — the reconciler
- * is single-flight per project, so ticks never pile up.
+ * every 60s it compares each enabled project's pipeline-ready set against that
+ * project's generation chain and assembles/invalidates as needed. Assemblies
+ * run minutes — the reconciler is single-flight per project, so ticks never
+ * pile up.
  */
 import { stat } from 'node:fs/promises';
 import { Effect } from 'effect';
@@ -36,10 +36,12 @@ import {
   listUatGenerationsSync,
   type UatGeneration,
 } from '../../../lib/database/uat-generations-db.js';
-import { isMergeTrainEnabled } from '../../../lib/database/app-settings.js';
+import { isMergeTrainEnabledForProject } from '../../../lib/cloister/auto-merge-policy.js';
+import { listProjectsSync } from '../../../lib/projects.js';
+import type { MergeCandidate } from '../../../lib/flywheel-merge-order.js';
 import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
-import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
+import { buildIssueTitleMap } from './issue-title-map.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -55,20 +57,12 @@ interface AcceptanceCriteriaCacheEntry {
 
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
 
-function projectRoot(): string {
-  return process.cwd();
-}
-
-/** Ready set in merge order, or null when no flywheel run is active. */
-async function getReadySet(): Promise<ReadyFeature[] | null> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return null;
-  const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+async function readySetFromCandidates(candidates: readonly MergeCandidate[], root: string): Promise<ReadyFeature[]> {
+  const { computeMergeQueueFromCandidates, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
   const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, projectRoot(), {
+    computeMergeQueueFromCandidates(candidates, root, {
+      eligibility: () => ({ eligible: true }),
       getPrUrl: resolveMergeQueuePrUrl,
-      onIneligible: (issueId, reason) =>
-        console.log(`[uat-train] ${issueId} has a merge verb but is not merge-eligible (${reason}) — excluded from the ready set`),
     }).pipe(
       Effect.provide(nodeServicesLayer),
     ),
@@ -84,12 +78,13 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
 }
 
 function codenameLabel(features: readonly ReadyFeature[]): string {
+  // D7 invariant: uat_generations.name is a global primary key. The label stays
+  // the issue prefix so generation names remain prefix-distinct across projects.
   const prefix = features[0]?.issueId.split('-')[0];
   return (prefix ?? 'uat').toLowerCase();
 }
 
-async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<UatGeneration> {
-  const root = projectRoot();
+async function assembleFromReadySet(root: string, features: readonly ReadyFeature[]): Promise<UatGeneration> {
   const store = buildUatGenerationStore();
   return assembleUatGeneration(
     {
@@ -108,8 +103,7 @@ async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<
   );
 }
 
-async function runCleanup(): Promise<void> {
-  const root = projectRoot();
+async function runCleanup(root: string): Promise<void> {
   await cleanupUatGenerations(root, {
     store: buildUatGenerationStore(),
     ...buildUatGenerationCleanupGit(root),
@@ -118,21 +112,47 @@ async function runCleanup(): Promise<void> {
   });
 }
 
+export type UatTrainReconcileResults = Record<string, ReconcileResult>;
+
 /** One reconciler pass. `force` rebuilds even when a live generation matches. */
-export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
-  const root = projectRoot();
-  const gitDeps = buildUatGenerationGitDeps(root);
-  return reconcileUatGenerations(root, {
-    isEnabled: () => isMergeTrainEnabled(),
-    getReadySet,
-    getMainHeadSha: () => gitDeps.fetchMain(),
-    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
-    store: buildUatGenerationStore(),
-    assemble: assembleFromReadySet,
-    teardownStack: (gen) => teardownUatStack(gen),
-    cleanup: runCleanup,
-    log: (msg) => console.log(msg),
-  }, options);
+export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<UatTrainReconcileResults> {
+  const { listEligibleCandidatesByProject } = await import('../../../lib/flywheel-merge-order.js');
+  const issueTitles = await buildIssueTitleMap();
+  const candidatesByProject = listEligibleCandidatesByProject({
+    titleFor: (issueId) => issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase()),
+  });
+  const results: UatTrainReconcileResults = {};
+
+  for (const { key, config } of listProjectsSync()) {
+    const root = config.path;
+    if (!isMergeTrainEnabledForProject(key)) {
+      results[key] = { action: 'disabled', invalidated: [] };
+      continue;
+    }
+
+    const candidates = candidatesByProject.get(key)?.candidates ?? [];
+    const liveGenerations = listUatGenerationsSync({ projectRoot: root, statuses: ['ready', 'superseded', 'assembling'] });
+    if (candidates.length === 0 && liveGenerations.length === 0) {
+      results[key] = { action: 'idle', invalidated: [] };
+      continue;
+    }
+
+    const readySet = await readySetFromCandidates(candidates, root);
+    const gitDeps = buildUatGenerationGitDeps(root);
+    results[key] = await reconcileUatGenerations(root, {
+      isEnabled: () => true,
+      getReadySet: async () => readySet,
+      getMainHeadSha: () => gitDeps.fetchMain(),
+      getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
+      store: buildUatGenerationStore(),
+      assemble: (features) => assembleFromReadySet(root, features),
+      teardownStack: (gen) => teardownUatStack(gen),
+      cleanup: () => runCleanup(root),
+      log: (msg) => console.log(msg),
+    }, options);
+  }
+
+  return results;
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
@@ -182,6 +202,12 @@ export interface UatGenerationPayload {
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
+export interface ProjectUatGenerationsPayload {
+  projectKey: string;
+  projectName: string;
+  generations: UatGenerationPayload[];
+}
+
 async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<void>): Promise<void> {
   let next = 0;
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
@@ -193,11 +219,10 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
   await Promise.all(workers);
 }
 
-async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, AcceptanceCriteriaSummary>> {
+async function loadAcceptanceCriteriaCache(projectRootPath: string, issueIds: ReadonlySet<string>): Promise<Map<string, AcceptanceCriteriaSummary>> {
   const cache = new Map<string, AcceptanceCriteriaSummary>();
   if (issueIds.size === 0) return cache;
 
-  const root = projectRoot();
   await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
     const upperIssueId = issueId.toUpperCase();
     const existing = acceptanceCriteriaByIssue.get(upperIssueId);
@@ -214,7 +239,7 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
     }
 
     try {
-      const found = await Effect.runPromise(findVBriefByIssue(root, upperIssueId));
+      const found = await Effect.runPromise(findVBriefByIssue(projectRootPath, upperIssueId));
       if (!found) {
         acceptanceCriteriaByIssue.delete(upperIssueId);
         cache.set(upperIssueId, []);
@@ -233,40 +258,45 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
-export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return [];
+export async function getUatGenerationsPayload(): Promise<ProjectUatGenerationsPayload[]> {
+  const payload: ProjectUatGenerationsPayload[] = [];
+  for (const { key, config } of listProjectsSync()) {
+    const chain = listUatGenerationsSync({ projectRoot: config.path, limit: CHAIN_PAYLOAD_LIMIT });
+    if (chain.length === 0) {
+      payload.push({ projectKey: key, projectName: config.name, generations: [] });
+      continue;
+    }
 
-  const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
-  if (chain.length === 0) return [];
-  const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds);
-  const payload: UatGenerationPayload[] = [];
-  for (const gen of chain) {
-    const probe = await probeUatStack(gen);
-    const members: UatGenerationMemberPayload[] = [];
-    for (const member of gen.members) {
-      members.push({
-        issueId: member.issueId,
-        title: member.title,
-        branch: member.branch,
-        ...(member.pr !== undefined ? { pr: member.pr } : {}),
-        ...(member.prUrl !== undefined ? { prUrl: member.prUrl } : {}),
-        mergeOrder: member.mergeOrder,
-        acceptanceCriteria: acCache.get(member.issueId.toUpperCase()) ?? [],
+    const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
+    const acCache = await loadAcceptanceCriteriaCache(config.path, memberIssueIds);
+    const generations: UatGenerationPayload[] = [];
+    for (const gen of chain) {
+      const probe = await probeUatStack(gen);
+      const members: UatGenerationMemberPayload[] = [];
+      for (const member of gen.members) {
+        members.push({
+          issueId: member.issueId,
+          title: member.title,
+          branch: member.branch,
+          ...(member.pr !== undefined ? { pr: member.pr } : {}),
+          ...(member.prUrl !== undefined ? { prUrl: member.prUrl } : {}),
+          mergeOrder: member.mergeOrder,
+          acceptanceCriteria: acCache.get(member.issueId.toUpperCase()) ?? [],
+        });
+      }
+      generations.push({
+        name: gen.name,
+        status: gen.status,
+        baseSha: gen.baseSha,
+        createdAt: gen.createdAt,
+        updatedAt: gen.updatedAt,
+        members,
+        heldOut: gen.heldOut,
+        resolutions: gen.resolutions,
+        stack: { status: probe.status, frontendUrl: probe.frontendUrl },
       });
     }
-    payload.push({
-      name: gen.name,
-      status: gen.status,
-      baseSha: gen.baseSha,
-      createdAt: gen.createdAt,
-      updatedAt: gen.updatedAt,
-      members,
-      heldOut: gen.heldOut,
-      resolutions: gen.resolutions,
-      stack: { status: probe.status, frontendUrl: probe.frontendUrl },
-    });
+    payload.push({ projectKey: key, projectName: config.name, generations });
   }
   return payload;
 }
@@ -288,7 +318,8 @@ export async function postUatGenerationPromotePayload(
   name: string,
   firePostMerge: (issueId: string) => boolean,
 ): Promise<PromoteResult> {
-  const root = projectRoot();
+  const gen = getUatGenerationSync(name);
+  const root = gen?.projectRoot ?? process.cwd();
   const { reviewRecordEligibility } = await import('../../../lib/flywheel-merge-order.js');
   return promoteUatGeneration(name, root, {
     git: buildUatPromoteGitDeps(root),
