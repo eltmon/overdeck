@@ -14,7 +14,14 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
+import {
+  resolveProjectFromIssueSync,
+  listProjectsSync,
+  getProjectSync,
+  setProjectAutoMergeDefaultSync,
+  setProjectMergeTrainSync,
+} from '../../../lib/projects.js';
+import { isMergeTrainEnabledForProject } from '../../../lib/cloister/auto-merge-policy.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -601,11 +608,47 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/projects/:projectKey/merge-train ───────────────────────
+const getProjectMergeTrainRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/merge-train',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const key = params['projectKey'] ?? '';
+    const config = getProjectSync(key);
+    if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    return jsonResponse({
+      value: config.merge_train ?? null,
+      effective: isMergeTrainEnabledForProject(key),
+    });
+  })),
+);
+
+// ─── Route: POST /api/projects/:projectKey/merge-train ──────────────────────
+const postProjectMergeTrainRoute = HttpRouter.add(
+  'POST',
+  '/api/projects/:projectKey/merge-train',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const key = params['projectKey'] ?? '';
+    if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    const body = (yield* readProjectJsonBody) as { value?: unknown };
+    const v = body.value;
+    if (v !== 'enabled' && v !== 'disabled' && v !== null) {
+      return jsonResponse({ error: "value must be 'enabled', 'disabled', or null" }, { status: 400 });
+    }
+    setProjectMergeTrainSync(key, v);
+    return jsonResponse({ value: v, effective: isMergeTrainEnabledForProject(key) });
+  })),
+);
+
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
+  getProjectMergeTrainRoute,
+  postProjectMergeTrainRoute,
 );
 
 export default projectsRouteLayer;

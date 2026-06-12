@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
+  getProjectSync: vi.fn(),
   listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  setProjectAutoMergeDefaultSync: vi.fn(),
+  setProjectMergeTrainSync: vi.fn(),
+}));
+
+vi.mock('../../../../../src/lib/cloister/auto-merge-policy.js', () => ({
+  isMergeTrainEnabledForProject: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
@@ -62,11 +70,31 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
-import { listProjectsSync } from '../../../../../src/lib/projects.js';
+import { fetchProjectSessionTree, projectsRouteLayer } from '../../../../../src/dashboard/server/routes/projects.ts';
+import { getProjectSync, listProjectsSync, setProjectMergeTrainSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
+import { isMergeTrainEnabledForProject } from '../../../../../src/lib/cloister/auto-merge-policy.js';
+
+interface RouteResult {
+  status: number;
+  body: unknown;
+}
+
+async function requestProjectsRoute(path: string, init: RequestInit = {}): Promise<RouteResult> {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init));
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(projectsRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      ),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) };
+}
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
 
@@ -224,5 +252,104 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features).toHaveLength(1);
     expect(tree.features[0]?.issueId).toBe('PAN-123');
     expect(tree.features[0]?.title).toBe('Implement Command Deck Session Tree');
+  });
+});
+
+describe('project merge-train routes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the configured value and effective fallback', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo' });
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(true);
+
+    const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train');
+
+    expect(result).toEqual({
+      status: 200,
+      body: { value: null, effective: true },
+    });
+    expect(isMergeTrainEnabledForProject).toHaveBeenCalledWith('panopticon-cli');
+  });
+
+  it('returns an explicit disabled override', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo', merge_train: 'disabled' });
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(false);
+
+    const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train');
+
+    expect(result).toEqual({
+      status: 200,
+      body: { value: 'disabled', effective: false },
+    });
+  });
+
+  it('persists enabled and returns the effective value', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo' });
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(true);
+
+    const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      body: JSON.stringify({ value: 'enabled' }),
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { value: 'enabled', effective: true },
+    });
+    expect(setProjectMergeTrainSync).toHaveBeenCalledWith('panopticon-cli', 'enabled');
+  });
+
+  it('rejects invalid non-null values', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo' });
+
+    const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      body: JSON.stringify({ value: 'auto' }),
+    });
+
+    expect(result).toEqual({
+      status: 400,
+      body: { error: "value must be 'enabled', 'disabled', or null" },
+    });
+    expect(setProjectMergeTrainSync).not.toHaveBeenCalled();
+  });
+
+  it('clears the override so the next GET follows the effective fallback', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo', merge_train: 'disabled' });
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(false);
+
+    const postResult = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      body: JSON.stringify({ value: null }),
+    });
+
+    expect(postResult).toEqual({
+      status: 200,
+      body: { value: null, effective: false },
+    });
+    expect(setProjectMergeTrainSync).toHaveBeenCalledWith('panopticon-cli', null);
+
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo' });
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(true);
+
+    const getResult = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train');
+
+    expect(getResult).toEqual({
+      status: 200,
+      body: { value: null, effective: true },
+    });
+  });
+
+  it('returns 404 for unknown projects', async () => {
+    vi.mocked(getProjectSync).mockReturnValue(null);
+
+    const result = await requestProjectsRoute('/api/projects/missing/merge-train');
+
+    expect(result).toEqual({
+      status: 404,
+      body: { error: 'Project not found' },
+    });
   });
 });
