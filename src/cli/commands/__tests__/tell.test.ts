@@ -9,12 +9,25 @@ const remoteMocks = vi.hoisted(() => ({
   sendToRemoteAgent: vi.fn(async () => {}),
 }));
 
-// Keep the real normalizeAgentId — the PAN-1749 regression was tellCommand
-// bypassing it with a naive `agent-` prefix, which broke singleton IDs.
-vi.mock('../../../lib/agents.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../lib/agents.js')>();
-  return { ...actual, messageAgent: agentMocks.messageAgent };
-});
+// Keep a focused normalizeAgentId implementation for the PAN-1749 regression:
+// singleton IDs and known prefixes must not get a naive `agent-` prefix.
+vi.mock('../../../lib/agents.js', () => ({
+  normalizeAgentId: (id: string) => {
+    const lower = id.toLowerCase();
+    if (
+      lower === 'flywheel-orchestrator' ||
+      lower.startsWith('agent-') ||
+      lower.startsWith('planning-') ||
+      lower.startsWith('conv-') ||
+      lower.startsWith('strike-') ||
+      lower.startsWith('inspect-')
+    ) {
+      return lower;
+    }
+    return `agent-${lower}`;
+  },
+  messageAgent: agentMocks.messageAgent,
+}));
 
 vi.mock('../../../lib/remote/index.js', () => ({
   loadRemoteAgentState: remoteMocks.loadRemoteAgentState,
