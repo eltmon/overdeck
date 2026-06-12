@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1491",
   "created": "2026-06-12T18:10:00.000Z",
-  "updated": "2026-06-12T19:06:12.260Z",
+  "updated": "2026-06-12T19:06:28.942Z",
   "gitState": {
     "branch": "feature/pan-1491",
     "sha": "81d60e1d3",
@@ -85,6 +85,11 @@
       "reason": "feedback",
       "note": "Review cycle 12 CHANGES REQUESTED: removed CI worker-cap workaround from vitest.config.ts and re-requested review.",
       "agentModel": "claude-opus-4"
+    },
+    {
+      "timestamp": "2026-06-12T19:06:28.940Z",
+      "reason": "end",
+      "note": "Fixed review feedback: removed CI worker-cap workaround from vitest.config.ts; full test suite passes with default parallelism (6017 passed, 51 skipped)."
     }
   ],
   "statusOverrides": {
