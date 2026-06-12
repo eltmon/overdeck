@@ -564,10 +564,13 @@ export function RolesPanel() {
                           <option value="pan-only">PAN only</option>
                           <option value="all-tracked-projects">All tracked projects</option>
                         </select>
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                          PAN only: Orchestrate only the Panopticon repo's issues. All tracked projects: Inventory and adopt ready work across every registered project (same author/assignee safety rules). This is distinct from per-project merge-train enablement.
+                        </p>
                       </label>
                     </div>
                     <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
-                      Changes apply on the next tick — no restart needed.
+                      Model, harness, effort, and max-agent changes apply on the next tick. Flywheel scope changes apply at the next run start or resume.
                     </p>
                   </div>
                 )}

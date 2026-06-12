@@ -42,6 +42,17 @@ test.describe('Settings Roles — Flywheel row', () => {
   test('persists flywheel scope and reloads the saved snapshot', async ({ page }) => {
     let settings = structuredClone(baseSettings);
 
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.textContent = '#pan-recovery-overlay { display: none !important; pointer-events: none !important; }';
+      document.documentElement.appendChild(style);
+    });
+
+    await page.route('**/api/version', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ version: 'test', supervisorUrl: null }),
+    }));
     await page.route('**/api/settings', async (route: Route) => {
       const method = route.request().method();
       if (method === 'GET') {
@@ -104,15 +115,15 @@ test.describe('Settings Roles — Flywheel row', () => {
       body: JSON.stringify([]),
     }));
 
-    await page.goto(DASHBOARD_URL);
-    const settingsBtn = page.locator('button:has-text("Settings")').first();
-    if (await settingsBtn.isVisible().catch(() => false)) {
-      await settingsBtn.click();
-    }
+    await page.goto(`${DASHBOARD_URL}/settings`);
 
     const flywheelCard = page.getByTestId('role-card').filter({ has: page.getByRole('heading', { name: 'Flywheel' }) });
     await expect(flywheelCard).toBeVisible({ timeout: 15_000 });
-    await expect(flywheelCard.getByText('Changes apply on the next tick — no restart needed.')).toBeVisible();
+    await expect(flywheelCard.getByLabel('Flywheel scope')).toBeVisible();
+    await expect(flywheelCard.getByText(/PAN only: Orchestrate only the Panopticon repo's issues/)).toBeVisible();
+    await expect(flywheelCard.getByText(/All tracked projects: Inventory and adopt ready work across every registered project/)).toBeVisible();
+    await expect(flywheelCard.getByText(/distinct from per-project merge-train enablement/)).toBeVisible();
+    await expect(flywheelCard.getByText(/Flywheel scope changes apply at the next run start or resume/)).toBeVisible();
 
     await flywheelCard.getByLabel('Flywheel scope').selectOption('all-tracked-projects');
     await expect.poll(() => settings.roles.flywheel.scope, { timeout: 5_000 }).toBe('all-tracked-projects');
@@ -120,6 +131,6 @@ test.describe('Settings Roles — Flywheel row', () => {
     await page.reload();
     await expect(flywheelCard.getByLabel('Flywheel scope')).toHaveValue('all-tracked-projects');
     await expect(flywheelCard).toContainText('Flywheel');
-    await expect(flywheelCard).toContainText('Changes apply on the next tick — no restart needed.');
+    await expect(flywheelCard).toContainText('Flywheel scope changes apply at the next run start or resume.');
   });
 });

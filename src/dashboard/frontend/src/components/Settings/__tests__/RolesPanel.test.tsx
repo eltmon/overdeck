@@ -51,6 +51,9 @@ const settingsPayload = {
   },
 };
 
+let settingsGetCount = 0;
+let lastSettingsGetPayload: typeof settingsPayload | null = null;
+
 function renderPanel() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -70,6 +73,8 @@ function installFetchMock(opts: {
 } = {}) {
   let currentSettings = structuredClone(opts.settings ?? settingsPayload);
   const claudeAuth = opts.claudeAuth ?? { loggedIn: false, hasAnthropicApiKey: false };
+  settingsGetCount = 0;
+  lastSettingsGetPayload = null;
 
   global.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
     const url = input.toString();
@@ -78,6 +83,8 @@ function installFetchMock(opts: {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
     }
     if (url === '/api/settings') {
+      settingsGetCount += 1;
+      lastSettingsGetPayload = structuredClone(currentSettings);
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve(currentSettings),
@@ -136,7 +143,8 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
-    expect(screen.getByText('Changes apply on the next tick — no restart needed.')).toBeInTheDocument();
+    expect(screen.getByText(/Model, harness, effort, and max-agent changes apply on the next tick/)).toBeInTheDocument();
+    expect(screen.getByText(/Flywheel scope changes apply at the next run start or resume/)).toBeInTheDocument();
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
@@ -146,6 +154,20 @@ describe('RolesPanel', () => {
     );
     expect(screen.getAllByText('Resolved: claude-opus-4-7').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
+  });
+
+  it('shows the flywheel scope select and help text without expanding the role card', async () => {
+    renderPanel();
+
+    const cards = await screen.findAllByTestId('role-card');
+    const flywheelCard = cards.find((card) => within(card).queryByRole('heading', { level: 4, name: 'Flywheel' }));
+
+    expect(flywheelCard).toBeDefined();
+    expect(within(flywheelCard!).getByLabelText('Flywheel scope')).toHaveValue('pan-only');
+    expect(within(flywheelCard!).getByText(/PAN only: Orchestrate only the Panopticon repo's issues/)).toBeInTheDocument();
+    expect(within(flywheelCard!).getByText(/All tracked projects: Inventory and adopt ready work across every registered project/)).toBeInTheDocument();
+    expect(within(flywheelCard!).getByText(/distinct from per-project merge-train enablement/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Review Security model')).not.toBeInTheDocument();
   });
 
   it('expands work and review cards to show configured sub-role defaults', async () => {
@@ -195,6 +217,10 @@ describe('RolesPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('Flywheel scope')).toHaveValue('all-tracked-projects');
+    });
+    await waitFor(() => {
+      expect(settingsGetCount).toBeGreaterThanOrEqual(2);
+      expect(lastSettingsGetPayload?.roles.flywheel.scope).toBe('all-tracked-projects');
     });
 
     const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
