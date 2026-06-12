@@ -27,12 +27,12 @@ export type PlanFinalizeQualityGateResult =
 
 export function evaluatePlanFinalizeQualityGate(
   doc: VBriefDocument,
-  options: Pick<PlanFinalizeOptions, 'qualityLint'> = {},
+  options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string } = {},
 ): PlanFinalizeQualityGateResult {
   if (options.qualityLint === false) {
     return { ok: true, skipped: true, issues: [] };
   }
-  const issues = lintPlanQuality(doc);
+  const issues = lintPlanQuality(doc, { prdText: options.prdText });
   const errors = issues.filter(issue => issue.severity === 'error');
   return errors.length > 0
     ? { ok: false, skipped: false, issues }
@@ -91,6 +91,15 @@ function readAutoSpawnOnFinalize(issueId: string): boolean {
   }
 }
 
+function readPrdDraftText(workspacePath: string, issueId: string): string | undefined {
+  const path = join(workspacePath, PAN_DIRNAME, 'drafts', `${issueId}.md`);
+  try {
+    return existsSync(path) ? readFileSync(path, 'utf-8') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Promise<void> {
   const startDir = options.workspace ? resolve(options.workspace) : process.cwd();
   const workspacePath = findWorkspaceRoot(startDir);
@@ -121,7 +130,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   }
 
   const planDoc = readPlanSync(planPath);
-  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, options);
+  const prdText = readPrdDraftText(workspacePath, issueId);
+  const qualityGate = evaluatePlanFinalizeQualityGate(planDoc, { ...options, prdText });
   if (qualityGate.skipped) {
     if (!options.json) {
       console.error(chalk.yellow('⚠ quality lint SKIPPED (--no-quality-lint)'));
@@ -138,6 +148,17 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.error(chalk.dim('Use --no-quality-lint only for an emergency one-run bypass.'));
       }
       process.exit(3);
+    }
+    const warnings = qualityGate.issues.filter(issue => issue.severity === 'warn');
+    if (warnings.length > 0) {
+      if (options.json) {
+        console.error(JSON.stringify({ qualityWarnings: warnings }));
+      } else {
+        console.error(chalk.yellow('⚠ vBRIEF quality warnings:'));
+        for (const line of formatQualityIssues(warnings)) {
+          console.error(chalk.yellow('  ' + line));
+        }
+      }
     }
   }
 

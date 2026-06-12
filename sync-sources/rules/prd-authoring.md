@@ -16,6 +16,7 @@ Author every plan so it can be executed without re-research or judgment calls:
   style.
 - **Numbered work items**, each carrying: what/why, the exact files and functions
   touched, step-by-step changes, and the named tests that prove it.
+- **Numbered requirements.** Functional requirements are labeled FR-1, FR-2, …; non-functional NFR-1, …, in a ## Requirements section. Plan items reference them via metadata.traces. Never renumber existing IDs in a revision — retire ids explicitly instead.
 - **Decisions made in the doc.** State decision rules plainly ("a model change, a
   harness change, or both ⇒ fresh session"). If a step genuinely requires live
   verification, mark it as an explicit **implementation checkpoint** with a stated

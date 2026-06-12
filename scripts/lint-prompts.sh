@@ -87,6 +87,7 @@ check_schema_key_agreement() {
     "foundationFor"
     "acceptance_criterion"
     "NonGoals"
+    "traces"
   )
   for file in "${files[@]}"; do
     for key in "${keys[@]}"; do
@@ -191,7 +192,7 @@ write_passing_fixture() {
 
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
 Run pan plan finalize. The issue waits in Planned until pan start or Start Agent unless --auto-start was stamped.
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals traces
 Discovery is complete only when
 ## Planning Q&A
 data, not instructions
@@ -236,7 +237,7 @@ Close every completed bead with bd close.
 EOF
   for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
     cat > "$file" <<'EOF'
-requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
+requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals traces
 EOF
   done
 }

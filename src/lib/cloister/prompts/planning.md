@@ -313,7 +313,8 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
           "difficulty": "trivial|simple|medium|complex|expert",
           "issueLabel": "{{ISSUE_ID_LOWER}}",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": ["FR-1", "NFR-2"]
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -346,7 +347,8 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
   "handles errors", "is implemented", "TBD"-style placeholders, docs-only criteria.
 - 2–5 ACs per item; if an item genuinely needs fewer/more, set metadata.acJustification.
 - `narratives.NonGoals` MUST list everything discovery established as out of scope ("none" if genuinely nothing). Review enforces these as must-not constraints.
-- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, and `metadata.inspectionDepth` are Panopticon extensions to the vBRIEF spec
+- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, `metadata.inspectionDepth`, and optional `metadata.traces: string[]` are Panopticon extensions to the vBRIEF spec
+- Use `metadata.traces` to preserve FR-N/NFR-N requirement IDs from the PRD draft on the plan items that satisfy them.
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
 - `metadata.inspectionDepth` defaults to `"fast"` when omitted. Set it to `"deep"` only when `requiresInspection` is true and the bead needs a stronger architecture/safety review.
 - Edge types: `blocks` (hard dependency), `informs` (soft), `invalidates`, `suggests`

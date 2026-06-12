@@ -14,6 +14,10 @@ export class PlanQualityLintError extends Error {
   }
 }
 
+export interface QualityLintOptions {
+  prdText?: string;
+}
+
 // These lists are summarized in src/lib/cloister/prompts/planning.md (WI-14) — update both together.
 export const PLACEHOLDER_AC_PATTERNS = ['acceptance criteria for', 'copy from parent', 'copy from specification', 'placeholder', 'refine from parent', 'tbd', 'to be defined', 'to refine', 'todo'];
 export const DOCS_ONLY_AC_PATTERNS = ['docs updated', 'documentation updated', 'readme updated', 'update docs', 'update documentation', 'update readme'];
@@ -28,6 +32,10 @@ const BANNED_AC_PATTERNS = [
 
 function issue(itemId: string | null, rule: string, message: string): QualityIssue {
   return { itemId, rule, message, severity: 'error' };
+}
+
+function warning(itemId: string | null, rule: string, message: string): QualityIssue {
+  return { itemId, rule, message, severity: 'warn' };
 }
 
 function acceptanceCriteria(item: VBriefItem): VBriefSubItem[] {
@@ -111,6 +119,40 @@ function lintDocumentReferences(doc: VBriefDocument): QualityIssue[] {
   return issues;
 }
 
+function collectDeclaredTraceIds(prdText: string): Set<string> {
+  const ids = new Set<string>();
+  const pattern = /^[-*\s]*\b(FR|NFR)-\d+\b/gm;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(prdText)) !== null) {
+    const id = match[0].match(/\b(?:FR|NFR)-\d+\b/)?.[0];
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function collectCoveredTraceIds(doc: VBriefDocument): Set<string> {
+  const ids = new Set<string>();
+  for (const item of doc.plan.items) {
+    if (item.status === 'cancelled') continue;
+    const traces = item.metadata?.traces;
+    if (!Array.isArray(traces)) continue;
+    for (const trace of traces) {
+      if (typeof trace === 'string') ids.add(trace);
+    }
+  }
+  return ids;
+}
+
+function lintTraceCoverage(doc: VBriefDocument, prdText?: string): QualityIssue[] {
+  if (!prdText) return [];
+  const declared = collectDeclaredTraceIds(prdText);
+  if (declared.size === 0) return [];
+  const covered = collectCoveredTraceIds(doc);
+  return Array.from(declared)
+    .filter(id => !covered.has(id))
+    .map(id => warning(null, 'trace-uncovered', `Requirement ${id} is declared in the PRD but no plan item metadata.traces references it`));
+}
+
 function hasBlocksCycle(doc: VBriefDocument): boolean {
   const itemIds = new Set(doc.plan.items.map(item => item.id));
   const inDegree = new Map<string, number>();
@@ -142,15 +184,16 @@ function hasBlocksCycle(doc: VBriefDocument): boolean {
   return visited < itemIds.size;
 }
 
-export function lintPlanQuality(doc: VBriefDocument): QualityIssue[] {
+export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
   return [
     ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
     ...lintDocumentReferences(doc),
+    ...lintTraceCoverage(doc, options.prdText),
   ];
 }
 
-export function qualityLintErrors(doc: VBriefDocument): QualityIssue[] {
-  return lintPlanQuality(doc).filter(issue => issue.severity === 'error');
+export function qualityLintErrors(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+  return lintPlanQuality(doc, options).filter(issue => issue.severity === 'error');
 }
 
 export function formatQualityIssues(issues: QualityIssue[]): string[] {
@@ -170,8 +213,8 @@ export function formatQualityIssues(issues: QualityIssue[]): string[] {
   return lines;
 }
 
-export function assertPlanQuality(doc: VBriefDocument): QualityIssue[] {
-  const issues = lintPlanQuality(doc);
+export function assertPlanQuality(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+  const issues = lintPlanQuality(doc, options);
   const errors = issues.filter(issue => issue.severity === 'error');
   if (errors.length > 0) {
     throw new PlanQualityLintError(issues);
