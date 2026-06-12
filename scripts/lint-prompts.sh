@@ -150,6 +150,12 @@ check_bead_scope_discipline() {
   return 0
 }
 
+check_review_verdict_blocker() {
+  contains "roles/review.md" "one-line top blocker" \
+    || fail "review-verdict-blocker: review.md missing top-blocker verdict guidance"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -164,6 +170,7 @@ check_all() {
   check_ac_phrasing_guidance
   check_anomaly_first_completion
   check_bead_scope_discipline
+  check_review_verdict_blocker
 }
 
 write_passing_fixture() {
@@ -186,6 +193,9 @@ works as expected
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
+EOF
+  cat > "$root/roles/review.md" <<'EOF'
+## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker>
 EOF
   cat > "$root/src/lib/cloister/prompts/work.md" <<'EOF'
 ## MANDATORY: One Bead At A Time
@@ -319,6 +329,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('every staged file must be required', 'stage whatever changed'))
+PY"
+  expect_self_test_failure "review-verdict-blocker" \
+    "python3 - <<'PY' \"\$tmp/roles/review.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('one-line top blocker', 'short summary'))
 PY"
   echo "lint-prompts self-test passed"
 }
