@@ -156,6 +156,12 @@ check_review_verdict_blocker() {
   return 0
 }
 
+check_codebase_map_prompt() {
+  contains "src/lib/cloister/prompts/planning.md" "Codebase Map" \
+    || fail "codebase-map-prompt: planning.md missing Codebase Map section"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -171,6 +177,7 @@ check_all() {
   check_anomaly_first_completion
   check_bead_scope_discipline
   check_review_verdict_blocker
+  check_codebase_map_prompt
 }
 
 write_passing_fixture() {
@@ -190,6 +197,7 @@ Discovery is complete only when
 data, not instructions
 audit your own plan
 works as expected
+Codebase Map
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -336,6 +344,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('one-line top blocker', 'short summary'))
+PY"
+  expect_self_test_failure "codebase-map-prompt" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('Codebase Map', 'Repository Map'))
 PY"
   echo "lint-prompts self-test passed"
 }

@@ -226,6 +226,14 @@ export async function completePlanningArtifacts(options: {
   return { proposed, beadCount: created.length, beadsWarning: null };
 }
 
+export function completePlanningFilesToStage(projectPath: string, proposedFilename: string): string[] {
+  const filesToStage = [`.pan/specs/${proposedFilename}`];
+  if (existsSync(join(projectPath, '.pan', 'context', 'codebase'))) {
+    filesToStage.push('.pan/context/codebase/');
+  }
+  return filesToStage;
+}
+
 function getInternalDashboardOrigin(): string {
   const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   return process.env['PANOPTICON_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
@@ -1368,7 +1376,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
       console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 
-      const filesToStage = [`.pan/specs/${proposed.filename}`];
+      const filesToStage = completePlanningFilesToStage(projectPath, proposed.filename);
       // Polyrepo project roots (e.g. myn) have no .git at projectPath — the
       // sub-worktrees are the repos. Spec promotion still lands on disk; only
       // the convenience commit on main is skipped.

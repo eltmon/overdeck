@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill } from '../issues.js';
+import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill, completePlanningFilesToStage } from '../issues.js';
 import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
@@ -82,6 +82,24 @@ afterEach(() => {
 });
 
 describe('completePlanningArtifacts', () => {
+  it('includes codebase map changes in the main-side promote commit pathspec', async () => {
+    const issueId = 'PAN-1150';
+    const { projectPath } = makeProject(issueId);
+    await mkdir(join(projectPath, '.pan', 'context', 'codebase'), { recursive: true });
+    writeFileSync(join(projectPath, '.pan', 'context', 'codebase', 'conventions.md'), [
+      '# Conventions',
+      '',
+      'Use project-local patterns.',
+      '<!-- last-verified: 2026-06-12 -->',
+      '',
+    ].join('\n'));
+
+    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.vbrief.json')).toEqual([
+      '.pan/specs/2026-06-12-PAN-1150-plan.vbrief.json',
+      '.pan/context/codebase/',
+    ]);
+  });
+
   it('promotes a first-run workspace draft and materializes one bead per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);

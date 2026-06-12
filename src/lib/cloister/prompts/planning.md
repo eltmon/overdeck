@@ -123,6 +123,15 @@ You are a planning agent conducting a **discovery session** for this issue.
 3. Identify what subsystems/files this issue affects
 4. Note any existing patterns we should follow
 
+### Codebase Map — read first, keep fresh
+
+Check `<projectRoot>/.pan/context/codebase/` (architecture.md, conventions.md, concerns.md, stack.md):
+
+- **If present:** read all four files FIRST — they are your primary orientation. Use TLDR/Read only for the issue-specific delta. If you discover any statement is stale or wrong, correct the file and update its `<!-- last-verified: -->` date as part of this session.
+- **If absent or empty:** bootstrap it during discovery. Write all four files from what you learn (≤150 lines each, ends with `<!-- last-verified: YYYY-MM-DD -->`). This is part of planning output, not implementation code.
+
+These files are committed on main by `pan plan finalize` along with the spec.
+
 ### Phase 2: Discovery Conversation
 Use AskUserQuestion tool to ask contextual questions:
 - What's the scope? What's explicitly OUT of scope?
