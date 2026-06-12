@@ -1,82 +1,49 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { validateRequirementsTrace } from '../review-requirements-validator';
 
-function fixture(name: string): string {
-  return readFileSync(resolve(process.cwd(), 'tests/fixtures/review-requirements', name), 'utf8');
+const FIXTURE_DIR = resolve(process.cwd(), 'tests/fixtures/review-requirements');
+
+interface FixtureMeta {
+  ok: boolean;
+  missingTraces: string[];
+  reasonIncludes?: string;
 }
 
-describe('validateRequirementsTrace', () => {
-  it('passes when all in_pr_scope Implemented ACs have valid traces', () => {
-    const result = validateRequirementsTrace(fixture('happy-path.md'));
-    expect(result.ok).toBe(true);
-    expect(result.missingTraces).toEqual([]);
-    expect(result.reason).toBe('');
-  });
+function fixtureNames(): string[] {
+  return readdirSync(FIXTURE_DIR)
+    .filter(name => name.endsWith('.md'))
+    .map(name => name.replace(/\.md$/, ''))
+    .sort();
+}
 
-  it('passes when only whole_feature_scope ACs are present and sentinel is used', () => {
-    const result = validateRequirementsTrace(fixture('whole-feature-only.md'));
-    expect(result.ok).toBe(true);
-    expect(result.missingTraces).toEqual([]);
-    expect(result.reason).toBe('');
-  });
+function fixtureMarkdown(name: string): string {
+  return readFileSync(resolve(FIXTURE_DIR, `${name}.md`), 'utf8');
+}
 
-  it('fails when the Live Code Path Traces section is missing', () => {
-    const result = validateRequirementsTrace(fixture('missing-section.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toContain('AC-1: Foo does the thing');
-    expect(result.missingTraces).toContain('AC-2: Bar handles edge');
-    expect(result.reason).toContain('requirements review missing live code path trace for ACs:');
-  });
+function fixtureMeta(name: string): FixtureMeta {
+  const raw = readFileSync(resolve(FIXTURE_DIR, `${name}.json`), 'utf8');
+  return JSON.parse(raw) as FixtureMeta;
+}
 
-  it('fails when one required AC trace is missing', () => {
-    const result = validateRequirementsTrace(fixture('missing-one-ac.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toEqual(['AC-2: Bar handles edge']);
-    expect(result.reason).toContain('AC-2: Bar handles edge');
-  });
+describe('validateRequirementsTrace fixture suite', () => {
+  for (const name of fixtureNames()) {
+    it(`matches expected result for ${name}.md`, () => {
+      const meta = fixtureMeta(name);
+      const result = validateRequirementsTrace(fixtureMarkdown(name));
 
-  it('fails when File values are prose or bare paths without extension/line', () => {
-    const result = validateRequirementsTrace(fixture('bad-file-format.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toContain('AC-1: Foo does the thing');
-    expect(result.missingTraces).toContain('AC-2: Bar handles edge');
-  });
+      expect(result.ok).toBe(meta.ok);
+      expect(result.missingTraces).toEqual(meta.missingTraces);
 
-  it('passes with zero qualifying ACs when sentinel body is present', () => {
-    const result = validateRequirementsTrace(fixture('sentinel-when-not-needed.md'));
-    expect(result.ok).toBe(true);
-    expect(result.missingTraces).toEqual([]);
-    expect(result.reason).toBe('');
-  });
+      if (meta.reasonIncludes) {
+        expect(result.reason).toContain(meta.reasonIncludes);
+      }
+    });
+  }
+});
 
-  it('fails when one qualifying AC exists but sentinel body is used', () => {
-    const result = validateRequirementsTrace(fixture('sentinel-when-needed.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toEqual(['AC-1: Foo does the thing']);
-    expect(result.reason).toContain('AC-1: Foo does the thing');
-  });
-
-  it('rejects Windows-style backslash paths', () => {
-    const result = validateRequirementsTrace(fixture('windows-path.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toEqual(['AC-1: Foo does the thing']);
-  });
-
-  it('passes when the first backticked path in a block is valid', () => {
-    const result = validateRequirementsTrace(fixture('multiple-paths-one-block.md'));
-    expect(result.ok).toBe(true);
-    expect(result.missingTraces).toEqual([]);
-    expect(result.reason).toBe('');
-  });
-
-  it('fails when the section header has wrong case', () => {
-    const result = validateRequirementsTrace(fixture('case-variation.md'));
-    expect(result.ok).toBe(false);
-    expect(result.missingTraces).toEqual(['AC-1: Foo does the thing']);
-  });
-
+describe('validateRequirementsTrace invariants', () => {
   it('truncates the reason to 240 characters when many ACs are missing', () => {
     const rows: string[] = [];
     const traces: string[] = [];
@@ -112,6 +79,6 @@ describe('validateRequirementsTrace', () => {
     const failResult = validateRequirementsTrace(truncatedMarkdown);
     expect(failResult.ok).toBe(false);
     expect(failResult.reason.length).toBeLessThanOrEqual(240);
-    expect(failResult.reason).toMatch(/\.\.\.$/);
+    expect(failResult.reason).toMatch(/\.{3}$/);
   });
 });

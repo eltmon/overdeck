@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "missingTraces": ["AC-1: Foo does the thing", "AC-2: Bar handles edge"],
+  "reasonIncludes": "requirements review missing live code path trace for ACs:"
+}
