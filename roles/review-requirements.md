@@ -25,6 +25,7 @@ Review only requirements coverage:
   (the prohibition is what matters).
 - Required wiring between changed artifacts, such as route-to-UI, config-to-consumer, or producer-to-caller links
 - Scope creep that changes user-visible behavior beyond the stated requirement
+- **Stub UI scope creep** — new tabs, modes, segmented-control entries, or routed views whose data hooks return `[]` / `null`, whose handlers no-op, or whose copy is `coming soon` without (a) a feature flag check gating them off, (b) removal from the user-facing surface, or (c) a non-stub implementation calling real data
 
 Do not review general bugs, security vulnerabilities, performance regressions, style, or architecture. If a gap is also a bug, frame it only as "the stated requirement is not met."
 
@@ -40,6 +41,16 @@ Do not review general bugs, security vulnerabilities, performance regressions, s
 8. Mark each requirement as implemented, partial, missing, not applicable, or out of scope.
 
 Do not run broad `git diff`, rediscover all changed files, or re-gather issue context that the manifest already provides.
+
+### Stub UI BLOCKING rule
+
+If the shared context summary or context manifest lists `stubUiFindings`, treat each entry as `!` BLOCKING (`scope: in_pr_scope`) unless the PR diff also shows one of the three valid mitigations for that affordance:
+
+1. A feature flag check guarding the new affordance off.
+2. Removal of the affordance from the user-facing surface.
+3. A non-stub implementation calling real data.
+
+A mitigated finding must be moved to **Non-blocking Notes** with a one-line explanation of which mitigation applies. Do not silently drop mitigated findings.
 
 ## Per-AC scope classification (REQUIRED)
 
@@ -127,6 +138,7 @@ Write exactly one final report to the output file.
 | <requirement> | <source> | in_pr_scope | Missing | No changed-code evidence found |
 | <requirement> | <source> | whole_feature_scope | Not in this PR | Belongs to feature, not this change set |
 | <requirement> | <source> | pre_existing | Implemented (pre-PR) | Existed before this branch |
+| Stub UI: <patternLabel> @ <file>:<line> | stubUiFindings (manifest) | in_pr_scope | Missing (BLOCKING) | Stub introduced — no feature flag, no removal, no real implementation |
 
 ## Findings
 
