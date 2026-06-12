@@ -15,6 +15,8 @@ import {
   type StubUiFinding,
 } from './stub-ui-patterns.js';
 
+export type { StubUiFinding };
+
 const execAsync = promisify(exec);
 
 interface ChangedFileEntry {

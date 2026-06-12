@@ -15,6 +15,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlanSync, readPlan } from '../vbrief/io.js';
+import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
@@ -78,6 +79,7 @@ export interface ReviewContextManifest {
   nonGoals: string[];
   traces: ReviewItemTrace[];
   policyNotes: string[];
+  stubUiFindings: StubUiFinding[];
   manifestPath: string;
 }
 
@@ -329,7 +331,7 @@ export interface BuildReviewContextOpts {
 export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
-    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'diff'
+    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'diff'
   >,
 ): string {
   const lines: string[] = [];
@@ -401,11 +403,22 @@ export function formatTier1Summary(
     }
   }
 
+  if (manifest.stubUiFindings.length > 0) {
+    lines.push('');
+    lines.push('Stub UI findings (BLOCKING if unmitigated):');
+    for (const finding of manifest.stubUiFindings.slice(0, 10)) {
+      lines.push(`  - ${finding.patternLabel} @ ${finding.filePath}:${finding.lineNumber}`);
+    }
+    if (manifest.stubUiFindings.length > 10) {
+      lines.push(`  ... and ${manifest.stubUiFindings.length - 10} more (see manifest)`);
+    }
+  }
+
   lines.push('');
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
   return lines.join('\n');
-}async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
+}export async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
   const { runId, issueId, workspace } = opts;
 
   if (!existsSync(workspace)) {
@@ -423,9 +436,13 @@ export function formatTier1Summary(
     getDiffStat(workspace, diffBase),
   ]);
 
-  const [planRequirements, policyNotes] = await Promise.all([
+  const [planRequirements, policyNotes, stubUiFindings] = await Promise.all([
     extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
+    scanStubUi(workspace, diffBase).catch((err) => {
+      console.warn(`[buildReviewContext] scanStubUi failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [] as StubUiFinding[];
+    }),
   ]);
 
   const manifestDir = join(workspace, PAN_DIRNAME, 'review', runId);
@@ -444,6 +461,7 @@ export function formatTier1Summary(
     nonGoals: planRequirements.nonGoals,
     traces: planRequirements.traces,
     policyNotes,
+    stubUiFindings,
     manifestPath,
   };
 
