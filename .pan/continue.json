@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1642",
   "created": "2026-06-12T18:35:00.000Z",
-  "updated": "2026-06-12T18:55:00.000Z",
-  "gitState": { "branch": "feature/pan-1642", "sha": "97be8cb6e", "dirty": false },
+  "updated": "2026-06-12T18:53:07.264Z",
+  "gitState": {
+    "branch": "feature/pan-1642",
+    "sha": "97be8cb6e",
+    "dirty": false
+  },
   "decisions": [
     {
       "id": "D8",
@@ -36,10 +40,46 @@
   "resumePoint": {
     "description": "Merge from origin/main committed, all quality gates pass. Push to origin/feature/pan-1642 and call pan done PAN-1642.",
     "beadId": null,
-    "filesToRead": [".pan/continue.json"]
+    "filesToRead": [
+      ".pan/continue.json"
+    ]
   },
   "beadsMapping": {},
-  "statusOverrides": {},
+  "statusOverrides": {
+    "p2-theme": "completed",
+    "p2-theme.ac1": "completed",
+    "p2-theme.ac2": "completed",
+    "p2-renderer": "completed",
+    "p2-renderer.ac1": "completed",
+    "p2-renderer.ac2": "completed",
+    "p2-renderer.ac3": "completed",
+    "p2-renderer.ac4": "completed",
+    "p2-settings-toggle": "completed",
+    "p2-settings-toggle.ac1": "completed",
+    "p2-settings-toggle.ac2": "completed",
+    "p1-wire-panels": "completed",
+    "p1-wire-panels.ac1": "completed",
+    "p1-wire-panels.ac2": "completed",
+    "p1-wire-panels.ac3": "completed",
+    "p1-wire-panels.ac4": "completed",
+    "p3-table-css": "completed",
+    "p3-table-css.ac1": "completed",
+    "p3-table-css.ac2": "completed",
+    "p2-add-dep": "completed",
+    "p2-add-dep.ac1": "completed",
+    "p2-add-dep.ac2": "completed",
+    "p2-flag-config": "completed",
+    "p2-flag-config.ac1": "completed",
+    "p2-flag-config.ac2": "completed",
+    "p1-pi-guard": "completed",
+    "p1-pi-guard.ac1": "completed",
+    "p1-pi-guard.ac2": "completed",
+    "p1-stream-hook": "completed",
+    "p1-stream-hook.ac1": "completed",
+    "p1-stream-hook.ac2": "completed",
+    "p1-stream-hook.ac3": "completed",
+    "p1-stream-hook.ac4": "completed"
+  },
   "agentModel": "claude-opus-4",
   "sessionHistory": [
     {
