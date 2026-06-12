@@ -134,6 +134,12 @@ recommendation in one sentence in its description.
 
 If any of these is unmet, ask the next question instead of starting Phase 3.
 
+**Record every exchange.** After each AskUserQuestion response, append the question, the
+options offered, and the chosen answer to the PRD draft at
+`<projectRoot>/.pan/drafts/{{ISSUE_ID}}.md` under a `## Planning Q&A` heading (create the
+heading on first use). These records are how future agents understand WHY the plan chose
+what it chose.
+
 ### Playwright Isolation
 
 If the issue will require browser-based verification, encode that expectation clearly in continue.json and acceptance criteria:

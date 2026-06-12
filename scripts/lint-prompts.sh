@@ -112,6 +112,12 @@ check_discovery_completeness() {
   return 0
 }
 
+check_planning_qa_retention() {
+  contains "src/lib/cloister/prompts/planning.md" "## Planning Q&A" \
+    || fail "planning-qa-retention: planning.md missing Planning Q&A persistence guidance"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -120,6 +126,7 @@ check_all() {
   check_schema_key_agreement
   check_handoff_consistency
   check_discovery_completeness
+  check_planning_qa_retention
 }
 
 write_passing_fixture() {
@@ -135,6 +142,7 @@ write_passing_fixture() {
 Run pan plan finalize. The issue waits in Planned until pan start or Start Agent unless --auto-start was stamped.
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals
 Discovery is complete only when
+## Planning Q&A
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
@@ -226,6 +234,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('Discovery is complete only when', 'Discovery continues until'))
+PY"
+  expect_self_test_failure "planning-qa-retention" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('## Planning Q&A', '## Planning Notes'))
 PY"
   echo "lint-prompts self-test passed"
 }
