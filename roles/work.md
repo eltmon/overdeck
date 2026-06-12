@@ -147,6 +147,8 @@ The work role does not choose models for these gates. The selected `pan inspect`
 
 ## Completion
 
+Summaries lead with anomalies and deviations — never bury them after the wins.
+
 When all beads are closed and the tree is clean:
 
 ```bash

@@ -388,6 +388,12 @@ Your `.pan/continue.json` MUST be valid JSON with these fields:
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
 {{#LOCAL}}
+**Completion summary rules (-c text and any end-of-work report):** lead with anomalies,
+never polish. In order: (1) anything skipped, deferred, flaky, or worked around;
+(2) deviations from the plan and why; (3) hazards discovered; (4) only then, what was
+delivered. A summary that reads fully successful when any anomaly occurred is a
+reporting failure. If there are genuinely no anomalies, say "No deviations." first.
+
 **Before declaring work complete, run these as BASH COMMANDS (using the Bash tool):**
 ```bash
 npm test                                         # Run tests

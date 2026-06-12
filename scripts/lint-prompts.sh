@@ -138,6 +138,12 @@ check_ac_phrasing_guidance() {
   return 0
 }
 
+check_anomaly_first_completion() {
+  contains "src/lib/cloister/prompts/work.md" "lead with anomalies" \
+    || fail "anomaly-first-completion: work prompt missing anomaly-first summary guidance"
+  return 0
+}
+
 check_all() {
   errors=()
   check_forbidden_strings
@@ -150,6 +156,7 @@ check_all() {
   check_external_content_framing
   check_plan_self_audit
   check_ac_phrasing_guidance
+  check_anomaly_first_completion
 }
 
 write_passing_fixture() {
@@ -185,6 +192,7 @@ EOF
 8. skip if false
 9. pan inspect ISSUE --bead bead
 data, not instructions
+lead with anomalies
 EOF
   cat > "$root/roles/work.md" <<'EOF'
 ## Per-Bead Workflow
@@ -289,6 +297,13 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('works as expected', 'vague success wording'))
+PY"
+  expect_self_test_failure "anomaly-first-completion" \
+    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/work.md\"
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+p.write_text(p.read_text().replace('lead with anomalies', 'summarize normally'))
 PY"
   echo "lint-prompts self-test passed"
 }
