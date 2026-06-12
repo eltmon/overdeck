@@ -23,6 +23,7 @@ import {
   spawnRun,
   getAgentStateSync,
   resumeAgent,
+  restartAgent,
   type SpawnOptions,
   getAgentDir,
 } from '../../src/lib/agents.js';
@@ -41,6 +42,10 @@ const transcriptLandingMocks = vi.hoisted(() => ({
   landed: false,
   useLandedFlag: false,
   snapshotCounts: undefined as number[] | undefined,
+}));
+
+const runtimeMirrorMocks = vi.hoisted(() => ({
+  snapshots: new Map<string, any>(),
 }));
 
 vi.mock('../../src/lib/transcript-landing.js', () => ({
@@ -63,6 +68,11 @@ vi.mock('../../src/lib/transcript-landing.js', () => ({
   hasNewTranscriptUserRecord: vi.fn((before: { userRecordCount: number }, after: { userRecordCount: number }) =>
     after.userRecordCount > before.userRecordCount,
   ),
+}));
+
+vi.mock('../../src/lib/agent-runtime-mirror.js', () => ({
+  getRuntimeSnapshot: vi.fn((agentId: string) => Effect.succeed(runtimeMirrorMocks.snapshots.get(agentId) ?? null)),
+  isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
 }));
 
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
@@ -236,6 +246,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     transcriptLandingMocks.landed = false;
     transcriptLandingMocks.useLandedFlag = false;
     transcriptLandingMocks.snapshotCounts = undefined;
+    runtimeMirrorMocks.snapshots.clear();
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
     vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
@@ -297,6 +308,18 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       ...(kickoffDelivered === undefined ? {} : { kickoffDelivered }),
     }));
     return workspace;
+  }
+
+  function setRuntimeOrigin(agentId: string, sessionModel?: string, sessionHarness?: string): void {
+    runtimeMirrorMocks.snapshots.set(agentId, {
+      id: agentId,
+      activity: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: `${agentId}-session`,
+      model: sessionModel,
+      sessionModel,
+      sessionHarness,
+    });
   }
 
   describe('work role (spawnAgent)', () => {
@@ -497,6 +520,56 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
+    it('resumeAgent keeps --resume when session origin model and harness are unchanged', async () => {
+      const agentId = 'agent-pan-resume-same-origin';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).toContain(`--resume '${agentId}-session'`);
+    });
+
+    it('resumeAgent drops --resume when the requested model differs from session origin', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-model-drift';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId, undefined, { model: 'claude-haiku-4-5' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+    });
+
+    it('resumeAgent drops --resume when the requested harness differs from session origin', async () => {
+      const agentId = 'agent-pan-resume-harness-drift';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId, undefined, { harness: 'pi' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+    });
+
+    it('resumeAgent keeps --resume for legacy sessions with no origin metadata', async () => {
+      const agentId = 'agent-pan-resume-legacy-origin';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId);
+
+      const result = await resumeAgent(agentId, undefined, { model: 'claude-haiku-4-5' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).toContain(`--resume '${agentId}-session'`);
+    });
+
     it('resumeAgent surfaces missing original kickoff instead of sending a contextless continue', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-missing-kickoff';
@@ -508,6 +581,21 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result.error).toContain('kickoff prompt missing');
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(false);
+    });
+
+    it.each([
+      ['new model', { model: 'claude-haiku-4-5' }],
+      ['new harness', { harness: 'pi' as const }],
+      ['new model and harness', { model: 'claude-haiku-4-5', harness: 'pi' as const }],
+    ])('restartAgent with %s starts fresh without --resume', async (_label, opts) => {
+      const agentId = `agent-pan-restart-${_label.replaceAll(' ', '-')}`;
+      writeResumableWorkAgent(agentId, true);
+
+      const result = await restartAgent(agentId, { ...opts, graceful: false });
+
+      expect(result).toEqual({ success: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
     });
 
     it('honours an explicit options.model over the role config default', async () => {

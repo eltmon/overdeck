@@ -2138,6 +2138,22 @@ export interface AgentRuntimeState {
   contextSaturatedAt?: string;
 }
 
+function sessionResumeDriftReasons(
+  runtimeState: AgentRuntimeState | null,
+  model: string,
+  harness: RuntimeName,
+): string[] {
+  if (!runtimeState?.sessionModel || !runtimeState.sessionHarness) return [];
+  const reasons: string[] = [];
+  if (runtimeState.sessionModel !== model) {
+    reasons.push(`model ${runtimeState.sessionModel}→${model}`);
+  }
+  if (runtimeState.sessionHarness !== harness) {
+    reasons.push(`harness ${runtimeState.sessionHarness}→${harness}`);
+  }
+  return reasons;
+}
+
 function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
   if (!snap) return null;
   // Map Activity → legacy state. The legacy 'active' value collapses working
@@ -4604,6 +4620,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
+    const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
+    const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
+    if (resumeDriftReasons.length > 0) {
+      logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
+    }
 
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
@@ -4614,6 +4635,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
     const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
       ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
+      : resumeDriftReasons.length > 0
+        ? { message: message ?? defaultResumeMessage, redeliveringKickoff: false }
       : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
@@ -4633,10 +4656,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       workspace: agentState.workspace,
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
-      // PAN-1781: compact recovery launches a FRESH session (no --resume) so the
-      // harness cannot rewind to the overflowed history. Normal resumes keep
-      // re-attaching to the saved session.
-      ...(compactSeed ? {} : { spawnMode: 'resume' as const, resumeSessionId: sessionId }),
+      // PAN-1781/PAN-1787: compact recovery and model/harness drift launch a
+      // fresh session. Normal resumes keep re-attaching to the saved session.
+      ...(shouldResumeSavedSession ? { spawnMode: 'resume' as const, resumeSessionId: sessionId } : {}),
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
@@ -4682,16 +4704,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       if (!delivery.ok) {
         console.error(`[resumeAgent] Codex continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
-    } else if (compactSeed) {
-      // PAN-1781: fresh seeded session — deliver like a kickoff. Transcript
+    } else if (!shouldResumeSavedSession) {
+      // Fresh session fallback — deliver like a kickoff. Transcript
       // confirmation is impossible here: the new session's id is unknown until
       // its SessionStart hook fires, and the saved sessionId points at the
-      // archived (overflowed) session. deliverInitialPromptWithRetry waits for
+      // archived or mismatched session. deliverInitialPromptWithRetry waits for
       // the ready signal internally.
       const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', agentState.deliveryMethod);
       messageDelivered = delivery.ok;
       if (!delivery.ok) {
-        console.error(`[resumeAgent] Compact-recovery seed did not land: ${delivery.failure ?? 'unknown failure'}`);
+        console.error(`[resumeAgent] Fresh-session continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
