@@ -2712,6 +2712,8 @@ export async function buildAgentLaunchConfig(opts: {
   channelsBridgeServerName?: string;
   useSupervisor?: boolean;
   supervisorScriptPath?: string;
+  /** Claude Code session id for fresh launches that need a known id before boot. */
+  sessionId?: string;
   /**
    * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
    * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
@@ -2840,6 +2842,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
+    sessionId: opts.harness === 'claude-code' ? opts.sessionId : undefined,
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -4625,8 +4628,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     saveAgentStateSync(agentState);
     const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
     const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
+    const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
+      ? randomUUID()
+      : undefined;
     if (resumeDriftReasons.length > 0) {
       logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
+    }
+    if (freshSessionId) {
+      saveSessionId(normalizedId, freshSessionId);
+    } else if (!shouldResumeSavedSession) {
+      try {
+        unlinkSync(join(getAgentDir(normalizedId), 'session.id'));
+      } catch { /* absent or already cleared */ }
     }
 
     // Compute the effective message before building the launcher so codex can
@@ -4662,6 +4675,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // PAN-1781/PAN-1787: compact recovery and model/harness drift launch a
       // fresh session. Normal resumes keep re-attaching to the saved session.
       ...(shouldResumeSavedSession ? { spawnMode: 'resume' as const, resumeSessionId: sessionId } : {}),
+      sessionId: freshSessionId,
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
@@ -4742,8 +4756,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     const resumedAt = new Date().toISOString();
     if (compactSeed) {
-      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+    } else if (!shouldResumeSavedSession) {
+      console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else {
       console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);

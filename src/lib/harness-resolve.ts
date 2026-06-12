@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { canUseHarnessSync } from './harness-policy.js';
+import { canUseHarnessSync, canUseModelWithAuthSync } from './harness-policy.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from './providers.js';
 import type { RuntimeName } from './runtimes/types.js';
 import type { Role } from './agents.js';
@@ -19,6 +19,13 @@ export type ResolveHarnessInput = {
   role?: Role;
   model: string;
 };
+
+export class HarnessResolutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HarnessResolutionError';
+  }
+}
 
 async function getProviderAuthModeForModel(model: string) {
   const { getProviderAuthMode } = await import('./agents.js');
@@ -54,13 +61,30 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
   const builtInHarness = getBuiltInDefaultHarness(provider);
 
   const winner = input.explicit ?? roleHarness ?? providerHarness ?? builtInHarness ?? 'claude-code';
+  const winnerIsExplicit = input.explicit !== undefined;
 
   if (!input.explicit && !roleHarness && !providerHarness) {
     logBuiltInDefaultNotice(provider, winner);
   }
 
-  const decision = canUseHarnessSync(winner, input.model, await getProviderAuthModeForModel(input.model));
+  const authMode = await getProviderAuthModeForModel(input.model);
+  const modelDecision = canUseModelWithAuthSync(input.model, authMode);
+  if (!modelDecision.allowed) {
+    throw new HarnessResolutionError(modelDecision.reason ?? `Model ${input.model} is not allowed with the current auth mode`);
+  }
+
+  const decision = canUseHarnessSync(winner, input.model, authMode);
   if (!decision.allowed) {
+    if (winnerIsExplicit) {
+      throw new HarnessResolutionError(decision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
+    }
+
+    const fallbackDecision = canUseHarnessSync('claude-code', input.model, authMode);
+    if (!fallbackDecision.allowed) {
+      throw new HarnessResolutionError(decision.reason ?? fallbackDecision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
+    }
+
+    console.warn(`harness ${winner} denied for ${provider}: ${decision.reason ?? 'policy denied'} — falling back to claude-code`);
     return 'claude-code';
   }
 

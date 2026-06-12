@@ -562,6 +562,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result).toEqual({ success: true, messageDelivered: true });
       const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
       expect(launcher).not.toContain('--resume');
+      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
+      expect(freshSessionId).not.toBe(`${agentId}-session`);
+      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
       expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
     });
 
@@ -575,6 +578,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result).toEqual({ success: true, messageDelivered: true });
       const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
       expect(launcher).not.toContain('--resume');
+      expect(existsSync(join(getAgentDir(agentId), 'session.id'))).toBe(false);
     });
 
     it('resumeAgent keeps --resume for legacy sessions with no origin metadata', async () => {
@@ -904,43 +908,35 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   describe('harness policy gate at the spawn entry points', () => {
-    // PAN-1048 review feedback 005 (C4): canUseHarness() must run before
-    // spawnRun/spawnAgent persist the resolved harness or hand it to the
-    // launcher, so a config'd `roles.<role>.harness: pi` cannot smuggle a
-    // ToS-blocked combo (Pi + Anthropic + subscription auth) into the
-    // launcher. resolveEffectiveHarness() collapses the requested harness
-    // to claude-code when the gate denies the combination.
-    it('downgrades pi → claude-code for spawnRun review when canUseHarness denies the combo', async () => {
+    it('rejects explicit pi for spawnRun review when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
       vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
 
-      const state = await spawnRun('PAN-PI-1', 'review', {
+      await expect(spawnRun('PAN-PI-1', 'review', {
         workspace: testWorkspace,
         harness: 'pi',
-      });
+      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
 
-      expect(state.harness).toBe('claude-code');
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
-    it('downgrades pi → claude-code for spawnAgent work when canUseHarness denies the combo', async () => {
+    it('rejects explicit pi for spawnAgent work when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
       vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
 
-      const state = await spawnAgent({
+      await expect(spawnAgent({
         issueId: 'PAN-PI-2',
         workspace: testWorkspace,
         role: 'work',
         harness: 'pi',
-      });
+      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
 
-      expect(state.harness).toBe('claude-code');
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 

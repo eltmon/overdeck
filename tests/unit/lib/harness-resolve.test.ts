@@ -12,9 +12,13 @@ vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfigSync: mocks.loadConfigSync,
 }));
 
-vi.mock('../../../src/lib/harness-policy.js', () => ({
-  canUseHarnessSync: mocks.canUseHarnessSync,
-}));
+vi.mock('../../../src/lib/harness-policy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/harness-policy.js')>();
+  return {
+    ...actual,
+    canUseHarnessSync: mocks.canUseHarnessSync,
+  };
+});
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: mocks.getProviderAuthMode,
@@ -102,9 +106,34 @@ describe('resolveHarness', () => {
     mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'blocked' });
     const { resolveHarness } = await loadSubject();
 
-    await expect(resolveHarness({ explicit: 'pi', model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
+    await expect(resolveHarness({ explicit: 'pi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
     expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('pi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.exec).not.toHaveBeenCalled();
+  });
+
+  it('falls back to claude-code for policy-denied role or provider defaults only after checking the fallback', async () => {
+    mocks.getProviderAuthMode.mockResolvedValue('subscription');
+    mocks.canUseHarnessSync
+      .mockReturnValueOnce({ allowed: false, reason: 'role default blocked' })
+      .mockReturnValueOnce({ allowed: true });
+    setConfig({ roles: { work: { harness: 'pi' } } });
+    const { resolveHarness } = await loadSubject();
+
+    await expect(resolveHarness({ role: 'work', model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
+
+    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(1, 'pi', 'claude-sonnet-4-6', 'subscription');
+    expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
+    expect(warnSpy).toHaveBeenCalledWith('harness pi denied for anthropic: role default blocked — falling back to claude-code');
+  });
+
+  it('does not fall back when the model itself is denied by auth policy', async () => {
+    mocks.getProviderAuthMode.mockResolvedValue('api-key');
+    const { resolveHarness } = await loadSubject();
+
+    await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('GPT-5.5 needs a ChatGPT/Codex subscription sign-in');
+
+    expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
     expect(mocks.exec).not.toHaveBeenCalled();
   });
 
