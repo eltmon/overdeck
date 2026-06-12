@@ -16,7 +16,7 @@ import { withBdMutexPromise } from '../bd-mutex.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
-import type { VBriefDocument, VBriefInspectionPolicy, VBriefItem, VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -355,7 +355,7 @@ async function createBeadsFromVBriefPromise(
     const labelStr = labels.join(',');
 
     const actionText = item.narrative?.Action ?? '';
-    const acLines = (item.subItems ?? [])
+    const acLines = subItemsOf(item)
       .filter(s => s.metadata?.kind === 'acceptance_criterion')
       .map(s => `- AC: ${s.title}`)
       .join('\n');
@@ -470,10 +470,10 @@ async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Pr
     // timestamps automatically. Each call below constitutes one write → one sequence increment.
     updateItemStatus(workspacePath, matchingItem.id, status);
 
-    // Also mark all AC subItems as completed when the parent item is completed.
-    // Each updateSubItemStatus call increments sequence separately (one write per subItem).
-    if (status === 'completed' && matchingItem.subItems) {
-      for (const sub of matchingItem.subItems) {
+    // Also mark all AC child items as completed when the parent item is completed.
+    // Each updateSubItemStatus call increments sequence separately (one write per child item).
+    if (status === 'completed') {
+      for (const sub of subItemsOf(matchingItem)) {
         if (sub.metadata?.kind === 'acceptance_criterion' && sub.status !== 'completed') {
           updateSubItemStatus(workspacePath, matchingItem.id, sub.id, 'completed');
         }

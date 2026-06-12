@@ -58,6 +58,24 @@ describe('lintPlanQuality story quality', () => {
     expect(rulesFor([item({ subItems: [] })])).toContain('ac-missing');
   });
 
+  it('applies AC rules equivalently to v0.6 items children', () => {
+    const legacy = rulesFor([item({
+      subItems: [
+        ac('item-1.ac1', 'Feature works as expected'),
+        ac('item-1.ac2', 'Given input then it returns output'),
+      ],
+    })]);
+    const current = rulesFor([item({
+      subItems: undefined,
+      items: [
+        ac('item-1.ac1', 'Feature works as expected'),
+        ac('item-1.ac2', 'Given input then it returns output'),
+      ],
+    })]);
+
+    expect(current).toEqual(legacy);
+  });
+
   it('flags 1 AC without justification', () => {
     expect(rulesFor([item({ subItems: [ac('item-1.ac1', 'Given input then it returns output')] })])).toContain('ac-count');
   });

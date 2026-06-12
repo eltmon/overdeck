@@ -144,6 +144,7 @@ describe('getVBriefACStatus', () => {
     id: string;
     title: string;
     subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
+    items?: Array<{ id: string; title: string; status?: string; kind?: string }>;
   }>): VBriefDocument {
     return {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -155,6 +156,12 @@ describe('getVBriefACStatus', () => {
           id: i.id,
           title: i.title,
           status: 'pending' as const,
+          items: i.items?.map(s => ({
+            id: s.id,
+            title: s.title,
+            status: (s.status ?? 'pending') as any,
+            metadata: { kind: s.kind ?? 'acceptance_criterion' },
+          })),
           subItems: i.subItems?.map(s => ({
             id: s.id,
             title: s.title,
@@ -220,6 +227,25 @@ describe('getVBriefACStatus', () => {
     expect(result.items[0].itemId).toBe('item-1');
     expect(result.items[0].completed).toBe(1);
     expect(result.items[0].pending).toBe(1);
+  });
+
+  it('extracts AC status from v0.6 items children', () => {
+    const doc = makePlanWithAC([{
+      id: 'item-1',
+      title: 'Build module',
+      items: [
+        { id: 'item-1.ac1', title: 'Function exists', status: 'completed' },
+        { id: 'item-1.ac2', title: 'Tests pass', status: 'pending' },
+      ],
+    }]);
+    doc.vBRIEFInfo.version = '0.6';
+    writeACPlan(doc);
+
+    const result = getVBriefACStatusSync(AC_WORKSPACE_PATH)!;
+    expect(result).not.toBeNull();
+    expect(result.totalCompleted).toBe(1);
+    expect(result.totalPending).toBe(1);
+    expect(result.items[0].criteria.map(ac => ac.subItemId)).toEqual(['item-1.ac1', 'item-1.ac2']);
   });
 
   it('returns allCompleted=true when all AC are completed', () => {
