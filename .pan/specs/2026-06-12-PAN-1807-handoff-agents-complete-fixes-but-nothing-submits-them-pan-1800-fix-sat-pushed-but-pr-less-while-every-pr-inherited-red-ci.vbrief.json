@@ -4,7 +4,7 @@
     "created": "2026-06-12T20:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1807: Handoff agents complete fixes but nothing submits them — PAN-1800 fix sat pushed-but-PR-less while every PR inherited red CI",
-    "updated": "2026-06-12T20:25:37.656Z"
+    "updated": "2026-06-12T20:32:13.213Z"
   },
   "plan": {
     "id": "pan-1807",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "25477a82-d97b-47e8-8e6a-0ee5203c90e1",
     "author": "agent:claude-fable-5",
-    "sequence": 8,
+    "sequence": 11,
     "created": "2026-06-12T20:05:00.000Z",
-    "updated": "2026-06-12T20:25:37.656Z",
+    "updated": "2026-06-12T20:32:13.213Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1807",
