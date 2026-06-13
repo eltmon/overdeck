@@ -2202,3 +2202,42 @@ after RUN-27 (assumed reboot casualty like RUN-19/RUN-21):
 - **Memory pressure stable:** RAM ~48-50 GB, swap dropped to 7.2/8.2 GB after
   killing PAN-1775 stack.
 - **No merges this tick.** The operator UAT gate remains the bottleneck.
+
+## RUN-32 tick 1 (2026-06-13 ~13:47Z) — fresh baseline; gate-bound pipeline, launched 2 critical substrate plans
+
+Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`.
+
+- **Main GREEN** at `c8ea5dc2e`, local main **in sync with origin** (0 ahead/0 behind) —
+  cleaner than RUN-28's 54-ahead divergence. Memory healthy: RAM 24.8/64.1 GB,
+  **swap clear (0/8.2 GB)**. Dashboard running plain `node dist/dashboard/server.js`
+  (NOT `--no-resume`); deacon Running, auto-start enabled.
+- **"Boot --no-resume" gates on stopped agents are STALE.** `pan status` shows dozens
+  of old agents (incl. MIN-831 at 3245 min) gated `Boot --no-resume`, but the current
+  boot has no `--no-resume` flag. The gate persists in state.json across reboots and
+  misleads — do not read it as the live resume policy. Verify the dashboard cmdline
+  (`ps aux | grep dashboard/server.js`) for the real policy.
+- **Only live productive agent was a WEDGED review convoy: PAN-1803.** Parent
+  `agent-pan-1803-review` (model `kimi-k2.7-code`) sits in standby "No reviewer
+  terminal signals yet. I will wait." for >30 min while its 4 sub-reviewers crashed on
+  400-context errors. This is the **PAN-1818 class** (reviewer overflow, no recovery for
+  role agents) and the **PAN-1614/PAN-1765** stuck-convoy class. Orchestrator cannot
+  pan kill/resume — surfaced as `investigate` + openQuestion for the operator.
+- **Pipeline is gate-bound, not idle-bound.** 11 `in_review` (most are PAUSED
+  completed-work parked at the operator merge gate — PAN-1242/1491/1629 review-passed;
+  PAN-1498/1614/1658/1765 review-blocked), 16 `verifying_on_main` (operator UAT/close-out
+  gate), 1 `in_progress` (PAN-1762, operator-held). With `require_uat_before_merge=true`,
+  the operator UAT/merge decision is the primary bottleneck — and the only flywheel-
+  forbidden action set (`pan resume/wake/kill/close`) is exactly what would advance them.
+- **Launched 2 planning chains** (both clean/no-branch, eltmon-authored, critical):
+  - `pan plan PAN-1818 --auto` → `planning-pan-1818` (reviewer 400-context overflow
+    recovery — the ROOT CAUSE of the convoy deaths wedging PAN-1803; highest leverage).
+  - `pan plan PAN-1507 --auto` → `planning-pan-1507` (Activity tab empty-state bug).
+- **Half-started branches to investigate next tick (follow-through debt):** PAN-1506
+  (`strike/pan-1506` + workspace), PAN-1508 (`strike/pan-1508`), PAN-1456
+  (`feature/pan-1456` + workspace), PAN-1510 (`feature/pan-1510` + workspace). All still
+  `todo` — prior strike/work attempts that never landed (likely reboot casualties). Each
+  is a critical substrate bug; next tick should determine whether the branch has usable
+  commits to resume vs. a fresh launch.
+- **Used `pan plan --auto`, not `pan start --auto`** — RUN-28 confirmed the `pan start
+  --auto` beads-recovery path is broken for fresh issues (PAN-1647/PAN-1799 class).
