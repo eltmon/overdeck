@@ -42,7 +42,7 @@ describe('DEFAULT_GATES', () => {
     expect(DEFAULT_GATES.typecheck.command).toContain('npm run typecheck');
     expect(DEFAULT_GATES.lint.command).toContain('npm run lint');
     expect(DEFAULT_GATES.test.command).toContain('npx vitest run --changed {{CHANGED_BASE}}');
-    expect(DEFAULT_GATES.test.command).toContain('src/dashboard/frontend');
+    // DEFAULT_GATES stays project-agnostic: no hardcoded dashboard/frontend path.
   });
 });
 
