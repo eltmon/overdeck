@@ -33,6 +33,7 @@ import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
 import { resetHarnessResolveCachesForTests } from '../../src/lib/harness-resolve.js';
+import { AGENTS_DIR } from '../../src/lib/paths.js';
 
 const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
@@ -163,6 +164,14 @@ vi.mock('../../src/lib/cliproxy.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/lib/provider-health.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/provider-health.js')>();
+  return {
+    ...actual,
+    validateProviderHealth: vi.fn(() => Effect.void),
+  };
+});
+
 vi.mock('../../src/lib/github-app.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/github-app.js')>();
   return {
@@ -179,7 +188,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
     config: {
       preset: 'balanced',
       enabledProviders: new Set(['anthropic']),
-      apiKeys: {},
+      apiKeys: process.env.KIMI_API_KEY ? { kimi: process.env.KIMI_API_KEY } : {},
       providerAuth: {},
       providerPlan: {},
       openrouterFavorites: [],
@@ -341,7 +350,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     }
   });
 
-  function writeResumableWorkAgent(agentId: string, kickoffDelivered: boolean | undefined, withPrompt = true): string {
+  function writeResumableWorkAgent(
+    agentId: string,
+    kickoffDelivered: boolean | undefined,
+    withPrompt = true,
+    overrides: { model?: string; harness?: 'claude-code' | 'pi' | 'codex'; codexMode?: 'exec' | 'tui' | 'work-tui' } = {},
+  ): string {
     const workspace = join(testPanopticonHome, `${agentId}-workspace`);
     mkdirSync(workspace, { recursive: true });
     const agentDir = getAgentDir(agentId);
@@ -360,6 +374,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       status: 'stopped',
       startedAt: new Date().toISOString(),
       ...(kickoffDelivered === undefined ? {} : { kickoffDelivered }),
+      ...overrides,
     }));
     return workspace;
   }
@@ -374,6 +389,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       sessionModel,
       sessionHarness,
     });
+  }
+
+  function stubHarnessBinary(binary: 'codex' | 'pi'): void {
+    const binDir = join(testPanopticonHome, `bin-${binary}`);
+    mkdirSync(binDir, { recursive: true });
+    const fakeBinary = join(binDir, binary);
+    writeFileSync(fakeBinary, '#!/bin/sh\nexit 0\n');
+    chmodSync(fakeBinary, 0o755);
+    process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+    resetHarnessResolveCachesForTests();
   }
 
   describe('work role (spawnAgent)', () => {
@@ -628,6 +653,82 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result).toEqual({ success: true, messageDelivered: true });
       const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
       expect(launcher).toContain(`--resume '${agentId}-session'`);
+    });
+
+    it('resumeAgent migrates legacy gpt agents to codex fresh sessions when codex is installed', async () => {
+      stubHarnessBinary('codex');
+      const agentId = 'agent-pan-resume-legacy-gpt-codex';
+      writeResumableWorkAgent(agentId, true, true, {
+        model: 'gpt-5.5',
+        harness: 'claude-code',
+      });
+      setRuntimeOrigin(agentId);
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+      const state = getAgentStateSync(agentId);
+      expect(state?.harness).toBe('codex');
+      expect(state?.codexMode).toBe('work-tui');
+      const lifecycle = readFileSync(join(AGENTS_DIR, agentId, 'lifecycle.log'), 'utf8');
+      expect(lifecycle).toContain('legacy harness migration claude-code→codex for model gpt-5.5');
+    });
+
+    it('resumeAgent migrates legacy Kimi agents to Pi fresh sessions when Pi is installed', async () => {
+      stubHarnessBinary('pi');
+      const originalKimiApiKey = process.env.KIMI_API_KEY;
+      process.env.KIMI_API_KEY = 'test-kimi-key';
+      try {
+        const agentId = 'agent-pan-resume-legacy-kimi-pi';
+        writeResumableWorkAgent(agentId, true, true, {
+          model: 'kimi-k2.5',
+          harness: 'claude-code',
+        });
+        setRuntimeOrigin(agentId);
+
+        const result = await resumeAgent(agentId);
+
+        expect(result).toEqual(expect.objectContaining({ success: true }));
+        const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+        expect(launcher).not.toContain('--resume');
+        const state = getAgentStateSync(agentId);
+        expect(state?.harness).toBe('pi');
+        expect(state?.codexMode).toBeUndefined();
+      } finally {
+        if (originalKimiApiKey === undefined) {
+          delete process.env.KIMI_API_KEY;
+        } else {
+          process.env.KIMI_API_KEY = originalKimiApiKey;
+        }
+      }
+    });
+
+    it('resumeAgent preserves --resume for legacy agents when the caller supplies an explicit harness', async () => {
+      const originalKimiApiKey = process.env.KIMI_API_KEY;
+      process.env.KIMI_API_KEY = 'test-kimi-key';
+      try {
+        const agentId = 'agent-pan-resume-legacy-explicit-harness';
+        writeResumableWorkAgent(agentId, true, true, {
+          model: 'kimi-k2.5',
+          harness: 'claude-code',
+        });
+        setRuntimeOrigin(agentId);
+
+        const result = await resumeAgent(agentId, undefined, { harness: 'claude-code' });
+
+        expect(result).toEqual({ success: true, messageDelivered: true });
+        const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+        expect(launcher).toContain(`--resume '${agentId}-session'`);
+        expect(getAgentStateSync(agentId)?.harness).toBe('claude-code');
+      } finally {
+        if (originalKimiApiKey === undefined) {
+          delete process.env.KIMI_API_KEY;
+        } else {
+          process.env.KIMI_API_KEY = originalKimiApiKey;
+        }
+      }
     });
 
     it('resumeAgent surfaces missing original kickoff instead of sending a contextless continue', async () => {
