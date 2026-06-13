@@ -30,6 +30,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 
 let TEST_HOME: string;
 let CONFIG_HOME: string;
+const ORIGINAL_HOME = process.env.HOME;
 
 beforeEach(() => {
   mockGenerateSmartSummary.mockClear();
@@ -53,6 +54,11 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.PANOPTICON_HOME;
+  if (ORIGINAL_HOME) {
+    process.env.HOME = ORIGINAL_HOME;
+  } else {
+    delete process.env.HOME;
+  }
   rmSync(TEST_HOME, { recursive: true, force: true });
   rmSync(CONFIG_HOME, { recursive: true, force: true });
 });
