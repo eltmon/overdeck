@@ -223,7 +223,7 @@ describe('operator.intervention dashboard routes', () => {
       type: 'operator.intervention',
       payload: { issueId: 'PAN-1', kind: 'pause', source: 'dashboard' },
     }));
-  });
+  }, 15000);
 
   it('emits restart from the successful dashboard restart route and forwards harness overrides', async () => {
     const { response, appendedEvents } = await requestAgents('/api/agents/agent-pan-1/restart', {

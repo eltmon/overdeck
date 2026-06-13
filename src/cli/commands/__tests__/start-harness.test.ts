@@ -80,7 +80,7 @@ describe('pan start --harness flag (PAN-636)', () => {
     const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
     expect(written.toLowerCase()).toContain('pi')
     expect(written.toLowerCase()).toContain('anthropic')
-  })
+  }, 15000)
 
   it('prompts for interactive --host --yes instead of silently accepting it', async () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })

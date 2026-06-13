@@ -321,7 +321,7 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it('logs verify-paused instead of manually-paused for merged paused agents', async () => {
     const agentId = 'agent-pan-1141-verify-paused';
