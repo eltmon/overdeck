@@ -178,6 +178,17 @@ function warnIfServerInTmuxSpawnScopeSync(): void {
  * socket to answer before returning.
  */
 export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void {
+  // PAN-1824: never run the managed-server founding under a test runner — it
+  // targets the real user-level socket/unit (defeating per-test socket
+  // isolation, PAN-1808) and on hosts where the server cannot come up it
+  // burns SERVER_ALIVE_TIMEOUT_MS synchronously inside every createSession.
+  // Unit tests of this function itself opt back in via the FORCE override.
+  if (process.env.PANOPTICON_TMUX_MANAGED_SERVER_FORCE !== '1') {
+    if (process.env.PANOPTICON_TMUX_NO_MANAGED_SERVER === '1' || process.env.VITEST) {
+      return;
+    }
+  }
+
   if (isManagedServerAliveSync()) {
     warnIfServerInTmuxSpawnScopeSync();
     return;
