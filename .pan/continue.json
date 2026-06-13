@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-1813",
+  "created": "2026-06-13T14:33:38.481Z",
+  "updated": "2026-06-13T14:39:11.368Z",
+  "gitState": { "branch": "feature/pan-1813", "sha": "46dbb6d51", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Centralize bd timeout via resolveBdTimeout(): PANOPTICON_BD_TIMEOUT_MS env override wins absolutely, else clamp(bd-ping total_ms × 20, floor 30000, ceiling 180000). Floor preserves today's 30s so an idle box is unchanged; the ping probe itself waits on the Dolt lock so its latency reflects contention. Route every bd call in src/lib/vbrief/beads.ts through it.", "recordedAt": "2026-06-13T14:39:11.368Z" },
+    { "id": "D2", "summary": "Recover bead IDs by exact-title re-query after a create timeout/empty-stdout; never auto-retry bd create. A client timeout on create usually means the create succeeded server-side, so re-querying bd list -l <label> and matching title === `${plan.id}: ${item.title}` recovers the only lost thing (the ID). Auto-retrying create would duplicate beads.", "recordedAt": "2026-06-13T14:39:11.368Z" },
+    { "id": "D3", "summary": "Verify dependency edges as a deterministic post-condition (same spirit as the existing dedup verification) and repair missing ones with `bd dep add <blocked> <blocker>`. Use a single batched `bd dep list <id…> --json` (records carry issue_id). An unrepairable edge FAILS the finalize loudly — never materialize a corrupt DAG silently.", "recordedAt": "2026-06-13T14:39:11.368Z" },
+    { "id": "D4", "summary": "Stamp plan.status='proposed' only AFTER beads creation succeeds (move stampPlanForFinalization from before createBeadsFromVBrief to after, still before promote). A beads failure then leaves the workspace spec un-stamped and cleanly re-runnable, removing the Run-1 half-finalized state.", "recordedAt": "2026-06-13T14:39:11.368Z" },
+    { "id": "D5", "summary": "Retry only idempotent bd reads (ping, dedup list, post-delete list, delete) with bounded exponential backoff (3 attempts, base 500ms, ×2). bd create is excluded (covered by D2's recover-by-title).", "recordedAt": "2026-06-13T14:39:11.368Z" },
+    { "id": "D6", "summary": "Reject `bd create --id` (client-generated IDs) in favor of re-query-by-title — explicit IDs risk prefix collisions with the shared Dolt DB and change the ID scheme. Scope limited to src/lib/vbrief/beads.ts + plan-finalize.ts; other bd call sites are out of scope.", "recordedAt": "2026-06-13T14:39:11.368Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "bd create is NOT idempotent — a naive retry after a server-side-successful create makes a DUPLICATE bead.", "mitigation": "Never auto-retry bd create. On create timeout/empty-stdout, recover the ID by exact-title re-query (D2). Retry wrapper (D5) excludes create." },
+    { "id": "H2", "summary": "Title-based ID recovery is ambiguous if two beads share the same full title.", "mitigation": "Dedup clears all prior beads first, so only this run's beads exist; match the exact full title `${plan.id}: ${item.title}`. If >1 bead matches, surface an error — do NOT silently pick one." },
+    { "id": "H3", "summary": "The bd ping latency probe itself contends for the Dolt lock and adds one more bd op per finalize.", "mitigation": "Probe once per finalize and cache the resolved timeout; the probe latency reflecting contention is the desired signal, and one extra op is negligible vs the create burst." },
+    { "id": "H4", "summary": "Adaptive timeout could wait near-unbounded if the ceiling were too high or absent.", "mitigation": "Hard CEILING = 180000ms (NFR-2). The resolver always clamps; a genuinely hung bd still fails within the ceiling." },
+    { "id": "H5", "summary": "Edge verification could add N `bd dep list` calls (one per bead) under contention, worsening load.", "mitigation": "Use ONE batched `bd dep list <id1> <id2> …> --json` (verified: each record carries `issue_id`, so a single call covers all beads) (NFR-4)." },
+    { "id": "H6", "summary": "Retry/backoff tests using real setTimeout cause slow/OOM-prone suites (repo rule).", "mitigation": "All retry/backoff tests MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync(); never real waits, never maxForks:1 (NFR-3)." },
+    { "id": "H7", "summary": "Reordering the status stamp must not break promote, which needs status='proposed' and canonicalFilename stamped.", "mitigation": "stampPlanForFinalization still runs before promotePlanning — only its position relative to createBeadsFromVBrief moves. createBeadsFromVBrief ignores plan.status (it reads id/items/edges only), so stamping after it is safe." },
+    { "id": "H8", "summary": "withBdMutexPromise serializes bd ops within ONE process only; cross-agent contention (the actual cause) is NOT eliminated by this issue.", "mitigation": "Reviewers must not expect contention to disappear — these changes make a single finalize SURVIVE contention. Reducing systemic load is an explicit NonGoal." },
+    { "id": "H9", "summary": "Tests mock execFile via promisify()→mockExecAsync (src/lib/vbrief/__tests__/create-beads.test.ts). New bd calls (re-query list, batched dep list, dep add) must be simulated through mockExecAsync.mockImplementation((file,args)=>…).", "mitigation": "Follow the existing mock harness; assert on the args array to distinguish create vs list vs dep-list vs dep-add and to simulate per-op timeouts." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-13T14:39:11.368Z", "reason": "planning", "note": "Auto-mode planning for PAN-1813: bd-timeout resilience in pan plan finalize. Read the create/dedup path (src/lib/vbrief/beads.ts) and the finalize orchestration (src/cli/commands/plan-finalize.ts); verified bd CLI surface (bd ping --json total_ms, bd create --silent, bd dep add, batched bd dep list --json carries issue_id). Produced a 5-bead plan: adaptive timeout, retry transient reads, recover-bead-id-by-title, verify+repair dep edges, stamp-status-after-beads. No contradictions found.", "agentModel": "agent:claude-opus-4-8" }
+  ],
+  "feedback": []
+}
