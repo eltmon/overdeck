@@ -265,7 +265,29 @@ export class FlyProvider implements RemoteProvider {
   deleteVm(name: string): Effect.Effect<void, RemoteError> {
     return effFromPromise('deleteVm', async () => {
       const { appName, machineId } = await this.resolveVm(name);
-      await this.getApi().destroyMachine(appName, machineId);
+      const api = this.getApi();
+      await api.destroyMachine(appName, machineId);
+
+      // Best-effort teardown of the associated durable-tier volume. An
+      // ephemeral machine has no such volume, so this is a no-op there.
+      const expectedVolumeName = `${name}-workspace`;
+      try {
+        const volumes = await api.listVolumes(appName);
+        const volume = volumes.find(
+          (v) =>
+            v.name === expectedVolumeName &&
+            v.state !== 'destroyed' &&
+            (v.attached_machine_id === machineId ||
+              v.attached_machine_id === null ||
+              v.attached_machine_id === undefined),
+        );
+        if (volume) {
+          await api.deleteVolume(appName, volume.id);
+        }
+      } catch {
+        // Don't fail teardown because the volume delete didn't succeed;
+        // the machine is already gone and the caller has what it needs.
+      }
     });
   }
 

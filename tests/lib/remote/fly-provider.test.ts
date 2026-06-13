@@ -20,6 +20,7 @@ const { execAsyncMock, spawnMock, mockApi } = vi.hoisted(() => {
     ensureApp: vi.fn(),
     createVolume: vi.fn(),
     listVolumes: vi.fn(),
+    deleteVolume: vi.fn(),
   };
   return { execAsyncMock, spawnMock, mockApi };
 });
@@ -163,6 +164,27 @@ describe('FlyProvider', () => {
       await run(provider.deleteVm('test-vm'));
 
       expect(mockApi.destroyMachine).toHaveBeenCalledWith('test-app', 'machine-1');
+    });
+
+    it('deletes the associated durable volume after destroying the machine', async () => {
+      mockApi.destroyMachine.mockResolvedValue(undefined);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'test-vm-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: 'machine-1' },
+      ]);
+      mockApi.deleteVolume.mockResolvedValue(undefined);
+
+      await run(provider.deleteVm('test-vm'));
+
+      expect(mockApi.deleteVolume).toHaveBeenCalledWith('test-app', 'vol-1');
+    });
+
+    it('skips volume deletion for an ephemeral (volumeless) machine', async () => {
+      mockApi.destroyMachine.mockResolvedValue(undefined);
+      mockApi.listVolumes.mockResolvedValue([]);
+
+      await run(provider.deleteVm('test-vm'));
+
+      expect(mockApi.deleteVolume).not.toHaveBeenCalled();
     });
   });
 
