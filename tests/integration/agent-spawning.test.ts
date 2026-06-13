@@ -630,6 +630,32 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain(`--resume '${agentId}-session'`);
     });
 
+    it('resumeAgent re-defaults a legacy agent\'s stale harness and drops --resume (PAN-1797)', async () => {
+      const agentId = 'agent-pan-resume-legacy-redefault';
+      writeResumableWorkAgent(agentId, true);
+      // Simulate a pre-PAN-1787 agent: stored harness is stale for its model
+      // (pi stored, but an Anthropic model re-resolves to claude-code) and there
+      // is NO session-origin metadata. Target harness claude-code has no binary
+      // check, so this is deterministic across local/CI.
+      const agentDir = getAgentDir(agentId);
+      const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8'));
+      state.harness = 'pi';
+      state.model = 'claude-haiku-4-5';
+      writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state));
+      setRuntimeOrigin(agentId); // no origin metadata = legacy
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
+      expect(freshSessionId).not.toBe(`${agentId}-session`);
+      // Harness was re-defaulted to the model's provider default, not pinned to
+      // the stale stored value.
+      expect(getAgentStateSync(agentId)?.harness).toBe('claude-code');
+    });
+
     it('resumeAgent surfaces missing original kickoff instead of sending a contextless continue', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-missing-kickoff';

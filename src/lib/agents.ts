@@ -4674,11 +4674,21 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
+    // PAN-1797: agents predating session-origin metadata must not have their
+    // stored harness treated as `explicit` on auto-resume — that pins a stale
+    // pairing (e.g. gpt-5.5 on claude-code) over the provider default forever.
+    // Re-resolve from the model for origin-less agents (only an operator-supplied
+    // opts.harness counts as explicit); agents WITH origin metadata keep prior
+    // behavior and are handled by sessionResumeDriftReasons below.
+    const hasSessionOrigin = !!(runtimeState?.sessionModel && runtimeState?.sessionHarness);
+    const priorHarness = agentState.harness;
     const effectiveHarness = await resolveHarness({
-      explicit: opts?.harness ?? agentState.harness,
+      explicit: hasSessionOrigin ? (opts?.harness ?? agentState.harness) : opts?.harness,
       role: agentState.role,
       model,
     });
+    const legacyHarnessMigrated =
+      !hasSessionOrigin && priorHarness !== undefined && priorHarness !== effectiveHarness;
     agentState.harness = effectiveHarness;
     if (effectiveHarness === 'codex') {
       agentState.codexMode = 'work-tui';
@@ -4688,6 +4698,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
     const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
+    if (legacyHarnessMigrated) {
+      // PAN-1797: force a fresh session so the re-defaulted harness takes effect;
+      // never reuse a session across a harness change.
+      resumeDriftReasons.push(`legacy harness ${priorHarness}→${effectiveHarness} (PAN-1797 re-default)`);
+    }
     const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
     const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
       ? randomUUID()
