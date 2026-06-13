@@ -903,6 +903,7 @@ export function ConversationPanel({
                 <ModelPicker
                   value={selectedModel}
                   harness={selectedHarness}
+                  liveConversation={conversation.sessionAlive}
                   onHarnessChange={(harness) => {
                     setSelectedHarness(harness);
                     switchModelMutation.mutate({ model: selectedModel, harness });

@@ -102,6 +102,8 @@ export const bodyToEvent = (
           agentId,
           model: source['model'],
           claudeSessionId: source['claudeSessionId'] as string | undefined,
+          sessionModel: source['sessionModel'] as string | undefined,
+          sessionHarness: source['sessionHarness'] as string | undefined,
         },
       };
     case 'cost-event': {

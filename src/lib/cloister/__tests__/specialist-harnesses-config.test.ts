@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+const rolesConfig = vi.hoisted(() => ({
+  roles: {} as Record<string, { model: string; harness?: 'claude-code' | 'pi' | 'codex' }>,
+}))
+
 vi.mock('../../paths.js', () => ({
   PANOPTICON_HOME: '/tmp/pan-test-specialist-harnesses-config',
   AGENTS_DIR: '/tmp/pan-test-specialist-harnesses-config/agents',
@@ -19,16 +23,28 @@ vi.mock('../../paths.js', () => ({
   encodeClaudeProjectDir: (p: string) => p,
 }))
 
+vi.mock('../../config-yaml.js', () => ({
+  loadConfigSync: vi.fn(() => ({
+    config: {
+      roles: rolesConfig.roles,
+    },
+  })),
+}))
+
 const TEST_HOME = '/tmp/pan-test-specialist-harnesses-config'
 
 import { loadCloisterConfigSync, saveCloisterConfigSync, type CloisterConfig } from '../config.js'
+import { ModelRouter, resetGlobalRouter } from '../router.js'
 
 describe('cloister specialist_harnesses config (PAN-636)', () => {
   beforeEach(() => {
+    rolesConfig.roles = {}
+    resetGlobalRouter()
     rmSync(TEST_HOME, { recursive: true, force: true })
     mkdirSync(TEST_HOME, { recursive: true })
   })
   afterEach(() => {
+    vi.restoreAllMocks()
     rmSync(TEST_HOME, { recursive: true, force: true })
   })
 
@@ -56,6 +72,8 @@ describe('cloister specialist_harnesses config (PAN-636)', () => {
       review_agent: 'pi',
       test_agent: 'claude-code',
     })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(new ModelRouter(reloaded).getSpecialistHarness('review-agent')).toBe('pi')
   })
 
   it('absent specialist_harnesses key in legacy config does not blow up (AC3 — no migration needed)', () => {

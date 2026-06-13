@@ -45,10 +45,21 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
   })
 
   it('new-shape model_set → agent.model_set', () => {
-    const ev = bodyToEvent(AGENT, { kind: 'model_set', model: 'claude-opus-4-7' }, TS)
+    const ev = bodyToEvent(AGENT, {
+      kind: 'model_set',
+      model: 'claude-opus-4-7',
+      claudeSessionId: 'sess-xyz',
+      sessionModel: 'claude-opus-4-7',
+      sessionHarness: 'claude-code',
+    }, TS)
     const decoded = decodeCandidate(ev)!
     expect(decoded._tag).toBe('Success')
     expect((ev as any).type).toBe('agent.model_set')
+    expect((ev as any).payload).toMatchObject({
+      claudeSessionId: 'sess-xyz',
+      sessionModel: 'claude-opus-4-7',
+      sessionHarness: 'claude-code',
+    })
   })
 
   it('unknown kind → null (no emit)', () => {
