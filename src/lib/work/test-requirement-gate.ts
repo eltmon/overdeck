@@ -17,6 +17,14 @@ import { ProcessSpawnError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
+interface LinearClientLike {
+  issues(args: { filter: { number: { eq: number }; team: { key: { eq: string } } }; first: number }): Promise<LinearIssuesResponse>;
+}
+
+interface LinearIssuesResponse {
+  nodes: Array<{ description: Promise<string | null | undefined> | string | null | undefined }>;
+}
+
 export interface TestRequirement {
   /** The keyword / phrase that matched. */
   keyword: string;
@@ -130,7 +138,7 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
 
     if (ghInfo.isGitHub) {
       const command = `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json body --jq '.body'`;
-      const result = yield* Effect.tryPromise({
+      const result = yield* Effect.tryPromise<{ stdout: string; stderr: string }, TrackerFetchError>({
         try: () => execAsync(command),
         catch: (cause) =>
           new TrackerFetchError({
@@ -138,7 +146,7 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
             message: `gh issue view failed for ${issueId}`,
             cause,
           }),
-      }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+      }).pipe(Effect.catch(() => Effect.succeed(null)));
       if (result === null) return null;
       return result.stdout.trim();
     }
@@ -157,8 +165,8 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
     const apiKey = yield* getLinearApiKey();
     if (apiKey === null) return null;
 
-    const { LinearClient } = yield* Effect.tryPromise({
-      try: () => import('@linear/sdk'),
+    const linearModule = yield* Effect.tryPromise<{ LinearClient: new (args: { apiKey: string }) => LinearClientLike }, TrackerFetchError>({
+      try: () => import('@linear/sdk') as Promise<{ LinearClient: new (args: { apiKey: string }) => LinearClientLike }>,
       catch: (cause) =>
         new TrackerFetchError({
           issueId,
@@ -167,8 +175,8 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
         }),
     });
 
-    const client = new LinearClient({ apiKey });
-    const response = yield* Effect.tryPromise({
+    const client = new linearModule.LinearClient({ apiKey });
+    const response = yield* Effect.tryPromise<LinearIssuesResponse, TrackerFetchError>({
       try: () =>
         client.issues({
           filter: {
@@ -183,19 +191,19 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
           message: `Linear issues query failed for ${issueId}`,
           cause,
         }),
-    }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
 
     if (response === null || response.nodes.length === 0) return null;
 
-    const description = yield* Effect.tryPromise({
-      try: () => response.nodes[0].description,
+    const description = yield* Effect.tryPromise<string | null, TrackerFetchError>({
+      try: () => Promise.resolve(response.nodes[0].description) as Promise<string | null>,
       catch: (cause) =>
         new TrackerFetchError({
           issueId,
           message: `Failed to read Linear issue description for ${issueId}`,
           cause,
         }),
-    }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+    }).pipe(Effect.catch(() => Effect.succeed(null)));
 
     return description ?? null;
   });
@@ -210,7 +218,10 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
  */
 function fetchNumstatForGate(workspacePath: string): Effect.Effect<string, ProcessSpawnError> {
   return Effect.gen(function* () {
-    const { stdout: baseStdout } = yield* Effect.tryPromise({
+    const { stdout: baseStdout } = yield* Effect.tryPromise<
+      { stdout: string; stderr: string },
+      ProcessSpawnError
+    >({
       try: () => execAsync('git merge-base origin/main HEAD', { cwd: workspacePath }),
       catch: (cause) =>
         new ProcessSpawnError({
@@ -221,7 +232,10 @@ function fetchNumstatForGate(workspacePath: string): Effect.Effect<string, Proce
         }),
     });
     const base = baseStdout.trim();
-    const { stdout: diffStdout } = yield* Effect.tryPromise({
+    const { stdout: diffStdout } = yield* Effect.tryPromise<
+      { stdout: string; stderr: string },
+      ProcessSpawnError
+    >({
       try: () => execAsync(`git diff --numstat ${base}...HEAD`, { cwd: workspacePath }),
       catch: (cause) =>
         new ProcessSpawnError({
@@ -234,15 +248,21 @@ function fetchNumstatForGate(workspacePath: string): Effect.Effect<string, Proce
     return diffStdout;
   }).pipe(
     Effect.catch(() =>
-      Effect.tryPromise({
-        try: () => execAsync('git diff --numstat origin/main...HEAD', { cwd: workspacePath }),
-        catch: (cause) =>
-          new ProcessSpawnError({
-            command: 'git diff --numstat',
-            args: ['origin/main...HEAD'],
-            message: cause instanceof Error ? cause.message : String(cause),
-            cause,
-          }),
+      Effect.gen(function* () {
+        const { stdout } = yield* Effect.tryPromise<
+          { stdout: string; stderr: string },
+          ProcessSpawnError
+        >({
+          try: () => execAsync('git diff --numstat origin/main...HEAD', { cwd: workspacePath }),
+          catch: (cause) =>
+            new ProcessSpawnError({
+              command: 'git diff --numstat',
+              args: ['origin/main...HEAD'],
+              message: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
+        });
+        return stdout;
       })
     ),
   );
