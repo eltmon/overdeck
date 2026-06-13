@@ -15,15 +15,25 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../../src/lib/database/schema.js';
 
 // ─── In-memory DB injection (needed for clearWorkspaceStuck / setReviewStatus) ─
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
+}));
+
+// PAN-1613: checkPostReviewCommits now gates on isIssueClosed, whose tracker
+// fallback shells out to `gh issue view`. Keep this a hermetic unit test (no
+// real network/tracker call) — the gate is never "closed" here.
+vi.mock('../../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
 }));
 
 // Stub pipeline notifier (no WebSocket bus in tests)
@@ -63,7 +73,7 @@ vi.mock('../../../../../src/lib/git/operations.js', () => ({
 }));
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
 });

@@ -4,19 +4,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../src/lib/database/schema.js';
 
 // ============== In-memory DB injection ==============
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
 });
@@ -28,12 +28,43 @@ afterEach(() => {
 // ============== Imports (after mock is set up) ==============
 
 import {
+  createConversation,
+  getConversationByName,
+  getStuckForks,
+  incrementForkRetryCount,
   listFavoritedIds,
-  setFavorite,
   removeFavorite,
+  setFavorite,
+  setForkRequest,
 } from '../../../../src/lib/database/conversations-db.js';
 
 // ============== Tests ==============
+
+describe('fork recovery metadata', () => {
+  it('round-trips fork requests, retry counts, and stuck fork filtering', () => {
+    createConversation({ name: 'conv-summary', tmuxSession: 'tmux-summary', cwd: '/tmp', forkStatus: 'summarizing' });
+    createConversation({ name: 'conv-failed', tmuxSession: 'tmux-failed', cwd: '/tmp', forkStatus: 'failed' });
+    createConversation({ name: 'conv-regular', tmuxSession: 'tmux-regular', cwd: '/tmp' });
+
+    const request = JSON.stringify({
+      parentConversationName: 'conv-parent',
+      sessionId: 'session-summary',
+      forkMode: 'summary',
+      localSummaryOnly: false,
+      handoffAuthor: 'external',
+    });
+    setForkRequest('conv-summary', request);
+
+    expect(incrementForkRetryCount('conv-summary')).toBe(1);
+    expect(incrementForkRetryCount('conv-summary')).toBe(2);
+
+    const conversation = getConversationByName('conv-summary');
+    expect(conversation?.forkRequest).toBe(request);
+    expect(conversation?.forkRetryCount).toBe(2);
+
+    expect(getStuckForks().map((fork) => fork.name)).toEqual(['conv-summary']);
+  });
+});
 
 describe('favorites — listFavoritedIds', () => {
   it('returns an empty array when no favorites exist', () => {

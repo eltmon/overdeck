@@ -176,7 +176,9 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
       if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Panopticon', path: '/tmp/panopticon' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
+      if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/conversations') return json([]);
+      if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
       if (path === '/api/flywheel/runs') return json([]);
@@ -282,8 +284,8 @@ describe('styleguide rendered surface conformance', () => {
 
     const commandDeck = await openRoute('/command-deck');
     await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
-    await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count(), renderPoll).toBe(1);
-    await expect.poll(() => commandDeck.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
+    // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTree remodel
+    await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
 
     const agents = await openRoute('/agents');

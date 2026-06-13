@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { SCHEMA_VERSION, initSchema, runMigrations } from '../../../../src/lib/database/schema.js';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 
 describe('schema migrations', () => {
-  let db: Database.Database;
+  let db: SqliteDatabase;
   let tempRoot: string;
 
   beforeEach(() => {
-    db = new Database(':memory:');
+    db = openDatabase(':memory:');
     tempRoot = mkdtempSync('/tmp/pan-schema-');
   });
 
@@ -120,13 +120,13 @@ describe('schema migrations', () => {
     `);
 
     // Verify the column is absent before migration
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('reviewed_at_commit');
 
     runMigrations(db);
 
     // After migration the column must exist
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('reviewed_at_commit');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
@@ -165,7 +165,7 @@ describe('schema migrations', () => {
 
   it('fresh initSchema includes reviewed_at_commit and merge_retry_count in review_status', () => {
     initSchema(db);
-    const cols = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const cols = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     const names = cols.map(c => c.name);
     expect(names).toContain('reviewed_at_commit');
     expect(names).toContain('merge_retry_count');
@@ -192,12 +192,12 @@ describe('schema migrations', () => {
       ALTER TABLE review_status_v22 RENAME TO review_status;
     `);
 
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('merge_retry_count');
 
     runMigrations(db);
 
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('merge_retry_count');
   });
 
@@ -245,13 +245,13 @@ describe('schema migrations', () => {
       ALTER TABLE review_status_v23 RENAME TO review_status;
     `);
 
-    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsBefore = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsBefore.map(c => c.name)).not.toContain('review_spawned_at');
     expect(colsBefore.map(c => c.name)).not.toContain('test_retry_count');
 
     runMigrations(db);
 
-    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    const colsAfter = db.prepare('PRAGMA table_info(review_status)').all<{ name: string }>();
     expect(colsAfter.map(c => c.name)).toContain('review_spawned_at');
     expect(colsAfter.map(c => c.name)).toContain('test_retry_count');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
@@ -313,6 +313,49 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-2') as { session_file: string };
     expect(row.session_file).toBe(stalePath);
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('fresh initSchema includes fork recovery columns on conversations', () => {
+    initSchema(db);
+
+    const cols = db.pragma('table_info(conversations)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forkRequest = cols.find((col) => col.name === 'fork_request');
+    const forkRetryCount = cols.find((col) => col.name === 'fork_retry_count');
+
+    expect(forkRequest).toBeDefined();
+    expect(forkRetryCount).toMatchObject({ notnull: 1, dflt_value: '0' });
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v52 → v53: adds fork recovery columns idempotently', () => {
+    initSchema(db);
+    db.pragma('user_version = 52');
+    db.exec(`
+      CREATE TABLE conversations_v52 AS SELECT
+        id, name, tmux_session, status, cwd, issue_id, created_at, ended_at,
+        last_attached_at, session_file, claude_session_id, title, title_source,
+        title_seed, total_cost, total_tokens, archived_at, model, effort,
+        fork_status, fork_error, harness, delivery_method, spawn_error,
+        handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+      FROM conversations;
+      DROP TABLE conversations;
+      ALTER TABLE conversations_v52 RENAME TO conversations;
+    `);
+
+    const before = db.pragma('table_info(conversations)') as Array<{ name: string }>;
+    expect(before.map((col) => col.name)).not.toContain('fork_request');
+    expect(before.map((col) => col.name)).not.toContain('fork_retry_count');
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const after = db.pragma('table_info(conversations)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forkRequest = after.find((col) => col.name === 'fork_request');
+    const forkRetryCount = after.find((col) => col.name === 'fork_retry_count');
+
+    expect(forkRequest).toBeDefined();
+    expect(forkRetryCount).toMatchObject({ notnull: 1, dflt_value: '0' });
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 });

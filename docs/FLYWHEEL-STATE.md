@@ -2114,3 +2114,91 @@ verdicts), instead of gating review on conflict resolution. RUN-18's
 timeline. Tonight's cost: 1686/1704/1747 × ~3 convoy cycles each. The faster
 main moves (good night for fixes!), the worse this burns — it's the next
 keystone after the gate drained.
+
+## RUN-28 tick 1 (2026-06-12) — post-reboot re-baseline; idle-at-prompt agents dominate
+
+Run config: `minAgents=2`, `maxAgents=4`, `scope=all-tracked-projects`,
+`auto_pickup_backlog=false`, `require_uat_before_merge=true`. First baseline
+after RUN-27 (assumed reboot casualty like RUN-19/RUN-21):
+
+- **Main is GREEN** at origin `2148beaf7` (CI success 16:24Z). Local primary
+  worktree HEAD `197faad8c` is **54 commits ahead of origin/main** with
+  uncommitted source edits from parallel sessions — do not commit source
+  changes here; use detached-worktree cherry-pick for any orchestrator-owned
+  landings.
+- **Deacon healthy** after a transient `pan admin cloister status` read that
+  initially reported `Stopped`, then `Running` after `pan admin cloister start`
+  reported already-running. If the watchdog status read proves flaky, file a
+  substrate bug; for now treat it as a display race.
+- **8 issues at the merge gate** (`ready_for_merge=1`): PAN-1242, PAN-1491,
+  PAN-1579, PAN-1614, PAN-1629, PAN-1765, PAN-1778, PAN-1803, plus MIN-831
+  (GitLab). All PRs clean/mergeable. With `require_uat_before_merge=true`,
+  these are the operator's only required human actions.
+- **Cloister "stuck" list is mostly idle-at-prompt agents that already
+  completed work.** Spot-checking tmux panes showed agents at the `❯` prompt
+  after `pan done` / review-start / verification-fix with no further work.
+  The classifier keys on heartbeat inactivity, not pipeline state, so done
+  work agents read as stuck. Paused six clearly-done/ready agents
+  (PAN-1242, PAN-1579, PAN-1614, PAN-1629, PAN-1765, PAN-1803) to free
+  governor work slots and memory.
+- **Genuinely blocked items needing work-agent attention:** PAN-1642
+  (frontend-typecheck verification failure), PAN-1775 (review blocked with
+  feedback file), PAN-1498 (review blocked + test failure), PAN-1658
+  (merge_status failed), PAN-1641 (blocked with possible stale blockers).
+- **Unstarted critical substrate bugs queued for next slots:** PAN-1799
+  (Codex spawn dies seconds after boot), PAN-1798 (shared tmux server kills
+  all sessions on pan kill), PAN-1805 (Codex conversation view blank),
+  PAN-1807 (handoff fixes not submitted), PAN-1808 (test leaks real tmux
+  session).
+- **Parked (needs-design / needs-discussion):** PAN-1424, PAN-1489, PAN-1791.
+  No action per run config.
+- **Memory:** RAM 42.1/64.1 GB used, **swap 8.2/8.2 GB full**. Per RUN-20
+  tick-9 correction, full swap with 22 GB available RAM is cold-page eviction,
+  not OOM pressure. Still, launching more work agents into a 16-active pool
+  above the configured cap is unwise until blocked items drain or slots free.
+
+## RUN-28 tick 2 (2026-06-12) — freed slots, pruned docker networks, launched planning on 4 critical substrate bugs
+
+- **Paused three more done/ready work agents** to free governor work slots:
+  PAN-1491 (review APPROVED, PR clean), PAN-1778 (PR #1780 all checks passing),
+  PAN-1787 (work complete, no open beads). Classifier "stuck" was idle-at-prompt
+  after completion, not genuine blockage.
+- **Docker network exhaustion surfaced:** `pan start PAN-1798 --auto` failed
+  with "all predefined address pools have been fully subnetted". Pruned 8 unused
+  workspace devnets (including deleted/merged issue workspaces), freeing pools.
+- **`pan start --auto` beads-recovery path is broken for fresh critical issues.**
+  PAN-1799/1805/1807/1798 all failed with `bd list`/`bd ping` errors during the
+  auto-start synthesized-vBRIEF recovery. This is the same family as PAN-1647
+  (flywheel's own `pan start --auto` path broken). Workaround: launched
+  `pan plan <id> --auto` for all four instead; they are now planning. Will need
+  plain `pan start` after finalize per the stop-at-proposed contract.
+- **Launched one direct work agent:** PAN-1808 via `pan start --host --yes`
+  (test-leak tmux-session bug; host-runnable test fix). Agent is up and
+  nucleating.
+- **Memory climbed to 49.9/64.1 GB used** with planning burst and PAN-1808 spawn.
+  Available RAM still ~14 GB; not at OOM but headroom shrinking. Swap remains full.
+- **Main green, unchanged** at origin `2148beaf7` (CI success 16:24Z). The local
+  FLYWHEEL-STATE.md commit was pushed (`10425baa0`), moving local main 62 ahead
+  of origin.
+
+## RUN-28 tick 3 (2026-06-12) — killed corrupted PAN-1775, paused idle done agents, freed stuck count to 0
+
+- **Cloister "stuck" count dropped to 0** after pausing the remaining idle
+  work agents that had completed work but stayed at the prompt:
+  PAN-1641 (pan done, review/test running), PAN-1658 (review passed,
+  merge_status failed — needs pipeline investigation), PAN-1642 (verification
+  failing repeatedly on feedback loop).
+- **PAN-1775 workspace corruption identified and killed.** Its workspace
+  `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775` contained
+  a PAN-1788 spec + continue.json (PAN-1788 is closed-out). The work agent was
+  asking which issue to implement because its loaded plan pointed to a closed
+  issue. Killed all PAN-1775 agents and re-launched `pan plan PAN-1775 --auto`
+  so it gets a fresh PAN-1775 vBRIEF. This is a workspace/planning-orphan
+  corruption instance — likely from a prior merged issue reusing or shadowing
+  the workspace path.
+- **4 critical substrate bugs still planning:** PAN-1799, PAN-1798, PAN-1805,
+  PAN-1807 (all in `planning-*` sessions, ~18 minutes in, Fable 5). PAN-1808
+  work agent is running but hit a provider cooldown (429) and is at 80% ctx.
+- **Memory pressure stable:** RAM ~48-50 GB, swap dropped to 7.2/8.2 GB after
+  killing PAN-1775 stack.
+- **No merges this tick.** The operator UAT gate remains the bottleneck.

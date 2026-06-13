@@ -10,13 +10,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
 import { initSchema } from '../../src/lib/database/schema.js';
 
 // ── In-memory DB injection ────────────────────────────────────────────────────
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 let projectStub: { projectPath: string } | null = null;
+const mockClearIssueClosedCache = vi.fn();
+
+vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
+  clearIssueClosedCache: (...args: unknown[]) => mockClearIssueClosedCache(...args),
+}));
 
 vi.mock('../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -93,10 +98,11 @@ function createWorkspace(): string {
 // ── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
   projectStub = null;
+  mockClearIssueClosedCache.mockClear();
 });
 
 afterEach(() => {
@@ -110,6 +116,14 @@ import { reopenWorkspaceState } from '../../src/lib/reopen.js';
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('reopenWorkspaceState', () => {
+  it('clears the closed-issue cache for the reopened issue', async () => {
+    const wsDir = createWorkspace();
+
+    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
+
+    expect(mockClearIssueClosedCache).toHaveBeenCalledWith('PAN-999');
+  });
+
   it('resets review/test/merge to pending', async () => {
     seedStatus({
       'PAN-999': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },

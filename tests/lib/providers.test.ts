@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -13,6 +13,7 @@ describe('providers', () => {
   it('returns Anthropic-compatible env for Google direct routing', () => {
     expect(getProviderEnvSync(PROVIDERS.google, 'AIza-test')).toEqual({
       ANTHROPIC_AUTH_TOKEN: 'AIza-test',
+      GEMINI_API_KEY: 'AIza-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite-preview',
@@ -25,6 +26,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_CODING_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
+      KIMI_API_KEY: 'sk-kimi-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
@@ -37,6 +39,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.kimi, 'sk-platform-test')).toEqual({
       ANTHROPIC_BASE_URL: KIMI_PLATFORM_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-platform-test',
+      KIMI_API_KEY: 'sk-platform-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
@@ -45,13 +48,23 @@ describe('providers', () => {
     });
   });
 
+  it('resolves the kimi provider for the kimi-k2.7-code coding model', () => {
+    expect(getProviderForModelSync('kimi-k2.7-code').name).toBe('kimi');
+  });
+
+  it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
+    expect(piProviderForModel('kimi-k2.7-code')).toBe('kimi-coding');
+    expect(qualifyPiModel('kimi-k2.7-code')).toBe('kimi-coding/kimi-k2.7-code');
+  });
+
   it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.minimax.compatibility).toBe('direct');
     expect(getProviderEnvSync(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
+      MINIMAX_API_KEY: 'sk-minimax-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'minimax-m2.7',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'MiniMax-M3',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'minimax-m2.7',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'minimax-m2.7-highspeed',
       ANTHROPIC_SMALL_FAST_MODEL: 'minimax-m2.7-highspeed',
@@ -64,6 +77,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.zai, 'sk-zai-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
+      ZAI_API_KEY: 'sk-zai-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-4.7',
@@ -78,6 +92,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.mimo, 'sk-mimo-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
+      MIMO_API_KEY: 'sk-mimo-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
@@ -92,6 +107,7 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
       ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1',
       ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
+      OPENROUTER_API_KEY: 'sk-or-test',
     });
   });
 
@@ -106,11 +122,35 @@ describe('providers', () => {
     expect(getProviderEnvSync(PROVIDERS.dashscope, 'sk-test')).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
       ANTHROPIC_AUTH_TOKEN: 'sk-test',
+      DASHSCOPE_API_KEY: 'sk-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-max',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3-coder-plus',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',
       ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-plus',
       CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3-plus',
+    });
+  });
+
+  it('resolves the xai provider for grok-build-0.1', () => {
+    expect(getProviderForModelSync('grok-build-0.1').name).toBe('xai');
+  });
+
+  it('qualifies grok-build-0.1 under the pi xai provider', () => {
+    expect(piProviderForModel('grok-build-0.1')).toBe('xai');
+    expect(qualifyPiModel('grok-build-0.1')).toBe('xai/grok-build-0.1');
+  });
+
+  it('routes xAI through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.xai.compatibility).toBe('direct');
+    expect(getProviderEnvSync(PROVIDERS.xai, 'xai-test-key')).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.x.ai/v1',
+      ANTHROPIC_AUTH_TOKEN: 'xai-test-key',
+      XAI_API_KEY: 'xai-test-key',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'grok-build-0.1',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'grok-build-0.1',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'grok-build-0.1',
+      ANTHROPIC_SMALL_FAST_MODEL: 'grok-build-0.1',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'grok-build-0.1',
     });
   });
 });

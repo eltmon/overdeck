@@ -12,6 +12,7 @@ import {
   getAvailableModelsSync,
 } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
+import { hasModelCapabilitySync } from '../../src/lib/model-capabilities.js';
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -74,13 +75,14 @@ describe('model-fallback', () => {
   describe('getModelsByProvider', () => {
     it('should return all Anthropic models', () => {
       const models = getModelsByProviderSync('anthropic');
+      expect(models).toContain('claude-fable-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
       expect(models).toContain('claude-opus-4-6');
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(6);
+      expect(models).toHaveLength(7);
     });
 
     it('should return all OpenAI models', () => {
@@ -367,20 +369,21 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const models = getAvailableModelsSync(enabled);
 
+      expect(models).toContain('claude-fable-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
       expect(models).toContain('claude-opus-4-6');
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(6);
+      expect(models).toHaveLength(7);
     });
 
     it('should return all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModelsSync(enabled);
 
-      expect(models.length).toBe(29); // 6 Anthropic + 13 OpenAI + 6 Google + 4 Kimi
+      expect(models.length).toBe(31); // 7 Anthropic + 13 OpenAI + 6 Google + 5 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -392,7 +395,7 @@ describe('model-fallback', () => {
       expect(models).toContain('o3');
       expect(models).toContain('gpt-5.3-codex');
       expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(19); // 6 Anthropic + 13 OpenAI
+      expect(models.length).toBe(20); // 7 Anthropic + 13 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -404,7 +407,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).toContain('gemini-2.5-pro');
       expect(models).toContain('gemini-2.5-flash');
-      expect(models.length).toBe(12); // 6 Anthropic + 6 Google
+      expect(models.length).toBe(13); // 7 Anthropic + 6 Google
     });
   });
 
@@ -481,6 +484,19 @@ describe('model-fallback', () => {
       expect(applyFallbackSync('kimi-k2' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
     });
 
+    it('kimi-k2.7-code is recognized as kimi provider', () => {
+      expect(getModelProviderSync('kimi-k2.7-code' as ModelId)).toBe('kimi');
+    });
+
+    it('kimi-k2.7-code falls back to Sonnet when kimi is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('kimi-k2.7-code' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('kimi-k2.7-code is a known model capability', () => {
+      expect(hasModelCapabilitySync('kimi-k2.7-code')).toBe(true);
+    });
+
     it('claude-opus-4-7 is recognized as anthropic provider', () => {
       expect(getModelProviderSync('claude-opus-4-7')).toBe('anthropic');
       expect(requiresExternalKeySync('claude-opus-4-7')).toBe(false);
@@ -492,6 +508,19 @@ describe('model-fallback', () => {
       expect(models).toContain('glm-4.7');
       expect(models).toContain('glm-4.7-flash');
       expect(models).toContain('glm-5.1');
+    });
+
+    it('grok-build-0.1 is recognized as xai provider', () => {
+      expect(getModelProviderSync('grok-build-0.1' as ModelId)).toBe('xai');
+    });
+
+    it('grok-build-0.1 falls back to Sonnet when xai is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('grok-build-0.1' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('grok-build-0.1 is a known model capability', () => {
+      expect(hasModelCapabilitySync('grok-build-0.1')).toBe(true);
     });
   });
 });

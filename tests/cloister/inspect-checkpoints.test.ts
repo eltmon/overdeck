@@ -126,18 +126,19 @@ describe('inspect-checkpoints', () => {
   });
 
   describe('getDiffBase', () => {
-    it('uses merge-base when no checkpoint exists', async () => {
+    it('uses the parent commit when no checkpoint exists', async () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
       const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
       expect(base).toBe('abc123def456');
     });
 
-    it('uses last checkpoint SHA when checkpoints exist', async () => {
+    it('uses the parent commit even when checkpoints exist', async () => {
       saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
+      execSyncMock.mockReturnValue('parent-sha\n');
 
       const base = await Effect.runPromise(getDiffBase(projectKey, issueId, '/tmp/workspace'));
-      expect(base).toBe('checkpoint-sha');
+      expect(base).toBe('parent-sha');
     });
 
     it('falls back to main when merge-base fails', async () => {

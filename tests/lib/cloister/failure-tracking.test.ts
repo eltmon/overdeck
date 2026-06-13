@@ -39,6 +39,8 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('../../../src/lib/database/review-status-db.js');
     vi.doUnmock('../../../src/lib/cloister/specialists.js');
     vi.doUnmock('../../../src/lib/tmux.js');
+    vi.doUnmock('../../../src/lib/cloister/concurrency.js');
+    vi.doUnmock('os');
     vi.resetModules();
 
     if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
@@ -74,13 +76,29 @@ describe('agent failure tracking and auto-resume backoff', () => {
   }
 
   async function loadDeaconWithResumeMock() {
+    vi.doMock('os', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('os')>();
+      return {
+        ...actual,
+        default: actual,
+        loadavg: () => [0, 0, 0],
+        cpus: () => Array.from({ length: 4 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+      };
+    });
+    vi.doMock('../../../src/lib/cloister/concurrency.js', () => ({
+      getConcurrencyLimits: () => ({ maxWorkAgents: 999, reservedAdvancingSlots: 3, totalCeiling: 1002 }),
+      countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+      workResumeSlotsAvailable: () => 999,
+      resetPatrolDispatchBudget: vi.fn(),
+      tryReserveAdvancingSlot: () => true,
+      canDispatchAdvancing: () => true,
+    }));
     vi.doMock('../../../src/lib/agents.js', async (importOriginal) => {
       const actual = await importOriginal<typeof import('../../../src/lib/agents.js')>();
       return {
         ...actual,
         resumeAgent: (...args: unknown[]) => resumeAgentMock(...args),
         listRunningAgents: vi.fn(() => []),
-  listRunningAgentsSync: vi.fn(() => []),
         listRunningAgentsSync: vi.fn(() => []),
       };
     });
@@ -99,17 +117,26 @@ describe('agent failure tracking and auto-resume backoff', () => {
       }),
       loadReviewStatuses: vi.fn().mockReturnValue({}),
       setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
       setReviewStatusSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/shadow-state.js', () => ({
       getShadowState: vi.fn(() => Effect.succeed(null)),
     }));
+    // PAN-1613: autoResumeStoppedWorkAgents now gates on isIssueClosed. With
+    // shadow-state mocked to null above, the real isIssueClosed would fall
+    // through to a live `gh issue view` — mock it so the gate is deterministic
+    // (never closed) and the test stays hermetic.
+    vi.doMock('../../../src/lib/cloister/issue-closed.js', () => ({
+      isIssueClosed: vi.fn(async () => false),
+      isTrackerIssueClosed: vi.fn(async () => false),
+      clearIssueClosedCache: vi.fn(),
+      TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
+    }));
     vi.doMock('../../../src/lib/activity-logger.js', () => ({
       emitActivityEntry: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
+      emitActivityEntrySync: vi.fn(),
       emitActivityTts: vi.fn(),
-  emitActivityTtsSync: vi.fn(),
+      emitActivityTtsSync: vi.fn(),
     }));
     vi.doMock('../../../src/lib/persistent-logger.js', () => ({
       logDeaconEvent: vi.fn(),
@@ -134,7 +161,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
       createSessionAsync: vi.fn(),
       isPaneDeadAsync: vi.fn().mockResolvedValue(false),
       killSession: vi.fn(),
-  killSessionSync: vi.fn(),
+      killSessionSync: vi.fn(),
       killSessionAsync: vi.fn().mockResolvedValue(undefined),
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),

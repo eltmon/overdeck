@@ -74,7 +74,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "In main.ts, spawn dist/dashboard/server.js as a child process using process.execPath with ELECTRON_RUN_AS_NODE=1. Pass bootstrap config (port, mode, auth token) via fd 3. Implement exponential backoff restart on crash, rotating log capture for child stdout/stderr, and graceful shutdown (SIGTERM then SIGKILL) on app quit. Use dynamic port allocation (localhost:0) to avoid conflicts. Rebuild native addons (node-pty, better-sqlite3) for Electron's Node version using electron-rebuild."
+          "Action": "In main.ts, spawn dist/dashboard/server.js as a child process using process.execPath with ELECTRON_RUN_AS_NODE=1. Pass bootstrap config (port, mode, auth token) via fd 3. Implement exponential backoff restart on crash, rotating log capture for child stdout/stderr, and graceful shutdown (SIGTERM then SIGKILL) on app quit. Use dynamic port allocation (localhost:0) to avoid conflicts. Rebuild node-pty for Electron's Node version using electron-rebuild."
         },
         "subItems": [
           {
@@ -97,7 +97,7 @@
           },
           {
             "id": "server-embed.ac4",
-            "title": "node-pty and better-sqlite3 work correctly under Electron's Node runtime (terminal streams, SQLite queries)",
+            "title": "node-pty works correctly under Electron's Node runtime and SQLite queries use the built-in driver",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
@@ -438,7 +438,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Configure electron-builder in apps/desktop/package.json for two targets: Linux (AppImage) and macOS (DMG, both arm64 and x64). Include dist/dashboard/server.js, dist/dashboard/public/, and native addon binaries in the package. Configure electron-rebuild in postinstall to rebuild node-pty and better-sqlite3 for Electron's Node version. Create app icons (Panopticon logo) for both platforms. Add npm scripts: dist:linux, dist:mac. Verify packaged app starts correctly on both platforms."
+          "Action": "Configure electron-builder in apps/desktop/package.json for two targets: Linux (AppImage) and macOS (DMG, both arm64 and x64). Include dist/dashboard/server.js, dist/dashboard/public/, and native addon binaries in the package. Configure electron-rebuild in postinstall to rebuild node-pty for Electron's Node version. Create app icons (Panopticon logo) for both platforms. Add npm scripts: dist:linux, dist:mac. Verify packaged app starts correctly on both platforms."
         },
         "subItems": [
           {
@@ -455,7 +455,7 @@
           },
           {
             "id": "packaging.ac3",
-            "title": "Native addons (node-pty, better-sqlite3) work in packaged builds",
+            "title": "Native addon node-pty works in packaged builds",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

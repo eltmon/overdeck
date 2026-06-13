@@ -172,15 +172,97 @@ describe('PAN-800 runtime reducer', () => {
     expect(s.agentRuntimeById[AGENT].activity).toBe('idle')
   })
 
-  it('agent.model_set stores model and optional claudeSessionId', () => {
+  it('agent.model_set stores model, optional claudeSessionId, and session origin', () => {
     const next = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
       type: 'agent.model_set',
-      payload: { agentId: AGENT, model: 'claude-opus-4-7', claudeSessionId: 'sess-xyz' },
+      payload: {
+        agentId: AGENT,
+        model: 'claude-opus-4-7',
+        claudeSessionId: 'sess-xyz',
+        sessionModel: 'claude-opus-4-7',
+        sessionHarness: 'claude-code',
+      },
     } as any))
     expect(next.agentRuntimeById[AGENT]).toMatchObject({
       model: 'claude-opus-4-7',
       claudeSessionId: 'sess-xyz',
+      sessionModel: 'claude-opus-4-7',
+      sessionHarness: 'claude-code',
     })
+  })
+
+  it('agent.model_set preserves existing session origin when resume omits origin fields', () => {
+    let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.model_set',
+      payload: {
+        agentId: AGENT,
+        model: 'claude-opus-4-7',
+        claudeSessionId: 'sess-xyz',
+        sessionModel: 'claude-opus-4-7',
+        sessionHarness: 'claude-code',
+      },
+    } as any))
+    s = applyEvent(s, at(2, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'gpt-5.5', claudeSessionId: 'sess-xyz' },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT]).toMatchObject({
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-xyz',
+      sessionModel: 'claude-opus-4-7',
+      sessionHarness: 'claude-code',
+    })
+  })
+
+  it('agent.model_set keeps legacy runtime snapshots without session origin valid', () => {
+    const next = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'gpt-5.5', claudeSessionId: 'sess-123' },
+    } as any))
+
+    expect(next.agentRuntimeById[AGENT]).toMatchObject({
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-123',
+    })
+    expect(next.agentRuntimeById[AGENT].sessionModel).toBeUndefined()
+    expect(next.agentRuntimeById[AGENT].sessionHarness).toBeUndefined()
+  })
+
+  it('agent.context_saturation_changed sets and clears contextSaturatedAt without clobbering other runtime fields', () => {
+    let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'working', currentTool: 'Read' },
+    } as any))
+    s = applyEvent(s, at(2, {
+      type: 'agent.model_set',
+      payload: { agentId: AGENT, model: 'gpt-5.5', claudeSessionId: 'sess-123' },
+    } as any))
+    s = applyEvent(s, at(3, {
+      type: 'agent.context_saturation_changed',
+      payload: { agentId: AGENT, contextSaturatedAt: '2026-06-05T12:00:00.000Z' },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT]).toMatchObject({
+      activity: 'working',
+      currentTool: 'Read',
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-123',
+      contextSaturatedAt: '2026-06-05T12:00:00.000Z',
+    })
+
+    s = applyEvent(s, at(4, {
+      type: 'agent.context_saturation_changed',
+      payload: { agentId: AGENT },
+    } as any))
+
+    expect(s.agentRuntimeById[AGENT]).toMatchObject({
+      activity: 'working',
+      currentTool: 'Read',
+      model: 'gpt-5.5',
+      claudeSessionId: 'sess-123',
+    })
+    expect(s.agentRuntimeById[AGENT].contextSaturatedAt).toBeUndefined()
   })
 
   it('agent.state_restored seeds a full snapshot and uses the event sequence', () => {

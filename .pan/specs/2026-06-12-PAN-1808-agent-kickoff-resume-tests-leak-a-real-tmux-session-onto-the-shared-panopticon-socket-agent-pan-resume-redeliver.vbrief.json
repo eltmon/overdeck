@@ -1,0 +1,85 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T19:43:10.284Z",
+    "updated": "2026-06-12T19:43:10.284Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1808: Agent kickoff/resume tests leak a real tmux session onto the shared panopticon socket (agent-pan-resume-redeliver)",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1808",
+    "title": "Agent kickoff/resume tests leak a real tmux session onto the shared panopticon socket (agent-pan-resume-redeliver)",
+    "status": "proposed",
+    "uid": "d94df813-0cb8-4cfc-b5e1-65fb3f5474f7",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-12T19:43:10.284Z",
+    "updated": "2026-06-12T19:43:10.284Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1808",
+        "label": "PAN-1808",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1808-agent-kickoff-resume-tests-leak-a-real-tmux-session-onto-the-shared-panopticon-socket-agent-pan-resume-redeliver.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Evidence (2026-06-12)\n\nAfter the PAN-1803 work agent ran `npm test` locally in its workspace at 11:35, a leftover session appeared on the shared agent socket:\n\n```\n$ tmux -L panopticon list-sessions\nagent-pan-resume-redeliver: 1 windows (created Fri Jun 12 11:35:55 2026)\n```\n\nThe pane contains a live interactive `claude --resume` session picker (\"No sessions match …\"). The name matches the kickoff-redelivery tests in `tests/integration/agent-spawning.test.ts` (\"resumeAgent re-delivers the original kickoff when kickoffDelivered is false\", etc.).\n\n## Why it matters\n\n- Leaked interactive claude processes accumulate RAM and API-session weight.\n- Sessions named `agent-*` on the panopticon socket are picked up by resource discovery / patrols and can confuse orphan detection.\n- Tests that touch the real shared socket can interfere with live agents (cf. PAN-1798's shared-server kill blast radius).\n\n## Desired behavior\n\nIntegration tests must never create sessions on the shared `panopticon` socket: use a per-run throwaway socket name (e.g. `-L pan-test-$PID`) injected via the tmux lib, and kill the socket's server in `afterAll`. The spawned command in these tests should be a stub, not the real `claude` binary.\n\n## Cleanup\nThe leaked session was killed manually after capture.\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T19:43:10.284Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1808",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Evidence (2026-06-12)\n\nAfter the PAN-1803 work agent ran `npm test` locally in its workspace at 11:35, a leftover session appeared on the shared agent socket:\n\n```\n$ tmux -L panopticon list-sessions\nagent-pan-resume-redeliver: 1 windows (created Fri Jun 12 11:35:55 2026)\n```\n\nThe pane contains a live interactive `claude --resume` session picker (\"No sessions match …\"). The name matches the kickoff-redelivery tests in `tests/integration/agent-spawning.test.ts` (\"resumeAgent re-delivers the original kickoff when kickoffDelivered is false\", etc.).\n\n## Why it matters\n\n- Leaked interactive claude processes accumulate RAM and API-session weight.\n- Sessions named `agent-*` on the panopticon socket are picked up by resource discovery / patrols and can confuse orphan detection.\n- Tests that touch the real shared socket can interfere with live agents (cf. PAN-1798's shared-server kill blast radius).\n\n## Desired behavior\n\nIntegration tests must never create sessions on the shared `panopticon` socket: use a per-run throwaway socket name (e.g. `-L pan-test-$PID`) injected via the tmux lib, and kill the socket's server in `afterAll`. The spawned command in these tests should be a stub, not the real `claude` binary.\n\n## Cleanup\nThe leaked session was killed manually after capture.\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Leaked interactive claude processes accumulate RAM and API-session weight.",
+            "status": "pending",
+            "created": "2026-06-12T19:43:10.284Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Sessions named agent-* on the panopticon socket are picked up by resource discovery / patrols and can confuse orphan detection.",
+            "status": "pending",
+            "created": "2026-06-12T19:43:10.284Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Tests that touch the real shared socket can interfere with live agents (cf. PAN-1798's shared-server kill blast radius).",
+            "status": "pending",
+            "created": "2026-06-12T19:43:10.284Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

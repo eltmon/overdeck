@@ -11,6 +11,7 @@ import {
   Sparkles,
   HelpCircle,
   Rocket,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import type { SessionNodeType } from '@panctl/contracts';
@@ -53,6 +54,7 @@ interface RoleStyle {
 const SESSION_STYLE: Record<SessionNodeType, RoleStyle> = {
   planning: { Icon: Brain, ring: 'var(--info)', fg: 'var(--info)' },
   work: { Icon: Hammer, ring: 'var(--primary)', fg: 'var(--primary)' },
+  strike: { Icon: Zap, ring: 'var(--warning)', fg: 'var(--warning)' },
   review: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   reviewer: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   test: { Icon: CheckCircle2, ring: 'var(--success)', fg: 'var(--success)' },

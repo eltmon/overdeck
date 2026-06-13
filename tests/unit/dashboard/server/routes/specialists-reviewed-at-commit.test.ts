@@ -20,12 +20,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../../src/lib/database/schema.js';
 
 // ─── In-memory DB injection ───────────────────────────────────────────────────
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -69,6 +69,19 @@ vi.mock('../../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),
+}));
+
+// checkPostReviewCommits now gates on isIssueClosed (PAN-1613). Its tracker
+// fallback shells out to `gh issue view`, which in CI resolves the test's
+// `PAN-900` against the real repo (and reads it as closed) — making the patrol
+// skip the issue and breaking these commit-detection assertions. Mock the
+// module so the gate is deterministic (never closed) and the unit test stays
+// isolated from the network, matching the other deacon-patrol tests.
+vi.mock('../../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
 }));
 
 vi.mock('../../../../../src/lib/pipeline-notifier.js', () => ({
@@ -132,7 +145,7 @@ vi.mock('node:fs', async (importActual) => {
 import { existsSync } from 'node:fs';
 
 beforeEach(() => {
-  testDb = new Database(':memory:');
+  testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
   vi.clearAllMocks();

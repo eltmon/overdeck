@@ -12,7 +12,7 @@ import { Effect } from 'effect';
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
 import { initSchema } from '../../src/lib/database/schema.js';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
@@ -21,7 +21,7 @@ import { execSync } from 'child_process';
 
 // ─── In-memory DB injection ───────────────────────────────────────────────────
 
-let testDb: Database.Database;
+let testDb: SqliteDatabase;
 
 vi.mock('../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -68,6 +68,19 @@ vi.mock('../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: vi.fn(),
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),
+}));
+
+// checkPostReviewCommits now gates on isIssueClosed (PAN-1613), whose tracker
+// fallback shells out to `gh issue view` — which in CI resolves the test's
+// PAN-1215-A against the real repo and reads it as closed, making the patrol
+// skip the issue and breaking these rebase-detection assertions. Mock the
+// module so the gate is deterministic (never closed) and this stays a unit-
+// isolated integration test.
+vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: vi.fn(async () => false),
+  isTrackerIssueClosed: vi.fn(async () => false),
+  clearIssueClosedCache: vi.fn(),
+  TRACKER_CLOSED_CACHE_TTL_MS: 5 * 60 * 1000,
 }));
 
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
@@ -162,7 +175,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
   let testRepoDir: string;
 
   beforeEach(() => {
-    testDb = new Database(':memory:');
+    testDb = openDatabase(':memory:');
     testDb.pragma('foreign_keys = ON');
     initSchema(testDb);
     vi.clearAllMocks();

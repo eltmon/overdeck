@@ -52,6 +52,7 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/react-dom'), join(root, 'node_modules', 'react-dom'), 'dir');
   await symlink(resolve(projectRoot, 'node_modules/.bun/scheduler@0.23.2/node_modules/scheduler'), join(root, 'node_modules', 'scheduler'), 'dir');
   await symlink(resolve(projectRoot, 'node_modules/.bun/loose-envify@1.4.0/node_modules/loose-envify'), join(root, 'node_modules', 'loose-envify'), 'dir');
+  await symlink(resolve(projectRoot, 'src/dashboard/frontend/node_modules/lucide-react'), join(root, 'node_modules', 'lucide-react'), 'dir');
   await writeFile(join(root, 'index.html'), '<!doctype html><html><body><div id="root"></div><script type="module" src="/src/main.ts"></script></body></html>');
   await writeFile(join(root, 'src', 'wsTransport.ts'), 'export function subscribeFlywheelStatus() { return () => undefined; }\n');
   await writeFile(join(root, 'src', 'reactQuery.ts'), `
@@ -93,6 +94,8 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
   await writeFile(join(root, 'src', 'FlywheelConversationPane.ts'), 'import React from \'react\'; export function FlywheelConversationPane() { return React.createElement(\'div\', { \'aria-label\': \'Flywheel conversation stub\' }, \'conversation\'); }\n');
   await writeFile(join(root, 'src', 'FlywheelStatePane.ts'), 'import React from \'react\'; export function FlywheelStatePane() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'FlywheelStatusDetails.ts'), 'import React from \'react\'; export function FlywheelStatusDetails() { return React.createElement(\'div\'); }\n');
+  await writeFile(join(root, 'src', 'MergeQueueCard.ts'), 'import React from \'react\'; export function MergeQueueCard() { return React.createElement(\'div\'); }\n');
+  await writeFile(join(root, 'src', 'MergePolicySection.ts'), 'import React from \'react\'; export function MergePolicySection() { return React.createElement(\'div\'); }\n');
   await writeFile(join(root, 'src', 'main.ts'), `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
@@ -128,6 +131,8 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
         { find: /(^|\/)components\/flywheel\/FlywheelConversationPane$/, replacement: join(root, 'src', 'FlywheelConversationPane.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelStatePane$/, replacement: join(root, 'src', 'FlywheelStatePane.ts') },
         { find: /(^|\/)components\/flywheel\/FlywheelStatusDetails$/, replacement: join(root, 'src', 'FlywheelStatusDetails.ts') },
+        { find: /(^|\/)components\/flywheel\/MergeQueueCard$/, replacement: join(root, 'src', 'MergeQueueCard.ts') },
+        { find: /(^|\/)components\/MergePolicySection$/, replacement: join(root, 'src', 'MergePolicySection.ts') },
       ],
     },
     plugins: [{
@@ -138,6 +143,8 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
         if (id.endsWith('/components/flywheel/FlywheelConversationPane') || id === '../components/flywheel/FlywheelConversationPane') return join(root, 'src', 'FlywheelConversationPane.ts');
         if (id.endsWith('/components/flywheel/FlywheelStatePane') || id === '../components/flywheel/FlywheelStatePane') return join(root, 'src', 'FlywheelStatePane.ts');
         if (id.endsWith('/components/flywheel/FlywheelStatusDetails') || id === '../components/flywheel/FlywheelStatusDetails') return join(root, 'src', 'FlywheelStatusDetails.ts');
+        if (id.endsWith('/components/flywheel/MergeQueueCard') || id === '../components/flywheel/MergeQueueCard') return join(root, 'src', 'MergeQueueCard.ts');
+        if (id.endsWith('/components/MergePolicySection') || id === '../components/MergePolicySection') return join(root, 'src', 'MergePolicySection.ts');
         return null;
       },
       transform(code, id) {
@@ -148,6 +155,8 @@ async function openFlywheelStatsPage(stats: FlywheelStats): Promise<void> {
             .replace("../components/flywheel/FlywheelConversationPane", "/src/FlywheelConversationPane.ts")
             .replace("../components/flywheel/FlywheelStatePane", "/src/FlywheelStatePane.ts")
             .replace("../components/flywheel/FlywheelStatusDetails", "/src/FlywheelStatusDetails.ts")
+            .replace("../components/flywheel/MergeQueueCard", "/src/MergeQueueCard.ts")
+            .replace("../components/MergePolicySection", "/src/MergePolicySection.ts")
             .replace("../lib/wsTransport", "/src/wsTransport.ts");
         }
         if (!next.includes('import React')) {

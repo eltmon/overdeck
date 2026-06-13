@@ -9,12 +9,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
+import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai';
 
 /**
  * Provider configuration
@@ -75,7 +75,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
     defaultHarness: 'pi',
-    models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    models: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
     description: 'Route directly to Kimi Anthropic-compatible endpoints; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
@@ -168,7 +168,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     haikuModel: 'qwen/qwen3.6-plus',
     tierModels: { opus: 'qwen/qwen3.6-plus', sonnet: 'qwen/qwen3.6-plus', haiku: 'qwen/qwen3.6-plus' },
     tested: true,
-    description: 'Route Nous Portal OpenAI-compatible models through Panopticon’s local Anthropic-compatible adapter using NOUS_API_KEY.',
+    description: "Route Nous Portal OpenAI-compatible models through Panopticon's local Anthropic-compatible adapter using NOUS_API_KEY.",
   },
 
   dashscope: {
@@ -182,7 +182,20 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     haikuModel: 'qwen3-plus',
     tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
     tested: false,
-    description: 'Route Alibaba DashScope Qwen models through Panopticon’s local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).',
+    description: "Route Alibaba DashScope Qwen models through Panopticon's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).",
+  },
+
+  xai: {
+    name: 'xai',
+    displayName: 'xAI (Grok)',
+    compatibility: 'direct',
+    defaultHarness: 'pi',
+    baseUrl: 'https://api.x.ai/v1',
+    authType: 'static',
+    models: ['grok-build-0.1'] as GrokModel[],
+    tierModels: { opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' },
+    tested: false,
+    description: 'Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out).',
   },
 };
 
@@ -231,8 +244,13 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Kimi models
-  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
+  }
+
+  // Check xAI models
+  if (['grok-build-0.1'].includes(modelId)) {
+    return PROVIDERS.xai;
   }
 
   // Check Z.AI models
@@ -310,6 +328,8 @@ export function getProviderEnvSync(
     env.DASHSCOPE_API_KEY = apiKey;
   } else if (provider.name === 'google') {
     env.GEMINI_API_KEY = apiKey;
+  } else if (provider.name === 'xai') {
+    env.XAI_API_KEY = apiKey;
   }
 
   // MiniMax, Z.AI, and MiMo recommend longer timeouts
@@ -479,6 +499,8 @@ export function piProviderForModel(modelId: string): string | undefined {
       return 'kimi-coding';
     case 'mimo':
       return 'xiaomi';
+    case 'xai':
+      return 'xai';
     default:
       return undefined;
   }

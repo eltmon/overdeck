@@ -66,6 +66,8 @@ describe('teardown-workspace', () => {
     mkdirSync(agentsDir, { recursive: true });
 
     vi.clearAllMocks();
+    mockExecAsync.mockReset();
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
   });
 
   afterEach(() => {
@@ -147,8 +149,10 @@ describe('teardown-workspace', () => {
     // Create agent state dirs
     const agentDir = join(agentsDir, 'agent-pan-100');
     const planningDir = join(agentsDir, 'planning-pan-100');
+    const strikeDir = join(agentsDir, 'strike-pan-100');
     mkdirSync(agentDir, { recursive: true });
     mkdirSync(planningDir, { recursive: true });
+    mkdirSync(strikeDir, { recursive: true });
 
     const results = await teardownWorkspace({
       issueId: 'PAN-100',
@@ -160,6 +164,7 @@ describe('teardown-workspace', () => {
     expect(agentResult!.success).toBe(true);
     expect(existsSync(agentDir)).toBe(false);
     expect(existsSync(planningDir)).toBe(false);
+    expect(existsSync(strikeDir)).toBe(false);
   });
 
   it('should skip workspace cleanup when no workspace exists', async () => {
@@ -213,6 +218,64 @@ describe('teardown-workspace', () => {
     // Worktree removal step should not appear
     const worktreeResult = results.find(r => r.step === 'teardown:worktree');
     expect(worktreeResult).toBeUndefined();
+  });
+
+  it('should delete a merged strike branch even when deleteBranches is not requested', async () => {
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+
+    const results = await teardownWorkspace({
+      issueId: 'PAN-100',
+      projectPath: testDir,
+    });
+
+    const strikeBranch = results.find(r => r.step === 'teardown:strike-branch');
+    expect(strikeBranch).toBeDefined();
+    expect(strikeBranch!.success).toBe(true);
+    expect(strikeBranch!.details).toContain('Deleted local branch strike/pan-100');
+  });
+
+  it('should preserve an unmerged strike branch and its worktree', async () => {
+    const strikeWs = join(testDir, 'workspaces', 'feature-pan-100-strike');
+    mkdirSync(strikeWs, { recursive: true });
+
+    mockExecAsync.mockImplementation(async (cmd: string) => {
+      if (cmd.includes('merge-base --is-ancestor')) {
+        throw new Error('not an ancestor');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const results = await teardownWorkspace(
+      { issueId: 'PAN-100', projectPath: testDir },
+      { deleteWorkspace: false },
+    );
+
+    const strikeBranch = results.find(r => r.step === 'teardown:strike-branch');
+    expect(strikeBranch).toBeDefined();
+    expect(strikeBranch!.success).toBe(true);
+    expect(strikeBranch!.details).toContain('Preserved local branch strike/pan-100 — not merged to main');
+
+    const strikeWorktree = results.find(r => r.step === 'teardown:strike-worktree');
+    expect(strikeWorktree).toBeDefined();
+    expect(strikeWorktree!.skipped).toBe(true);
+    expect(existsSync(strikeWs)).toBe(true);
+  });
+
+  it('should remove a merged strike worktree even when deleteWorkspace is false', async () => {
+    const strikeWs = join(testDir, 'workspaces', 'feature-pan-100-strike');
+    mkdirSync(strikeWs, { recursive: true });
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+
+    const results = await teardownWorkspace(
+      { issueId: 'PAN-100', projectPath: testDir },
+      { deleteWorkspace: false },
+    );
+
+    const strikeWorktree = results.find(r => r.step === 'teardown:strike-worktree');
+    expect(strikeWorktree).toBeDefined();
+    expect(strikeWorktree!.success).toBe(true);
+    expect(strikeWorktree!.skipped).toBe(false);
+    expect(strikeWorktree!.details).toContain('Removed git worktree');
   });
 
   it('should NOT clear beads by default (normal completion preserves beads)', async () => {

@@ -125,7 +125,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -660,6 +660,28 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // KIMI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'kimi-k2.7-code': {
+    model: 'kimi-k2.7-code',
+    provider: 'kimi',
+    displayName: 'Kimi K2.7 Code',
+    costPer1MTokens: 2.5, // $0.95 in (cache-miss) / $4.00 out; $0.19 in (cache-hit)
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 95, // Coding-first flagship, surpasses K2.6
+      'code-review': 93,
+      debugging: 93,
+      planning: 90,
+      documentation: 90,
+      testing: 90,
+      security: 85,
+      performance: 88,
+      synthesis: 94, // Long-horizon agentic task decomposition
+      speed: 75, // MoE: 1T total params, 32B active
+      'context-length': 98, // 262K context
+    },
+    notes: 'Moonshot/Kimi\'s coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat',
+  },
+
   'kimi-k2.6': {
     model: 'kimi-k2.6',
     provider: 'kimi',
@@ -1037,6 +1059,33 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 98,
     },
     notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // XAI (GROK) MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'grok-build-0.1': {
+    model: 'grok-build-0.1',
+    provider: 'xai',
+    displayName: 'Grok Build 0.1',
+    costPer1MTokens: 1.5, // $1.00/M in, $2.00/M out, $0.20/M cached in
+    contextWindow: 256000,
+    supportsImages: true, // text + image input per xAI docs (May 2026)
+    skills: {
+      'code-generation': 90, // purpose-trained agentic coding model
+      'code-review': 88,
+      debugging: 88,
+      planning: 87, // plan-mode built into the CLI; reasoning always active
+      documentation: 85,
+      testing: 86,
+      security: 82,
+      performance: 84,
+      synthesis: 88, // multi-agent parallel subagent support (up to 8)
+      speed: 82, // fast coding variant per xAI naming
+      'context-length': 97, // 256K context window
+    },
+    notes: 'xAI\'s agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli.',
   },
 };
 
