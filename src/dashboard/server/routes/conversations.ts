@@ -120,6 +120,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { HarnessResolutionError, resolveHarness } from '../../../lib/harness-resolve.js';
 import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -426,6 +427,22 @@ async function resolveAllowedHarness(requested: unknown, model?: string | null):
   if (!model) return 'claude-code';
   const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
   return decision.allowed ? harness : 'claude-code';
+}
+
+export async function resolveInitialConversationHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
+  if (!model) return 'claude-code';
+
+  if (requested === 'pi' || requested === 'claude-code' || requested === 'codex') {
+    const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
+    return decision.allowed ? requested : 'claude-code';
+  }
+
+  try {
+    return await resolveHarness({ model });
+  } catch (err) {
+    if (err instanceof HarnessResolutionError) return 'claude-code';
+    throw err;
+  }
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -2470,7 +2487,7 @@ const postConversationRoute = HttpRouter.add(
         const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
-        const harness = await resolveAllowedHarness(body['harness'], model);
+        const harness = await resolveInitialConversationHarness(body['harness'], model);
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
         const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
         const applyProviderOverride = body['applyProviderOverride'] === true;
