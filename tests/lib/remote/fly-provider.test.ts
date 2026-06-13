@@ -18,6 +18,8 @@ const { execAsyncMock, spawnMock, mockApi } = vi.hoisted(() => {
     execCommand: vi.fn(),
     waitForState: vi.fn(),
     ensureApp: vi.fn(),
+    createVolume: vi.fn(),
+    listVolumes: vi.fn(),
   };
   return { execAsyncMock, spawnMock, mockApi };
 });
@@ -100,6 +102,57 @@ describe('FlyProvider', () => {
       }));
       const [, , config] = mockApi.createMachine.mock.calls[0];
       expect(config).not.toHaveProperty('mounts');
+      expect(mockApi.listVolumes).not.toHaveBeenCalled();
+    });
+
+    it('durable-tier create provisions a volume and mounts it at /workspace', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.listVolumes.mockResolvedValue([]);
+      mockApi.createVolume.mockResolvedValue({ id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad' });
+      mockApi.createMachine.mockResolvedValue({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(durable.createVm('ws-123'));
+
+      expect(mockApi.createVolume).toHaveBeenCalledWith('test-app', {
+        name: 'ws-123-workspace',
+        region: 'iad',
+        sizeGb: 10,
+      });
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        mounts: [{ volume: 'vol-1', path: '/workspace' }],
+      }));
+    });
+
+    it('durable-tier adopts an existing machine with its volume attached', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' }]);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: 'm1' },
+      ]);
+      mockApi.getMachine.mockResolvedValue({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      const result = await run(durable.createVm('ws-123'));
+
+      expect(mockApi.createMachine).not.toHaveBeenCalled();
+      expect(mockApi.createVolume).not.toHaveBeenCalled();
+      expect(result.machineId).toBe('m1');
+    });
+
+    it('durable-tier refuses to adopt a machine missing its volume', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' }]);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: null },
+      ]);
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await expect(run(durable.createVm('ws-123'))).rejects.toThrow('does not have volume');
     });
   });
 

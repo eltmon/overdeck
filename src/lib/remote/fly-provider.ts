@@ -44,6 +44,8 @@ export interface FlyProviderConfig {
   resiliencyTier?: 'ephemeral' | 'durable';
 }
 
+const DURABLE_VOLUME_SIZE_GB = 10;
+
 function mapFlyStateToVmStatus(state: string): VmStatus {
   switch (state) {
     case 'started':
@@ -175,7 +177,41 @@ export class FlyProvider implements RemoteProvider {
       // Adopt it instead — rootfs resets from the image on start, so a
       // restarted leftover is indistinguishable from a fresh machine for
       // the provisioning steps that follow.
-      const existing = (await api.listMachines(this.config.app)).find((m) => m.name === name && m.state !== 'destroyed');
+      const existing = (await api.listMachines(this.config.app)).find(
+        (m) => m.name === name && m.state !== 'destroyed',
+      );
+      const isDurable = this.config.resiliencyTier === 'durable';
+      const expectedVolumeName = `${name}-workspace`;
+      let volumeId: string | undefined;
+
+      if (isDurable) {
+        const volumes = await api.listVolumes(this.config.app);
+        let volume = volumes.find(
+          (v) =>
+            v.name === expectedVolumeName &&
+            v.region === this.config.region &&
+            v.state !== 'destroyed',
+        );
+
+        if (!volume) {
+          volume = await api.createVolume(this.config.app, {
+            name: expectedVolumeName,
+            region: this.config.region,
+            sizeGb: DURABLE_VOLUME_SIZE_GB,
+          });
+        }
+
+        if (existing && volume.attached_machine_id !== existing.id) {
+          throw new Error(
+            `Durable tier requires a /workspace volume for '${name}', but the existing machine ` +
+              `'${existing.id}' does not have volume '${expectedVolumeName}' attached. ` +
+              `Destroy the existing machine or choose a different name.`,
+          );
+        }
+
+        volumeId = volume.id;
+      }
+
       if (existing) {
         if (existing.state !== 'started') {
           await api.startMachine(this.config.app, existing.id);
@@ -191,9 +227,7 @@ export class FlyProvider implements RemoteProvider {
         };
       }
 
-      // Create machine. Tier is read here so the ephemeral path below keeps
-      // today's payload unchanged; durable wiring lands in later beads.
-      void this.config.resiliencyTier;
+      // Create machine
       const machine = await api.createMachine(this.config.app, name, {
         image: this.config.image,
         size: this.config.vmSize,
@@ -201,6 +235,7 @@ export class FlyProvider implements RemoteProvider {
         region: this.config.region,
         restart: { policy: 'no' },
         auto_destroy: false,
+        ...(volumeId ? { mounts: [{ volume: volumeId, path: '/workspace' }] } : {}),
       });
 
       // Wait for machine to start. This must be fatal: callers exec commands

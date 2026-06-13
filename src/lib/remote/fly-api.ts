@@ -42,6 +42,7 @@ export interface FlyMachine {
     image: string;
     env?: Record<string, string>;
     guest?: { cpu_kind: string; cpus: number; memory_mb: number };
+    mounts?: FlyMount[];
   };
 }
 
