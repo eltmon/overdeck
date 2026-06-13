@@ -2894,7 +2894,12 @@ const postAgentsRoute = HttpRouter.add(
       yield* Effect.gen(function* () {
         const gitRoot = workspacePath;
         if (existsSync(join(gitRoot, PAN_DIRNAME))) {
-          yield* Effect.promise(() => execAsync(`git add -f .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
+          // PAN-1819: use plain git add (never -f) and exclude workspace-state/sync-target paths.
+          yield* Effect.promise(() => execAsync(`git add .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
+          yield* Effect.promise(() => execAsync(
+            `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
+            { cwd: gitRoot, encoding: 'utf-8' },
+          ));
         }
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
