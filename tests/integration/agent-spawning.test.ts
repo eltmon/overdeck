@@ -15,7 +15,7 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { chmodSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, delimiter } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
 import {
@@ -287,6 +287,17 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = '1';
+    // The pi harness is normally guarded by `command -v pi`. Several tests
+    // exercise the pi resume/delivery path, so provide a harmless stub binary
+    // on PATH for the duration of this test. This keeps harness resolution
+    // deterministic regardless of whether the real `pi` CLI is installed on
+    // the runner (PAN-1859).
+    const piBinDir = join(testPanopticonHome, 'bin');
+    mkdirSync(piBinDir, { recursive: true });
+    const piStub = join(piBinDir, 'pi');
+    writeFileSync(piStub, '#!/bin/sh\nexit 0\n');
+    chmodSync(piStub, 0o755);
+    process.env.PATH = `${piBinDir}${delimiter}${process.env.PATH}`;
     transcriptLandingMocks.snapshotCount = 0;
     transcriptLandingMocks.landed = false;
     transcriptLandingMocks.useLandedFlag = false;
