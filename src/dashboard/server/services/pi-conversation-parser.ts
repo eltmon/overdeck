@@ -24,6 +24,11 @@ import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contracts';
 import type { ParseResult } from './conversation-service.js';
 
+export function isPiSessionFile(sessionFile: string): boolean {
+  const normalized = sessionFile.replace(/\\/g, '/');
+  return /\/\.panopticon\/agents\/[^/]+\/sessions\//.test(normalized);
+}
+
 interface PiUsage {
   input?: number;
   output?: number;

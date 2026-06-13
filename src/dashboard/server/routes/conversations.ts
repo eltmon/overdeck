@@ -141,7 +141,7 @@ import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
 import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
-import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
@@ -777,11 +777,6 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
   } catch {
     return null;
   }
-}
-
-/** Detect whether a session file path is a Pi conversation JSONL. */
-function isPiSessionFile(sessionFile: string): boolean {
-  return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
 }
 
 /**

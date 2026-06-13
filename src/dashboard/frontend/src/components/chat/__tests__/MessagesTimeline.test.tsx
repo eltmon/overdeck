@@ -10,10 +10,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
 import type { ChatMessage } from '../chat-types';
 
 vi.mock('../ChatMarkdown', () => ({
+  ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   ChatMarkdown: ({ text, cwd, issueId }: { text: string; cwd?: string; issueId?: string | null }) => (
     <div data-testid="chat-markdown" data-cwd={cwd ?? ''} data-issue-id={issueId ?? ''}>{text}</div>
   ),

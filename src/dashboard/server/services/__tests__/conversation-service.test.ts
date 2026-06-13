@@ -6,13 +6,14 @@ const mockReadFile = vi.fn();
 const mockStat = vi.fn();
 const mockReaddir = vi.fn();
 const mockOpen = vi.fn();
+const mockWatch = vi.fn(() => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) }));
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
   stat: mockStat,
   readdir: mockReaddir,
   open: mockOpen,
-  watch: vi.fn(() => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) })),
+  watch: mockWatch,
 }));
 
 vi.mock('node:os', () => ({ homedir: () => '/home/testuser' }));
@@ -812,6 +813,38 @@ describe('parseConversationMessages', () => {
     });
   });
 
+  it('does not emit an ID-only assistant placeholder from carried pendingAssistantId', async () => {
+    const userLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-2',
+      timestamp: '2024-01-01T00:00:02.000Z',
+      message: {
+        content: [
+          { type: 'tool_result', tool_use_id: 'tool-incr', content: 'result!', is_error: false },
+        ],
+      },
+    });
+    const pendingToolUse = new Map([[ 'tool-incr', {
+      id: 'tool-incr',
+      createdAt: '2024-01-01T00:00:01.000Z',
+      label: 'Bash',
+      tone: 'tool' as const,
+    } ]]);
+
+    mockReadFile.mockResolvedValue(Buffer.from(userLine + '\n'));
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl', 0, {
+      pendingToolUse,
+      unresolvedResults: new Map(),
+      lastSequence: 1,
+      pendingAssistantId: 'asst-1',
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.workLog[0]).toMatchObject({ id: 'tool-incr', result: 'result!' });
+    expect(result.pendingAssistantId).toBe('asst-1');
+  });
+
   it('uses sequence as tiebreaker when timestamps are identical', async () => {
     const lines = [
       {
@@ -878,6 +911,36 @@ describe('parseConversationMessages', () => {
     expect(result.messages).toHaveLength(2);
     expect(result.messages[0]).toMatchObject({ role: 'assistant', text: 'After compact' });
     expect(result.messages[1]).toMatchObject({ role: 'user', text: 'User after compact' });
+  });
+
+  it('derives context usage from the parse result without re-reading the active window', async () => {
+    const staleAssistant = {
+      type: 'assistant',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { model: 'claude-opus-4-7', usage: { input_tokens: 999_999 } },
+    };
+    const boundary = { type: 'system', subtype: 'compact_boundary', timestamp: '2024-01-01T00:00:01.000Z' };
+    const activeAssistant = {
+      type: 'assistant',
+      timestamp: '2024-01-01T00:00:02.000Z',
+      message: {
+        model: 'claude-opus-4-7',
+        usage: { input_tokens: 12_000, cache_read_input_tokens: 3_000 },
+      },
+    };
+    const buffer = makeBuffer([staleAssistant, boundary, activeAssistant]);
+    mockReadFile.mockResolvedValue(buffer);
+
+    const { contextUsageFromParseResult, parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+    const openCalls = mockOpen.mock.calls.length;
+    const usage = contextUsageFromParseResult(result, 'claude-opus-4-7');
+
+    expect(mockOpen).toHaveBeenCalledTimes(openCalls);
+    expect(usage).toMatchObject({
+      estimatedTokens: 15_000,
+      activeBytes: Buffer.byteLength(`${makeJsonlLine(boundary)}\n${makeJsonlLine(activeAssistant)}\n`),
+    });
   });
 
   it('correctly orders a real mis-ordered session fixture', async () => {
@@ -1013,6 +1076,78 @@ describe('parseConversationMessages', () => {
     expect(result1).toEqual(result2);
     // Cache hit: both results identical without re-parsing on second call
     expect(result1.isWorking).toBe(true);
+  });
+});
+
+describe('watchConversation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000, size: buf.length };
+    });
+    mockOpen.mockImplementation(async () => {
+      const buffer = await mockReadFile();
+      return {
+        read: (buf: Buffer, offset: number, length: number, position: number) => {
+          const toCopy = Math.min(length, Math.max(0, buffer.length - position));
+          if (toCopy > 0) {
+            buffer.copy(buf, offset, position, position + toCopy);
+          }
+          return Promise.resolve({ bytesRead: toCopy, buffer: buf });
+        },
+        close: () => Promise.resolve(),
+      };
+    });
+  });
+
+  it('awaits async callbacks before parsing the next file-watch event', async () => {
+    const firstLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-1',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      message: { content: [{ type: 'text', text: 'First' }] },
+    });
+    const secondLine = makeJsonlLine({
+      type: 'user',
+      uuid: 'u-2',
+      timestamp: '2024-01-01T00:00:01.000Z',
+      message: { content: [{ type: 'text', text: 'Second' }] },
+    });
+    let buffer = Buffer.from(`${firstLine}\n`);
+    mockReadFile.mockImplementation(async () => buffer);
+    mockWatch.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: async function* () {
+        yield {};
+        yield {};
+      },
+    }));
+
+    let releaseFirstCallback!: () => void;
+    const firstCallbackDone = new Promise<void>((resolve) => {
+      releaseFirstCallback = resolve;
+    });
+    const callback = vi.fn(async () => {
+      if (callback.mock.calls.length === 1) {
+        buffer = Buffer.from(`${firstLine}\n${secondLine}\n`);
+        await firstCallbackDone;
+      }
+    });
+
+    const { watchConversation } = await import('../conversation-service.js');
+    const handle = watchConversation('/fake/session.jsonl', callback, {
+      byteOffset: 0,
+      priorState: { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+    });
+
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    releaseFirstCallback();
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(2));
+    handle.stop();
   });
 });
 

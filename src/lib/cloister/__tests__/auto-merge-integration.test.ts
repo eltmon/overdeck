@@ -53,14 +53,10 @@ async function tickWith(overrides: Partial<Parameters<typeof tickAutoMergeExecut
   });
 }
 
-function realElapsedMs(started: number): number {
-  return vi.getRealSystemTime() - started;
-}
-
-async function advanceFakeTimersQuickly(ms: number): Promise<void> {
-  const started = vi.getRealSystemTime();
+async function advanceFakeTimers(ms: number): Promise<void> {
+  const started = Date.now();
   await vi.advanceTimersByTimeAsync(ms);
-  expect(realElapsedMs(started)).toBeLessThan(100);
+  expect(Date.now() - started).toBe(ms);
 }
 
 describe('auto-merge schedule/cancel/executor integration', () => {
@@ -91,7 +87,7 @@ describe('auto-merge schedule/cancel/executor integration', () => {
     const mergeIssue = vi.fn();
 
     await scheduleAutoMerge();
-    await advanceFakeTimersQuickly(4 * 60_000);
+    await advanceFakeTimers(4 * 60_000);
 
     expect(deleteAutoMergePayload('PAN-1486', { now: () => new Date(Date.now()), announce: vi.fn() })).toMatchObject({
       status: 200,
@@ -99,7 +95,7 @@ describe('auto-merge schedule/cancel/executor integration', () => {
     });
     expect(getPendingAutoMergePayload()).toEqual([]);
 
-    await advanceFakeTimersQuickly(60_000);
+    await advanceFakeTimers(60_000);
     await tickWith({ mergeIssue });
 
     expect(mergeIssue).not.toHaveBeenCalled();
@@ -111,7 +107,7 @@ describe('auto-merge schedule/cancel/executor integration', () => {
     const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', mergeStatus: 'merged' });
 
     await scheduleAutoMerge();
-    await advanceFakeTimersQuickly(5 * 60_000);
+    await advanceFakeTimers(5 * 60_000);
     await tickWith({ isEligible: async () => ({ eligible: true }), mergeIssue });
 
     expect(mergeIssue).toHaveBeenCalledTimes(1);
@@ -124,7 +120,7 @@ describe('auto-merge schedule/cancel/executor integration', () => {
     const mergeIssue = vi.fn();
 
     await scheduleAutoMerge();
-    await advanceFakeTimersQuickly(5 * 60_000);
+    await advanceFakeTimers(5 * 60_000);
     await tickWith({
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }),
       mergeIssue,

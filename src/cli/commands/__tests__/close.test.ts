@@ -66,9 +66,11 @@ describe('closeOutCommand', () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it so the
-    // function returns and these assertions run, instead of vitest trapping the exit.
-    vi.spyOn(process, 'exit').mockImplementation(((_code?: number) => {}) as never);
+    // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it with
+    // an explicit throw so the promise rejection remains observable in Vitest.
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit unexpectedly called with "${code}"`);
+    }) as never);
     installIssueState([]);
     answerConfirmation('yes');
   });
@@ -79,7 +81,7 @@ describe('closeOutCommand', () => {
   });
 
   it('warns and asks for confirmation when the issue is not verifying-on-main', async () => {
-    await closeOutCommand('PAN-1190', {});
+    await expect(closeOutCommand('PAN-1190', {})).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
     expect(output).toContain("Issue should normally be in 'verifying-on-main' before close-out.");
@@ -93,7 +95,7 @@ describe('closeOutCommand', () => {
   });
 
   it('skips the confirmation prompt when --force is used', async () => {
-    await closeOutCommand('PAN-1190', { force: true });
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
     expect(mocks.closeOut).toHaveBeenCalledOnce();
@@ -101,7 +103,7 @@ describe('closeOutCommand', () => {
 
   it('allows the flywheel orchestrator to close out', async () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', 'flywheel-orchestrator');
-    await closeOutCommand('PAN-1190', { force: true });
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     // Not barred by the caller guard, and the close-out actually runs.
     expect(process.exit).not.toHaveBeenCalledWith(1);
@@ -110,7 +112,7 @@ describe('closeOutCommand', () => {
 
   it('allows an operator conversation (conv-*) to close out', async () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', 'conv-20260608-1234');
-    await closeOutCommand('PAN-1190', { force: true });
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     expect(process.exit).not.toHaveBeenCalledWith(1);
     expect(mocks.closeOut).toHaveBeenCalledOnce();
@@ -118,7 +120,7 @@ describe('closeOutCommand', () => {
 
   it('bars other autonomous agents (agent-*/planning-*/strike-*) from closing out', async () => {
     vi.stubEnv('PANOPTICON_AGENT_ID', 'agent-pan-123');
-    await closeOutCommand('PAN-1190', { force: true });
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
 
     expect(process.exit).toHaveBeenCalledWith(1);
     const errors = vi.mocked(console.error).mock.calls.map((c) => String(c[0])).join('\n');
