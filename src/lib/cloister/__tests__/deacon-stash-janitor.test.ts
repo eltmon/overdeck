@@ -134,7 +134,7 @@ import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
 import { loadCloisterConfigSync } from '../config.js';
-import { listSessionNames, killSession, sessionExistsSync, sessionExists, isPaneDead } from '../../../lib/tmux.js';
+import { listSessionNames, killSession, sessionExistsSync, sessionExists, isPaneDead, capturePane } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetAgentState = vi.mocked(getAgentStateSync);
@@ -146,6 +146,7 @@ const mockKillSessionAsync = vi.mocked(killSession);
 const mockSessionExists = vi.mocked(sessionExistsSync);
 const mockSessionExistsAsync = vi.mocked(sessionExists);
 const mockIsPaneDead = vi.mocked(isPaneDead);
+const mockCapturePane = vi.mocked(capturePane);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
@@ -619,6 +620,104 @@ describe('monitorReviewConvoySignals', () => {
     expect(actions).toEqual([
       'Signaled REVIEWER_FAILED security reviewer idle with no output after terminal API error (retry exhausted) to agent-pan-879-review',
     ]);
+  });
+
+  it('fast-fails an overflowed reviewer without waiting for the idle threshold (PAN-1818)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: '/tmp/test-agents/agent-pan-879-review-security/review-security.md',
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    } as any);
+    mockCapturePane.mockResolvedValue('API Error: 400 Your input exceeds the context window of this model.');
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockCapturePane).toHaveBeenCalledWith('agent-pan-879-review-security', 100);
+    expect(mockSpawnReviewSubRole).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      'REVIEWER_FAILED security context-window overflow (no retry — deterministic)',
+    );
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'failed',
+    }));
+    expect(actions).toEqual([
+      'Signaled REVIEWER_FAILED security context-window overflow (no retry — deterministic) to agent-pan-879-review',
+    ]);
+  });
+
+  it('preserves PAN-1806 idle-respawn when the reviewer tail shows no overflow (PAN-1818)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: '2026-05-13T00:00:00.000Z',
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+        reviewRetryAttempt: 0,
+      } as any)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+      } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    } as any);
+    mockCapturePane.mockResolvedValue('some other terminal error, no context window mention');
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockCapturePane).toHaveBeenCalledWith('agent-pan-879-review-security', 100);
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockSpawnReviewSubRole).toHaveBeenCalled();
+    expect(actions).toEqual([]);
   });
 
   it('does not treat a fresh active reviewer as idle (PAN-1806)', async () => {

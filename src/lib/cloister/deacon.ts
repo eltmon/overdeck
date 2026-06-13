@@ -5859,12 +5859,24 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
         : 0;
     const idleAndNoOutput = reviewerSessionAlive && !outputWrittenForThisRun && runtimeIdleAgeMs > REVIEWER_IDLE_FAILURE_MS;
 
+    // PAN-1818: context-window overflow is deterministic on the same diff/manifest.
+    // Capture the pane tail and fast-fail BEFORE the idle-respawn branch so we never
+    // burn another cycle respawning a reviewer that will re-overflow.
+    let contextOverflowDetected = false;
+    if (!outputWrittenForThisRun) {
+      const tail = await Effect.runPromise(capturePane(agentId, 100)).catch(() => '');
+      contextOverflowDetected = isContextOverflowTail(tail);
+    }
+
     let signal: 'ready' | 'failed' | 'timeout' | null = null;
     let reason = '';
     if (outputWrittenForThisRun) {
       // Report exists for this run but the Stop-hook didn't signal (no fresh
       // marker) — back it up with READY. Safe: the report is on disk.
       signal = 'ready';
+    } else if (contextOverflowDetected) {
+      signal = 'failed';
+      reason = 'context-window overflow (no retry — deterministic)';
     } else if (idleAndNoOutput) {
       const attempt = state.reviewRetryAttempt ?? 0;
       if (attempt < 1 && (await respawnIdleReviewer(state, agentId))) {
