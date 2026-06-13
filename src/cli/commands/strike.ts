@@ -6,14 +6,16 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 import { spawnAgent } from '../../lib/agents.js';
+import { resolveHarness } from '../../lib/harness-resolve.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import type { RoleEffort } from '../../lib/config-yaml.js';
+import { resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
 
 const execAsync = promisify(exec);
 
 export interface StrikeOptions {
   model?: string;
-  harness?: 'claude-code' | 'pi' | 'codex';
+  harness?: RuntimeName;
   effort?: RoleEffort;
   dryRun?: boolean;
 }
@@ -117,14 +119,21 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
     const plan = planStrike(issueId);
 
     if (options.dryRun) {
+      const dryRunModel = resolveRoleModel('strike', options.model || undefined, loadYamlConfig().config);
+      const dryRunHarness = await resolveHarness({
+        explicit: options.harness,
+        role: 'strike',
+        model: dryRunModel,
+      });
+
       spinner.stop();
       console.log(chalk.bold(`\n[dry-run] Would strike ${plan.issueId}`));
       console.log(`  Workspace:  ${plan.workspace}`);
       console.log(`  Branch:     ${plan.branch}`);
       console.log(`  Session:    ${plan.sessionName}`);
-      console.log(`  Harness:    ${options.harness ?? 'claude-code'}`);
+      console.log(`  Harness:    ${dryRunHarness}`);
       console.log(`  Effort:     ${options.effort ?? 'medium'}`);
-      if (options.model) console.log(`  Model:      ${options.model}`);
+      console.log(`  Model:      ${dryRunModel}`);
       return;
     }
 
