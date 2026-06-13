@@ -162,10 +162,6 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     }
   }
 
-  // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
-  // vBRIEF before beads creation. Atomic temp+rename.
-  const canonicalFilename = stampPlanForFinalization(planPath, issueId);
-
   emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
   // Pass the exact plan being finalized: on a re-plan, the main-side canonical
   // spec still has the OLD content until promotion, so resolving main-first
@@ -192,6 +188,10 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     workspacePath,
     createdCount: result.created.length,
   });
+
+  // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
+  // vBRIEF only after beads creation succeeds. Atomic temp+rename.
+  const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
   emitActivityEntrySync({
     source: 'plan',

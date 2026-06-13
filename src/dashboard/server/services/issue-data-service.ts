@@ -17,7 +17,7 @@ import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
-import { CacheService, DEFAULT_TTLS } from './cache-service.js';
+import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
@@ -551,9 +551,15 @@ export class IssueDataService {
     const result: Record<string, any> = {};
     for (const [tracker, state] of Object.entries(this.trackers)) {
       const limit = this.cache.getRateLimit(tracker);
+      const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
+      const backoffMs = intervals ? this.cache.getBackoffMs(tracker, intervals.default) : 0;
+      const suspendMs = this.cache.getSuspensionMs(tracker);
       result[tracker] = {
         remaining: limit?.remaining ?? null,
         total: limit?.total ?? null,
+        backoffMs,
+        suspendedUntil: suspendMs > 0 ? new Date(Date.now() + suspendMs).toISOString() : null,
+        rateLimited: suspendMs > 0,
         pollInterval: state.currentInterval,
         lastFetched: state.lastFetchedAt,
         lastError: state.lastError,
@@ -575,12 +581,27 @@ export class IssueDataService {
     const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
     if (!intervals) return;
 
-    const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
-    const effectiveInterval = Math.min(
-      Math.max(intervals.default + backoffMs, intervals.min),
-      intervals.max
-    );
-    state.currentInterval = effectiveInterval;
+    let delayMs: number;
+    try {
+      const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
+      const effectiveInterval = Math.min(
+        Math.max(intervals.default + backoffMs, intervals.min),
+        intervals.max
+      );
+
+      // If the tracker is exhausted, suspend polling until the rate-limit window resets.
+      // This bypasses intervals.max so we don't wake up before the quota resets.
+      const suspendMs = this.cache.getSuspensionMs(tracker);
+      delayMs = effectiveInterval;
+      if (suspendMs > 0) {
+        delayMs = Math.min(suspendMs, 3_600_000);
+        console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
+      }
+    } catch (err: any) {
+      console.error(`[IssueDataService] Cache read failed for ${tracker}; falling back to default interval:`, err.message);
+      delayMs = intervals.default;
+    }
+    state.currentInterval = delayMs;
 
     state.timer = setTimeout(async () => {
       try {
@@ -594,7 +615,7 @@ export class IssueDataService {
         state.lastError = err.message;
       }
       this.scheduleNext(tracker);
-    }, effectiveInterval);
+    }, delayMs);
   }
 
   private async ensureShadowStateLoaded(): Promise<void> {
@@ -1007,6 +1028,38 @@ export class IssueDataService {
     }
   }
 
+  private normalizeLinearResetAt(resetValue: number | null): string | null {
+    if (resetValue === null) return null;
+    // Linear sends reset as Unix milliseconds, but other trackers use Unix seconds.
+    // Defensive normalization: values below 1e12 are seconds, otherwise milliseconds.
+    const epochMs = resetValue < 1_000_000_000_000 ? resetValue * 1000 : resetValue;
+    return new Date(epochMs).toISOString();
+  }
+
+  private recordLinearExhaustion(response: Response, nowMs: number): void {
+    const existing = this.cache.getRateLimit('linear');
+    const total =
+      parseIntegerHeader(response.headers, 'x-ratelimit-requests-limit') ??
+      parseIntegerHeader(response.headers, 'x-ratelimit-limit') ??
+      existing?.total ??
+      2500;
+
+    let resetAt = this.normalizeLinearResetAt(
+      parseIntegerHeader(response.headers, 'x-ratelimit-requests-reset') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-reset')
+    );
+    if (!resetAt) {
+      const retryAfter = parseIntegerHeader(response.headers, 'retry-after');
+      if (retryAfter !== null) {
+        resetAt = new Date(nowMs + retryAfter * 1000).toISOString();
+      } else {
+        resetAt = new Date(nowMs + 3_600_000).toISOString();
+      }
+    }
+
+    this.cache.updateRateLimit('linear', { remaining: 0, total, resetAt });
+  }
+
   private async fetchLinearIssues(apiKey: string, sinceUpdatedAt: string | null): Promise<any[]> {
     const allIssues: any[] = [];
     let hasMore = true;
@@ -1095,10 +1148,44 @@ export class IssueDataService {
         body: JSON.stringify({ query, variables: { after: cursor } }),
       });
 
+      // Parse Linear rate-limit headers before reading the body or throwing on errors.
+      // Linear uses x-ratelimit-requests-*; fall back to the bare x-ratelimit-* names.
+      const rlRemaining =
+        parseIntegerHeader(response.headers, 'x-ratelimit-requests-remaining') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-remaining');
+      const rlTotal =
+        parseIntegerHeader(response.headers, 'x-ratelimit-requests-limit') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-limit');
+      const rlReset =
+        this.normalizeLinearResetAt(
+          parseIntegerHeader(response.headers, 'x-ratelimit-requests-reset') ??
+            parseIntegerHeader(response.headers, 'x-ratelimit-reset')
+        );
+      if (rlRemaining !== null && rlTotal !== null && rlReset !== null) {
+        this.cache.updateRateLimit('linear', { remaining: rlRemaining, total: rlTotal, resetAt: rlReset });
+      }
+
+      // Detect quota exhaustion on HTTP 429 before attempting to parse the body.
+      if (response.status === 429) {
+        this.recordLinearExhaustion(response, Date.now());
+        let bodyText = '';
+        try { bodyText = await response.text(); } catch { /* ignore unreadable body */ }
+        let message = `Linear API error: HTTP 429`;
+        try {
+          const body = JSON.parse(bodyText);
+          if (body?.errors?.[0]?.message) message = body.errors[0].message;
+        } catch { /* ignore non-JSON body */ }
+        throw new Error(message);
+      }
+
       const json = await response.json();
 
       if (json.errors) {
-        throw new Error(json.errors[0]?.message || 'Linear GraphQL error');
+        const message = json.errors[0]?.message || 'Linear GraphQL error';
+        if (/rate limit|ratelimited/i.test(message)) {
+          this.recordLinearExhaustion(response, Date.now());
+        }
+        throw new Error(message);
       }
 
       const issues = json.data?.issues;
