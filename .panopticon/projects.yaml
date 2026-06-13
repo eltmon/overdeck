@@ -45,7 +45,8 @@ projects:
       unit:
         type: vitest
         path: .
-        command: npx vitest run --no-file-parallelism && cd src/dashboard/frontend && npm test
+        command: npx vitest run --no-file-parallelism && cd src/dashboard/frontend &&
+          npm test
       e2e:
         type: vitest
         path: .
@@ -75,20 +76,14 @@ projects:
         command: npm run lint
         required: true
       build:
-        # PAN-1659: skip the heavy docs-index build in the per-issue verification
-        # gate. The docs-RAG index is a publish-time, repo-wide artifact (built by
-        # prepublishOnly / build-for-publish.mjs on release), unrelated to verifying
-        # an issue's code; three concurrent gate builds once pegged the host to load
-        # 132/24 cores and caused false failures.
-        command: SKIP_DOCS_INDEX=1 npm run build
+        command: npm run build
         required: true
       test:
-        # PAN-666: scope to files changed since the target branch so a feature
-        # agent is never blocked by pre-existing failures in code it did not
-        # touch. {{CHANGED_BASE}} is injected by the verification gate as
-        # origin/<target-branch>; vitest --changed walks the import graph and runs
-        # only tests affected by the PR's diff. Pre-existing rot in unmodified
-        # files is skipped (and logged by the gate).
+        # PAN-666 change-scoped gate (activated 2026-06-13, PAN-1848). Runs only
+        # tests affected by the work agent's diff since {{CHANGED_BASE}} (=origin/main),
+        # so unrelated pre-existing reds don't fail every gate. The running build
+        # (post 09:18 reload) substitutes {{CHANGED_BASE}}. Dual run covers the
+        # root + the frontend workspace.
         command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
         required: true
   mind-your-now:
@@ -181,7 +176,8 @@ projects:
       migration-validation:
         type: maven
         path: api
-        command: ./mvnw test -Dtest=FlywayMigrationValidationTest -Dtestcontainers.reuse.enable=true
+        command: ./mvnw test -Dtest=FlywayMigrationValidationTest
+          -Dtestcontainers.reuse.enable=true
       frontend-unit:
         type: vitest
         path: fe
@@ -361,3 +357,25 @@ projects:
       type: standalone
       workspaces_dir: workspaces
       default_branch: main
+  eltmon-video:
+    name: eltmon-video
+    path: /home/eltmon/Projects/eltmon-video
+    issue_prefix: ELV
+    workspace:
+      type: standalone
+      workspaces_dir: workspaces
+      default_branch: main
+  tindra:
+    name: tindra
+    path: /home/eltmon/Projects/tindra
+    issue_prefix: TIN
+    linear_team: TIN
+    workspace:
+      type: standalone
+      workspaces_dir: workspaces
+      default_branch: main
+    tests:
+      unit:
+        type: vitest
+        path: .
+        command: npm test -- --run
