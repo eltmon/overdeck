@@ -31,7 +31,7 @@ import { homedir } from 'node:os';
 import { join, normalize } from 'node:path';
 
 /** Valid agent / tmux session identifier. */
-const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+export const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 function isSafeAgentId(agentId: string): boolean {
   return SAFE_AGENT_ID_PATTERN.test(agentId);
