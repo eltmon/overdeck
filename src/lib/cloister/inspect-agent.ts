@@ -37,7 +37,7 @@ import {
   clearCredentialFileAuthSync,
 } from '../providers.js';
 import type { ModelId } from '../settings.js';
-import { getProviderEnvForModel, saveAgentRuntimeState } from '../agents.js';
+import { getProviderEnvForModel, saveAgentRuntimeState, saveAgentState } from '../agents.js';
 import { isIssueClosed } from './issue-closed.js';
 
 const execAsync = promisify(exec);
@@ -239,6 +239,19 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
       lastActivity: new Date().toISOString(),
       currentIssue: context.issueId,
     });
+
+    // PAN-1834 — write a minimal state.json so inspect agents are enumerated by
+    // listRunningAgents and scanned by the enrichment poller for pending input.
+    await Effect.runPromise(saveAgentState({
+      id: tmuxSession,
+      issueId: context.issueId,
+      workspace: context.workspace,
+      role: 'work',
+      model,
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      inspectSubRole: subRole,
+    }));
 
     return {
       success: true,
