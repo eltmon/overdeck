@@ -124,7 +124,7 @@ describe('resolveHarness', () => {
 
     expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(1, 'pi', 'claude-sonnet-4-6', 'subscription');
     expect(mocks.canUseHarnessSync).toHaveBeenNthCalledWith(2, 'claude-code', 'claude-sonnet-4-6', 'subscription');
-    expect(warnSpy).toHaveBeenCalledWith('harness pi denied for anthropic: role default blocked — falling back to claude-code');
+    expect(warnSpy).toHaveBeenCalledWith('harness pi denied for anthropic: role default blocked — falling back to native claude-code');
   });
 
   it('does not fall back when the model itself is denied by auth policy', async () => {
@@ -140,12 +140,12 @@ describe('resolveHarness', () => {
   it('falls back to claude-code when a selected pi or codex binary is missing', async () => {
     setBinaryAvailable(false);
     const { resolveHarness } = await loadSubject();
-    setConfig({});
+    setConfig({ providerHarnesses: { anthropic: 'codex' } });
 
-    await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('claude-code');
+    await expect(resolveHarness({ model: 'claude-sonnet-4-6' })).resolves.toBe('claude-code');
 
     expect(mocks.exec).toHaveBeenCalledWith('command -v codex', expect.any(Function));
-    expect(warnSpy).toHaveBeenCalledWith('harness codex requested for openai, but codex is not installed — falling back to claude-code');
+    expect(warnSpy).toHaveBeenCalledWith('harness codex requested for anthropic, but codex is not installed — falling back to native claude-code');
   });
 
   it('logs the built-in provider-default notice once per provider', async () => {
