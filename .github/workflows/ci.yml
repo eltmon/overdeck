@@ -176,7 +176,7 @@ jobs:
           # here — the job tears it down on completion.
           DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 < /dev/null &
           for i in $(seq 1 60); do
-            if curl -sf http://localhost:3011/api/health > /dev/null; then
+            if curl --connect-timeout 2 --max-time 3 -sf http://localhost:3011/api/health > /dev/null; then
               exit 0
             fi
             sleep 1
