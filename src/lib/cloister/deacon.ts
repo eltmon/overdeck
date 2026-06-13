@@ -5537,7 +5537,7 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
 
   if (!existsSync(AGENTS_DIR)) return [];
   let dirs: string[];
-  try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
+  try { dirs = readdirSync(AGENTS_DIR).filter(d => existsSync(join(AGENTS_DIR, d, 'state.json'))); }
   catch { return []; }
 
   logDeaconEventSync(`recoverOrphanedAgents started${context ? ` (${context})` : ''}: scanning ${dirs.length} directorie(s)`);

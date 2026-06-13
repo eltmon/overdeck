@@ -601,13 +601,41 @@ export function isQualifiedAgentId(input: string): boolean {
  * Resolve a CLI-supplied agent target to an on-disk agent ID (PAN-1760).
  * Accepts bare numerics ("1148"), issue IDs ("PAN-1148"), and fully-qualified
  * agent IDs ("agent-pan-1148-ship", "strike-pan-1723", "inspect-pan-1744-x",
- * "flywheel-orchestrator"). Returns null when a bare numeric can't be resolved
- * to exactly one agent state dir.
+ * "flywheel-orchestrator"). For issue IDs, prefers the canonical work-agent
+ * directory when present, then falls back to the single registered agent state
+ * for that issue. Returns null when multiple non-work state dirs match.
  */
 export function resolveAgentTargetSync(input: string): string | null {
   if (isQualifiedAgentId(input)) return input.toLowerCase();
   const issueId = resolveBareNumericIdSync(input);
-  return issueId ? normalizeAgentId(issueId) : null;
+  if (!issueId) return null;
+
+  const canonicalAgentId = normalizeAgentId(issueId);
+  if (getAgentStateSync(canonicalAgentId)) return canonicalAgentId;
+
+  try {
+    if (!existsSync(AGENTS_DIR)) return canonicalAgentId;
+    const wantedIssueId = issueId.toUpperCase();
+    const matches: string[] = [];
+    for (const entry of readdirSync(AGENTS_DIR, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const stateFile = join(AGENTS_DIR, entry.name, 'state.json');
+      if (!existsSync(stateFile)) continue;
+      try {
+        const parsed = JSON.parse(readFileSync(stateFile, 'utf-8')) as { issueId?: string };
+        if (parsed.issueId?.toUpperCase() === wantedIssueId) {
+          matches.push(entry.name);
+        }
+      } catch {
+        // Skip unreadable state files.
+      }
+    }
+    if (matches.length === 1) return matches[0].toLowerCase();
+    if (matches.length > 1) return null;
+    return canonicalAgentId;
+  } catch {
+    return canonicalAgentId;
+  }
 }
 
 /**

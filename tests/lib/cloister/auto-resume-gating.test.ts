@@ -407,6 +407,28 @@ describe('auto-resume gates', () => {
     expect(state?.consecutiveFailures).toBe(1);
   });
 
+  it('recovers orphaned strike agents whose registered session is missing', async () => {
+    const agentId = 'strike-pan-1820';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1820',
+      workspace: workspaceFor(agentId),
+      harness: 'codex',
+      role: 'strike',
+      model: 'gpt-5',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+    });
+
+    const actions = await recoverOrphanedAgents('patrol');
+
+    expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
+    const state = agents.getAgentStateSync(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.consecutiveFailures).toBe(1);
+  });
+
   it('does not orphan-recover verify-paused running agents with killed tmux sessions', async () => {
     const agentId = 'agent-pan-1141-verify-orphan';
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
