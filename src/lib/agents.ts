@@ -38,7 +38,7 @@ import { buildCompactRecoverySeedMessage } from './context-overflow.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
-import { canUseHarnessSync } from './harness-policy.js';
+import { resolveHarness } from './harness-resolve.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { Effect } from 'effect';
@@ -51,6 +51,7 @@ import { recordFeatureRegistryLifecycle } from './registry/feature-registry-popu
 import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
+import { sendGracefulRestartWarning } from './graceful-restart.js';
 import type { MemoryIdentity } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
@@ -381,15 +382,6 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
   }
 }
 
-async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
-  const providerDefault = loadYamlConfig().config.providerHarnesses?.[getProviderForModelSync(model).name];
-  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' || harness === 'codex'
-    ? harness
-    : providerDefault ?? 'claude-code';
-  const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
-  return decision.allowed ? requested : 'claude-code';
-}
-
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') {
@@ -448,6 +440,12 @@ export async function getAgentRuntimeBaseCommand(
     // buildCodexCommand in launcher-generator builds the full Codex command;
     // return a stub base command so the launcher generator can short-circuit.
     return `codex`;
+  }
+
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -538,6 +536,12 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (harness === 'codex') {
     return `codex`;
+  }
+
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -783,9 +787,7 @@ export function clearReadySignal(agentId: string): void {
 export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
-  for (let i = 0; i < timeoutSeconds; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-
+  for (let i = 0; i <= timeoutSeconds; i++) {
     if (existsSync(readyPath)) {
       try {
         const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
@@ -797,6 +799,10 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
       } catch {
         // File exists but mid-write / invalid — keep waiting.
       }
+    }
+
+    if (i < timeoutSeconds) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
     }
   }
 
@@ -923,6 +929,8 @@ export interface AgentState {
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
+  /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
+  reviewRetryAttempt?: number;
   hostOverride?: boolean;
 }
 
@@ -977,6 +985,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
+    reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
   };
 }
@@ -1369,21 +1378,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const clearClientTimeout = () => {
       if (timeout) clearTimeout(timeout);
-      timeout = null;
+      timeout = undefined;
     };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       reject(err);
     };
 
@@ -2135,6 +2144,8 @@ export interface AgentRuntimeState {
   lastActivity: string;
   currentTool?: string;
   claudeSessionId?: string;
+  sessionModel?: string;
+  sessionHarness?: RuntimeName;
   /**
    * For specialists: the issue currently being processed. Tracked per-agent in
    * the AgentStateService snapshot (see agent.current_issue_set event).
@@ -2147,6 +2158,22 @@ export interface AgentRuntimeState {
   waitingStartedAt?: string;
   waitingNotification?: string;
   contextSaturatedAt?: string;
+}
+
+function sessionResumeDriftReasons(
+  runtimeState: AgentRuntimeState | null,
+  model: string,
+  harness: RuntimeName,
+): string[] {
+  if (!runtimeState?.sessionModel || !runtimeState.sessionHarness) return [];
+  const reasons: string[] = [];
+  if (runtimeState.sessionModel !== model) {
+    reasons.push(`model ${runtimeState.sessionModel}→${model}`);
+  }
+  if (runtimeState.sessionHarness !== harness) {
+    reasons.push(`harness ${runtimeState.sessionHarness}→${harness}`);
+  }
+  return reasons;
 }
 
 function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntimeState | null {
@@ -2167,6 +2194,10 @@ function snapshotToRuntimeState(snap: AgentRuntimeSnapshot | null): AgentRuntime
     lastActivity: snap.lastActivity,
     currentTool: snap.currentTool,
     claudeSessionId: snap.claudeSessionId,
+    sessionModel: snap.sessionModel,
+    sessionHarness: (snap.sessionHarness === 'claude-code' || snap.sessionHarness === 'pi' || snap.sessionHarness === 'codex')
+      ? snap.sessionHarness
+      : undefined,
     currentIssue: snap.currentIssue,
     resolution: snap.resolution as AgentResolution | undefined,
     resolutionCount: snap.resolutionCount,
@@ -2256,14 +2287,25 @@ export async function saveAgentRuntimeState(agentId: string, patch: Partial<Agen
     await Effect.runPromise(emitAgentEvent(agentId, { kind: 'activity', activity: 'working', tool: patch.currentTool }));
   }
 
-  if (patch.claudeSessionId) {
+  if (patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
     // model_set requires a model — use existing snapshot's model if present.
     const snap = getAgentRuntimeStateSync(agentId);
-    if (snap || patch.claudeSessionId) {
-      await Effect.runPromise(emitAgentEvent(agentId, {
+    if (snap || patch.claudeSessionId || patch.sessionModel !== undefined || patch.sessionHarness !== undefined) {
+      const event: {
+        kind: 'model_set';
+        model: string;
+        claudeSessionId?: string;
+        sessionModel?: string;
+        sessionHarness?: RuntimeName;
+      } = {
         kind: 'model_set',
         model: 'unknown',
-        claudeSessionId: patch.claudeSessionId,
+      };
+      if (patch.claudeSessionId !== undefined) event.claudeSessionId = patch.claudeSessionId;
+      if (patch.sessionModel !== undefined) event.sessionModel = patch.sessionModel;
+      if (patch.sessionHarness !== undefined) event.sessionHarness = patch.sessionHarness;
+      await Effect.runPromise(emitAgentEvent(agentId, {
+        ...event,
       }));
     }
   }
@@ -2689,6 +2731,8 @@ export async function buildAgentLaunchConfig(opts: {
   channelsBridgeServerName?: string;
   useSupervisor?: boolean;
   supervisorScriptPath?: string;
+  /** Claude Code session id for fresh launches that need a known id before boot. */
+  sessionId?: string;
   /**
    * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
    * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
@@ -2817,6 +2861,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
+    sessionId: opts.harness === 'claude-code' ? opts.sessionId : undefined,
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,
     useSupervisor: opts.useSupervisor,
@@ -3094,22 +3139,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   initHookSync(agentId);
 
-  // PAN-1048 C5: Resolve the harness for this role from config.roles[role].harness
-  // before falling back to claude-code. Explicit options.harness takes precedence
-  // (used by the dashboard run picker), then config, then default. Without this
-  // step, every role spawned through spawnRun ignored the per-role harness slot
-  // surfaced in the Settings UI.
-  //
-  // PAN-1048 review feedback 005 (C4): every spawn entry point must pass the
-  // requested harness through canUseHarness() before persisting or launching
-  // (harness-policy.ts:3-6). resolveEffectiveHarness() collapses the requested
-  // harness to claude-code when the policy gate (e.g. Pi + Anthropic
-  // subscription auth, a ToS violation) blocks it, so a config-level
-  // `roles.work.harness: pi` cannot silently bypass the gate just because the
-  // model+auth combination is illegal.
-  const requestedHarness: RuntimeName | undefined = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness;
-  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveHarness({
+    explicit: options.harness,
+    role,
+    model: selectedModel,
+  });
 
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
@@ -3203,10 +3237,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
   let sessionId: string | undefined;
+  let rawSessionId: string | undefined;
   if (shouldRegisterConversation) {
     // When resuming, reuse the prior JSONL session so `claude --resume` reloads conversation history.
     // When starting fresh, generate a new UUID and use `claude --session-id`.
-    const rawSessionId = options.resumeSessionId ?? randomUUID();
+    rawSessionId = options.resumeSessionId ?? randomUUID();
 
     // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
     // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
@@ -3301,6 +3336,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   }));
+  if (shouldRegisterConversation) {
+    await saveAgentRuntimeState(agentId, {
+      claudeSessionId: rawSessionId,
+      ...(options.resumeSessionId ? {} : {
+        sessionModel: selectedModel,
+        sessionHarness: resolvedHarness,
+      }),
+    });
+  }
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
@@ -3426,18 +3470,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
-  // PAN-1048 review feedback 003: respect roles.work.harness from config when
-  // the caller did not pass an explicit options.harness. Without this, every
-  // work spawn ignored the per-role harness slot surfaced in Settings → Roles
-  // and silently fell back to claude-code — the same bug spawnRun() already
-  // fixed for non-work roles at line 1665.
-  //
-  // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
-  // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
-  // runs before we persist the resolved harness or hand it to the launcher.
-  const requestedHarness: RuntimeName | undefined = options.harness
-    ?? loadYamlConfig().config.roles?.[role]?.harness;
-  const resolvedHarness: RuntimeName = await resolveEffectiveHarness(requestedHarness, selectedModel);
+  const resolvedHarness: RuntimeName = await resolveHarness({
+    explicit: options.harness,
+    role,
+    model: selectedModel,
+  });
 
   // Create state
   const existingState = getAgentStateSync(agentId);
@@ -3651,6 +3688,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   }));
+  await saveAgentRuntimeState(agentId, {
+    sessionModel: selectedModel,
+    sessionHarness: resolvedHarness,
+  });
 
   // Channels: start dismissing the dev-channels confirmation dialog as soon as
   // the tmux session exists, but only block on completion when we are about to
@@ -3689,6 +3730,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       return state;
     }
+  }
+
+  // For codex work agents, poll for the first rollout JSONL in the background
+  // and persist the thread-id so transcript/cost lookups hit the fast path
+  // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
+  // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
+  // fallback covers sessions whose first turn lands after this window.
+  if (resolvedHarness === 'codex') {
+    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    void (async () => {
+      try {
+        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+          await import('./runtimes/codex.js');
+        const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
+        if (rollout) {
+          const threadId = extractThreadIdFromRollout(rollout);
+          if (threadId) writeThreadId(agentId, threadId);
+        }
+      } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
+    })();
   }
 
   // Update status
@@ -4595,7 +4656,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
-    const effectiveHarness = await resolveEffectiveHarness(opts?.harness ?? agentState.harness, model);
+    const effectiveHarness = await resolveHarness({
+      explicit: opts?.harness ?? agentState.harness,
+      role: agentState.role,
+      model,
+    });
     agentState.harness = effectiveHarness;
     if (effectiveHarness === 'codex') {
       agentState.codexMode = 'work-tui';
@@ -4604,6 +4669,21 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
+    const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
+    const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
+    const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
+      ? randomUUID()
+      : undefined;
+    if (resumeDriftReasons.length > 0) {
+      logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
+    }
+    if (freshSessionId) {
+      saveSessionId(normalizedId, freshSessionId);
+    } else if (!shouldResumeSavedSession) {
+      try {
+        unlinkSync(join(getAgentDir(normalizedId), 'session.id'));
+      } catch { /* absent or already cleared */ }
+    }
 
     // Compute the effective message before building the launcher so codex can
     // embed it as the inline prompt in `codex exec resume <threadId> <message>`.
@@ -4614,6 +4694,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const defaultResumeMessage = buildDefaultResumeContinueMessage(issueId);
     const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
       ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
+      : resumeDriftReasons.length > 0
+        ? { message: message ?? defaultResumeMessage, redeliveringKickoff: false }
       : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
@@ -4633,10 +4715,10 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       workspace: agentState.workspace,
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
-      // PAN-1781: compact recovery launches a FRESH session (no --resume) so the
-      // harness cannot rewind to the overflowed history. Normal resumes keep
-      // re-attaching to the saved session.
-      ...(compactSeed ? {} : { spawnMode: 'resume' as const, resumeSessionId: sessionId }),
+      // PAN-1781/PAN-1787: compact recovery and model/harness drift launch a
+      // fresh session. Normal resumes keep re-attaching to the saved session.
+      ...(shouldResumeSavedSession ? { spawnMode: 'resume' as const, resumeSessionId: sessionId } : {}),
+      sessionId: freshSessionId,
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
@@ -4682,16 +4764,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       if (!delivery.ok) {
         console.error(`[resumeAgent] Codex continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
-    } else if (compactSeed) {
-      // PAN-1781: fresh seeded session — deliver like a kickoff. Transcript
+    } else if (!shouldResumeSavedSession) {
+      // Fresh session fallback — deliver like a kickoff. Transcript
       // confirmation is impossible here: the new session's id is unknown until
       // its SessionStart hook fires, and the saved sessionId points at the
-      // archived (overflowed) session. deliverInitialPromptWithRetry waits for
+      // archived or mismatched session. deliverInitialPromptWithRetry waits for
       // the ready signal internally.
       const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', agentState.deliveryMethod);
       messageDelivered = delivery.ok;
       if (!delivery.ok) {
-        console.error(`[resumeAgent] Compact-recovery seed did not land: ${delivery.failure ?? 'unknown failure'}`);
+        console.error(`[resumeAgent] Fresh-session continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
     } else {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
@@ -4717,8 +4799,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
     const resumedAt = new Date().toISOString();
     if (compactSeed) {
-      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId})`);
-      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}), messageDelivered=${messageDelivered}`);
+      console.log(`[agents] Respawned ${normalizedId} fresh with compact-recovery seed (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: compact-recovery fresh respawn (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
+    } else if (!shouldResumeSavedSession) {
+      console.log(`[agents] Respawned ${normalizedId} fresh because session origin drifted (archived session ${sessionId}${freshSessionId ? `, new session ${freshSessionId}` : ''})`);
+      logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: fresh respawn after origin drift (archived sessionId=${sessionId}${freshSessionId ? `, newSessionId=${freshSessionId}` : ''}), messageDelivered=${messageDelivered}`);
     } else {
       console.log(`[agents] Resumed ${normalizedId} with Claude session ${sessionId}`);
       logAgentLifecycleSync(normalizedId, `resumeAgent SUCCESS: sessionId=${sessionId}, messageDelivered=${messageDelivered}`);
@@ -4812,28 +4897,17 @@ export async function restartAgent(
   }
 
   if (graceful && await Effect.runPromise(sessionExists(normalizedId))) {
-    const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
-    try {
-      await Effect.runPromise(sendKeys(normalizedId, warning));
-    } catch { /* non-fatal — session may already be dead */ }
-
-    await new Promise(r => setTimeout(r, 30_000));
-
-    const continueFile = join(agentState.workspace, '.pan', 'continue.json');
-    if (existsSync(continueFile)) {
-      const mtime = statSync(continueFile).mtimeMs;
-      const ageMs = Date.now() - mtime;
-      if (ageMs > 5 * 60 * 1000) {
-        console.warn(`[restartAgent] continue.json is stale (${Math.round(ageMs / 1000)}s old) — proceeding anyway`);
-      }
-    }
+    await sendGracefulRestartWarning(normalizedId, agentState.harness, agentState.workspace);
   }
 
   await Effect.runPromise(stopAgent(normalizedId));
 
   const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
-  const requestedHarness = newHarness ?? agentState.harness;
-  const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
+  const effectiveHarness = await resolveHarness({
+    explicit: newHarness ?? agentState.harness,
+    role: agentState.role,
+    model: effectiveModel,
+  });
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }

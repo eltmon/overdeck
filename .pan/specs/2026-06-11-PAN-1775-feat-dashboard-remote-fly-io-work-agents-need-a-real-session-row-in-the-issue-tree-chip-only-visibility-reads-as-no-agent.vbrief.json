@@ -1,69 +1,177 @@
 {
   "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-06-11T10:04:17.751Z",
-    "updated": "2026-06-11T10:04:17.751Z",
-    "author": "panopticon-cli/auto-start",
-    "description": "Auto-synthesized minimal plan for PAN-1775: feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
-    "inspectionPolicy": "never"
+    "version": "0.6",
+    "created": "2026-06-12T20:21:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1775: feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
+    "updated": "2026-06-12T20:26:31.969Z"
   },
   "plan": {
     "id": "pan-1775",
     "title": "feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
     "status": "proposed",
-    "uid": "48500c79-70ae-4dca-9b5d-8ccda6961d53",
-    "author": "panopticon-cli/auto-start",
-    "sequence": 1,
-    "created": "2026-06-11T10:04:17.751Z",
-    "updated": "2026-06-11T10:04:17.751Z",
+    "uid": "a04e57c1-c2cf-4daf-857d-d2b210e4de38",
+    "author": "agent:claude-fable-5",
+    "sequence": 4,
+    "created": "2026-06-12T20:21:00Z",
+    "updated": "2026-06-12T20:26:31.969Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1775",
         "label": "PAN-1775",
         "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/1786",
+        "label": "PR #1786 (open; review cycle 3 CHANGES REQUESTED)",
+        "type": "reference"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1775.md",
+        "label": "PRD draft (fix-cycle context, FR-1/FR-2)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1676",
+        "label": "PAN-1676 (remote-agent visibility pass that added the chip)",
+        "type": "issue"
       }
     ],
     "tags": [
-      "auto-start"
+      "dashboard",
+      "remote-agents",
+      "fly-io",
+      "session-tree",
+      "review-fix-cycle"
     ],
-    "metadata": {
-      "canonicalFilename": "2026-06-11-PAN-1775-feat-dashboard-remote-fly-io-work-agents-need-a-real-session-row-in-the-issue-tree-chip-only-visibility-reads-as-no-agent.vbrief.json"
-    },
     "narratives": {
-      "Problem": "## Problem\n\nDuring the PAN-1762 remote Fable 5 test, the operator asked: *\"why can't I see the work agent in the issue tree?\"* — while the agent was running fine on Fly.\n\nThe remote agent IS surfaced, but only as a **tiny icon chip** in the issue row's resource strip (tooltip: `fly.io: pan-pan-1762-ws (running)`). Compare the two adjacent issues in the tree today:\n\n- **PAN-1765 (local agent):** full session row — `Work (gpt-5.5) · 9s ago · working · 20m` with live last-heard, current tool, and an openable terminal.\n- **PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read `1 session idle · ! INPUT` while a work agent was actively implementing on Fly.\n\n## Why\n\n`feature.sessions` is built from local tmux discovery; remote agents have no local tmux session, so they never enter the sessions list. The PAN-1676 visibility pass added the chip + remoteAgent details (FeatureItem.tsx rows / resource strip) but not session-row parity.\n\n## Fix\n\n1. Synthesize a session entry from `remote-state.json` (`~/.panopticon/agents/agent-<id>/remote-state.json`) wherever feature.sessions is composed, labeled e.g. `Work (claude-fable-5) · fly.io · running`, so the issue header badge counts it as a running work agent (`1 work agent running`, not `1 session idle`).\n2. Clicking it should open the remote terminal (tmux on the VM via `pan workspace ssh` / a ws-terminal remote bridge — or at minimum show remote agent output via `getRemoteAgentOutput`).\n3. The idle planning session should not outrank an actively-working remote agent for the issue's headline status.\n\n## Refs\nPAN-1676 (remaining scope: \"Dashboard visibility / overflow-slot surfacing for remote agents\"), PAN-1762 (the live test that surfaced this).",
-      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+      "Problem": "The feature itself (remote Fly work agents rendered as real session rows, remote output on click, remote work outranking idle planning in the headline badge) is already implemented on feature/pan-1775 (core commit 441eeecbc) with open PR #1786 and green CI. Review cycle 3 returned CHANGES REQUESTED with one blocking finding: the branch tracks .pan/continue.json — gitignored workspace runtime state, currently carrying unrelated PAN-1788 content, already untracked on origin/main. Planning discovery found .pan/spec.vbrief.json tracked on the branch too — the identical PAN-1073 invariant violation, also with foreign PAN-1788 content, absent from the PR diff only because it is unchanged since the merge-base. The review also demoted (convergence gate) a real functional gap: fetchProjectSessionTree (src/dashboard/server/routes/projects.ts:471-542) seeds feature candidates only from local workspaces/feature-* directories, so an active remote agent with remote-state.json but NO local workspace directory still produces no session row — recreating the original bug for remote-only agents.",
+      "Proposal": "Two-bead fix cycle on the existing branch; do not restructure the reviewed implementation. Bead 1: untrack both workspace working copies (.pan/continue.json and .pan/spec.vbrief.json) via `git rm --cached` in a new commit — no history rewrite, no .gitignore change, files stay on disk. Bead 2: in fetchProjectSessionTree, additionally seed feature candidates from listActiveRemoteAgentStates() (src/lib/remote/remote-agents.ts:82) using the dynamic-import + try/catch pattern from src/dashboard/server/services/resource-discovery.ts:507-521, filtered to the requested project and deduplicated against the workspace scan, with a unit test covering the no-local-workspace case. Then re-enter review per the synthesis instruction (pan review request PAN-1775 -m \"Fixed review issues\").",
+      "NonGoals": "- No change to the 5s polling cadence of RemoteSessionOutput in SessionPanel.tsx (performance reviewer classified it acceptable/non-blocking; server-side streaming/backoff is a follow-up candidate)\n- No changes to the already-reviewed session-row synthesis in collectSessionTreeNodes (projects.ts:206-274)\n- No interactive remote terminal bridge (tmux-over-ssh); click-through stays the remote output view via getRemoteAgentOutput\n- No history rewriting on feature/pan-1775 (no rebase -i, no amending pushed commits)\n- No .gitignore edits (.pan/continue.json and .pan/spec.vbrief.json are already ignored)\n- No re-implementation or restructuring of the feature commits already on the branch"
     },
+    "autoDecisions": [
+      {
+        "summary": "Treated this planning run as a fix-cycle plan for open PR #1786 rather than re-planning the feature.",
+        "rationale": "The implementation is complete on feature/pan-1775 with green CI; review cycle 3 blocked on artifact hygiene. Re-planning from scratch would discard reviewed, working code."
+      },
+      {
+        "summary": "Extended the review's required fix to untrack .pan/spec.vbrief.json alongside .pan/continue.json.",
+        "rationale": "Planning verified both workspace working copies are tracked on the branch with foreign PAN-1788 content while origin/main tracks neither; the spec copy escaped the review only because it is unchanged since the merge-base. It is the same PAN-1073 invariant the blocking finding cites — leaving it invites a cycle-4 block."
+      },
+      {
+        "summary": "Included the demoted correctness finding (remote-only agents excluded from the session tree) in scope as a second bead.",
+        "rationale": "It is the issue's core promise ('remote work agents need a real session row'); the demotion was procedural (convergence gate: projects.ts unchanged since the prior cycle), and editing projects.ts this cycle makes the finding promotable — leaving it unfixed would block review cycle 4."
+      },
+      {
+        "summary": "Kept the 5s remote-output polling cadence out of scope.",
+        "rationale": "The performance reviewer explicitly classified it acceptable and non-blocking at current scale, bounded to open panels; widening scope would grow the diff in a blocked-review cycle."
+      },
+      {
+        "summary": "Untrack via `git rm --cached` in a new commit instead of any history rewrite.",
+        "rationale": "History rewriting on pushed branches is a forbidden one-way door; gitignore already covers both paths, so index removal is sufficient and the review's verification command (git ls-files) passes."
+      }
+    ],
     "items": [
       {
-        "id": "auto-start",
-        "title": "Implement issue",
+        "id": "untrack-workspace-state",
+        "title": "Untrack workspace .pan/continue.json and .pan/spec.vbrief.json from the feature branch",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-06-11T10:04:17.751Z",
+        "priority": "high",
+        "created": "2026-06-12T20:21:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1775",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
         },
         "narrative": {
-          "Action": "## Problem\n\nDuring the PAN-1762 remote Fable 5 test, the operator asked: *\"why can't I see the work agent in the issue tree?\"* — while the agent was running fine on Fly.\n\nThe remote agent IS surfaced, but only as a **tiny icon chip** in the issue row's resource strip (tooltip: `fly.io: pan-pan-1762-ws (running)`). Compare the two adjacent issues in the tree today:\n\n- **PAN-1765 (local agent):** full session row — `Work (gpt-5.5) · 9s ago · working · 20m` with live last-heard, current tool, and an openable terminal.\n- **PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read `1 session idle · ! INPUT` while a work agent was actively implementing on Fly.\n\n## Why\n\n`feature.sessions` is built from local tmux discovery; remote agents have no local tmux session, so they never enter the sessions list. The PAN-1676 visibility pass added the chip + remoteAgent details (FeatureItem.tsx rows / resource strip) but not session-row parity.\n\n## Fix\n\n1. Synthesize a session entry from `remote-state.json` (`~/.panopticon/agents/agent-<id>/remote-state.json`) wherever feature.sessions is composed, labeled e.g. `Work (claude-fable-5) · fly.io · running`, so the issue header badge counts it as a running work agent (`1 work agent running`, not `1 session idle`).\n2. Clicking it should open the remote terminal (tmux on the VM via `pan workspace ssh` / a ws-terminal remote bridge — or at minimum show remote agent output via `getRemoteAgentOutput`).\n3. The idle planning session should not outrank an actively-working remote agent for the issue's headline status.\n\n## Refs\nPAN-1676 (remaining scope: \"Dashboard visibility / overflow-slot surfacing for remote agents\"), PAN-1762 (the live test that surfaced this)."
+          "Action": "From the workspace root (/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775), run `git rm --cached .pan/continue.json .pan/spec.vbrief.json` and commit as a new commit (suggested message: 'fix(repo): untrack workspace planning working copies — review blocker, PAN-1775'). This resolves the cycle-3 blocking finding (tracked .pan/continue.json carrying unrelated PAN-1788 state) and the identical inherited violation on .pan/spec.vbrief.json (tracked since the merge-base, also PAN-1073-violating). Do NOT delete either file from disk — both are live workspace runtime state for this issue. Do NOT edit .gitignore: both paths are already ignored (.gitignore lines 59-60 and 120/123). Do NOT rewrite history (no amend, no rebase of pushed commits). Known pitfall: while the files are tracked, `git check-ignore` reports them as NOT ignored — gitignore patterns do not apply to tracked files; the check passes only after untracking. Watch hazard H2: a later rebase against main may raise a modify/delete conflict on these paths because origin/main does not track them — resolve in favor of deletion from the index; the on-disk files are untouched."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "auto-start.ac1",
-            "title": "**PAN-1765 (local agent):** full session row — Work (gpt-5.5) · 9s ago · working · 20m with live last-heard, current tool, and an openable terminal.",
+            "id": "untrack-workspace-state.ac1",
+            "title": "Given the fix commit, `git ls-files -- .pan/continue.json .pan/spec.vbrief.json` run at the workspace root returns no output (neither path remains tracked on feature/pan-1775)",
             "status": "pending",
-            "created": "2026-06-11T10:04:17.751Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac2",
-            "title": "**PAN-1762 (remote agent):** no session row at all. Worse, the issue's headline badge was hijacked by the leftover idle planning session — it read 1 session idle · ! INPUT while a work agent was actively implementing on Fly.",
+            "id": "untrack-workspace-state.ac2",
+            "title": "Both files remain present on disk with their PAN-1775 content, and `git check-ignore .pan/continue.json .pan/spec.vbrief.json` exits 0 after untracking (git ignores both paths going forward)",
             "status": "pending",
-            "created": "2026-06-11T10:04:17.751Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "untrack-workspace-state.ac3",
+            "title": "The removal lands as a new commit appended to feature/pan-1775 and preserves all prior branch history (no amend, no rebase of pushed commits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-only-session-row",
+        "title": "Seed session-tree feature candidates from active remote agent states",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-12T20:21:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1775",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/projects.ts fetchProjectSessionTree() (lines ~471-542): seed feature candidates from listActiveRemoteAgentStates() (exported by src/lib/remote/remote-agents.ts:82) in addition to the existing workspaces/feature-* directory scan (lines 503-510). Use the dynamic-import + try/catch guard pattern from src/dashboard/server/services/resource-discovery.ts:507-521 (import '../../../lib/remote/remote-agents.js' adjusted for this file's relative depth; on import failure, skip remote seeding silently so the tree still returns workspace-derived features). For each RemoteAgentState ({ issueId, vmName, model, status, location }): (1) skip if its issueId does not resolve to the requested project — use resolveProjectFromIssue from src/lib/projects.ts and compare the resolved project's key with project.key; (2) skip if a candidate with the same issueLower already exists from the workspace scan (dedupe — e.g. PAN-1762 had both a local workspace and a remote agent); (3) otherwise append { name: `feature-${issueLower}`, issueLower, issueId } and let the existing per-candidate loop process it. The existing loop already handles remote-only candidates: its hasAgent check passes because ~/.panopticon/agents/agent-<issueLower>/ contains remote-state.json, and collectSessionTreeNodes synthesizes the remote SessionNode (remote: { provider: 'fly.io', vmName } at projects.ts:269) even when the workspacePath does not exist on disk. Structural requirement: the candidate-processing loop currently lives inside `if (await pathExists(workspacesDir))` (line 501) — restructure minimally so remote-derived candidates are processed even when the workspaces directory is absent. Per hazard H4, the unit test must prove resolveJsonlPath and getSessionTreeWorkspacePath tolerate the missing workspace directory. Add the test to the existing suite tests/unit/dashboard/server/routes/projects.test.ts (created by commit 441eeecbc), following its existing mocking patterns."
+        },
+        "items": [
+          {
+            "id": "remote-only-session-row.ac1",
+            "title": "Given an active remote-state.json (location 'remote', status 'running') for an issue with NO workspaces/feature-<issue> directory, fetchProjectSessionTree returns a feature entry for that issue whose sessions include a work row carrying remote.provider 'fly.io' and the state's vmName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-only-session-row.ac2",
+            "title": "An issue discovered by both the workspace scan and remote seeding produces exactly one feature entry (dedupe by issueLower preserves the workspace-scan candidate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-only-session-row.ac3",
+            "title": "The returned tree excludes remote agents whose issueId resolves to a different project than the requested projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-only-session-row.ac4",
+            "title": "When the remote-agents module import fails, fetchProjectSessionTree falls back to workspace-derived features only and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-only-session-row.ac5",
+            "title": "A new unit test in tests/unit/dashboard/server/routes/projects.test.ts asserts the no-local-workspace remote case returns the synthesized remote session row, proving the missing-workspacePath path does not throw",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -71,6 +179,10 @@
         ]
       }
     ],
-    "edges": []
-  }
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1775-feat-dashboard-remote-fly-io-work-agents-need-a-real-session-row-in-the-issue-tree-chip-only-visibility-reads-as-no-agent.vbrief.json"
+    }
+  },
+  "status": "proposed"
 }

@@ -53,9 +53,15 @@ vi.mock('../../config.js', () => ({
   getDevrootPathSync: vi.fn(() => null),
 }));
 
+// ── stub-ui scanner mock ───────────────────────────────────────────────────
+vi.mock('../lint-stub-ui.js', () => ({
+  scanStubUi: vi.fn(),
+}));
+
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext } from '../review-context.js';
 import { findPlanSync } from '../../vbrief/io.js';
+import { scanStubUi } from '../lint-stub-ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function mockGitOutput(map: Record<string, { stdout: string; stderr?: string }>) {
@@ -76,6 +82,7 @@ describe('buildReviewContext', () => {
     vi.clearAllMocks();
     mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
+    vi.mocked(scanStubUi).mockResolvedValue([]);
   });
 
   it('throws when workspace does not exist', async () => {
@@ -238,6 +245,52 @@ describe('buildReviewContext', () => {
     expect(manifest.changedFiles).toEqual([]);
     expect(manifest.headSha).toBe('unknown');
     expect(manifest.diff.stat).toContain('Unable');
+  });
+
+  it('includes stubUiFindings on the manifest', async () => {
+    vi.mocked(scanStubUi).mockResolvedValue([
+      {
+        patternId: 'empty-array-return',
+        patternLabel: 'Hook/function returns an empty array',
+        filePath: 'src/dashboard/frontend/src/components/Inspector/FilesTab.tsx',
+        lineNumber: 42,
+        addedLine: '  return [];',
+        severity: 'block',
+      },
+    ]);
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1500\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.stubUiFindings).toHaveLength(1);
+    expect(manifest.stubUiFindings[0]?.patternId).toBe('empty-array-return');
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.stubUiFindings).toEqual(manifest.stubUiFindings);
+  });
+
+  it('survives a throwing scanStubUi with stubUiFindings: []', async () => {
+    vi.mocked(scanStubUi).mockRejectedValue(new Error('scanner boom'));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1500\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.stubUiFindings).toEqual([]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.stubUiFindings).toEqual([]);
   });
 });
 

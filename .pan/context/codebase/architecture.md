@@ -57,4 +57,15 @@ server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 
 Conversations pin harness at creation (`routes/conversations.ts` ~:2741) — not a spawn site.
 
+## Remote (Fly.io) work agents
+
+Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
+`fly-provider.ts`). State lives at
+`~/.panopticon/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
+`vmName`, `status`). The dashboard surfaces them via
+`listActiveRemoteAgentStates()` in `services/resource-discovery.ts` (issue chip
++ aggregate status, PAN-1676) and session-row synthesis in
+`routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
+no local tmux session — never assume tmux discovery covers them.
+
 <!-- last-verified: 2026-06-12 -->

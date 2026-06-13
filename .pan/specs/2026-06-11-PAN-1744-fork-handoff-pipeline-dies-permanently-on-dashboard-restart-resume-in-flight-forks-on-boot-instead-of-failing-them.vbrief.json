@@ -4,17 +4,17 @@
     "created": "2026-06-11T01:01:38.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1744: Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
-    "updated": "2026-06-11T03:09:55.118Z"
+    "updated": "2026-06-12T20:21:12.324Z"
   },
   "plan": {
     "id": "pan-1744",
     "title": "Fork/handoff pipeline dies permanently on dashboard restart — resume in-flight forks on boot instead of failing them",
-    "status": "proposed",
+    "status": "completed",
     "uid": "0a48ed05-3ad4-4cb0-98f5-1477b1199db3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 36,
+    "sequence": 37,
     "created": "2026-06-11T01:01:38.000Z",
-    "updated": "2026-06-11T03:09:55.118Z",
+    "updated": "2026-06-12T20:21:12.324Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1744",
@@ -530,5 +530,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

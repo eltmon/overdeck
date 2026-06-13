@@ -18,6 +18,7 @@ const moveDirSync = (src, dst) => {
     if (error?.code !== 'EXDEV') {
       throw error;
     }
+
     cpSync(src, dst, { recursive: true });
     rmSync(src, { recursive: true, force: true });
   }

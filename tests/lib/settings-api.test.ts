@@ -411,7 +411,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, or codex');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, pi, codex, or empty string');
     });
   });
 

@@ -13,6 +13,7 @@
 
 import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
+import type { SqliteDatabase } from './driver.js';
 import type { CostEvent } from '../costs/events.js';
 
 /** A SQLite operation against panopticon.db failed. */
@@ -486,7 +487,7 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
 
 // ============== Helpers ==============
 
-function getModelBreakdownForIssue(db: import('better-sqlite3').Database, issueId: string): Record<string, ModelBreakdown> {
+function getModelBreakdownForIssue(db: SqliteDatabase, issueId: string): Record<string, ModelBreakdown> {
   const rows = db.prepare(`
     SELECT model, SUM(cost) as cost, COUNT(*) as calls,
            SUM(input + output + cache_read + cache_write) as tokens
@@ -502,7 +503,7 @@ function getModelBreakdownForIssue(db: import('better-sqlite3').Database, issueI
   return result;
 }
 
-function getStageBreakdownForIssue(db: import('better-sqlite3').Database, issueId: string): Record<string, StageBreakdown> {
+function getStageBreakdownForIssue(db: SqliteDatabase, issueId: string): Record<string, StageBreakdown> {
   const rows = db.prepare(`
     SELECT session_type as stage, SUM(cost) as cost, COUNT(*) as calls,
            SUM(input + output + cache_read + cache_write) as tokens

@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-1498",
+  "created": "2026-06-12T19:00:24.977Z",
+  "updated": "2026-06-12T23:36:13.710Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T19:00Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-12T19:00:24.978Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T23:04Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-12T23:04:11.506Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T23:33Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-12T23:33:12.444Z"
+    }
+  ]
+}

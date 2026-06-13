@@ -140,6 +140,23 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
+
+export function buildPanStartArgs(input: {
+  issueId: string;
+  model: string;
+  harness?: RuntimeName | null;
+  allowHost?: boolean;
+}): string[] {
+  return [
+    'start',
+    input.issueId,
+    '--local',
+    '--model',
+    input.model,
+    ...(input.harness ? ['--harness', input.harness] : []),
+    ...(input.allowHost ? ['--host', '--yes'] : []),
+  ];
+}
 type StartAgentPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 function emitStartAgentPhase(
@@ -2877,7 +2894,12 @@ const postAgentsRoute = HttpRouter.add(
       yield* Effect.gen(function* () {
         const gitRoot = workspacePath;
         if (existsSync(join(gitRoot, PAN_DIRNAME))) {
-          yield* Effect.promise(() => execAsync(`git add -f .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
+          // PAN-1819: use plain git add (never -f) and exclude workspace-state/sync-target paths.
+          yield* Effect.promise(() => execAsync(`git add .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
+          yield* Effect.promise(() => execAsync(
+            `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
+            { cwd: gitRoot, encoding: 'utf-8' },
+          ));
         }
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
@@ -3431,9 +3453,12 @@ const postAgentsRoute = HttpRouter.add(
                   });
                   emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent after containers became healthy', { workspacePath });
                   const activityId = await spawnPanCommand(
-                    ['start', issueId, '--local', '--model', spawnModel,
-                      ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
-                      ...(allowHost ? ['--host', '--yes'] : [])],
+                    buildPanStartArgs({
+                      issueId,
+                      model: spawnModel,
+                      harness: effectiveHarness,
+                      allowHost,
+                    }),
                     workspacePath,
                   );
                   emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
@@ -3494,9 +3519,12 @@ const postAgentsRoute = HttpRouter.add(
     try {
       emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
       activityId = yield* Effect.promise(() => spawnPanCommand(
-        ['start', issueId, '--local', '--model', spawnModel,
-          ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
-          ...(allowHost ? ['--host', '--yes'] : [])],
+        buildPanStartArgs({
+          issueId,
+          model: spawnModel,
+          harness: effectiveHarness,
+          allowHost,
+        }),
         workspacePath,
       ));
       emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {

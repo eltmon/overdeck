@@ -15,9 +15,9 @@ export function getSharedIssueService(): IssueDataService {
   return _service;
 }
 
-export function startSharedIssueService(): Promise<void> {
+export function startSharedIssueService(options?: { skipPolling?: boolean }): Promise<void> {
   if (_startPromise) return _startPromise;
-  _startPromise = getSharedIssueService().start().catch((err: unknown) => {
+  _startPromise = getSharedIssueService().start(options).catch((err: unknown) => {
     console.error('[issue-service-singleton] start failed:', err);
   });
   return _startPromise;

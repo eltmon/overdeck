@@ -40,6 +40,38 @@ interface QueuedCommit {
   timer: NodeJS.Timeout;
 }
 
+/**
+ * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * state. Mirrors the exclusion list in src/lib/cloister/merge-agent.ts.
+ */
+const AUTO_COMMIT_EXCLUDED_PATHS = [
+  '.pan/kickoff.md',
+  '.pan/continue.json',
+  '.pan/handoff-*.md',
+  '.pan/spec.vbrief.json',
+  '.claude/rules/',
+  '.claude/skills/',
+];
+
+function isAutoCommitExcludedPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
+    if (pattern.endsWith('/')) {
+      if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) {
+        return true;
+      }
+    } else if (pattern.includes('*')) {
+      const regex = new RegExp(
+        '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') + '$'
+      );
+      if (regex.test(normalized)) return true;
+    } else if (normalized === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface FlushResult {
   committed: boolean;
   reason?: string;
@@ -224,7 +256,13 @@ function doCommit(
     );
 
     const paths = Array.from(batch.paths);
-    const relativePaths = paths.map((p) => relativizeToRoot(p, projectRoot));
+    const relativePaths = paths
+      .map((p) => relativizeToRoot(p, projectRoot))
+      .filter((p) => !isAutoCommitExcludedPath(p));
+
+    if (relativePaths.length === 0) {
+      return { committed: false, reason: 'all paths excluded from auto-commit' };
+    }
 
     // git add
     const addOk: boolean | FlushResult = yield* runGit(

@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveClaudeSessionId } from './jsonl-resolver.js';
+import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
@@ -94,6 +94,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
+  findManagedServerPidSync,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
@@ -275,14 +276,22 @@ async function terminatePids(pids: number[]): Promise<void> {
   }
 }
 
-function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
   const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+  // PAN-1798: never let conversation cmdline matching catch the shared tmux
+  // server. If the server was founded implicitly by a conversation, its
+  // cmdline embeds that conversation's session name and a pkill/pgrep-style
+  // match would destroy every session on the socket. Exclude the live server
+  // PID explicitly; teardown already starts with tmux kill-session on the
+  // target session, so this cleanup only mops up orphan runtime processes.
+  const serverPid = findManagedServerPidSync();
 
   return rows
     .filter((row) => {
       if (row.pid === process.pid) return false;
+      if (serverPid !== undefined && row.pid === serverPid) return false;
       if (row.args.includes(launcherScript)) return true;
       return sessionNeedles.some((needle) => row.args.includes(needle));
     })
@@ -743,7 +752,7 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
   // The thread-id stored in codex-thread-id is the session identifier.
   if (conv.harness === 'codex') {
-    return resolveCodexSessionFile(conv.tmuxSession);
+    return resolveCodexRolloutPath(conv.tmuxSession);
   }
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
@@ -785,30 +794,9 @@ function isCodexSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
-async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
-  const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
-  const threadIdPath = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
-  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
-
-  // Fast path: a persisted thread-id resolves directly to its rollout.
-  if (existsSync(threadIdPath)) {
-    try {
-      const threadId = readFileSync(threadIdPath, 'utf-8').trim();
-      if (threadId) {
-        const path = findRolloutPath(codexHome, threadId);
-        if (path) return path;
-      }
-    } catch { /* fall through to the lazy fallback */ }
-  }
-
-  // PAN-1690 — lazy fallback. The spawn-time thread-id capture is a one-shot
-  // 120s wait, but Codex only writes its rollout on the first turn, so a
-  // conversation whose first message lands later never gets a persisted
-  // thread-id and the transcript stays empty. The per-conversation CODEX_HOME
-  // holds only this conversation's rollouts, so the newest one is its current
-  // thread — resolve it directly so the view works regardless of spawn timing.
-  return findLatestRollout(codexHome);
-}
+// Codex rollout resolution (thread-id fast path + PAN-1690 latest-rollout
+// fallback) lives in ./jsonl-resolver.ts as resolveCodexRolloutPath, shared
+// with the work-agent transcript resolver (PAN-1805).
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
   const claudeSessionFile = await resolveSessionFile(conv);
@@ -3023,41 +3011,54 @@ const getConversationMessagesRoute = HttpRouter.add(
           if (cached) {
             sessionFile = cached;
           } else if (/^(specialist-|agent-|planning-)/.test(name)) {
+            // Codex agents (PAN-1805): no Claude session exists — the
+            // transcript is the rollout JSONL under the per-agent CODEX_HOME.
+            try {
+              if (await resolveAgentHarness(name) === 'codex') {
+                const rollout = await resolveCodexRolloutPath(name);
+                if (rollout) {
+                  sessionFile = rollout;
+                  setSpecialistSessionCache(name, rollout);
+                }
+              }
+            } catch { /* fall through to the Claude lookup */ }
             // Resolve JSONL via the unified session-id lookup chain
             // (session.id file → sessions.json → runtime state) in
             // ~/.panopticon/agents/<name>/. Covers work agents, planning
             // agents, and all specialist types (reviewers, test, merge).
-            try {
-              const claudeSessionId = await resolveClaudeSessionId(name);
-              if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
-                const claudeProjects = join(homedir(), '.claude', 'projects');
-                const dirs = await readdir(claudeProjects);
-                const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-                const candidates = dirs
-                  .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-                  .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
-                const STAT_BATCH_SIZE = 50;
-                let found: string | null = null;
-                for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
-                  const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-                  const checks = await Promise.all(
-                    batch.map(async (candidate) => {
-                      try {
-                        await stat(candidate);
-                        return candidate;
-                      } catch {
-                        return null;
-                      }
-                    }),
-                  );
-                  found = checks.find((c): c is string => c !== null) ?? null;
+            if (!sessionFile) {
+              try {
+                const claudeSessionId = await resolveClaudeSessionId(name);
+                if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
+                  const claudeProjects = join(homedir(), '.claude', 'projects');
+                  const dirs = await readdir(claudeProjects);
+                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+                  const candidates = dirs
+                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+                    .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
+                  const STAT_BATCH_SIZE = 50;
+                  let found: string | null = null;
+                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
+                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+                    const checks = await Promise.all(
+                      batch.map(async (candidate) => {
+                        try {
+                          await stat(candidate);
+                          return candidate;
+                        } catch {
+                          return null;
+                        }
+                      }),
+                    );
+                    found = checks.find((c): c is string => c !== null) ?? null;
+                  }
+                  if (found) {
+                    sessionFile = found;
+                    setSpecialistSessionCache(name, found);
+                  }
                 }
-                if (found) {
-                  sessionFile = found;
-                  setSpecialistSessionCache(name, found);
-                }
-              }
-            } catch { /* session resolution failed */ }
+              } catch { /* session resolution failed */ }
+            }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });

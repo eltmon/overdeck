@@ -5,46 +5,23 @@
  * Stores health state transitions for visualization and analysis.
  */
 
-import type Database from 'better-sqlite3';
-import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { Data, Effect } from 'effect';
+import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 import { PANOPTICON_HOME } from '../paths.js';
+import type { HealthState } from '../runtimes/types.js';
 
 /**
  * Local error class for the cloister health-history SQLite store. Distinct from
- * `DatabaseError` in the application-settings store because this layer
- * (better-sqlite3 / bun:sqlite, sync API) has different failure surfaces.
+ * `DatabaseError` in the application-settings store because this layer has its
+ * own health-history failure surfaces.
  */
 export class CloisterDatabaseError extends Data.TaggedError('CloisterDatabaseError')<{
   readonly operation: string;
   readonly message: string;
   readonly cause?: unknown;
 }> {}
-
-declare const Bun: unknown;
-const _require = createRequire(import.meta.url);
-
-function openSqliteDb(dbPath: string): Database.Database {
-  if (typeof Bun !== 'undefined') {
-    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
-    const bunDb = new BunDatabase(dbPath);
-    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
-      if (options?.simple) {
-        const key = sql.trim();
-        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
-        return row?.[key] ?? null;
-      }
-      bunDb.exec(`PRAGMA ${sql}`);
-      return undefined;
-    };
-    return bunDb as Database.Database;
-  }
-  const BetterSqlite3 = _require('better-sqlite3');
-  return new BetterSqlite3(dbPath) as Database.Database;
-}
-import type { HealthState } from '../runtimes/types.js';
 
 const CLOISTER_DB_PATH = join(PANOPTICON_HOME, 'cloister.db');
 const RETENTION_DAYS = 7;
@@ -69,7 +46,7 @@ export interface HealthEventWithMetadata extends Omit<HealthEvent, 'metadata'> {
   metadata?: Record<string, unknown>;
 }
 
-let db: Database.Database | null = null;
+let db: SqliteDatabase | null = null;
 
 /**
  * Initialize the health history database
@@ -77,14 +54,14 @@ let db: Database.Database | null = null;
  * Creates the database file and schema if they don't exist.
  * Safe to call multiple times - idempotent.
  */
-export function initHealthDatabase(): Database.Database {
+export function initHealthDatabase(): SqliteDatabase {
   // Ensure panopticon home exists
   if (!existsSync(PANOPTICON_HOME)) {
     mkdirSync(PANOPTICON_HOME, { recursive: true });
   }
 
   // Open or create database
-  db = openSqliteDb(CLOISTER_DB_PATH);
+  db = openDatabase(CLOISTER_DB_PATH);
 
   // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL');
@@ -117,7 +94,7 @@ export function initHealthDatabase(): Database.Database {
 /**
  * Get the database instance, initializing if necessary
  */
-export function getHealthDatabase(): Database.Database {
+export function getHealthDatabase(): SqliteDatabase {
   if (!db) {
     return initHealthDatabase();
   }
@@ -214,7 +191,7 @@ export function getHealthHistorySync(
     ORDER BY timestamp ASC
   `);
 
-  const events = stmt.all(agentId, startTime, endTime) as HealthEvent[];
+  const events = stmt.all(agentId, startTime, endTime) as unknown as HealthEvent[];
 
   // Parse metadata JSON
   return events.map((event) => ({
@@ -245,7 +222,7 @@ export function getRecentHealthHistorySync(
     LIMIT ?
   `);
 
-  const events = stmt.all(agentId, limit) as HealthEvent[];
+  const events = stmt.all(agentId, limit) as unknown as HealthEvent[];
 
   // Parse metadata JSON and reverse to get chronological order
   return events
@@ -277,7 +254,7 @@ export function getAllHealthHistorySync(
     ORDER BY timestamp ASC
   `);
 
-  const events = stmt.all(startTime, endTime) as HealthEvent[];
+  const events = stmt.all(startTime, endTime) as unknown as HealthEvent[];
 
   // Parse metadata JSON
   return events.map((event) => ({
@@ -342,7 +319,7 @@ export function getAgentsWithHistorySync(): string[] {
  * @returns Number of events deleted
  */
 export function cleanupOldEventsSync(
-  database: Database.Database = getHealthDatabase(),
+  database: SqliteDatabase = getHealthDatabase(),
   retentionDays: number = RETENTION_DAYS
 ): number {
   const cutoffDate = new Date();
@@ -409,7 +386,7 @@ export function getDatabaseStatsSync(): {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// `better-sqlite3` (and `bun:sqlite`) are intentionally synchronous APIs, so
+// The shared SQLite driver is intentionally synchronous, so
 // these wrappers stay sync at the call site and lift failures into a typed
 // `CloisterDatabaseError` channel via `Effect.try`. They exist so callers in
 // the Effect world can compose health-history reads/writes without manually

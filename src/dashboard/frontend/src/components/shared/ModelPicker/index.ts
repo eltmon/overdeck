@@ -7,7 +7,6 @@ export {
   useAvailableModels,
   invalidateAvailableModelsCache,
   formatCost,
-  PROVIDER_LABELS,
   FALLBACK_GROUPS,
   FALLBACK_COMPACTION_MODEL,
   HARNESS_OPTIONS,

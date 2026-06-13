@@ -16,7 +16,7 @@ import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearF
 export interface WriteFeedbackOptions {
   issueId: string;
   workspacePath?: string;
-  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent' | 'ci-monitor';
   outcome: string;
   summary: string;
   markdownBody: string;
