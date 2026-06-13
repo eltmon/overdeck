@@ -59,7 +59,7 @@ vi.mock('../lint-stub-ui.js', () => ({
 }));
 
 // ── import after mocks ─────────────────────────────────────────────────────
-import { buildReviewContext } from '../review-context.js';
+import { buildReviewContext, formatTier1Summary, REVIEW_LARGE_CHANGESET_FILES, REVIEW_LARGE_CHANGESET_LINES } from '../review-context.js';
 import { findPlanSync } from '../../vbrief/io.js';
 import { scanStubUi } from '../lint-stub-ui.js';
 
@@ -355,4 +355,61 @@ describe('riskScore (via buildReviewContext file ranking)', () => {
       expect(manifest.changedFiles[0]?.riskScore).toBe(1);
     });
   }
+});
+
+describe('large changeset guardrail', () => {
+  const baseManifest = {
+    issueId: 'PAN-1059',
+    branch: 'feature-pan-1059',
+    headSha: 'abc123',
+    changedFiles: [],
+    largeChangeset: { fileCount: 0, changedLines: 0, isLarge: false },
+    acceptanceCriteria: [],
+    nonGoals: [],
+    traces: [],
+    policyNotes: [],
+    stubUiFindings: [],
+    diff: { stat: '1 file changed, 1 insertion(+)', truncated: false },
+  };
+
+  it('flags a changeset with more than REVIEW_LARGE_CHANGESET_FILES files', () => {
+    const files = Array.from({ length: REVIEW_LARGE_CHANGESET_FILES + 1 }, (_, i) => ({
+      path: `src/lib/f${i}.ts`,
+      status: 'M' as const,
+      additions: 1,
+      deletions: 0,
+      riskScore: 2,
+    }));
+    const summary = formatTier1Summary({ ...baseManifest, changedFiles: files, largeChangeset: { fileCount: files.length, changedLines: files.length, isLarge: true } });
+    expect(summary).toContain('LARGE CHANGESET');
+    expect(summary).toContain('highest-risk files first');
+    expect(summary).toContain('BLOCKING coverage gap');
+  });
+
+  it('flags a changeset with more than REVIEW_LARGE_CHANGESET_LINES changed lines', () => {
+    const files = [{
+      path: 'src/lib/big.ts',
+      status: 'M' as const,
+      additions: REVIEW_LARGE_CHANGESET_LINES + 1,
+      deletions: 0,
+      riskScore: 2,
+    }];
+    const summary = formatTier1Summary({ ...baseManifest, changedFiles: files, largeChangeset: { fileCount: 1, changedLines: REVIEW_LARGE_CHANGESET_LINES + 1, isLarge: true } });
+    expect(summary).toContain('LARGE CHANGESET');
+    expect(summary).toContain('changed regions');
+  });
+
+  it('omits the guardrail for small changesets', () => {
+    const files = Array.from({ length: REVIEW_LARGE_CHANGESET_FILES }, (_, i) => ({
+      path: `src/lib/f${i}.ts`,
+      status: 'M' as const,
+      additions: 1,
+      deletions: 0,
+      riskScore: 2,
+    }));
+    const changedLines = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+    const summary = formatTier1Summary({ ...baseManifest, changedFiles: files, largeChangeset: { fileCount: files.length, changedLines, isLarge: false } });
+    expect(summary).not.toContain('LARGE CHANGESET');
+    expect(summary).not.toContain('BLOCKING coverage gap');
+  });
 });

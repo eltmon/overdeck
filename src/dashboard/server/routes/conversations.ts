@@ -28,6 +28,7 @@ import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, r
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
+import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import {
@@ -3800,7 +3801,7 @@ export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDo
   return readFile(conv.handoffDocPath, 'utf-8');
 }
 
-async function ensureForkSessionReady(
+export async function ensureForkSessionReady(
   conv: Conversation,
   sessionId: string,
   resume: boolean,
@@ -3830,7 +3831,7 @@ async function ensureForkSessionReady(
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
-async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
+export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
 
@@ -3865,6 +3866,13 @@ async function injectForkSummary(conv: Conversation, summary: string, caller: st
       console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
     }
   }
+}
+
+export function handleForkPipelineFailure(name: string, err: unknown): void {
+  console.error(`[fork-pipeline] Failed for ${name}:`, err);
+  const msg = err instanceof Error ? err.message : String(err);
+  updateForkStatus(name, 'failed', msg);
+  markConversationEnded(name);
 }
 
 export async function runForkPipeline(
@@ -3929,10 +3937,40 @@ export async function runForkPipeline(
 
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
-      return Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (error) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return '';
+      }
     }
-    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, parentConv.harness ?? undefined);
-    return result.summary;
+    try {
+      const result = await generateSummaryForFork(
+        parentSessionFile,
+        summaryModel,
+        includeThinkingInSummary,
+        summaryHarness,
+        parentConv.harness ?? undefined,
+      );
+      return result.summary;
+    } catch (error) {
+      if (!forkFallbackReason) {
+        forkFallbackReason = `LLM summary failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      console.warn(
+        `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (heuristicError) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
+        );
+        return '';
+      }
+    }
   };
 
   if (forkMode === 'handoff') {
@@ -3997,9 +4035,9 @@ export async function runForkPipeline(
   }
 
   updateForkStatus(convName, 'spawning');
-  await ensureForkSessionReady(conv, sessionId, false);
+  await self.ensureForkSessionReady(conv, sessionId, false);
 
-  await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
+  await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -4294,8 +4332,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         registerInFlightForkPipeline(
           runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
         ).catch((err) => {
-          console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
-          updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
+          handleForkPipelineFailure(newConv.name, err);
         });
 
         return jsonResponse({

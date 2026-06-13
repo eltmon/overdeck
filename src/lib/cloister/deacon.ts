@@ -28,7 +28,7 @@ import {
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isContextOverflowTail } from '../context-overflow.js';
-import type { ReviewSubRole } from './review-monitor.js';
+import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -977,8 +977,15 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   const agentSessions = sessionNames.filter(
     name => name.startsWith('agent-') || name.startsWith('specialist-') || name.startsWith('planning-'),
   );
+  // PAN-1818: convoy reviewer sub-role sessions (agent-<issue>-review-<subRole>)
+  // are owned exclusively by monitorReviewConvoySignals(). checkApiErrorAgents
+  // derives a garbage issueId from these names and would apply work-agent
+  // compact-respawn, racing the monitor. Skip them here.
+  const nonReviewerSessions = agentSessions.filter(
+    name => !/^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(name),
+  );
 
-  for (const sessionName of agentSessions) {
+  for (const sessionName of nonReviewerSessions) {
     const recovery = apiErrorRecoveryState.get(sessionName);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
       continue;
@@ -5721,6 +5728,8 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 }
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
+const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
+const reviewReportsPresentNudges = new Map<string, number>();
 
 /**
  * Respawn a convoy reviewer that has gone idle without writing its output.
@@ -5785,6 +5794,81 @@ async function respawnIdleReviewer(state: AgentState, agentId: string): Promise<
   }
 }
 
+async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentState[]): Promise<string[]> {
+  const actions: string[] = [];
+  const now = Date.now();
+  const synthesisStates = states.filter(state =>
+    state.role === 'review'
+    && !state.reviewSubRole
+    && state.reviewRunId
+    && state.workspace
+    && state.issueId
+  );
+
+  for (const state of synthesisStates) {
+    const status = getReviewStatusSync(state.issueId);
+    if (!status || status.reviewStatus !== 'reviewing') continue;
+
+    const reviewDir = join(state.workspace, '.pan', 'review', state.reviewRunId!);
+    if (existsSync(join(reviewDir, 'synthesis.md'))) continue;
+
+    const sessionAlive = await Effect.runPromise(sessionExists(state.id)).catch(() => false);
+    if (!sessionAlive) continue;
+    const paneDead = await Effect.runPromise(isPaneDead(state.id)).catch(() => true);
+    if (paneDead) continue;
+
+    const startedMs = Date.parse(state.startedAt);
+    const readyLines: string[] = [];
+    let allReportsPresent = true;
+    for (const subRole of REVIEW_SUB_ROLES) {
+      const outputPath = join(reviewDir, `${subRole}.md`);
+      if (!existsSync(outputPath)) {
+        allReportsPresent = false;
+        break;
+      }
+      try {
+        const outputMtimeMs = statSync(outputPath).mtimeMs;
+        if (Number.isFinite(startedMs) && outputMtimeMs < startedMs) {
+          allReportsPresent = false;
+          break;
+        }
+      } catch {
+        allReportsPresent = false;
+        break;
+      }
+      readyLines.push(`REVIEWER_READY ${subRole} ${outputPath}`);
+    }
+    if (!allReportsPresent) continue;
+
+    const nudgeKey = `${state.id}:${state.reviewRunId}`;
+    const lastNudge = reviewReportsPresentNudges.get(nudgeKey);
+    if (lastNudge && now - lastNudge < REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS) continue;
+
+    const message = [
+      'Deacon fallback: all reviewer report files for this review run are present on disk, but synthesis has not been written yet.',
+      'If you have not already synthesized this run, treat these as the missing terminal reviewer signals and proceed now:',
+      '',
+      ...readyLines,
+      '',
+      'Read the four reports, write synthesis.md, then signal review status exactly as roles/review.md instructs.',
+    ].join('\n');
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(state.id, message);
+      reviewReportsPresentNudges.set(nudgeKey, now);
+      const action = `Nudged ${state.id} to synthesize from ${REVIEW_SUB_ROLES.length} reviewer reports`;
+      actions.push(action);
+      logDeaconEventSync(`monitorReviewConvoySignals: ${action}`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logDeaconEventSync(`monitorReviewConvoySignals: failed to nudge ${state.id} for complete reviewer reports: ${errMsg}`);
+    }
+  }
+
+  return actions;
+}
+
 export async function monitorReviewConvoySignals(): Promise<string[]> {
   const actions: string[] = [];
   if (!existsSync(AGENTS_DIR)) return actions;
@@ -5796,10 +5880,13 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     return actions;
   }
 
+  const reviewStates: AgentState[] = [];
+
   for (const agentId of agentDirs) {
     const state = getAgentStateSync(agentId);
     if (!state) continue;
     if (state.role !== 'review') continue;
+    reviewStates.push(state);
     if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
     if (state.reviewMonitorSignaled) continue;
 
@@ -5859,12 +5946,25 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
         : 0;
     const idleAndNoOutput = reviewerSessionAlive && !outputWrittenForThisRun && runtimeIdleAgeMs > REVIEWER_IDLE_FAILURE_MS;
 
+    // PAN-1818: context-window overflow is deterministic on the same diff/manifest.
+    // Capture the pane tail and fast-fail BEFORE the idle-respawn branch so we never
+    // burn another cycle respawning a reviewer that will re-overflow. Only check when
+    // the reviewer is idle at its prompt — an active reviewer cannot have hit a 400 yet.
+    let contextOverflowDetected = false;
+    if (!outputWrittenForThisRun && runtimeState?.state === 'idle') {
+      const tail = await Effect.runPromise(capturePane(agentId, 100)).catch(() => '');
+      contextOverflowDetected = isContextOverflowTail(tail);
+    }
+
     let signal: 'ready' | 'failed' | 'timeout' | null = null;
     let reason = '';
     if (outputWrittenForThisRun) {
       // Report exists for this run but the Stop-hook didn't signal (no fresh
       // marker) — back it up with READY. Safe: the report is on disk.
       signal = 'ready';
+    } else if (contextOverflowDetected) {
+      signal = 'failed';
+      reason = 'context-window overflow (no retry — deterministic)';
     } else if (idleAndNoOutput) {
       const attempt = state.reviewRetryAttempt ?? 0;
       if (attempt < 1 && (await respawnIdleReviewer(state, agentId))) {
@@ -5934,6 +6034,8 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       logDeaconEventSync(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
     }
   }
+
+  actions.push(...await nudgeSynthesisForCompleteReviewerReports(reviewStates));
 
   return actions;
 }

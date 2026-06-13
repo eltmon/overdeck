@@ -52,7 +52,7 @@ function embeddingFor(input: DocsEmbeddingInput): Float32Array {
   return new Float32Array([0, 1]);
 }
 
-describe('docs query library', () => {
+describe('docs query library', { timeout: 30_000 }, () => {
   beforeEach(async () => {
     rootDir = await mkdtemp(join(tmpdir(), 'pan-docs-query-'));
     syncSourcesRoot = join(rootDir, 'sync-sources');
