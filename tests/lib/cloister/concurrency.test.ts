@@ -7,7 +7,7 @@ import {
   type RunningCounts,
 } from '../../../src/lib/cloister/concurrency.js';
 
-const LIMITS: ConcurrencyLimits = { maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 };
+const LIMITS: ConcurrencyLimits = { maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9, exemptOperatorStarted: true };
 
 describe('concurrency governor — pure math', () => {
   it('reports free work slots below the cap', () => {
@@ -44,6 +44,7 @@ describe('concurrency governor — config + counting', () => {
     const limits = getConcurrencyLimits();
     expect(limits.maxWorkAgents).toBe(1); // clamped to >= 1
     expect(limits.reservedAdvancingSlots).toBe(0); // clamped to >= 0
+    expect(limits.exemptOperatorStarted).toBe(true); // defaults to true
   });
 
   it('counts only tmux-alive agents, grouped into work vs advancing', async () => {
@@ -83,7 +84,7 @@ describe('concurrency governor — config + counting', () => {
   it('emergency brake stops excess work agents idle-first and clears stoppedByUser', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/cloister/config.js', () => ({
-      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1 } }),
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1, exempt_operator_started: false } }),
     }));
     const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
       'agent-a': { id: 'agent-a' }, 'agent-b': { id: 'agent-b' },
@@ -131,5 +132,35 @@ describe('concurrency governor — config + counting', () => {
     }));
     const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
     expect(emergencyBrake()).toEqual({ before: 1, cap: 6, stopped: [], remaining: 1 });
+  });
+
+  it('emergency brake skips operator-started agents when exemptOperatorStarted is true (PAN-1812)', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/cloister/config.js', () => ({
+      loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1, exempt_operator_started: true } }),
+    }));
+    const states: Record<string, { id: string; stoppedByUser?: boolean }> = {
+      'agent-fly-a': { id: 'agent-fly-a' },
+      'agent-op-b': { id: 'agent-op-b' },
+      'agent-op-c': { id: 'agent-op-c' },
+    };
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-fly-a', role: 'work', tmuxActive: true, flywheelRunId: 'RUN-1', lastActivity: '2026-01-01T00:00:00Z' },
+        { id: 'agent-op-b', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' },
+        { id: 'agent-op-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-03T00:00:00Z' },
+      ],
+      stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
+      getAgentStateSync: (id: string) => states[id],
+      saveAgentStateSync: (s: { id: string }) => { states[s.id] = states[s.id]; },
+      getAgentRuntimeStateSync: (id: string) => ({ state: 'active' }),
+    }));
+    const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
+
+    const result = emergencyBrake();
+
+    expect(result.before).toBe(3);
+    expect(result.stopped).toEqual(['agent-fly-a']);
+    expect(result.remaining).toBe(2);
   });
 });

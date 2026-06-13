@@ -922,6 +922,9 @@ export interface AgentState {
    */
   roleRunHead?: string;
 
+  /** Flywheel run that spawned this agent, if any. Absent for operator-started agents (PAN-1812). */
+  flywheelRunId?: string;
+
   /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
   reviewSubRole?: string;
   reviewRunId?: string;
@@ -1100,6 +1103,17 @@ function clearFailureTrackingFields(state: AgentState): void {
   delete state.lastFailureNextRetryAt;
 }
 
+/**
+ * Marker prefix used by the flywheel orchestrator when pausing an agent solely
+ * to free a governor work slot. Pauses for this reason must never leave the
+ * agent troubled (PAN-1812).
+ */
+export const GOVERNOR_SLOT_PAUSE_REASON_PREFIX = '[governor-slot]';
+
+function isGovernorSlotPauseReason(reason: string | undefined): boolean {
+  return reason !== undefined && reason.startsWith(GOVERNOR_SLOT_PAUSE_REASON_PREFIX);
+}
+
 /** Sets the persistent manual pause gate used before stopping or suppressing resume. */
 function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false): void {
   if (!state.paused) {
@@ -1113,6 +1127,14 @@ function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = f
     delete state.pausedReason;
   } else {
     state.pausedReason = reason;
+  }
+
+  // PAN-1812: a governor slot pause is a resource-hygiene action, not a fault.
+  // Clear any existing troubled gate so the agent remains resumable when a slot
+  // frees.
+  if (isGovernorSlotPauseReason(reason)) {
+    delete state.troubled;
+    delete state.troubledAt;
   }
 }
 

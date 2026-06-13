@@ -94,7 +94,7 @@ describe('checkOpenBeads', () => {
     expect(result[1]).toContain('untitled');
   });
 
-  it('passes the issueId lowercased in the bd args', async () => {
+  it('passes the issueId lowercased as a title-contains filter', async () => {
     let capturedArgs: string[] = [];
     mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
       capturedArgs = args;
@@ -103,6 +103,7 @@ describe('checkOpenBeads', () => {
 
     const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-714'));
+    expect(capturedArgs).toContain('--title-contains');
     expect(capturedArgs).toContain('pan-714');
   });
 
@@ -148,5 +149,17 @@ describe('checkOpenBeads', () => {
     const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
     expect(result.length).toBe(1);
     expect(result[0]).toMatch(/invalid output/);
+  });
+
+  it('returns a blocking failure when bd times out (PAN-1812)', async () => {
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      const err = Object.assign(new Error('bd list timed out'), { killed: true, signal: 'SIGKILL' });
+      cb(err, { stdout: '', stderr: '' });
+    });
+
+    const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
+    const result = await Effect.runPromise(checkOpenBeads('/fake/workspace', 'PAN-1'));
+    expect(result.length).toBe(1);
+    expect(result[0]).toMatch(/Open beads check timed out/);
   });
 });

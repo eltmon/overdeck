@@ -36,6 +36,8 @@ export interface ConcurrencyLimits {
   reservedAdvancingSlots: number;
   /** Overall ceiling for any auto-dispatch: work cap + reserved advancing slots. */
   totalCeiling: number;
+  /** Whether operator-started agents are exempt from governor reaping (PAN-1812). */
+  exemptOperatorStarted: boolean;
 }
 
 function normalizeCount(value: unknown, fallback: number, min: number): number {
@@ -52,6 +54,7 @@ export function getConcurrencyLimits(): ConcurrencyLimits {
     maxWorkAgents,
     reservedAdvancingSlots,
     totalCeiling: maxWorkAgents + reservedAdvancingSlots,
+    exemptOperatorStarted: c?.exempt_operator_started ?? true,
   };
 }
 
@@ -165,16 +168,22 @@ export interface BrakeResult {
 }
 
 export function emergencyBrake(): BrakeResult {
-  const { maxWorkAgents } = getConcurrencyLimits();
+  const { maxWorkAgents, exemptOperatorStarted } = getConcurrencyLimits();
   const runningWork = listRunningAgentsSync().filter(a => a.tmuxActive && a.role === 'work');
   const excess = runningWork.length - maxWorkAgents;
   if (excess <= 0) {
     return { before: runningWork.length, cap: maxWorkAgents, stopped: [], remaining: runningWork.length };
   }
 
+  // PAN-1812: operator-started work agents (no flywheelRunId) are exempt from
+  // automatic governor reaping when the config flag is enabled.
+  const candidates = exemptOperatorStarted
+    ? runningWork.filter(a => a.flywheelRunId !== undefined && a.flywheelRunId !== null && a.flywheelRunId !== '')
+    : runningWork;
+
   // Stop the least-productive first: idle agents ahead of active ones, and among
   // equals the stalest (oldest lastActivity) first.
-  const ordered = [...runningWork].sort((a, b) => {
+  const ordered = [...candidates].sort((a, b) => {
     const aIdle = getAgentRuntimeStateSync(a.id)?.state === 'idle' ? 0 : 1;
     const bIdle = getAgentRuntimeStateSync(b.id)?.state === 'idle' ? 0 : 1;
     if (aIdle !== bIdle) return aIdle - bIdle;
