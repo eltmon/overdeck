@@ -1,0 +1,365 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T14:53:29.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1817: surface tracker-quota exhaustion as a health signal + idle-stack-reaper regression test",
+    "updated": "2026-06-13T14:57:19.465Z"
+  },
+  "plan": {
+    "id": "pan-1817",
+    "title": "Surface tracker-quota exhaustion as a health signal (+ idle-stack-reaper regression test)",
+    "status": "proposed",
+    "uid": "3903d9d8-46b4-4b59-b37d-0f7561e61724",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T14:53:29.000Z",
+    "updated": "2026-06-13T14:57:19.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1817",
+        "label": "PAN-1817",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1821",
+        "label": "PAN-1821 (Linear updateRateLimit — out of scope)",
+        "type": "related"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1823",
+        "label": "PAN-1823 (Linear 429 backoff — out of scope)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "observability",
+      "tracker",
+      "rate-limit",
+      "doctor",
+      "regression-test"
+    ],
+    "narratives": {
+      "Problem": "The Linear quota-burn root cause (18 workspace pollers sharing one 2500/hr key + un-reaped idle container stacks) is already fixed structurally on main and test-locked (92a82ed9a peer cache-only + skipPolling test; aafb1b43c idle-stack-reaper). What remains from the issue's asks is #4: when a tracker's quota IS exhausted, the dashboard error-loops silently ('[IssueDataService] Linear poll error: …') and downstream lifecycle ops (pan close/pan wipe) fail their tracker steps with no operator-visible signal, corrupting lifecycle bookkeeping silently. Asks #1/#5 are done; #2 is split to PAN-1821/PAN-1823; #3 is already satisfied (the poll is a single paginated GraphQL query, no per-issue fan-out).",
+      "Proposal": "Persist a per-tracker poll-health signal (ok/quota_exhausted/error + message + timestamp) in a new SQLite table in CacheService — the single source of truth readable by BOTH the in-process dashboard health service AND the out-of-process `pan doctor` CLI (which cannot see the dashboard's in-memory state.lastError). IssueDataService records the outcome on every poll (classifying rate-limit errors via /rate.?limit/i), clearing the signal on the next success. Surface it in two existing operator-facing places: a new `pan doctor` row, and a `warning` severity + reasons[] entry in /api/system/health (reusing the existing SystemHealthPill/HealthDashboard rendering — no new React component). GitHub additionally gets an early low-quota warning from its already-persisted rate_limits.remaining. Finally, close the regression gap the operator asked for: write the missing idle-stack-reaper unit test (the reaper ships a test-only reset hook but has zero test files).",
+      "NonGoals": "- Real Linear 429 backoff / proactive updateRateLimit('linear', …) header parsing — that is PAN-1821 / PAN-1823.\n- Eliminating per-issue Linear fan-out — none exists; the poll is already batched paginated GraphQL.\n- Stripping LINEAR_API_KEY from the peer server compose service — deliberately not done; peer routes legitimately use the Linear client for on-demand reads/mutations.\n- New dashboard React components — reuse SystemHealthPill / HealthDashboard which already render severity + reasons[].\n- A new poller-count regression test — the existing skipPolling suite already locks 'host polls / peer doesn't' on both branches.\n- Writing Linear data into the rate_limits table — that table stays GitHub-only here to avoid colliding with PAN-1821."
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "poll-health-store",
+        "title": "Add a persisted per-tracker poll-health store to CacheService",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:53:29.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1817",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "record-poll-outcomes",
+            "dashboard-health-signal",
+            "doctor-quota-check"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/cache-service.ts add a new `tracker_poll_health` table (columns: tracker TEXT PRIMARY KEY, status TEXT, message TEXT, observed_at TEXT) inside createSchema() alongside the existing rate_limits table (around cache-service.ts:80). Add `recordPollHealth(tracker, { status, message })` (INSERT … ON CONFLICT(tracker) DO UPDATE — upsert, stamping observed_at) and `getPollHealth(tracker): PollHealth | null` mirroring the existing updateRateLimit/getRateLimit pair (cache-service.ts:289-322). Export a PollHealthStatus = 'ok' | 'quota_exhausted' | 'error' type and a PollHealth interface { status, message, observedAt }. This is the foundation API the recording, dashboard-health, and doctor beads all consume — keep the method signatures stable."
+        },
+        "items": [
+          {
+            "id": "poll-health-store.ac1",
+            "title": "recordPollHealth persists a tracker_poll_health row that getPollHealth returns with the same status and message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-health-store.ac2",
+            "title": "getPollHealth returns null for a tracker with no recorded poll outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-health-store.ac3",
+            "title": "A second recordPollHealth for the same tracker persists (upserts) the latest status, and getPollHealth returns only the newest row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-health-store.ac4",
+            "title": "createSchema creates tracker_poll_health idempotently (CREATE TABLE IF NOT EXISTS) and preserves the existing rate_limits schema unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "record-poll-outcomes",
+        "title": "Record poll outcomes (incl. rate-limit classification) from IssueDataService",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:53:29.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1817",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-data-service.ts add a private helper recordPollOutcome(tracker, error?) that classifies the error (case-insensitive /rate.?limit/i on err.message => 'quota_exhausted'; other error => 'error'; no error => 'ok') and calls this.cache.recordPollHealth(tracker, …). Call it in the success path and catch block of each poll method: pollLinear (success ~995, catch 1004-1007), pollGitHub (success 809, per-repo catch 797-799), pollRally (success 1353, catch 1362-1367). Because polling only runs on the host poller (peers run with skipPolling and never invoke these methods), peers record nothing. Do NOT call updateRateLimit('linear', …) — the rate_limits table stays GitHub-only here (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "record-poll-outcomes.ac1",
+            "title": "A Linear poll error whose message matches /rate.?limit/i persists poll health status 'quota_exhausted' for linear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-poll-outcomes.ac2",
+            "title": "A non-rate-limit Linear poll error persists poll health status 'error' for linear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-poll-outcomes.ac3",
+            "title": "A successful Linear poll persists poll health status 'ok', clearing any prior quota_exhausted signal (FR-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-poll-outcomes.ac4",
+            "title": "start({ skipPolling: true }) persists no poll health for any tracker — peers never poll (NFR-2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-poll-outcomes.ac5",
+            "title": "pollLinear preserves the rate_limits table unchanged for linear — updateRateLimit is not called (NFR-1)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-health-signal",
+        "title": "Raise /api/system/health severity + reason on tracker-quota exhaustion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:53:29.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1817",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/system-health-service.ts, read the persisted poll health (cache.getPollHealth('linear'|'github'|'rally')) and GitHub remaining (cache.getRateLimit('github')) inside refreshSystemHealth (~583), treating any record older than a staleness window (e.g. 2× the poll interval) as no-signal. Pass a trackerQuota summary into evaluateSeverity (443-491) so a quota_exhausted tracker — or GitHub remaining at/near zero — appends a warning reason like 'Linear API quota exhausted — poller is rate-limited; lifecycle tracker steps may fail.'. Add a trackerQuota field to SystemHealthSnapshot in both system-health-service.ts (interface ~102) and src/dashboard/frontend/src/types.ts (~330). No new React component — SystemHealthPill (renders severity + reasons[0]) and HealthDashboard already display the reason."
+        },
+        "items": [
+          {
+            "id": "dashboard-health-signal.ac1",
+            "title": "A recent linear quota_exhausted record raises /api/system/health severity to at least 'warning' and produces a reasons[] entry naming Linear quota exhaustion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-health-signal.ac2",
+            "title": "GitHub rate_limits remaining at zero raises severity to at least 'warning' and produces a reasons[] entry naming GitHub quota",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-health-signal.ac3",
+            "title": "With all trackers OK or no signal, refreshSystemHealth produces no tracker-quota reason and tracker state does not raise severity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-health-signal.ac4",
+            "title": "A quota_exhausted record older than the staleness window preserves normal severity — the signal is not sticky (FR-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-quota-check",
+        "title": "Add a tracker-quota row to `pan doctor`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:53:29.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1817",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/doctor.ts add an exported checkTrackerQuota(): CheckResult[] (mirroring checkClosedIssueOrphanAgentDirs at 238 and getCachedIssueRowsForDoctor at 226: construct `new CacheService()` and read getPollHealth(tracker) for github/linear/rally plus getRateLimit('github')). Return 'warn' (or 'error') with a fix hint when a tracker reports quota_exhausted or GitHub remaining is at/near zero, and 'ok' otherwise. Wire it into doctorCommand alongside the other checks.push(...) calls (~723-727). Treat stale records as no-signal, consistent with the dashboard bead."
+        },
+        "items": [
+          {
+            "id": "doctor-quota-check.ac1",
+            "title": "pan doctor renders a non-OK (warn/error) row naming the Linear quota with a fix hint when linear poll health is quota_exhausted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-quota-check.ac2",
+            "title": "pan doctor renders a non-OK row naming GitHub quota when rate_limits remaining is at/near zero",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-quota-check.ac3",
+            "title": "pan doctor renders an OK tracker-quota row when no tracker reports a quota signal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-quota-check.ac4",
+            "title": "doctorCommand emits the checkTrackerQuota result into its printed checks list (the check is wired in, not dead code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reaper-regression-test",
+        "title": "Add the missing idle-stack-reaper unit test (regression hardening)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:53:29.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1817",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/__tests__/idle-stack-reaper.test.ts exercising reconcileIdleWorkspaceStacks (src/lib/cloister/idle-stack-reaper.ts) via injected IdleStackReaperDeps + __resetIdleStackReaperState() between cases. The reaper currently ships the test-only reset hook but has NO test file. Cover: (1) idle < graceMs => not reaped; (2) idle >= graceMs => server+frontend stop issued; (3) running agent / live tmux => never reaped; (4) grace clock resets when UI containers disappear; (5) PANOPTICON_DISABLE_STACK_REAPER short-circuits the patrol. Use injected deps/clock — do not rely on real wall-clock timers."
+        },
+        "items": [
+          {
+            "id": "reaper-regression-test.ac1",
+            "title": "reconcileIdleWorkspaceStacks preserves a workspace idle less than graceMs (no container stop issued)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-regression-test.ac2",
+            "title": "reconcileIdleWorkspaceStacks closes (stops) the server+frontend containers of a workspace idle longer than graceMs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-regression-test.ac3",
+            "title": "reconcileIdleWorkspaceStacks preserves a workspace with a running agent or live tmux regardless of elapsed idle time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-regression-test.ac4",
+            "title": "The grace clock resets when a workspace's UI containers disappear, and PANOPTICON_DISABLE_STACK_REAPER causes reconcileIdleWorkspaceStacks to exit without reaping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "poll-health-store",
+        "to": "record-poll-outcomes",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-health-store",
+        "to": "dashboard-health-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-health-store",
+        "to": "doctor-quota-check",
+        "type": "blocks"
+      },
+      {
+        "from": "record-poll-outcomes",
+        "to": "dashboard-health-signal",
+        "type": "informs"
+      },
+      {
+        "from": "record-poll-outcomes",
+        "to": "doctor-quota-check",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1817-surface-tracker-quota-exhaustion-as-a-health-signal-idle-stack-reaper-regression-test.vbrief.json"
+    }
+  }
+}
