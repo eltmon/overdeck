@@ -93,6 +93,20 @@
     .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
     .chip.refine { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
     .chip.stale { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+    .chip.promoted { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+    .chip.held { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+    .node.gate-blocked { opacity: .82; }
+    .node.gate-promoted { border-top: 2px solid color-mix(in srgb, var(--primary) 60%, transparent); }
+    /* pickup gate segmented control in the rationale panel */
+    .gate-row { border-top: 1px solid var(--border); padding-top: 13px; margin-bottom: 13px; }
+    .gate-row .glbl { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); margin-bottom: 7px; }
+    .gate-seg { display: flex; border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; }
+    .gate-seg button { flex: 1; background: transparent; border: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 500; padding: 6px 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-right: 1px solid var(--input); }
+    .gate-seg button:last-child { border-right: none; }
+    .gate-seg button.on-auto { background: var(--accent); color: var(--foreground); }
+    .gate-seg button.on-ready { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--foreground); }
+    .gate-seg button.on-block { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning-foreground); }
+    .gate-hint { font-size: 11px; color: var(--muted-foreground); margin-top: 7px; line-height: 1.45; }
     .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
     .chip.verb.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
     .chip.verb.review { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
@@ -244,7 +258,7 @@
         </div>
 
         <div class="footnote">
-          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
+          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. <b>In-pipeline issues are pinned</b> — never re-ranked under you. Each issue also carries an <b>operator pickup gate</b> (Auto / <span style="color:var(--foreground)">📌 Ready</span> / <span style="color:var(--warning-foreground)">⛔ Block</span>, see the rationale panel): <b>Ready</b> promotes it for auto-pickup, <b>Block</b> holds it out and sets a parked label — and when <code>auto_pickup_backlog</code> is on, the <b>Flywheel pulls the highest-ranked eligible issue straight from this sequence</b> instead of oldest-first. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
         </div>
       </div>
     </div>
@@ -259,7 +273,7 @@
       { id:'PAN-1801', rank:2,  size:'m',  imp:'high', score:88, deps:['PAN-1665'],  pipe:null,     ready:true,  prd:true,
         title:'Relay CI check failures back to the work agent',
         why:'Work agents fly blind on red checks today. Cheap, high-impact, already fully planned (vBRIEF + beads on disk).' },
-      { id:'PAN-1491', rank:3,  size:'m',  imp:'high', score:84, deps:[],            pipe:null,     ready:false, prd:true,
+      { id:'PAN-1491', rank:3,  size:'m',  imp:'high', score:84, deps:[],            pipe:null,     ready:false, prd:true,  gate:'ready',
         title:'Metric-aware flywheel prioritization',
         why:'Compounding leverage: once the flywheel ranks by outcome metrics, every later pick gets better. Independent of the throttle work.' },
       { id:'PAN-1666', rank:4,  size:'l',  imp:'high', score:81, deps:['PAN-1665'],  pipe:'review', ready:false, prd:false,
@@ -274,7 +288,7 @@
       { id:'PAN-1691', rank:7,  size:'l',  imp:'med',  score:69, deps:['PAN-1666'],  pipe:'plan',   ready:false, prd:true,
         title:'Merge-train engine + v3 flywheel UI',
         why:'Builds on the un-freeze. Being planned now; large surface, so it sits behind the rollout it depends on.' },
-      { id:'PAN-1737', rank:8,  size:'xl', imp:'med',  score:64, deps:['PAN-1666','PAN-1781'], pipe:null, ready:false, prd:true,
+      { id:'PAN-1737', rank:8,  size:'xl', imp:'med',  score:64, deps:['PAN-1666','PAN-1781'], pipe:null, ready:false, prd:true, gate:'blocked',
         title:'UAT batch trains — assemble and promote generations',
         why:'Biggest single item (XL). High value but expensive; consumes the un-freeze and informs from the compact-boundary fix.' },
       { id:'PAN-1705', rank:9,  size:'m',  imp:'med',  score:58, deps:['PAN-1674'],  pipe:null,     ready:false, prd:false,
@@ -331,9 +345,11 @@
     for (const n of NODES) {
       const [x,y] = POS[n.id];
       const el = document.createElement('div');
-      el.className = `node ${n.size} ${n.imp}` + (n.pipe ? ` pipe phase-${n.pipe}` : '') + (n.cond && n.cond!=='ok' ? ` cond-${n.cond}` : '');
+      el.className = `node ${n.size} ${n.imp}` + (n.pipe ? ` pipe phase-${n.pipe}` : '') + (n.cond && n.cond!=='ok' ? ` cond-${n.cond}` : '') + (n.gate==='blocked' ? ' gate-blocked' : '') + (n.gate==='ready' ? ' gate-promoted' : '');
       el.id = 'node-' + n.id; el.style.left = x+'px'; el.style.top = y+'px';
       const chips = [];
+      if (n.gate==='ready')  chips.push(`<span class="chip promoted">📌 PROMOTED</span>`);
+      if (n.gate==='blocked')chips.push(`<span class="chip held">⛔ HELD</span>`);
       if (n.pipe)            chips.push(`<span class="chip verb ${n.pipe}"><span class="pulsedot"></span>${PHASE_LABEL[n.pipe]}</span>`);
       if (n.cond==='refine') chips.push(`<span class="chip refine">⚠ REFINE</span>`);
       if (n.cond==='stale')  chips.push(`<span class="chip stale">⊘ STALE</span>`);
@@ -367,6 +383,10 @@
       document.querySelectorAll('.node.selected').forEach(e => e.classList.remove('selected'));
       const el = document.getElementById('node-'+id); if (el) el.classList.add('selected');
       const n = byId[id];
+      const gate = n.gate || 'auto';
+      const gateHint = gate==='ready' ? 'Promoted: eligible for auto-pickup now, even ahead of heuristics.'
+                     : gate==='blocked' ? 'Held: the Flywheel will not auto-pick this; Block also sets a parked label.'
+                     : 'Auto: normal eligibility (ready · not blocked · passes the security filter).';
       const flags = [];
       if (n.pipe)            flags.push(`<span class="chip verb ${n.pipe}"><span class="pulsedot"></span>in pipeline · ${PHASE_LABEL[n.pipe]}</span>`);
       if (n.cond==='refine') flags.push(`<span class="chip refine">⚠ needs refinement</span>`);
@@ -389,6 +409,15 @@
           <span class="k">Depends on</span><span class="v mono">${n.deps.length ? n.deps.join(', ') : '— none'}</span>
         </div>
         <div class="r-flags">${flags.join('')}</div>
+        <div class="gate-row">
+          <div class="glbl">Pickup gate · operator</div>
+          <div class="gate-seg">
+            <button class="${gate==='auto'?'on-auto':''}">Auto</button>
+            <button class="${gate==='ready'?'on-ready':''}">✓ Ready</button>
+            <button class="${gate==='blocked'?'on-block':''}">⛔ Block</button>
+          </div>
+          <div class="gate-hint">${gateHint}</div>
+        </div>
         <div class="r-body"><div class="why">AI rationale · from sequence.md</div>${n.why}</div>`;
     }
 
@@ -404,7 +433,7 @@
       </div>`).join('');
 
     drawEdges();
-    select('PAN-1665');
+    select('PAN-1491');
     window.addEventListener('resize', drawEdges);
   </script>
 </body>
