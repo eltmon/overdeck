@@ -16,7 +16,7 @@ import { withBdMutexPromise } from '../bd-mutex.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
-import { subItemsOf, type VBriefDocument, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefEdge, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -190,6 +190,88 @@ export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions =
     }
   }
   throw lastError;
+}
+
+/**
+ * Post-condition verification for dependency edges.
+ *
+ * Issues one batched `bd dep list` over all created bead IDs, compares the
+ * actual `blocks` dependencies against plan.edges, and repairs any missing edge
+ * with `bd dep add`. Edges whose endpoints were not both captured are reported
+ * as errors and not repaired. After repairs, any edge that is still missing
+ * causes success:false so finalize exits non-zero rather than silently shipping
+ * a corrupt DAG.
+ */
+async function verifyAndRepairDependencyEdges(
+  workspacePath: string,
+  planEdges: VBriefEdge[],
+  beadIds: Map<string, string>,
+  timeoutMs: number,
+): Promise<{ success: boolean; errors: string[] }> {
+  const blockEdges = planEdges.filter(edge => edge.type === 'blocks');
+  if (blockEdges.length === 0 || beadIds.size === 0) {
+    return { success: true, errors: [] };
+  }
+
+  const createdBeadIds = Array.from(new Set(beadIds.values()));
+
+  let actualDeps: any[];
+  try {
+    const { stdout } = await retryBd(() => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
+      encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+    }));
+    actualDeps = parseBdList(stdout);
+  } catch (error: any) {
+    return { success: false, errors: [`dep list failed: ${execFileErrorMessage(error)}`] };
+  }
+
+  const isBlocksDep = (dep: any) =>
+    dep?.dependency_type === 'blocks' || dep?.type === 'blocks' || dep?.relationship === 'blocks';
+  const actualDepSet = new Set(
+    actualDeps
+      .filter(isBlocksDep)
+      .map(dep => `${dep.issue_id}|${dep.id}`),
+  );
+
+  const errors: string[] = [];
+  const missingRepairs: Array<{ from: string; to: string; beadFrom: string; beadTo: string }> = [];
+
+  for (const edge of blockEdges) {
+    const beadFrom = beadIds.get(edge.from);
+    const beadTo = beadIds.get(edge.to);
+    if (!beadFrom || !beadTo) {
+      errors.push(`Missing bead IDs for dependency edge ${edge.from} -> ${edge.to}`);
+      continue;
+    }
+    const key = `${beadTo}|${beadFrom}`;
+    if (!actualDepSet.has(key)) {
+      missingRepairs.push({ from: edge.from, to: edge.to, beadFrom, beadTo });
+    }
+  }
+
+  for (const repair of missingRepairs) {
+    try {
+      await retryBd(() => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+      }));
+      actualDepSet.add(`${repair.beadTo}|${repair.beadFrom}`);
+    } catch (error: any) {
+      errors.push(`Failed to repair dependency edge ${repair.from} -> ${repair.to}: ${execFileErrorMessage(error)}`);
+    }
+  }
+
+  // Any edge still missing after repair attempts is a hard failure.
+  for (const edge of blockEdges) {
+    const beadFrom = beadIds.get(edge.from);
+    const beadTo = beadIds.get(edge.to);
+    if (!beadFrom || !beadTo) continue;
+    const key = `${beadTo}|${beadFrom}`;
+    if (!actualDepSet.has(key)) {
+      errors.push(`Dependency edge ${edge.from} -> ${edge.to} still missing after repair`);
+    }
+  }
+
+  return { success: errors.length === 0, errors };
 }
 
 export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
@@ -530,6 +612,17 @@ async function createBeadsFromVBriefPromise(
       }
     }
   }
+
+  // Verify dependency edges as a post-condition. A create that timed out and was
+  // recovered, or contention that dropped the --deps argument, can leave the DAG
+  // incomplete. Repair any missing edges before declaring success.
+  const edgeVerification = await verifyAndRepairDependencyEdges(
+    workspacePath,
+    planEdges,
+    beadIds,
+    bdTimeoutMs,
+  );
+  errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
   });

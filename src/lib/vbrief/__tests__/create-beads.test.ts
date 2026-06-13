@@ -638,7 +638,8 @@ describe('createBeadsFromVBrief', () => {
         .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                        // post-delete list
         .mockRejectedValueOnce(timeoutError)                                        // bd create item-a times out
         .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: 'bead-a', title: 'PAN-511: Alpha task' }]), stderr: '' }) // recovery list
-        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' });                 // bd create item-b
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })                  // bd create item-b
+        .mockResolvedValueOnce({ stdout: JSON.stringify([{ issue_id: 'bead-b', id: 'bead-a', dependency_type: 'blocks' }]), stderr: '' }); // dep list verification
 
       const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
 
@@ -850,6 +851,136 @@ describe('createBeadsFromVBrief', () => {
       expect(fn).toHaveBeenCalledTimes(3);
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('verify and repair dependency edges after creation', () => {
+    function makeDocWithDeps(planId: string): VBriefDocument {
+      return {
+        vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+        plan: {
+          id: planId,
+          title: `${planId} Dep Plan`,
+          status: 'active',
+          items: [
+            { id: 'item-a', title: 'Alpha task', status: 'pending', metadata: { difficulty: 'simple', issueLabel: planId.toLowerCase() } },
+            { id: 'item-b', title: 'Beta task', status: 'pending', metadata: { difficulty: 'simple', issueLabel: planId.toLowerCase() } },
+          ],
+          edges: [{ type: 'blocks' as const, from: 'item-a', to: 'item-b' }],
+        },
+      };
+    }
+
+    it('repairs a missing blocks edge with bd dep add (AC1)', async () => {
+      const ws = createWorkspace('PAN-518');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-518', makeDocWithDeps('PAN-518'));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-a\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                  // dep list: edge missing
+        .mockResolvedValueOnce({ stdout: '', stderr: '' });                   // dep add repair
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      const depAddCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'dep' && args[1] === 'add',
+      );
+      expect(depAddCalls).toHaveLength(1);
+      expect(depAddCalls[0][1]).toEqual(['dep', 'add', 'bead-b', 'bead-a']);
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('issues no dep add when dep list already contains the edge (AC2)', async () => {
+      const ws = createWorkspace('PAN-519');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-519', makeDocWithDeps('PAN-519'));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-a\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([{ issue_id: 'bead-b', id: 'bead-a', dependency_type: 'blocks' }]),
+          stderr: '',
+        });
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      const depAddCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'dep' && args[1] === 'add',
+      );
+      expect(depAddCalls).toHaveLength(0);
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('fails when dep add repair fails (AC3)', async () => {
+      vi.useFakeTimers();
+      const ws = createWorkspace('PAN-520');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-520', makeDocWithDeps('PAN-520'));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-a\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockRejectedValueOnce(new Error('dep add failed'))
+        .mockRejectedValueOnce(new Error('dep add failed'))
+        .mockRejectedValueOnce(new Error('dep add failed'));
+
+      const resultPromise = Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+      await vi.advanceTimersByTimeAsync(10000);
+      const result = await resultPromise;
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(error => error.includes('item-a') && error.includes('item-b'))).toBe(true);
+
+      vi.useRealTimers();
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('skips verification when plan has zero blocks edges (AC4)', async () => {
+      const ws = createWorkspace('PAN-521');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-521', makeDoc('PAN-521', [{ id: 'item-1', title: 'Solo task' }]));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-solo\n', stderr: '' });
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+
+      const depCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'dep',
+      );
+      expect(depCalls).toHaveLength(0);
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
     });
   });
 
